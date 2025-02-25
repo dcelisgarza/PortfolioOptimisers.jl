@@ -20,7 +20,7 @@ If you use PortfolioOptimisers.jl in your work, please cite using the reference 
 
 ## Contributing
 
-If you want to make contributions of any kind, please first that a look into our [contributing guide directly on GitHub](docs/src/90-contributing.md) or the [contributing page on the website](https://dcelisgarza.github.io/PortfolioOptimisers.jl/dev/90-contributing/)
+If you want to make contributions of any kind, please first that a look into our [contributing guide directly on GitHub](docs/src/90-contributing.md) or the [contributing page on the website](https://dcelisgarza.github.io/PortfolioOptimisers.jl/docs/90-contributing/)
 
 * * *
 
