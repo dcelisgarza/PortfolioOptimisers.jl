@@ -1,0 +1,7 @@
+name = "PortfolioOptimisers"
+uuid = "fa682b3e-00c5-5c62-9cc2-3773ac6947ae"
+authors = ["Daniel Celis Garza <daniel.celis.garza@gmail.com>"]
+version = "0.1.0"
+
+[compat]
+julia = "1.10"
