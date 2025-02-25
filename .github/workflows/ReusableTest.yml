@@ -26,6 +26,8 @@ on:
     secrets:
       codecov_token:
         required: true
+      coveralls_token:
+        required: true
 
 jobs:
   test:
@@ -50,3 +52,6 @@ jobs:
         with:
           file: lcov.info
           token: ${{ secrets.codecov_token }}
+      - uses: julia-actions/julia-uploadcoveralls@latest
+        env:
+          token: ${{ secrets.coveralls_token }}
