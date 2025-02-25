@@ -53,5 +53,5 @@ jobs:
           file: lcov.info
           token: ${{ secrets.codecov_token }}
       - uses: julia-actions/julia-uploadcoveralls@latest
-        with:
-          token: ${{ secrets.coveralls_token }}
+        env:
+          COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
