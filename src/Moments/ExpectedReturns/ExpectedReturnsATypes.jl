@@ -1,0 +1,3 @@
+abstract type ExpectedReturnsEstimator end
+abstract type ShrunkExpectedReturnEstimator <: ExpectedReturnsEstimator end
+abstract type ShrunkExpectedReturnsTarget end
