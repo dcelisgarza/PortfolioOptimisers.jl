@@ -1,6 +1,6 @@
-struct DefaultMatrixProcess <: MatrixProcess end
+struct DefaultMatrixProcessing <: MatrixProcessing end
 
-function mtx_process!(::DefaultMatrixProcess, ce, X::AbstractMatrix, T, N, args...;
+function mtx_process!(::DefaultMatrixProcessing, ce, X::AbstractMatrix, T, N, args...;
                       kwargs...)
     # posdef_fix!(ce.posdef, X)
     # denoise!(ce.denoise, ce.posdef, X, T / N)
@@ -9,4 +9,4 @@ function mtx_process!(::DefaultMatrixProcess, ce, X::AbstractMatrix, T, N, args.
     return nothing
 end
 
-export DefaultMatrixProcess
+export DefaultMatrixProcessing

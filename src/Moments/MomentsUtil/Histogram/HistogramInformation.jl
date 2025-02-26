@@ -1,47 +1,3 @@
-struct B_Knuth <: AstroPyBins end
-struct B_FreedmanDiaconis <: AstroPyBins end
-struct B_Scott <: AstroPyBins end
-struct B_HacineGharbiRavier <: AbstractBins end
-
-function get_bin_width_func(::B_Knuth)
-    return pyimport("astropy.stats").knuth_bin_width
-end
-function get_bin_width_func(::B_FreedmanDiaconis)
-    return pyimport("astropy.stats").freedman_bin_width
-end
-function get_bin_width_func(::B_Scott)
-    return pyimport("astropy.stats").scott_bin_width
-end
-function get_bin_width_func(::Union{B_HacineGharbiRavier, <:Integer})
-    return nothing
-end
-function calc_num_bins(::AstroPyBins, xj::AbstractVector, xi::AbstractVector, j::Integer,
-                       i::Integer, bin_width_func, ::Any)
-    xjl, xju = extrema(xj)
-    k1 = (xju - xjl) / pyconvert(eltype(xj), bin_width_func(Py(xj).to_numpy()))
-    return round(Int,
-                 if j != i
-                     xil, xiu = extrema(xi)
-                     k2 = (xiu - xil) /
-                          pyconvert(eltype(xi), bin_width_func(Py(xi).to_numpy()))
-                     max(k1, k2)
-                 else
-                     k1
-                 end)
-end
-function calc_num_bins(::B_HacineGharbiRavier, xj::AbstractVector, xi::AbstractVector,
-                       j::Integer, i::Integer, ::Any, T::Integer)
-    corr = cor(xj, xi)
-    return round(Int, if isone(corr)
-                     z = cbrt(8 + 324 * T + 12 * sqrt(36 * T + 729 * T^2))
-                     z / 6 + 2 / (3 * z) + 1 / 3
-                 else
-                     sqrt(1 + sqrt(1 + 24 * T / (1 - corr^2))) / sqrt(2)
-                 end)
-end
-function calc_num_bins(bins::Integer, args...)
-    return bins
-end
 function calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
     bp1 = bins + one(bins)
 
@@ -189,5 +145,3 @@ function mutual_info(X::AbstractMatrix,
 
     return mut_mtx
 end
-
-export B_Knuth, B_FreedmanDiaconis, B_Scott, B_HacineGharbiRavier

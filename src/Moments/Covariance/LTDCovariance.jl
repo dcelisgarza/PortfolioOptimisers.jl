@@ -1,16 +1,13 @@
 
-mutable struct LTDCovariance{T1 <: Real, T2 <: PortfolioOptimisersVarianceEstimator,
-                             T3 <: Union{Nothing, <:AbstractWeights}} <:
+mutable struct LTDCovariance{T1 <: PortfolioOptimisersVarianceEstimator, T2 <: Real} <:
                PortfolioOptimisersCovarianceEstimator
-    alpha::T1
-    ve::T2
-    w::T3
+    ve::T1
+    alpha::T2
 end
-function LTDCovariance(; alpha::Real = 0.05,
-                       ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
-                       w::Union{Nothing, <:AbstractWeights} = nothing)
+function LTDCovariance(; ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
+                       alpha::Real = 0.05)
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    return LTDCovariance{typeof(alpha), typeof(ve), typeof(w)}(alpha, ve, w)
+    return LTDCovariance{typeof(ve), typeof(alpha)}(ve, alpha)
 end
 
 function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05)
@@ -46,11 +43,7 @@ function StatsBase.cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1)
     if dims == 2
         X = transpose(X)
     end
-    std_vec = vec(if isnothing(ce.w)
-                      std(ce.ve, X; dims = 1)
-                  else
-                      std(ce.ve, X, ce.w; dims = 1)
-                  end)
+    std_vec = std(ce.ve, X; dims = 1)
     return lower_tail_dependence(X, ce.alpha) .* (std_vec ⊗ std_vec)
 end
 

@@ -8,19 +8,41 @@
         ew = eweights(1:100, 0.3; scale = true)
 
         ces = [FullCovariance(),
-               FullCovariance(; ce = SimpleCovariance(; corrected = false), w = ew),
-               FullCovariance(; ce = AnalyticalNonlinearShrinkage()),
-               FullCovariance(; ce = AnalyticalNonlinearShrinkage(), w = fw),
-               SemiCovariance(),
-               SemiCovariance(; ce = SimpleCovariance(; corrected = false), w = ew),
-               SemiCovariance(; ce = AnalyticalNonlinearShrinkage()),
-               SemiCovariance(; ce = AnalyticalNonlinearShrinkage(), w = fw),
-               SpearmanCovariance(), KendallCovariance(), MutualInfoCovariance(),
+               FullCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = SimpleCovariance(;
+                                                                                   corrected = false),
+                                                             w = ew)),
+               FullCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage())),
+               FullCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage(),
+                                                             w = fw)), SemiCovariance(),
+               SemiCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = SimpleCovariance(;
+                                                                                   corrected = false),
+                                                             w = ew)),
+               SemiCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage())),
+               SemiCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage(),
+                                                             w = fw)), SpearmanCovariance(),
+               KendallCovariance(), MutualInfoCovariance(),
                MutualInfoCovariance(; bins = B_Knuth()),
                MutualInfoCovariance(; bins = B_FreedmanDiaconis()),
                MutualInfoCovariance(; bins = B_Scott()), MutualInfoCovariance(; bins = 5),
-               MutualInfoCovariance(; ve = SimpleVariance(; corrected = false), w = ew),
-               DistanceCovariance(), DistanceCovariance(; w = ew), LTDCovariance()]
+               MutualInfoCovariance(; ve = SimpleVariance(; corrected = false, w = ew)),
+               DistanceCovariance(), DistanceCovariance(; w = ew), LTDCovariance(),
+               Gerber0Covariance(),
+               Gerber0Covariance(; ve = SimpleVariance(; corrected = false, w = ew)),
+               Gerber0NormalisedCovariance(),
+               Gerber0NormalisedCovariance(;
+                                           ve = SimpleVariance(; corrected = false, w = ew))]
 
         for (i, ce) ∈ pairs(ces)
             cv = cov(ce, X)
