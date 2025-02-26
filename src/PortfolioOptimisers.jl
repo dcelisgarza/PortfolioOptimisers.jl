@@ -69,6 +69,10 @@ include("./Moments/Covariance/GerberCovariance/GerberCovariance_AbstractTypes.jl
 include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/BaseGerberCovariance_AbstractTypes.jl")
 include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber0Covariance.jl")
 include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber0NormalisedCovariance.jl")
+include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber1Covariance.jl")
+include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber1NormalisedCovariance.jl")
+include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber2Covariance.jl")
+include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber2NormalisedCovariance.jl")
 
 ## Smyth Broby Covariance
 include("./Moments/Covariance/GerberCovariance/SmythBrobyCovariance/SmythBrobyCovariance_AbstractTypes.jl")

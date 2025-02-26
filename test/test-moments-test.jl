@@ -42,6 +42,16 @@
                Gerber0Covariance(; ve = SimpleVariance(; corrected = false, w = ew)),
                Gerber0NormalisedCovariance(),
                Gerber0NormalisedCovariance(;
+                                           ve = SimpleVariance(; corrected = false, w = ew)),
+               Gerber1Covariance(),
+               Gerber1Covariance(; ve = SimpleVariance(; corrected = false, w = ew)),
+               Gerber1NormalisedCovariance(),
+               Gerber1NormalisedCovariance(;
+                                           ve = SimpleVariance(; corrected = false, w = ew)),
+               Gerber2Covariance(),
+               Gerber2Covariance(; ve = SimpleVariance(; corrected = false, w = ew)),
+               Gerber2NormalisedCovariance(),
+               Gerber2NormalisedCovariance(;
                                            ve = SimpleVariance(; corrected = false, w = ew))]
 
         for (i, ce) ∈ pairs(ces)
