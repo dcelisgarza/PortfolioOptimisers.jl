@@ -1,5 +1,6 @@
 struct DistanceCovariance{T1 <: Distances.Metric, T2 <: Tuple, T3 <: NamedTuple,
-                          T4 <: Union{Nothing, <:AbstractWeights}} <: POCovarianceEstimator
+                          T4 <: Union{Nothing, <:AbstractWeights}} <:
+       PortfolioOptimisersCovarianceEstimator
     dist::T1
     args::T2
     kwargs::T3

@@ -1,14 +1,14 @@
 struct MutualInfoCovariance{T1 <: POVarianceEstimator,
                             T2 <: Union{<:Integer, <:AbstractBins}, T3 <: Bool,
                             T4 <: Union{Nothing, <:AbstractWeights}} <:
-       POCovarianceEstimator
+       PortfolioOptimisersCovarianceEstimator
     ve::T1
     bins::T2
     normalise::T3
     w::T4
 end
 function MutualInfoCovariance(; ve::POVarianceEstimator = SimpleVariance(),
-                              bins::Union{<:Integer, <:AbstractBins} = B_HGR(),
+                              bins::Union{<:Integer, <:AbstractBins} = B_HacineGharbiRavier(),
                               normalise::Bool = true,
                               w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(bins, Integer)

@@ -1,7 +1,7 @@
 
 mutable struct LTDCovariance{T1 <: Real, T2 <: POVarianceEstimator,
                              T3 <: Union{Nothing, <:AbstractWeights}} <:
-               POCovarianceEstimator
+               PortfolioOptimisersCovarianceEstimator
     alpha::T1
     ve::T2
     w::T3

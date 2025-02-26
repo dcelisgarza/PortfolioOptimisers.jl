@@ -4,16 +4,20 @@
     @testset "cov2cor" begin
         rng = StableRNG(123456789)
         X = randn(rng, 100, 10)
+        fw = FrequencyWeights(rand(rng, 100))
         ew = eweights(1:100, 0.3; scale = true)
 
         ces = [FullCovariance(),
                FullCovariance(; ce = SimpleCovariance(; corrected = false), w = ew),
-               FullCovariance(; ce = AnalyticalNonlinearShrinkage()), SemiCovariance(),
+               FullCovariance(; ce = AnalyticalNonlinearShrinkage()),
+               FullCovariance(; ce = AnalyticalNonlinearShrinkage(), w = fw),
+               SemiCovariance(),
                SemiCovariance(; ce = SimpleCovariance(; corrected = false), w = ew),
-               SemiCovariance(; ce = AnalyticalNonlinearShrinkage()), SpearmanCovariance(),
-               KendallCovariance(), MutualInfoCovariance(),
+               SemiCovariance(; ce = AnalyticalNonlinearShrinkage()),
+               SemiCovariance(; ce = AnalyticalNonlinearShrinkage(), w = fw),
+               SpearmanCovariance(), KendallCovariance(), MutualInfoCovariance(),
                MutualInfoCovariance(; bins = B_Knuth()),
-               MutualInfoCovariance(; bins = B_Freedman()),
+               MutualInfoCovariance(; bins = B_FreedmanDiaconis()),
                MutualInfoCovariance(; bins = B_Scott()), MutualInfoCovariance(; bins = 5),
                MutualInfoCovariance(; ve = SimpleVariance(; corrected = false), w = ew),
                DistanceCovariance(), DistanceCovariance(; w = ew), LTDCovariance()]

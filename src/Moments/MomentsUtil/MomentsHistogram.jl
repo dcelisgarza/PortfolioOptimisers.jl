@@ -1,18 +1,18 @@
 struct B_Knuth <: AstroBins end
-struct B_Freedman <: AstroBins end
+struct B_FreedmanDiaconis <: AstroBins end
 struct B_Scott <: AstroBins end
-struct B_HGR <: AbstractBins end
+struct B_HacineGharbiRavier <: AbstractBins end
 
 function get_bin_width_func(::B_Knuth)
     return pyimport("astropy.stats").knuth_bin_width
 end
-function get_bin_width_func(::B_Freedman)
+function get_bin_width_func(::B_FreedmanDiaconis)
     return pyimport("astropy.stats").freedman_bin_width
 end
 function get_bin_width_func(::B_Scott)
     return pyimport("astropy.stats").scott_bin_width
 end
-function get_bin_width_func(::Union{B_HGR, <:Integer})
+function get_bin_width_func(::Union{B_HacineGharbiRavier, <:Integer})
     return nothing
 end
 function calc_num_bins(::AstroBins, xj::AbstractVector, xi::AbstractVector, j::Integer,
@@ -29,8 +29,8 @@ function calc_num_bins(::AstroBins, xj::AbstractVector, xi::AbstractVector, j::I
                      k1
                  end)
 end
-function calc_num_bins(::B_HGR, xj::AbstractVector, xi::AbstractVector, j::Integer,
-                       i::Integer, ::Any, T::Integer)
+function calc_num_bins(::B_HacineGharbiRavier, xj::AbstractVector, xi::AbstractVector,
+                       j::Integer, i::Integer, ::Any, T::Integer)
     corr = cor(xj, xi)
     return round(Int, if isone(corr)
                      z = cbrt(8 + 324 * T + 12 * sqrt(36 * T + 729 * T^2))
@@ -88,7 +88,8 @@ function intrinsic_mutual_info(X::AbstractMatrix)
 
     return sum(mi)
 end
-function variation_info(X::AbstractMatrix, bins::Union{<:AbstractBins, <:Integer} = B_HGR(),
+function variation_info(X::AbstractMatrix,
+                        bins::Union{<:AbstractBins, <:Integer} = B_HacineGharbiRavier(),
                         normalise::Bool = true)
     T, N = size(X)
     var_mtx = Matrix{eltype(X)}(undef, N, N)
@@ -160,7 +161,8 @@ function mutual_variation_info(X::AbstractMatrix,
     return mut_mtx, var_mtx
 end
 =#
-function mutual_info(X::AbstractMatrix, bins::Union{<:AbstractBins, <:Integer} = B_HGR(),
+function mutual_info(X::AbstractMatrix,
+                     bins::Union{<:AbstractBins, <:Integer} = B_HacineGharbiRavier(),
                      normalise::Bool = true)
     T, N = size(X)
     mut_mtx = Matrix{eltype(X)}(undef, N, N)
@@ -188,4 +190,4 @@ function mutual_info(X::AbstractMatrix, bins::Union{<:AbstractBins, <:Integer} =
     return mut_mtx
 end
 
-export B_Knuth, B_Freedman, B_Scott, B_HGR
+export B_Knuth, B_FreedmanDiaconis, B_Scott, B_HacineGharbiRavier
