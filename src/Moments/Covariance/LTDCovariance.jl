@@ -50,7 +50,7 @@ function StatsBase.cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1)
                   else
                       std(ce.ve, X, ce.w; dims = 1)
                   end)
-    return lower_tail_dependence(X, ce.alpha) .* (std_vec * transpose(std_vec))
+    return lower_tail_dependence(X, ce.alpha) .* (std_vec ⊗ std_vec)
 end
 
 export LTDCovariance

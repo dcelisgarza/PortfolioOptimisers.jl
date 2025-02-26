@@ -30,6 +30,21 @@
                 println("Test $i fails on:\n$(ce)\n")
             end
             @test result
+
+            cvt = cov(ce, Matrix(transpose(X)); dims = 2)
+            crt = cor(ce, Matrix(transpose(X)); dims = 2)
+            resultt = isapprox(if isa(cvt, Matrix)
+                                   StatsBase.cov2cor(cvt)
+                               else
+                                   StatsBase.cov2cor(Matrix(cvt))
+                               end, crt)
+            if !resultt
+                println("Test `dims = 2` $i fails on:\n$(ce)\n")
+            end
+            @test resultt
+
+            @test isapprox(cv, cvt)
+            @test isapprox(cr, crt)
         end
     end
 
@@ -45,6 +60,13 @@
             result = isapprox(er, res)
             if !result
                 println("Test $i fails on:\n$(me)\n$(res)\n")
+            end
+            @test result
+
+            er = mean(me, transpose(X); dims = 2)
+            result = isapprox(er, transpose(res))
+            if !result
+                println("Test `dims = 2` $i fails on:\n$(me)\n$(res)\n")
             end
             @test result
         end

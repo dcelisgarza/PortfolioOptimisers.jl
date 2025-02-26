@@ -26,7 +26,7 @@ function StatsBase.cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1)
                       std(ce.ve, X, ce.w; dims = 1)
                   end)
 
-    return corkendall(X) .* (std_vec * transpose(std_vec))
+    return corkendall(X) .* (std_vec ⊗ std_vec)
 end
 
 export KendallCovariance

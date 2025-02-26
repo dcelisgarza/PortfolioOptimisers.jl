@@ -36,7 +36,7 @@ function StatsBase.cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 
                   else
                       std(ce.ve, X, ce.w; dims = 1)
                   end)
-    return mutual_info(X, ce.bins, ce.normalise) .* (std_vec * transpose(std_vec))
+    return mutual_info(X, ce.bins, ce.normalise) .* (std_vec ⊗ std_vec)
 end
 
 export MutualInfoCovariance

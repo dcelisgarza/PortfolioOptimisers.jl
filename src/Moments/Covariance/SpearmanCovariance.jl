@@ -27,7 +27,7 @@ function StatsBase.cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1)
                       std(ce.ve, X, ce.w; dims = 1)
                   end)
 
-    return corspearman(X) .* (std_vec * transpose(std_vec))
+    return corspearman(X) .* (std_vec ⊗ std_vec)
 end
 
 export SpearmanCovariance
