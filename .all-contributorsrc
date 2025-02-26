@@ -1,22 +1,5 @@
 {
   "projectName": "PortfolioOptimisers",
   "projectOwner": "dcelisgarza",
-  "files": ["README.md", "docs/src/index.md"],
-   "commitType": "docs",
-  "commitConvention": "angular",
-  "contributorsPerLine": 7,
-  "contributors": [
-    {
-      "login": "dcelisgarza",
-      "name": "Daniel Celis Garza",
-      "avatar_url": "https://avatars.githubusercontent.com/dcelisgarza",
-      "profile": "https://github.com/dcelisgarza/",
-      "contributions": [
-        "code",
-        "projectManagement",
-        "docs",
-        "maintenance"
-      ]
-    }
-  ]
+  "files": ["README.md", "docs/src/index.md"]
 }
