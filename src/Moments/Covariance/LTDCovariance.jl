@@ -1,12 +1,13 @@
 
-mutable struct LTDCovariance{T1 <: Real, T2 <: POVarianceEstimator,
+mutable struct LTDCovariance{T1 <: Real, T2 <: PortfolioOptimisersVarianceEstimator,
                              T3 <: Union{Nothing, <:AbstractWeights}} <:
                PortfolioOptimisersCovarianceEstimator
     alpha::T1
     ve::T2
     w::T3
 end
-function LTDCovariance(; alpha::Real = 0.05, ve::POVarianceEstimator = SimpleVariance(),
+function LTDCovariance(; alpha::Real = 0.05,
+                       ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                        w::Union{Nothing, <:AbstractWeights} = nothing)
     @smart_assert(zero(alpha) < alpha < one(alpha))
     return LTDCovariance{typeof(alpha), typeof(ve), typeof(w)}(alpha, ve, w)

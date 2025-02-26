@@ -1,6 +1,6 @@
-struct B_Knuth <: AstroBins end
-struct B_FreedmanDiaconis <: AstroBins end
-struct B_Scott <: AstroBins end
+struct B_Knuth <: AstroPyBins end
+struct B_FreedmanDiaconis <: AstroPyBins end
+struct B_Scott <: AstroPyBins end
 struct B_HacineGharbiRavier <: AbstractBins end
 
 function get_bin_width_func(::B_Knuth)
@@ -15,7 +15,7 @@ end
 function get_bin_width_func(::Union{B_HacineGharbiRavier, <:Integer})
     return nothing
 end
-function calc_num_bins(::AstroBins, xj::AbstractVector, xi::AbstractVector, j::Integer,
+function calc_num_bins(::AstroPyBins, xj::AbstractVector, xi::AbstractVector, j::Integer,
                        i::Integer, bin_width_func, ::Any)
     xjl, xju = extrema(xj)
     k1 = (xju - xjl) / pyconvert(eltype(xj), bin_width_func(Py(xj).to_numpy()))

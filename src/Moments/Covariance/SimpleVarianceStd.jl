@@ -1,4 +1,4 @@
-struct SimpleVariance{T1 <: Bool} <: POVarianceEstimator
+struct SimpleVariance{T1 <: Bool} <: PortfolioOptimisersVarianceEstimator
     corrected::T1
 end
 function SimpleVariance(; corrected::Bool = true)

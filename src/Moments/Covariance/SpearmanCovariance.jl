@@ -1,10 +1,10 @@
-struct SpearmanCovariance{T1 <: POVarianceEstimator,
+struct SpearmanCovariance{T1 <: PortfolioOptimisersVarianceEstimator,
                           T2 <: Union{Nothing, <:AbstractWeights}} <:
        RankCovarianceEstimator
     ve::T1
     w::T2
 end
-function SpearmanCovariance(; ve::POVarianceEstimator = SimpleVariance(),
+function SpearmanCovariance(; ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                             w::Union{Nothing, <:AbstractWeights} = nothing)
     return SpearmanCovariance{typeof(ve), typeof(w)}(ve, w)
 end

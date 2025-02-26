@@ -1,4 +1,4 @@
-struct MutualInfoCovariance{T1 <: POVarianceEstimator,
+struct MutualInfoCovariance{T1 <: PortfolioOptimisersVarianceEstimator,
                             T2 <: Union{<:Integer, <:AbstractBins}, T3 <: Bool,
                             T4 <: Union{Nothing, <:AbstractWeights}} <:
        PortfolioOptimisersCovarianceEstimator
@@ -7,7 +7,7 @@ struct MutualInfoCovariance{T1 <: POVarianceEstimator,
     normalise::T3
     w::T4
 end
-function MutualInfoCovariance(; ve::POVarianceEstimator = SimpleVariance(),
+function MutualInfoCovariance(; ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                               bins::Union{<:Integer, <:AbstractBins} = B_HacineGharbiRavier(),
                               normalise::Bool = true,
                               w::Union{Nothing, <:AbstractWeights} = nothing)

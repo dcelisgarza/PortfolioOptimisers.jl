@@ -1,9 +1,9 @@
-struct KendallCovariance{T1 <: POVarianceEstimator,
+struct KendallCovariance{T1 <: PortfolioOptimisersVarianceEstimator,
                          T2 <: Union{Nothing, <:AbstractWeights}} <: RankCovarianceEstimator
     ve::T1
     w::T2
 end
-function KendallCovariance(; ve::POVarianceEstimator = SimpleVariance(),
+function KendallCovariance(; ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                            w::Union{Nothing, <:AbstractWeights} = nothing)
     return KendallCovariance{typeof(ve), typeof(w)}(ve, w)
 end
