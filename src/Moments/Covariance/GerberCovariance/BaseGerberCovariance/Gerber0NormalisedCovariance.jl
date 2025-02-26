@@ -49,7 +49,7 @@ function StatsBase.cov(ce::Gerber0NormalisedCovariance, X::AbstractMatrix; dims:
     if dims == 2
         X = transpose(X)
     end
-    mean_vec = mean(X; dims = 1)
+    mean_vec = mean(ce.me, X; dims = 1)
     std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))

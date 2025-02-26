@@ -41,20 +41,41 @@
                Gerber0Covariance(),
                Gerber0Covariance(; ve = SimpleVariance(; corrected = false, w = ew)),
                Gerber0NormalisedCovariance(),
-               Gerber0NormalisedCovariance(;
+               Gerber0NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
                                            ve = SimpleVariance(; corrected = false, w = ew)),
                Gerber1Covariance(),
                Gerber1Covariance(; ve = SimpleVariance(; corrected = false, w = ew)),
                Gerber1NormalisedCovariance(),
-               Gerber1NormalisedCovariance(;
+               Gerber1NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
                                            ve = SimpleVariance(; corrected = false, w = ew)),
                Gerber2Covariance(),
                Gerber2Covariance(; ve = SimpleVariance(; corrected = false, w = ew)),
                Gerber2NormalisedCovariance(),
-               Gerber2NormalisedCovariance(;
-                                           ve = SimpleVariance(; corrected = false, w = ew))]
+               Gerber2NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
+                                           ve = SimpleVariance(; corrected = false, w = ew)),
+               SmythBroby0Covariance(),
+               SmythBroby0Covariance(; me = SimpleExpectedReturns(; w = ew),
+                                     ve = SimpleVariance(; corrected = false, w = ew)),
+               SmythBroby0NormalisedCovariance(),
+               SmythBroby0NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
+                                               ve = SimpleVariance(; corrected = false,
+                                                                   w = ew)),
+               SmythBroby1Covariance(),
+               SmythBroby1Covariance(; me = SimpleExpectedReturns(; w = ew),
+                                     ve = SimpleVariance(; corrected = false, w = ew)),
+               SmythBroby1NormalisedCovariance(),
+               SmythBroby1NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
+                                               ve = SimpleVariance(; corrected = false,
+                                                                   w = ew)),
+               SmythBroby2Covariance(),
+               SmythBroby2Covariance(; me = SimpleExpectedReturns(; w = ew),
+                                     ve = SimpleVariance(; corrected = false, w = ew)),
+               SmythBroby2NormalisedCovariance(),
+               SmythBroby2NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
+                                               ve = SimpleVariance(; corrected = false,
+                                                                   w = ew))]
 
-        for (i, ce) ∈ pairs(ces)
+        for (i, ce) ∈ pairs(reverse(ces))
             cv = cov(ce, X)
             cr = cor(ce, X)
             result = isapprox(if isa(cv, Matrix)

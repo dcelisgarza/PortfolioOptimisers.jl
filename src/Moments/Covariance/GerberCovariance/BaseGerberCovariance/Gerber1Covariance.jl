@@ -18,6 +18,7 @@ function _gerber1(ce::Gerber1Covariance, X::AbstractMatrix, std_vec)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
     N = Matrix{Bool}(undef, T, N)
+    std_vec = std_vec * ce.threshold
     U .= X .>= std_vec
     D .= X .<= -std_vec
     N .= .!U .& .!D
@@ -34,7 +35,7 @@ function StatsBase.cor(ce::Gerber1Covariance, X::AbstractMatrix; dims::Int = 1)
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1) * ce.threshold
+    std_vec = std(ce.ve, X; dims = 1)
     return _gerber1(ce, X, std_vec)
 end
 function StatsBase.cov(ce::Gerber1Covariance, X::AbstractMatrix; dims::Int = 1)
@@ -42,7 +43,7 @@ function StatsBase.cov(ce::Gerber1Covariance, X::AbstractMatrix; dims::Int = 1)
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1) * ce.threshold
+    std_vec = std(ce.ve, X; dims = 1)
     return _gerber1(ce, X, std_vec) .* (std_vec ⊗ std_vec)
 end
 
