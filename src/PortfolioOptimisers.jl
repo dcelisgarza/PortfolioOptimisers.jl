@@ -86,5 +86,11 @@ include("./Moments/Covariance/GerberCovariance/SmythBrobyCovariance/SmythBroby2N
 
 ## Smyth Broby Gerber Covariance
 include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerberCovariance_AbstractTypes.jl")
+include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber0Covariance.jl")
+include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber0NormalisedCovariance.jl")
+include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber1Covariance.jl")
+include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber1NormalisedCovariance.jl")
+include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber2Covariance.jl")
+include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber2NormalisedCovariance.jl")
 
 end
