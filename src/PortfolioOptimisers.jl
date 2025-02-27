@@ -14,6 +14,31 @@ end PortfolioOptimisers
 # Utility
 include("./LinearAlgebra/LinearAlgebra.jl")
 
+# Fix Non Positive Definite
+include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_AbstractTypes.jl")
+include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_NoFix.jl")
+include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_NearestCorrelationMatrix.jl")
+
+# Detone
+include("./Moments/MomentsUtil/Detone/Detone_AbstractTypes.jl")
+include("./Moments/MomentsUtil/Detone/NoDetone.jl")
+include("./Moments/MomentsUtil/Detone/Detone.jl")
+
+# Denoise
+include("./Moments/MomentsUtil/Denoise/Denoise_AbstractTypes.jl")
+include("./Moments/MomentsUtil/Denoise/NoDenoise.jl")
+include("./Moments/MomentsUtil/Denoise/ShrunkDenoise.jl")
+include("./Moments/MomentsUtil/Denoise/SpectralDenoise.jl")
+include("./Moments/MomentsUtil/Denoise/FixedDenoise.jl")
+include("./Moments/MomentsUtil/Denoise/Denoise.jl")
+
+# Histogram
+include("./Moments/MomentsUtil/Histogram/Histogram_AbstractTypes.jl")
+include("./Moments/MomentsUtil/Histogram/HistogramAstroPyBins.jl")
+include("./Moments/MomentsUtil/Histogram/HistogramHGRBins.jl")
+include("./Moments/MomentsUtil/Histogram/HistogramIntegerBins.jl")
+include("./Moments/MomentsUtil/Histogram/HistogramInformation.jl")
+
 # Simple Expected Returns
 include("./Moments/ExpectedReturns/ExpectedReturns_AbstractTypes.jl")
 include("./Moments/ExpectedReturns/SimpleExpectedReturns.jl")
@@ -39,29 +64,6 @@ include("./Moments/Covariance/DistanceCovariance.jl")
 
 # LTD Covariance
 include("./Moments/Covariance/LTDCovariance.jl")
-
-# Fix Non Positive Definite
-include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_AbstractTypes.jl")
-include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_NoFix.jl")
-include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_NearestCorrelationMatrix.jl")
-
-# Detone
-include("./Moments/MomentsUtil/Detone/Detone_AbstractTypes.jl")
-include("./Moments/MomentsUtil/Detone/NoDetone.jl")
-include("./Moments/MomentsUtil/Detone/Detone.jl")
-
-# Denoise
-include("./Moments/MomentsUtil/Denoise/Denoise_AbstractTypes.jl")
-include("./Moments/MomentsUtil/Denoise/NoDenoise.jl")
-include("./Moments/MomentsUtil/Denoise/ShrunkDenoise.jl")
-include("./Moments/MomentsUtil/Denoise/Denoise.jl")
-
-# Histogram
-include("./Moments/MomentsUtil/Histogram/Histogram_AbstractTypes.jl")
-include("./Moments/MomentsUtil/Histogram/HistogramAstroPyBins.jl")
-include("./Moments/MomentsUtil/Histogram/HistogramHGRBins.jl")
-include("./Moments/MomentsUtil/Histogram/HistogramIntegerBins.jl")
-include("./Moments/MomentsUtil/Histogram/HistogramInformation.jl")
 
 # Mutual Information Covariance
 include("./Moments/Covariance/MutualInfoCovariance.jl")

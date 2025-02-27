@@ -1,1 +1,4 @@
 abstract type FixNonPositiveDefiniteMatrix end
+function fix_non_positive_definite_matrix! end
+
+export fix_non_positive_definite_matrix!

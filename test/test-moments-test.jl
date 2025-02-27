@@ -1,23 +1,53 @@
-# using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation
+# using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
+#       JuliaFormatter
 
 # rng = StableRNG(123456789)
 # X = randn(rng, 100, 10)
+# T, N = size(X)
+# q = T / N
+# sigma = cov(X)
+
+# sigma1 = copy(sigma)
+# d1 = ShrunkDenoise()
+# denoise!(d1, FNPDM_NearestCorrelationMatrix(), sigma1, q)
+
+# sigma2 = copy(sigma)
+# d2 = FixedDenoise()
+# denoise!(d2, FNPDM_NearestCorrelationMatrix(), sigma2, q)
+
+# sigma3 = copy(sigma)
+# d3 = SpectralDenoise()
+# denoise!(d3, FNPDM_NearestCorrelationMatrix(), sigma3, q)
 
 # using PortfolioOptimiser
-# cv1 = cov(SmythBrobyGerber2Covariance(), X)
-# cr1 = cor(SmythBrobyGerber2Covariance(), X)
-# cv2 = cov(SmythBrobyGerber2NormalisedCovariance(), X)
-# cr2 = cor(SmythBrobyGerber2NormalisedCovariance(), X)
 
-# cv3 = cov(CovGerberSB2(), X)
-# cr3 = cor(CovGerberSB2(), X)
-# cv4 = cov(CovGerberSB2(; normalise = true), X)
-# cr4 = cor(CovGerberSB2(; normalise = true), X)
+# d4 = DenoiseShrink()
+# sigma4 = copy(sigma)
+# PortfolioOptimiser.denoise!(d4, PosdefNearest(), sigma4, q)
 
-# @test isapprox(cv1, cv3)
-# @test isapprox(cr1, cr3)
-# @test isapprox(cv2, cv4)
-# @test isapprox(cr2, cr4)
+# d5 = DenoiseFixed()
+# sigma5 = copy(sigma)
+# PortfolioOptimiser.denoise!(d5, PosdefNearest(), sigma5, q)
+
+# d6 = DenoiseSpectral()
+# sigma6 = copy(sigma)
+# PortfolioOptimiser.denoise!(d6, PosdefNearest(), sigma6, q)
+
+# # using PortfolioOptimiser
+# # cv1 = cov(SmythBrobyGerber2Covariance(), X)
+# # cr1 = cor(SmythBrobyGerber2Covariance(), X)
+# # cv2 = cov(SmythBrobyGerber2NormalisedCovariance(), X)
+# # cr2 = cor(SmythBrobyGerber2NormalisedCovariance(), X)
+
+# # cv3 = cov(CovGerberSB2(), X)
+# # cr3 = cor(CovGerberSB2(), X)
+# # cv4 = cov(CovGerberSB2(; normalise = true), X)
+# # cr4 = cor(CovGerberSB2(; normalise = true), X)
+
+# # @test isapprox(cv1, cv3)
+# # @test isapprox(cr1, cr3)
+# # @test isapprox(cv2, cv4)
+# # @test isapprox(cr2, cr4)
 
 @safetestset "Moments" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation

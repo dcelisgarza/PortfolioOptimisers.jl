@@ -7,34 +7,6 @@ function FNPDM_NearestCorrelationMatrix(;
                                                                                                                      tau = 1e-12))
     return FNPDM_NearestCorrelationMatrix{typeof(alg)}(alg)
 end
-function fix_non_positive_definite_matrix(method::FNPDM_NearestCorrelationMatrix,
-                                          X::AbstractMatrix)
-    if isposdef(X)
-        return nothing
-    end
-
-    s = diag(X)
-    iscov = any(.!isone.(s))
-    _X = if iscov
-        s .= sqrt.(s)
-        cov2cor(X, s)
-    else
-        X
-    end
-
-    NearestCorrelationMatrix.nearest_cor!(_X, method.alg)
-
-    if !isposdef(_X)
-        @warn("Matrix could not be made positive definite.")
-        return X
-    end
-
-    if iscov
-        StatsBase.cor2cov!(_X, s)
-    end
-
-    return _X
-end
 function fix_non_positive_definite_matrix!(method::FNPDM_NearestCorrelationMatrix,
                                            X::AbstractMatrix)
     if isposdef(X)
