@@ -6,10 +6,10 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::
         cor(ce, X; dims = dims, mean = mean)
     catch
         sigma = cov(ce, X; dims = dims, mean = mean)
-        if isa(sigma, Symmetric)
+        if ismutable(sigma)
             StatsBase.cov2cor!(sigma)
         else
-            StatsBase.cov2cor!(Matrix(sigma))
+            sigma = StatsBase.cov2cor(Matrix(sigma))
         end
         sigma
     end
@@ -21,10 +21,10 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix,
         cor(ce, X, w; dims = dims, mean = mean)
     catch
         sigma = cov(ce, X, w; dims = dims, mean = mean)
-        if isa(sigma, Symmetric)
+        if ismutable(sigma)
             StatsBase.cov2cor!(sigma)
         else
-            StatsBase.cov2cor!(Matrix(sigma))
+            sigma = StatsBase.cov2cor(Matrix(sigma))
         end
         sigma
     end
