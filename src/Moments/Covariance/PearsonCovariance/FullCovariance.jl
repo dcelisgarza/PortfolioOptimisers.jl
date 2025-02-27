@@ -12,12 +12,7 @@ function StatsBase.cov(ce::FullCovariance, X::AbstractMatrix; dims::Int = 1)
 end
 function StatsBase.cor(ce::FullCovariance, X::AbstractMatrix; dims::Int = 1)
     mu = mean(ce.me, X; dims = dims)
-    try
-        cor(ce.ce, X; dims = dims, mean = mu)
-    catch
-        sigma = cov(ce.ce, X; dims = dims, mean = mu)
-        isa(sigma, Matrix) ? StatsBase.cov2cor(sigma) : StatsBase.cov2cor(Matrix(sigma))
-    end
+    return robust_cor(ce.ce, X; dims = dims, mean = mu)
 end
 
 export FullCovariance

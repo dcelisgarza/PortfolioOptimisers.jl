@@ -68,10 +68,6 @@ include("./Moments/Covariance/LTDCovariance.jl")
 # Mutual Information Covariance
 include("./Moments/Covariance/MutualInfoCovariance.jl")
 
-# Matrix Processing
-include("./Moments/MomentsUtil/MatrixProcessing/MatrixProcessing_AbstractTypes.jl")
-include("./Moments/MomentsUtil/MatrixProcessing/DefaultMatrixProcessing.jl")
-
 # Shrunk Expected Returns
 include("./Moments/ExpectedReturns/ShrunkExpectedReturnsTargets.jl")
 
@@ -105,6 +101,17 @@ include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythB
 include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber1NormalisedCovariance.jl")
 include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber2Covariance.jl")
 include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber2NormalisedCovariance.jl")
+
+# Distances
+include("./Moments/Distance/Distance_AbstractTypes.jl")
+include("./Moments/Distance/SimpleDistance.jl")
+include("./Moments/Distance/SimpleAbsoluteDistance.jl")
+include("./Moments/Distance/GeneralSimpleDistance.jl")
+include("./Moments/Distance/GeneralSimpleAbsoluteDistance.jl")
+
+# Matrix Processing
+include("./MatrixProcessing/MatrixProcessing_AbstractTypes.jl")
+include("./MatrixProcessing/DefaultMatrixProcessing.jl")
 
 include("./Moments/Covariance/PortfolioOptimisersCovariance.jl")
 

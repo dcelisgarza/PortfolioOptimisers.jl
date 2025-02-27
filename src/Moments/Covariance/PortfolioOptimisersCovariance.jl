@@ -5,4 +5,4 @@ struct PortfolioOptimisersCovariance{T1 <: StatsBase.CovarianceEstimator,
     fix_non_pos_def::T2
 end
 
-export PortfolioOptimisersCovariance
+export PortfolioOptimisersCovariance, robust_cor

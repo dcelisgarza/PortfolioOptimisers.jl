@@ -20,19 +20,10 @@ function StatsBase.cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::I
 end
 function StatsBase.cor(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1,
                        mean = nothing)
-    try
-        if isnothing(ce.w)
-            cor(ce.ce, X; dims = dims, mean = mean)
-        else
-            cor(ce.ce, X, ce.w; dims = dims, mean = mean)
-        end
-    catch
-        sigma = if isnothing(ce.w)
-            cov(ce.ce, X; dims = dims, mean = mean)
-        else
-            cov(ce.ce, X, ce.w; dims = dims, mean = mean)
-        end
-        isa(sigma, Matrix) ? StatsBase.cov2cor(sigma) : StatsBase.cov2cor(Matrix(sigma))
+    if isnothing(ce.w)
+        robust_cor(ce.ce, X; dims = dims, mean = mean)
+    else
+        robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean)
     end
 end
 

@@ -15,12 +15,7 @@ end
 function StatsBase.cor(ce::SemiCovariance, X::AbstractMatrix; dims::Int = 1)
     mu = mean(ce.me, X; dims = dims)
     X = min.(X .- mu, zero(eltype(X)))
-    try
-        cor(ce.ce, X; dims = dims, mean = zero(eltype(X)))
-    catch
-        sigma = cov(ce.ce, X; dims = dims, mean = zero(eltype(X)))
-        isa(sigma, Matrix) ? StatsBase.cov2cor(sigma) : StatsBase.cov2cor(Matrix(sigma))
-    end
+    return robust_cor(ce.ce, X; dims = dims, mean = zero(eltype(X)))
 end
 
 export SemiCovariance
