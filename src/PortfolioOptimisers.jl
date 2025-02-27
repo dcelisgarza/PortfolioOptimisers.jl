@@ -45,6 +45,17 @@ include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_AbstractType
 include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_NoFix.jl")
 include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_NearestCorrelationMatrix.jl")
 
+# Detone
+include("./Moments/MomentsUtil/Detone/Detone_AbstractTypes.jl")
+include("./Moments/MomentsUtil/Detone/NoDetone.jl")
+include("./Moments/MomentsUtil/Detone/Detone.jl")
+
+# Denoise
+include("./Moments/MomentsUtil/Denoise/Denoise_AbstractTypes.jl")
+include("./Moments/MomentsUtil/Denoise/NoDenoise.jl")
+include("./Moments/MomentsUtil/Denoise/ShrunkDenoise.jl")
+include("./Moments/MomentsUtil/Denoise/Denoise.jl")
+
 # Histogram
 include("./Moments/MomentsUtil/Histogram/Histogram_AbstractTypes.jl")
 include("./Moments/MomentsUtil/Histogram/HistogramAstroPyBins.jl")
@@ -92,5 +103,7 @@ include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythB
 include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber1NormalisedCovariance.jl")
 include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber2Covariance.jl")
 include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythBrobyGerber2NormalisedCovariance.jl")
+
+include("./Moments/Covariance/PortfolioOptimisersCovariance.jl")
 
 end
