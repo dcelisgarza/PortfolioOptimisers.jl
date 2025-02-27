@@ -1,4 +1,4 @@
 struct NoDenoise <: DenoiseAlgorithm end
-function denoise!(::NoDenoise, args...)
+function denoise!(::NoDenoise, ::FixNonPositiveDefiniteMatrix, ::AbstractMatrix, ::Real)
     return nothing
 end
