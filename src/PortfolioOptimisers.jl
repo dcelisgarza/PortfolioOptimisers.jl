@@ -104,10 +104,21 @@ include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythB
 
 # Distances
 include("./Moments/Distance/Distance_AbstractTypes.jl")
-include("./Moments/Distance/SimpleDistance.jl")
-include("./Moments/Distance/SimpleAbsoluteDistance.jl")
-include("./Moments/Distance/GeneralSimpleDistance.jl")
-include("./Moments/Distance/GeneralSimpleAbsoluteDistance.jl")
+
+## Simple distance
+include("./Moments/Distance/SimpleDistance/SimpleDistance.jl")
+include("./Moments/Distance/SimpleDistance/SimpleAbsoluteDistance.jl")
+include("./Moments/Distance/SimpleDistance/SimpleDistanceDistance.jl")
+include("./Moments/Distance/SimpleDistance/SimpleAbsoluteDistanceDistance.jl")
+
+## General distance
+include("./Moments/Distance/GeneralDistance/GeneralDistance.jl")
+include("./Moments/Distance/GeneralDistance/GeneralAbsoluteDistance.jl")
+include("./Moments/Distance/GeneralDistance/GeneralDistanceDistance.jl")
+include("./Moments/Distance/GeneralDistance/GeneralAbsoluteDistanceDistance.jl")
+
+## General distance
+include("./Moments/Distance/LogDistance/LogDistance.jl")
 
 # Matrix Processing
 include("./MatrixProcessing/MatrixProcessing_AbstractTypes.jl")

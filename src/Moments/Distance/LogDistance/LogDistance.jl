@@ -1,0 +1,1 @@
+struct LogDistance <: PortfolioOptimisersDistanceMetric end
