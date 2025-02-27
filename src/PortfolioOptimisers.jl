@@ -12,32 +12,33 @@ using AverageShiftedHistograms, Clustering, Distances, GLM, JuMP, LinearAlgebra,
 end PortfolioOptimisers
 
 # Utility
-include("./LinearAlgebra/LinearAlgebra.jl")
+## Operators
+include("./LinearAlgebra/Operators.jl")
 
 # Fix Non Positive Definite
-include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_AbstractTypes.jl")
-include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_NoFix.jl")
-include("./Moments/MomentsUtil/FixNonPositiveDefiniteMatrices/FNPDM_NearestCorrelationMatrix.jl")
+include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_AbstractTypes.jl")
+include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_NoFix.jl")
+include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_NearestCorrelationMatrix.jl")
 
 # Detone
-include("./Moments/MomentsUtil/Detone/Detone_AbstractTypes.jl")
-include("./Moments/MomentsUtil/Detone/NoDetone.jl")
-include("./Moments/MomentsUtil/Detone/Detone.jl")
+include("./LinearAlgebra/Detone/Detone_AbstractTypes.jl")
+include("./LinearAlgebra/Detone/NoDetone.jl")
+include("./LinearAlgebra/Detone/Detone.jl")
 
 # Denoise
-include("./Moments/MomentsUtil/Denoise/Denoise_AbstractTypes.jl")
-include("./Moments/MomentsUtil/Denoise/NoDenoise.jl")
-include("./Moments/MomentsUtil/Denoise/ShrunkDenoise.jl")
-include("./Moments/MomentsUtil/Denoise/SpectralDenoise.jl")
-include("./Moments/MomentsUtil/Denoise/FixedDenoise.jl")
-include("./Moments/MomentsUtil/Denoise/Denoise.jl")
+include("./LinearAlgebra/Denoise/Denoise_AbstractTypes.jl")
+include("./LinearAlgebra/Denoise/NoDenoise.jl")
+include("./LinearAlgebra/Denoise/ShrunkDenoise.jl")
+include("./LinearAlgebra/Denoise/SpectralDenoise.jl")
+include("./LinearAlgebra/Denoise/FixedDenoise.jl")
+include("./LinearAlgebra/Denoise/Denoise.jl")
 
 # Histogram
-include("./Moments/MomentsUtil/Histogram/Histogram_AbstractTypes.jl")
-include("./Moments/MomentsUtil/Histogram/HistogramAstroPyBins.jl")
-include("./Moments/MomentsUtil/Histogram/HistogramHGRBins.jl")
-include("./Moments/MomentsUtil/Histogram/HistogramIntegerBins.jl")
-include("./Moments/MomentsUtil/Histogram/HistogramInformation.jl")
+include("./LinearAlgebra/Histogram/Histogram_AbstractTypes.jl")
+include("./LinearAlgebra/Histogram/HistogramAstroPyBins.jl")
+include("./LinearAlgebra/Histogram/HistogramHGRBins.jl")
+include("./LinearAlgebra/Histogram/HistogramIntegerBins.jl")
+include("./LinearAlgebra/Histogram/HistogramInformation.jl")
 
 # Simple Expected Returns
 include("./Moments/ExpectedReturns/ExpectedReturns_AbstractTypes.jl")
@@ -105,20 +106,33 @@ include("./Moments/Covariance/GerberCovariance/SmythBrobyGerberCovariance/SmythB
 # Distances
 include("./Moments/Distance/Distance_AbstractTypes.jl")
 
-## Simple distance
+## Simple Distance
 include("./Moments/Distance/SimpleDistance/SimpleDistance.jl")
 include("./Moments/Distance/SimpleDistance/SimpleAbsoluteDistance.jl")
 include("./Moments/Distance/SimpleDistance/SimpleDistanceDistance.jl")
 include("./Moments/Distance/SimpleDistance/SimpleAbsoluteDistanceDistance.jl")
 
-## General distance
+## General Distance
 include("./Moments/Distance/GeneralDistance/GeneralDistance.jl")
 include("./Moments/Distance/GeneralDistance/GeneralAbsoluteDistance.jl")
 include("./Moments/Distance/GeneralDistance/GeneralDistanceDistance.jl")
 include("./Moments/Distance/GeneralDistance/GeneralAbsoluteDistanceDistance.jl")
 
-## General distance
+## Log Distance
 include("./Moments/Distance/LogDistance/LogDistance.jl")
+include("./Moments/Distance/LogDistance/LogDistanceDistance.jl")
+include("./Moments/Distance/GeneralLogDistance/GeneralLogDistance.jl")
+include("./Moments/Distance/GeneralLogDistance/GeneralLogDistanceDistance.jl")
+
+## Variation of Information Distance
+include("./Moments/Distance/VariationInfoDistance/VariationInfoDistance.jl")
+include("./Moments/Distance/VariationInfoDistance/VariationInfoDistanceDistance.jl")
+include("./Moments/Distance/GeneralVariationInfoDistance/GeneralVariationInfoDistance.jl")
+include("./Moments/Distance/GeneralVariationInfoDistance/GeneralVariationInfoDistanceDistance.jl")
+
+## Correlation Distance
+include("./Moments/Distance/CorrelationDistance/CorrelationDistance.jl")
+include("./Moments/Distance/CorrelationDistance/CorrelationDistanceDistance.jl")
 
 # Matrix Processing
 include("./MatrixProcessing/MatrixProcessing_AbstractTypes.jl")
