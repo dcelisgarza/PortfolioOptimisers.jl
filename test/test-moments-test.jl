@@ -1,11 +1,11 @@
-using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
-      JuliaFormatter
+# using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
+#       JuliaFormatter
 
-rng = StableRNG(123456789)
-X = randn(rng, 100, 10)
-T, N = size(X)
-q = T / N
-sigma = cov(X)
+# rng = StableRNG(123456789)
+# X = randn(rng, 100, 10)
+# T, N = size(X)
+# q = T / N
+# sigma = cov(X)
 
 # sigma1 = copy(sigma)
 # d1 = ShrunkDenoise()

@@ -1,19 +1,15 @@
-struct VariationInfoDistance{T1 <: PortfolioOptimisersVarianceEstimator,
-                             T2 <: Union{<:Integer, <:AbstractBins}, T3 <: Bool} <:
+struct VariationInfoDistance{T1 <: Union{<:Integer, <:AbstractBins}, T2 <: Bool} <:
        PortfolioOptimisersDistanceMetric
-    ve::T1
-    bins::T2
-    normalise::T3
+    bins::T1
+    normalise::T2
 end
 function VariationInfoDistance(;
-                               ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                                bins::Union{<:Integer, <:AbstractBins} = B_HacineGharbiRavier(),
                                normalise::Bool = true)
     if isa(bins, Integer)
         @smart_assert(bins > zero(bins))
     end
-    return VariationInfoDistance{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins,
-                                                                              normalise)
+    return VariationInfoDistance{typeof(bins), typeof(normalise)}(bins, normalise)
 end
 function distance(de::VariationInfoDistance, ::Any, X::AbstractMatrix; dims::Int = 1)
     @smart_assert(dims ∈ (1, 2))

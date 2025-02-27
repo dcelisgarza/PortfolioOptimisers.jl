@@ -1,17 +1,14 @@
-struct VariationInfoDistanceDistance{T1 <: PortfolioOptimisersVarianceEstimator,
-                                     T2 <: Union{<:Integer, <:AbstractBins}, T3 <: Bool,
-                                     T4 <: Distances.Metric, T5 <: Tuple,
-                                     T6 <: NamedTuple} <:
+struct VariationInfoDistanceDistance{T1 <: Union{<:Integer, <:AbstractBins}, T2 <: Bool,
+                                     T3 <: Distances.Metric, T4 <: Tuple,
+                                     T5 <: NamedTuple} <:
        PortfolioOptimisersDistanceDistanceMetric
-    ve::T1
-    bins::T2
-    normalise::T3
-    dist::T4
-    args::T5
-    kwargs::T6
+    bins::T1
+    normalise::T2
+    dist::T3
+    args::T4
+    kwargs::T5
 end
 function VariationInfoDistanceDistance(;
-                                       ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                                        bins::Union{<:Integer, <:AbstractBins} = B_HacineGharbiRavier(),
                                        normalise::Bool = true,
                                        dist::Distances.Metric = Distances.Euclidean(),
@@ -19,13 +16,9 @@ function VariationInfoDistanceDistance(;
     if isa(bins, Integer)
         @smart_assert(bins > zero(bins))
     end
-    return VariationInfoDistanceDistance{typeof(ve), typeof(bins), typeof(normalise),
-                                         typeof(dist), typeof(args), typeof(kwargs)}(ve,
-                                                                                     bins,
-                                                                                     normalise,
-                                                                                     dist,
-                                                                                     args,
-                                                                                     kwargs)
+    return VariationInfoDistanceDistance{typeof(bins), typeof(normalise), typeof(dist),
+                                         typeof(args), typeof(kwargs)}(bins, normalise,
+                                                                       dist, args, kwargs)
 end
 function distance(de::VariationInfoDistanceDistance, ::Any, X::AbstractMatrix;
                   dims::Int = 1)

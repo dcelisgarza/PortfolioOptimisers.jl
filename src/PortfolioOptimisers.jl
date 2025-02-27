@@ -133,6 +133,14 @@ include("./Moments/Distance/GeneralVariationInfoDistance/GeneralVariationInfoDis
 ## Correlation Distance
 include("./Moments/Distance/CorrelationDistance/CorrelationDistance.jl")
 include("./Moments/Distance/CorrelationDistance/CorrelationDistanceDistance.jl")
+include("./Moments/Distance/GeneralCorrelationDistance/GeneralCorrelationDistance.jl")
+include("./Moments/Distance/GeneralCorrelationDistance/GeneralCorrelationDistanceDistance.jl")
+
+## Canonical Distance
+include("./Moments/Distance/CanonicalDistance/CanonicalDistance.jl")
+include("./Moments/Distance/CanonicalDistance/CanonicalDistanceDistance.jl")
+include("./Moments/Distance/GeneralCanonicalDistance/GeneralCanonicalDistance.jl")
+include("./Moments/Distance/GeneralCanonicalDistance/GeneralCanonicalDistanceDistance.jl")
 
 # Matrix Processing
 include("./MatrixProcessing/MatrixProcessing_AbstractTypes.jl")
