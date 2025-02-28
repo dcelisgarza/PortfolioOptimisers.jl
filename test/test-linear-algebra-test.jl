@@ -19,4 +19,39 @@
         @test !isapprox(res1, res6)
         @test !isapprox(res1, res7)
     end
+
+    @testset "Non Positive Definite Matrices" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 10, 20)
+        sigma1 = cov(X)
+        sigma2 = copy(sigma1)
+        sigma3 = copy(sigma1)
+        fix_non_positive_definite_matrix!(FNPDM_NearestCorrelationMatrix(), sigma1)
+        @test isposdef(sigma1)
+
+        fix_non_positive_definite_matrix!(FNPDM_NoFix(), sigma2)
+        @test !isposdef(sigma2)
+        @test isapprox(sigma2, sigma3)
+    end
+
+    @testset "Denoise algorithms" begin
+        rng = StableRNG(987654321)
+        X = randn(rng, 1000, 20)
+        T, N = size(X)
+        q = T / N
+        sigma = cov(X)
+
+        des = [NoDenoise(), FixedDenoise(), ShrunkDenoise(), SpectralDenoise()]
+        denoise_t = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv"), DataFrame)
+
+        for i ∈ 1:ncol(denoise_t)
+            sigma1 = copy(sigma)
+            denoise!(des[i], FNPDM_NearestCorrelationMatrix(), sigma1, q)
+            res = isapprox(sigma1, reshape(denoise_t[!, i], MN))
+            if !res
+                println("Fails on iteration $i")
+            end
+            @test res
+        end
+    end
 end

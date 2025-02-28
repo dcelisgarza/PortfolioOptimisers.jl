@@ -52,7 +52,7 @@
 
         de = CanonicalDistance()
         for i ∈ 1:ncol(dist_t)
-            dist = distance(de, ces[i], X)
+            dist = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist)
             res = isapprox(dist, reshape(dist_t[!, i], MN))
             if !res
@@ -63,7 +63,7 @@
 
         de = GeneralCanonicalDistance()
         for i ∈ 1:ncol(dist_t)
-            dist = distance(de, ces[i], X)
+            dist = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist)
             res = isapprox(dist, reshape(dist_t[!, i], MN))
             if !res
@@ -429,5 +429,8 @@
             @test !isapprox(s1, s2)
             @test !isapprox(v1, v2)
         end
+    end
+    @testset "Misc tests" begin
+        @test iszero(PortfolioOptimisers.intrinsic_mutual_info(rand(1, 1)))
     end
 end

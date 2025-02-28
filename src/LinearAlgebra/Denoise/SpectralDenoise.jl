@@ -1,19 +1,17 @@
 
-struct SpectralDenoise{T1 <: Real, T2 <: Integer, T3 <: Integer, T4, T5 <: Tuple,
-                       T6 <: NamedTuple} <: DenoiseAlgorithm
-    alpha::T1
-    m::T2
-    n::T3
-    kernel::T4
-    args::T5
-    kwargs::T6
+struct SpectralDenoise{T1 <: Integer, T2 <: Integer, T3, T4 <: Tuple, T5 <: NamedTuple} <:
+       DenoiseAlgorithm
+    m::T1
+    n::T2
+    kernel::T3
+    args::T4
+    kwargs::T5
 end
-function SpectralDenoise(; alpha::Real = 0.0, m::Integer = 10, n::Integer = 1000,
+function SpectralDenoise(; m::Integer = 10, n::Integer = 1000,
                          kernel = AverageShiftedHistograms.Kernels.gaussian,
                          args::Tuple = (), kwargs::NamedTuple = (;))
-    @smart_assert(zero(alpha) <= alpha <= one(alpha))
-    return SpectralDenoise{typeof(alpha), typeof(m), typeof(n), typeof(kernel),
-                           typeof(args), typeof(kwargs)}(alpha, m, n, kernel, args, kwargs)
+    return SpectralDenoise{typeof(m), typeof(n), typeof(kernel), typeof(args),
+                           typeof(kwargs)}(m, n, kernel, args, kwargs)
 end
 function denoise!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
                   vecs::AbstractMatrix, num_factors::Integer)
