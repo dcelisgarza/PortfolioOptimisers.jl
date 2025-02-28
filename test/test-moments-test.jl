@@ -1,6 +1,37 @@
 @safetestset "Moments" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
           CSV, DataFrames
+    @testset "Absolute Distances" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 20)
+        des = [SimpleAbsoluteDistance(), SimpleAbsoluteDistanceDistance(), LogDistance(),
+               LogDistanceDistance()]
+
+        dist_t = CSV.read(joinpath(@__DIR__, "./assets/Absolute-Distance.csv"), DataFrame)
+
+        ce = FullCovariance()
+        for i ∈ 1:ncol(dist_t)
+            dist = distance(des[i], ce, X)
+            MN = size(dist)
+            res = isapprox(dist, reshape(dist_t[!, i], MN))
+            if !res
+                println("Fails on Absolute Distance iteration $i")
+            end
+            @test res
+        end
+
+        des = [GeneralAbsoluteDistance(), GeneralAbsoluteDistanceDistance(),
+               GeneralLogDistance(), GeneralLogDistanceDistance()]
+        for i ∈ 1:ncol(dist_t)
+            dist = distance(des[i], ce, X)
+            MN = size(dist)
+            res = isapprox(dist, reshape(dist_t[!, i], MN))
+            if !res
+                println("Fails on General Absolute Distance iteration $i")
+            end
+            @test res
+        end
+    end
     @testset "Canonical and General Canonical Distance" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
