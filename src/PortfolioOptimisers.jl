@@ -70,7 +70,10 @@ include("./Moments/Covariance/LTDCovariance.jl")
 include("./Moments/Covariance/MutualInfoCovariance.jl")
 
 # Shrunk Expected Returns
-include("./Moments/ExpectedReturns/ShrunkExpectedReturnsTargets.jl")
+include("./Moments/ExpectedReturns/ShrunkExpectedReturns/ShrunkExpectedReturns_Types.jl")
+include("./Moments/ExpectedReturns/ShrunkExpectedReturns/JamesSteinExpectedReturns.jl")
+include("./Moments/ExpectedReturns/ShrunkExpectedReturns/BayesSteinExpectedReturns.jl")
+include("./Moments/ExpectedReturns/ShrunkExpectedReturns/BodnarOkhrinParolyaExpectedReturns.jl")
 
 # Gerber Covariance
 include("./Moments/Covariance/GerberCovariance/GerberCovariance_AbstractTypes.jl")
@@ -141,6 +144,11 @@ include("./Moments/Distance/CanonicalDistance/CanonicalDistance.jl")
 include("./Moments/Distance/CanonicalDistance/CanonicalDistanceDistance.jl")
 include("./Moments/Distance/GeneralCanonicalDistance/GeneralCanonicalDistance.jl")
 include("./Moments/Distance/GeneralCanonicalDistance/GeneralCanonicalDistanceDistance.jl")
+
+# DBHTs
+include("./DBHT/DBHT.jl")
+include("./DBHT/NoLoGo.jl")
+include("./DBHT/LoGo.jl")
 
 # Matrix Processing
 include("./MatrixProcessing/MatrixProcessing_AbstractTypes.jl")

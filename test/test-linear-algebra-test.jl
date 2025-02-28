@@ -46,6 +46,7 @@
         for i ∈ 1:ncol(denoise_t)
             sigma1 = copy(sigma)
             denoise!(des[i], FNPDM_NearestCorrelationMatrix(), sigma1, q)
+            MN = size(sigma1)
             res = isapprox(sigma1, reshape(denoise_t[!, i], MN))
             if !res
                 println("Fails on iteration $i")
@@ -66,6 +67,7 @@
         for i ∈ 1:ncol(detone)
             sigma1 = copy(sigma)
             detone!(des[i], FNPDM_NearestCorrelationMatrix(), sigma1)
+            MN = size(sigma1)
             res = isapprox(sigma1, reshape(detone[!, i], MN))
             if !res
                 println("Fails on iteration $i")
