@@ -1,13 +1,12 @@
-struct FNPDM_NearestCorrelationMatrix{T1 <: NearestCorrelationMatrix.NCMAlgorithm} <:
+struct FNPD_NearestCorrelationMatrix{T1 <: NearestCorrelationMatrix.NCMAlgorithm} <:
        FixNonPositiveDefiniteMatrix
     alg::T1
 end
-function FNPDM_NearestCorrelationMatrix(;
-                                        alg::NearestCorrelationMatrix.NCMAlgorithm = NearestCorrelationMatrix.Newton(;
-                                                                                                                     tau = 1e-12))
-    return FNPDM_NearestCorrelationMatrix{typeof(alg)}(alg)
+function FNPD_NearestCorrelationMatrix(;
+                                       alg::NearestCorrelationMatrix.NCMAlgorithm = NearestCorrelationMatrix.Newton())
+    return FNPD_NearestCorrelationMatrix{typeof(alg)}(alg)
 end
-function fix_non_positive_definite_matrix!(method::FNPDM_NearestCorrelationMatrix,
+function fix_non_positive_definite_matrix!(method::FNPD_NearestCorrelationMatrix,
                                            X::AbstractMatrix)
     if isposdef(X)
         return nothing
@@ -38,4 +37,4 @@ function fix_non_positive_definite_matrix!(method::FNPDM_NearestCorrelationMatri
     return nothing
 end
 
-export FNPDM_NearestCorrelationMatrix
+export FNPD_NearestCorrelationMatrix

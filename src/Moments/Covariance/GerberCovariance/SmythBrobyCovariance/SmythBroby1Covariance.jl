@@ -4,7 +4,7 @@ struct SmythBroby1Covariance{T1 <: ExpectedReturnsEstimator,
                              T6 <: Real, T7 <: Real, T8 <: Real} <: SmythBrobyCovariance
     me::T1
     ve::T2
-    fix_non_pos_def::T3
+    fnpd::T3
     threshold::T4
     c1::T5
     c2::T6
@@ -13,16 +13,18 @@ struct SmythBroby1Covariance{T1 <: ExpectedReturnsEstimator,
 end
 function SmythBroby1Covariance(; me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
                                ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                               fix_non_pos_def::FixNonPositiveDefiniteMatrix = FNPDM_NearestCorrelationMatrix(),
+                               fnpd::FixNonPositiveDefiniteMatrix = FNPD_NearestCorrelationMatrix(),
                                threshold::Real = 0.5, c1::Real = 0.5, c2::Real = 0.5,
                                c3::Real = 4.0, n::Real = 2.0)
     @smart_assert(zero(threshold) < threshold < one(threshold))
     @smart_assert(zero(c1) < c1 <= one(c1))
     @smart_assert(zero(c2) < c2 <= one(c2) && c3 > c2)
-    return SmythBroby1Covariance{typeof(me), typeof(ve), typeof(fix_non_pos_def),
-                                 typeof(threshold), typeof(c1), typeof(c2), typeof(c3),
-                                 typeof(n)}(me, ve, fix_non_pos_def, threshold, c1, c2, c3,
-                                            n)
+    return SmythBroby1Covariance{typeof(me), typeof(ve), typeof(fnpd), typeof(threshold),
+                                 typeof(c1), typeof(c2), typeof(c3), typeof(n)}(me, ve,
+                                                                                fnpd,
+                                                                                threshold,
+                                                                                c1, c2, c3,
+                                                                                n)
 end
 function _smythbroby1(ce::SmythBroby1Covariance, X::AbstractMatrix, mean_vec, std_vec)
     T, N = size(X)
@@ -62,7 +64,7 @@ function _smythbroby1(ce::SmythBroby1Covariance, X::AbstractMatrix, mean_vec, st
             end
         end
     end
-    fix_non_positive_definite_matrix!(ce.fix_non_pos_def, rho)
+    fix_non_positive_definite_matrix!(ce.fnpd, rho)
     return rho
 end
 function StatsBase.cor(ce::SmythBroby1Covariance, X::AbstractMatrix; dims::Int = 1,

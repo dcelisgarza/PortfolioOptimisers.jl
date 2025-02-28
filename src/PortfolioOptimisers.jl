@@ -16,9 +16,9 @@ end PortfolioOptimisers
 include("./LinearAlgebra/Operators.jl")
 
 # Fix Non Positive Definite
-include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_AbstractTypes.jl")
-include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_NoFix.jl")
-include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_NearestCorrelationMatrix.jl")
+include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPD_AbstractTypes.jl")
+include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPD_NoFix.jl")
+include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPD_NearestCorrelationMatrix.jl")
 
 # Detone
 include("./LinearAlgebra/Detone/Detone_AbstractTypes.jl")

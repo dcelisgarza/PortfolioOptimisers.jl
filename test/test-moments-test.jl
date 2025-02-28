@@ -9,7 +9,7 @@
 
         dist_t = CSV.read(joinpath(@__DIR__, "./assets/Absolute-Distance.csv"), DataFrame)
 
-        ce = FullCovariance()
+        ce = PortfolioOptimisersCovariance()
         for i ∈ 1:ncol(dist_t)
             dist = distance(des[i], ce, X)
             MN = size(dist)
@@ -35,8 +35,8 @@
     @testset "Canonical and General Canonical Distance" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
-        ces = [FullCovariance(), SemiCovariance(), SpearmanCovariance(),
-               KendallCovariance(), MutualInfoCovariance(),
+        ces = [PortfolioOptimisersCovariance(), FullCovariance(), SemiCovariance(),
+               SpearmanCovariance(), KendallCovariance(), MutualInfoCovariance(),
                MutualInfoCovariance(; bins = 5), DistanceCovariance(),
                LTDCovariance(; alpha = 0.15), Gerber0Covariance(),
                Gerber0NormalisedCovariance(), Gerber1Covariance(),
@@ -75,8 +75,8 @@
     @testset "Canonical and General Canonical Distance Distance" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
-        ces = [FullCovariance(), SemiCovariance(), SpearmanCovariance(),
-               KendallCovariance(), MutualInfoCovariance(),
+        ces = [PortfolioOptimisersCovariance(), FullCovariance(), SemiCovariance(),
+               SpearmanCovariance(), KendallCovariance(), MutualInfoCovariance(),
                MutualInfoCovariance(; bins = 5), DistanceCovariance(),
                LTDCovariance(; alpha = 0.15), Gerber0Covariance(),
                Gerber0NormalisedCovariance(), Gerber1Covariance(),
@@ -118,7 +118,7 @@
         X = randn(rng, 1000, 20)
         fw = FrequencyWeights(rand(rng, 1000))
         ew = eweights(1:1000, 0.01; scale = true)
-        ces = [FullCovariance(),
+        ces = [PortfolioOptimisersCovariance(), FullCovariance(),
                FullCovariance(; me = SimpleExpectedReturns(; w = ew),
                               ce = GeneralWeightedCovariance(;
                                                              ce = SimpleCovariance(;
@@ -267,7 +267,7 @@
         fw = FrequencyWeights(rand(rng, 100))
         ew = eweights(1:100, 0.3; scale = true)
 
-        ces = [FullCovariance(),
+        ces = [PortfolioOptimisersCovariance(), FullCovariance(),
                FullCovariance(;
                               ce = GeneralWeightedCovariance(;
                                                              ce = SimpleCovariance(;

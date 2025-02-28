@@ -5,7 +5,7 @@ struct SmythBrobyGerber2NormalisedCovariance{T1 <: ExpectedReturnsEstimator,
                                              T8 <: Real} <: SmythBrobyGerberCovariance
     me::T1
     ve::T2
-    fix_non_pos_def::T3
+    fnpd::T3
     threshold::T4
     c1::T5
     c2::T6
@@ -15,18 +15,18 @@ end
 function SmythBrobyGerber2NormalisedCovariance(;
                                                me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
                                                ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                                               fix_non_pos_def::FixNonPositiveDefiniteMatrix = FNPDM_NearestCorrelationMatrix(),
+                                               fnpd::FixNonPositiveDefiniteMatrix = FNPD_NearestCorrelationMatrix(),
                                                threshold::Real = 0.5, c1::Real = 0.5,
                                                c2::Real = 0.5, c3::Real = 4.0,
                                                n::Real = 2.0)
     @smart_assert(zero(threshold) < threshold < one(threshold))
     @smart_assert(zero(c1) < c1 <= one(c1))
     @smart_assert(zero(c2) < c2 <= one(c2) && c3 > c2)
-    return SmythBrobyGerber2NormalisedCovariance{typeof(me), typeof(ve),
-                                                 typeof(fix_non_pos_def), typeof(threshold),
-                                                 typeof(c1), typeof(c2), typeof(c3),
-                                                 typeof(n)}(me, ve, fix_non_pos_def,
-                                                            threshold, c1, c2, c3, n)
+    return SmythBrobyGerber2NormalisedCovariance{typeof(me), typeof(ve), typeof(fnpd),
+                                                 typeof(threshold), typeof(c1), typeof(c2),
+                                                 typeof(c3), typeof(n)}(me, ve, fnpd,
+                                                                        threshold, c1, c2,
+                                                                        c3, n)
 end
 function _smythbroby2normalised(ce::SmythBrobyGerber2NormalisedCovariance,
                                 X::AbstractMatrix)
@@ -63,7 +63,7 @@ function _smythbroby2normalised(ce::SmythBrobyGerber2NormalisedCovariance,
     end
     h = sqrt.(diag(rho))
     rho .= Symmetric(rho ./ (h * transpose(h)), :U)
-    fix_non_positive_definite_matrix!(ce.fix_non_pos_def, rho)
+    fix_non_positive_definite_matrix!(ce.fnpd, rho)
     return rho
 end
 function StatsBase.cor(ce::SmythBrobyGerber2NormalisedCovariance, X::AbstractMatrix;

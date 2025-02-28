@@ -1,11 +1,11 @@
-struct PortfolioOptimisersCovariance{T1 <: StatsBase.CovarianceEstimator,
+struct PortfolioOptimisersCovariance{T1 <: PortfolioOptimisersCovarianceEstimator,
                                      T2 <: MatrixProcessing} <:
        PortfolioOptimisersCovarianceEstimator
     ce::T1
     mp::T2
 end
 function PortfolioOptimisersCovariance(;
-                                       ce::StatsBase.CovarianceEstimator = FullCovariance(),
+                                       ce::PortfolioOptimisersCovarianceEstimator = FullCovariance(),
                                        mp::MatrixProcessing = DefaultMatrixProcessing())
     return PortfolioOptimisersCovariance{typeof(ce), typeof(mp)}(ce, mp)
 end

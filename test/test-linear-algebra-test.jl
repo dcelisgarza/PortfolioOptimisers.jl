@@ -26,10 +26,10 @@
         sigma1 = cov(X)
         sigma2 = copy(sigma1)
         sigma3 = copy(sigma1)
-        fix_non_positive_definite_matrix!(FNPDM_NearestCorrelationMatrix(), sigma1)
+        fix_non_positive_definite_matrix!(FNPD_NearestCorrelationMatrix(), sigma1)
         @test isposdef(sigma1)
 
-        fix_non_positive_definite_matrix!(FNPDM_NoFix(), sigma2)
+        fix_non_positive_definite_matrix!(FNPD_NoFix(), sigma2)
         @test !isposdef(sigma2)
         @test isapprox(sigma2, sigma3)
     end
@@ -45,7 +45,7 @@
 
         for i ∈ 1:ncol(denoise_t)
             sigma1 = copy(sigma)
-            denoise!(des[i], FNPDM_NearestCorrelationMatrix(), sigma1, q)
+            denoise!(des[i], FNPD_NearestCorrelationMatrix(), sigma1, q)
             MN = size(sigma1)
             res = isapprox(sigma1, reshape(denoise_t[!, i], MN))
             if !res
@@ -66,7 +66,7 @@
 
         for i ∈ 1:ncol(detone)
             sigma1 = copy(sigma)
-            detone!(des[i], FNPDM_NearestCorrelationMatrix(), sigma1)
+            detone!(des[i], FNPD_NearestCorrelationMatrix(), sigma1)
             MN = size(sigma1)
             res = isapprox(sigma1, reshape(detone[!, i], MN))
             if !res

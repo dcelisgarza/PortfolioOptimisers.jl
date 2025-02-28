@@ -18,7 +18,7 @@ function find_max_eval(vals, q; kernel = AverageShiftedHistograms.Kernels.gaussi
     e_max = x * (1.0 + sqrt(1.0 / q))^2
     return e_max, x
 end
-function denoise!(de::DenoiseAlgorithm, fix_non_pos_def::FixNonPositiveDefiniteMatrix,
+function denoise!(de::DenoiseAlgorithm, fnpd::FixNonPositiveDefiniteMatrix,
                   X::AbstractMatrix, q::Real)
     s = diag(X)
     iscov = any(.!isone.(s))
@@ -31,7 +31,7 @@ function denoise!(de::DenoiseAlgorithm, fix_non_pos_def::FixNonPositiveDefiniteM
                             kwargs = de.kwargs)[1]
     num_factors = findlast(vals .< max_val)
     denoise!(de, X, vals, vecs, num_factors)
-    fix_non_positive_definite_matrix!(fix_non_pos_def, X)
+    fix_non_positive_definite_matrix!(fnpd, X)
     if iscov
         StatsBase.cor2cov!(X, s)
     end
