@@ -1,6 +1,6 @@
 @safetestset "Linear Algebra" begin
+    using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CSV, LinearAlgebra
     @testset "Operators" begin
-        using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test
         rng = StableRNG(987654321)
         X1 = rand(rng, 10)
         X2 = rand(rng, 10)
@@ -19,7 +19,6 @@
         @test !isapprox(res1, res6)
         @test !isapprox(res1, res7)
     end
-
     @testset "Non Positive Definite Matrices" begin
         rng = StableRNG(123456789)
         X = randn(rng, 10, 20)
@@ -33,7 +32,6 @@
         @test !isposdef(sigma2)
         @test isapprox(sigma2, sigma3)
     end
-
     @testset "Denoise algorithms" begin
         rng = StableRNG(987654321)
         X = randn(rng, 1000, 20)
@@ -54,7 +52,6 @@
             @test res
         end
     end
-
     @testset "Detone" begin
         rng = StableRNG(987654321)
         X = randn(rng, 1000, 20)
