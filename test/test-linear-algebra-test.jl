@@ -1,5 +1,6 @@
 @safetestset "Linear Algebra" begin
-    using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CSV, LinearAlgebra
+    using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CSV, LinearAlgebra,
+          DataFrames
     @testset "Operators" begin
         rng = StableRNG(987654321)
         X1 = rand(rng, 10)
