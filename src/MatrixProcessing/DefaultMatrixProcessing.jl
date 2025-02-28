@@ -1,5 +1,5 @@
 struct DefaultMatrixProcessing{T1 <: FixNonPositiveDefiniteMatrix, T2 <: DenoiseAlgorithm,
-                               T3::AbstractDetone, T4 <: AbstractLoGo} <: MatrixProcessing
+                               T3 <: AbstractDetone, T4 <: AbstractLoGo} <: MatrixProcessing
     fix_non_pos_def::T1
     denoise::T2
     detone::T3
