@@ -4,7 +4,8 @@ struct PortfolioOptimisersCovariance{T1 <: StatsBase.CovarianceEstimator,
     ce::T1
     processing::T2
 end
-function PortfolioOptimisersCovariance(ce::StatsBase.CovarianceEstimator = FullCovariance(),
+function PortfolioOptimisersCovariance(;
+                                       ce::StatsBase.CovarianceEstimator = FullCovariance(),
                                        processing::MatrixProcessing = DefaultMatrixProcessing())
     return PortfolioOptimisersCovariance{typeof(ce), typeof(processing)}(ce, processing)
 end
