@@ -5,7 +5,8 @@
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
         ces = [FullCovariance(), SemiCovariance(), SpearmanCovariance(),
-               KendallCovariance(), MutualInfoCovariance(), DistanceCovariance(),
+               KendallCovariance(), MutualInfoCovariance(),
+               MutualInfoCovariance(; bins = 5), DistanceCovariance(),
                LTDCovariance(; alpha = 0.15), Gerber0Covariance(),
                Gerber0NormalisedCovariance(), Gerber1Covariance(),
                Gerber1NormalisedCovariance(), Gerber2Covariance(),
@@ -44,7 +45,8 @@
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
         ces = [FullCovariance(), SemiCovariance(), SpearmanCovariance(),
-               KendallCovariance(), MutualInfoCovariance(), DistanceCovariance(),
+               KendallCovariance(), MutualInfoCovariance(),
+               MutualInfoCovariance(; bins = 5), DistanceCovariance(),
                LTDCovariance(; alpha = 0.15), Gerber0Covariance(),
                Gerber0NormalisedCovariance(), Gerber1Covariance(),
                Gerber1NormalisedCovariance(), Gerber2Covariance(),
@@ -60,7 +62,7 @@
 
         de = CanonicalDistanceDistance()
         for i ∈ 1:ncol(dist_t)
-            dist = distance(de, ces[i], X)
+            dist = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist)
             res = isapprox(dist, reshape(dist_t[!, i], MN))
             if !res
@@ -71,7 +73,7 @@
 
         de = GeneralCanonicalDistanceDistance()
         for i ∈ 1:ncol(dist_t)
-            dist = distance(de, ces[i], X)
+            dist = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist)
             res = isapprox(dist, reshape(dist_t[!, i], MN))
             if !res
