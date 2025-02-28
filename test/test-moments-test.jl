@@ -398,17 +398,3 @@
         end
     end
 end
-
-rng = StableRNG(123456789)
-X = randn(rng, 1000, 20)
-ces = [FullCovariance(), SemiCovariance(), SpearmanCovariance(), KendallCovariance(),
-       MutualInfoCovariance(), DistanceCovariance(), LTDCovariance(; alpha = 0.15),
-       Gerber0Covariance(), Gerber0NormalisedCovariance(), Gerber1Covariance(),
-       Gerber1NormalisedCovariance(), Gerber2Covariance(), Gerber2NormalisedCovariance(),
-       SmythBroby0Covariance(), SmythBroby0NormalisedCovariance(), SmythBroby1Covariance(),
-       SmythBroby1NormalisedCovariance(), SmythBroby2Covariance(),
-       SmythBroby2NormalisedCovariance(), SmythBrobyGerber0Covariance(),
-       SmythBrobyGerber0NormalisedCovariance(), SmythBrobyGerber1Covariance(),
-       SmythBrobyGerber1NormalisedCovariance(), SmythBrobyGerber2Covariance(),
-       SmythBrobyGerber2NormalisedCovariance()]
-dist_t = CSV.read(joinpath(@__DIR__, "./assets/Canonical-Distance-Distance.csv"), DataFrame)
