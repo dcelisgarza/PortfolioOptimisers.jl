@@ -54,4 +54,25 @@
             @test res
         end
     end
+
+    @testset "Detone" begin
+        rng = StableRNG(987654321)
+        X = randn(rng, 1000, 20)
+        T, N = size(X)
+        q = T / N
+        sigma = cov(X)
+
+        des = [NoDetone(), Detone(), Detone(; n = 3)]
+        detone = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv"), DataFrame)
+
+        for i ∈ 1:ncol(detone)
+            sigma1 = copy(sigma)
+            detone!(des[i], FNPDM_NearestCorrelationMatrix(), sigma1)
+            res = isapprox(sigma1, reshape(detone[!, i], MN))
+            if !res
+                println("Fails on iteration $i")
+            end
+            @test res
+        end
+    end
 end

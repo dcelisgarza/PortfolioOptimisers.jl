@@ -5,8 +5,8 @@ function Detone(; n::Integer = 1)
     @smart_assert(n >= zero(n))
     return Detone{typeof(n)}(n)
 end
-function detone!(ce::Detone, X::AbstractMatrix,
-                 fix_non_pos_def::FixNonPositiveDefiniteMatrix)
+function detone!(ce::Detone, fix_non_pos_def::FixNonPositiveDefiniteMatrix,
+                 X::AbstractMatrix)
     n = ce.n
     @smart_assert(one(size(X, 1)) <= n <= size(X, 1))
     n -= 1
