@@ -14,14 +14,16 @@ function MutualInfoCovariance(; ve::PortfolioOptimisersVarianceEstimator = Simpl
     return MutualInfoCovariance{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins,
                                                                              normalise)
 end
-function StatsBase.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1)
+function StatsBase.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
+                       kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
     return mutual_info(X, ce.bins, ce.normalise)
 end
-function StatsBase.cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1)
+function StatsBase.cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
+                       kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)

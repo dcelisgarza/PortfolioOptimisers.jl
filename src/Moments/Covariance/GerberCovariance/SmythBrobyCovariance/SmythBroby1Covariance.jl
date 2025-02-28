@@ -65,7 +65,8 @@ function _smythbroby1(ce::SmythBroby1Covariance, X::AbstractMatrix, mean_vec, st
     fix_non_positive_definite_matrix!(ce.fix_non_pos_def, rho)
     return rho
 end
-function StatsBase.cor(ce::SmythBroby1Covariance, X::AbstractMatrix; dims::Int = 1)
+function StatsBase.cor(ce::SmythBroby1Covariance, X::AbstractMatrix; dims::Int = 1,
+                       kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
@@ -76,7 +77,8 @@ function StatsBase.cor(ce::SmythBroby1Covariance, X::AbstractMatrix; dims::Int =
     std_vec[idx] .= eps(eltype(X))
     return _smythbroby1(ce, X, mean_vec, std_vec)
 end
-function StatsBase.cov(ce::SmythBroby1Covariance, X::AbstractMatrix; dims::Int = 1)
+function StatsBase.cov(ce::SmythBroby1Covariance, X::AbstractMatrix; dims::Int = 1,
+                       kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)

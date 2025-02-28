@@ -31,14 +31,14 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05)
 
     return rho
 end
-function StatsBase.cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1)
+function StatsBase.cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
     return lower_tail_dependence(X, ce.alpha)
 end
-function StatsBase.cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1)
+function StatsBase.cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)

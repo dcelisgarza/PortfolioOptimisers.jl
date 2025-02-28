@@ -63,7 +63,7 @@ function _smythbroby0normalised(ce::SmythBroby0NormalisedCovariance, X::Abstract
     return rho
 end
 function StatsBase.cor(ce::SmythBroby0NormalisedCovariance, X::AbstractMatrix;
-                       dims::Int = 1)
+                       dims::Int = 1, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
@@ -76,7 +76,7 @@ function StatsBase.cor(ce::SmythBroby0NormalisedCovariance, X::AbstractMatrix;
     return _smythbroby0normalised(ce, X)
 end
 function StatsBase.cov(ce::SmythBroby0NormalisedCovariance, X::AbstractMatrix;
-                       dims::Int = 1)
+                       dims::Int = 1, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)

@@ -30,7 +30,7 @@ function _gerber2(ce::Gerber2Covariance, X::AbstractMatrix, std_vec)
     fix_non_positive_definite_matrix!(ce.fix_non_pos_def, rho)
     return rho
 end
-function StatsBase.cor(ce::Gerber2Covariance, X::AbstractMatrix; dims::Int = 1)
+function StatsBase.cor(ce::Gerber2Covariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
@@ -38,7 +38,7 @@ function StatsBase.cor(ce::Gerber2Covariance, X::AbstractMatrix; dims::Int = 1)
     std_vec = std(ce.ve, X; dims = 1)
     return _gerber2(ce, X, std_vec)
 end
-function StatsBase.cov(ce::Gerber2Covariance, X::AbstractMatrix; dims::Int = 1)
+function StatsBase.cov(ce::Gerber2Covariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)

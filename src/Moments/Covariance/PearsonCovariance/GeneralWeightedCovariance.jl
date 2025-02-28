@@ -11,7 +11,7 @@ function GeneralWeightedCovariance(;
     return GeneralWeightedCovariance{typeof(ce), typeof(w)}(ce, w)
 end
 function StatsBase.cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1,
-                       mean = nothing)
+                       mean = nothing, kwargs...)
     return if isnothing(ce.w)
         cov(ce.ce, X; dims = dims, mean = mean)
     else
@@ -19,7 +19,7 @@ function StatsBase.cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::I
     end
 end
 function StatsBase.cor(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1,
-                       mean = nothing)
+                       mean = nothing, kwargs...)
     if isnothing(ce.w)
         robust_cor(ce.ce, X; dims = dims, mean = mean)
     else
