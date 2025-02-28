@@ -1,7 +1,37 @@
 @safetestset "Moments" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
           CSV, DataFrames
+    @testset "Canonical Distance" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 20)
+        ces = [FullCovariance(), SemiCovariance(), SpearmanCovariance(),
+               KendallCovariance(), MutualInfoCovariance(), DistanceCovariance(),
+               LTDCovariance(; alpha = 0.15), Gerber0Covariance(),
+               Gerber0NormalisedCovariance(), Gerber1Covariance(),
+               Gerber1NormalisedCovariance(), Gerber2Covariance(),
+               Gerber2NormalisedCovariance(), SmythBroby0Covariance(),
+               SmythBroby0NormalisedCovariance(), SmythBroby1Covariance(),
+               SmythBroby1NormalisedCovariance(), SmythBroby2Covariance(),
+               SmythBroby2NormalisedCovariance(), SmythBrobyGerber0Covariance(),
+               SmythBrobyGerber0NormalisedCovariance(), SmythBrobyGerber1Covariance(),
+               SmythBrobyGerber1NormalisedCovariance(), SmythBrobyGerber2Covariance(),
+               SmythBrobyGerber2NormalisedCovariance()]
+        dist_t = CSV.read(joinpath(@__DIR__, "./assets/Canonical-Distance.csv"), DataFrame)
+
+        de = CanonicalDistance()
+        for i ∈ 1:ncol(dist_t)
+            dist = distance(de, ces[i], X)
+            MN = size(dist)
+            res = isapprox(dist, reshape(dist_t[!, i], MN))
+            if !res
+                println("Fails on iteration $i")
+            end
+            @test res
+        end
+    end
     @testset "Canonical Distance Distance" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 20)
         ces = [FullCovariance(), SemiCovariance(), SpearmanCovariance(),
                KendallCovariance(), MutualInfoCovariance(), DistanceCovariance(),
                LTDCovariance(; alpha = 0.15), Gerber0Covariance(),
@@ -174,32 +204,6 @@
                 println("Fails on cor iteration $i")
             end
             @test res2
-        end
-    end
-    @testset "Canonical Distance" begin
-        ces = [FullCovariance(), SemiCovariance(), SpearmanCovariance(),
-               KendallCovariance(), MutualInfoCovariance(), DistanceCovariance(),
-               LTDCovariance(; alpha = 0.15), Gerber0Covariance(),
-               Gerber0NormalisedCovariance(), Gerber1Covariance(),
-               Gerber1NormalisedCovariance(), Gerber2Covariance(),
-               Gerber2NormalisedCovariance(), SmythBroby0Covariance(),
-               SmythBroby0NormalisedCovariance(), SmythBroby1Covariance(),
-               SmythBroby1NormalisedCovariance(), SmythBroby2Covariance(),
-               SmythBroby2NormalisedCovariance(), SmythBrobyGerber0Covariance(),
-               SmythBrobyGerber0NormalisedCovariance(), SmythBrobyGerber1Covariance(),
-               SmythBrobyGerber1NormalisedCovariance(), SmythBrobyGerber2Covariance(),
-               SmythBrobyGerber2NormalisedCovariance()]
-        dist_t = CSV.read(joinpath(@__DIR__, "./assets/Canonical-Distance.csv"), DataFrame)
-
-        de = CanonicalDistance()
-        for i ∈ 1:ncol(dist_t)
-            dist = distance(de, ces[i], X)
-            MN = size(dist)
-            res = isapprox(dist, reshape(dist_t[!, i], MN))
-            if !res
-                println("Fails on iteration $i")
-            end
-            @test res
         end
     end
     @testset "cov2cor" begin
