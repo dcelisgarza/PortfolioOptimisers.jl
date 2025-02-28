@@ -2,12 +2,12 @@ struct PortfolioOptimisersCovariance{T1 <: StatsBase.CovarianceEstimator,
                                      T2 <: MatrixProcessing} <:
        PortfolioOptimisersCovarianceEstimator
     ce::T1
-    processing::T2
+    mp::T2
 end
 function PortfolioOptimisersCovariance(;
                                        ce::StatsBase.CovarianceEstimator = FullCovariance(),
-                                       processing::MatrixProcessing = DefaultMatrixProcessing())
-    return PortfolioOptimisersCovariance{typeof(ce), typeof(processing)}(ce, processing)
+                                       mp::MatrixProcessing = DefaultMatrixProcessing())
+    return PortfolioOptimisersCovariance{typeof(ce), typeof(mp)}(ce, mp)
 end
 function StatsBase.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
                        kwargs...)
@@ -17,7 +17,7 @@ function StatsBase.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dim
     end
     T, N = size(X)
     sigma = cov(ce.ce, X)
-    mtx_process!(ce.processing, sigma, T, N)
+    mtx_process!(ce.mp, sigma, T, N)
     return sigma
 end
 function StatsBase.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
@@ -28,7 +28,7 @@ function StatsBase.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dim
     end
     T, N = size(X)
     rho = cor(ce.ce, X)
-    mtx_process!(ce.processing, rho, T, N)
+    mtx_process!(ce.mp, rho, T, N)
     return rho
 end
 
