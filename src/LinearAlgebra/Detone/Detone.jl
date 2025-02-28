@@ -5,7 +5,7 @@ function Detone(; n::Integer = 1)
     @smart_assert(n >= zero(n))
     return Detone{typeof(n)}(n)
 end
-function detone!(ce::Detone, fnpd::FixNonPositiveDefiniteMatrix, X::AbstractMatrix)
+function detone!(ce::Detone, fnpdm::FixNonPositiveDefiniteMatrix, X::AbstractMatrix)
     n = ce.n
     @smart_assert(one(size(X, 1)) <= n <= size(X, 1))
     n -= 1
@@ -23,7 +23,7 @@ function detone!(ce::Detone, fnpd::FixNonPositiveDefiniteMatrix, X::AbstractMatr
     X .-= _vecs * _vals * transpose(_vecs)
     X .= cov2cor(X)
 
-    fix_non_positive_definite_matrix!(fnpd, X)
+    fix_non_positive_definite_matrix!(fnpdm, X)
 
     if iscov
         StatsBase.cor2cov!(X, s)

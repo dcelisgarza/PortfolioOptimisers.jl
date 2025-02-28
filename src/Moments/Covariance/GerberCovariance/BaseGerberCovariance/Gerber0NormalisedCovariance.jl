@@ -4,17 +4,17 @@ struct Gerber0NormalisedCovariance{T1 <: ExpectedReturnsEstimator,
        BaseGerberCovariance
     me::T1
     ve::T2
-    fnpd::T3
+    fnpdm::T3
     threshold::T4
 end
 function Gerber0NormalisedCovariance(;
                                      me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
                                      ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                                     fnpd::FixNonPositiveDefiniteMatrix = FNPD_NearestCorrelationMatrix(),
+                                     fnpdm::FixNonPositiveDefiniteMatrix = FNPDM_NearestCorrelationMatrix(),
                                      threshold::Real = 0.5)
     @smart_assert(zero(threshold) < threshold < one(threshold))
-    return Gerber0NormalisedCovariance{typeof(me), typeof(ve), typeof(fnpd),
-                                       typeof(threshold)}(me, ve, fnpd, threshold)
+    return Gerber0NormalisedCovariance{typeof(me), typeof(ve), typeof(fnpdm),
+                                       typeof(threshold)}(me, ve, fnpdm, threshold)
 end
 function _gerber0normalised(ce::Gerber0NormalisedCovariance, X::AbstractMatrix)
     T, N = size(X)
@@ -28,7 +28,7 @@ function _gerber0normalised(ce::Gerber0NormalisedCovariance, X::AbstractMatrix)
     UmD = U - D
     UpD = U + D
     rho = (transpose(UmD) * UmD) ./ (transpose(UpD) * UpD)
-    fix_non_positive_definite_matrix!(ce.fnpd, rho)
+    fix_non_positive_definite_matrix!(ce.fnpdm, rho)
     return rho
 end
 function StatsBase.cor(ce::Gerber0NormalisedCovariance, X::AbstractMatrix; dims::Int = 1,
