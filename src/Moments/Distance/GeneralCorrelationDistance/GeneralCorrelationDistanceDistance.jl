@@ -9,7 +9,7 @@ end
 function GeneralCorrelationDistanceDistance(; power::Integer = 1,
                                             dist::Distances.Metric = Distances.Euclidean(),
                                             args::Tuple = (), kwargs::NamedTuple = (;))
-    @smart_assert(power > one(power))
+    @smart_assert(power >= one(power))
     return GeneralCorrelationDistanceDistance{typeof(power), typeof(dist), typeof(args),
                                               typeof(kwargs)}(power, dist, args, kwargs)
 end

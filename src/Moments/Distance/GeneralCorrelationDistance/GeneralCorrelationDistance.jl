@@ -2,7 +2,7 @@ struct GeneralCorrelationDistance{T1 <: Integer} <: PortfolioOptimisersDistanceM
     power::T1
 end
 function GeneralCorrelationDistance(; power::Integer = 1)
-    @smart_assert(power > one(power))
+    @smart_assert(power >= one(power))
     return GeneralCorrelationDistance{typeof(power)}(power)
 end
 function distance(de::GeneralCorrelationDistance, ce::StatsBase.CovarianceEstimator,

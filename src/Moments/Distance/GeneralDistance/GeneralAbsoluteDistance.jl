@@ -2,7 +2,7 @@ struct GeneralAbsoluteDistance{T1 <: Integer} <: PortfolioOptimisersDistanceMetr
     power::T1
 end
 function GeneralAbsoluteDistance(; power::Integer = 1)
-    @smart_assert(power > one(power))
+    @smart_assert(power >= one(power))
     return GeneralAbsoluteDistance{typeof(power)}(power)
 end
 function distance(de::GeneralAbsoluteDistance, ce::StatsBase.CovarianceEstimator,

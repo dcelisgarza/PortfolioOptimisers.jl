@@ -2,7 +2,7 @@ struct GeneralLogDistance{T1 <: Integer} <: PortfolioOptimisersDistanceMetric
     power::T1
 end
 function GeneralLogDistance(; power::Integer = 1)
-    @smart_assert(power > one(power))
+    @smart_assert(power >= one(power))
     return GeneralLogDistance{typeof(power)}(power)
 end
 function distance(de::GeneralLogDistance, ce::StatsBase.CovarianceEstimator,

@@ -21,7 +21,7 @@ function GeneralVariationInfoDistanceDistance(; power::Integer = 1,
     if isa(bins, Integer)
         @smart_assert(bins > zero(bins))
     end
-    @smart_assert(power > one(power))
+    @smart_assert(power >= one(power))
     return GeneralVariationInfoDistanceDistance{typeof(power), typeof(ve), typeof(bins),
                                                 typeof(normalise), typeof(dist),
                                                 typeof(args), typeof(kwargs)}(power, ve,
