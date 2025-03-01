@@ -3,13 +3,15 @@ struct DBHT_UniqueRoot <: DBHT_RootType end
 struct DBHT_EqualRoot <: DBHT_RootType end
 
 abstract type SimilarityMatrixEstimator end
-struct DBHTExp <: SimilarityMatrixEstimator end
-struct DBHTMaxDist <: SimilarityMatrixEstimator end
+struct DBHT_ExponentialSimilarity <: SimilarityMatrixEstimator end
+struct DBHT_MaximumDistanceSimilarity <: SimilarityMatrixEstimator end
 
-function dbht_similarity(::DBHTExp, S, D)
+export DBHT_ExponentialSimilarity, DBHT_MaximumDistanceSimilarity
+
+function dbht_similarity(::DBHT_ExponentialSimilarity, S, D)
     return exp.(-D)
 end
-function dbht_similarity(::DBHTMaxDist, S, D)
+function dbht_similarity(::DBHT_MaximumDistanceSimilarity, S, D)
     return ceil(maximum(D)^2) .- D .^ 2
 end
 

@@ -4,7 +4,7 @@ struct LoGo{T1 <: PortfolioOptimisersUnionDistanceMetric,
     similarity::T2
 end
 function LoGo(; dist::PortfolioOptimisersUnionDistanceMetric = CanonicalDistance(),
-              similarity::SimilarityMatrixEstimator = DBHTMaxDist())
+              similarity::SimilarityMatrixEstimator = DBHT_MaximumDistanceSimilarity())
     return LoGo{typeof(dist), typeof(similarity)}(dist, similarity)
 end
 function LoGo!(je::LoGo, fnpdm::FixNonPositiveDefiniteMatrix, sigma::AbstractMatrix,
@@ -18,6 +18,7 @@ function LoGo!(je::LoGo, fnpdm::FixNonPositiveDefiniteMatrix, sigma::AbstractMat
     else
         sigma
     end
+
     D = distance(je.dist, S, X; dims = dims)
     S = dbht_similarity(je.similarity, S, D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
