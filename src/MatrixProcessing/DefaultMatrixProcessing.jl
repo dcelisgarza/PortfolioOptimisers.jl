@@ -13,12 +13,13 @@ function DefaultMatrixProcessing(;
     return DefaultMatrixProcessing{typeof(fnpdm), typeof(denoise), typeof(detone),
                                    typeof(logo)}(fnpdm, denoise, detone, logo)
 end
-function mtx_process!(mp::DefaultMatrixProcessing, X::AbstractMatrix, T, N, args...;
-                      kwargs...)
-    fix_non_positive_definite_matrix!(mp.fnpdm, X)
-    denoise!(mp.denoise, mp.fnpdm, X, T / N)
-    detone!(mp.detone, mp.fnpdm, X)
-    logo!(mp.logo, mp.fnpdm, X)
+function mtx_process!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix, X::AbstractMatrix,
+                      args...; kwargs...)
+    T, N = size(X)
+    fix_non_positive_definite_matrix!(mp.fnpdm, sigma)
+    denoise!(mp.denoise, mp.fnpdm, sigma, T / N)
+    detone!(mp.detone, mp.fnpdm, sigma)
+    LoGo!(mp.logo, mp.fnpdm, sigma, X)
     return nothing
 end
 

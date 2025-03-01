@@ -146,9 +146,10 @@ include("./Moments/Distance/GeneralCanonicalDistance/GeneralCanonicalDistance.jl
 include("./Moments/Distance/GeneralCanonicalDistance/GeneralCanonicalDistanceDistance.jl")
 
 # DBHTs
-include("./DBHT/DBHT.jl")
-include("./DBHT/NoLoGo.jl")
-include("./DBHT/LoGo.jl")
+include("./DBHT/Clustering/DBHT.jl")
+include("./DBHT/LoGo/LoGo_AbstractTypes.jl")
+include("./DBHT/LoGo/NoLoGo.jl")
+include("./DBHT/LoGo/LoGo.jl")
 
 # Matrix Processing
 include("./MatrixProcessing/MatrixProcessing_AbstractTypes.jl")

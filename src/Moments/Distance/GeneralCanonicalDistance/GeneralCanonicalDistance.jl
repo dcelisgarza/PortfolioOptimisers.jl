@@ -23,5 +23,8 @@ function distance(de::GeneralCanonicalDistance, ce::StatsBase.CovarianceEstimato
                   X::AbstractMatrix; dims::Int = 1)
     return distance(GeneralDistance(; power = de.power), ce, X; dims = dims)
 end
+function distance(de::GeneralCanonicalDistance, rho::AbstractMatrix, args...; kwargs...)
+    return distance(GeneralDistance(; power = de.power), rho)
+end
 
 export GeneralCanonicalDistance

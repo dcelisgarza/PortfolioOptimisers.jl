@@ -12,7 +12,6 @@
         res5 = PortfolioOptimisers.outer_prod(transpose(X1), transpose(X2))
         res6 = PortfolioOptimisers.:⊗(X2, X1)
         res7 = PortfolioOptimisers.outer_prod(X2, X1)
-
         @test isapprox(res1, res2)
         @test isapprox(res1, res3)
         @test isapprox(res1, res4)
@@ -39,10 +38,8 @@
         T, N = size(X)
         q = T / N
         sigma = cov(X)
-
         des = [NoDenoise(), FixedDenoise(), ShrunkDenoise(), SpectralDenoise()]
         denoise_t = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv"), DataFrame)
-
         for i ∈ 1:ncol(denoise_t)
             sigma1 = copy(sigma)
             denoise!(des[i], FNPDM_NearestCorrelationMatrix(), sigma1, q)
@@ -60,10 +57,8 @@
         T, N = size(X)
         q = T / N
         sigma = cov(X)
-
         des = [NoDetone(), Detone(), Detone(; n = 3)]
         detone = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv"), DataFrame)
-
         for i ∈ 1:ncol(detone)
             sigma1 = copy(sigma)
             detone!(des[i], FNPDM_NearestCorrelationMatrix(), sigma1)

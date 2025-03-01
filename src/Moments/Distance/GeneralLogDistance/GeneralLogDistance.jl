@@ -15,5 +15,15 @@ function distance(de::GeneralLogDistance, ce::LTDCovariance, X::AbstractMatrix;
     rho = robust_cor(ce, X; dims = dims) .^ de.power
     return -log.(rho)
 end
+function distance(de::GeneralLogDistance, rho::AbstractMatrix, args...; kwargs...)
+    @smart_assert(size(rho, 1) == size(rho, 2))
+    s = diag(rho)
+    iscov = any(.!isone.(s))
+    if iscov
+        s .= sqrt.(s)
+        rho = StatsBase.cov2cor(rho, s)
+    end
+    return -log.(abs.(rho) .^ de.power)
+end
 
 export GeneralLogDistance

@@ -25,5 +25,16 @@ function distance(de::GeneralLogDistanceDistance, ce::LTDCovariance, X::Abstract
     dist = -log.(rho)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
+function distance(de::GeneralLogDistanceDistance, rho::AbstractMatrix, args...; kwargs...)
+    @smart_assert(size(rho, 1) == size(rho, 2))
+    s = diag(rho)
+    iscov = any(.!isone.(s))
+    if iscov
+        s .= sqrt.(s)
+        rho = StatsBase.cov2cor(rho, s)
+    end
+    dist = -log.(abs.(rho) .^ de.power)
+    return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
+end
 
 export GeneralLogDistanceDistance

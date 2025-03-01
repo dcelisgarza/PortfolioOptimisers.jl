@@ -8,6 +8,7 @@ function FNPDM_NearestCorrelationMatrix(;
 end
 function fix_non_positive_definite_matrix!(method::FNPDM_NearestCorrelationMatrix,
                                            X::AbstractMatrix)
+    @smart_assert(size(X, 1) == size(X, 2))
     if isposdef(X)
         return nothing
     end

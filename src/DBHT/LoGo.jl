@@ -1,1 +1,0 @@
-struct LoGo <: AbstractLoGo end

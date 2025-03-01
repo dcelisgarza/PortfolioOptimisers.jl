@@ -39,5 +39,10 @@ function distance(de::GeneralCanonicalDistanceDistance, ce::StatsBase.Covariance
                                             args = de.args, kwargs = de.kwargs), ce, X;
                     dims = dims)
 end
+function distance(de::GeneralCanonicalDistanceDistance, rho::AbstractMatrix, args...;
+                  kwargs...)
+    return distance(GeneralDistanceDistance(; power = de.power, dist = de.dist,
+                                            args = de.args, kwargs = de.kwargs), rho)
+end
 
 export GeneralCanonicalDistanceDistance

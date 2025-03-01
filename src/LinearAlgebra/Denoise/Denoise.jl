@@ -20,6 +20,7 @@ function find_max_eval(vals, q; kernel = AverageShiftedHistograms.Kernels.gaussi
 end
 function denoise!(de::DenoiseAlgorithm, fnpdm::FixNonPositiveDefiniteMatrix,
                   X::AbstractMatrix, q::Real)
+    @smart_assert(size(X, 1) == size(X, 2))
     s = diag(X)
     iscov = any(.!isone.(s))
     if iscov

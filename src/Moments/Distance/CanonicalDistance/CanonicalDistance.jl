@@ -15,5 +15,7 @@ function distance(::CanonicalDistance, ce::StatsBase.CovarianceEstimator, X::Abs
                   dims::Int = 1)
     return distance(SimpleDistance(), ce, X; dims = dims)
 end
-
+function distance(::CanonicalDistance, rho::AbstractMatrix, args...; kwargs...)
+    return distance(SimpleDistance(), rho)
+end
 export CanonicalDistance
