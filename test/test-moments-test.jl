@@ -1,6 +1,18 @@
 @safetestset "Moments" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
           CSV, DataFrames
+
+    function find_tol(a1, a2; name1 = :a1, name2 = :a2)
+        for rtol ∈
+            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
+             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
+             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
+            if isapprox(a1, a2; rtol = rtol)
+                println("isapprox($name1, $name2, rtol = $(rtol))")
+                break
+            end
+        end
+    end
     @testset "Expected Returns" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
@@ -32,6 +44,7 @@
             res = isapprox(er, reshape(ert[!, i], size(er)))
             if !res
                 println("Test $i fails on:\n$(me)\n$(res)\n")
+                find_tol(dist1, reshape(ert[!, i], size(er)); name1 = :er, name2 = :er_t)
             end
             @test res
         end
@@ -46,25 +59,43 @@
 
         ce = PortfolioOptimisersCovariance()
         for i ∈ 1:ncol(dist_t)
-            dist = distance(des[i], ce, X)
-            MN = size(dist)
-            res = isapprox(dist, reshape(dist_t[!, i], MN))
-            if !res
+            dist1 = distance(des[i], ce, X)
+            MN = size(dist1)
+            res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
+            if !res1
                 println("Fails on Absolute Distance iteration $i")
+                find_tol(dist1, reshape(dist_t[!, i], MN); name1 = :dist1, name2 = :dist1_t)
             end
-            @test res
+            @test res1
+
+            dist2 = distance(des[i], cov(ce, X), X)
+            res2 = isapprox(dist1, dist2)
+            if !res2
+                println("Fails on Absolute Distance method comparison iteration $i")
+                find_tol(dist1, reshape(dist_t[!, i], MN); name1 = :dist1, name2 = :dist2)
+            end
+            @test res2
         end
 
         des = [GeneralAbsoluteDistance(), GeneralAbsoluteDistanceDistance(),
                GeneralLogDistance(), GeneralLogDistanceDistance()]
         for i ∈ 1:ncol(dist_t)
-            dist = distance(des[i], ce, X)
-            MN = size(dist)
-            res = isapprox(dist, reshape(dist_t[!, i], MN))
-            if !res
-                println("Fails on General Absolute Distance iteration $i")
+            dist1 = distance(des[i], ce, X)
+            MN = size(dist1)
+            res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
+            if !res1
+                println("Fails on General Absolute Distance Distance iteration $i")
+                find_tol(dist1, reshape(dist_t[!, i], MN); name1 = :dist1, name2 = :dist1_t)
             end
-            @test res
+            @test res1
+
+            dist2 = distance(des[i], cov(ce, X), X)
+            res2 = isapprox(dist1, dist2)
+            if !res2
+                println("Fails on General Absolute Distance Distance method comparison iteration $i")
+                find_tol(dist1, reshape(dist_t[!, i], MN); name1 = :dist1, name2 = :dist2)
+            end
+            @test res2
         end
     end
     @testset "Canonical and General Canonical Distance" begin
@@ -87,24 +118,62 @@
 
         de = CanonicalDistance()
         for i ∈ 1:ncol(dist_t)
-            dist = distance(de, ces[i], transpose(X); dims = 2)
-            MN = size(dist)
-            res = isapprox(dist, reshape(dist_t[!, i], MN))
-            if !res
+            dist1 = distance(de, ces[i], transpose(X); dims = 2)
+            MN = size(dist1)
+            res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
+            if !res1
                 println("Fails on Canonical Distance iteration $i")
+                find_tol(dist1, reshape(dist_t[!, i], MN); name1 = :dist1, name2 = :dist1_t)
             end
-            @test res
+            @test res1
+
+            dist2 = if isa(ces[i], MutualInfoCovariance)
+                distance(VariationInfoDistance(; bins = ces[i].bins,
+                                               normalise = ces[i].normalise),
+                         cov(ces[i], X), X)
+            elseif isa(ces[i], DistanceCovariance)
+                distance(CorrelationDistance(;), cov(ces[i], X), X)
+            elseif isa(ces[i], LTDCovariance)
+                distance(LogDistance(), cov(ces[i], X), X)
+            else
+                distance(de, cov(ces[i], X), X)
+            end
+            res2 = isapprox(dist1, dist2)
+            if !res2
+                println("Fails on Canonical Distance method comparison iteration $i")
+                find_tol(dist1, dist2; name1 = :dist1, name2 = :dist2)
+            end
+            @test res2
         end
 
         de = GeneralCanonicalDistance()
         for i ∈ 1:ncol(dist_t)
-            dist = distance(de, ces[i], transpose(X); dims = 2)
-            MN = size(dist)
-            res = isapprox(dist, reshape(dist_t[!, i], MN))
-            if !res
+            dist1 = distance(de, ces[i], transpose(X); dims = 2)
+            MN = size(dist1)
+            res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
+            if !res1
                 println("Fails on General Canonical Distance iteration $i")
+                find_tol(dist1, reshape(dist_t[!, i], MN); name1 = :dist1, name2 = :dist1_t)
             end
-            @test res
+            @test res1
+
+            dist2 = if isa(ces[i], MutualInfoCovariance)
+                distance(GeneralVariationInfoDistance(; bins = ces[i].bins,
+                                                      normalise = ces[i].normalise),
+                         cov(ces[i], X), X)
+            elseif isa(ces[i], DistanceCovariance)
+                distance(GeneralCorrelationDistance(;), cov(ces[i], X), X)
+            elseif isa(ces[i], LTDCovariance)
+                distance(GeneralLogDistance(), cov(ces[i], X), X)
+            else
+                distance(de, cov(ces[i], X), X)
+            end
+            res2 = isapprox(dist1, dist2)
+            if !res2
+                println("Fails on General Canonical Distance method comparison iteration $i")
+                find_tol(dist1, dist2; name1 = :dist1, name2 = :dist2)
+            end
+            @test res2
         end
     end
     @testset "Canonical and General Canonical Distance Distance" begin
@@ -128,24 +197,62 @@
 
         de = CanonicalDistanceDistance()
         for i ∈ 1:ncol(dist_t)
-            dist = distance(de, ces[i], transpose(X); dims = 2)
-            MN = size(dist)
-            res = isapprox(dist, reshape(dist_t[!, i], MN))
-            if !res
+            dist1 = distance(de, ces[i], transpose(X); dims = 2)
+            MN = size(dist1)
+            res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
+            if !res1
                 println("Fails on Canonical Distance Distance iteration $i")
+                find_tol(dist1, reshape(dist_t[!, i], MN); name1 = :dist1, name2 = :dist1_t)
             end
-            @test res
+            @test res1
+
+            dist2 = if isa(ces[i], MutualInfoCovariance)
+                distance(VariationInfoDistanceDistance(; bins = ces[i].bins,
+                                                       normalise = ces[i].normalise),
+                         cov(ces[i], X), X)
+            elseif isa(ces[i], DistanceCovariance)
+                distance(CorrelationDistanceDistance(;), cov(ces[i], X), X)
+            elseif isa(ces[i], LTDCovariance)
+                distance(LogDistanceDistance(), cov(ces[i], X), X)
+            else
+                distance(de, cov(ces[i], X), X)
+            end
+            res2 = isapprox(dist1, dist2)
+            if !res2
+                println("Fails on Canonical Distance Distance method comparison iteration $i")
+                find_tol(dist1, dist2; name1 = :dist1, name2 = :dist2)
+            end
+            @test res2
         end
 
         de = GeneralCanonicalDistanceDistance()
         for i ∈ 1:ncol(dist_t)
-            dist = distance(de, ces[i], transpose(X); dims = 2)
-            MN = size(dist)
-            res = isapprox(dist, reshape(dist_t[!, i], MN))
-            if !res
+            dist1 = distance(de, ces[i], transpose(X); dims = 2)
+            MN = size(dist1)
+            res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
+            if !res1
                 println("Fails on General Canonical Distance Distance iteration $i")
+                find_tol(dist1, reshape(dist_t[!, i], MN); name1 = :dist1, name2 = :dist1_t)
             end
-            @test res
+            @test res1
+
+            dist2 = if isa(ces[i], MutualInfoCovariance)
+                distance(GeneralVariationInfoDistanceDistance(; bins = ces[i].bins,
+                                                              normalise = ces[i].normalise),
+                         cov(ces[i], X), X)
+            elseif isa(ces[i], DistanceCovariance)
+                distance(GeneralCorrelationDistanceDistance(;), cov(ces[i], X), X)
+            elseif isa(ces[i], LTDCovariance)
+                distance(GeneralLogDistanceDistance(), cov(ces[i], X), X)
+            else
+                distance(de, cov(ces[i], X), X)
+            end
+            res2 = isapprox(dist1, dist2)
+            if !res2
+                println("Fails on General Canonical Distance Distance method comparison iteration $i")
+                find_tol(dist1, dist2; name1 = :dist1, name2 = :dist2)
+            end
+            @test res2
         end
     end
     @testset "Covariance and Correlation correctness" begin
@@ -288,10 +395,12 @@
             res2 = isapprox(cr, reshape(cvrt[!, j + 1], MN))
             if !res1
                 println("Fails on cov iteration $i")
+                find_tol(cv, reshape(cvrt[!, j], MN); name1 = :cv, name2 = :cv_t)
             end
             @test res1
             if !res2
                 println("Fails on cor iteration $i")
+                find_tol(cr, reshape(cvrt[!, j + 1], MN); name1 = :cr, name2 = :cr_t)
             end
             @test res2
         end
@@ -397,30 +506,49 @@
         for (i, ce) ∈ pairs(ces)
             cv = cov(ce, X)
             cr = cor(ce, X)
-            result = isapprox(if isa(cv, Matrix)
-                                  StatsBase.cov2cor(cv)
-                              else
-                                  StatsBase.cov2cor(Matrix(cv))
-                              end, cr)
-            if !result
+            res1 = isapprox(if isa(cv, Matrix)
+                                StatsBase.cov2cor(cv)
+                            else
+                                StatsBase.cov2cor(Matrix(cv))
+                            end, cr)
+            if !res1
                 println("Test $i fails on:\n$(ce)\n")
+                find_tol(if isa(cv, Matrix)
+                             StatsBase.cov2cor(cv)
+                         else
+                             StatsBase.cov2cor(Matrix(cv))
+                         end, cr; name1 = :cv, name2 = :cr)
             end
-            @test result
+            @test res1
 
             cvt = cov(ce, Matrix(transpose(X)); dims = 2)
             crt = cor(ce, Matrix(transpose(X)); dims = 2)
-            resultt = isapprox(if isa(cvt, Matrix)
-                                   StatsBase.cov2cor(cvt)
-                               else
-                                   StatsBase.cov2cor(Matrix(cvt))
-                               end, crt)
-            if !resultt
+            res2 = isapprox(if isa(cvt, Matrix)
+                                StatsBase.cov2cor(cvt)
+                            else
+                                StatsBase.cov2cor(Matrix(cvt))
+                            end, crt)
+            if !res2
                 println("Test `dims = 2` $i fails on:\n$(ce)\n")
+                find_tol(if isa(cvt, Matrix)
+                             StatsBase.cov2cor(cvt)
+                         else
+                             StatsBase.cov2cor(Matrix(cvt))
+                         end, crt; name1 = :cvt, name2 = :crt)
             end
-            @test resultt
+            @test res2
 
-            @test isapprox(cv, cvt)
-            @test isapprox(cr, crt)
+            res3 = isapprox(cv, cvt)
+            if !res3
+                find_tol(cv, cvt; name1 = :cv, name2 = :cvt)
+            end
+            @test res3
+
+            res4 = isapprox(cr, crt)
+            if !res4
+                find_tol(cr, crt; name1 = :cr, name2 = :crt)
+            end
+            @test res4
         end
     end
     @testset "SimpleVariance" begin

@@ -1,9 +1,9 @@
-struct LoGo{T1 <: PortfolioOptimisersDistanceMetric, T2 <: SimilarityMatrixEstimator} <:
-       AbstractLoGo
+struct LoGo{T1 <: PortfolioOptimisersUnionDistanceMetric,
+            T2 <: SimilarityMatrixEstimator} <: AbstractLoGo
     dist::T1
     similarity::T2
 end
-function LoGo(; dist::PortfolioOptimisersDistanceMetric = CanonicalDistance(),
+function LoGo(; dist::PortfolioOptimisersUnionDistanceMetric = CanonicalDistance(),
               similarity::SimilarityMatrixEstimator = DBHTMaxDist())
     return LoGo{typeof(dist), typeof(similarity)}(dist, similarity)
 end

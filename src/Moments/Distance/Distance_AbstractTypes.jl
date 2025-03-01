@@ -1,7 +1,9 @@
-abstract type PortfolioOptimisersDistanceMetric <: Distances.Metric end
+abstract type PortfolioOptimisersUnionDistanceMetric <: Distances.Metric end
+abstract type PortfolioOptimisersDistanceMetric <: PortfolioOptimisersUnionDistanceMetric end
 abstract type PortfolioOptimisersAbsoluteDistanceMetric <: PortfolioOptimisersDistanceMetric end
 
-abstract type PortfolioOptimisersDistanceDistanceMetric <: Distances.Metric end
+abstract type PortfolioOptimisersDistanceDistanceMetric <:
+              PortfolioOptimisersUnionDistanceMetric end
 abstract type PortfolioOptimisersAbsoluteDistanceDistanceMetric <:
               PortfolioOptimisersDistanceDistanceMetric end
 
