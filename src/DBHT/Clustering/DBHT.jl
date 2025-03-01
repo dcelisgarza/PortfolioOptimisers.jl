@@ -14,6 +14,7 @@ end
 function dbht_similarity(::DBHT_MaximumDistanceSimilarity, S, D)
     return ceil(maximum(D)^2) .- D .^ 2
 end
+export dbht_similarity
 
 """
 ```

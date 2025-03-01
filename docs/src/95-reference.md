@@ -1,5 +1,8 @@
 # [Reference](@id reference)
 
+```@bibliography
+```
+
 ## Contributors
 
 ```@raw html

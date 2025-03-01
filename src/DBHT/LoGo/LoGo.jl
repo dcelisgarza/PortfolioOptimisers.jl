@@ -7,9 +7,18 @@ function LoGo(; dist::PortfolioOptimisersUnionDistanceMetric = CanonicalDistance
               similarity::SimilarityMatrixEstimator = DBHT_MaximumDistanceSimilarity())
     return LoGo{typeof(dist), typeof(similarity)}(dist, similarity)
 end
+function LoGo_dist_assert(::Union{VariationInfoDistance, VariationInfoDistanceDistance},
+                          sigma::AbstractMatrix, X::AbstractMatrix)
+    @smart_assert(size(sigma, 1) == size(X, 2))
+    return nothing
+end
+function LoGo_dist_assert(args...)
+    return nothing
+end
 function LoGo!(je::LoGo, fnpdm::FixNonPositiveDefiniteMatrix, sigma::AbstractMatrix,
                X::AbstractMatrix; dims::Int = 1)
     @smart_assert(size(sigma, 1) == size(sigma, 2))
+    LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
     iscov = any(.!isone.(s))
     S = if iscov
@@ -18,7 +27,6 @@ function LoGo!(je::LoGo, fnpdm::FixNonPositiveDefiniteMatrix, sigma::AbstractMat
     else
         sigma
     end
-
     D = distance(je.dist, S, X; dims = dims)
     S = dbht_similarity(je.similarity, S, D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
