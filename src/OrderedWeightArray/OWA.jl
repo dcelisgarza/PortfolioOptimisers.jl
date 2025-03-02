@@ -20,7 +20,6 @@ function owa_wcvar(T::Integer, alphas::AbstractVector{<:Real},
     for (i, j) ∈ zip(alphas, weights)
         w .+= owa_cvar(T, i) * j
     end
-
     return w
 end
 function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
@@ -34,13 +33,11 @@ function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Int
         w[i] = (alphas[i + 1] - alphas[i - 1]) * alphas[i] / alphas[n]^2
     end
     w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]
-    w = owa_wcvar(T, alphas, w)
-    return w
+    return owa_wcvar(T, alphas, w)
 end
 function owa_wr(T::Integer)
     w = zeros(typeof(inv(T)), T)
     w[1] = -1
-
     return w
 end
 function owa_rg(T::Integer)
@@ -50,8 +47,7 @@ function owa_rg(T::Integer)
     return w
 end
 function owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
-    w = owa_cvar(T, alpha) .- reverse(owa_cvar(T, beta))
-    return w
+    return owa_cvar(T, alpha) .- reverse(owa_cvar(T, beta))
 end
 function owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
                      weights_a::AbstractVector{<:Real},
@@ -83,7 +79,6 @@ function owa_l_moment(T::Integer, k::Integer = 2)
         a *= 1 / (k * binomial(T, k))
         w[i] = a
     end
-
     return w
 end
 function owa_l_moment_crm(T::Integer; k::Integer = 2,
@@ -97,3 +92,6 @@ function owa_l_moment_crm(T::Integer; k::Integer = 2,
     end
     return owa_l_moment_crm(method, weights)
 end
+
+export owa_gmd, owa_cvar, owa_wcvar, owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_wcvarrg,
+       owa_tgrg, owa_l_moment, owa_l_moment_crm
