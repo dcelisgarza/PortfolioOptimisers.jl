@@ -82,7 +82,7 @@ function owa_l_moment(T::Integer, k::Integer = 2)
     return w
 end
 function owa_l_moment_crm(T::Integer; k::Integer = 2,
-                          method::AbstractOrderedWeightArrays = OWA_NCRRA())
+                          method::AbstractOrderedWeightsArray = OWA_NCRRA())
     @smart_assert(k >= 2)
     rg = 2:k
     weights = Matrix{typeof(inv(T * k))}(undef, T, length(rg))

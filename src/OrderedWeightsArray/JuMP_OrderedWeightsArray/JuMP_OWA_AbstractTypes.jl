@@ -1,5 +1,5 @@
-abstract type JuMP_OrderedWeightArrays <: AbstractOrderedWeightArrays end
-function owa_model_setup(method::JuMP_OrderedWeightArrays, weights::AbstractMatrix{<:Real})
+abstract type JuMP_OrderedWeightsArray <: AbstractOrderedWeightsArray end
+function owa_model_setup(method::JuMP_OrderedWeightsArray, weights::AbstractMatrix{<:Real})
     T, N = size(weights)
     model = JuMP.Model()
     max_phi = method.max_phi
@@ -18,7 +18,7 @@ function owa_model_setup(method::JuMP_OrderedWeightArrays, weights::AbstractMatr
                  end)
     return model
 end
-function owa_model_solve(model::JuMP.Model, method::JuMP_OrderedWeightArrays,
+function owa_model_solve(model::JuMP.Model, method::JuMP_OrderedWeightsArray,
                          weights::AbstractMatrix)
     solvers = method.solvers
     success = optimise_JuMP_model(model, solvers)[1]

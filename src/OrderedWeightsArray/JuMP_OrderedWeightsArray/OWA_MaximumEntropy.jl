@@ -1,6 +1,6 @@
 struct OWA_MaximumEntropy{T1 <: Real, T2 <: Real, T3 <: Real,
                           T4 <: Union{Solver, <:AbstractVector{Solver}}} <:
-       JuMP_OrderedWeightArrays
+       JuMP_OrderedWeightsArray
     max_phi::T1
     scale_constr::T2
     scale_obj::T3

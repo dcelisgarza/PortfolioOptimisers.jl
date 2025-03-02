@@ -1,4 +1,4 @@
-struct OWA_NCRRA{T1 <: Real} <: AbstractOrderedWeightArrays
+struct OWA_NCRRA{T1 <: Real} <: AbstractOrderedWeightsArray
     g::T1
 end
 function OWA_NCRRA(; g::Real = 0.5)
