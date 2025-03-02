@@ -44,4 +44,4 @@ function mtx_process!(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMa
     return nothing
 end
 
-export DefaultMatrixProcessing
+export DefaultMatrixProcessing, NonPositiveDefiniteMatrixProcessing

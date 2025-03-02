@@ -1,6 +1,6 @@
 
-mutable struct LTDCovariance{T1 <: PortfolioOptimisersVarianceEstimator, T2 <: Real} <:
-               PortfolioOptimisersCovarianceEstimator
+struct LTDCovariance{T1 <: PortfolioOptimisersVarianceEstimator, T2 <: Real} <:
+       PortfolioOptimisersCovarianceEstimator
     ve::T1
     alpha::T2
 end
@@ -9,7 +9,6 @@ function LTDCovariance(; ve::PortfolioOptimisersVarianceEstimator = SimpleVarian
     @smart_assert(zero(alpha) < alpha < one(alpha))
     return LTDCovariance{typeof(ve), typeof(alpha)}(ve, alpha)
 end
-
 function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05)
     T, N = size(X)
     k = ceil(Int, T * alpha)

@@ -15,6 +15,19 @@ end PortfolioOptimisers
 ## Operators
 include("./LinearAlgebra/Operators.jl")
 
+# Solver
+include("./ModelOptimisation/Solver.jl")
+include("./ModelOptimisation/OptimiseModel.jl")
+
+# Ordered Weight Arrays
+include("./OrderedWeightArray/OrderedWeightArray_AbstractTypes.jl")
+include("./OrderedWeightArray/OWA_NCRRA.jl")
+include("./OrderedWeightArray/JuMP_OrderedWeightArrays/JuMP_OWA_AbstractTypes.jl")
+include("./OrderedWeightArray/JuMP_OrderedWeightArrays/OWA_MaximumEntropy.jl")
+include("./OrderedWeightArray/JuMP_OrderedWeightArrays/OWA_MinimumSumSquares.jl")
+include("./OrderedWeightArray/JuMP_OrderedWeightArrays/OWA_MinimumSquareDistance.jl")
+include("./OrderedWeightArray/OWA.jl")
+
 # Fix Non Positive Definite
 include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_AbstractTypes.jl")
 include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_NoFix.jl")

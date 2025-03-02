@@ -1,15 +1,15 @@
 """
-    abstract type DBHT_RootType end
+    abstract type DBHT_RootMethod end
 """
-abstract type DBHT_RootType end
+abstract type DBHT_RootMethod end
 """
-    struct DBHT_UniqueRoot <: DBHT_RootType end
+    struct DBHT_UniqueRoot <: DBHT_RootMethod end
 """
-struct DBHT_UniqueRoot <: DBHT_RootType end
+struct DBHT_UniqueRoot <: DBHT_RootMethod end
 """
-    struct DBHT_EqualRoot <: DBHT_RootType end
+    struct DBHT_EqualRoot <: DBHT_RootMethod end
 """
-struct DBHT_EqualRoot <: DBHT_RootType end
+struct DBHT_EqualRoot <: DBHT_RootMethod end
 
 abstract type SimilarityMatrixEstimator end
 struct DBHT_ExponentialSimilarity <: SimilarityMatrixEstimator end
@@ -578,7 +578,7 @@ Looks for 3-cliques of a Maximal Planar Graph (MPG), then construct a hierarchy 
 
   - `Apm`: `N×N` adjacency matrix of an MPG.
 
-  - `type`: type for finding the root of the graph [`DBHT_RootType`](@ref). Uses Voronoi tesselation between tiling triangles.
+  - `type`: type for finding the root of the graph [`DBHT_RootMethod`](@ref). Uses Voronoi tesselation between tiling triangles.
 
       + [`DBHT_UniqueRoot`](@ref): create a unique root.
       + [`DBHT_EqualRoot`](@ref): the root is created from the candidate's adjacency tree.
@@ -592,7 +592,7 @@ Looks for 3-cliques of a Maximal Planar Graph (MPG), then construct a hierarchy 
   - `Sb`: `Nc×1` vector. `Sb[n] = 1` indicates 3-clique `n` is separating.
 """
 function CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real},
-                             type::DBHT_RootType = DBHT_UniqueRoot())
+                             root_method::DBHT_RootMethod = DBHT_UniqueRoot())
     N = size(Apm, 1)
     A = Apm .!= 0
     K3, E, clique = clique3(A)
@@ -619,7 +619,7 @@ function CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real},
     Pred = BuildHierarchy(M)
     Root = findall(Pred .== 0)
 
-    H = CliqueRoot(type, Root, Pred, Nc, A, CliqList)
+    H = CliqueRoot(root_method, Root, Pred, Nc, A, CliqList)
 
     if !isempty(H)
         H2, Mb = BubbleHierarchy(Pred, Sb)
@@ -1077,7 +1077,7 @@ Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering a
 
     Where ``\\mathbf{C}`` is the correlation matrix, ``\\mathbf{D}`` the dissimilarity matrix `D`, and ``\\odot`` the Hadamard (elementwise) operator.
   - `branchorder`: parameter for ordering the final dendrogram's branches accepted by [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
-  - `type`: type for finding the root of a Direct Bubble Hierarchical Clustering Tree in case there is more than one candidate [`DBHT_RootType`](@ref).
+  - `type`: type for finding the root of a Direct Bubble Hierarchical Clustering Tree in case there is more than one candidate [`DBHT_RootMethod`](@ref).
 
       + `:Unique`: create a unique root.
       + `:Equal`: the root is created from the candidate's adjacency tree.
@@ -1093,7 +1093,8 @@ Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering a
   - `Z_hclust`: Z matrix in [Clustering.Hclust](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format.
 """
 function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
-               branchorder::Symbol = :optimal, type::DBHT_RootType = DBHT_UniqueRoot())
+               branchorder::Symbol = :optimal,
+               root_method::DBHT_RootMethod = DBHT_UniqueRoot())
     @assert(issymmetric(D), "Distance matrix should be symmetric.")
     @assert(issymmetric(S), "Similarity matrix should be symmetric.")
 
@@ -1102,7 +1103,7 @@ function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
     Apm[Apm .!= 0] .= D[Apm .!= 0]
     Dpm = distance_wei(Apm)[1]
 
-    H1, Hb, Mb, CliqList, Sb = CliqHierarchyTree2s(Rpm, type)
+    H1, Hb, Mb, CliqList, Sb = CliqHierarchyTree2s(Rpm, root_method)
 
     Mb = Mb[1:size(CliqList, 1), :]
 
