@@ -11,8 +11,7 @@ using AverageShiftedHistograms, Clustering, Distances, GLM, JuMP, LinearAlgebra,
     read(path, String)
 end PortfolioOptimisers
 
-# Utility
-## Operators
+# Linear Algebra
 include("./LinearAlgebra/Operators.jl")
 
 # Solver
@@ -180,5 +179,8 @@ include("./Moments/Coskewness/SemiCoskewness.jl")
 include("./Moments/Cokurtosis/Cokurtosis_AbstractTypes.jl")
 include("./Moments/Cokurtosis/FullCokurtosis.jl")
 include("./Moments/Cokurtosis/SemiCokurtosis.jl")
+
+# Utils
+include("./Utils/Utils.jl")
 
 end

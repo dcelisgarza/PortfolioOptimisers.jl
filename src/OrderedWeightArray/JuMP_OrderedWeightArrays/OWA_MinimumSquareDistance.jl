@@ -25,7 +25,7 @@ function owa_l_moment_crm(method::OWA_MinimumSquareDistance,
     theta = model[:theta]
     @variable(model, t)
     @constraint(model,
-                [scale_constr * t; scale_constr * (theta[2:end] .- theta[1:(end - 1)])] ∈
+                scale_constr * [t; (theta[2:end] .- theta[1:(end - 1)])] ∈
                 SecondOrderCone())
     @objective(model, Min, scale_obj * t)
     return owa_model_solve(model, method, weights)

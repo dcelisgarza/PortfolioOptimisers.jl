@@ -5,12 +5,12 @@ function optimise_JuMP_model(model::JuMP.Model,
     for solver ∈ solvers
         name = solver.name
         solver_i = solver.solver
-        params = solver.params
+        settings = solver.settings
         add_bridges = solver.add_bridges
         check_sol = solver.check_sol
         set_optimizer(model, solver_i; add_bridges = add_bridges)
-        if !isnothing(params) && !isempty(params)
-            for (k, v) ∈ params
+        if !isnothing(settings) && !isempty(settings)
+            for (k, v) ∈ settings
                 set_attribute(model, k, v)
             end
         end
@@ -27,7 +27,7 @@ function optimise_JuMP_model(model::JuMP.Model,
         catch err
             push!(solvers_tried,
                   name => Dict(:objective_val => objective_value(model), :err => err,
-                               :params => params))
+                               :settings => settings))
         end
     end
     return success, solvers_tried

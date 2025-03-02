@@ -6,8 +6,8 @@ function OWA_NCRRA(; g::Real = 0.5)
     return OWA_NCRRA{typeof(g)}(g)
 end
 function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real)
-    k = size(weights, 2)
-    phis = Vector{eltype(weights)}(undef, k - 1)
+    N = size(weights, 2)
+    phis = Vector{eltype(weights)}(undef, N)
     e = 1
     for i ∈ eachindex(phis)
         e *= g + i - 1
