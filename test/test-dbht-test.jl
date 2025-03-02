@@ -129,9 +129,6 @@
         @test isapprox(cliques1, cliques1_t)
         @test isapprox(cliqueTree1, cliqueTree1_t)
 
-        using PortfolioOptimisers, DataFrames, CSV, Random, StableRNGs, Test, StatsBase,
-              Statistics, Clustering, SparseArrays
-
         rng = StableRNG(1357268)
         X = randn(rng, 1000, 20)
         ce = PortfolioOptimisersCovariance()
@@ -242,6 +239,26 @@
         @test isapprox(separators2, separators2_t)
         @test isapprox(cliques2, cliques2_t)
         @test isapprox(cliqueTree2, cliqueTree2_t)
+
+        T8, Rpm, Adjv, Dpm, Mv, Z3, dbht = DBHTs(dist, S; branchorder = :r,
+                                                 type = root_type)
+        m1 = Z3[:, 1] .< 0
+        m2 = Z3[:, 2] .< 0
+        Z3[.!m1, 1] .+= size(Z3, 1) + 1
+        Z3[.!m2, 2] .+= size(Z3, 1) + 1
+        Z3[m1, 1] .= -Z3[m1, 1]
+        Z3[m2, 2] .= -Z3[m2, 2]
+        Z3[:, 1:2] .-= 1
+        Z3_t = reshape([18.0, 2.0, 0.0, 5.0, 22.0, 1.0, 20.0, 25.0, 3.0, 6.0, 13.0, 4.0,
+                        11.0, 10.0, 8.0, 32.0, 30.0, 31.0, 27.0, 19.0, 15.0, 7.0, 16.0,
+                        23.0, 21.0, 24.0, 26.0, 9.0, 17.0, 29.0, 12.0, 14.0, 28.0, 33.0,
+                        34.0, 35.0, 36.0, 37.0, 0.125, 0.14285714285714285,
+                        0.16666666666666666, 0.2, 0.25, 0.3333333333333333, 0.5, 1.0, 0.1,
+                        0.1111111111111111, 0.125, 0.14285714285714285, 0.16666666666666666,
+                        0.2, 0.25, 0.3333333333333333, 0.5, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0,
+                        4.0, 3.0, 6.0, 9.0, 2.0, 2.0, 3.0, 2.0, 2.0, 3.0, 4.0, 6.0, 9.0,
+                        11.0, 20.0], :, 4)
+        @test isapprox(Z3, Z3_t)
     end
     @testset "LoGo" begin
         rng = StableRNG(123456789)

@@ -155,6 +155,12 @@ include("./DBHT/LoGo/LoGo.jl")
 include("./MatrixProcessing/MatrixProcessing_AbstractTypes.jl")
 include("./MatrixProcessing/DefaultMatrixProcessing.jl")
 
+# PortfolioOptimisers Covariance Estimator
 include("./Moments/Covariance/PortfolioOptimisersCovariance.jl")
+
+# Cokurtosis
+include("./Moments/Cokurtosis/Cokurtosis_AbstractTypes.jl")
+include("./Moments/Cokurtosis/FullCokurtosis.jl")
+include("./Moments/Cokurtosis/SemiCokurtosis.jl")
 
 end

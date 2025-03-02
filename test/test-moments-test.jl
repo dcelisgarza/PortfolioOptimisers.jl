@@ -13,6 +13,23 @@
             end
         end
     end
+    @testset "Cokurtosis" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 20)
+        df = DataFrame()
+        kes = [FullCokurtosis(), SemiCokurtosis()]
+        kt_t = CSV.read(joinpath(@__DIR__, "./assets/CokurtosisEstimator.csv"), DataFrame)
+        for i ∈ eachindex(kes)
+            kt = PortfolioOptimisers.cokurt(kes[i], X)
+            MN = size(kt)
+            res = isapprox(kt, reshape(kt_t[!, i], MN))
+            if !res
+                println("Fails on cokurtosis iteration $i")
+                find_tol(kt, reshape(kt_t[!, i], MN); name1 = :kt, name2 = :kt_t)
+            end
+            @test res
+        end
+    end
     @testset "Expected Returns" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
