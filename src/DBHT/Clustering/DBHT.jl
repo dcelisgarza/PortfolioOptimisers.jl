@@ -1,5 +1,14 @@
+"""
+    abstract type DBHT_RootType end
+"""
 abstract type DBHT_RootType end
+"""
+    struct DBHT_UniqueRoot <: DBHT_RootType end
+"""
 struct DBHT_UniqueRoot <: DBHT_RootType end
+"""
+    struct DBHT_EqualRoot <: DBHT_RootType end
+"""
 struct DBHT_EqualRoot <: DBHT_RootType end
 
 abstract type SimilarityMatrixEstimator end
@@ -571,8 +580,8 @@ Looks for 3-cliques of a Maximal Planar Graph (MPG), then construct a hierarchy 
 
   - `type`: type for finding the root of the graph [`DBHT_RootType`](@ref). Uses Voronoi tesselation between tiling triangles.
 
-      + [`DBHT_UniqueRoot()`](@ref): create a unique root.
-      + [`DBHT_EqualRoot()`](@ref): the root is created from the candidate's adjacency tree.
+      + [`DBHT_UniqueRoot`](@ref): create a unique root.
+      + [`DBHT_EqualRoot`](@ref): the root is created from the candidate's adjacency tree.
 
 # Outputs
 
@@ -984,12 +993,9 @@ function HierarchyConstruct4s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<
         PairLink, dvu = LinkageFunction(Dpm, LabelVec1)
         LabelVec2[LabelVec1 .== PairLink[1] .|| LabelVec1 .== PairLink[2]] .= maximum(LabelVec1) +
                                                                               1
-
         dvu = unique(dcl[LabelVec1 .== PairLink[1]]) +
               unique(dcl[LabelVec1 .== PairLink[2]])
-
         dcl[LabelVec1 .== PairLink[1] .|| LabelVec1 .== PairLink[2]] .= dvu
-
         Z = DendroConstruct(Z, LabelVec1, LabelVec2, dvu)
         LabelVec1 = copy(LabelVec2)
     end
