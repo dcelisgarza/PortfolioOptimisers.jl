@@ -22,5 +22,26 @@ function mtx_process!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix, X::Abs
     LoGo!(mp.logo, mp.fnpdm, sigma, X)
     return nothing
 end
+struct NonPositiveDefiniteMatrixProcessing{T1 <: DenoiseAlgorithm, T2 <: AbstractDetone,
+                                           T3 <: AbstractLoGo} <: MatrixProcessing
+    denoise::T1
+    detone::T2
+    logo::T3
+end
+function NonPositiveDefiniteMatrixProcessing(; denoise::DenoiseAlgorithm = NoDenoise(),
+                                             detone::NoDetone = NoDetone(),
+                                             logo::AbstractLoGo = NoLoGo())
+    return NonPositiveDefiniteMatrixProcessing{typeof(denoise), typeof(detone),
+                                               typeof(logo)}(denoise, detone, logo)
+end
+function mtx_process!(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
+                      X::AbstractMatrix, args...; kwargs...)
+    T, N = size(X)
+    fix_non_positive_definite_matrix!(FNPDM_NoFix(), sigma)
+    denoise!(mp.denoise, FNPDM_NoFix(), sigma, T / N)
+    detone!(mp.detone, FNPDM_NoFix(), sigma)
+    LoGo!(mp.logo, FNPDM_NoFix(), sigma, X)
+    return nothing
+end
 
 export DefaultMatrixProcessing

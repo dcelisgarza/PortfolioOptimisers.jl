@@ -13,6 +13,29 @@
             end
         end
     end
+    @testset "Coskewness" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 20)
+        cses = [FullCoskewness(), SemiCoskewness()]
+        sk_t = CSV.read(joinpath(@__DIR__, "./assets/CoskewnessEstimator.csv"), DataFrame)
+        for i ∈ eachindex(cses)
+            sk, v = coskewness(cses[i], transpose(X); dims = 2)
+            MN1 = size(sk)
+            MN2 = size(v)
+            res1 = isapprox(sk, reshape(sk_t[1:prod(MN1), i], MN1))
+            res2 = isapprox(v, reshape(sk_t[(1 + prod(MN1)):end, i], MN2))
+            if !res1
+                println("Fails on coskewness estimator iteration $i")
+                find_tol(sk, reshape(sk_t[1:prod(MN1), i], MN1); name1 = :sk, name2 = :sk_t)
+            end
+            @test res1
+            if !res2
+                println("Fails on spectral matrix estimator iteration $i")
+                find_tol(v, reshape(v_t[1:prod(MN1), i], MN1); name1 = :v, name2 = :v_t)
+            end
+            @test res2
+        end
+    end
     @testset "Cokurtosis" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
@@ -20,7 +43,7 @@
         kes = [FullCokurtosis(), SemiCokurtosis()]
         kt_t = CSV.read(joinpath(@__DIR__, "./assets/CokurtosisEstimator.csv"), DataFrame)
         for i ∈ eachindex(kes)
-            kt = PortfolioOptimisers.cokurt(kes[i], X)
+            kt = cokurtosis(kes[i], transpose(X); dims = 2)
             MN = size(kt)
             res = isapprox(kt, reshape(kt_t[!, i], MN))
             if !res

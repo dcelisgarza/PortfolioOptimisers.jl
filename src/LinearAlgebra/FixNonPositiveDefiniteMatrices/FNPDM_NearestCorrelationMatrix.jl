@@ -12,7 +12,6 @@ function fix_non_positive_definite_matrix!(method::FNPDM_NearestCorrelationMatri
     if isposdef(X)
         return nothing
     end
-
     s = diag(X)
     iscov = any(.!isone.(s))
     _X = if iscov
@@ -21,20 +20,15 @@ function fix_non_positive_definite_matrix!(method::FNPDM_NearestCorrelationMatri
     else
         X
     end
-
     NearestCorrelationMatrix.nearest_cor!(_X, method.alg)
-
     if !isposdef(_X)
         @warn("Matrix could not be made positive definite.")
         return nothing
     end
-
     if iscov
         StatsBase.cor2cov!(_X, s)
     end
-
     X .= _X
-
     return nothing
 end
 

@@ -158,6 +158,11 @@ include("./MatrixProcessing/DefaultMatrixProcessing.jl")
 # PortfolioOptimisers Covariance Estimator
 include("./Moments/Covariance/PortfolioOptimisersCovariance.jl")
 
+# Coskewness
+include("./Moments/Coskewness/Coskewness_AbstractTypes.jl")
+include("./Moments/Coskewness/FullCoskewness.jl")
+include("./Moments/Coskewness/SemiCoskewness.jl")
+
 # Cokurtosis
 include("./Moments/Cokurtosis/Cokurtosis_AbstractTypes.jl")
 include("./Moments/Cokurtosis/FullCokurtosis.jl")
