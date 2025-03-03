@@ -1,13 +1,12 @@
 @safetestset "Constraints" begin
     using PortfolioOptimisers, DataFrames, Test
-
     @testset "Linear Constraints" begin
         assets = 1:10
         asset_sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         lhs_1 = LinearConstraintSide(; group = :Assets, name = 1)
-        rhs_1 = LinearConstraintSide(; group = :Assets, name = 1, coef = 0, cnst = 0.35)
+        rhs_1 = LinearConstraintSide(; cnst = 0.35)
         lhs_2 = LinearConstraintSide(; group = :Assets, name = 1)
         rhs_2 = LinearConstraintSide(; group = [:Assets, :Assets], name = [1, 3],
                                      coef = [0, 0.3], cnst = [0.25, 0])
@@ -83,5 +82,20 @@
         @test isapprox(B_ineq, B_ineq_t)
         @test isapprox(A_eq, A_eq_t)
         @test isapprox(B_eq, B_eq_t)
+
+        a, b, c, d = linear_constraints(LinearConstraint(; lhs = LinearConstraintSide(),
+                                                         rhs = LinearConstraintSide()),
+                                        asset_sets)
+        @test isempty(a)
+        @test isempty(b)
+        @test isempty(c)
+        @test isempty(d)
+
+        @test_throws AssertionError LinearConstraintSide(; group = [nothing], name = ["a"],
+                                                         coef = [2], cnst = [0])
+        lcs = LinearConstraintSide(; group = [nothing], name = [nothing], coef = [2],
+                                   cnst = [0])
+        @test isnothing(lcs.group[1])
+        @test isnothing(lcs.name[1])
     end
 end
