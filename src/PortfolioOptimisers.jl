@@ -17,7 +17,6 @@ include("./LinearAlgebra/Operators.jl")
 # Constraints
 include("./Constraints/LinearConstraints/LinearConstraints_AbstractTypes.jl")
 include("./Constraints/LinearConstraints/LinearConstraints.jl")
-include("./Constraints/LinearConstraints/CardinalLinearConstraints.jl")
 
 # Solver
 include("./ModelOptimisation/Solver.jl")

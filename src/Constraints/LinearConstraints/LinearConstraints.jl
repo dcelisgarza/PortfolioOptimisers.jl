@@ -5,8 +5,8 @@ struct LinearConstraintSide{T1, T2, T3, T4} <: AbstractLinearConstraintSide
     cnst::T4
 end
 function LinearConstraintSide(; group = nothing, name = nothing,
-                              coef::Union{<:Real, <:AbstractVector{<:Real}} = 1,
-                              cnst::Union{<:Real, <:AbstractVector{<:Real}} = 0)
+                              coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                              cnst::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
