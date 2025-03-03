@@ -56,5 +56,21 @@
         @test isapprox(owa_l_moment(100, 3), owa_t[!, 9])
         @test isapprox(owa_l_moment(100, 4), owa_t[!, 10])
         @test isapprox(owa_l_moment(100, 10), owa_t[!, 11])
+
+        w1 = owa_tgrg(100)
+        alpha_i = 0.0001
+        alpha = 0.05
+        a_sim = 100
+        alphas = range(; start = alpha_i, stop = alpha, length = a_sim)
+        n = length(alphas)
+        w = Vector{typeof(alpha)}(undef, n)
+
+        w[1] = alphas[2] * alphas[1] / alphas[n]^2
+        for i ∈ 2:(n - 1)
+            w[i] = (alphas[i + 1] - alphas[i - 1]) * alphas[i] / alphas[n]^2
+        end
+        w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]
+        w2 = owa_wcvarrg(100, alphas, w)
+        @test isapprox(w1, w2)
     end
 end
