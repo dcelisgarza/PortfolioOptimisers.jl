@@ -2,7 +2,7 @@ module PortfolioOptimisers
 
 using AverageShiftedHistograms, Clustering, Distances, GLM, JuMP, LinearAlgebra,
       MultivariateStats, NearestCorrelationMatrix, Optim, Graphs, SimpleWeightedGraphs,
-      PythonCall, Random, SmartAsserts, SparseArrays, Statistics, StatsBase
+      PythonCall, Random, SmartAsserts, SparseArrays, Statistics, StatsBase, DataFrames
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let
@@ -13,6 +13,9 @@ end PortfolioOptimisers
 
 # Linear Algebra
 include("./LinearAlgebra/Operators.jl")
+
+# Constraints
+include("./Constraints/Constraints.jl")
 
 # Solver
 include("./ModelOptimisation/Solver.jl")
@@ -181,6 +184,7 @@ include("./Moments/Cokurtosis/FullCokurtosis.jl")
 include("./Moments/Cokurtosis/SemiCokurtosis.jl")
 
 # Utils
-include("./Utils/Utils.jl")
+include("./Utils/BaseFunctionOverloads.jl")
+include("./Utils/EquationParsing.jl")
 
 end

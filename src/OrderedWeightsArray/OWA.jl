@@ -54,7 +54,6 @@ function owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
                      betas::AbstractVector{<:Real} = alphas,
                      weights_b::AbstractVector{<:Real} = weights_a)
     w = owa_wcvar(T, alphas, weights_a) .- reverse(owa_wcvar(T, betas, weights_b))
-
     return w
 end
 function owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,
