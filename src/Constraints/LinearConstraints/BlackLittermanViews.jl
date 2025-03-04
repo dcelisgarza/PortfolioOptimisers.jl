@@ -1,52 +1,32 @@
-struct BlackLittermanView{T1 <: LinearConstraintSide, T2 <: LinearConstraintSide}
-    lhs::T1
-    rhs::T2
-end
-function BlackLittermanView(; lhs::LinearConstraintSide = LinearConstraintSide(),
-                            rhs::LinearConstraintSide = LinearConstraintSide())
-    return BlackLittermanView{typeof(lhs), typeof(rhs)}(lhs, rhs)
-end
-function views_constraints(vcs::Union{<:BlackLittermanView,
-                                      <:AbstractVector{<:BlackLittermanView}},
-                           asset_sets::DataFrame, datatype::Type = Float64,
-                           strict::Bool = false)
+function views_constraints(vcs::Union{<:LinearConstraintSide,
+                                      <:AbstractVector{<:LinearConstraintSide}},
+                           asset_sets::DataFrame, datatype::Type = Float64)
     N = nrow(asset_sets)
 
     P = Vector{datatype}(undef, 0)
     Q = Vector{datatype}(undef, 0)
 
     for vc ∈ vcs
-        lhs = vc.lhs
-        rhs = vc.rhs
-
-        lhs_A, lhs_B = get_asset_constraint_data(lhs, asset_sets, strict)
-        rhs_A, rhs_B = get_asset_constraint_data(rhs, asset_sets, strict)
-
-        lhs_flag = isempty(lhs_A) || all(iszero.(lhs_A))
-        rhs_flag = isempty(rhs_A) || all(iszero.(rhs_A))
-
-        if lhs_flag && rhs_flag
+        vc_A, vc_B = try
+            get_asset_constraint_data(vc, asset_sets; normalise = true, strict = true)
+        catch err
+            if isa(err, ArgumentError)
+                @warn(err.msg * "\n$(vc)\nMoving onto next view.")
+            end
             continue
         end
 
-        rlhs_A = if lhs_flag
-            -rhs_A
-        elseif rhs_flag
-            lhs_A
-        else
-            sign = relative_factor_constraint_sign(vc.kind)
-            sign * (lhs_A - rhs_A)
+        if isempty(vc_A) || all(iszero.(vc_A))
+            continue
         end
 
-        rlhs_B = (rhs_B - lhs_B)
-
-        s = sum(rlhs_A)
-        if !iszero(s)
-            rlhs_A ./= abs(sum(rlhs_A))
-        end
-
-        append!(P, rlhs_A)
-        append!(Q, rlhs_B)
+        vc_B *= -1
+        # s = sum(rvc_A)
+        # if !iszero(s)
+        #     rvc_A ./= abs(sum(rvc_A))
+        # end
+        append!(P, vc_A)
+        append!(Q, vc_B)
     end
 
     if !isempty(P)
@@ -58,4 +38,4 @@ function views_constraints(vcs::Union{<:BlackLittermanView,
     return P, Q
 end
 
-export BlackLittermanView, views_constraints
+export views_constraints

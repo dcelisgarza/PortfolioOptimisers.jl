@@ -31,7 +31,7 @@ function HierarchicalConstraint(; group = nothing, name = nothing,
                                                                                        hi)
 end
 function hc_constraints(hcc::HierarchicalConstraint{<:Any, <:Any, <:Real, <:Real},
-                        asset_sets::DataFrame)
+                        asset_sets::DataFrame; strict::Bool = false)
     group_names = names(asset_sets)
     N = nrow(asset_sets)
     w1 = zeros(promote_type(eltype(hcc.lo), eltype(hcc.hi)), N)
@@ -41,12 +41,14 @@ function hc_constraints(hcc::HierarchicalConstraint{<:Any, <:Any, <:Real, <:Real
         idx = asset_sets[!, group] .== name
         w1[idx] .= lo
         w2[idx] .= hi
+    elseif strict
+        throw(ArgumentError("$(string(group)) is not in $(group_names)."))
     end
     return w1, w2
 end
 function hc_constraints(hcc::HierarchicalConstraint{<:AbstractVector, <:AbstractVector,
                                                     <:AbstractVector, <:AbstractVector},
-                        asset_sets::DataFrame, strict::Bool = false)
+                        asset_sets::DataFrame; strict::Bool = false)
     group_names = names(asset_sets)
     N = nrow(asset_sets)
     w1 = zeros(promote_type(eltype(hcc.lo), eltype(hcc.hi)), N)

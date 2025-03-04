@@ -2,19 +2,18 @@ abstract type LinearConstraintKind end
 struct AssetLinearConstraint <: LinearConstraintKind end
 struct FactorLinearConstraint <: LinearConstraintKind end
 struct LinearConstraint{T1 <: LinearConstraintSide, T2 <: LinearConstraintSide,
-                        T3 <: ComparisonOperators, T4 <: LinearConstraintKind, T5 <: Bool}
+                        T3 <: ComparisonOperators, T4 <: LinearConstraintKind}
     lhs::T1
     rhs::T2
     comp::T3
     kind::T4
-    normalise::T5
 end
 function LinearConstraint(; lhs::LinearConstraintSide, rhs::LinearConstraintSide,
                           comp::ComparisonOperators = LEQ(),
-                          kind::LinearConstraintKind = AssetLinearConstraint(),
-                          normalise::Bool = false)
-    return LinearConstraint{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind),
-                            typeof(normalise)}(lhs, rhs, comp, kind, normalise)
+                          kind::LinearConstraintKind = AssetLinearConstraint())
+    return LinearConstraint{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs, rhs,
+                                                                                  comp,
+                                                                                  kind)
 end
 function relative_factor_constraint_sign(::AssetLinearConstraint)
     return 1
@@ -24,7 +23,7 @@ function relative_factor_constraint_sign(::FactorLinearConstraint)
 end
 function linear_constraints(lcs::Union{<:LinearConstraint,
                                        <:AbstractVector{<:LinearConstraint}},
-                            asset_sets::DataFrame, datatype::Type = Float64,
+                            asset_sets::DataFrame, datatype::Type = Float64;
                             strict::Bool = false)
     N = nrow(asset_sets)
     A_ineq = Vector{datatype}(undef, 0)
@@ -35,8 +34,8 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
         lhs = lc.lhs
         rhs = lc.rhs
 
-        lhs_A, lhs_B = get_asset_constraint_data(lhs, asset_sets, strict)
-        rhs_A, rhs_B = get_asset_constraint_data(rhs, asset_sets, strict)
+        lhs_A, lhs_B = get_asset_constraint_data(lhs, asset_sets; strict = strict)
+        rhs_A, rhs_B = get_asset_constraint_data(rhs, asset_sets; strict = strict)
 
         lhs_flag = isempty(lhs_A) || all(iszero.(lhs_A))
         rhs_flag = isempty(rhs_A) || all(iszero.(rhs_A))
@@ -55,13 +54,6 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
             sign * (lhs_A - rhs_A) * d
         end
         rlhs_B = (rhs_B - lhs_B) * d
-
-        if lc.normalise
-            s = sum(rlhs_A)
-            if !iszero(s)
-                rlhs_A ./= abs(sum(rlhs_A))
-            end
-        end
 
         if flag_ineq
             append!(A_ineq, rlhs_A)

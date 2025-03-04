@@ -31,7 +31,8 @@ end
 function get_asset_constraint_data(hs::LinearConstraintSide{<:AbstractVector,
                                                             <:AbstractVector,
                                                             <:AbstractVector, <:Real},
-                                   asset_sets::DataFrame, strict::Bool = false)
+                                   asset_sets::DataFrame; normalise::Bool = false,
+                                   strict::Bool = false)
     group_names = names(asset_sets)
     N = nrow(asset_sets)
     A = Vector{promote_type(eltype(hs.coef), typeof(hs.cnst))}(undef, 0)
@@ -39,9 +40,17 @@ function get_asset_constraint_data(hs::LinearConstraintSide{<:AbstractVector,
     for (group, name, coef) ∈ zip(hs.group, hs.name, hs.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = asset_sets[!, group] .== name
-            append!(A, coef * idx)
+            idx = coef * idx
+            if normalise
+                sc = sign(coef)
+                idx /= sum(idx)
+                idx .*= sc
+            end
+            append!(A, idx)
         elseif strict
             throw(ArgumentError("$(string(group)) is not in $(group_names)."))
+        else
+            @warn("$(string(group)) is not in $(group_names).")
         end
     end
     tcnst = hs.cnst
@@ -52,7 +61,8 @@ function get_asset_constraint_data(hs::LinearConstraintSide{<:AbstractVector,
     end
 end
 function get_asset_constraint_data(hs::LinearConstraintSide{<:Any, <:Any, <:Real, <:Real},
-                                   asset_sets::DataFrame, strict::Bool = false)
+                                   asset_sets::DataFrame; normalise::Bool = false,
+                                   strict::Bool = false)
     group_names = names(asset_sets)
     N = nrow(asset_sets)
     A = Vector{promote_type(eltype(hs.coef), typeof(hs.cnst))}(undef, 0)
@@ -60,9 +70,17 @@ function get_asset_constraint_data(hs::LinearConstraintSide{<:Any, <:Any, <:Real
     (; group, name, coef) = hs
     if !(isnothing(group) || string(group) ∉ group_names)
         idx = asset_sets[!, group] .== name
-        append!(A, coef * idx)
+        idx = coef * idx
+        if normalise
+            sc = sign(coef)
+            idx /= sum(idx)
+            idx .*= sc
+        end
+        append!(A, idx)
     elseif strict
         throw(ArgumentError("$(string(group)) is not in $(group_names)."))
+    else
+        @warn("$(string(group)) is not in $(group_names).")
     end
     tcnst = hs.cnst
     return A, tcnst

@@ -41,7 +41,7 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix; dims::Int = 
     prior_model = prior(pe.pe, X)
     prior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
 
-    P, Q = views_constraints(pe.views, pe.asset_sets, eltype(prior_X), strict)
+    P, Q = views_constraints(pe.views, pe.asset_sets, eltype(prior_X))
     @smart_assert(!isempty(P))
 
     views_conf = pe.views_conf
