@@ -1,4 +1,5 @@
-for (op, name) ∈ zip((Solver, LinearConstraint), ("Solver", "LinearConstraint"))
+for (op, name) ∈ zip((Solver, LinearConstraint, BlackLittermanView),
+                     ("Solver", "LinearConstraint", "BlackLittermanView"))
     eval(quote
              Base.iterate(S::$op, state = 1) = state > 1 ? nothing : (S, state + 1)
              function Base.String(s::$op)

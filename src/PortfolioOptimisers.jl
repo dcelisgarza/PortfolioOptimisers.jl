@@ -16,7 +16,9 @@ include("./LinearAlgebra/Operators.jl")
 
 # Constraints
 include("./Constraints/Constraint_AbstractTypes.jl")
-include("./Constraints/LinearConstraints.jl")
+include("./Constraints/LinearConstraints/LinearConstraintSide.jl")
+include("./Constraints/LinearConstraints/LinearConstraints.jl")
+include("./Constraints/LinearConstraints/BlackLittermanViews.jl")
 include("./Constraints/HierarchicalConstraints.jl")
 
 # Solver
@@ -184,6 +186,11 @@ include("./Moments/Coskewness/SemiCoskewness.jl")
 include("./Moments/Cokurtosis/Cokurtosis_AbstractTypes.jl")
 include("./Moments/Cokurtosis/FullCokurtosis.jl")
 include("./Moments/Cokurtosis/SemiCokurtosis.jl")
+
+# Prior
+include("./Prior/Prior_AbstractTypes.jl")
+include("./Prior/EmpiricalPrior.jl")
+include("./Prior/BlackLittermanPrior.jl")
 
 # Utils
 include("./Utils/BaseFunctionOverloads.jl")
