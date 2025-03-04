@@ -15,8 +15,9 @@ end PortfolioOptimisers
 include("./LinearAlgebra/Operators.jl")
 
 # Constraints
-include("./Constraints/LinearConstraints/LinearConstraints_AbstractTypes.jl")
-include("./Constraints/LinearConstraints/LinearConstraints.jl")
+include("./Constraints/Constraint_AbstractTypes.jl")
+include("./Constraints/LinearConstraints.jl")
+include("./Constraints/HierarchicalConstraints.jl")
 
 # Solver
 include("./ModelOptimisation/Solver.jl")

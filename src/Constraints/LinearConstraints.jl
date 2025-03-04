@@ -1,4 +1,13 @@
-struct LinearConstraintSide{T1, T2, T3, T4} <: AbstractLinearConstraintSide
+function comparison_sign_ineq_flag(::EQ)
+    return 1, false
+end
+function comparison_sign_ineq_flag(::LEQ)
+    return 1, true
+end
+function comparison_sign_ineq_flag(::GEQ)
+    return -1, true
+end
+struct LinearConstraintSide{T1, T2, T3, T4 <: Real}
     group::T1
     name::T2
     coef::T3
@@ -6,14 +15,13 @@ struct LinearConstraintSide{T1, T2, T3, T4} <: AbstractLinearConstraintSide
 end
 function LinearConstraintSide(; group = nothing, name = nothing,
                               coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
-                              cnst::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
+                              cnst::Real = 0.0)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
-    cnst_flag = isa(cnst, AbstractVector)
-    if any((group_flag, name_flag, coef_flag, cnst_flag))
-        @smart_assert(all((group_flag, name_flag, coef_flag, cnst_flag)))
-        @smart_assert(length(group) == length(name) == length(coef) == length(cnst))
+    if any((group_flag, name_flag, coef_flag))
+        @smart_assert(all((group_flag, name_flag, coef_flag)))
+        @smart_assert(length(group) == length(name) == length(coef))
         for (g, n) ∈ zip(group, name)
             if isnothing(g) || isnothing(n)
                 @smart_assert(isnothing(g) && isnothing(n))
@@ -31,17 +39,16 @@ function LinearConstraintSide(; group = nothing, name = nothing,
 end
 function Base.getindex(hs::LinearConstraintSide, i::Int)
     if isa(hs.group, AbstractVector)
-        return hs.group[i], hs.name[i], hs.coef[i], hs.cnst[i]
+        return hs.group[i], hs.name[i], hs.coef[i]
     else
-        return hs.group, hs.name, hs.coef, hs.cnst
+        return hs.group, hs.name, hs.coef
     end
 end
 abstract type LinearConstraintKind end
 struct AssetLinearConstraint <: LinearConstraintKind end
 struct FactorLinearConstraint <: LinearConstraintKind end
 struct LinearConstraint{T1 <: LinearConstraintSide, T2 <: LinearConstraintSide,
-                        T3 <: ComparisonOperators, T4 <: LinearConstraintKind,
-                        T5 <: Bool} <: AbstractLinearConstraint
+                        T3 <: ComparisonOperators, T4 <: LinearConstraintKind, T5 <: Bool}
     lhs::T1
     rhs::T2
     comp::T3
@@ -55,26 +62,40 @@ function LinearConstraint(; lhs::LinearConstraintSide, rhs::LinearConstraintSide
     return LinearConstraint{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind),
                             typeof(normalise)}(lhs, rhs, comp, kind, normalise)
 end
-function get_asset_constraint_data(hs::LinearConstraintSide, asset_sets::DataFrame)
+function get_asset_constraint_data(hs::LinearConstraintSide{<:AbstractVector,
+                                                            <:AbstractVector,
+                                                            <:AbstractVector, <:Real},
+                                   asset_sets::DataFrame)
     group_names = names(asset_sets)
     N = nrow(asset_sets)
-    A = Vector(undef, 0)
-    tcnst = 0.0
-    # Loop over every entry in this side of the constraint.
-    for i ∈ eachindex(hs.cnst)
-        group, name, coef, cnst = hs[i]
+    A = Vector{promote_type(eltype(hs.coef), typeof(hs.cnst))}(undef, 0)
+    sizehint!(A, length(hs.group))
+    tcnst = hs.cnst
+    for (group, name, coef) ∈ zip(hs.group, hs.name, hs.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = asset_sets[!, group] .== name
             append!(A, coef * idx)
         end
-        # Find all the indices where the group's members are equal to the name.
-        tcnst += cnst
     end
-    if isempty(A)
+    return if isempty(A)
         A, tcnst
     else
         vec(sum(reshape(A, N, :); dims = 2)), tcnst
     end
+end
+function get_asset_constraint_data(hs::LinearConstraintSide{<:Any, <:Any, <:Real, <:Real},
+                                   asset_sets::DataFrame)
+    group_names = names(asset_sets)
+    N = nrow(asset_sets)
+    A = Vector{promote_type(eltype(hs.coef), typeof(hs.cnst))}(undef, 0)
+    sizehint!(A, N)
+    tcnst = hs.cnst
+    (; group, name, coef) = hs
+    if !(isnothing(group) || string(group) ∉ group_names)
+        idx = asset_sets[!, group] .== name
+        append!(A, coef * idx)
+    end
+    return A, tcnst
 end
 function relative_factor_constraint_sign(::AssetLinearConstraint)
     return 1
@@ -84,20 +105,19 @@ function relative_factor_constraint_sign(::FactorLinearConstraint)
 end
 function linear_constraints(lcs::Union{LinearConstraint,
                                        <:AbstractVector{<:LinearConstraint}},
-                            asset_sets::DataFrame)
+                            asset_sets::DataFrame, datatype::Type = Float64)
     N = nrow(asset_sets)
 
-    A_ineq = Vector(undef, 0)
-    B_ineq = Vector(undef, 0)
+    A_ineq = Vector{datatype}(undef, 0)
+    B_ineq = Vector{datatype}(undef, 0)
 
-    A_eq = Vector(undef, 0)
-    B_eq = Vector(undef, 0)
+    A_eq = Vector{datatype}(undef, 0)
+    B_eq = Vector{datatype}(undef, 0)
 
     for lc ∈ lcs
         lhs = lc.lhs
         rhs = lc.rhs
 
-        # Construct left and right hand sides of the constraint.
         lhs_A, lhs_B = get_asset_constraint_data(lhs, asset_sets)
         rhs_A, rhs_B = get_asset_constraint_data(rhs, asset_sets)
 
@@ -156,4 +176,5 @@ function linear_constraints(lcs::Union{LinearConstraint,
     return A_ineq, B_ineq, A_eq, B_eq
 end
 
-export LinearConstraintSide, LinearConstraint, AssetLinearConstraint, FactorLinearConstraint
+export linear_constraints, LinearConstraintSide, LinearConstraint, AssetLinearConstraint,
+       FactorLinearConstraint
