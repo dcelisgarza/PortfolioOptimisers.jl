@@ -37,13 +37,6 @@ function LinearConstraintSide(; group = nothing, name = nothing,
                                                                                          coef,
                                                                                          cnst)
 end
-function Base.getindex(hs::LinearConstraintSide, i::Int)
-    if isa(hs.group, AbstractVector)
-        return hs.group[i], hs.name[i], hs.coef[i]
-    else
-        return hs.group, hs.name, hs.coef
-    end
-end
 abstract type LinearConstraintKind end
 struct AssetLinearConstraint <: LinearConstraintKind end
 struct FactorLinearConstraint <: LinearConstraintKind end
@@ -121,29 +114,22 @@ function linear_constraints(lcs::Union{LinearConstraint,
         lhs_A, lhs_B = get_asset_constraint_data(lhs, asset_sets)
         rhs_A, rhs_B = get_asset_constraint_data(rhs, asset_sets)
 
-        empty_lhs_A = isempty(lhs_A)
-        zero_lhs_A = all(iszero.(lhs_A))
+        lhs_flag = isempty(lhs_A) || all(iszero.(lhs_A))
+        rhs_flag = isempty(rhs_A) || all(iszero.(rhs_A))
 
-        empty_rhs_A = isempty(rhs_A)
-        zero_rhs_A = all(iszero.(rhs_A))
-
-        if empty_lhs_A && empty_rhs_A || zero_lhs_A && zero_rhs_A
+        if lhs_flag && rhs_flag
             continue
         end
 
         d, flag_ineq = comparison_sign_ineq_flag(lc.comp)
 
-        rlhs_A = if empty_lhs_A || zero_lhs_A
+        rlhs_A = if lhs_flag
             -rhs_A * d
-        elseif empty_rhs_A || zero_rhs_A
+        elseif rhs_flag
             lhs_A * d
         else
             sign = relative_factor_constraint_sign(lc.kind)
             sign * (lhs_A - rhs_A) * d
-        end
-
-        if isempty(rlhs_A) || all(iszero.(rlhs_A))
-            continue
         end
 
         rlhs_B = (rhs_B - lhs_B) * d

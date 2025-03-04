@@ -89,6 +89,15 @@
         @test isempty(c)
         @test isempty(d)
 
+        lhs = LinearConstraintSide(; group = [:Foo], name = [20], coef = [5])
+        rhs = LinearConstraintSide(; cnst = 0.35)
+        a, b, c, d = linear_constraints(LinearConstraint(; lhs = lhs, rhs = rhs),
+                                        asset_sets)
+        @test isempty(a)
+        @test isempty(b)
+        @test isempty(c)
+        @test isempty(d)
+
         @test_throws AssertionError LinearConstraintSide(; group = [nothing], name = ["a"],
                                                          coef = [2], cnst = 0)
         lcs = LinearConstraintSide(; group = [nothing], name = [nothing], coef = [2],
@@ -117,5 +126,17 @@
         w_min, w_max = hc_constraints(hcc_3, asset_sets)
         @test isapprox(w_min, [0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2, 0.2])
         @test isapprox(w_max, [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5])
+
+        @test_throws AssertionError HierarchicalConstraint(group = :Asset)
+        hcc = HierarchicalConstraint()
+        @test isnothing(hcc.group)
+        @test isnothing(hcc.name)
+
+        @test_throws AssertionError HierarchicalConstraint(; group = [nothing],
+                                                           name = ["a"], hi = [2], lo = [1])
+        lcs = HierarchicalConstraint(; group = [nothing], name = [nothing], hi = [5],
+                                     lo = [3])
+        @test isnothing(lcs.group[1])
+        @test isnothing(lcs.name[1])
     end
 end
