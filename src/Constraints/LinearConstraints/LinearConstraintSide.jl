@@ -31,7 +31,7 @@ end
 function get_asset_constraint_data(hs::LinearConstraintSide{<:AbstractVector,
                                                             <:AbstractVector,
                                                             <:AbstractVector, <:Real},
-                                   asset_sets::DataFrame, throw_if_missing::Bool = false)
+                                   asset_sets::DataFrame, strict::Bool = false)
     group_names = names(asset_sets)
     N = nrow(asset_sets)
     A = Vector{promote_type(eltype(hs.coef), typeof(hs.cnst))}(undef, 0)
@@ -40,7 +40,7 @@ function get_asset_constraint_data(hs::LinearConstraintSide{<:AbstractVector,
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = asset_sets[!, group] .== name
             append!(A, coef * idx)
-        elseif throw_if_missing
+        elseif strict
             throw(ArgumentError("$(string(group)) is not in $(group_names)."))
         end
     end
@@ -52,7 +52,7 @@ function get_asset_constraint_data(hs::LinearConstraintSide{<:AbstractVector,
     end
 end
 function get_asset_constraint_data(hs::LinearConstraintSide{<:Any, <:Any, <:Real, <:Real},
-                                   asset_sets::DataFrame, throw_if_missing::Bool = false)
+                                   asset_sets::DataFrame, strict::Bool = false)
     group_names = names(asset_sets)
     N = nrow(asset_sets)
     A = Vector{promote_type(eltype(hs.coef), typeof(hs.cnst))}(undef, 0)
@@ -61,7 +61,7 @@ function get_asset_constraint_data(hs::LinearConstraintSide{<:Any, <:Any, <:Real
     if !(isnothing(group) || string(group) ∉ group_names)
         idx = asset_sets[!, group] .== name
         append!(A, coef * idx)
-    elseif throw_if_missing
+    elseif strict
         throw(ArgumentError("$(string(group)) is not in $(group_names)."))
     end
     tcnst = hs.cnst

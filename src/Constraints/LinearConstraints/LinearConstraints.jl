@@ -22,10 +22,10 @@ end
 function relative_factor_constraint_sign(::FactorLinearConstraint)
     return -1
 end
-function linear_constraints(lcs::Union{LinearConstraint,
+function linear_constraints(lcs::Union{<:LinearConstraint,
                                        <:AbstractVector{<:LinearConstraint}},
                             asset_sets::DataFrame, datatype::Type = Float64,
-                            throw_if_missing::Bool = false)
+                            strict::Bool = false)
     N = nrow(asset_sets)
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)
@@ -35,8 +35,8 @@ function linear_constraints(lcs::Union{LinearConstraint,
         lhs = lc.lhs
         rhs = lc.rhs
 
-        lhs_A, lhs_B = get_asset_constraint_data(lhs, asset_sets, throw_if_missing)
-        rhs_A, rhs_B = get_asset_constraint_data(rhs, asset_sets, throw_if_missing)
+        lhs_A, lhs_B = get_asset_constraint_data(lhs, asset_sets, strict)
+        rhs_A, rhs_B = get_asset_constraint_data(rhs, asset_sets, strict)
 
         lhs_flag = isempty(lhs_A) || all(iszero.(lhs_A))
         rhs_flag = isempty(rhs_A) || all(iszero.(rhs_A))

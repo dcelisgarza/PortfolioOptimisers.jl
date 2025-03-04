@@ -94,6 +94,10 @@ include("./Moments/ExpectedReturns/ShrunkExpectedReturns/JamesSteinExpectedRetur
 include("./Moments/ExpectedReturns/ShrunkExpectedReturns/BayesSteinExpectedReturns.jl")
 include("./Moments/ExpectedReturns/ShrunkExpectedReturns/BodnarOkhrinParolyaExpectedReturns.jl")
 
+# Equilibrium Expected Returns
+include("./Moments/ExpectedReturns/EquilibriumExpectedReturns.jl")
+include("./Moments/ExpectedReturns/ExcessExpectedReturns.jl")
+
 # Gerber Covariance
 include("./Moments/Covariance/GerberCovariance/GerberCovariance_AbstractTypes.jl")
 

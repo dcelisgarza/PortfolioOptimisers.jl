@@ -2,13 +2,14 @@ struct BlackLittermanView{T1 <: LinearConstraintSide, T2 <: LinearConstraintSide
     lhs::T1
     rhs::T2
 end
-function BlackLittermanView(; lhs::LinearConstraintSide, rhs::LinearConstraintSide)
+function BlackLittermanView(; lhs::LinearConstraintSide = LinearConstraintSide(),
+                            rhs::LinearConstraintSide = LinearConstraintSide())
     return BlackLittermanView{typeof(lhs), typeof(rhs)}(lhs, rhs)
 end
-function view_constraints(vcs::Union{BlackLittermanView,
-                                     <:AbstractVector{<:BlackLittermanView}},
-                          asset_sets::DataFrame, datatype::Type = Float64,
-                          throw_if_missing::Bool = false)
+function views_constraints(vcs::Union{<:BlackLittermanView,
+                                      <:AbstractVector{<:BlackLittermanView}},
+                           asset_sets::DataFrame, datatype::Type = Float64,
+                           strict::Bool = false)
     N = nrow(asset_sets)
 
     P = Vector{datatype}(undef, 0)
@@ -18,8 +19,8 @@ function view_constraints(vcs::Union{BlackLittermanView,
         lhs = vc.lhs
         rhs = vc.rhs
 
-        lhs_A, lhs_B = get_asset_constraint_data(lhs, asset_sets, throw_if_missing)
-        rhs_A, rhs_B = get_asset_constraint_data(rhs, asset_sets, throw_if_missing)
+        lhs_A, lhs_B = get_asset_constraint_data(lhs, asset_sets, strict)
+        rhs_A, rhs_B = get_asset_constraint_data(rhs, asset_sets, strict)
 
         lhs_flag = isempty(lhs_A) || all(iszero.(lhs_A))
         rhs_flag = isempty(rhs_A) || all(iszero.(rhs_A))
@@ -56,3 +57,5 @@ function view_constraints(vcs::Union{BlackLittermanView,
 
     return P, Q
 end
+
+export BlackLittermanView, views_constraints

@@ -1,22 +1,22 @@
 struct BodnarOkhrinParolyaExpectedReturns{T1 <: StatsBase.CovarianceEstimator,
-                                          T2 <: ShrunkExpectedReturnsTarget,
-                                          T3 <: Union{Nothing, <:AbstractWeights}} <:
+                                          T2 <: ExpectedReturnsEstimator,
+                                          T3 <: ShrunkExpectedReturnsTarget} <:
        ShrunkExpectedReturnsEstimator
     ce::T1
-    target::T2
-    w::T3
+    me::T2
+    target::T3
 end
 function BodnarOkhrinParolyaExpectedReturns(;
                                             ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                            target::ShrunkExpectedReturnsTarget = SERT_GrandMean(),
-                                            w::Union{Nothing, <:AbstractWeights} = nothing)
-    return BodnarOkhrinParolyaExpectedReturns{typeof(ce), typeof(target), typeof(w)}(ce,
-                                                                                     target,
-                                                                                     w)
+                                            me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
+                                            target::ShrunkExpectedReturnsTarget = SERT_GrandMean())
+    return BodnarOkhrinParolyaExpectedReturns{typeof(ce), typeof(me), typeof(target)}(ce,
+                                                                                      me,
+                                                                                      target)
 end
 function StatsBase.mean(me::BodnarOkhrinParolyaExpectedReturns, X::AbstractMatrix;
                         dims::Int = 1)
-    mu = isnothing(me.w) ? mean(X; dims = dims) : mean(X, me.w; dims = dims)
+    mu = mean(me.me, X; dims = dims)
     sigma = cov(me.ce, X; dims = dims)
     T, N = size(X)
     isigma = sigma \ I
