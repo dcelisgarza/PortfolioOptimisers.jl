@@ -1,7 +1,7 @@
 struct CorrelationDistance <: PortfolioOptimisersDistanceMetric end
 function distance(::CorrelationDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1)
-    rho = robust_cor(ce, X; dims = dims)
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+    rho = robust_cor(ce, X; dims = dims, kwargs...)
     return sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
 end
 function distance(::CorrelationDistance, rho::AbstractMatrix, args...; kwargs...)

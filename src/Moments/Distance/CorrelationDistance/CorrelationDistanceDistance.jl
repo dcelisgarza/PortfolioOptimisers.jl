@@ -11,8 +11,8 @@ function CorrelationDistanceDistance(; dist::Distances.Metric = Distances.Euclid
                                                                                    kwargs)
 end
 function distance(de::CorrelationDistanceDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1)
-    rho = robust_cor(ce, X; dims = dims)
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+    rho = robust_cor(ce, X; dims = dims, kwargs...)
     dist = sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end

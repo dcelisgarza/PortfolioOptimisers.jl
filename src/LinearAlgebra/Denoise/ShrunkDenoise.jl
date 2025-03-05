@@ -16,17 +16,12 @@ function ShrunkDenoise(; alpha::Real = 0.0, m::Integer = 10, n::Integer = 1000,
 end
 function denoise!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
                   vecs::AbstractMatrix, num_factors::Integer)
-    # Small
     vals_l = vals[1:num_factors]
     vecs_l = vecs[:, 1:num_factors]
-
-    # Large
     vals_r = vals[(num_factors + 1):end]
     vecs_r = vecs[:, (num_factors + 1):end]
-
     corr0 = vecs_r * Diagonal(vals_r) * transpose(vecs_r)
     corr1 = vecs_l * Diagonal(vals_l) * transpose(vecs_l)
-
     X .= corr0 + de.alpha * corr1 + (one(de.alpha) - de.alpha) * Diagonal(corr1)
     return nothing
 end

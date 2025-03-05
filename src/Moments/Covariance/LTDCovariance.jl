@@ -13,7 +13,6 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05)
     T, N = size(X)
     k = ceil(Int, T * alpha)
     rho = Matrix{eltype(X)}(undef, N, N)
-
     if k > 0
         for j ∈ axes(X, 2)
             xj = view(X, :, j)
@@ -27,7 +26,6 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05)
             end
         end
     end
-
     return rho
 end
 function StatsBase.cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -42,7 +40,7 @@ function StatsBase.cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwar
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1)
+    std_vec = std(ce.ve, X; dims = 1, kwargs...)
     return lower_tail_dependence(X, ce.alpha) .* (std_vec ⊗ std_vec)
 end
 

@@ -13,17 +13,17 @@ end
 function StatsBase.cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1,
                        mean = nothing, kwargs...)
     return if isnothing(ce.w)
-        cov(ce.ce, X; dims = dims, mean = mean)
+        cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
-        cov(ce.ce, X, ce.w; dims = dims, mean = mean)
+        cov(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
     end
 end
 function StatsBase.cor(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1,
                        mean = nothing, kwargs...)
     if isnothing(ce.w)
-        robust_cor(ce.ce, X; dims = dims, mean = mean)
+        robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
-        robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean)
+        robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
     end
 end
 

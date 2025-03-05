@@ -1,11 +1,12 @@
 struct LogDistance <: PortfolioOptimisersDistanceMetric end
 function distance(::LogDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;
-                  dims::Int = 1)
-    rho = abs.(robust_cor(ce, X; dims = dims))
+                  dims::Int = 1, kwargs...)
+    rho = abs.(robust_cor(ce, X; dims = dims, kwargs...))
     return -log.(rho)
 end
-function distance(::LogDistance, ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1)
-    rho = robust_cor(ce, X; dims = dims)
+function distance(::LogDistance, ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1,
+                  kwargs...)
+    rho = robust_cor(ce, X; dims = dims, kwargs...)
     return -log.(rho)
 end
 function distance(de::LogDistance, rho::AbstractMatrix, args...; kwargs...)

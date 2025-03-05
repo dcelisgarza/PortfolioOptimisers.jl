@@ -10,14 +10,14 @@ function LogDistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
                                                                            kwargs)
 end
 function distance(de::LogDistanceDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1)
-    rho = abs.(robust_cor(ce, X; dims = dims))
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+    rho = abs.(robust_cor(ce, X; dims = dims, kwargs...))
     dist = -log.(rho)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 function distance(de::LogDistanceDistance, ce::LTDCovariance, X::AbstractMatrix;
-                  dims::Int = 1)
-    rho = robust_cor(ce, X; dims = dims)
+                  dims::Int = 1, kwargs...)
+    rho = robust_cor(ce, X; dims = dims, kwargs...)
     dist = -log.(rho)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end

@@ -31,7 +31,7 @@ function GeneralVariationInfoDistanceDistance(; power::Integer = 1,
                                                                               kwargs)
 end
 function distance(de::GeneralVariationInfoDistanceDistance, ::Any, X::AbstractMatrix;
-                  dims::Int = 1)
+                  dims::Int = 1, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)

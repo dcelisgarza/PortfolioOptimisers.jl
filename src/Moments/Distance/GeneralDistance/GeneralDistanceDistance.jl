@@ -14,9 +14,9 @@ function GeneralDistanceDistance(; power::Integer = 1,
                                    typeof(kwargs)}(power, dist, args, kwargs)
 end
 function distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1)
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
     scale = isodd(de.power) ? 0.5 : 1.0
-    rho = robust_cor(ce, X; dims = dims) .^ de.power
+    rho = robust_cor(ce, X; dims = dims, kwargs...) .^ de.power
     dist = sqrt.(clamp!((one(eltype(X)) .- rho) * scale, zero(eltype(X)), one(eltype(X))))
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end

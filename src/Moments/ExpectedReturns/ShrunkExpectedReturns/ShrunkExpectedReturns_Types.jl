@@ -1,10 +1,8 @@
 abstract type ShrunkExpectedReturnsEstimator <: ExpectedReturnsEstimator end
 abstract type ShrunkExpectedReturnsTarget end
-
 struct SERT_GrandMean <: ShrunkExpectedReturnsTarget end
 struct SERT_VolatilityWeighted <: ShrunkExpectedReturnsTarget end
 struct SERT_MeanSquareError <: ShrunkExpectedReturnsTarget end
-
 function target_mean(::SERT_GrandMean, mu::AbstractArray, sigma::AbstractMatrix; kwargs...)
     return fill(mean(mu), length(mu))
 end

@@ -15,7 +15,7 @@ function StatsBase.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dim
     if dims == 2
         X = transpose(X)
     end
-    sigma = cov(ce.ce, X)
+    sigma = cov(ce.ce, X, kwargs...)
     mtx_process!(ce.mp, sigma, X)
     return sigma
 end
@@ -25,7 +25,7 @@ function StatsBase.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dim
     if dims == 2
         X = transpose(X)
     end
-    rho = cor(ce.ce, X)
+    rho = cor(ce.ce, X, kwargs...)
     mtx_process!(ce.mp, rho, X)
     return rho
 end

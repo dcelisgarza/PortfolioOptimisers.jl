@@ -7,18 +7,20 @@ function SimpleVariance(; corrected::Bool = true,
                         w::Union{Nothing, <:AbstractWeights} = nothing)
     return SimpleVariance{typeof(corrected), typeof(w)}(corrected, w)
 end
-function StatsBase.std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing)
+function StatsBase.std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing,
+                       kwargs...)
     return if isnothing(ve.w)
-        std(X; dims = dims, corrected = ve.corrected, mean = mean)
+        std(X; dims = dims, corrected = ve.corrected, mean = mean, kwargs...)
     else
-        std(X, ve.w, dims; corrected = ve.corrected, mean = mean)
+        std(X, ve.w, dims; corrected = ve.corrected, mean = mean, kwargs...)
     end
 end
-function StatsBase.var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing)
+function StatsBase.var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing,
+                       kwargs...)
     return if isnothing(ve.w)
-        var(X; dims = dims, corrected = ve.corrected, mean = mean)
+        var(X; dims = dims, corrected = ve.corrected, mean = mean, kwargs...)
     else
-        var(X, ve.w, dims; corrected = ve.corrected, mean = mean)
+        var(X, ve.w, dims; corrected = ve.corrected, mean = mean, kwargs...)
     end
 end
 

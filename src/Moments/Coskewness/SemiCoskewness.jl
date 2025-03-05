@@ -7,12 +7,12 @@ function SemiCoskewness(; me::ExpectedReturnsEstimator = SimpleExpectedReturns()
                         mp::MatrixProcessing = NonPositiveDefiniteMatrixProcessing())
     return SemiCoskewness{typeof(me), typeof(mp)}(me, mp)
 end
-function coskewness(ske::SemiCoskewness, X::AbstractMatrix; dims::Int = 1)
+function coskewness(ske::SemiCoskewness, X::AbstractMatrix; dims::Int = 1, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
-    mu = mean(ske.me, X)
+    mu = mean(ske.me, X; kwargs...)
     y = min.(X .- mu, zero(eltype(X)))
     return _coskewness(y, X, ske.mp)
 end
