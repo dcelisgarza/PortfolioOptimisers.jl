@@ -81,14 +81,16 @@
                BodnarOkhrinParolyaExpectedReturns(; me = SimpleExpectedReturns(; w = ew),
                                                   target = SERT_VolatilityWeighted()),
                BodnarOkhrinParolyaExpectedReturns(; me = SimpleExpectedReturns(; w = ew),
-                                                  target = SERT_MeanSquareError())]
+                                                  target = SERT_MeanSquareError()),
+               EquilibriumExpectedReturns(), EquilibriumExpectedReturns(; l = 2),
+               ExcessExpectedReturns(), ExcessExpectedReturns(; rf = 0.01)]
         ert = CSV.read(joinpath(@__DIR__, "./assets/Expected-Returns.csv"), DataFrame)
         for i ∈ eachindex(mes)
             er = mean(mes[i], X)
             res = isapprox(er, reshape(ert[!, i], size(er)))
             if !res
-                println("Test $i fails on:\n$(me)\n$(res)\n")
-                find_tol(dist1, reshape(ert[!, i], size(er)); name1 = :er, name2 = :er_t)
+                println("Test $i fails on:\n$(me[i])\n$(res)\n")
+                find_tol(er, reshape(ert[!, i], size(er)); name1 = :er, name2 = :er_t)
             end
             @test res
         end
