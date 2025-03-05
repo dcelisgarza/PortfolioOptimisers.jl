@@ -42,7 +42,7 @@ function hc_constraints(hcc::HierarchicalConstraint{<:Any, <:Any, <:Real, <:Real
         w1[idx] .= lo
         w2[idx] .= hi
     elseif strict
-        throw(ArgumentError("$(string(group)) is not in $(group_names)."))
+        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(hcc)"))
     end
     return w1, w2
 end
@@ -59,7 +59,7 @@ function hc_constraints(hcc::HierarchicalConstraint{<:AbstractVector, <:Abstract
             w1[idx] .= lo
             w2[idx] .= hi
         elseif strict
-            throw(ArgumentError("$(string(group)) is not in $(group_names)."))
+            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(hcc)"))
         end
     end
     return w1, w2
