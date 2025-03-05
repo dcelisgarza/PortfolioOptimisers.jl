@@ -37,8 +37,8 @@ function StatsBase.cor(ce::Gerber0NormalisedCovariance, X::AbstractMatrix; dims:
     if dims == 2
         X = transpose(X)
     end
-    mean_vec = mean(ce.me, X; dims = 1, kwargs...)
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    mean_vec = mean(ce.me, X; dims = 1)
+    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ./ std_vec
@@ -51,7 +51,7 @@ function StatsBase.cov(ce::Gerber0NormalisedCovariance, X::AbstractMatrix; dims:
         X = transpose(X)
     end
     mean_vec = mean(ce.me, X; dims = 1)
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ./ std_vec

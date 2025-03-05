@@ -6,8 +6,8 @@ function GeneralAbsoluteDistance(; power::Integer = 1)
     return GeneralAbsoluteDistance{typeof(power)}(power)
 end
 function distance(de::GeneralAbsoluteDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
-    rho = abs.(robust_cor(ce, X; dims = dims, kwargs...)) .^ de.power
+                  X::AbstractMatrix; dims::Int = 1)
+    rho = abs.(robust_cor(ce, X; dims = dims)) .^ de.power
     return sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::GeneralAbsoluteDistance, rho::AbstractMatrix, args...; kwargs...)

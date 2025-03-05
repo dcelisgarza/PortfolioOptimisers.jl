@@ -11,8 +11,7 @@ function VariationInfoDistance(;
     end
     return VariationInfoDistance{typeof(bins), typeof(normalise)}(bins, normalise)
 end
-function distance(de::VariationInfoDistance, ::Any, X::AbstractMatrix; dims::Int = 1,
-                  kwargs...)
+function distance(de::VariationInfoDistance, ::Any, X::AbstractMatrix; dims::Int = 1)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)

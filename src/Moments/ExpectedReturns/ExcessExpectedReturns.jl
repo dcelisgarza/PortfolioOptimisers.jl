@@ -7,9 +7,8 @@ function ExcessExpectedReturns(; me::ExpectedReturnsEstimator = SimpleExpectedRe
                                rf::Real = 0.0)
     return ExcessExpectedReturns{typeof(me), typeof(rf)}(me, rf)
 end
-function StatsBase.mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1,
-                        kwargs...)
-    return mean(me.me, X; dims = dims, kwargs...) .- me.rf
+function StatsBase.mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1)
+    return mean(me, X; dims = dims) .- me.rf
 end
 
 export ExcessExpectedReturns

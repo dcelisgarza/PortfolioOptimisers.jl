@@ -10,31 +10,29 @@ function CanonicalDistanceDistance(; dist::Distances.Metric = Distances.Euclidea
                                                                                  kwargs)
 end
 function distance(de::CanonicalDistanceDistance, ce::MutualInfoCovariance,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+                  X::AbstractMatrix; dims::Int = 1)
     return distance(VariationInfoDistanceDistance(; bins = ce.bins,
                                                   normalise = ce.normalise, dist = de.dist,
                                                   args = de.args, kwargs = de.kwargs), ce,
-                    X; dims = dims, kwargs...)
+                    X; dims = dims)
 end
 function distance(de::CanonicalDistanceDistance, ce::LTDCovariance, X::AbstractMatrix;
-                  dims::Int = 1, kwargs...)
+                  dims::Int = 1)
     return distance(LogDistanceDistance(; dist = de.dist, args = de.args,
-                                        kwargs = de.kwargs), ce, X; dims = dims, kwargs...)
+                                        kwargs = de.kwargs), ce, X; dims = dims)
 end
 function distance(de::CanonicalDistanceDistance, ce::DistanceCovariance, X::AbstractMatrix;
-                  dims::Int = 1, kwargs...)
+                  dims::Int = 1)
     return distance(CorrelationDistanceDistance(; dist = de.dist, args = de.args,
-                                                kwargs = de.kwargs), ce, X; dims = dims,
-                    kwargs...)
+                                                kwargs = de.kwargs), ce, X; dims = dims)
 end
 function distance(de::CanonicalDistanceDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+                  X::AbstractMatrix; dims::Int = 1)
     return distance(SimpleDistanceDistance(; dist = de.dist, args = de.args,
-                                           kwargs = de.kwargs), ce, X; dims = dims,
-                    kwargs...)
+                                           kwargs = de.kwargs), ce, X; dims = dims)
 end
 function distance(de::CanonicalDistanceDistance, rho::AbstractMatrix, args...; kwargs...)
     return distance(SimpleDistanceDistance(; dist = de.dist, args = de.args,
-                                           kwargs = de.kwargs), rho; kwargs...)
+                                           kwargs = de.kwargs), rho)
 end
 export CanonicalDistanceDistance

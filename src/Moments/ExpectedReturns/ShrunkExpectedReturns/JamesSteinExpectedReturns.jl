@@ -12,10 +12,9 @@ function JamesSteinExpectedReturns(;
                                    target::ShrunkExpectedReturnsTarget = SERT_GrandMean())
     return JamesSteinExpectedReturns{typeof(ce), typeof(me), typeof(target)}(ce, me, target)
 end
-function StatsBase.mean(me::JamesSteinExpectedReturns, X::AbstractMatrix; dims::Int = 1,
-                        kwargs...)
-    mu = mean(me.me, X; dims = dims, kwargs...)
-    sigma = cov(me.ce, X; dims = dims, kwargs...)
+function StatsBase.mean(me::JamesSteinExpectedReturns, X::AbstractMatrix; dims::Int = 1)
+    mu = mean(me.me, X; dims = dims)
+    sigma = cov(me.ce, X; dims = dims)
     T, N = size(X)
     b = if isone(dims)
         transpose(target_mean(me.target, transpose(mu), sigma; T = T))

@@ -18,8 +18,7 @@ function GeneralVariationInfoDistance(; power::Integer = 1,
     return GeneralVariationInfoDistance{typeof(power), typeof(ve), typeof(bins),
                                         typeof(normalise)}(power, ve, bins, normalise)
 end
-function distance(de::GeneralVariationInfoDistance, ::Any, X::AbstractMatrix; dims::Int = 1,
-                  kwargs...)
+function distance(de::GeneralVariationInfoDistance, ::Any, X::AbstractMatrix; dims::Int = 1)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)

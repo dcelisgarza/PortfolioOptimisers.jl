@@ -14,14 +14,14 @@ function GeneralLogDistanceDistance(; power::Integer = 1,
                                       typeof(kwargs)}(power, dist, args, kwargs)
 end
 function distance(de::GeneralLogDistanceDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
-    rho = abs.(robust_cor(ce, X; dims = dims, kwargs...)) .^ de.power
+                  X::AbstractMatrix; dims::Int = 1)
+    rho = abs.(robust_cor(ce, X; dims = dims)) .^ de.power
     dist = -log.(rho)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 function distance(de::GeneralLogDistanceDistance, ce::LTDCovariance, X::AbstractMatrix;
-                  dims::Int = 1, kwargs...)
-    rho = robust_cor(ce, X; dims = dims, kwargs...) .^ de.power
+                  dims::Int = 1)
+    rho = robust_cor(ce, X; dims = dims) .^ de.power
     dist = -log.(rho)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end

@@ -15,9 +15,9 @@ function BodnarOkhrinParolyaExpectedReturns(;
                                                                                       target)
 end
 function StatsBase.mean(me::BodnarOkhrinParolyaExpectedReturns, X::AbstractMatrix;
-                        dims::Int = 1, kwargs...)
-    mu = mean(me.me, X; dims = dims, kwargs...)
-    sigma = cov(me.ce, X; dims = dims, kwargs...)
+                        dims::Int = 1)
+    mu = mean(me.me, X; dims = dims)
+    sigma = cov(me.ce, X; dims = dims)
     T, N = size(X)
     isigma = sigma \ I
     b = if isone(dims)

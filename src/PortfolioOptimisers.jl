@@ -16,8 +16,9 @@ include("./LinearAlgebra/Operators.jl")
 
 # Constraints
 include("./Constraints/Constraint_AbstractTypes.jl")
-include("./Constraints/LinearConstraints.jl")
-include("./Constraints/BlackLittermanViews.jl")
+include("./Constraints/LinearConstraints/LinearConstraintSide.jl")
+include("./Constraints/LinearConstraints/LinearConstraints.jl")
+include("./Constraints/LinearConstraints/BlackLittermanViews.jl")
 include("./Constraints/HierarchicalConstraints.jl")
 
 # Solver

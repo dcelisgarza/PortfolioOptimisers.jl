@@ -10,8 +10,8 @@ function SimpleDistanceDistance(; dist::Distances.Metric = Distances.Euclidean()
                                                                               kwargs)
 end
 function distance(de::SimpleDistanceDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
-    rho = robust_cor(ce, X; dims = dims, kwargs...)
+                  X::AbstractMatrix; dims::Int = 1)
+    rho = robust_cor(ce, X; dims = dims)
     dist = sqrt.(clamp!((one(eltype(X)) .- rho) * 0.5, zero(eltype(X)), one(eltype(X))))
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end

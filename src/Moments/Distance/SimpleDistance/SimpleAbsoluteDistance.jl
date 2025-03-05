@@ -1,7 +1,7 @@
 struct SimpleAbsoluteDistance <: PortfolioOptimisersAbsoluteDistanceMetric end
 function distance(::SimpleAbsoluteDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
-    rho = abs.(robust_cor(ce, X; dims = dims, kwargs...))
+                  X::AbstractMatrix; dims::Int = 1)
+    rho = abs.(robust_cor(ce, X; dims = dims))
     return sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::SimpleAbsoluteDistance, rho::AbstractMatrix, args...; kwargs...)

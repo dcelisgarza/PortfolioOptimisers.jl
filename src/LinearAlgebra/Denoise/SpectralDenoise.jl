@@ -1,3 +1,4 @@
+
 struct SpectralDenoise{T1 <: Integer, T2 <: Integer, T3, T4 <: Tuple, T5 <: NamedTuple} <:
        DenoiseAlgorithm
     m::T1

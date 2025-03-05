@@ -1,6 +1,6 @@
 struct BlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProcessing,
-                                    T3 <: Union{<:LinearConstraintAtom,
-                                                <:AbstractVector{<:LinearConstraintAtom}},
+                                    T3 <: Union{<:LinearConstraintSide,
+                                                <:AbstractVector{<:LinearConstraintSide}},
                                     T4 <: DataFrame, T5 <: Real,
                                     T6 <: Union{Nothing, <:AbstractVector},
                                     T7 <: Union{Nothing, <:Real}} <: PriorEstimator
@@ -16,8 +16,8 @@ function BlackLittermanPriorEstimator(;
                                       pe::PriorEstimator = EmpiricalPriorEstimator(;
                                                                                    me = EquilibriumExpectedReturns()),
                                       mp::MatrixProcessing = DefaultMatrixProcessing(),
-                                      views::Union{<:LinearConstraintAtom,
-                                                   <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),
+                                      views::Union{<:LinearConstraintSide,
+                                                   <:AbstractVector{<:LinearConstraintSide}} = LinearConstraintSide(),
                                       asset_sets::DataFrame = DataFrame(), rf::Real = 0.0,
                                       views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                       tau::Union{Nothing, <:Real} = nothing)
@@ -32,8 +32,7 @@ function BlackLittermanPriorEstimator(;
                                         typeof(tau)}(pe, mp, views, asset_sets, rf,
                                                      views_conf, tau)
 end
-function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix; dims::Int = 1,
-               strict::Bool = false)
+function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix; dims::Int = 1)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
@@ -44,8 +43,7 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix; dims::Int = 
     prior_model = prior(pe.pe, X)
     prior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
 
-    P, Q = views_constraints(pe.views, pe.asset_sets; datatype = eltype(prior_X),
-                             strict = strict)
+    P, Q = views_constraints(pe.views, pe.asset_sets, eltype(prior_X))
     @smart_assert(!isempty(P))
 
     views_conf = pe.views_conf

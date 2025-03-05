@@ -6,9 +6,9 @@ function GeneralDistance(; power::Integer = 1)
     return GeneralDistance{typeof(power)}(power)
 end
 function distance(de::GeneralDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;
-                  dims::Int = 1, kwargs...)
+                  dims::Int = 1)
     scale = isodd(de.power) ? 0.5 : 1.0
-    rho = robust_cor(ce, X; dims = dims, kwargs...) .^ de.power
+    rho = robust_cor(ce, X; dims = dims) .^ de.power
     return sqrt.(clamp!((one(eltype(X)) .- rho) * scale, zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::GeneralDistance, rho::AbstractMatrix, args...; kwargs...)

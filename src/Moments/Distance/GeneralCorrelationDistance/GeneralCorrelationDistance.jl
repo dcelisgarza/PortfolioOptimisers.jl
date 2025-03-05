@@ -6,8 +6,8 @@ function GeneralCorrelationDistance(; power::Integer = 1)
     return GeneralCorrelationDistance{typeof(power)}(power)
 end
 function distance(de::GeneralCorrelationDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1, kwargs...)
-    rho = robust_cor(ce, X; dims = dims, kwargs...) .^ de.power
+                  X::AbstractMatrix; dims::Int = 1)
+    rho = robust_cor(ce, X; dims = dims) .^ de.power
     return sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::GeneralCorrelationDistance, rho::AbstractMatrix, args...; kwargs...)

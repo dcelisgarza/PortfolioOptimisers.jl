@@ -8,11 +8,11 @@ function FullCovariance(; me::ExpectedReturnsEstimator = SimpleExpectedReturns()
     return FullCovariance{typeof(me), typeof(ce)}(me, ce)
 end
 function StatsBase.cov(ce::FullCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return cov(ce.ce, X; dims = dims, mean = mean(ce.me, X; dims = dims), kwargs...)
+    return cov(ce.ce, X; dims = dims, mean = mean(ce.me, X; dims = dims))
 end
 function StatsBase.cor(ce::FullCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    mu = mean(ce.me, X; dims = dims, kwargs...)
-    return robust_cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
+    mu = mean(ce.me, X; dims = dims)
+    return robust_cor(ce.ce, X; dims = dims, mean = mu)
 end
 
 export FullCovariance

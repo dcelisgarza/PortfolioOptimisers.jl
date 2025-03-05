@@ -34,7 +34,7 @@ function StatsBase.cor(ce::Gerber2Covariance, X::AbstractMatrix; dims::Int = 1, 
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1, kwargs...)
+    std_vec = std(ce.ve, X; dims = 1)
     return _gerber2(ce, X, std_vec)
 end
 function StatsBase.cov(ce::Gerber2Covariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -42,7 +42,7 @@ function StatsBase.cov(ce::Gerber2Covariance, X::AbstractMatrix; dims::Int = 1, 
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1, kwargs...)
+    std_vec = std(ce.ve, X; dims = 1)
     return _gerber2(ce, X, std_vec) .* (std_vec ⊗ std_vec)
 end
 
