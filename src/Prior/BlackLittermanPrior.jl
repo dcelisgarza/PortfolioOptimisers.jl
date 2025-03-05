@@ -1,6 +1,6 @@
 struct BlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProcessing,
-                                    T3 <: Union{<:LinearConstraintSide,
-                                                <:AbstractVector{<:LinearConstraintSide}},
+                                    T3 <: Union{<:LinearConstraintAtom,
+                                                <:AbstractVector{<:LinearConstraintAtom}},
                                     T4 <: DataFrame, T5 <: Real,
                                     T6 <: Union{Nothing, <:AbstractVector},
                                     T7 <: Union{Nothing, <:Real}} <: PriorEstimator
@@ -16,8 +16,8 @@ function BlackLittermanPriorEstimator(;
                                       pe::PriorEstimator = EmpiricalPriorEstimator(;
                                                                                    me = EquilibriumExpectedReturns()),
                                       mp::MatrixProcessing = DefaultMatrixProcessing(),
-                                      views::Union{<:LinearConstraintSide,
-                                                   <:AbstractVector{<:LinearConstraintSide}} = LinearConstraintSide(),
+                                      views::Union{<:LinearConstraintAtom,
+                                                   <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),
                                       asset_sets::DataFrame = DataFrame(), rf::Real = 0.0,
                                       views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                       tau::Union{Nothing, <:Real} = nothing)
