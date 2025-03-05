@@ -11,9 +11,10 @@ function views_constraints(vcs::Union{<:LinearConstraintSide,
             get_asset_constraint_data(vc, asset_sets; normalise = true, strict = true)
         catch err
             if isa(err, ArgumentError)
-                @warn(err.msg * "\n$(vc)\nMoving onto next view.")
+                continue
+            else
+                throw(err)
             end
-            continue
         end
 
         if isempty(vc_A) || all(iszero.(vc_A))

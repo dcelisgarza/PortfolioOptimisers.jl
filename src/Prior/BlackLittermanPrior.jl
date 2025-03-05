@@ -1,6 +1,6 @@
 struct BlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProcessing,
-                                    T3 <: Union{<:BlackLittermanView,
-                                                <:AbstractVector{<:BlackLittermanView}},
+                                    T3 <: Union{<:LinearConstraintSide,
+                                                <:AbstractVector{<:LinearConstraintSide}},
                                     T4 <: DataFrame, T5 <: Real,
                                     T6 <: Union{Nothing, <:AbstractVector},
                                     T7 <: Union{Nothing, <:Real}} <: PriorEstimator
@@ -16,21 +16,23 @@ function BlackLittermanPriorEstimator(;
                                       pe::PriorEstimator = EmpiricalPriorEstimator(;
                                                                                    me = EquilibriumExpectedReturns()),
                                       mp::MatrixProcessing = DefaultMatrixProcessing(),
-                                      views::Union{<:BlackLittermanView,
-                                                   <:AbstractVector{<:BlackLittermanView}} = BlackLittermanView(),
+                                      views::Union{<:LinearConstraintSide,
+                                                   <:AbstractVector{<:LinearConstraintSide}} = LinearConstraintSide(),
                                       asset_sets::DataFrame = DataFrame(), rf::Real = 0.0,
                                       views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                       tau::Union{Nothing, <:Real} = nothing)
     if !isnothing(views_conf)
         @smart_assert(length(views) == length(views_conf))
+        @smart_assert(all(zero(eltype(views_conf)) .<
+                          views_conf .<=
+                          one(eltype(views_conf))))
     end
     return BlackLittermanPriorEstimator{typeof(pe), typeof(mp), typeof(views),
                                         typeof(asset_sets), typeof(rf), typeof(views_conf),
                                         typeof(tau)}(pe, mp, views, asset_sets, rf,
                                                      views_conf, tau)
 end
-function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix; dims::Int = 1,
-               strict::Bool = false)
+function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix; dims::Int = 1)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)

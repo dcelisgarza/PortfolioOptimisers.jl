@@ -48,9 +48,9 @@ function get_asset_constraint_data(hs::LinearConstraintSide{<:AbstractVector,
             end
             append!(A, idx)
         elseif strict
-            throw(ArgumentError("$(string(group)) is not in $(group_names)."))
+            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(hs)."))
         else
-            @warn("$(string(group)) is not in $(group_names).")
+            @warn("$(string(group)) is not in $(group_names).\n$(hs).")
         end
     end
     tcnst = hs.cnst
