@@ -13,7 +13,31 @@
             end
         end
     end
-
+    @testset "Empirical Prior" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 10) * 0.001
+        assets = 1:10
+        asset_sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        pes = [EmpiricalPriorEstimator(), EmpiricalPriorEstimator(; horizon = 252)]
+        pet = CSV.read(joinpath(@__DIR__, "./assets/Empirical-Prior.csv"), DataFrame)
+        for i ∈ eachindex(pes)
+            pm = prior(pes[i], X)
+            mu_t = reshape(pet[1:10, i], size(pm.mu))
+            sigma_t = reshape(pet[11:end, i], size(pm.sigma))
+            res1 = isapprox(pm.mu, mu_t)
+            if !res1
+                println("Test $i fails on mu.")
+                find_tol(pm.mu, mu_t; name1 = :er, name2 = :er_t)
+            end
+            @test res1
+            res2 = isapprox(pm.sigma, sigma_t)
+            if !res2
+                println("Test $i fails on sigma.")
+                find_tol(pm.sigma, sigma_t; name1 = :er, name2 = :er_t)
+            end
+            @test res2
+        end
+    end
     @testset "Black Litterman Prior" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 10) * 0.001
@@ -55,15 +79,37 @@
             res1 = isapprox(pm.mu, mu_t)
             if !res1
                 println("Test $i fails on mu.")
-                find_tol(mu, mu_t; name1 = :er, name2 = :er_t)
+                find_tol(pm.mu, mu_t; name1 = :er, name2 = :er_t)
             end
             @test res1
             res2 = isapprox(pm.sigma, sigma_t)
             if !res2
                 println("Test $i fails on sigma.")
-                find_tol(mu, mu_t; name1 = :er, name2 = :er_t)
+                find_tol(pm.sigma, sigma_t; name1 = :er, name2 = :er_t)
             end
             @test res2
         end
+
+        P, Q = views_constraints(LinearConstraintAtom(; group = :Foo, name = 2, coef = 1,
+                                                      cnst = 0.003), asset_sets)
+        @test isempty(P)
+        @test isempty(Q)
+
+        @test_throws ArgumentError views_constraints(LinearConstraintAtom(; group = :Foo,
+                                                                          name = 2,
+                                                                          coef = 1,
+                                                                          cnst = 0.003),
+                                                     asset_sets; strict = true)
+
+        P, Q = views_constraints(LinearConstraintAtom(; group = [:Foo], name = [2],
+                                                      coef = [1], cnst = 0.003), asset_sets)
+        @test isempty(P)
+        @test isempty(Q)
+
+        @test_throws ArgumentError views_constraints(LinearConstraintAtom(; group = [:Foo],
+                                                                          name = [2],
+                                                                          coef = [1],
+                                                                          cnst = 0.003),
+                                                     asset_sets; strict = true)
     end
 end

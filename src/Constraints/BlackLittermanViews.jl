@@ -54,7 +54,7 @@ function get_black_litterman_views_data(lca::LinearConstraintAtom{<:Any, <:Any, 
 end
 function views_constraints(lcas::Union{<:LinearConstraintAtom,
                                        <:AbstractVector{<:LinearConstraintAtom}},
-                           asset_sets::DataFrame, datatype::Type = Float64,
+                           asset_sets::DataFrame; datatype::Type = Float64,
                            strict::Bool = false)
     N = nrow(asset_sets)
 

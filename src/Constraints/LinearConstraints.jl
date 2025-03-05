@@ -68,7 +68,7 @@ function get_asset_constraint_data(lca::LinearConstraintAtom{<:Any, <:Any, <:Rea
 end
 function linear_constraints(lcs::Union{<:LinearConstraint,
                                        <:AbstractVector{<:LinearConstraint}},
-                            asset_sets::DataFrame, datatype::Type = Float64;
+                            asset_sets::DataFrame; datatype::Type = Float64,
                             strict::Bool = false)
     N = nrow(asset_sets)
     A_ineq = Vector{datatype}(undef, 0)

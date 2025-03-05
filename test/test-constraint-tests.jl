@@ -155,5 +155,10 @@
         w_min, w_max = hc_constraints(hcc_1, asset_sets)
         @test all(iszero.(w_min))
         @test all(isone.(w_max))
+
+        hcc_1 = HierarchicalConstraint(; group = :Foo, name = :Bar, lo = 0.7, hi = 0.8)
+        w_min, w_max = hc_constraints(hcc_1, asset_sets)
+        @test all(iszero.(w_min))
+        @test all(isone.(w_max))
     end
 end
