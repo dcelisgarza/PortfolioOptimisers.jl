@@ -7,3 +7,5 @@ end
 function MultivariateStats.fit(type::PPCATarget, X::AbstractMatrix)
     return MultivariateStats.fit(MultivariateStats.PPCA, X; type.kwargs...)
 end
+
+export PPCATarget

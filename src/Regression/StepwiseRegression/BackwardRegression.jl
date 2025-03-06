@@ -1,10 +1,10 @@
 struct BackwardRegression{T1 <: StepwiseRegressionCriteria} <: StepwiseRegression
     criterion::T1
 end
-function BackwardRegression(; criterion::StepwiseRegressionCriteria = PVal())
+function BackwardRegression(; criterion::StepwiseRegressionCriteria = PValue())
     return BackwardRegression{typeof(criterion)}(criterion)
 end
-function _regression(re::BackwardRegression{<:PVal}, x::AbstractVector, F::AbstractMatrix)
+function _regression(re::BackwardRegression{<:PValue}, x::AbstractVector, F::AbstractMatrix)
     ovec = range(; start = 1, stop = 1, length = length(x))
     fit_result = GLM.lm([ovec F], x)
     included = 1:size(F, 2)

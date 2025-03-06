@@ -3,18 +3,17 @@ struct FactorPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector, T3 <: Abstra
     X::T1
     mu::T2
     sigma::T3
-    csigma::T4
+    chol::T4
 end
 function FactorPriorModel(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                          csigma::AbstractMatrix)
+                          chol::AbstractMatrix)
     @smart_assert(size(X, 2) ==
                   length(mu) ==
                   size(sigma, 1) ==
                   size(sigma, 2) ==
-                  size(csigma, 2))
-    return FactorPriorModel{typeof(X), typeof(mu), typeof(sigma), typeof(csigma)}(X, mu,
-                                                                                  sigma,
-                                                                                  csigma)
+                  size(chol, 2))
+    return FactorPriorModel{typeof(X), typeof(mu), typeof(sigma), typeof(chol)}(X, mu,
+                                                                                sigma, chol)
 end
 struct FactorModelPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProcessing,
                                  T3 <: RegressionMethod,
@@ -57,8 +56,8 @@ function prior(pe::FactorModelPriorEstimator, X::AbstractMatrix, F::AbstractMatr
     end
     mtx_process!(pe.mp, posterior_sigma, posterior_X)
     return FactorPriorModel(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                            csigma = transpose(reshape(posterior_csigma,
-                                                       length(posterior_mu), :)))
+                            chol = transpose(reshape(posterior_csigma, length(posterior_mu),
+                                                     :)))
 end
 
 export FactorPriorModel, FactorModelPriorEstimator

@@ -5,14 +5,14 @@ abstract type MaxValStepwiseRegressionCriteria <: StepwiseRegressionCriteria end
 struct AIC <: MinValStepwiseRegressionCriteria end
 struct AICC <: MinValStepwiseRegressionCriteria end
 struct BIC <: MinValStepwiseRegressionCriteria end
-struct RSq <: MaxValStepwiseRegressionCriteria end
-struct AdjRSq <: MaxValStepwiseRegressionCriteria end
-struct PVal{T1 <: Real} <: StepwiseRegressionCriteria
+struct RSquared <: MaxValStepwiseRegressionCriteria end
+struct AdjustedRSquared <: MaxValStepwiseRegressionCriteria end
+struct PValue{T1 <: Real} <: StepwiseRegressionCriteria
     threshold::T1
 end
-function PVal(; threshold::Real = 0.05)
+function PValue(; threshold::Real = 0.05)
     @smart_assert(zero(threshold) < threshold < one(threshold))
-    return PVal{typeof(threshold)}(threshold)
+    return PValue{typeof(threshold)}(threshold)
 end
 function regression_criterion_func(::AIC)
     return GLM.aic
@@ -23,10 +23,10 @@ end
 function regression_criterion_func(::BIC)
     return GLM.bic
 end
-function regression_criterion_func(::RSq)
+function regression_criterion_func(::RSquared)
     return GLM.r2
 end
-function regression_criterion_func(::AdjRSq)
+function regression_criterion_func(::AdjustedRSquared)
     return GLM.adjr2
 end
 function regression_threshold(::MinValStepwiseRegressionCriteria)
@@ -83,4 +83,4 @@ function regression(method::StepwiseRegression, X::AbstractMatrix, F::AbstractMa
     return LoadingsMatrix(; c = view(loadings, :, 1), M = view(loadings, :, 2:cols))
 end
 
-export AIC, BIC, RSq, AdjRSq, PVal
+export AIC, AICC, BIC, RSquared, AdjustedRSquared, PValue

@@ -113,6 +113,10 @@
                                                      asset_sets; strict = true)
     end
     @testset "Factor Model Prior" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 100, 10)
+        F = X[:, [3, 8]]
+
         pm1 = prior(FactorModelPriorEstimator(; residuals = false), transpose(X),
                     transpose(F); dims = 2)
         pm1_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Model-Prior-No-Residuals.csv"),
@@ -125,7 +129,7 @@
         @test isapprox(pm1.X, X_t)
         @test isapprox(pm1.mu, mu_t)
         @test isapprox(pm1.sigma, sigma_t)
-        @test isapprox(pm1.csigma, csigma_t)
+        @test isapprox(pm1.chol, csigma_t)
 
         pm2 = prior(FactorModelPriorEstimator(; residuals = true), transpose(X),
                     transpose(F); dims = 2)
@@ -139,6 +143,6 @@
         @test isapprox(pm2.X, X_t)
         @test isapprox(pm2.mu, mu_t)
         @test isapprox(pm2.sigma, sigma_t)
-        @test isapprox(pm2.csigma, csigma_t)
+        @test isapprox(pm2.chol, csigma_t)
     end
 end

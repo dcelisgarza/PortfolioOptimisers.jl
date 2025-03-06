@@ -1,10 +1,10 @@
 struct ForwardRegression{T1 <: StepwiseRegressionCriteria} <: StepwiseRegression
     criterion::T1
 end
-function ForwardRegression(; criterion::StepwiseRegressionCriteria = PVal())
+function ForwardRegression(; criterion::StepwiseRegressionCriteria = PValue())
     return ForwardRegression{typeof(criterion)}(criterion)
 end
-function _regression(re::ForwardRegression{<:PVal}, x::AbstractVector, F::AbstractMatrix)
+function _regression(re::ForwardRegression{<:PValue}, x::AbstractVector, F::AbstractMatrix)
     ovec = range(; start = 1, stop = 1, length = length(x))
     indices = 1:size(F, 2)
     included = Vector{eltype(indices)}(undef, 0)

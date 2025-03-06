@@ -15,17 +15,19 @@
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
         F = X[:, [3, 8, 14, 19, 10]]
-        res = [ForwardRegression(), ForwardRegression(PortfolioOptimisers.AIC()),
-               ForwardRegression(PortfolioOptimisers.RSq()), BackwardRegression(),
-               BackwardRegression(PortfolioOptimisers.AIC()),
-               BackwardRegression(PortfolioOptimisers.RSq()), PCARegression(),
-               PCARegression(; target = PortfolioOptimisers.PPCATarget())]
+        res = [ForwardRegression(), ForwardRegression(AIC()), ForwardRegression(AICC()),
+               ForwardRegression(BIC()), ForwardRegression(RSquared()),
+               ForwardRegression(AdjustedRSquared()), BackwardRegression(),
+               BackwardRegression(AIC()), BackwardRegression(AICC()),
+               BackwardRegression(BIC()), BackwardRegression(RSquared()),
+               BackwardRegression(AdjustedRSquared()), PCARegression(),
+               PCARegression(; target = PPCATarget())]
         res_t = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv"), DataFrame)
         for i ∈ eachindex(res)
-            if i == 8
+            if i == length(res)
                 continue
             end
-            loadings = PortfolioOptimisers.regression(res[i], X, F)
+            loadings = regression(res[i], X, F)
             lt = [loadings.c; vec(loadings.M)]
             result = isapprox(lt, res_t[!, i])
             if !result
