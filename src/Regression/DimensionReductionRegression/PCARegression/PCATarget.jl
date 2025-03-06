@@ -1,4 +1,4 @@
-struct PCATarget{T1 <: NamedTuple} <: DimensionReductionTarget
+struct PCATarget{T1 <: NamedTuple} <: AbstractPCATarget
     kwargs::T1
 end
 function PCATarget(; kwargs::NamedTuple = (;))

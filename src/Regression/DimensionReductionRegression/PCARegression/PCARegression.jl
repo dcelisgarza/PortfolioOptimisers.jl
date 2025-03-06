@@ -1,13 +1,13 @@
 struct PCARegression{T1 <: ExpectedReturnsEstimator,
-                     T2 <: PortfolioOptimisersVarianceEstimator,
-                     T3 <: DimensionReductionTarget} <: DimensionReductionRegression
+                     T2 <: PortfolioOptimisersVarianceEstimator, T3 <: AbstractPCATarget} <:
+       DimensionReductionRegression
     me::T1
     ve::T2
     target::T3
 end
 function PCARegression(; me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
                        ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
-                       target::DimensionReductionTarget = PCATarget())
+                       target::AbstractPCATarget = PCATarget())
     return PCARegression{typeof(me), typeof(ve), typeof(target)}(me, ve, target)
 end
 function prep_dim_red_reg(type::PCARegression, X::AbstractMatrix)

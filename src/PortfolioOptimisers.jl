@@ -196,9 +196,10 @@ include("./Regression/StepwiseRegression/StepwiseRegression.jl")
 include("./Regression/StepwiseRegression/ForwardRegression.jl")
 include("./Regression/StepwiseRegression/BackwardRegression.jl")
 include("./Regression/DimensionReductionRegression/DimensionReduction_AbstractTypes.jl")
-include("./Regression/DimensionReductionRegression/DimensionReduction_PCATarget.jl")
-include("./Regression/DimensionReductionRegression/DimensionReduction_PPCATarget.jl")
-include("./Regression/DimensionReductionRegression/DimensionReductionRegression.jl")
+include("./Regression/DimensionReductionRegression/PCARegression/PCARegression_AbstractTypes.jl")
+include("./Regression/DimensionReductionRegression/PCARegression/PCATarget.jl")
+include("./Regression/DimensionReductionRegression/PCARegression/PPCATarget.jl")
+include("./Regression/DimensionReductionRegression/PCARegression/PCARegression.jl")
 
 # Prior
 include("./Prior/Prior_AbstractTypes.jl")
