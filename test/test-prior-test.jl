@@ -21,7 +21,7 @@
         pes = [EmpiricalPriorEstimator(), EmpiricalPriorEstimator(; horizon = 252)]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Empirical-Prior.csv"), DataFrame)
         for i ∈ eachindex(pes)
-            pm = prior(pes[i], X)
+            pm = prior(pes[i], transpose(X); dims = 2)
             mu_t = reshape(pet[1:10, i], size(pm.mu))
             sigma_t = reshape(pet[11:end, i], size(pm.sigma))
             res1 = isapprox(pm.mu, mu_t)
@@ -73,7 +73,7 @@
                                             views_conf = fill(1.0, length(views)))]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Black-Litterman-Prior.csv"), DataFrame)
         for i ∈ eachindex(pes)
-            pm = prior(pes[i], X)
+            pm = prior(pes[i], transpose(X); dims = 2)
             mu_t = reshape(pet[1:10, i], size(pm.mu))
             sigma_t = reshape(pet[11:end, i], size(pm.sigma))
             res1 = isapprox(pm.mu, mu_t)

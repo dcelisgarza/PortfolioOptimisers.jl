@@ -190,6 +190,16 @@ include("./Moments/Cokurtosis/Cokurtosis_AbstractTypes.jl")
 include("./Moments/Cokurtosis/FullCokurtosis.jl")
 include("./Moments/Cokurtosis/SemiCokurtosis.jl")
 
+# Regression
+include("./Regression/Regression_AbstractTypes.jl")
+include("./Regression/StepwiseRegression/StepwiseRegression.jl")
+include("./Regression/StepwiseRegression/ForwardRegression.jl")
+include("./Regression/StepwiseRegression/BackwardRegression.jl")
+include("./Regression/DimensionReductionRegression/DimensionReduction_AbstractTypes.jl")
+include("./Regression/DimensionReductionRegression/DimensionReduction_PCATarget.jl")
+include("./Regression/DimensionReductionRegression/DimensionReduction_PPCATarget.jl")
+include("./Regression/DimensionReductionRegression/DimensionReductionRegression.jl")
+
 # Prior
 include("./Prior/Prior_AbstractTypes.jl")
 include("./Prior/EmpiricalPrior.jl")
