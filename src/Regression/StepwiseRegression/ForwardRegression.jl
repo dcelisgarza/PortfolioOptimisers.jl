@@ -4,7 +4,7 @@ end
 function ForwardRegression(; criterion::StepwiseRegressionCriteria = PVal())
     return ForwardRegression{typeof(criterion)}(criterion)
 end
-function _regression(re::ForwardRegression{<:PVal}, F::AbstractMatrix, x::AbstractVector)
+function _regression(re::ForwardRegression{<:PVal}, x::AbstractVector, F::AbstractMatrix)
     ovec = range(; start = 1, stop = 1, length = length(x))
     indices = 1:size(F, 2)
     included = Vector{eltype(indices)}(undef, 0)
@@ -57,7 +57,7 @@ function get_forward_reg_incl_excl!(::MaxValStepwiseRegressionCriteria, value, e
 end
 function _regression(re::ForwardRegression{<:Union{<:MinValStepwiseRegressionCriteria,
                                                    <:MaxValStepwiseRegressionCriteria}},
-                     F::AbstractMatrix, x::AbstractVector)
+                     x::AbstractVector, F::AbstractMatrix)
     T, N = size(F)
     ovec = range(; start = 1, stop = 1, length = T)
     indices = 1:N

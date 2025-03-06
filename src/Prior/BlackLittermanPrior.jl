@@ -32,7 +32,7 @@ function BlackLittermanPriorEstimator(;
                                         typeof(tau)}(pe, mp, views, asset_sets, rf,
                                                      views_conf, tau)
 end
-function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix; dims::Int = 1,
+function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix, args...; dims::Int = 1,
                strict::Bool = false)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
@@ -41,7 +41,7 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix; dims::Int = 
     T, N = size(X)
     @smart_assert(nrow(pe.asset_sets) == N)
 
-    prior_model = prior(pe.pe, X)
+    prior_model = prior(pe.pe, X, args...)
     prior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
 
     P, Q = views_constraints(pe.views, pe.asset_sets; datatype = eltype(prior_X),
@@ -74,7 +74,7 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix; dims::Int = 
     # posterior_sigma = prior_sigma + M
 
     mtx_process!(pe.mp, posterior_sigma, prior_X)
-    return PriorModel(; X = prior_X, mu = posterior_mu, sigma = posterior_sigma)
+    return Prior(; X = prior_X, mu = posterior_mu, sigma = posterior_sigma)
 end
 
 export BlackLittermanPriorEstimator

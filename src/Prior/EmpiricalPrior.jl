@@ -11,18 +11,18 @@ function EmpiricalPriorEstimator(;
                                  horizon::Union{Nothing, <:Real} = nothing)
     return EmpiricalPriorEstimator{typeof(ce), typeof(me), typeof(horizon)}(ce, me, horizon)
 end
-function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, Nothing}, X::AbstractMatrix;
-               dims::Int = 1)
+function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, Nothing}, X::AbstractMatrix,
+               args...; dims::Int = 1)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
     mu = vec(mean(pe.me, X))
     sigma = cov(pe.ce, X)
-    return PriorModel(; X = X, mu = mu, sigma = sigma)
+    return Prior(; X = X, mu = mu, sigma = sigma)
 end
-function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMatrix;
-               dims::Int = 1)
+function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMatrix,
+               args...; dims::Int = 1)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
@@ -34,7 +34,7 @@ function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMat
     sigma .*= pe.horizon
     mu .= exp.(mu + 0.5 * diag(sigma))
     sigma .= (mu ⊗ mu) .* (exp.(sigma) .- one(eltype(sigma)))
-    return PriorModel(; X = X, mu = mu, sigma = sigma)
+    return Prior(; X = X, mu = mu, sigma = sigma)
 end
 
-export EmpiricalPriorEstimator, PriorModel
+export EmpiricalPriorEstimator, Prior

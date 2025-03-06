@@ -204,6 +204,7 @@ include("./Regression/DimensionReductionRegression/DimensionReductionRegression.
 include("./Prior/Prior_AbstractTypes.jl")
 include("./Prior/EmpiricalPrior.jl")
 include("./Prior/BlackLittermanPrior.jl")
+include("./Prior/FactorModelPrior.jl")
 
 # Utils
 include("./Utils/BaseFunctionOverloads.jl")

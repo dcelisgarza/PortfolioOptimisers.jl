@@ -1,4 +1,4 @@
-abstract type RegressionType end
+abstract type RegressionMethod end
 struct LoadingsMatrix{T1 <: AbstractVector, T2 <: AbstractMatrix}
     c::T1
     M::T2

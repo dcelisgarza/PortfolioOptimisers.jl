@@ -112,4 +112,33 @@
                                                                           cnst = 0.003),
                                                      asset_sets; strict = true)
     end
+    @testset "Factor Model Prior" begin
+        pm1 = prior(FactorModelPriorEstimator(; residuals = false), transpose(X),
+                    transpose(F); dims = 2)
+        pm1_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Model-Prior-No-Residuals.csv"),
+                         DataFrame)
+        X_t = reshape(view(pm1_t, 1:1000, 1), 100, 10)
+        mu_t = view(pm1_t, 1001:1010, 1)
+        sigma_t = reshape(view(pm1_t, 1011:1110, 1), 10, 10)
+        csigma_t = reshape(view(pm1_t, 1111:nrow(pm1_t), 1), :, 10)
+
+        @test isapprox(pm1.X, X_t)
+        @test isapprox(pm1.mu, mu_t)
+        @test isapprox(pm1.sigma, sigma_t)
+        @test isapprox(pm1.csigma, csigma_t)
+
+        pm2 = prior(FactorModelPriorEstimator(; residuals = true), transpose(X),
+                    transpose(F); dims = 2)
+        pm2_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Model-Prior-Residuals.csv"),
+                         DataFrame)
+        X_t = reshape(view(pm2_t, 1:1000, 1), 100, 10)
+        mu_t = view(pm2_t, 1001:1010, 1)
+        sigma_t = reshape(view(pm2_t, 1011:1110, 1), 10, 10)
+        csigma_t = reshape(view(pm2_t, 1111:nrow(pm2_t), 1), :, 10)
+
+        @test isapprox(pm2.X, X_t)
+        @test isapprox(pm2.mu, mu_t)
+        @test isapprox(pm2.sigma, sigma_t)
+        @test isapprox(pm2.csigma, csigma_t)
+    end
 end

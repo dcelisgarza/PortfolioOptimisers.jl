@@ -19,8 +19,8 @@ function prep_dim_red_reg(type::PCARegression, X::AbstractMatrix)
     x1 = [ones(eltype(X), N) Xp]
     return x1, Vp
 end
-function _regression(mu::AbstractVector, sigma::AbstractVector, x1::AbstractMatrix,
-                     Vp::AbstractMatrix, y::AbstractVector)
+function _regression(y::AbstractVector, mu::AbstractVector, sigma::AbstractVector,
+                     x1::AbstractMatrix, Vp::AbstractMatrix)
     fit_result = GLM.lm(x1, y)
     beta_pc = coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma
@@ -28,7 +28,7 @@ function _regression(mu::AbstractVector, sigma::AbstractVector, x1::AbstractMatr
     pushfirst!(beta, beta0)
     return beta
 end
-function regression(method::PCARegression, F::AbstractMatrix, X::AbstractMatrix)
+function regression(method::PCARegression, X::AbstractMatrix, F::AbstractMatrix)
     cols = size(F, 2) + 1
     rows = size(X, 2)
     loadings = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
@@ -37,7 +37,7 @@ function regression(method::PCARegression, F::AbstractMatrix, X::AbstractMatrix)
     sigma = vec(std(method.ve, F; mean = mu, dims = 1))
     mu = vec(mu)
     for i ∈ axes(loadings, 1)
-        loadings[i, :] .= _regression(mu, sigma, f1, Vp, view(X, :, i))
+        loadings[i, :] .= _regression(view(X, :, i), mu, sigma, f1, Vp)
     end
     return LoadingsMatrix(; c = view(loadings, :, 1), M = view(loadings, :, 2:cols))
 end

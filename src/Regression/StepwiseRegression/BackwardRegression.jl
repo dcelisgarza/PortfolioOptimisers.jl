@@ -4,7 +4,7 @@ end
 function BackwardRegression(; criterion::StepwiseRegressionCriteria = PVal())
     return BackwardRegression{typeof(criterion)}(criterion)
 end
-function _regression(re::BackwardRegression{<:PVal}, F::AbstractMatrix, x::AbstractVector)
+function _regression(re::BackwardRegression{<:PVal}, x::AbstractVector, F::AbstractMatrix)
     ovec = range(; start = 1, stop = 1, length = length(x))
     fit_result = GLM.lm([ovec F], x)
     included = 1:size(F, 2)
@@ -49,7 +49,7 @@ function get_backward_reg_incl!(::MaxValStepwiseRegressionCriteria, value, inclu
 end
 function _regression(re::BackwardRegression{<:Union{<:MinValStepwiseRegressionCriteria,
                                                     <:MaxValStepwiseRegressionCriteria}},
-                     F::AbstractMatrix, x::AbstractVector)
+                     x::AbstractVector, F::AbstractMatrix)
     T, N = size(F)
     ovec = range(; start = 1, stop = 1, length = T)
     included = collect(1:N)

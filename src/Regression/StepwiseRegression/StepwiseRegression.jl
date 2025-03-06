@@ -1,4 +1,4 @@
-abstract type StepwiseRegression <: RegressionType end
+abstract type StepwiseRegression <: RegressionMethod end
 abstract type StepwiseRegressionCriteria end
 abstract type MinValStepwiseRegressionCriteria <: StepwiseRegressionCriteria end
 abstract type MaxValStepwiseRegressionCriteria <: StepwiseRegressionCriteria end
@@ -62,14 +62,14 @@ function add_best_asset_after_failure_pval!(included::AbstractVector, F::Abstrac
     push!(included, new_feature)
     return nothing
 end
-function regression(method::StepwiseRegression, F::AbstractMatrix, X::AbstractMatrix)
+function regression(method::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix)
     features = 1:size(F, 2)
     cols = size(F, 2) + 1
     N, rows = size(X)
     ovec = range(; start = 1, stop = 1, length = N)
     loadings = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     for i ∈ axes(loadings, 1)
-        included = _regression(method, F, view(X, :, i))
+        included = _regression(method, view(X, :, i), F)
         x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)
         fit_result = GLM.lm(x1, view(X, :, i))
         params = coef(fit_result)

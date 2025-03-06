@@ -1,2 +1,2 @@
-abstract type DimensionReductionRegression <: RegressionType end
+abstract type DimensionReductionRegression <: RegressionMethod end
 abstract type DimensionReductionTarget end
