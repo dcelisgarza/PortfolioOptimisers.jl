@@ -24,9 +24,6 @@
                PCARegression(; target = PPCATarget())]
         res_t = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv"), DataFrame)
         for i ∈ eachindex(res)
-            if i == length(res)
-                continue
-            end
             loadings = regression(res[i], X, F)
             lt = [loadings.c; vec(loadings.M)]
             result = isapprox(lt, res_t[!, i])
@@ -34,7 +31,9 @@
                 println("Test $i fails.\n$(res[i])")
                 find_tol(lt, res_t[!, i]; name1 = :loadings, name2 = :loadings_t)
             end
-            @test result
+            if i != length(res)
+                @test result
+            end
         end
     end
 end

@@ -53,24 +53,30 @@
         vc_4 = LinearConstraintAtom(; group = [:Asset, :Clusters], name = [5, 1],
                                     coef = [1, -1], cnst = 0.007)
         vc_5 = LinearConstraintAtom(; group = :Clusters, name = 2, coef = 1, cnst = 0.001)
-        views = [vc_1, vc_2, vc_3, vc_4, vc_5]
-        pes = [BlackLittermanPriorEstimator(; views = views, asset_sets = asset_sets),
-               BlackLittermanPriorEstimator(; views = views, asset_sets = asset_sets,
-                                            rf = 0.0001),
+        asset_views = [vc_1, vc_2, vc_3, vc_4, vc_5]
+        pes = [BlackLittermanPriorEstimator(; asset_views = asset_views,
+                                            asset_sets = asset_sets),
+               BlackLittermanPriorEstimator(; asset_views = asset_views,
+                                            asset_sets = asset_sets, rf = 0.0001),
                BlackLittermanPriorEstimator(;
                                             pe = EmpiricalPriorEstimator(;
                                                                          me = ExcessExpectedReturns()),
-                                            views = views, asset_sets = asset_sets),
+                                            asset_views = asset_views,
+                                            asset_sets = asset_sets),
                BlackLittermanPriorEstimator(;
                                             pe = EmpiricalPriorEstimator(;
                                                                          me = ExcessExpectedReturns(;
                                                                                                     rf = 0.0001)),
-                                            views = views, asset_sets = asset_sets,
-                                            rf = 0.0001),
-               BlackLittermanPriorEstimator(; views = views, asset_sets = asset_sets,
-                                            views_conf = fill(eps(), length(views))),
-               BlackLittermanPriorEstimator(; views = views, asset_sets = asset_sets,
-                                            views_conf = fill(1.0, length(views)))]
+                                            asset_views = asset_views,
+                                            asset_sets = asset_sets, rf = 0.0001),
+               BlackLittermanPriorEstimator(; asset_views = asset_views,
+                                            asset_sets = asset_sets,
+                                            asset_views_conf = fill(eps(),
+                                                                    length(asset_views))),
+               BlackLittermanPriorEstimator(; asset_views = asset_views,
+                                            asset_sets = asset_sets,
+                                            asset_views_conf = fill(1.0,
+                                                                    length(asset_views)))]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Black-Litterman-Prior.csv"), DataFrame)
         for i ∈ eachindex(pes)
             pm = prior(pes[i], transpose(X); dims = 2)
