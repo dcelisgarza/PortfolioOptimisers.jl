@@ -25,7 +25,7 @@
         res_t = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv"), DataFrame)
         for i ∈ eachindex(res)
             loadings = regression(res[i], X, F)
-            lt = [loadings.c; vec(loadings.M)]
+            lt = [loadings.b; vec(loadings.M)]
             result = isapprox(lt, res_t[!, i])
             if !result
                 println("Test $i fails.\n$(res[i])")

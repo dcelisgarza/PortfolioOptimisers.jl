@@ -75,7 +75,7 @@
                                                                     length(asset_views))),
                BlackLittermanPriorEstimator(; asset_views = asset_views,
                                             asset_sets = asset_sets,
-                                            asset_views_conf = fill(1.0,
+                                            asset_views_conf = fill(1.0 - eps(),
                                                                     length(asset_views)))]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Black-Litterman-Prior.csv"), DataFrame)
         for i ∈ eachindex(pes)
@@ -150,5 +150,72 @@
         @test isapprox(pm2.mu, mu_t)
         @test isapprox(pm2.sigma, sigma_t)
         @test isapprox(pm2.chol, csigma_t)
+    end
+    @testset "Bayesian Black Litterman Prior" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 100, 10) * 0.001
+        F = X[:, [3, 8, 5, 10]]
+        assets = 1:10
+        factor_sets = DataFrame(:Factor => [1, 2, 3, 4])
+        vc_1 = LinearConstraintAtom(; group = :Factor, name = 2, coef = 1, cnst = 0.003)
+        vc_2 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [4, 1],
+                                    coef = [1, -1], cnst = -0.001)
+        vc_3 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [2, 3],
+                                    coef = [1, -1], cnst = 0.002)
+        views = [vc_1, vc_2, vc_3]
+        pes = [BayesianBlackLittermanPriorEstimator(;
+                                                    pe = FactorModelPriorEstimator(;
+                                                                                   pe = EmpiricalPriorEstimator(;
+                                                                                                                me = ExcessExpectedReturns(;
+                                                                                                                                           rf = 0.001))),
+                                                    mp = DefaultMatrixProcessing(),
+                                                    factor_views = views,
+                                                    factor_sets = factor_sets, rf = 0.001),
+               BayesianBlackLittermanPriorEstimator(;
+                                                    pe = FactorModelPriorEstimator(;
+                                                                                   pe = EmpiricalPriorEstimator(;
+                                                                                                                me = ExcessExpectedReturns(;
+                                                                                                                                           rf = 0.001))),
+                                                    mp = DefaultMatrixProcessing(),
+                                                    factor_views = views,
+                                                    factor_sets = factor_sets, rf = 0.001,
+                                                    factor_views_conf = fill(eps(),
+                                                                             length(views))),
+               BayesianBlackLittermanPriorEstimator(;
+                                                    pe = FactorModelPriorEstimator(;
+                                                                                   pe = EmpiricalPriorEstimator(;
+                                                                                                                me = ExcessExpectedReturns(;
+                                                                                                                                           rf = 0.001))),
+                                                    mp = DefaultMatrixProcessing(),
+                                                    factor_views = views,
+                                                    factor_sets = factor_sets, rf = 0.001,
+                                                    factor_views_conf = fill(1 -
+                                                                             sqrt(eps()),
+                                                                             length(views)))]
+        pet = CSV.read(joinpath(@__DIR__, "./assets/Bayesian-Black-Litterman-Prior.csv"),
+                       DataFrame)
+        for i ∈ eachindex(pes)
+            pm = prior(pes[i], transpose(X), transpose(F); dims = 2)
+            X_t = reshape(pet[1:1000, i], size(pm.X))
+            mu_t = reshape(pet[1001:1010, i], size(pm.mu))
+            sigma_t = reshape(pet[1011:end, i], size(pm.sigma))
+            res1 = isapprox(pm.mu, mu_t)
+            if !res1
+                println("Test $i fails on mu.")
+                find_tol(pm.X, X; name1 = :X, name2 = :X_t)
+            end
+            res2 = isapprox(pm.mu, mu_t)
+            if !res2
+                println("Test $i fails on mu.")
+                find_tol(pm.mu, mu_t; name1 = :mu, name2 = :mu_t)
+            end
+            @test res2
+            res3 = isapprox(pm.sigma, sigma_t)
+            if !res3
+                println("Test $i fails on sigma.")
+                find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
+            end
+            @test res3
+        end
     end
 end

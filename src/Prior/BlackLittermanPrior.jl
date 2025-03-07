@@ -24,8 +24,11 @@ function BlackLittermanPriorEstimator(;
     if !isnothing(asset_views_conf)
         @smart_assert(length(asset_views) == length(asset_views_conf))
         @smart_assert(all(zero(eltype(asset_views_conf)) .<
-                          asset_views_conf .<=
+                          asset_views_conf .<
                           one(eltype(asset_views_conf))))
+    end
+    if !isnothing(tau)
+        @smart_assert(tau > zero(tau))
     end
     return BlackLittermanPriorEstimator{typeof(pe), typeof(mp), typeof(asset_views),
                                         typeof(asset_sets), typeof(rf),

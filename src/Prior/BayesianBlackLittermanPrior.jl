@@ -17,15 +17,18 @@ function BayesianBlackLittermanPriorEstimator(;
                                               pe::FactorModelPriorEstimator                                                         = FactorModelPriorEstimator(; pe = EmpiricalPriorEstimator(; me = EquilibriumExpectedReturns())),
                                               mp::MatrixProcessing                                                                  = MatrixProcessing(),
                                               factor_views::Union{<:LinearConstraintAtom, <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),
-                                              factor_sets::AbstractVector                                                           = String[],
+                                              factor_sets::DataFrame                                                                = DataFrame(),
                                               rf::Real                                                                              = 0.0,
                                               factor_views_conf::Union{Nothing, <:AbstractVector}                                   = nothing,
                                               tau::Union{Nothing, <:Real}                                                           = nothing)
     if !isnothing(factor_views_conf)
         @smart_assert(length(factor_views) == length(factor_views_conf))
         @smart_assert(all(zero(eltype(factor_views_conf)) .<
-                          factor_views_conf .<=
+                          factor_views_conf .<
                           one(eltype(factor_views_conf))))
+    end
+    if !isnothing(tau)
+        @smart_assert(tau > zero(tau))
     end
     return BayesianBlackLittermanPriorEstimator{typeof(pe), typeof(mp),
                                                 typeof(factor_views), typeof(factor_sets),
@@ -39,8 +42,9 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
+        F = transpose(F)
     end
-    T, N = size(F, 2)
+    T, N = size(F)
     @smart_assert(nrow(pe.factor_sets) == N)
     prior_model = prior(pe.pe, X, F)
     prior_X, prior_sigma, f_mu, f_sigma, loadings = prior_model.X, prior_model.sigma,
@@ -59,15 +63,18 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
                                  alphas = inv.(factor_views_conf) .- 1
                                  alphas .* f_P * f_sigma * transpose(f_P)
                              end)
-    (; c, M) = loadings
-    v1 = transpose(f_P) * f_omega
-    v2 = prior_sigma \ M
-    v3 = inv(f_sigma) + v1 \ f_P
-    v4 = v3 \ (f_sigma \ f_mu + v1 \ f_Q)
-    v5 = v2 * (v3 + transpose(M) * v2)
-    posterior_sigma = (inv(prior_sigma) - v5 \ transpose(M) * inv(prior_sigma)) \ I
-    posterior_mu = (posterior_sigma * v5 \ v3 * v4) .+ pe.rf .+ c
+    (; b, M) = loadings
+    sigma_hat = inv(f_sigma) + transpose(f_P) * (f_omega \ f_P)
+    mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(f_P) * (f_omega \ f_Q))
+    v1 = prior_sigma \ M
+    v2 = sigma_hat + transpose(M) * v1
+    v3 = inv(prior_sigma)
+    posterior_sigma = inv(v3 - v1 * (v2 \ transpose(M)) * v3)
     mtx_process!(pe.mp, posterior_sigma, prior_X)
+    posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat) .+ pe.rf .+ b
     return FactorPriorModel(; X = prior_X, mu = posterior_mu, sigma = posterior_sigma,
-                            f_mu = f_mu, f_sigma = f_sigma, loadings = loadings)
+                            f_mu = f_mu, f_sigma = f_sigma, loadings = loadings,
+                            chol = Matrix{eltype(posterior_sigma)}(undef, 0, 0))
 end
+
+export BayesianBlackLittermanPriorEstimator

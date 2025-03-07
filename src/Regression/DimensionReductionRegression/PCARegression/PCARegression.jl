@@ -39,7 +39,7 @@ function regression(method::PCARegression, X::AbstractMatrix, F::AbstractMatrix)
     for i ∈ axes(loadings, 1)
         loadings[i, :] .= _regression(view(X, :, i), mu, sigma, f1, Vp)
     end
-    return LoadingsMatrix(; c = view(loadings, :, 1), M = view(loadings, :, 2:cols))
+    return LoadingsMatrix(; b = view(loadings, :, 1), M = view(loadings, :, 2:cols))
 end
 
 export PCARegression

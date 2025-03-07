@@ -17,7 +17,7 @@ function FactorPriorModel(; X::AbstractMatrix, mu::AbstractVector, sigma::Abstra
                   size(sigma, 1) ==
                   size(sigma, 2) ==
                   size(loadings.M, 1) ==
-                  length(loadings.c))
+                  length(loadings.b))
     @smart_assert(length(f_mu) ==
                   size(f_sigma, 1) ==
                   size(f_sigma, 2) ==
@@ -58,9 +58,9 @@ function prior(pe::FactorModelPriorEstimator, X::AbstractMatrix, F::AbstractMatr
     factor_prior = prior(pe.pe, F)
     f_mu, f_sigma = factor_prior.mu, factor_prior.sigma
     loadings = regression(pe.re, X, F)
-    (; c, M) = loadings
-    posterior_X = F * transpose(M) .+ transpose(c)
-    posterior_mu = M * f_mu .+ c
+    (; b, M) = loadings
+    posterior_X = F * transpose(M) .+ transpose(b)
+    posterior_mu = M * f_mu .+ b
     posterior_sigma = M * f_sigma * transpose(M)
     posterior_csigma = M * cholesky(f_sigma).L
     if pe.residuals

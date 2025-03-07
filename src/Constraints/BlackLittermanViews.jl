@@ -10,6 +10,14 @@ function get_black_litterman_views_data(lca::LinearConstraintAtom{<:AbstractVect
     for (group, name, coef) ∈ zip(lca.group, lca.name, lca.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = asset_sets[!, group] .== name
+            if all(iszero.(idx))
+                if strict
+                    throw(ArgumentError("$(string(name)) is not in $(group).\n$(lca)"))
+                else
+                    @warn("$(string(name)) is not in $(group).\n$(lca)")
+                end
+                continue
+            end
             idx = coef * idx
             sc = sign(coef)
             idx /= sum(idx)
@@ -39,6 +47,14 @@ function get_black_litterman_views_data(lca::LinearConstraintAtom{<:Any, <:Any, 
     (; group, name, coef) = lca
     if !(isnothing(group) || string(group) ∉ group_names)
         idx = asset_sets[!, group] .== name
+        if all(iszero.(idx))
+            if strict
+                throw(ArgumentError("$(string(name)) is not in $(group).\n$(lca)"))
+            else
+                @warn("$(string(name)) is not in $(group).\n$(lca)")
+            end
+            return A, lca.cnst
+        end
         idx = coef * idx
         sc = sign(coef)
         idx /= sum(idx)
