@@ -16,11 +16,15 @@ function FactorPriorModel(; X::AbstractMatrix, mu::AbstractVector, sigma::Abstra
                   length(mu) ==
                   size(sigma, 1) ==
                   size(sigma, 2) ==
+                  size(loadings.M, 1) ==
+                  length(loadings.c))
+    @smart_assert(length(f_mu) ==
+                  size(f_sigma, 1) ==
+                  size(f_sigma, 2) ==
                   size(loadings.M, 2))
     if !isempty(chol)
         @smart_assert(size(chol, 2) == length(mu))
     end
-    @smart_assert(length(f_mu) == size(f_sigma, 1) == size(f_sigma, 2))
     return FactorPriorModel{typeof(X), typeof(mu), typeof(sigma), typeof(chol),
                             typeof(f_mu), typeof(f_sigma), typeof(loadings)}(X, mu, sigma,
                                                                              chol, f_mu,
