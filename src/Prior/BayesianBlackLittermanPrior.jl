@@ -1,4 +1,4 @@
-struct BayesianBlackLittermanPriorEstimator{T1 <: FactorModelPriorEstimator,
+struct BayesianBlackLittermanPriorEstimator{T1 <: FactorPriorEstimator,
                                             T2 <: MatrixProcessing,
                                             T3 <: Union{<:LinearConstraintAtom,
                                                         <:AbstractVector{<:LinearConstraintAtom}},
@@ -14,7 +14,7 @@ struct BayesianBlackLittermanPriorEstimator{T1 <: FactorModelPriorEstimator,
     tau::T7
 end
 function BayesianBlackLittermanPriorEstimator(;
-                                              pe::FactorModelPriorEstimator                                                         = FactorModelPriorEstimator(; pe = EmpiricalPriorEstimator(; me = EquilibriumExpectedReturns())),
+                                              pe::FactorPriorEstimator                                                              = FactorPriorEstimator(; pe = EmpiricalPriorEstimator(; me = EquilibriumExpectedReturns())),
                                               mp::MatrixProcessing                                                                  = MatrixProcessing(),
                                               factor_views::Union{<:LinearConstraintAtom, <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),
                                               factor_sets::DataFrame                                                                = DataFrame(),
@@ -72,9 +72,9 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_sigma = inv(v3 - v1 * (v2 \ transpose(M)) * v3)
     mtx_process!(pe.mp, posterior_sigma, prior_X)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat) .+ pe.rf .+ b
-    return FactorPriorModel(; X = prior_X, mu = posterior_mu, sigma = posterior_sigma,
-                            f_mu = f_mu, f_sigma = f_sigma, loadings = loadings,
-                            chol = Matrix{eltype(posterior_sigma)}(undef, 0, 0))
+    return FactorPrior(; X = prior_X, mu = posterior_mu, sigma = posterior_sigma,
+                       f_mu = f_mu, f_sigma = f_sigma, loadings = loadings,
+                       chol = Matrix{eltype(posterior_sigma)}(undef, 0, 0))
 end
 
 export BayesianBlackLittermanPriorEstimator

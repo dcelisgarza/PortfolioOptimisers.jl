@@ -66,20 +66,11 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix, args...; dim
                                alphas .* P * prior_sigma * transpose(P)
                            end)
 
-    v = tau * prior_sigma * transpose(P)
-    a = P * v + omega
-    b = Q .- P * prior_mu
-    posterior_mu = prior_mu + v * (a \ b) .+ pe.rf
-    posterior_sigma = prior_sigma + tau * prior_sigma - v * (a \ transpose(v))
-
-    # a = (tau * prior_sigma) \ I
-    # b = omega \ I
-    # c = transpose(P) * b
-    # M = (a + c * P) \ I
-    # PI = M * (a * prior_mu + c * Q)
-    # posterior_mu = PI .+ pe.rf
-    # posterior_sigma = prior_sigma + M
-
+    v1 = tau * prior_sigma * transpose(P)
+    v2 = P * v1 + omega
+    v3 = Q .- P * prior_mu
+    posterior_mu = prior_mu + v1 * (v2 \ v3) .+ pe.rf
+    posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     mtx_process!(pe.mp, posterior_sigma, prior_X)
     return Prior(; X = prior_X, mu = posterior_mu, sigma = posterior_sigma)
 end

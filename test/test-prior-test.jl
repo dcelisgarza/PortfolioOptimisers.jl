@@ -118,14 +118,14 @@
                                                                           cnst = 0.003),
                                                      asset_sets; strict = true)
     end
-    @testset "Factor Model Prior" begin
+    @testset "Factor Prior" begin
         rng = StableRNG(123456789)
         X = randn(rng, 100, 10)
         F = X[:, [3, 8]]
 
-        pm1 = prior(FactorModelPriorEstimator(; residuals = false), transpose(X),
-                    transpose(F); dims = 2)
-        pm1_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Model-Prior-No-Residuals.csv"),
+        pm1 = prior(FactorPriorEstimator(; residuals = false), transpose(X), transpose(F);
+                    dims = 2)
+        pm1_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-No-Residuals.csv"),
                          DataFrame)
         X_t = reshape(view(pm1_t, 1:1000, 1), 100, 10)
         mu_t = view(pm1_t, 1001:1010, 1)
@@ -137,9 +137,9 @@
         @test isapprox(pm1.sigma, sigma_t)
         @test isapprox(pm1.chol, csigma_t)
 
-        pm2 = prior(FactorModelPriorEstimator(; residuals = true), transpose(X),
-                    transpose(F); dims = 2)
-        pm2_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Model-Prior-Residuals.csv"),
+        pm2 = prior(FactorPriorEstimator(; residuals = true), transpose(X), transpose(F);
+                    dims = 2)
+        pm2_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-Residuals.csv"),
                          DataFrame)
         X_t = reshape(view(pm2_t, 1:1000, 1), 100, 10)
         mu_t = view(pm2_t, 1001:1010, 1)
@@ -164,28 +164,28 @@
                                     coef = [1, -1], cnst = 0.002)
         views = [vc_1, vc_2, vc_3]
         pes = [BayesianBlackLittermanPriorEstimator(;
-                                                    pe = FactorModelPriorEstimator(;
-                                                                                   pe = EmpiricalPriorEstimator(;
-                                                                                                                me = ExcessExpectedReturns(;
-                                                                                                                                           rf = 0.001))),
+                                                    pe = FactorPriorEstimator(;
+                                                                              pe = EmpiricalPriorEstimator(;
+                                                                                                           me = ExcessExpectedReturns(;
+                                                                                                                                      rf = 0.001))),
                                                     mp = DefaultMatrixProcessing(),
                                                     factor_views = views,
                                                     factor_sets = factor_sets, rf = 0.001),
                BayesianBlackLittermanPriorEstimator(;
-                                                    pe = FactorModelPriorEstimator(;
-                                                                                   pe = EmpiricalPriorEstimator(;
-                                                                                                                me = ExcessExpectedReturns(;
-                                                                                                                                           rf = 0.001))),
+                                                    pe = FactorPriorEstimator(;
+                                                                              pe = EmpiricalPriorEstimator(;
+                                                                                                           me = ExcessExpectedReturns(;
+                                                                                                                                      rf = 0.001))),
                                                     mp = DefaultMatrixProcessing(),
                                                     factor_views = views,
                                                     factor_sets = factor_sets, rf = 0.001,
                                                     factor_views_conf = fill(eps(),
                                                                              length(views))),
                BayesianBlackLittermanPriorEstimator(;
-                                                    pe = FactorModelPriorEstimator(;
-                                                                                   pe = EmpiricalPriorEstimator(;
-                                                                                                                me = ExcessExpectedReturns(;
-                                                                                                                                           rf = 0.001))),
+                                                    pe = FactorPriorEstimator(;
+                                                                              pe = EmpiricalPriorEstimator(;
+                                                                                                           me = ExcessExpectedReturns(;
+                                                                                                                                      rf = 0.001))),
                                                     mp = DefaultMatrixProcessing(),
                                                     factor_views = views,
                                                     factor_sets = factor_sets, rf = 0.001,

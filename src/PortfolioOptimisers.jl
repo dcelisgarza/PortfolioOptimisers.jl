@@ -205,8 +205,9 @@ include("./Regression/DimensionReductionRegression/PCARegression/PCARegression.j
 include("./Prior/Prior_AbstractTypes.jl")
 include("./Prior/EmpiricalPrior.jl")
 include("./Prior/BlackLittermanPrior.jl")
-include("./Prior/FactorModelPrior.jl")
+include("./Prior/FactorPrior.jl")
 include("./Prior/BayesianBlackLittermanPrior.jl")
+include("./Prior/FactorBlackLittermanPrior.jl")
 
 # Utils
 include("./Utils/BaseFunctionOverloads.jl")
