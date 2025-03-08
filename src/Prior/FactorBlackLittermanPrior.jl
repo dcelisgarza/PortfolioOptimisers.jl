@@ -1,5 +1,51 @@
-struct FactorBlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProcessing,
-                                          T3 <: MatrixProcessing, T4 <: RegressionMethod,
+struct FactorBlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
+                                      T3 <: AbstractMatrix, T4 <: AbstractMatrix,
+                                      T5 <: AbstractVector, T6 <: AbstractMatrix,
+                                      T7 <: LoadingsMatrix, T8 <: AbstractMatrix,
+                                      T9 <: AbstractVector} <:
+       AbstractBlackLittermanPriorModel
+    X::T1
+    mu::T2
+    sigma::T3
+    chol::T4
+    f_mu::T5
+    f_sigma::T6
+    loadings::T7
+    f_P::T8
+    f_Q::T9
+end
+function FactorBlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVector,
+                                        sigma::AbstractMatrix, chol::AbstractMatrix,
+                                        f_mu::AbstractVector, f_sigma::AbstractMatrix,
+                                        loadings::LoadingsMatrix, f_P::AbstractMatrix,
+                                        f_Q::AbstractVector)
+    @smart_assert(size(X, 2) ==
+                  length(mu) ==
+                  size(sigma, 1) ==
+                  size(sigma, 2) ==
+                  size(chol, 2) ==
+                  size(loadings.M, 1) ==
+                  length(loadings.b))
+    @smart_assert(length(f_mu) ==
+                  size(f_sigma, 1) ==
+                  size(f_sigma, 2) ==
+                  size(loadings.M, 2) ==
+                  size(f_P, 2))
+    @smart_assert(length(f_Q) == size(f_P, 1))
+    return FactorBlackLittermanPriorModel{typeof(X), typeof(mu), typeof(sigma),
+                                          typeof(chol), typeof(f_mu), typeof(f_sigma),
+                                          typeof(loadings), typeof(f_P), typeof(f_Q)}(X, mu,
+                                                                                      sigma,
+                                                                                      chol,
+                                                                                      f_mu,
+                                                                                      f_sigma,
+                                                                                      loadings,
+                                                                                      f_P,
+                                                                                      f_Q)
+end
+struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator,
+                                          T2 <: MatrixProcessing, T3 <: MatrixProcessing,
+                                          T4 <: RegressionMethod,
                                           T5 <: PortfolioOptimisersVarianceEstimator,
                                           T6 <: Union{<:LinearConstraintAtom,
                                                       <:AbstractVector{<:LinearConstraintAtom}},
@@ -7,7 +53,8 @@ struct FactorBlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProc
                                           T10 <: Union{Nothing, <:AbstractVector},
                                           T11 <: Union{Nothing, <:AbstractVector},
                                           T12 <: Union{Nothing, <:Real},
-                                          T13 <: Union{Nothing, <:Real}}
+                                          T13 <: Union{Nothing, <:Real}} <:
+       AbstractBlackLittermanPriorEstimator
     pe::T1
     f_mp::T2
     mp::T3
@@ -23,7 +70,7 @@ struct FactorBlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProc
     tau::T13
 end
 function FactorBlackLittermanPriorEstimator(;
-                                            pe::PriorEstimator = EmpiricalPriorEstimator(),
+                                            pe::AbstractPriorEstimator = EmpiricalPriorEstimator(),
                                             f_mp::MatrixProcessing = DefaultMatrixProcessing(),
                                             mp::MatrixProcessing = DefaultMatrixProcessing(),
                                             re::RegressionMethod = ForwardRegression(),
@@ -99,10 +146,13 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    return FactorPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                       chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)),
-                       f_mu = f_posterior_mu, f_sigma = f_posterior_sigma,
-                       loadings = loadings)
+    return FactorBlackLittermanPriorModel(; X = posterior_X, mu = posterior_mu,
+                                          sigma = posterior_sigma,
+                                          chol = transpose(reshape(posterior_csigma,
+                                                                   length(posterior_mu), :)),
+                                          f_mu = f_posterior_mu,
+                                          f_sigma = f_posterior_sigma, loadings = loadings,
+                                          f_P = f_P, f_Q = f_Q)
 end
 
-export FactorBlackLittermanPriorEstimator
+export FactorBlackLittermanPriorModel, FactorBlackLittermanPriorEstimator

@@ -1,9 +1,31 @@
-struct BlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProcessing,
+struct BlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
+                                T3 <: AbstractMatrix, T4 <: AbstractMatrix,
+                                T5 <: AbstractVector} <: AbstractBlackLittermanPriorModel
+    X::T1
+    mu::T2
+    sigma::T3
+    P::T4
+    Q::T5
+end
+function BlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVector,
+                                  sigma::AbstractMatrix, P::AbstractMatrix,
+                                  Q::AbstractVector)
+    @smart_assert(size(X, 2) ==
+                  length(mu) ==
+                  size(sigma, 1) ==
+                  size(sigma, 2) ==
+                  size(P, 2))
+    @smart_assert(length(Q) == size(P, 1))
+    return BlackLittermanPriorModel{typeof(X), typeof(mu), typeof(sigma), typeof(P),
+                                    typeof(Q)}(X, mu, sigma, P, Q)
+end
+struct BlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator, T2 <: MatrixProcessing,
                                     T3 <: Union{<:LinearConstraintAtom,
                                                 <:AbstractVector{<:LinearConstraintAtom}},
                                     T4 <: DataFrame, T5 <: Real,
                                     T6 <: Union{Nothing, <:AbstractVector},
-                                    T7 <: Union{Nothing, <:Real}} <: PriorEstimator
+                                    T7 <: Union{Nothing, <:Real}} <:
+       AbstractBlackLittermanPriorEstimator
     pe::T1
     mp::T2
     views::T3
@@ -13,8 +35,8 @@ struct BlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProcessing
     tau::T7
 end
 function BlackLittermanPriorEstimator(;
-                                      pe::PriorEstimator = EmpiricalPriorEstimator(;
-                                                                                   me = EquilibriumExpectedReturns()),
+                                      pe::AbstractPriorEstimator = EmpiricalPriorEstimator(;
+                                                                                           me = EquilibriumExpectedReturns()),
                                       mp::MatrixProcessing = DefaultMatrixProcessing(),
                                       views::Union{<:LinearConstraintAtom,
                                                    <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),
@@ -68,7 +90,8 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix, args...; dim
     posterior_mu = prior_mu + v1 * (v2 \ v3) .+ pe.rf
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     mtx_process!(pe.mp, posterior_sigma, posterior_X)
-    return Prior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma)
+    return BlackLittermanPriorModel(; X = posterior_X, mu = posterior_mu,
+                                    sigma = posterior_sigma, P = P, Q = Q)
 end
 
-export BlackLittermanPriorEstimator
+export BlackLittermanPriorModel, BlackLittermanPriorEstimator

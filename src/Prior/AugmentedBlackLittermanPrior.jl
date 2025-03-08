@@ -1,4 +1,49 @@
-struct AugmentedBlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: PriorEstimator,
+struct AugmentedBlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
+                                         T3 <: AbstractMatrix, T4 <: AbstractVector,
+                                         T5 <: AbstractMatrix, T6 <: LoadingsMatrix,
+                                         T7 <: AbstractMatrix, T8 <: AbstractVector,
+                                         T9 <: AbstractMatrix, T10 <: AbstractVector} <:
+       AbstractBlackLittermanPriorModel
+    X::T1
+    mu::T2
+    sigma::T3
+    f_mu::T4
+    f_sigma::T5
+    loadings::T6
+    P::T7
+    Q::T8
+    f_P::T9
+    f_Q::T10
+end
+function AugmentedBlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVector,
+                                           sigma::AbstractMatrix, f_mu::AbstractVector,
+                                           f_sigma::AbstractMatrix,
+                                           loadings::LoadingsMatrix, P::AbstractMatrix,
+                                           Q::AbstractVector, f_P::AbstractMatrix,
+                                           f_Q::AbstractVector)
+    @smart_assert(size(X, 2) ==
+                  length(mu) ==
+                  size(sigma, 1) ==
+                  size(sigma, 2) ==
+                  size(loadings.M, 1) ==
+                  length(loadings.b) ==
+                  size(P, 2))
+    @smart_assert(length(f_mu) ==
+                  size(f_sigma, 1) ==
+                  size(f_sigma, 2) ==
+                  size(loadings.M, 2) ==
+                  size(f_P, 2))
+    @smart_assert(length(f_Q) == size(f_P, 1))
+    @smart_assert(length(Q) == size(P, 1))
+    return AugmentedBlackLittermanPriorModel{typeof(X), typeof(mu), typeof(sigma),
+                                             typeof(f_mu), typeof(f_sigma),
+                                             typeof(loadings), typeof(P), typeof(Q),
+                                             typeof(f_P), typeof(f_Q)}(X, mu, sigma, f_mu,
+                                                                       f_sigma, loadings, P,
+                                                                       Q, f_P, f_Q)
+end
+struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator,
+                                             T2 <: AbstractPriorEstimator,
                                              T3 <: MatrixProcessing, T4 <: RegressionMethod,
                                              T5 <: PortfolioOptimisersVarianceEstimator,
                                              T6 <: Union{<:LinearConstraintAtom,
@@ -11,7 +56,8 @@ struct AugmentedBlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: PriorEs
                                              T13 <: Union{Nothing, <:AbstractVector},
                                              T14 <: Union{Nothing, <:AbstractVector},
                                              T15 <: Union{Nothing, <:Real},
-                                             T16 <: Union{Nothing, <:Real}}
+                                             T16 <: Union{Nothing, <:Real}} <:
+       AbstractBlackLittermanPriorEstimator
     a_pe::T1
     f_pe::T2
     mp::T3
@@ -94,19 +140,16 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     v1 = tau * aug_prior_sigma * transpose(aug_P)
     v2 = aug_P * v1 + aug_omega
     v3 = aug_Q .- aug_P * aug_prior_mu
-    aug_posterior_mu = aug_prior_mu + v1 * (v2 \ v3) .+ pe.rf
+    aug_posterior_mu = aug_prior_mu + v1 * (v2 \ v3)
     aug_posterior_sigma = aug_prior_sigma + tau * aug_prior_sigma -
                           v1 * (v2 \ transpose(v1))
-    posterior_mu = aug_posterior_mu[1:size(X, 1)] .+ b
-    posterior_sigma = aug_posterior_mu[1:size(X, 1), 1:size(X, 1)]
+    posterior_mu = aug_posterior_mu[1:size(X, 1)] .+ pe.rf .+ b
+    posterior_sigma = aug_posterior_sigma[1:size(X, 1), 1:size(X, 1)]
     mtx_process!(pe.mp, posterior_sigma, posterior_X)
-    # if pe.residuals
-    #     err = X - posterior_X
-    #     err_sigma = diagm(vec(var(pe.ve, err; dims = 1)))
-    #     posterior_sigma .+= err_sigma
-    # end
-
-    return nothing
+    return AugmentedBlackLittermanPriorModel(; X = posterior_X, mu = posterior_mu,
+                                             sigma = posterior_sigma, f_mu = f_prior_mu,
+                                             f_sigma = f_prior_sigma, loadings = loadings,
+                                             P = P, Q = Q, f_P = f_P, f_Q = f_Q)
 end
 
-export AugmentedBlackLittermanPriorEstimator
+export AugmentedBlackLittermanPriorModel, AugmentedBlackLittermanPriorEstimator

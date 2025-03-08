@@ -1,10 +1,47 @@
+struct BayesianBlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
+                                        T3 <: AbstractMatrix, T4 <: AbstractVector,
+                                        T5 <: AbstractMatrix, T6 <: LoadingsMatrix,
+                                        T7 <: AbstractMatrix, T8 <: AbstractVector} <:
+       AbstractBlackLittermanPriorModel
+    X::T1
+    mu::T2
+    sigma::T3
+    f_mu::T4
+    f_sigma::T5
+    loadings::T6
+    f_P::T7
+    f_Q::T8
+end
+function BayesianBlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVector,
+                                          sigma::AbstractMatrix, f_mu::AbstractVector,
+                                          f_sigma::AbstractMatrix, loadings::LoadingsMatrix,
+                                          f_P::AbstractMatrix, f_Q::AbstractVector)
+    @smart_assert(size(X, 2) ==
+                  length(mu) ==
+                  size(sigma, 1) ==
+                  size(sigma, 2) ==
+                  size(loadings.M, 1) ==
+                  length(loadings.b))
+    @smart_assert(length(f_mu) ==
+                  size(f_sigma, 1) ==
+                  size(f_sigma, 2) ==
+                  size(loadings.M, 2) ==
+                  size(f_P, 2))
+    @smart_assert(length(f_Q) == size(f_P, 1))
+    return BayesianBlackLittermanPriorModel{typeof(X), typeof(mu), typeof(sigma),
+                                            typeof(f_mu), typeof(f_sigma), typeof(loadings),
+                                            typeof(f_P), typeof(f_Q)}(X, mu, sigma, f_mu,
+                                                                      f_sigma, loadings,
+                                                                      f_P, f_Q)
+end
 struct BayesianBlackLittermanPriorEstimator{T1 <: FactorPriorEstimator,
                                             T2 <: MatrixProcessing,
                                             T3 <: Union{<:LinearConstraintAtom,
                                                         <:AbstractVector{<:LinearConstraintAtom}},
                                             T4 <: DataFrame, T5 <: Real,
                                             T6 <: Union{Nothing, <:AbstractVector},
-                                            T7 <: Union{Nothing, <:Real}} <: PriorEstimator
+                                            T7 <: Union{Nothing, <:Real}} <:
+       AbstractBlackLittermanPriorEstimator
     pe::T1
     mp::T2
     views::T3
@@ -73,9 +110,10 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_sigma = inv(v3 - v1 * (v2 \ transpose(M)) * v3)
     mtx_process!(pe.mp, posterior_sigma, posterior_X)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat) .+ pe.rf .+ b
-    return FactorPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                       f_mu = f_mu, f_sigma = f_sigma, loadings = loadings,
-                       chol = Matrix{eltype(posterior_sigma)}(undef, 0, 0))
+    return BayesianBlackLittermanPriorModel(; X = posterior_X, mu = posterior_mu,
+                                            sigma = posterior_sigma, f_mu = f_mu,
+                                            f_sigma = f_sigma, loadings = loadings,
+                                            f_P = f_P, f_Q = f_Q)
 end
 
 export BayesianBlackLittermanPriorEstimator
