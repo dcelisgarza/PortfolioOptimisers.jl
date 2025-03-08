@@ -498,7 +498,7 @@
             pm = prior(pe, transpose(X), transpose(F); dims = 2)
             X_t = reshape(view(pm_t[!, i], 1:1000, 1), 100, 10)
             mu_t = view(pm_t[!, i], 1001:1010, 1)
-            sigma_t = reshape(view(pm_t[!, i], 1011:norw(pm_t), 1), 10, 10)
+            sigma_t = reshape(view(pm_t[!, i], 1011:nrow(pm_t), 1), 10, 10)
 
             res1 = isapprox(pm.X, X_t)
             if !res1
