@@ -51,12 +51,11 @@ struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator,
                                              T7 <: Union{<:LinearConstraintAtom,
                                                          <:AbstractVector{<:LinearConstraintAtom}},
                                              T8 <: DataFrame, T9 <: DataFrame, T10 <: Real,
-                                             T11 <: Bool,
+                                             T11 <: Union{Nothing, <:AbstractVector},
                                              T12 <: Union{Nothing, <:AbstractVector},
                                              T13 <: Union{Nothing, <:AbstractVector},
-                                             T14 <: Union{Nothing, <:AbstractVector},
-                                             T15 <: Union{Nothing, <:Real},
-                                             T16 <: Union{Nothing, <:Real}} <:
+                                             T14 <: Union{Nothing, <:Real},
+                                             T15 <: Union{Nothing, <:Real}} <:
        AbstractBlackLittermanPriorEstimator
     a_pe::T1
     f_pe::T2
@@ -68,12 +67,61 @@ struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator,
     a_sets::T8
     f_sets::T9
     rf::T10
-    residuals::T11
-    a_views_conf::T12
-    f_views_conf::T13
-    w::T14
-    l::T15
-    tau::T16
+    a_views_conf::T11
+    f_views_conf::T12
+    w::T13
+    l::T14
+    tau::T15
+end
+function AugmentedBlackLittermanPriorEstimator(;
+                                               a_pe::AbstractPriorEstimator                                                     = EmpiricalPriorEstimator(),
+                                               f_pe::AbstractPriorEstimator                                                     = EmpiricalPriorEstimator(),
+                                               mp::MatrixProcessing                                                             = DefaultMatrixProcessing(),
+                                               re::RegressionMethod                                                             = ForwardRegression(),
+                                               ve::PortfolioOptimisersVarianceEstimator                                         = SimpleVariance(),
+                                               a_views::Union{<:LinearConstraintAtom, <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),
+                                               f_views::Union{<:LinearConstraintAtom, <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),
+                                               a_sets::DataFrame                                                                = DataFrame(),
+                                               f_sets::DataFrame                                                                = DataFrame(),
+                                               rf::Real                                                                         = 0.0,
+                                               a_views_conf::Union{Nothing, <:AbstractVector}                                   = nothing,
+                                               f_views_conf::Union{Nothing, <:AbstractVector}                                   = nothing,
+                                               w::Union{Nothing, <:AbstractVector}                                              = nothing,
+                                               l::Union{Nothing, <:Real}                                                        = nothing,
+                                               tau::Union{Nothing, <:Real}                                                      = nothing)
+    if !isnothing(a_views_conf)
+        @smart_assert(length(a_views) == length(a_views_conf))
+        @smart_assert(all(zero(eltype(a_views_conf)) .<
+                          a_views_conf .<
+                          one(eltype(a_views_conf))))
+    end
+    if !isnothing(f_views_conf)
+        @smart_assert(length(f_views) == length(f_views_conf))
+        @smart_assert(all(zero(eltype(f_views_conf)) .<
+                          f_views_conf .<
+                          one(eltype(f_views_conf))))
+    end
+    if !isnothing(tau)
+        @smart_assert(tau > zero(tau))
+    end
+    return AugmentedBlackLittermanPriorEstimator{typeof(a_pe), typeof(f_pe), typeof(mp),
+                                                 typeof(re), typeof(ve), typeof(a_views),
+                                                 typeof(f_views), typeof(a_sets),
+                                                 typeof(f_sets), typeof(rf),
+                                                 typeof(a_views_conf), typeof(f_views_conf),
+                                                 typeof(w), typeof(l), typeof(tau)}(a_pe,
+                                                                                    f_pe,
+                                                                                    mp, re,
+                                                                                    ve,
+                                                                                    a_views,
+                                                                                    f_views,
+                                                                                    a_sets,
+                                                                                    f_sets,
+                                                                                    rf,
+                                                                                    a_views_conf,
+                                                                                    f_views_conf,
+                                                                                    w, l,
+                                                                                    tau)
 end
 function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
                F::AbstractMatrix; dims::Int = 1, strict::Bool = false)
@@ -143,9 +191,9 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     aug_posterior_mu = aug_prior_mu + v1 * (v2 \ v3)
     aug_posterior_sigma = aug_prior_sigma + tau * aug_prior_sigma -
                           v1 * (v2 \ transpose(v1))
-    posterior_mu = aug_posterior_mu[1:size(X, 1)] .+ pe.rf .+ b
-    posterior_sigma = aug_posterior_sigma[1:size(X, 1), 1:size(X, 1)]
-    mtx_process!(pe.mp, posterior_sigma, posterior_X)
+    mtx_process!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
+    posterior_mu = aug_posterior_mu[1:size(X, 2)] .+ pe.rf .+ b
+    posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
     return AugmentedBlackLittermanPriorModel(; X = posterior_X, mu = posterior_mu,
                                              sigma = posterior_sigma, f_mu = f_prior_mu,
                                              f_sigma = f_prior_sigma, loadings = loadings,

@@ -1,8 +1,7 @@
 function get_black_litterman_views_data(lca::LinearConstraintAtom{<:AbstractVector,
                                                                   <:AbstractVector,
                                                                   <:AbstractVector, <:Real},
-                                        sets::DataFrame; normalise::Bool = false,
-                                        strict::Bool = false)
+                                        sets::DataFrame; strict::Bool = false)
     group_names = names(sets)
     N = nrow(sets)
     A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)
@@ -38,7 +37,7 @@ function get_black_litterman_views_data(lca::LinearConstraintAtom{<:AbstractVect
 end
 function get_black_litterman_views_data(lca::LinearConstraintAtom{<:Any, <:Any, <:Real,
                                                                   <:Real}, sets::DataFrame;
-                                        normalise::Bool = false, strict::Bool = false)
+                                        strict::Bool = false)
     group_names = names(sets)
     N = nrow(sets)
     A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)

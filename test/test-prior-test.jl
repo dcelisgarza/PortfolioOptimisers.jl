@@ -395,4 +395,129 @@
             @test res4
         end
     end
+    @testset "Augmented Black Litterman Prior" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 100, 10) * 0.001
+        F = X[:, [3, 8, 5, 10]]
+
+        assets = 1:10
+        a_sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        vc_1 = LinearConstraintAtom(; group = :Asset, name = 2, coef = 1, cnst = 0.003)
+        vc_2 = LinearConstraintAtom(; group = [:Asset, :Asset], name = [3, 8],
+                                    coef = [1, -1], cnst = -0.001)
+        vc_3 = LinearConstraintAtom(; group = [:Clusters, :Asset], name = [3, 9],
+                                    coef = [1, -1], cnst = 0.002)
+        vc_4 = LinearConstraintAtom(; group = [:Asset, :Clusters], name = [5, 1],
+                                    coef = [1, -1], cnst = 0.007)
+        vc_5 = LinearConstraintAtom(; group = :Clusters, name = 2, coef = 1, cnst = 0.001)
+        a_views = [vc_1, vc_2, vc_3, vc_4, vc_5]
+        P, Q = views_constraints(a_views, a_sets)
+
+        f_sets = DataFrame(:Factor => [1, 2, 3, 4])
+        vc_1 = LinearConstraintAtom(; group = :Factor, name = 2, coef = 1, cnst = 0.003)
+        vc_2 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [4, 1],
+                                    coef = [1, -1], cnst = -0.001)
+        vc_3 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [2, 3],
+                                    coef = [1, -1], cnst = 0.002)
+        f_views = [vc_1, vc_2, vc_3]
+        f_P, f_Q = views_constraints(f_views, f_sets)
+
+        pes = [AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets),
+               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets,
+                                                     rf = 0.001),
+               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets,
+                                                     rf = 0.001, l = 1),
+               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets,
+                                                     rf = 0.001, l = 1,
+                                                     w = (1:10) / sum(1:10)),
+               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets,
+                                                     a_views_conf = fill(eps(),
+                                                                         length(a_views)),
+                                                     f_views_conf = fill(eps(),
+                                                                         length(f_views))),
+               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets,
+                                                     rf = 0.001,
+                                                     a_views_conf = fill(eps(),
+                                                                         length(a_views)),
+                                                     f_views_conf = fill(eps(),
+                                                                         length(f_views))),
+               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets,
+                                                     rf = 0.001, l = 1,
+                                                     a_views_conf = fill(eps(),
+                                                                         length(a_views)),
+                                                     f_views_conf = fill(eps(),
+                                                                         length(f_views))),
+               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets,
+                                                     rf = 0.001, l = 1,
+                                                     w = (1:10) / sum(1:10),
+                                                     a_views_conf = fill(eps(),
+                                                                         length(a_views)),
+                                                     f_views_conf = fill(eps(),
+                                                                         length(f_views))),
+               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets,
+                                                     a_views_conf = fill(1 - sqrt(eps()),
+                                                                         length(a_views)),
+                                                     f_views_conf = fill(1 - sqrt(eps()),
+                                                                         length(f_views))),
+               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets,
+                                                     rf = 0.001,
+                                                     a_views_conf = fill(1 - sqrt(eps()),
+                                                                         length(a_views)),
+                                                     f_views_conf = fill(1 - sqrt(eps()),
+                                                                         length(f_views))),
+               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets,
+                                                     rf = 0.001, l = 1,
+                                                     a_views_conf = fill(1 - sqrt(eps()),
+                                                                         length(a_views)),
+                                                     f_views_conf = fill(1 - sqrt(eps()),
+                                                                         length(f_views))),
+               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+                                                     f_views = f_views, f_sets = f_sets,
+                                                     rf = 0.001, l = 1,
+                                                     w = (1:10) / sum(1:10),
+                                                     a_views_conf = fill(1 - sqrt(eps()),
+                                                                         length(a_views)),
+                                                     f_views_conf = fill(1 - sqrt(eps()),
+                                                                         length(f_views)))]
+        pm_t = CSV.read(joinpath(@__DIR__,
+                                 "./assets/Factor-Black-Litterman-Prior-No-Residuals.csv"),
+                        DataFrame)
+
+        for (i, pe) ∈ enumerate(pes)
+            pm = prior(pe, transpose(X), transpose(F); dims = 2)
+            X_t = reshape(view(pm_t[!, i], 1:1000, 1), 100, 10)
+            mu_t = view(pm_t[!, i], 1001:1010, 1)
+            sigma_t = reshape(view(pm_t[!, i], 1011:norw(pm_t), 1), 10, 10)
+
+            res1 = isapprox(pm.X, X_t)
+            if !res1
+                println("Test $i fails on X.")
+                find_tol(pm.X, X_t; name1 = :X, name2 = :X_t)
+            end
+            @test res1
+            res2 = isapprox(pm.mu, mu_t)
+            if !res2
+                println("Test $i fails on mu.")
+                find_tol(pm.mu, mu_t; name1 = :mu, name2 = :mu_t)
+            end
+            @test res2
+            res3 = isapprox(pm.sigma, sigma_t)
+            if !res3
+                println("Test $i fails on sigma.")
+                find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
+            end
+            @test res3
+        end
+    end
 end

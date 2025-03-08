@@ -83,6 +83,13 @@ function FactorBlackLittermanPriorEstimator(;
                                             w::Union{Nothing, <:AbstractVector} = nothing,
                                             l::Union{Nothing, <:Real} = nothing,
                                             tau::Union{Nothing, <:Real} = nothing)
+    if !isnothing(views_conf)
+        @smart_assert(length(views) == length(views_conf))
+        @smart_assert(all(zero(eltype(views_conf)) .< views_conf .< one(eltype(views_conf))))
+    end
+    if !isnothing(tau)
+        @smart_assert(tau > zero(tau))
+    end
     return FactorBlackLittermanPriorEstimator{typeof(pe), typeof(f_mp), typeof(mp),
                                               typeof(re), typeof(ve), typeof(views),
                                               typeof(sets), typeof(rf), typeof(residuals),
