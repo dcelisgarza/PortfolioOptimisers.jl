@@ -6,38 +6,35 @@ struct BlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProcessing
                                     T7 <: Union{Nothing, <:Real}} <: PriorEstimator
     pe::T1
     mp::T2
-    asset_views::T3
-    asset_sets::T4
+    views::T3
+    sets::T4
     rf::T5
-    asset_views_conf::T6
+    views_conf::T6
     tau::T7
 end
 function BlackLittermanPriorEstimator(;
                                       pe::PriorEstimator = EmpiricalPriorEstimator(;
                                                                                    me = EquilibriumExpectedReturns()),
                                       mp::MatrixProcessing = DefaultMatrixProcessing(),
-                                      asset_views::Union{<:LinearConstraintAtom,
-                                                         <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),
-                                      asset_sets::DataFrame = DataFrame(), rf::Real = 0.0,
-                                      asset_views_conf::Union{Nothing, <:AbstractVector} = nothing,
+                                      views::Union{<:LinearConstraintAtom,
+                                                   <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),
+                                      sets::DataFrame = DataFrame(), rf::Real = 0.0,
+                                      views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                       tau::Union{Nothing, <:Real} = nothing)
-    if !isnothing(asset_views_conf)
-        @smart_assert(length(asset_views) == length(asset_views_conf))
-        @smart_assert(all(zero(eltype(asset_views_conf)) .<
-                          asset_views_conf .<
-                          one(eltype(asset_views_conf))))
+    if !isnothing(views_conf)
+        @smart_assert(length(views) == length(views_conf))
+        @smart_assert(all(zero(eltype(views_conf)) .< views_conf .< one(eltype(views_conf))))
     end
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))
     end
-    return BlackLittermanPriorEstimator{typeof(pe), typeof(mp), typeof(asset_views),
-                                        typeof(asset_sets), typeof(rf),
-                                        typeof(asset_views_conf), typeof(tau)}(pe, mp,
-                                                                               asset_views,
-                                                                               asset_sets,
-                                                                               rf,
-                                                                               asset_views_conf,
-                                                                               tau)
+    return BlackLittermanPriorEstimator{typeof(pe), typeof(mp), typeof(views), typeof(sets),
+                                        typeof(rf), typeof(views_conf), typeof(tau)}(pe, mp,
+                                                                                     views,
+                                                                                     sets,
+                                                                                     rf,
+                                                                                     views_conf,
+                                                                                     tau)
 end
 function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix, args...; dims::Int = 1,
                strict::Bool = false)
@@ -46,23 +43,22 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix, args...; dim
         X = transpose(X)
     end
     T, N = size(X)
-    @smart_assert(nrow(pe.asset_sets) == N)
+    @smart_assert(nrow(pe.sets) == N)
 
     prior_model = prior(pe.pe, X, args...)
     prior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
 
-    P, Q = views_constraints(pe.asset_views, pe.asset_sets; datatype = eltype(prior_X),
-                             strict = strict)
+    P, Q = views_constraints(pe.views, pe.sets; datatype = eltype(prior_X), strict = strict)
     @smart_assert(!isempty(P))
 
-    asset_views_conf = pe.asset_views_conf
+    views_conf = pe.views_conf
     tau = isnothing(pe.tau) ? inv(T) : pe.tau
-    omega = tau * Diagonal(if isnothing(asset_views_conf)
+    omega = tau * Diagonal(if isnothing(views_conf)
                                P * prior_sigma * transpose(P)
                            else
-                               idx = iszero.(asset_views_conf)
-                               asset_views_conf[idx] .= eps(eltype(asset_views_conf))
-                               alphas = inv.(asset_views_conf) .- 1
+                               idx = iszero.(views_conf)
+                               views_conf[idx] .= eps(eltype(views_conf))
+                               alphas = inv.(views_conf) .- 1
                                alphas .* P * prior_sigma * transpose(P)
                            end)
 

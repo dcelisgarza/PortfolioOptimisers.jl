@@ -31,14 +31,14 @@ function HierarchicalConstraint(; group = nothing, name = nothing,
                                                                                        hi)
 end
 function hc_constraints(hcc::HierarchicalConstraint{<:Any, <:Any, <:Real, <:Real},
-                        asset_sets::DataFrame; strict::Bool = false)
-    group_names = names(asset_sets)
-    N = nrow(asset_sets)
+                        sets::DataFrame; strict::Bool = false)
+    group_names = names(sets)
+    N = nrow(sets)
     w1 = zeros(promote_type(eltype(hcc.lo), eltype(hcc.hi)), N)
     w2 = ones(promote_type(eltype(hcc.lo), eltype(hcc.hi)), N)
     (; group, name, lo, hi) = hcc
     if !(isnothing(group) || string(group) ∉ group_names)
-        idx = asset_sets[!, group] .== name
+        idx = sets[!, group] .== name
         w1[idx] .= lo
         w2[idx] .= hi
     elseif strict
@@ -50,14 +50,14 @@ function hc_constraints(hcc::HierarchicalConstraint{<:Any, <:Any, <:Real, <:Real
 end
 function hc_constraints(hcc::HierarchicalConstraint{<:AbstractVector, <:AbstractVector,
                                                     <:AbstractVector, <:AbstractVector},
-                        asset_sets::DataFrame; strict::Bool = false)
-    group_names = names(asset_sets)
-    N = nrow(asset_sets)
+                        sets::DataFrame; strict::Bool = false)
+    group_names = names(sets)
+    N = nrow(sets)
     w1 = zeros(promote_type(eltype(hcc.lo), eltype(hcc.hi)), N)
     w2 = ones(promote_type(eltype(hcc.lo), eltype(hcc.hi)), N)
     for (group, name, lo, hi) ∈ zip(hcc.group, hcc.name, hcc.lo, hcc.hi)
         if !(isnothing(group) || string(group) ∉ group_names)
-            idx = asset_sets[!, group] .== name
+            idx = sets[!, group] .== name
             w1[idx] .= lo
             w2[idx] .= hi
         elseif strict

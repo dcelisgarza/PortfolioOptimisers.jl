@@ -17,7 +17,7 @@
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 10) * 0.001
         assets = 1:10
-        asset_sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         pes = [EmpiricalPriorEstimator(), EmpiricalPriorEstimator(; horizon = 252)]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Empirical-Prior.csv"), DataFrame)
         for i ∈ eachindex(pes)
@@ -43,7 +43,7 @@
         X = randn(rng, 1000, 10) * 0.001
 
         assets = 1:10
-        asset_sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
 
         vc_1 = LinearConstraintAtom(; group = :Asset, name = 2, coef = 1, cnst = 0.003)
         vc_2 = LinearConstraintAtom(; group = [:Asset, :Asset], name = [3, 8],
@@ -53,30 +53,22 @@
         vc_4 = LinearConstraintAtom(; group = [:Asset, :Clusters], name = [5, 1],
                                     coef = [1, -1], cnst = 0.007)
         vc_5 = LinearConstraintAtom(; group = :Clusters, name = 2, coef = 1, cnst = 0.001)
-        asset_views = [vc_1, vc_2, vc_3, vc_4, vc_5]
-        pes = [BlackLittermanPriorEstimator(; asset_views = asset_views,
-                                            asset_sets = asset_sets),
-               BlackLittermanPriorEstimator(; asset_views = asset_views,
-                                            asset_sets = asset_sets, rf = 0.0001),
+        views = [vc_1, vc_2, vc_3, vc_4, vc_5]
+        pes = [BlackLittermanPriorEstimator(; views = views, sets = sets),
+               BlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.0001),
                BlackLittermanPriorEstimator(;
                                             pe = EmpiricalPriorEstimator(;
                                                                          me = ExcessExpectedReturns()),
-                                            asset_views = asset_views,
-                                            asset_sets = asset_sets),
+                                            views = views, sets = sets),
                BlackLittermanPriorEstimator(;
                                             pe = EmpiricalPriorEstimator(;
                                                                          me = ExcessExpectedReturns(;
                                                                                                     rf = 0.0001)),
-                                            asset_views = asset_views,
-                                            asset_sets = asset_sets, rf = 0.0001),
-               BlackLittermanPriorEstimator(; asset_views = asset_views,
-                                            asset_sets = asset_sets,
-                                            asset_views_conf = fill(eps(),
-                                                                    length(asset_views))),
-               BlackLittermanPriorEstimator(; asset_views = asset_views,
-                                            asset_sets = asset_sets,
-                                            asset_views_conf = fill(1.0 - eps(),
-                                                                    length(asset_views)))]
+                                            views = views, sets = sets, rf = 0.0001),
+               BlackLittermanPriorEstimator(; views = views, sets = sets,
+                                            views_conf = fill(eps(), length(views))),
+               BlackLittermanPriorEstimator(; views = views, sets = sets,
+                                            views_conf = fill(1.0 - eps(), length(views)))]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Black-Litterman-Prior.csv"), DataFrame)
         for i ∈ eachindex(pes)
             pm = prior(pes[i], transpose(X); dims = 2)
@@ -97,7 +89,7 @@
         end
 
         P, Q = views_constraints(LinearConstraintAtom(; group = :Foo, name = 2, coef = 1,
-                                                      cnst = 0.003), asset_sets)
+                                                      cnst = 0.003), sets)
         @test isempty(P)
         @test isempty(Q)
 
@@ -105,10 +97,10 @@
                                                                           name = 2,
                                                                           coef = 1,
                                                                           cnst = 0.003),
-                                                     asset_sets; strict = true)
+                                                     sets; strict = true)
 
         P, Q = views_constraints(LinearConstraintAtom(; group = [:Foo], name = [2],
-                                                      coef = [1], cnst = 0.003), asset_sets)
+                                                      coef = [1], cnst = 0.003), sets)
         @test isempty(P)
         @test isempty(Q)
 
@@ -116,10 +108,10 @@
                                                                           name = [2],
                                                                           coef = [1],
                                                                           cnst = 0.003),
-                                                     asset_sets; strict = true)
+                                                     sets; strict = true)
 
         P, Q = views_constraints(LinearConstraintAtom(; group = :Asset, name = 11, coef = 1,
-                                                      cnst = 0.003), asset_sets)
+                                                      cnst = 0.003), sets)
         @test isempty(P)
         @test isempty(Q)
 
@@ -127,10 +119,10 @@
                                                                           name = 11,
                                                                           coef = 1,
                                                                           cnst = 0.003),
-                                                     asset_sets, strict = true)
+                                                     sets, strict = true)
 
         P, Q = views_constraints(LinearConstraintAtom(; group = [:Asset], name = [11],
-                                                      coef = [1], cnst = 0.003), asset_sets)
+                                                      coef = [1], cnst = 0.003), sets)
         @test isempty(P)
         @test isempty(Q)
 
@@ -139,7 +131,7 @@
                                                                           name = [11],
                                                                           coef = [1],
                                                                           cnst = 0.003),
-                                                     asset_sets, strict = true)
+                                                     sets, strict = true)
     end
     @testset "Factor Prior" begin
         rng = StableRNG(123456789)
@@ -179,7 +171,7 @@
         X = randn(rng, 100, 10) * 0.001
         F = X[:, [3, 8, 5, 10]]
         assets = 1:10
-        factor_sets = DataFrame(:Factor => [1, 2, 3, 4])
+        sets = DataFrame(:Factor => [1, 2, 3, 4])
         vc_1 = LinearConstraintAtom(; group = :Factor, name = 2, coef = 1, cnst = 0.003)
         vc_2 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [4, 1],
                                     coef = [1, -1], cnst = -0.001)
@@ -192,29 +184,24 @@
                                                                                                            me = ExcessExpectedReturns(;
                                                                                                                                       rf = 0.001))),
                                                     mp = DefaultMatrixProcessing(),
-                                                    factor_views = views,
-                                                    factor_sets = factor_sets, rf = 0.001),
+                                                    views = views, sets = sets, rf = 0.001),
                BayesianBlackLittermanPriorEstimator(;
                                                     pe = FactorPriorEstimator(;
                                                                               pe = EmpiricalPriorEstimator(;
                                                                                                            me = ExcessExpectedReturns(;
                                                                                                                                       rf = 0.001))),
                                                     mp = DefaultMatrixProcessing(),
-                                                    factor_views = views,
-                                                    factor_sets = factor_sets, rf = 0.001,
-                                                    factor_views_conf = fill(eps(),
-                                                                             length(views))),
+                                                    views = views, sets = sets, rf = 0.001,
+                                                    views_conf = fill(eps(), length(views))),
                BayesianBlackLittermanPriorEstimator(;
                                                     pe = FactorPriorEstimator(;
                                                                               pe = EmpiricalPriorEstimator(;
                                                                                                            me = ExcessExpectedReturns(;
                                                                                                                                       rf = 0.001))),
                                                     mp = DefaultMatrixProcessing(),
-                                                    factor_views = views,
-                                                    factor_sets = factor_sets, rf = 0.001,
-                                                    factor_views_conf = fill(1 -
-                                                                             sqrt(eps()),
-                                                                             length(views)))]
+                                                    views = views, sets = sets, rf = 0.001,
+                                                    views_conf = fill(1 - sqrt(eps()),
+                                                                      length(views)))]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Bayesian-Black-Litterman-Prior.csv"),
                        DataFrame)
         for i ∈ eachindex(pes)
@@ -246,61 +233,52 @@
         X = randn(rng, 100, 10) * 0.001
         F = X[:, [3, 8, 5, 10]]
 
-        pes = [FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets,
+        vc_1 = LinearConstraintAtom(; group = :Factor, name = 2, coef = 1, cnst = 0.003)
+        vc_2 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [4, 1],
+                                    coef = [1, -1], cnst = -0.001)
+        vc_3 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [2, 3],
+                                    coef = [1, -1], cnst = 0.002)
+        views = [vc_1, vc_2, vc_3]
+
+        pes = [FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
                                                   residuals = false),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   residuals = false),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, residuals = false),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   residuals = false),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets,
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
                                                   residuals = false,
-                                                  factor_views_conf = fill(eps(),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   residuals = false,
-                                                  factor_views_conf = fill(eps(),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, residuals = false,
-                                                  factor_views_conf = fill(eps(),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   residuals = false,
-                                                  factor_views_conf = fill(eps(),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
                                                   residuals = false,
-                                                  factor_views_conf = fill(1 - sqrt(eps()),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(1 - sqrt(eps()),
+                                                                    length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   residuals = false,
-                                                  factor_views_conf = fill(1 - sqrt(eps()),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(1 - sqrt(eps()),
+                                                                    length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, residuals = false,
-                                                  factor_views_conf = fill(1 - sqrt(eps()),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(1 - sqrt(eps()),
+                                                                    length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   residuals = false,
-                                                  factor_views_conf = fill(1 - sqrt(eps()),
-                                                                           length(views)))]
+                                                  views_conf = fill(1 - sqrt(eps()),
+                                                                    length(views)))]
 
         pm1_t = CSV.read(joinpath(@__DIR__,
                                   "./assets/Factor-Black-Litterman-Prior-No-Residuals.csv"),
@@ -339,61 +317,45 @@
             @test res4
         end
 
-        pes = [FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets,
+        pes = [FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
                                                   residuals = true),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   residuals = true),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, residuals = true),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   residuals = true),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets,
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
                                                   residuals = true,
-                                                  factor_views_conf = fill(eps(),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   residuals = true,
-                                                  factor_views_conf = fill(eps(),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, residuals = true,
-                                                  factor_views_conf = fill(eps(),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   residuals = true,
-                                                  factor_views_conf = fill(eps(),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
                                                   residuals = true,
-                                                  factor_views_conf = fill(1 - sqrt(eps()),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(1 - sqrt(eps()),
+                                                                    length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   residuals = true,
-                                                  factor_views_conf = fill(1 - sqrt(eps()),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(1 - sqrt(eps()),
+                                                                    length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, residuals = true,
-                                                  factor_views_conf = fill(1 - sqrt(eps()),
-                                                                           length(views)),),
-               FactorBlackLittermanPriorEstimator(; factor_views = views,
-                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  views_conf = fill(1 - sqrt(eps()),
+                                                                    length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   residuals = true,
-                                                  factor_views_conf = fill(1 - sqrt(eps()),
-                                                                           length(views)))]
+                                                  views_conf = fill(1 - sqrt(eps()),
+                                                                    length(views)))]
 
         pm1_t = CSV.read(joinpath(@__DIR__,
                                   "./assets/Factor-Black-Litterman-Prior-Residuals.csv"),

@@ -1,15 +1,15 @@
 function get_black_litterman_views_data(lca::LinearConstraintAtom{<:AbstractVector,
                                                                   <:AbstractVector,
                                                                   <:AbstractVector, <:Real},
-                                        asset_sets::DataFrame; normalise::Bool = false,
+                                        sets::DataFrame; normalise::Bool = false,
                                         strict::Bool = false)
-    group_names = names(asset_sets)
-    N = nrow(asset_sets)
+    group_names = names(sets)
+    N = nrow(sets)
     A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)
     sizehint!(A, length(lca.group))
     for (group, name, coef) ∈ zip(lca.group, lca.name, lca.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
-            idx = asset_sets[!, group] .== name
+            idx = sets[!, group] .== name
             if all(iszero.(idx))
                 if strict
                     throw(ArgumentError("$(string(name)) is not in $(group).\n$(lca)"))
@@ -37,16 +37,15 @@ function get_black_litterman_views_data(lca::LinearConstraintAtom{<:AbstractVect
     end
 end
 function get_black_litterman_views_data(lca::LinearConstraintAtom{<:Any, <:Any, <:Real,
-                                                                  <:Real},
-                                        asset_sets::DataFrame; normalise::Bool = false,
-                                        strict::Bool = false)
-    group_names = names(asset_sets)
-    N = nrow(asset_sets)
+                                                                  <:Real}, sets::DataFrame;
+                                        normalise::Bool = false, strict::Bool = false)
+    group_names = names(sets)
+    N = nrow(sets)
     A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)
     sizehint!(A, N)
     (; group, name, coef) = lca
     if !(isnothing(group) || string(group) ∉ group_names)
-        idx = asset_sets[!, group] .== name
+        idx = sets[!, group] .== name
         if all(iszero.(idx))
             if strict
                 throw(ArgumentError("$(string(name)) is not in $(group).\n$(lca)"))
@@ -70,15 +69,14 @@ function get_black_litterman_views_data(lca::LinearConstraintAtom{<:Any, <:Any, 
 end
 function views_constraints(lcas::Union{<:LinearConstraintAtom,
                                        <:AbstractVector{<:LinearConstraintAtom}},
-                           asset_sets::DataFrame; datatype::Type = Float64,
-                           strict::Bool = false)
-    N = nrow(asset_sets)
+                           sets::DataFrame; datatype::Type = Float64, strict::Bool = false)
+    N = nrow(sets)
 
     P = Vector{datatype}(undef, 0)
     Q = Vector{datatype}(undef, 0)
 
     for lc ∈ lcas
-        lc_A, lc_B = get_black_litterman_views_data(lc, asset_sets; strict = strict)
+        lc_A, lc_B = get_black_litterman_views_data(lc, sets; strict = strict)
 
         if isempty(lc_A) || all(iszero.(lc_A))
             continue

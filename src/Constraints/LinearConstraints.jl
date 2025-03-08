@@ -24,14 +24,14 @@ end
 function get_asset_constraint_data(lca::LinearConstraintAtom{<:AbstractVector,
                                                              <:AbstractVector,
                                                              <:AbstractVector, <:Real},
-                                   asset_sets::DataFrame; strict::Bool = false)
-    group_names = names(asset_sets)
-    N = nrow(asset_sets)
+                                   sets::DataFrame; strict::Bool = false)
+    group_names = names(sets)
+    N = nrow(sets)
     A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)
     sizehint!(A, length(lca.group))
     for (group, name, coef) ∈ zip(lca.group, lca.name, lca.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
-            idx = asset_sets[!, group] .== name
+            idx = sets[!, group] .== name
             idx = coef * idx
             append!(A, idx)
         elseif strict
@@ -48,14 +48,14 @@ function get_asset_constraint_data(lca::LinearConstraintAtom{<:AbstractVector,
     end
 end
 function get_asset_constraint_data(lca::LinearConstraintAtom{<:Any, <:Any, <:Real, <:Real},
-                                   asset_sets::DataFrame; strict::Bool = false)
-    group_names = names(asset_sets)
-    N = nrow(asset_sets)
+                                   sets::DataFrame; strict::Bool = false)
+    group_names = names(sets)
+    N = nrow(sets)
     A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)
     sizehint!(A, N)
     (; group, name, coef) = lca
     if !(isnothing(group) || string(group) ∉ group_names)
-        idx = asset_sets[!, group] .== name
+        idx = sets[!, group] .== name
         idx = coef * idx
         append!(A, idx)
     elseif strict
@@ -68,9 +68,8 @@ function get_asset_constraint_data(lca::LinearConstraintAtom{<:Any, <:Any, <:Rea
 end
 function linear_constraints(lcs::Union{<:LinearConstraint,
                                        <:AbstractVector{<:LinearConstraint}},
-                            asset_sets::DataFrame; datatype::Type = Float64,
-                            strict::Bool = false)
-    N = nrow(asset_sets)
+                            sets::DataFrame; datatype::Type = Float64, strict::Bool = false)
+    N = nrow(sets)
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)
     A_eq = Vector{datatype}(undef, 0)
@@ -79,8 +78,8 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
         lhs = lc.lhs
         rhs = lc.rhs
 
-        lhs_A, lhs_B = get_asset_constraint_data(lhs, asset_sets; strict = strict)
-        rhs_A, rhs_B = get_asset_constraint_data(rhs, asset_sets; strict = strict)
+        lhs_A, lhs_B = get_asset_constraint_data(lhs, sets; strict = strict)
+        rhs_A, rhs_B = get_asset_constraint_data(rhs, sets; strict = strict)
 
         lhs_flag = isempty(lhs_A) || all(iszero.(lhs_A))
         rhs_flag = isempty(rhs_A) || all(iszero.(rhs_A))

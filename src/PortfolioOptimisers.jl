@@ -208,6 +208,7 @@ include("./Prior/BlackLittermanPrior.jl")
 include("./Prior/FactorPrior.jl")
 include("./Prior/BayesianBlackLittermanPrior.jl")
 include("./Prior/FactorBlackLittermanPrior.jl")
+include("./Prior/AugmentedBlackLittermanPrior.jl")
 
 # Utils
 include("./Utils/BaseFunctionOverloads.jl")

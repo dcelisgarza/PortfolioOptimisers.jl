@@ -2,7 +2,7 @@
     using PortfolioOptimisers, DataFrames, Test
     @testset "Linear Constraints" begin
         assets = 1:10
-        asset_sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         lhs_1 = LinearConstraintAtom(; group = :Assets, name = 1)
@@ -56,7 +56,7 @@
                   LinearConstraint(; kind = FactorLinearConstraint(), lhs = lhs_12,
                                    rhs = rhs_12, comp = LEQ()),
                   LinearConstraint(; lhs = lhs_13, rhs = rhs_13, comp = EQ())]
-        A_ineq, B_ineq, A_eq, B_eq = linear_constraints(constr, asset_sets)
+        A_ineq, B_ineq, A_eq, B_eq = linear_constraints(constr, sets)
         A_ineq_t = reshape([1.0, -0.0, -1.0, 2.0, 0.0, -0.0, -1.0, 0.0, -0.0, -1.0, 0.0,
                             0.0, -0.0, -1.0, -0.3, -2.0, 2.0, -2.0, 1.0, -1.0, -1.0, 0.0,
                             3.0, -3.0, 1.0, 0.0, 1.0, 1.0, 0.0, -2.0, 2.0, 1.0, 0.0, -1.0,
@@ -78,7 +78,7 @@
 
         a, b, c, d = linear_constraints(LinearConstraint(; lhs = LinearConstraintAtom(),
                                                          rhs = LinearConstraintAtom()),
-                                        asset_sets)
+                                        sets)
         @test isempty(a)
         @test isempty(b)
         @test isempty(c)
@@ -86,8 +86,7 @@
 
         lhs = LinearConstraintAtom(; group = [:Foo], name = [20], coef = [5])
         rhs = LinearConstraintAtom(; cnst = 0.35)
-        a, b, c, d = linear_constraints(LinearConstraint(; lhs = lhs, rhs = rhs),
-                                        asset_sets)
+        a, b, c, d = linear_constraints(LinearConstraint(; lhs = lhs, rhs = rhs), sets)
         @test isempty(a)
         @test isempty(b)
         @test isempty(c)
@@ -103,33 +102,33 @@
         lhs_1 = LinearConstraintAtom(; group = :Assets, name = 1)
         rhs_1 = LinearConstraintAtom(; cnst = 0.35)
         constr = LinearConstraint(; lhs = lhs_1, rhs = rhs_1, comp = EQ())
-        @test_throws ArgumentError linear_constraints(constr, asset_sets, strict = true)
+        @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
 
         lhs_1 = LinearConstraintAtom(; group = :Assets, name = 1)
         rhs_1 = LinearConstraintAtom(; group = [:Foo], name = [:Bar], coef = [1],
                                      cnst = 0.35)
         constr = LinearConstraint(; lhs = lhs_1, rhs = rhs_1, comp = EQ())
-        @test_throws ArgumentError linear_constraints(constr, asset_sets, strict = true)
+        @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
     end
     @testset "Hierarchical constraints" begin
         assets = 1:10
-        asset_sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
 
         hcc_1 = HierarchicalConstraint(; group = :Assets, name = 1, lo = 0.7, hi = 0.8)
-        w_min, w_max = hc_constraints(hcc_1, asset_sets)
+        w_min, w_max = hc_constraints(hcc_1, sets)
         @test isapprox(w_min, [0.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         @test isapprox(w_max, [0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
         hcc_2 = HierarchicalConstraint(; group = [:Assets, :Assets], name = [1, 5],
                                        lo = [0.7, 0.3], hi = [0.8, 0.6])
-        w_min, w_max = hc_constraints(hcc_2, asset_sets)
+        w_min, w_max = hc_constraints(hcc_2, sets)
         @test isapprox(w_min, [0.7, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0])
         @test isapprox(w_max, [0.8, 1.0, 1.0, 1.0, 0.6, 1.0, 1.0, 1.0, 1.0, 1.0])
 
         hcc_3 = HierarchicalConstraint(; group = :Clusters, name = 3, lo = 0.2, hi = 0.5)
-        w_min, w_max = hc_constraints(hcc_3, asset_sets)
+        w_min, w_max = hc_constraints(hcc_3, sets)
         @test isapprox(w_min, [0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2, 0.2])
         @test isapprox(w_max, [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5])
 
@@ -146,18 +145,18 @@
         @test isnothing(lcs.name[1])
 
         hcc_1 = HierarchicalConstraint(; group = :Foo, name = :Bar, lo = 0.7, hi = 0.8)
-        @test_throws ArgumentError hc_constraints(hcc_1, asset_sets, strict = true)
+        @test_throws ArgumentError hc_constraints(hcc_1, sets, strict = true)
 
         hcc_1 = HierarchicalConstraint(; group = [:Foo], name = [:Bar], lo = [0.7],
                                        hi = [0.8])
-        @test_throws ArgumentError hc_constraints(hcc_1, asset_sets, strict = true)
+        @test_throws ArgumentError hc_constraints(hcc_1, sets, strict = true)
 
-        w_min, w_max = hc_constraints(hcc_1, asset_sets)
+        w_min, w_max = hc_constraints(hcc_1, sets)
         @test all(iszero.(w_min))
         @test all(isone.(w_max))
 
         hcc_1 = HierarchicalConstraint(; group = :Foo, name = :Bar, lo = 0.7, hi = 0.8)
-        w_min, w_max = hc_constraints(hcc_1, asset_sets)
+        w_min, w_max = hc_constraints(hcc_1, sets)
         @test all(iszero.(w_min))
         @test all(isone.(w_max))
     end
