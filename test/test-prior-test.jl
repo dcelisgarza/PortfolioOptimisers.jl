@@ -239,6 +239,7 @@
         vc_3 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [2, 3],
                                     coef = [1, -1], cnst = 0.002)
         views = [vc_1, vc_2, vc_3]
+        sets = DataFrame(:Factor => [1, 2, 3, 4])
 
         pes = [FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
                                                   residuals = false),
