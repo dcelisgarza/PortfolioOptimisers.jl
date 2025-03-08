@@ -53,8 +53,8 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
         X = transpose(X)
         F = transpose(F)
     end
-    factor_prior = prior(pe.pe, F)
-    f_mu, f_sigma = factor_prior.mu, factor_prior.sigma
+    f_prior = prior(pe.pe, F)
+    f_mu, f_sigma = f_prior.mu, f_prior.sigma
     loadings = regression(pe.re, X, F)
     (; b, M) = loadings
     posterior_X = F * transpose(M) .+ transpose(b)

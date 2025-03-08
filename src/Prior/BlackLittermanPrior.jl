@@ -42,17 +42,17 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix, args...; dim
     if dims == 2
         X = transpose(X)
     end
-    T, N = size(X)
-    @smart_assert(nrow(pe.sets) == N)
+    @smart_assert(nrow(pe.sets) == size(X, 2))
 
     prior_model = prior(pe.pe, X, args...)
-    prior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
+    posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
 
-    P, Q = views_constraints(pe.views, pe.sets; datatype = eltype(prior_X), strict = strict)
+    P, Q = views_constraints(pe.views, pe.sets; datatype = eltype(posterior_X),
+                             strict = strict)
     @smart_assert(!isempty(P))
 
+    tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
     views_conf = pe.views_conf
-    tau = isnothing(pe.tau) ? inv(T) : pe.tau
     omega = tau * Diagonal(if isnothing(views_conf)
                                P * prior_sigma * transpose(P)
                            else
@@ -67,8 +67,8 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix, args...; dim
     v3 = Q .- P * prior_mu
     posterior_mu = prior_mu + v1 * (v2 \ v3) .+ pe.rf
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
-    mtx_process!(pe.mp, posterior_sigma, prior_X)
-    return Prior(; X = prior_X, mu = posterior_mu, sigma = posterior_sigma)
+    mtx_process!(pe.mp, posterior_sigma, posterior_X)
+    return Prior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma)
 end
 
 export BlackLittermanPriorEstimator

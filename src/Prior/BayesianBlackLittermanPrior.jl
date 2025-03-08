@@ -45,17 +45,17 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
         X = transpose(X)
         F = transpose(F)
     end
-    T, N = size(F)
-    @smart_assert(nrow(pe.sets) == N)
+    @smart_assert(nrow(pe.sets) == size(F, 2))
     prior_model = prior(pe.pe, X, F)
-    prior_X, prior_sigma, f_mu, f_sigma, loadings = prior_model.X, prior_model.sigma,
-                                                    prior_model.f_mu, prior_model.f_sigma,
-                                                    prior_model.loadings
-    f_P, f_Q = views_constraints(pe.views, pe.sets; datatype = eltype(prior_X),
+    posterior_X, prior_sigma, f_mu, f_sigma, loadings = prior_model.X, prior_model.sigma,
+                                                        prior_model.f_mu,
+                                                        prior_model.f_sigma,
+                                                        prior_model.loadings
+    f_P, f_Q = views_constraints(pe.views, pe.sets; datatype = eltype(posterior_X),
                                  strict = strict)
     @smart_assert(!isempty(f_P))
+    tau = isnothing(pe.tau) ? inv(size(F, 1)) : pe.tau
     views_conf = pe.views_conf
-    tau = isnothing(pe.tau) ? inv(T) : pe.tau
     f_omega = tau * Diagonal(if isnothing(views_conf)
                                  f_P * f_sigma * transpose(f_P)
                              else
@@ -71,9 +71,9 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     v2 = sigma_hat + transpose(M) * v1
     v3 = inv(prior_sigma)
     posterior_sigma = inv(v3 - v1 * (v2 \ transpose(M)) * v3)
-    mtx_process!(pe.mp, posterior_sigma, prior_X)
+    mtx_process!(pe.mp, posterior_sigma, posterior_X)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat) .+ pe.rf .+ b
-    return FactorPrior(; X = prior_X, mu = posterior_mu, sigma = posterior_sigma,
+    return FactorPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                        f_mu = f_mu, f_sigma = f_sigma, loadings = loadings,
                        chol = Matrix{eltype(posterior_sigma)}(undef, 0, 0))
 end

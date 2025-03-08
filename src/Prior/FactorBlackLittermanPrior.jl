@@ -9,7 +9,7 @@ struct FactorBlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProc
                                           T12 <: Union{Nothing, <:Real},
                                           T13 <: Union{Nothing, <:Real}}
     pe::T1
-    factor_mp::T2
+    f_mp::T2
     mp::T3
     re::T4
     ve::T5
@@ -24,7 +24,7 @@ struct FactorBlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProc
 end
 function FactorBlackLittermanPriorEstimator(;
                                             pe::PriorEstimator = EmpiricalPriorEstimator(),
-                                            factor_mp::MatrixProcessing = DefaultMatrixProcessing(),
+                                            f_mp::MatrixProcessing = DefaultMatrixProcessing(),
                                             mp::MatrixProcessing = DefaultMatrixProcessing(),
                                             re::RegressionMethod = ForwardRegression(),
                                             ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
@@ -36,11 +36,11 @@ function FactorBlackLittermanPriorEstimator(;
                                             w::Union{Nothing, <:AbstractVector} = nothing,
                                             l::Union{Nothing, <:Real} = nothing,
                                             tau::Union{Nothing, <:Real} = nothing)
-    return FactorBlackLittermanPriorEstimator{typeof(pe), typeof(factor_mp), typeof(mp),
+    return FactorBlackLittermanPriorEstimator{typeof(pe), typeof(f_mp), typeof(mp),
                                               typeof(re), typeof(ve), typeof(views),
                                               typeof(sets), typeof(rf), typeof(residuals),
                                               typeof(views_conf), typeof(w), typeof(l),
-                                              typeof(tau)}(pe, factor_mp, mp, re, ve, views,
+                                              typeof(tau)}(pe, f_mp, mp, re, ve, views,
                                                            sets, rf, residuals, views_conf,
                                                            w, l, tau)
 end
@@ -51,10 +51,9 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
         X = transpose(X)
         F = transpose(F)
     end
-    T = size(X, 1)
-    # Factor statistics.
-    factor_prior = prior(pe.pe, F)
-    f_prior_mu, f_prior_sigma = factor_prior.mu, factor_prior.sigma
+    # Factor prior.
+    f_prior = prior(pe.pe, F)
+    f_prior_mu, f_prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors.
     loadings = regression(pe.re, X, F)
     (; b, M) = loadings
@@ -62,8 +61,8 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
     f_P, f_Q = views_constraints(pe.views, pe.sets; datatype = eltype(posterior_X),
                                  strict = strict)
     @smart_assert(!isempty(f_P))
+    tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
     views_conf = pe.views_conf
-    tau = isnothing(pe.tau) ? inv(T) : pe.tau
     f_omega = tau * Diagonal(if isnothing(views_conf)
                                  f_P * f_prior_sigma * transpose(f_P)
                              else
@@ -74,6 +73,7 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
                              end)
     f_prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
+            @smart_assert(length(pe.w) == size(X, 2))
             pe.w
         else
             fill(inv(size(X, 2)), size(X, 2))
@@ -87,7 +87,7 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
     v3 = f_Q .- f_P * f_prior_mu
     f_posterior_mu = f_prior_mu + v1 * (v2 \ v3) .+ pe.rf
     f_posterior_sigma = f_prior_sigma + tau * f_prior_sigma - v1 * (v2 \ transpose(v1))
-    mtx_process!(pe.factor_mp, f_posterior_sigma, F)
+    mtx_process!(pe.f_mp, f_posterior_sigma, F)
     # Reconstruct the posteriors using the black litterman adjusted factor statistics.
     posterior_mu = M * f_posterior_mu .+ b
     posterior_sigma = M * f_posterior_sigma * transpose(M)
