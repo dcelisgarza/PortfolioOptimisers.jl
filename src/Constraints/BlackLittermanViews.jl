@@ -17,10 +17,14 @@ function get_black_litterman_views_data(lca::LinearConstraintAtom{<:AbstractVect
                 end
                 continue
             end
-            idx = coef * idx
-            sc = sign(coef)
-            idx /= sum(idx)
-            idx .*= sc
+            if count(idx) > one(eltype(idx))
+                idx = coef * idx
+                sc = sign(coef)
+                idx /= sum(idx)
+                idx .*= sc
+            else
+                idx = coef * idx
+            end
             append!(A, idx)
         elseif strict
             throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lca)."))
@@ -53,10 +57,14 @@ function get_black_litterman_views_data(lca::LinearConstraintAtom{<:Any, <:Any, 
             end
             return A, lca.cnst
         end
-        idx = coef * idx
-        sc = sign(coef)
-        idx /= sum(idx)
-        idx .*= sc
+        if count(idx) > one(eltype(idx))
+            idx = coef * idx
+            sc = sign(coef)
+            idx /= sum(idx)
+            idx .*= sc
+        else
+            idx = coef * idx
+        end
         append!(A, idx)
     elseif strict
         throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lca)"))
