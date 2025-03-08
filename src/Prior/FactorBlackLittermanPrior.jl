@@ -23,7 +23,7 @@ struct FactorBlackLittermanPriorEstimator{T1 <: PriorEstimator, T2 <: MatrixProc
     tau::T13
 end
 function FactorBlackLittermanPriorEstimator(;
-                                            pe::PriorEstimator                                                                    = EmpiricalPriorEstimator(;),
+                                            pe::PriorEstimator                                                                    = EmpiricalPriorEstimator(),
                                             posterior_factor_mp::MatrixProcessing                                                 = DefaultMatrixProcessing(),
                                             posterior_mp::MatrixProcessing                                                        = DefaultMatrixProcessing(),
                                             re::RegressionMethod                                                                  = ForwardRegression(),
@@ -97,6 +97,7 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
     # Reconstruct the posteriors using the black litterman adjusted factor statistics.
     posterior_mu = M * f_posterior_mu .+ b
     posterior_sigma = M * f_posterior_sigma * transpose(M)
+    mtx_process!(pe.posterior_mp, posterior_sigma, posterior_X)
     posterior_csigma = M * cholesky(f_posterior_sigma).L
     if pe.residuals
         err = X - posterior_X
@@ -104,7 +105,6 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    mtx_process!(pe.posterior_mp, posterior_sigma, posterior_X)
     return FactorPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                        chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)),
                        f_mu = f_posterior_mu, f_sigma = f_posterior_sigma,

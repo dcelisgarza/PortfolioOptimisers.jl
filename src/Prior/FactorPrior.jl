@@ -60,6 +60,7 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
     posterior_X = F * transpose(M) .+ transpose(b)
     posterior_mu = M * f_mu .+ b
     posterior_sigma = M * f_sigma * transpose(M)
+    mtx_process!(pe.mp, posterior_sigma, posterior_X)
     posterior_csigma = M * cholesky(f_sigma).L
     if pe.residuals
         err = X - posterior_X
@@ -67,7 +68,6 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    mtx_process!(pe.mp, posterior_sigma, posterior_X)
     return FactorPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                        chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)),
                        f_mu = f_mu, f_sigma = f_sigma, loadings = loadings)

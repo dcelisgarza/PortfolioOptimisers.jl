@@ -117,6 +117,29 @@
                                                                           coef = [1],
                                                                           cnst = 0.003),
                                                      asset_sets; strict = true)
+
+        P, Q = views_constraints(LinearConstraintAtom(; group = :Asset, name = 11, coef = 1,
+                                                      cnst = 0.003), asset_sets)
+        @test isempty(P)
+        @test isempty(Q)
+
+        @test_throws ArgumentError views_constraints(LinearConstraintAtom(; group = :Asset,
+                                                                          name = 11,
+                                                                          coef = 1,
+                                                                          cnst = 0.003),
+                                                     asset_sets, strict = true)
+
+        P, Q = views_constraints(LinearConstraintAtom(; group = [:Asset], name = [11],
+                                                      coef = [1], cnst = 0.003), asset_sets)
+        @test isempty(P)
+        @test isempty(Q)
+
+        @test_throws ArgumentError views_constraints(LinearConstraintAtom(;
+                                                                          group = [:Asset],
+                                                                          name = [11],
+                                                                          coef = [1],
+                                                                          cnst = 0.003),
+                                                     asset_sets, strict = true)
     end
     @testset "Factor Prior" begin
         rng = StableRNG(123456789)
@@ -130,12 +153,12 @@
         X_t = reshape(view(pm1_t, 1:1000, 1), 100, 10)
         mu_t = view(pm1_t, 1001:1010, 1)
         sigma_t = reshape(view(pm1_t, 1011:1110, 1), 10, 10)
-        csigma_t = reshape(view(pm1_t, 1111:nrow(pm1_t), 1), :, 10)
+        chol_t = reshape(view(pm1_t, 1111:nrow(pm1_t), 1), :, 10)
 
         @test isapprox(pm1.X, X_t)
         @test isapprox(pm1.mu, mu_t)
         @test isapprox(pm1.sigma, sigma_t)
-        @test isapprox(pm1.chol, csigma_t)
+        @test isapprox(pm1.chol, chol_t)
 
         pm2 = prior(FactorPriorEstimator(; residuals = true), transpose(X), transpose(F);
                     dims = 2)
@@ -144,12 +167,12 @@
         X_t = reshape(view(pm2_t, 1:1000, 1), 100, 10)
         mu_t = view(pm2_t, 1001:1010, 1)
         sigma_t = reshape(view(pm2_t, 1011:1110, 1), 10, 10)
-        csigma_t = reshape(view(pm2_t, 1111:nrow(pm2_t), 1), :, 10)
+        chol_t = reshape(view(pm2_t, 1111:nrow(pm2_t), 1), :, 10)
 
         @test isapprox(pm2.X, X_t)
         @test isapprox(pm2.mu, mu_t)
         @test isapprox(pm2.sigma, sigma_t)
-        @test isapprox(pm2.chol, csigma_t)
+        @test isapprox(pm2.chol, chol_t)
     end
     @testset "Bayesian Black Litterman Prior" begin
         rng = StableRNG(123456789)
@@ -216,6 +239,197 @@
                 find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
             end
             @test res3
+        end
+    end
+    @testset "Factor Black Litterman Prior" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 100, 10) * 0.001
+        F = X[:, [3, 8, 5, 10]]
+
+        pes = [FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets,
+                                                  residuals = false),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  residuals = false),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, residuals = false),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, w = (1:10) / sum(1:10),
+                                                  residuals = false),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets,
+                                                  residuals = false,
+                                                  factor_views_conf = fill(eps(),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  residuals = false,
+                                                  factor_views_conf = fill(eps(),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, residuals = false,
+                                                  factor_views_conf = fill(eps(),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, w = (1:10) / sum(1:10),
+                                                  residuals = false,
+                                                  factor_views_conf = fill(eps(),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets,
+                                                  residuals = false,
+                                                  factor_views_conf = fill(1 - sqrt(eps()),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  residuals = false,
+                                                  factor_views_conf = fill(1 - sqrt(eps()),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, residuals = false,
+                                                  factor_views_conf = fill(1 - sqrt(eps()),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, w = (1:10) / sum(1:10),
+                                                  residuals = false,
+                                                  factor_views_conf = fill(1 - sqrt(eps()),
+                                                                           length(views)))]
+
+        pm1_t = CSV.read(joinpath(@__DIR__,
+                                  "./assets/Factor-Black-Litterman-Prior-No-Residuals.csv"),
+                         DataFrame)
+
+        for (i, pe) ∈ enumerate(pes)
+            pm = prior(pe, transpose(X), transpose(F); dims = 2)
+            X_t = reshape(view(pm1_t[!, i], 1:1000, 1), 100, 10)
+            mu_t = view(pm1_t[!, i], 1001:1010, 1)
+            sigma_t = reshape(view(pm1_t[!, i], 1011:1110, 1), 10, 10)
+            chol_t = reshape(view(pm1_t[!, i], 1111:nrow(pm1_t), 1), :, 10)
+
+            res1 = isapprox(pm.X, X_t)
+            if !res1
+                println("Test $i no residuals fails on X.")
+                find_tol(pm.X, X_t; name1 = :X, name2 = :X_t)
+            end
+            @test res1
+            res2 = isapprox(pm.mu, mu_t)
+            if !res2
+                println("Test $i no residuals fails on mu.")
+                find_tol(pm.mu, mu_t; name1 = :mu, name2 = :mu_t)
+            end
+            @test res2
+            res3 = isapprox(pm.sigma, sigma_t)
+            if !res3
+                println("Test $i no residuals fails on sigma.")
+                find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
+            end
+            @test res3
+            res4 = isapprox(pm.chol, chol_t)
+            if !res4
+                println("Test $i no residuals fails on chol.")
+                find_tol(pm.chol, chol_t; name1 = :chol, name2 = :chol_t)
+            end
+            @test res4
+        end
+
+        pes = [FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets,
+                                                  residuals = true),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  residuals = true),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, residuals = true),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, w = (1:10) / sum(1:10),
+                                                  residuals = true),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets,
+                                                  residuals = true,
+                                                  factor_views_conf = fill(eps(),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  residuals = true,
+                                                  factor_views_conf = fill(eps(),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, residuals = true,
+                                                  factor_views_conf = fill(eps(),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, w = (1:10) / sum(1:10),
+                                                  residuals = true,
+                                                  factor_views_conf = fill(eps(),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets,
+                                                  residuals = true,
+                                                  factor_views_conf = fill(1 - sqrt(eps()),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  residuals = true,
+                                                  factor_views_conf = fill(1 - sqrt(eps()),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, residuals = true,
+                                                  factor_views_conf = fill(1 - sqrt(eps()),
+                                                                           length(views)),),
+               FactorBlackLittermanPriorEstimator(; factor_views = views,
+                                                  factor_sets = factor_sets, rf = 0.001,
+                                                  l = 1, w = (1:10) / sum(1:10),
+                                                  residuals = true,
+                                                  factor_views_conf = fill(1 - sqrt(eps()),
+                                                                           length(views)))]
+
+        pm1_t = CSV.read(joinpath(@__DIR__,
+                                  "./assets/Factor-Black-Litterman-Prior-Residuals.csv"),
+                         DataFrame)
+
+        for (i, pe) ∈ enumerate(pes)
+            pm = prior(pe, transpose(X), transpose(F); dims = 2)
+            X_t = reshape(view(pm1_t[!, i], 1:1000, 1), 100, 10)
+            mu_t = view(pm1_t[!, i], 1001:1010, 1)
+            sigma_t = reshape(view(pm1_t[!, i], 1011:1110, 1), 10, 10)
+            chol_t = reshape(view(pm1_t[!, i], 1111:nrow(pm1_t), 1), :, 10)
+
+            res1 = isapprox(pm.X, X_t)
+            if !res1
+                println("Test $i residuals fails on X.")
+                find_tol(pm.X, X_t; name1 = :X, name2 = :X_t)
+            end
+            @test res1
+            res2 = isapprox(pm.mu, mu_t)
+            if !res2
+                println("Test $i residuals fails on mu.")
+                find_tol(pm.mu, mu_t; name1 = :mu, name2 = :mu_t)
+            end
+            @test res2
+            res3 = isapprox(pm.sigma, sigma_t)
+            if !res3
+                println("Test $i residuals fails on sigma.")
+                find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
+            end
+            @test res3
+            res4 = isapprox(pm.chol, chol_t)
+            if !res4
+                println("Test $i residuals fails on chol.")
+                find_tol(pm.chol, chol_t; name1 = :chol, name2 = :chol_t)
+            end
+            @test res4
         end
     end
 end
