@@ -98,6 +98,15 @@ function FactorBlackLittermanPriorEstimator(;
                                                            sets, rf, residuals, views_conf,
                                                            w, l, tau)
 end
+function Base.getproperty(obj::FactorBlackLittermanPriorEstimator, sym::Symbol)
+    return if sym == :me
+        obj.pe.me
+    elseif sym == :ce
+        obj.pe.ce
+    else
+        getfield(obj, sym)
+    end
+end
 function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
                dims::Int = 1, strict::Bool = false)
     @smart_assert(dims ∈ (1, 2))

@@ -1,8 +1,9 @@
 module PortfolioOptimisers
 
-using AverageShiftedHistograms, Clustering, Distances, GLM, JuMP, LinearAlgebra,
-      MultivariateStats, NearestCorrelationMatrix, Optim, Graphs, SimpleWeightedGraphs,
-      PythonCall, Random, SmartAsserts, SparseArrays, Statistics, StatsBase, DataFrames
+using AverageShiftedHistograms, Clustering, Distances, Distributions, GLM, JuMP,
+      LinearAlgebra, MultivariateStats, NearestCorrelationMatrix, Optim, Graphs,
+      SimpleWeightedGraphs, PythonCall, Random, SmartAsserts, SparseArrays, Statistics,
+      StatsBase, DataFrames
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let
@@ -209,6 +210,16 @@ include("./Prior/FactorPriorModel.jl")
 include("./Prior/BayesianBlackLittermanPrior.jl")
 include("./Prior/FactorBlackLittermanPrior.jl")
 include("./Prior/AugmentedBlackLittermanPrior.jl")
+
+# Uncertainty sets
+include("./UncertaintySets/UncertaintySets_AbstractTypes.jl")
+include("./UncertaintySets/EllipseUncertaintySetClass.jl")
+include("./UncertaintySets/BoxUncertaintySetClass.jl")
+include("./UncertaintySets/BootstrapUncertaintySets/BootstrapUncertaintySets_AbstractTypes.jl")
+include("./UncertaintySets/BootstrapUncertaintySets/ARCHUncertaintySets/ARCHUncertaintySets_AbstractTypes.jl")
+include("./UncertaintySets/BootstrapUncertaintySets/ARCHUncertaintySets/ARCHEllipseUncertaintySets.jl")
+include("./UncertaintySets/BootstrapUncertaintySets/ARCHUncertaintySets/ARCHBoxUncertaintySets.jl")
+include("./UncertaintySets/NormalUncertaintySets.jl")
 
 # Utils
 include("./Utils/BaseFunctionOverloads.jl")

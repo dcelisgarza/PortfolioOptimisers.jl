@@ -123,6 +123,15 @@ function AugmentedBlackLittermanPriorEstimator(;
                                                                                     w, l,
                                                                                     tau)
 end
+function Base.getproperty(obj::AugmentedBlackLittermanPriorEstimator, sym::Symbol)
+    return if sym == :me
+        obj.a_pe.me
+    elseif sym == :ce
+        obj.a_pe.ce
+    else
+        getfield(obj, sym)
+    end
+end
 function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
                F::AbstractMatrix; dims::Int = 1, strict::Bool = false)
     @smart_assert(dims ∈ (1, 2))

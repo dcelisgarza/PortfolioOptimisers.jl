@@ -54,7 +54,7 @@ function BayesianBlackLittermanPriorEstimator(;
                                               pe::FactorPriorEstimator = FactorPriorEstimator(;
                                                                                               pe = EmpiricalPriorEstimator(;
                                                                                                                            me = EquilibriumExpectedReturns())),
-                                              mp::MatrixProcessing = MatrixProcessing(),
+                                              mp::MatrixProcessing = DefaultMatrixProcessing(),
                                               views::Union{<:LinearConstraintAtom,
                                                            <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),
                                               sets::DataFrame = DataFrame(), rf::Real = 0.0,
@@ -74,6 +74,15 @@ function BayesianBlackLittermanPriorEstimator(;
                                                                                  sets, rf,
                                                                                  views_conf,
                                                                                  tau)
+end
+function Base.getproperty(obj::BayesianBlackLittermanPriorEstimator, sym::Symbol)
+    return if sym == :me
+        obj.pe.me
+    elseif sym == :ce
+        obj.pe.ce
+    else
+        getfield(obj, sym)
+    end
 end
 function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
                F::AbstractMatrix; dims::Int = 1, strict::Bool = false)

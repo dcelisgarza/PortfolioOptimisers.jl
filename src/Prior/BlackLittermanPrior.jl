@@ -34,6 +34,15 @@ struct BlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator, T2 <: MatrixPr
     views_conf::T6
     tau::T7
 end
+function Base.getproperty(obj::BlackLittermanPriorEstimator, sym::Symbol)
+    return if sym == :me
+        obj.pe.me
+    elseif sym == :ce
+        obj.pe.ce
+    else
+        getfield(obj, sym)
+    end
+end
 function BlackLittermanPriorEstimator(;
                                       pe::AbstractPriorEstimator = EmpiricalPriorEstimator(;
                                                                                            me = EquilibriumExpectedReturns()),

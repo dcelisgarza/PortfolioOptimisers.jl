@@ -47,6 +47,15 @@ function FactorPriorEstimator(; pe::AbstractPriorEstimator = EmpiricalPriorEstim
     return FactorPriorEstimator{typeof(pe), typeof(mp), typeof(re), typeof(ve),
                                 typeof(residuals)}(pe, mp, re, ve, residuals)
 end
+function Base.getproperty(obj::FactorPriorEstimator, sym::Symbol)
+    return if sym == :me
+        obj.pe.me
+    elseif sym == :ce
+        obj.pe.ce
+    else
+        getfield(obj, sym)
+    end
+end
 function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
                dims::Int = 1)
     @smart_assert(dims ∈ (1, 2))
