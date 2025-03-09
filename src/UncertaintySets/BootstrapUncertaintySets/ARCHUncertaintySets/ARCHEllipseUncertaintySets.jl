@@ -5,20 +5,20 @@ function uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncerta
     (; X, mu, sigma) = pm
     N = size(X, 2)
     mus, sigmas = bootstrap_generator(ue, X)
-    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
     X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
+    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
     for i ∈ 1:(ue.n_sim)
-        X_sigma[:, i] = vec(sigmas[:, :, i] - sigma)
         X_mu[:, i] = vec(mus[:, i] - mu)
+        X_sigma[:, i] = vec(sigmas[:, :, i] - sigma)
     end
-    sigma_sigma = cov(ue.pe.ce, X_sigma)
     sigma_mu = cov(ue.pe.ce, X_mu)
+    sigma_sigma = cov(ue.pe.ce, X_sigma)
     if ue.class.diagonal
-        sigma_sigma .= Diagonal(sigma_sigma)
         sigma_mu .= Diagonal(sigma_mu)
+        sigma_sigma .= Diagonal(sigma_sigma)
     end
-    k_sigma = k_uncertainty_set(ue.class.method, ue.q, X_sigma, sigma_sigma)
     k_mu = k_uncertainty_set(ue.class.method, ue.q, X_mu, sigma_mu)
+    k_sigma = k_uncertainty_set(ue.class.method, ue.q, X_sigma, sigma_sigma)
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu),
            EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma)
 end

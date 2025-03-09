@@ -1,16 +1,21 @@
-struct NormalKUncertaintyMethod <: UncertaintyKMethod end
+struct NormalKUncertaintyMethod{T1 <: NamedTuple} <: UncertaintyKMethod
+    kwargs::T1
+end
+function NormalKUncertaintyMethod(kwargs::NamedTuple = (;))
+    return NormalKUncertaintyMethod{typeof(kwargs)}(kwargs)
+end
 struct GeneralKUncertaintyMethod <: UncertaintyKMethod end
 struct ChiSqKUncertaintyMethod <: UncertaintyKMethod end
-function k_uncertainty_set(::NormalKUncertaintyMethod, q::Real, X::AbstractMatrix,
+function k_uncertainty_set(km::NormalKUncertaintyMethod, q::Real, X::AbstractMatrix,
                            sigma_X::AbstractMatrix)
     k_mus = diag(X * (sigma_X \ I) * transpose(X))
-    return sqrt(quantile(k_mus, one(q) - q))
+    return sqrt(quantile(k_mus, one(q) - q; km.kwargs...))
 end
 function k_uncertainty_set(::GeneralKUncertaintyMethod, q::Real, args...)
     return sqrt((one(q) - q) / q)
 end
 function k_uncertainty_set(::ChiSqKUncertaintyMethod, q::Real, X::AbstractMatrix, args...)
-    return sqrt(quantile(Chisq(size(X, 1)), one(q) - q))
+    return sqrt(cquantile(Chisq(size(X, 1)), q))
 end
 function k_uncertainty_set(type::Real, args...)
     return type
