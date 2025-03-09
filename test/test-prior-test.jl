@@ -490,8 +490,7 @@
                                                                          length(a_views)),
                                                      f_views_conf = fill(1 - sqrt(eps()),
                                                                          length(f_views)))]
-        pm_t = CSV.read(joinpath(@__DIR__,
-                                 "./assets/Factor-Black-Litterman-Prior-No-Residuals.csv"),
+        pm_t = CSV.read(joinpath(@__DIR__, "./assets/Augmented-Black-Litterman-Prior.csv"),
                         DataFrame)
 
         for (i, pe) ∈ enumerate(pes)
