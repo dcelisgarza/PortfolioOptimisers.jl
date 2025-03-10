@@ -2,7 +2,7 @@ struct BayesianBlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVect
                                         T3 <: AbstractMatrix, T4 <: AbstractVector,
                                         T5 <: AbstractMatrix, T6 <: LoadingsMatrix,
                                         T7 <: AbstractMatrix, T8 <: AbstractVector} <:
-       AbstractBlackLittermanPriorModel
+       AbstractPriorModel_AFV
     X::T1
     mu::T2
     sigma::T3
@@ -34,14 +34,14 @@ function BayesianBlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVecto
                                                                       f_sigma, loadings,
                                                                       f_P, f_Q)
 end
-struct BayesianBlackLittermanPriorEstimator{T1 <: FactorPriorEstimator,
+struct BayesianBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_2,
                                             T2 <: MatrixProcessing,
                                             T3 <: Union{<:LinearConstraintAtom,
                                                         <:AbstractVector{<:LinearConstraintAtom}},
                                             T4 <: DataFrame, T5 <: Real,
                                             T6 <: Union{Nothing, <:AbstractVector},
                                             T7 <: Union{Nothing, <:Real}} <:
-       AbstractBlackLittermanPriorEstimator
+       AbstractPriorEstimator_2_2
     pe::T1
     mp::T2
     views::T3
@@ -51,9 +51,9 @@ struct BayesianBlackLittermanPriorEstimator{T1 <: FactorPriorEstimator,
     tau::T7
 end
 function BayesianBlackLittermanPriorEstimator(;
-                                              pe::FactorPriorEstimator = FactorPriorEstimator(;
-                                                                                              pe = EmpiricalPriorEstimator(;
-                                                                                                                           me = EquilibriumExpectedReturns())),
+                                              pe::AbstractPriorEstimatorMap_2_2 = FactorPriorEstimator(;
+                                                                                                       pe = EmpiricalPriorEstimator(;
+                                                                                                                                    me = EquilibriumExpectedReturns())),
                                               mp::MatrixProcessing = DefaultMatrixProcessing(),
                                               views::Union{<:LinearConstraintAtom,
                                                            <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),

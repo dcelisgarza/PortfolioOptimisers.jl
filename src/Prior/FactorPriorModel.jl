@@ -1,6 +1,6 @@
 struct FactorPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector, T3 <: AbstractMatrix,
                         T4 <: AbstractMatrix, T5 <: AbstractVector, T6 <: AbstractMatrix,
-                        T7 <: LoadingsMatrix} <: AbstractPriorModel
+                        T7 <: LoadingsMatrix} <: AbstractPriorModel_AFC
     X::T1
     mu::T2
     sigma::T3
@@ -29,17 +29,18 @@ function FactorPriorModel(; X::AbstractMatrix, mu::AbstractVector, sigma::Abstra
                                                                              f_sigma,
                                                                              loadings)
 end
-struct FactorPriorEstimator{T1 <: AbstractPriorEstimator, T2 <: MatrixProcessing,
+struct FactorPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1, T2 <: MatrixProcessing,
                             T3 <: RegressionMethod,
                             T4 <: PortfolioOptimisersVarianceEstimator, T5 <: Bool} <:
-       AbstractPriorEstimator
+       AbstractPriorEstimator_2_1
     pe::T1
     mp::T2
     re::T3
     ve::T4
     residuals::T5
 end
-function FactorPriorEstimator(; pe::AbstractPriorEstimator = EmpiricalPriorEstimator(),
+function FactorPriorEstimator(;
+                              pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                               mp::MatrixProcessing = DefaultMatrixProcessing(),
                               re::RegressionMethod = ForwardRegression(),
                               ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),

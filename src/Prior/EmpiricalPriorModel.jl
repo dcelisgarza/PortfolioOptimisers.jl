@@ -1,5 +1,5 @@
 struct EmpiricalPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
-                           T3 <: AbstractMatrix} <: AbstractPriorModel
+                           T3 <: AbstractMatrix} <: AbstractPriorModel_A
     X::T1
     mu::T2
     sigma::T3
@@ -10,7 +10,7 @@ function EmpiricalPriorModel(; X::AbstractMatrix, mu::AbstractVector, sigma::Abs
 end
 struct EmpiricalPriorEstimator{T1 <: StatsBase.CovarianceEstimator,
                                T2 <: ExpectedReturnsEstimator,
-                               T3 <: Union{Nothing, <:Real}} <: AbstractPriorEstimator
+                               T3 <: Union{Nothing, <:Real}} <: AbstractPriorEstimator_1_0
     ce::T1
     me::T2
     horizon::T3

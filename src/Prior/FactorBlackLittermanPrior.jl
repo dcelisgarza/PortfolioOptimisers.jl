@@ -2,8 +2,7 @@ struct FactorBlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector
                                       T3 <: AbstractMatrix, T4 <: AbstractMatrix,
                                       T5 <: AbstractVector, T6 <: AbstractMatrix,
                                       T7 <: LoadingsMatrix, T8 <: AbstractMatrix,
-                                      T9 <: AbstractVector} <:
-       AbstractBlackLittermanPriorModel
+                                      T9 <: AbstractVector} <: AbstractPriorModel_AFVC
     X::T1
     mu::T2
     sigma::T3
@@ -43,7 +42,7 @@ function FactorBlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVector,
                                                                                       f_P,
                                                                                       f_Q)
 end
-struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator,
+struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
                                           T2 <: MatrixProcessing, T3 <: MatrixProcessing,
                                           T4 <: RegressionMethod,
                                           T5 <: PortfolioOptimisersVarianceEstimator,
@@ -54,7 +53,7 @@ struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator,
                                           T11 <: Union{Nothing, <:AbstractVector},
                                           T12 <: Union{Nothing, <:Real},
                                           T13 <: Union{Nothing, <:Real}} <:
-       AbstractBlackLittermanPriorEstimator
+       AbstractPriorEstimator_2_1
     pe::T1
     f_mp::T2
     mp::T3
@@ -70,7 +69,7 @@ struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator,
     tau::T13
 end
 function FactorBlackLittermanPriorEstimator(;
-                                            pe::AbstractPriorEstimator = EmpiricalPriorEstimator(),
+                                            pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                                             f_mp::MatrixProcessing = DefaultMatrixProcessing(),
                                             mp::MatrixProcessing = DefaultMatrixProcessing(),
                                             re::RegressionMethod = ForwardRegression(),

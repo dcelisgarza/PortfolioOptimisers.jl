@@ -1,7 +1,7 @@
 struct NormalKUncertaintyMethod{T1 <: NamedTuple} <: UncertaintyKMethod
     kwargs::T1
 end
-function NormalKUncertaintyMethod(kwargs::NamedTuple = (;))
+function NormalKUncertaintyMethod(; kwargs::NamedTuple = (;))
     return NormalKUncertaintyMethod{typeof(kwargs)}(kwargs)
 end
 struct GeneralKUncertaintyMethod <: UncertaintyKMethod end

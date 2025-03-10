@@ -3,7 +3,7 @@ struct AugmentedBlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVec
                                          T5 <: AbstractMatrix, T6 <: LoadingsMatrix,
                                          T7 <: AbstractMatrix, T8 <: AbstractVector,
                                          T9 <: AbstractMatrix, T10 <: AbstractVector} <:
-       AbstractBlackLittermanPriorModel
+       AbstractPriorModel_AVFV
     X::T1
     mu::T2
     sigma::T3
@@ -42,8 +42,8 @@ function AugmentedBlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVect
                                                                        f_sigma, loadings, P,
                                                                        Q, f_P, f_Q)
 end
-struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator,
-                                             T2 <: AbstractPriorEstimator,
+struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
+                                             T2 <: AbstractPriorEstimatorMap_2_1,
                                              T3 <: MatrixProcessing, T4 <: RegressionMethod,
                                              T5 <: PortfolioOptimisersVarianceEstimator,
                                              T6 <: Union{<:LinearConstraintAtom,
@@ -56,7 +56,7 @@ struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator,
                                              T13 <: Union{Nothing, <:AbstractVector},
                                              T14 <: Union{Nothing, <:Real},
                                              T15 <: Union{Nothing, <:Real}} <:
-       AbstractBlackLittermanPriorEstimator
+       AbstractPriorEstimator_2_1
     a_pe::T1
     f_pe::T2
     mp::T3
@@ -74,8 +74,8 @@ struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator,
     tau::T15
 end
 function AugmentedBlackLittermanPriorEstimator(;
-                                               a_pe::AbstractPriorEstimator                                                     = EmpiricalPriorEstimator(),
-                                               f_pe::AbstractPriorEstimator                                                     = EmpiricalPriorEstimator(),
+                                               a_pe::AbstractPriorEstimatorMap_2_1                                              = EmpiricalPriorEstimator(),
+                                               f_pe::AbstractPriorEstimatorMap_2_1                                              = EmpiricalPriorEstimator(),
                                                mp::MatrixProcessing                                                             = DefaultMatrixProcessing(),
                                                re::RegressionMethod                                                             = ForwardRegression(),
                                                ve::PortfolioOptimisersVarianceEstimator                                         = SimpleVariance(),

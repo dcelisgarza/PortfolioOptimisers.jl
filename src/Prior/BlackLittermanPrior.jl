@@ -1,6 +1,6 @@
 struct BlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
                                 T3 <: AbstractMatrix, T4 <: AbstractMatrix,
-                                T5 <: AbstractVector} <: AbstractBlackLittermanPriorModel
+                                T5 <: AbstractVector} <: AbstractPriorModel_AV
     X::T1
     mu::T2
     sigma::T3
@@ -19,13 +19,14 @@ function BlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVector,
     return BlackLittermanPriorModel{typeof(X), typeof(mu), typeof(sigma), typeof(P),
                                     typeof(Q)}(X, mu, sigma, P, Q)
 end
-struct BlackLittermanPriorEstimator{T1 <: AbstractPriorEstimator, T2 <: MatrixProcessing,
+struct BlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
+                                    T2 <: MatrixProcessing,
                                     T3 <: Union{<:LinearConstraintAtom,
                                                 <:AbstractVector{<:LinearConstraintAtom}},
                                     T4 <: DataFrame, T5 <: Real,
                                     T6 <: Union{Nothing, <:AbstractVector},
                                     T7 <: Union{Nothing, <:Real}} <:
-       AbstractBlackLittermanPriorEstimator
+       AbstractPriorEstimator_1o2_1o2
     pe::T1
     mp::T2
     views::T3
@@ -44,8 +45,8 @@ function Base.getproperty(obj::BlackLittermanPriorEstimator, sym::Symbol)
     end
 end
 function BlackLittermanPriorEstimator(;
-                                      pe::AbstractPriorEstimator = EmpiricalPriorEstimator(;
-                                                                                           me = EquilibriumExpectedReturns()),
+                                      pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(;
+                                                                                                      me = EquilibriumExpectedReturns()),
                                       mp::MatrixProcessing = DefaultMatrixProcessing(),
                                       views::Union{<:LinearConstraintAtom,
                                                    <:AbstractVector{<:LinearConstraintAtom}} = LinearConstraintAtom(),
