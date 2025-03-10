@@ -35,7 +35,7 @@ struct EllipseUncertaintySet{T1 <: AbstractMatrix, T2 <: Real} <: UncertaintySet
 end
 function EllipseUncertaintySet(; sigma::AbstractMatrix, k::Real)
     @smart_assert(size(sigma, 1) == size(sigma, 2))
-    @smart_assert(zero(k) < k < one(k))
+    @smart_assert(zero(k) < k)
     return EllipseUncertaintySet{typeof(sigma), typeof(k)}(sigma, k)
 end
 

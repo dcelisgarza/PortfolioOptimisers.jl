@@ -45,8 +45,8 @@ function bootstrap_generator(ue::ARCHUncertaintySetEstimator, X::AbstractMatrix)
     for (i, data) ∈ enumerate(gen.bootstrap(ue.n_sim))
         X = pyconvert(Array, data)[1][1]
         mu = mean(ue.pe.me, X; dims = 1)
-        mus[:, i] .= vec(mu)
-        sigmas[:, :, i] .= cov(ue.pe.ce, X; dims = 1, mean = mu)
+        mus[:, i] = vec(mu)
+        sigmas[:, :, i] = cov(ue.pe.ce, X; dims = 1, mean = mu)
     end
     return mus, sigmas
 end
