@@ -3,14 +3,13 @@ function uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any,
                                                          <:Any, <:Any, <:Any, <:Any, <:Any},
                          X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, mu, sigma) = pm
-    N = size(X, 2)
-    mus, sigmas = bootstrap_generator(ue, X)
-    X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
-    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
+    N = size(pm.X, 2)
+    mus, sigmas = bootstrap_generator(ue, pm.X)
+    X_mu = Matrix{eltype(pm.X)}(undef, N, ue.n_sim)
+    X_sigma = Matrix{eltype(pm.X)}(undef, N^2, ue.n_sim)
     for i ∈ axes(X_mu, 2)
-        X_mu[:, i] = vec(mus[:, i] - mu)
-        X_sigma[:, i] = vec(sigmas[:, :, i] - sigma)
+        X_mu[:, i] = vec(mus[:, i] - pm.mu)
+        X_sigma[:, i] = vec(sigmas[:, :, i] - pm.sigma)
     end
     X_mu = transpose(X_mu)
     X_sigma = transpose(X_sigma)
@@ -30,12 +29,11 @@ function mu_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any,
                                                             <:Any}, X::AbstractMatrix,
                             args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, mu) = pm
-    N = size(X, 2)
-    mus = mu_bootstrap_generator(ue, X)
-    X_mu = Matrix{eltype(X)}(undef, N, ue.n_sim)
+    N = size(pm.X, 2)
+    mus = mu_bootstrap_generator(ue, pm.X)
+    X_mu = Matrix{eltype(pm.X)}(undef, N, ue.n_sim)
     for i ∈ axes(X_mu, 2)
-        X_mu[:, i] = vec(mus[:, i] - mu)
+        X_mu[:, i] = vec(mus[:, i] - pm.mu)
     end
     X_mu = transpose(X_mu)
     sigma_mu = if ue.class.diagonal
@@ -52,12 +50,11 @@ function sigma_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any,
                                                                <:Any}, X::AbstractMatrix,
                                args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, sigma) = pm
-    N = size(X, 2)
-    sigmas = sigma_bootstrap_generator(ue, X)
-    X_sigma = Matrix{eltype(X)}(undef, N^2, ue.n_sim)
+    N = size(pm.X, 2)
+    sigmas = sigma_bootstrap_generator(ue, pm.X)
+    X_sigma = Matrix{eltype(pm.X)}(undef, N^2, ue.n_sim)
     for i ∈ axes(X_sigma, 2)
-        X_sigma[:, i] = vec(sigmas[:, :, i] - sigma)
+        X_sigma[:, i] = vec(sigmas[:, :, i] - pm.sigma)
     end
     X_sigma = transpose(X_sigma)
     sigma_sigma = if ue.class.diagonal

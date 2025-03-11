@@ -1,13 +1,13 @@
 function uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass,
                                                            <:Any, <:Any, <:Any},
                          X::AbstractMatrix, args...; dims::Int = 1)
-    Random.seed!(ue.rng, ue.seed)
-    T, N = size(X)
     pm = prior(ue.pe, X, args...; dims = dims)
+    T, N = size(pm.X)
     sigma = pm.sigma
     q = ue.q * 0.5
     sigma_mu = sigma / T
-    sigmas = rand(Wishart(T, sigma_mu), ue.n_sim)
+    Random.seed!(ue.rng, ue.seed)
+    sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     sigma_l = Matrix{eltype(sigma)}(undef, N, N)
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
     for j ∈ 1:N
@@ -31,22 +31,22 @@ function mu_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
     pm = prior(ue.pe, X, args...; dims = dims)
     sigma = pm.sigma
     q = ue.q * 0.5
-    mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma)) * 2
+    mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma / size(pm.X, 1))) * 2
     mu_l = range(; start = zero(eltype(sigma)), stop = zero(eltype(sigma)),
-                 length = size(X, 1))
+                 length = size(pm.X, 2))
     return BoxUncertaintySet(; lo = mu_l, hi = mu_u)
 end
 function sigma_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
                                                                  <:BoxUncertaintySetClass,
                                                                  <:Any, <:Any, <:Any},
                                X::AbstractMatrix, args...; dims::Int = 1)
-    T, N = size(X)
     pm = prior(ue.pe, X, args...; dims = dims)
+    T, N = size(pm.X)
     sigma = pm.sigma
     q = ue.q * 0.5
     sigma_mu = sigma / T
     Random.seed!(ue.rng, ue.seed)
-    sigmas = rand(Wishart(T, sigma_mu), ue.n_sim)
+    sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     sigma_l = Matrix{eltype(sigma)}(undef, N, N)
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
     for j ∈ 1:N

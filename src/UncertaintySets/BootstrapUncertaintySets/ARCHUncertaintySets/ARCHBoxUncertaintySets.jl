@@ -2,14 +2,13 @@ function uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertainty
                                                          <:Any, <:Any, <:Any, <:Any, <:Any},
                          X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
-    X = pm.X
-    N = size(X, 2)
-    mus, sigmas = bootstrap_generator(ue, X)
+    N = size(pm.X, 2)
+    mus, sigmas = bootstrap_generator(ue, pm.X)
     q = ue.q * 0.5
-    mu_l = Vector{eltype(X)}(undef, N)
-    mu_u = Vector{eltype(X)}(undef, N)
-    sigma_l = Matrix{eltype(X)}(undef, N, N)
-    sigma_u = Matrix{eltype(X)}(undef, N, N)
+    mu_l = Vector{eltype(pm.X)}(undef, N)
+    mu_u = Vector{eltype(pm.X)}(undef, N)
+    sigma_l = Matrix{eltype(pm.X)}(undef, N, N)
+    sigma_u = Matrix{eltype(pm.X)}(undef, N, N)
     for j ∈ 1:N
         mu_j = mus[j, :]
         mu_l[j] = quantile(mu_j, q)
@@ -28,12 +27,11 @@ function mu_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertai
                                                             <:Any}, X::AbstractMatrix,
                             args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
-    X = pm.X
-    N = size(X, 2)
-    mus = mu_bootstrap_generator(ue, X)
+    N = size(pm.X, 2)
+    mus = mu_bootstrap_generator(ue, pm.X)
     q = ue.q * 0.5
-    mu_l = Vector{eltype(X)}(undef, N)
-    mu_u = Vector{eltype(X)}(undef, N)
+    mu_l = Vector{eltype(pm.X)}(undef, N)
+    mu_u = Vector{eltype(pm.X)}(undef, N)
     for j ∈ 1:N
         mu_j = mus[j, :]
         mu_l[j] = quantile(mu_j, q)
@@ -47,12 +45,11 @@ function sigma_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any,
                                                                <:Any}, X::AbstractMatrix,
                                args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
-    X = pm.X
-    N = size(X, 2)
-    sigmas = sigma_bootstrap_generator(ue, X)
+    N = size(pm.X, 2)
+    sigmas = sigma_bootstrap_generator(ue, pm.X)
     q = ue.q * 0.5
-    sigma_l = Matrix{eltype(X)}(undef, N, N)
-    sigma_u = Matrix{eltype(X)}(undef, N, N)
+    sigma_l = Matrix{eltype(pm.X)}(undef, N, N)
+    sigma_u = Matrix{eltype(pm.X)}(undef, N, N)
     for j ∈ 1:N
         for i ∈ j:N
             sigma_ij = sigmas[i, j, :]

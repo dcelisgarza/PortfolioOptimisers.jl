@@ -14,7 +14,7 @@ end
 function k_uncertainty_set(::GeneralKUncertaintyMethod, q::Real, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_uncertainty_set(::ChiSqKUncertaintyMethod, q::Real, X::AbstractMatrix, args...)
+function k_uncertainty_set(::ChiSqKUncertaintyMethod, q::Real, X::AbstractArray, args...)
     return sqrt(cquantile(Chisq(size(X, 1)), q))
 end
 function k_uncertainty_set(type::Real, args...)

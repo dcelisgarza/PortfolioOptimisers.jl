@@ -3,14 +3,14 @@ function uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
                                                                                         <:NormalKUncertaintyMethod},
                                                            <:Any, <:Any, <:Any},
                          X::AbstractMatrix, args...; dims::Int = 1)
-    Random.seed!(ue.rng, ue.seed)
     pm = prior(ue.pe, X, args...; dims = dims)
     (; X, mu, sigma) = pm
     T, N = size(X)
     sigma_mu = sigma / T
     fix_non_positive_definite_matrix!(ue.pe.ce.mp.fnpdm, sigma_mu)
-    X_mu = transpose(rand(MvNormal(mu, sigma), ue.n_sim))
-    sigmas = rand(Wishart(T, sigma_mu), ue.n_sim)
+    Random.seed!(ue.rng, ue.seed)
+    X_mu = transpose(rand(ue.rng, MvNormal(mu, sigma), ue.n_sim))
+    sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
     for i ∈ axes(sigmas, 1)
         X_sigma[:, :, i] = sigmas[i] - sigma
@@ -77,13 +77,13 @@ function mu_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
                                                                                            <:NormalKUncertaintyMethod},
                                                               <:Any, <:Any, <:Any},
                             X::AbstractMatrix, args...; dims::Int = 1)
-    Random.seed!(ue.rng, ue.seed)
     pm = prior(ue.pe, X, args...; dims = dims)
     (; X, mu, sigma) = pm
     T = size(X, 1)
     sigma_mu = sigma / T
     fix_non_positive_definite_matrix!(ue.pe.ce.mp.fnpdm, sigma_mu)
-    X_mu = transpose(rand(MvNormal(mu, sigma), ue.n_sim))
+    Random.seed!(ue.rng, ue.seed)
+    X_mu = transpose(rand(ue.rng, MvNormal(mu, sigma), ue.n_sim))
     if ue.class.diagonal
         sigma_mu = Diagonal(sigma_mu)
     end
@@ -122,20 +122,18 @@ function mu_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
     k_mu = k_uncertainty_set(ue.class.method, ue.q)
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu)
 end
-############################
-############################
 function sigma_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
                                                                  <:EllipseUncertaintySetClass{<:Any,
                                                                                               <:NormalKUncertaintyMethod},
                                                                  <:Any, <:Any, <:Any},
                                X::AbstractMatrix, args...; dims::Int = 1)
-    Random.seed!(ue.rng, ue.seed)
     pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, mu, sigma) = pm
+    (; X, sigma) = pm
     T, N = size(X)
     sigma_mu = sigma / T
     fix_non_positive_definite_matrix!(ue.pe.ce.mp.fnpdm, sigma_mu)
-    sigmas = rand(Wishart(T, sigma_mu), ue.n_sim)
+    Random.seed!(ue.rng, ue.seed)
+    sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
     for i ∈ axes(sigmas, 1)
         X_sigma[:, :, i] = sigmas[i] - sigma
