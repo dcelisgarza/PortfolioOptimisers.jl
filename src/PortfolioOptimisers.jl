@@ -3,7 +3,7 @@ module PortfolioOptimisers
 using AverageShiftedHistograms, Clustering, Distances, Distributions, GLM, JuMP,
       LinearAlgebra, MultivariateStats, NearestCorrelationMatrix, Optim, Graphs,
       SimpleWeightedGraphs, PythonCall, Random, SmartAsserts, SparseArrays, Statistics,
-      StatsBase, DataFrames
+      StatsBase, DataFrames, TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let
@@ -227,5 +227,6 @@ include("./UncertaintySets/NormalUncertaintySets/NormalEllipseUncertaintySets.jl
 # Utils
 include("./Utils/BaseFunctionOverloads.jl")
 include("./Utils/EquationParsing.jl")
+include("./Utils/PricesToReturns.jl")
 
 end

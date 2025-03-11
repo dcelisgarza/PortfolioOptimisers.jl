@@ -23,6 +23,7 @@ SmartAsserts = "56560af0-ab70-43fe-a531-155d81972b00"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
 
 [compat]
 AverageShiftedHistograms = "0.8.9"
@@ -44,4 +45,5 @@ SmartAsserts = "0.2.1"
 SparseArrays = "1.11.0"
 Statistics = "1.11.1"
 StatsBase = "0.34.4"
+TimeSeries = "0.24.2"
 julia = "1"
