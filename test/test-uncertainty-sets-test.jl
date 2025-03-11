@@ -143,7 +143,7 @@
         ues_t = CSV.read(joinpath(@__DIR__, "assets/Ellipse-Uncertainty-Sets.csv"),
                          DataFrame)
         uesigma_t = CSV.read(joinpath(@__DIR__,
-                                      "assets/Ellipse-Uncertainty-Sets-sigma.csv"),
+                                      "assets/Ellipse-Uncertainty-Sets-Sigma.csv"),
                              DataFrame)
         for (i, ue) ∈ pairs(ues)
             mu_set1, sigma_set1 = uncertainty_set(ue, transpose(X); dims = 2)
