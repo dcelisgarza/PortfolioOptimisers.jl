@@ -28,7 +28,7 @@
             lt = [loadings.b; vec(loadings.M)]
             result = isapprox(lt, res_t[!, i])
             if !result
-                if i != length(res)
+                if i == length(res)
                     continue
                 end
                 println("Test $i fails.\n$(res[i])")

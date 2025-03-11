@@ -13,11 +13,13 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                       one(missing_row_percent))
     end
 
-    asset_names, factor_names = if !isempty(F)
+    if !isempty(F)
+        asset_names = string.(colnames(X))
+        factor_names = string.(colnames(F))
         X = merge(X, F; method = join_method)
-        colnames(X), colnames(F)
     else
-        colnames(X), ()
+        asset_names = string.(colnames(X))
+        factor_names = String[]
     end
     if !isnothing(map_func)
         X = map(map_func, X)
@@ -48,49 +50,9 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     dropmissing!(X)
     X = DataFrame(percentchange(TimeArray(X; timestamp = :timestamp), ret_method;
                                 padding = padding))
-    return X
+    col_names = names(X)
+    return X[!, intersect(col_names, asset_names)], X[!,
+                                                      intersect(col_names, factor_names)]
 end
 
 export prices_to_returns
-
-#=
-function join_ticker_prices(tickers, lopt::LoadOpt = LoadOpt())
-    path = lopt.path
-    select = lopt.select
-    tickers = intersect(tickers, replace.(readdir(path), ".csv" => ""))
-    prices = DataFrame(; timestamp = DateTime[])
-    jtp_iter = ProgressBar(tickers)
-    for ticker ∈ jtp_iter
-        set_description(jtp_iter, "Generating master prices dataframe:")
-        ticker_prices = load_ticker_prices(ticker, lopt)
-        if isempty(ticker_prices)
-            continue
-        end
-        DataFrames.rename!(ticker_prices,
-                           setdiff(select, (:timestamp,))[1] => Symbol(ticker))
-        prices = outerjoin(prices, ticker_prices; on = :timestamp)
-    end
-
-    f(x) =
-        if (isa(x, Number) && (isnan(x) || x < zero(x)))
-            missing
-        else
-            x
-        end
-
-    transform!(prices, setdiff(names(prices), ("timestamp",)) .=> ByRow((x) -> f(x));
-               renamecols = false)
-
-    missings = Int[]
-    sizehint!(missings, ncol(prices))
-    for col ∈ eachcol(prices)
-        push!(missings, count(ismissing.(col)))
-    end
-
-    m = StatsBase.mode(missings)
-    missings[1] = m
-    prices = prices[!, missings .== m]
-    dropmissing!(prices)
-    return sort!(prices, :timestamp)
-end
-=#
