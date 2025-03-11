@@ -177,7 +177,7 @@
             res2 = isapprox(sigma2, uesigma_t[!, i])
             if !res2
                 println("Sigma iteration $i failed")
-                find_tol(sigma2, uesigma_t; name1 = :sigma1, name2 = :uesigma_t)
+                find_tol(sigma2, uesigma_t[!, i]; name1 = :sigma1, name2 = :uesigma_t)
             end
             @test res2
 

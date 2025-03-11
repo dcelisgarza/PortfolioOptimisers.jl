@@ -12,14 +12,12 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                       missing_row_percent <=
                       one(missing_row_percent))
     end
-    asset_names = colnames(X)
-    factor_names = isempty(F) ? () : colnames(F)
 
-    factor_names = if !isempty(F)
+    asset_names, factor_names = if !isempty(F)
         X = merge(X, F; method = join_method)
-        colnames(F)
+        colnames(X), colnames(F)
     else
-        ()
+        colnames(X), ()
     end
     if !isnothing(map_func)
         X = map(map_func, X)
@@ -27,27 +25,29 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     if !isempty(collapse_args)
         X = collapse(X, collapse_args...)
     end
-    X = DataFrame(percentchange(X, ret_method; padding = padding))
+    X = DataFrame(X)
     f(x) =
-        if isa(x, Number) && (isnan(x) || x < zero(x))
+        if isa(x, Number) && isnan(x)
             missing
         else
             x
         end
     DataFrames.transform!(X, 2:ncol(X) .=> ByRow((x) -> f(x)); renamecols = false)
-
-    missings_cols = vec(count(ismissing.(Matrix(X[!, 2:end])); dims = 2))
+    missing_mtx = ismissing.(Matrix(X[!, 2:end]))
+    missings_cols = vec(count(missing_mtx; dims = 2))
     keep_rows = missings_cols .<= (ncol(X) - 1) * missing_col_percent
-    X = X[keep_rows, 1:end]
-
-    missings_rows = vec(count(ismissing.(Matrix(X[!, 2:end])); dims = 1))
+    X = X[keep_rows, :]
+    missings_rows = vec(count(missing_mtx; dims = 1))
     keep_cols = if !isinf(missing_row_percent)
         missings_rows .<= nrow(X) * missing_row_percent
     else
         missings_rows .== StatsBase.mode(missings_rows)
     end
-    X = X[!, findall([true; keep_cols])]
+    X = X[!, [true; keep_cols]]
+    select!(X, Not(names(X, Missing)))
     dropmissing!(X)
+    X = DataFrame(percentchange(TimeArray(X; timestamp = :timestamp), ret_method;
+                                padding = padding))
     return X
 end
 

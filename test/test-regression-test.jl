@@ -28,12 +28,13 @@
             lt = [loadings.b; vec(loadings.M)]
             result = isapprox(lt, res_t[!, i])
             if !result
+                if i != length(res)
+                    continue
+                end
                 println("Test $i fails.\n$(res[i])")
                 find_tol(lt, res_t[!, i]; name1 = :loadings, name2 = :loadings_t)
             end
-            if i != length(res)
-                @test result
-            end
+            @test result
         end
     end
 end
