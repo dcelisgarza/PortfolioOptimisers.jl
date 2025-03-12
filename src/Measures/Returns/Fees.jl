@@ -42,17 +42,22 @@ function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
         zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees)))
     end
 end
-function calc_fees(w::AbstractVector, latest_prices::AbstractVector, turnover::Turnover)
-    fees_turnover = turnover.val
-    benchmark = turnover.w
-    return if isa(fees_turnover, Real)
-        sum(fees_turnover * abs.(benchmark .- w) .* latest_prices)
-    elseif isa(fees_turnover, AbstractVector) &&
-           !(isempty(fees_turnover) || all(iszero.(fees_turnover)))
-        dot(fees_turnover, abs.(benchmark .- w) .* latest_prices)
+function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
+                   turnover::Turnover{<:Real, <:Any})
+    return if !iszero(turnover.val)
+        sum(turnover.val * abs.(turnover.w .- w) .* latest_prices)
     else
-        zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees_turnover),
-                          eltype(benchmark)))
+        zero(promote_type(eltype(w), eltype(latest_prices), eltype(turnover.val),
+                          eltype(turnover.w)))
+    end
+end
+function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
+                   turnover::Turnover{<:AbstractVector, <:Any})
+    if !(isempty(turnover.val) || all(iszero.(turnover.val)))
+        dot(turnover.val, abs.(turnover.w .- w) .* latest_prices)
+    else
+        zero(promote_type(eltype(w), eltype(latest_prices), eltype(turnover.val),
+                          eltype(turnover.w)))
     end
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector, ::NoTurnover)
@@ -82,16 +87,18 @@ function calc_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function
         zero(promote_type(eltype(w), eltype(fees)))
     end
 end
-function calc_fees(w::AbstractVector, turnover::Turnover)
-    fees_turnover = turnover.val
-    benchmark = turnover.w
-    return if isa(fees_turnover, Real)
-        sum(fees_turnover * abs.(benchmark .- w))
-    elseif isa(fees_turnover, AbstractVector) &&
-           !(isempty(fees_turnover) || all(iszero.(fees_turnover)))
-        dot(fees_turnover, abs.(benchmark .- w))
+function calc_fees(w::AbstractVector, turnover::Turnover{<:Real, <:Any})
+    return if !iszero(turnover.val)
+        sum(turnover.val * abs.(turnover.w .- w))
     else
-        zero(promote_type(eltype(w), eltype(fees_turnover), eltype(benchmark)))
+        zero(promote_type(eltype(w), eltype(turnover.val), eltype(turnover.w)))
+    end
+end
+function calc_fees(w::AbstractVector, turnover::Turnover{<:AbstractVector, <:Any})
+    return if !(isempty(turnover.val) || all(iszero.(turnover.val)))
+        dot(turnover.val, abs.(turnover.w .- w))
+    else
+        zero(promote_type(eltype(w), eltype(turnover.val), eltype(turnover.w)))
     end
 end
 function calc_fees(w::AbstractVector, ::NoTurnover)
@@ -143,16 +150,20 @@ function calc_asset_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Fu
     end
     return fees_w
 end
-function calc_asset_fees(w::AbstractVector, turnover::Turnover)
-    fees_turnover = turnover.val
-    benchmark = turnover.w
-    fees_w = zeros(promote_type(eltype(w), eltype(fees_turnover), eltype(benchmark)),
+function calc_asset_fees(w::AbstractVector, turnover::Turnover{<:Real, <:Any})
+    fees_w = zeros(promote_type(eltype(w), eltype(turnover.val), eltype(turnover.w)),
                    length(w))
-    if isa(fees_turnover, Real)
-        fees_w .= fees_turnover * abs.(benchmark .- w)
-    elseif isa(fees_turnover, AbstractVector) &&
-           !(isempty(fees_turnover) || all(iszero.(fees_turnover)))
-        fees_w .= fees_turnover .* abs.(benchmark .- w)
+    if !iszero(turnover.val)
+        fees_w .= turnover.val * abs.(turnover.w .- w)
+    end
+    return fees_w
+end
+function calc_asset_fees(w::AbstractVector,
+                         turnover::Turnover{<:AbstractVector{<:Real}, <:Any})
+    fees_w = zeros(promote_type(eltype(w), eltype(turnover.val), eltype(turnover.w)),
+                   length(w))
+    if !(isempty(turnover.val) || all(iszero.(turnover.val)))
+        fees_w .= turnover.val .* abs.(turnover.w .- w)
     end
     return fees_w
 end
@@ -208,16 +219,20 @@ function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
-                         turnover::Turnover)
-    fees_turnover = turnover.val
-    benchmark = turnover.w
-    fees_w = zeros(promote_type(eltype(w), eltype(latest_prices), eltype(fees_turnover),
-                                eltype(benchmark)), length(w))
-    if isa(fees_turnover, Real)
-        fees_w .= fees_turnover * abs.(benchmark .- w) .* latest_prices
-    elseif isa(fees_turnover, AbstractVector) &&
-           !(isempty(fees_turnover) || all(iszero.(fees_turnover)))
-        fees_w .= fees_turnover .* abs.(benchmark .- w) .* latest_prices
+                         turnover::Turnover{<:Real, <:Any})
+    fees_w = zeros(promote_type(eltype(w), eltype(latest_prices), eltype(turnover.val),
+                                eltype(turnover.w)), length(w))
+    if !iszero(turnover.val)
+        fees_w .= turnover.val * abs.(turnover.w .- w) .* latest_prices
+    end
+    return fees_w
+end
+function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
+                         turnover::Turnover{<:AbstractVector{<:Real}, <:Any})
+    fees_w = zeros(promote_type(eltype(w), eltype(latest_prices), eltype(turnover.val),
+                                eltype(turnover.w)), length(w))
+    if !(isempty(turnover.val) || all(iszero.(turnover.val)))
+        fees_w .= turnover.val .* abs.(turnover.w .- w) .* latest_prices
     end
     return fees_w
 end

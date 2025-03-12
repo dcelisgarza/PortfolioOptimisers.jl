@@ -24,7 +24,7 @@ struct RiskMeasureSettings{T1 <: Bool, T2 <: Real, T3 <: Real} <:
     ub::T3
 end
 function RiskMeasureSettings(; flag::Bool = true, scale::Real = 1.0, ub::Real = Inf)
-    return RiskMeasureSettings{typeof(scale), typeof(ub)}(flag, scale, ub)
+    return RiskMeasureSettings{typeof(flag), typeof(scale), typeof(ub)}(flag, scale, ub)
 end
 struct HierarchicalRiskMeasureSettings{T1 <: Real} <: AbstractRiskMeasureSettings
     scale::T1

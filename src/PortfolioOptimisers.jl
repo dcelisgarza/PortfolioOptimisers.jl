@@ -236,7 +236,10 @@ include("./PreSelection/PreSelection.jl")
 include("./Measures/TrackingTurnover/Turnover.jl")
 include("./Measures/Returns/Fees.jl")
 include("./Measures/Risk/Risk_AbstractTypes.jl")
-include("./Measures/Risk/PortfolioMean.jl")
+include("./Measures/Risk/MeanReturn.jl")
 include("./Measures/Risk/MeanAbsoluteDeviation.jl")
+include("./Measures/Risk/StandardDeviation.jl")
+include("./Measures/Risk/Variance.jl")
+include("./Measures/Risk/SquaredRiskMeasures.jl")
 
 end
