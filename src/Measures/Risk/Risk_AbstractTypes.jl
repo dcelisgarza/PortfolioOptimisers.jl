@@ -1,5 +1,5 @@
 abstract type AbstractRiskMeasure end
-function cluster_risk_measure_factory(r::AbstractRiskMeasure, args...; kwargs...)
+function risk_measure_factory(r::AbstractRiskMeasure, args...; kwargs...)
     return r
 end
 abstract type OptimisationRiskMeasure <: AbstractRiskMeasure end
@@ -63,20 +63,55 @@ function calc_target_ret_mu(x::AbstractVector, w::AbstractVector, rm::TargetRisk
     return target
 end
 const SolverRiskMeasures = Union{SolverRiskMeasure, SolverHierarchicalRiskMeasure}
-function risk_measure_nothing_real_vec_factory_cluster(risk_variable::AbstractVector{<:Real},
-                                                       cluster::AbstractVector)
+
+function risk_measure_nothing_vec_factory(risk_variable::AbstractVector{<:Real},
+                                          prior_variable::AbstractVector{<:Real})
+    return if !isempty(risk_variable)
+        risk_variable
+    elseif !isempty(prior_variable)
+        prior_variable
+    else
+        throw(ArgumentError("Both risk_variable and prior_variable are empty."))
+    end
+end
+function risk_measure_nothing_vec_factory(::Any, prior_variable::AbstractVector{<:Real})
+    return if !isempty(prior_variable)
+        prior_variable
+    else
+        throw(ArgumentError("prior_variable is empty."))
+    end
+end
+function risk_measure_nothing_matrix_factory(::Any, prior_variable::AbstractMatrix)
+    return if !isempty(prior_variable)
+        prior_variable
+    else
+        throw(ArgumentError("prior_variable is empty."))
+    end
+end
+function risk_measure_nothing_matrix_factory(risk_variable::AbstractMatrix{<:Real},
+                                             prior_variable::AbstractMatrix{<:Real})
+    return if !isempty(risk_variable)
+        risk_variable
+    elseif !isempty(prior_variable)
+        prior_variable
+    else
+        throw(ArgumentError("Both risk_variable and prior_variable are empty."))
+    end
+end
+function risk_measure_nothing_real_vec_factory(risk_variable::AbstractVector{<:Real},
+                                               cluster::AbstractVector)
     return if !isempty(risk_variable)
         view(risk_variable, cluster)
     else
         risk_variable
     end
 end
-function risk_measure_nothing_real_vec_factory_cluster(risk_variable::Any, ::Any)
+function risk_measure_nothing_real_vec_factory(risk_variable::Any, ::Any)
     return risk_variable
 end
-function risk_measure_nothing_vec_factory_cluster(risk_variable::AbstractVector{<:Real},
-                                                  prior_variable::AbstractVector{<:Real},
-                                                  cluster::AbstractVector)
+function risk_measure_nothing_vec_factory(risk_variable::AbstractVector{<:Real},
+                                          prior_variable::AbstractVector{<:Real},
+                                          cluster::AbstractVector)
     return if !isempty(risk_variable)
         view(risk_variable, cluster)
     elseif !isempty(prior_variable)
@@ -85,26 +120,25 @@ function risk_measure_nothing_vec_factory_cluster(risk_variable::AbstractVector{
         throw(ArgumentError("Both risk_variable and prior_variable are empty."))
     end
 end
-function risk_measure_nothing_vec_factory_cluster(::Any,
-                                                  prior_variable::AbstractVector{<:Real},
-                                                  cluster::AbstractVector)
+function risk_measure_nothing_vec_factory(::Any, prior_variable::AbstractVector{<:Real},
+                                          cluster::AbstractVector)
     return if !isempty(prior_variable)
         view(prior_variable, cluster)
     else
         throw(ArgumentError("prior_variable is empty."))
     end
 end
-function risk_measure_nothing_matrix_factory_cluster(::Any, prior_variable::AbstractMatrix,
-                                                     cluster::AbstractVector)
+function risk_measure_nothing_matrix_factory(::Any, prior_variable::AbstractMatrix,
+                                             cluster::AbstractVector)
     return if !isempty(prior_variable)
         view(prior_variable, cluster, cluster)
     else
         throw(ArgumentError("prior_variable is empty."))
     end
 end
-function risk_measure_nothing_matrix_factory_cluster(risk_variable::AbstractMatrix{<:Real},
-                                                     prior_variable::AbstractMatrix{<:Real},
-                                                     cluster::AbstractVector)
+function risk_measure_nothing_matrix_factory(risk_variable::AbstractMatrix{<:Real},
+                                             prior_variable::AbstractMatrix{<:Real},
+                                             cluster::AbstractVector)
     return if !isempty(risk_variable)
         view(risk_variable, cluster, cluster)
     elseif !isempty(prior_variable)

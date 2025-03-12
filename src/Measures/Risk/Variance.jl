@@ -27,9 +27,9 @@ end
 function (variance::Variance)(w::AbstractVector)
     return dot(w, variance.sigma, w)
 end
-function cluster_risk_measure_factory(r::Variance, prior::AbstractPriorModel,
-                                      cluster::AbstractVector)
-    sigma = risk_measure_nothing_matrix_factory_cluster(r.sigma, prior.sigma, cluster)
+function risk_measure_factory(r::Variance, prior::AbstractPriorModel,
+                              cluster::AbstractVector)
+    sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, cluster)
     return Variance(; settings = r.settings, formulation = r.formulation, sigma = sigma,
                     a_rc = r.a_rc, b_rc = r.b_rc)
 end

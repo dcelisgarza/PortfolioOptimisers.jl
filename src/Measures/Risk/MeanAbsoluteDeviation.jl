@@ -24,12 +24,17 @@ function (r::MeanAbsoluteDeviation)(X::AbstractMatrix, w::AbstractVector,
     we = r.we
     return isnothing(we) ? mean(abs.(x .- mu)) : mean(abs.(x .- mu), we)
 end
-function cluster_risk_measure_factory(r::MeanAbsoluteDeviation, prior::AbstractPriorModel,
-                                      cluster::AbstractVector)
-    target = risk_measure_nothing_real_vec_factory_cluster(r.target, cluster)
-    mu = risk_measure_nothing_vec_factory_cluster(r.mu, prior.mu, cluster)
+function risk_measure_factory(r::MeanAbsoluteDeviation, prior::AbstractPriorModel,
+                              cluster::AbstractVector)
+    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
     return MeanAbsoluteDeviation(; settings = r.settings, target = target, w = r.w, mu = mu,
                                  we = r.we)
+end
+function risk_measure_factory(r::MeanAbsoluteDeviation, prior::AbstractPriorModel)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
+    return MeanAbsoluteDeviation(; settings = r.settings, target = r.target, w = r.w,
+                                 mu = mu, we = r.we)
 end
 
 export MeanAbsoluteDeviation
