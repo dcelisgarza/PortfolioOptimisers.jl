@@ -241,6 +241,13 @@ include("./Measures/Risk/MeanReturn.jl")
 include("./Measures/Risk/MeanAbsoluteDeviation.jl")
 include("./Measures/Risk/StandardDeviation.jl")
 include("./Measures/Risk/Variance.jl")
+include("./Measures/Risk/SemiStandardDeviation.jl")
+include("./Measures/Risk/FirstLowerPartialMoment.jl")
+include("./Measures/Risk/WorstRealisation.jl")
+include("./Measures/Risk/ConditionalValueatRisk.jl")
+include("./Measures/Risk/DistributionallyRobustConditionalValueatRisk.jl")
+include("./Measures/Risk/EntropicRiskMeasure.jl")
+include("./Measures/Risk/EntropicValueatRisk.jl")
 include("./Measures/Risk/SquaredRiskMeasures.jl")
 
 end

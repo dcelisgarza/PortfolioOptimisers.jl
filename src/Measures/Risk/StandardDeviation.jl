@@ -8,8 +8,8 @@ function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings
     issquarepermissive(sigma)
     return StandardDeviation{typeof(settings), typeof(sigma)}(settings, sigma)
 end
-function (sd::StandardDeviation)(w::AbstractVector)
-    return sqrt(dot(w, sd.sigma, w))
+function (r::StandardDeviation)(w::AbstractVector)
+    return sqrt(dot(w, r.sigma, w))
 end
 function risk_measure_factory(r::StandardDeviation, prior::AbstractPriorModel,
                               cluster::AbstractVector)

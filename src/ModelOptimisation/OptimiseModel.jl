@@ -1,5 +1,5 @@
 function optimise_JuMP_model(model::JuMP.Model,
-                             solvers::Union{Solver, <:AbstractVector{<:Solver}})
+                             solvers::Union{<:Solver, <:AbstractVector{<:Solver}})
     solvers_tried = Dict()
     success = false
     for solver ∈ solvers

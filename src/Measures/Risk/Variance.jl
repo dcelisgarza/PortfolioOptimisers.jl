@@ -24,8 +24,8 @@ function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
     return Variance{typeof(settings), typeof(formulation), typeof(sigma), typeof(a_rc),
                     typeof(b_rc)}(settings, formulation, sigma, a_rc, b_rc)
 end
-function (variance::Variance)(w::AbstractVector)
-    return dot(w, variance.sigma, w)
+function (r::Variance)(w::AbstractVector)
+    return dot(w, r.sigma, w)
 end
 function risk_measure_factory(r::Variance, prior::AbstractPriorModel,
                               cluster::AbstractVector)
