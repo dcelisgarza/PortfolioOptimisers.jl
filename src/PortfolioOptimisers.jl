@@ -233,9 +233,9 @@ include("./Utils/PricesToReturns.jl")
 include("./PreSelection/PreSelection.jl")
 
 # Risk measure
-include("./RiskMeasure/RiskMeasure_AbstractTypes.jl")
-include("./RiskMeasure/Turnover.jl")
-include("./RiskMeasure/Fees.jl")
-include("./RiskMeasure/PortfolioMean.jl")
+include("./Measures/TrackingTurnover/Turnover.jl")
+include("./Measures/Returns/Fees.jl")
+include("./Measures/Risk/Risk_AbstractTypes.jl")
+include("./Measures/Risk/PortfolioMean.jl")
 
 end
