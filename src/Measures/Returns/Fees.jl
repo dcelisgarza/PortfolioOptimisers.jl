@@ -166,7 +166,7 @@ function calc_asset_fixed_fees(w::AbstractVector, fees::Real, tol_kwargs::NamedT
         idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
         idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees)));
                            tol_kwargs...)
-        fees_w[idx1][idx2] .= fees * idx2
+        fees_w[idx1] .= fees * idx2
     end
     return fees_w
 end
@@ -177,7 +177,7 @@ function calc_asset_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
         idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
         idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees)));
                            tol_kwargs...)
-        fees_w[idx1][idx2] .= fees[idx1][idx2]
+        fees_w[idx1] .= fees[idx1][idx2]
     end
     return fees_w
 end

@@ -40,32 +40,40 @@
         f1_t = CSV.read(joinpath(@__DIR__, "assets/Fees.csv"), DataFrame)
         f2_t = CSV.read(joinpath(@__DIR__, "assets/Asset-Fees.csv"), DataFrame)
 
-        cntr = 0
         for (i, fe) ∈ enumerate(fees_estimator)
             f1 = calc_fees(w1, fe)
-            res1 = isapprox(f1, f1_t[cntr + 1, 1])
+            res1 = isapprox(f1, f1_t[(i - 1) * 2 + 1, 1])
             if !res1
                 println("Fee $i failed: $f1 != $(f1_t[(cntr+1),1])")
-                find_tol(f1, f1_t[cntr + 1, 1]; name1 = :f1, name2 = :f1_t)
+                find_tol(f1, f1_t[(i - 1) * 2 + 1, 1]; name1 = :f1, name2 = :f1_t)
             end
             @test res1
 
             f2 = calc_fees(w1, P, fe)
-            res2 = isapprox(f2, f1_t[cntr + 2, 1])
+            res2 = isapprox(f2, f1_t[(i - 1) * 2 + 2, 1])
             if !res2
                 println("Fee $i failed: $f2 != $(f1_t[(cntr+2),1])")
-                find_tol(f2, f1_t[cntr + 2, 1]; name1 = :f3, name2 = :f1_t)
+                find_tol(f2, f1_t[(i - 1) * 2 + 2, 1]; name1 = :f3, name2 = :f1_t)
             end
             @test res2
 
             f3 = calc_asset_fees(w1, fe)
-            res3 = isapprox(f3, f2_t[!, i])
+            res3 = isapprox(f3, f2_t[1:20, i])
             if !res3
-                println("Fee with prices $i failed")
-                find_tol(f3, f2_t[!, i]; name1 = :f2, name2 = :f2_t)
+                println("Asset fee $i failed")
+                find_tol(f3, f2_t[1:20, i]; name1 = :f2, name2 = :f2_t)
             end
             @test res3
-            cntr += 2
+            @test isapprox(f1, sum(f3))
+
+            f4 = calc_asset_fees(w1, P, fe)
+            res4 = isapprox(f4, f2_t[21:end, i])
+            if !res4
+                println("Asset fee with prices $i failed")
+                find_tol(f4, f2_t[21:end, i]; name1 = :f2, name2 = :f2_t)
+            end
+            @test res4
+            @test isapprox(f2, sum(f4))
         end
     end
 end
