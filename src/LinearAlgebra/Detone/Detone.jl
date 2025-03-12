@@ -6,7 +6,7 @@ function Detone(; n::Integer = 1)
     return Detone{typeof(n)}(n)
 end
 function detone!(ce::Detone, fnpdm::FixNonPositiveDefiniteMatrix, X::AbstractMatrix)
-    @smart_assert(size(X, 1) == size(X, 2))
+    issquare(X)
     n = ce.n
     @smart_assert(one(size(X, 1)) <= n <= size(X, 1))
     n -= 1

@@ -21,7 +21,7 @@ function distance(de::GeneralCorrelationDistanceDistance, ce::StatsBase.Covarian
 end
 function distance(de::GeneralCorrelationDistanceDistance, rho::AbstractMatrix, args...;
                   kwargs...)
-    @smart_assert(size(rho, 1) == size(rho, 2))
+    issquare(rho)
     s = diag(rho)
     iscov = any(.!isone.(s))
     if iscov

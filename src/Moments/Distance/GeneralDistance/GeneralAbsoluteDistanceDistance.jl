@@ -21,7 +21,7 @@ function distance(de::GeneralAbsoluteDistanceDistance, ce::StatsBase.CovarianceE
 end
 function distance(de::GeneralAbsoluteDistanceDistance, rho::AbstractMatrix, args...;
                   kwargs...)
-    @smart_assert(size(rho, 1) == size(rho, 2))
+    issquare(rho)
     s = diag(rho)
     iscov = any(.!isone.(s))
     if iscov

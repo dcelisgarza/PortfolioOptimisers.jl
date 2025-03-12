@@ -228,6 +228,7 @@ include("./UncertaintySets/NormalUncertaintySets/NormalEllipseUncertaintySets.jl
 include("./Utils/BaseFunctionOverloads.jl")
 include("./Utils/EquationParsing.jl")
 include("./Utils/PricesToReturns.jl")
+include("./Utils/Assertions.jl")
 
 # Preselection
 include("./PreSelection/PreSelection.jl")

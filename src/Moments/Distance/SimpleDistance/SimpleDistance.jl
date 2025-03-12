@@ -5,7 +5,7 @@ function distance(::SimpleDistance, ce::StatsBase.CovarianceEstimator, X::Abstra
     return sqrt.(clamp!((one(eltype(X)) .- rho) * 0.5, zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::SimpleDistance, rho::AbstractMatrix, args...; kwargs...)
-    @smart_assert(size(rho, 1) == size(rho, 2))
+    issquare(rho)
     s = diag(rho)
     iscov = any(.!isone.(s))
     if iscov

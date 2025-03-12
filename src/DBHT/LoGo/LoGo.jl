@@ -17,7 +17,7 @@ function LoGo_dist_assert(args...)
 end
 function LoGo!(je::LoGo, fnpdm::FixNonPositiveDefiniteMatrix, sigma::AbstractMatrix,
                X::AbstractMatrix; dims::Int = 1)
-    @smart_assert(size(sigma, 1) == size(sigma, 2))
+    issquare(sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
     iscov = any(.!isone.(s))

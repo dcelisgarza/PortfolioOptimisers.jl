@@ -9,7 +9,7 @@ function distance(::LogDistance, ce::LTDCovariance, X::AbstractMatrix; dims::Int
     return -log.(rho)
 end
 function distance(de::LogDistance, rho::AbstractMatrix, args...; kwargs...)
-    @smart_assert(size(rho, 1) == size(rho, 2))
+    issquare(rho)
     s = diag(rho)
     iscov = any(.!isone.(s))
     if iscov

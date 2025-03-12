@@ -26,7 +26,7 @@ function distance(de::GeneralLogDistanceDistance, ce::LTDCovariance, X::Abstract
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 function distance(de::GeneralLogDistanceDistance, rho::AbstractMatrix, args...; kwargs...)
-    @smart_assert(size(rho, 1) == size(rho, 2))
+    issquare(rho)
     s = diag(rho)
     iscov = any(.!isone.(s))
     if iscov
