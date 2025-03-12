@@ -232,4 +232,10 @@ include("./Utils/PricesToReturns.jl")
 # Preselection
 include("./PreSelection/PreSelection.jl")
 
+# Risk measure
+include("./RiskMeasure/RiskMeasure_AbstractTypes.jl")
+include("./RiskMeasure/Turnover.jl")
+include("./RiskMeasure/Fees.jl")
+include("./RiskMeasure/PortfolioMean.jl")
+
 end
