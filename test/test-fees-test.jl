@@ -21,42 +21,28 @@
         slw = rand(rng, 20)
         tv = rand(rng, 20)
         P = randn(rng, 20)
-        fees_estimator = [PortfolioOptimisers.Fees(; long = 0.01, short = 0.02,
-                                                   fixed_long = 0.05, fixed_short = 0.07,
-                                                   rebalance = PortfolioOptimisers.Turnover(;
-                                                                                            val = 0.11,
-                                                                                            w = w2)),
-                          PortfolioOptimisers.Fees(; long = 0.0, short = 0.0,
-                                                   fixed_long = 0.0, fixed_short = 0.0,
-                                                   rebalance = PortfolioOptimisers.Turnover(;
-                                                                                            val = 0.0,
-                                                                                            w = w2)),
-                          PortfolioOptimisers.Fees(; long = 0.01, short = 0.02,
-                                                   fixed_long = 0.05, fixed_short = 0.07,
-                                                   rebalance = PortfolioOptimisers.NoTurnover()),
-                          PortfolioOptimisers.Fees(; long = lw, short = sw,
-                                                   fixed_long = flw, fixed_short = slw,
-                                                   rebalance = PortfolioOptimisers.Turnover(;
-                                                                                            val = tv,
-                                                                                            w = w2)),
-                          PortfolioOptimisers.Fees(; long = Float64[], short = Float64[],
-                                                   fixed_long = Float64[],
-                                                   fixed_short = Float64[],
-                                                   rebalance = PortfolioOptimisers.Turnover(;
-                                                                                            val = Float64[],
-                                                                                            w = w2)),
-                          PortfolioOptimisers.Fees(; long = Float64[], short = Float64[],
-                                                   fixed_long = Float64[],
-                                                   fixed_short = Float64[],
-                                                   rebalance = PortfolioOptimisers.Turnover(;
-                                                                                            val = Float64[],
-                                                                                            w = Float64[]))]
+        fees_estimator = [Fees(; long = 0.01, short = 0.02, fixed_long = 0.05,
+                               fixed_short = 0.07,
+                               rebalance = Turnover(; val = 0.11, w = w2)),
+                          Fees(; long = 0.0, short = 0.0, fixed_long = 0.0,
+                               fixed_short = 0.0,
+                               rebalance = Turnover(; val = 0.0, w = w2)),
+                          Fees(; long = 0.01, short = 0.02, fixed_long = 0.05,
+                               fixed_short = 0.07, rebalance = NoTurnover()),
+                          Fees(; long = lw, short = sw, fixed_long = flw, fixed_short = slw,
+                               rebalance = Turnover(; val = tv, w = w2)),
+                          Fees(; long = Float64[], short = Float64[],
+                               fixed_long = Float64[], fixed_short = Float64[],
+                               rebalance = Turnover(; val = Float64[], w = w2)),
+                          Fees(; long = Float64[], short = Float64[],
+                               fixed_long = Float64[], fixed_short = Float64[],
+                               rebalance = Turnover(; val = Float64[], w = Float64[]))]
         f1_t = CSV.read(joinpath(@__DIR__, "assets/Fees.csv"), DataFrame)
         f2_t = CSV.read(joinpath(@__DIR__, "assets/Asset-Fees.csv"), DataFrame)
 
         cntr = 0
         for (i, fe) ∈ enumerate(fees_estimator)
-            f1 = PortfolioOptimisers.calc_fees(w1, fe)
+            f1 = calc_fees(w1, fe)
             res1 = isapprox(f1, f1_t[cntr + 1, 1])
             if !res1
                 println("Fee $i failed: $f1 != $(f1_t[(cntr+1),1])")
@@ -64,7 +50,7 @@
             end
             @test res1
 
-            f2 = PortfolioOptimisers.calc_fees(w1, P, fe)
+            f2 = calc_fees(w1, P, fe)
             res2 = isapprox(f2, f1_t[cntr + 2, 1])
             if !res2
                 println("Fee $i failed: $f2 != $(f1_t[(cntr+2),1])")
@@ -72,7 +58,7 @@
             end
             @test res2
 
-            f3 = PortfolioOptimisers.calc_asset_fees(w1, fe)
+            f3 = calc_asset_fees(w1, fe)
             res3 = isapprox(f3, f2_t[!, i])
             if !res3
                 println("Fee with prices $i failed")
@@ -83,5 +69,3 @@
         end
     end
 end
-
-using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames

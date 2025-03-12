@@ -159,6 +159,42 @@ function calc_asset_fees(w::AbstractVector, fees::Fees = Fees())
     fees_rebal = calc_asset_fees(w, fees.rebalance)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_rebal
 end
+function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
+                         fees::Union{AbstractVector{<:Real}, Real}, op::Function)
+    fees_w = zeros(eltype(w), length(w))
+    if isa(fees, Real) && !iszero(fees)
+        idx = op(w, zero(eltype(w)))
+        fees_w[idx] .= fees * w[idx] .* latest_prices[idx]
+    elseif isa(fees, AbstractVector) && !(isempty(fees) || all(iszero.(fees)))
+        idx = op(w, zero(eltype(w)))
+        fees_w[idx] .= fees[idx] .* w[idx] .* latest_prices[idx]
+    end
+    return fees_w
+end
+function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
+                         rebalance::AbstractTurnover)
+    fees_w = zeros(eltype(w), length(w))
+    if isa(rebalance, Turnover)
+        fees_rebal = rebalance.val
+        benchmark = rebalance.w
+        if isa(fees_rebal, Real)
+            fees_w .= fees_rebal * abs.(benchmark .- w) .* latest_prices
+        elseif isa(fees_rebal, AbstractVector) &&
+               !(isempty(fees_rebal) || all(iszero.(fees_rebal)))
+            fees_w .= fees_rebal .* abs.(benchmark .- w) .* latest_prices
+        end
+    end
+    return fees_w
+end
+function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
+                         fees::Fees = Fees())
+    fees_long = calc_asset_fees(w, latest_prices, fees.long, .>=)
+    fees_short = calc_asset_fees(w, latest_prices, -fees.short, .<)
+    fees_fixed_long = calc_asset_fixed_fees(w, fees.fixed_long, fees.tol_kwargs, .>=)
+    fees_fixed_short = calc_asset_fixed_fees(w, fees.fixed_short, fees.tol_kwargs, .<)
+    fees_rebal = calc_asset_fees(w, latest_prices, fees.rebalance)
+    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_rebal
+end
 function calc_net_returns(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fees())
     return X * w .- calc_fees(w, fees)
 end
