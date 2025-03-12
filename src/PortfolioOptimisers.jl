@@ -237,5 +237,6 @@ include("./Measures/TrackingTurnover/Turnover.jl")
 include("./Measures/Returns/Fees.jl")
 include("./Measures/Risk/Risk_AbstractTypes.jl")
 include("./Measures/Risk/PortfolioMean.jl")
+include("./Measures/Risk/MeanAbsoluteDeviation.jl")
 
 end

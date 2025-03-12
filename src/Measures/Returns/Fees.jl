@@ -7,22 +7,22 @@ struct Fees{T1 <: Union{<:Real, <:AbstractVector{<:Real}},
     short::T2
     fixed_long::T3
     fixed_short::T4
-    rebalance::T5
+    turnover::T5
     tol_kwargs::T6
 end
 function Fees(; long::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
               short::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
               fixed_long::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
               fixed_short::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
-              rebalance::AbstractTurnover = NoTurnover(),
+              turnover::AbstractTurnover = NoTurnover(),
               tol_kwargs::NamedTuple = (; atol = 1e-8))
     @smart_assert(all(long .>= zero(long)))
     @smart_assert(all(short .>= zero(short)))
     @smart_assert(all(fixed_long .>= zero(fixed_long)))
     @smart_assert(all(fixed_short .>= zero(fixed_short)))
     return Fees{typeof(long), typeof(short), typeof(fixed_long), typeof(fixed_short),
-                typeof(rebalance), typeof(tol_kwargs)}(long, short, fixed_long, fixed_short,
-                                                       rebalance, tol_kwargs)
+                typeof(turnover), typeof(tol_kwargs)}(long, short, fixed_long, fixed_short,
+                                                      turnover, tol_kwargs)
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Real,
                    op::Function)
@@ -42,16 +42,16 @@ function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
         zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees)))
     end
 end
-function calc_fees(w::AbstractVector, latest_prices::AbstractVector, rebalance::Turnover)
-    fees_rebal = rebalance.val
-    benchmark = rebalance.w
-    return if isa(fees_rebal, Real)
-        sum(fees_rebal * abs.(benchmark .- w) .* latest_prices)
-    elseif isa(fees_rebal, AbstractVector) &&
-           !(isempty(fees_rebal) || all(iszero.(fees_rebal)))
-        dot(fees_rebal, abs.(benchmark .- w) .* latest_prices)
+function calc_fees(w::AbstractVector, latest_prices::AbstractVector, turnover::Turnover)
+    fees_turnover = turnover.val
+    benchmark = turnover.w
+    return if isa(fees_turnover, Real)
+        sum(fees_turnover * abs.(benchmark .- w) .* latest_prices)
+    elseif isa(fees_turnover, AbstractVector) &&
+           !(isempty(fees_turnover) || all(iszero.(fees_turnover)))
+        dot(fees_turnover, abs.(benchmark .- w) .* latest_prices)
     else
-        zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees_rebal),
+        zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees_turnover),
                           eltype(benchmark)))
     end
 end
@@ -63,8 +63,8 @@ function calc_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Fees 
     fees_short = calc_fees(w, latest_prices, -fees.short, .<)
     fees_fixed_long = calc_fixed_fees(w, fees.fixed_long, fees.tol_kwargs, .>=)
     fees_fixed_short = calc_fixed_fees(w, fees.fixed_short, fees.tol_kwargs, .<)
-    fees_rebal = calc_fees(w, latest_prices, fees.rebalance)
-    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_rebal
+    fees_turnover = calc_fees(w, latest_prices, fees.turnover)
+    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 function calc_fees(w::AbstractVector, fees::Real, op::Function)
     return if !iszero(fees)
@@ -82,16 +82,16 @@ function calc_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function
         zero(promote_type(eltype(w), eltype(fees)))
     end
 end
-function calc_fees(w::AbstractVector, rebalance::Turnover)
-    fees_rebal = rebalance.val
-    benchmark = rebalance.w
-    return if isa(fees_rebal, Real)
-        sum(fees_rebal * abs.(benchmark .- w))
-    elseif isa(fees_rebal, AbstractVector) &&
-           !(isempty(fees_rebal) || all(iszero.(fees_rebal)))
-        dot(fees_rebal, abs.(benchmark .- w))
+function calc_fees(w::AbstractVector, turnover::Turnover)
+    fees_turnover = turnover.val
+    benchmark = turnover.w
+    return if isa(fees_turnover, Real)
+        sum(fees_turnover * abs.(benchmark .- w))
+    elseif isa(fees_turnover, AbstractVector) &&
+           !(isempty(fees_turnover) || all(iszero.(fees_turnover)))
+        dot(fees_turnover, abs.(benchmark .- w))
     else
-        zero(promote_type(eltype(w), eltype(fees_rebal), eltype(benchmark)))
+        zero(promote_type(eltype(w), eltype(fees_turnover), eltype(benchmark)))
     end
 end
 function calc_fees(w::AbstractVector, ::NoTurnover)
@@ -124,8 +124,8 @@ function calc_fees(w::AbstractVector, fees::Fees = Fees())
     fees_short = calc_fees(w, -fees.short, .<)
     fees_fixed_long = calc_fixed_fees(w, fees.fixed_long, fees.tol_kwargs, .>=)
     fees_fixed_short = calc_fixed_fees(w, fees.fixed_short, fees.tol_kwargs, .<)
-    fees_rebal = calc_fees(w, fees.rebalance)
-    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_rebal
+    fees_turnover = calc_fees(w, fees.turnover)
+    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 function calc_asset_fees(w::AbstractVector, fees::Real, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
@@ -143,16 +143,16 @@ function calc_asset_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Fu
     end
     return fees_w
 end
-function calc_asset_fees(w::AbstractVector, rebalance::Turnover)
-    fees_rebal = rebalance.val
-    benchmark = rebalance.w
-    fees_w = zeros(promote_type(eltype(w), eltype(fees_rebal), eltype(benchmark)),
+function calc_asset_fees(w::AbstractVector, turnover::Turnover)
+    fees_turnover = turnover.val
+    benchmark = turnover.w
+    fees_w = zeros(promote_type(eltype(w), eltype(fees_turnover), eltype(benchmark)),
                    length(w))
-    if isa(fees_rebal, Real)
-        fees_w .= fees_rebal * abs.(benchmark .- w)
-    elseif isa(fees_rebal, AbstractVector) &&
-           !(isempty(fees_rebal) || all(iszero.(fees_rebal)))
-        fees_w .= fees_rebal .* abs.(benchmark .- w)
+    if isa(fees_turnover, Real)
+        fees_w .= fees_turnover * abs.(benchmark .- w)
+    elseif isa(fees_turnover, AbstractVector) &&
+           !(isempty(fees_turnover) || all(iszero.(fees_turnover)))
+        fees_w .= fees_turnover .* abs.(benchmark .- w)
     end
     return fees_w
 end
@@ -186,8 +186,8 @@ function calc_asset_fees(w::AbstractVector, fees::Fees = Fees())
     fees_short = calc_asset_fees(w, -fees.short, .<)
     fees_fixed_long = calc_asset_fixed_fees(w, fees.fixed_long, fees.tol_kwargs, .>=)
     fees_fixed_short = calc_asset_fixed_fees(w, fees.fixed_short, fees.tol_kwargs, .<)
-    fees_rebal = calc_asset_fees(w, fees.rebalance)
-    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_rebal
+    fees_turnover = calc_asset_fees(w, fees.turnover)
+    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Real,
                          op::Function)
@@ -208,16 +208,16 @@ function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
-                         rebalance::Turnover)
-    fees_rebal = rebalance.val
-    benchmark = rebalance.w
-    fees_w = zeros(promote_type(eltype(w), eltype(latest_prices), eltype(fees_rebal),
+                         turnover::Turnover)
+    fees_turnover = turnover.val
+    benchmark = turnover.w
+    fees_w = zeros(promote_type(eltype(w), eltype(latest_prices), eltype(fees_turnover),
                                 eltype(benchmark)), length(w))
-    if isa(fees_rebal, Real)
-        fees_w .= fees_rebal * abs.(benchmark .- w) .* latest_prices
-    elseif isa(fees_rebal, AbstractVector) &&
-           !(isempty(fees_rebal) || all(iszero.(fees_rebal)))
-        fees_w .= fees_rebal .* abs.(benchmark .- w) .* latest_prices
+    if isa(fees_turnover, Real)
+        fees_w .= fees_turnover * abs.(benchmark .- w) .* latest_prices
+    elseif isa(fees_turnover, AbstractVector) &&
+           !(isempty(fees_turnover) || all(iszero.(fees_turnover)))
+        fees_w .= fees_turnover .* abs.(benchmark .- w) .* latest_prices
     end
     return fees_w
 end
@@ -230,8 +230,8 @@ function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
     fees_short = calc_asset_fees(w, latest_prices, -fees.short, .<)
     fees_fixed_long = calc_asset_fixed_fees(w, fees.fixed_long, fees.tol_kwargs, .>=)
     fees_fixed_short = calc_asset_fixed_fees(w, fees.fixed_short, fees.tol_kwargs, .<)
-    fees_rebal = calc_asset_fees(w, latest_prices, fees.rebalance)
-    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_rebal
+    fees_turnover = calc_asset_fees(w, latest_prices, fees.turnover)
+    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 function calc_net_returns(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fees())
     return X * w .- calc_fees(w, fees)

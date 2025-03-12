@@ -1,0 +1,28 @@
+struct MeanAbsoluteDeviation{T1 <: RiskMeasureSettings,
+                             T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                             T3 <: Union{Nothing, <:AbstractWeights},
+                             T4 <: Union{Nothing, <:AbstractVector{<:Real}},
+                             T5 <: Union{Nothing, <:AbstractWeights}} <: TargetRiskMeasure
+    settings::T1
+    target::T2
+    w::T3
+    mu::T4
+    we::T5
+end
+function MeanAbsoluteDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                               target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                               w::Union{Nothing, <:AbstractWeights} = nothing,
+                               mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                               we::Union{Nothing, <:AbstractWeights} = nothing)
+    return MeanAbsoluteDeviation{typeof(settings), typeof(target), typeof(w), typeof(mu),
+                                 typeof(we)}(settings, target, w, mu, we)
+end
+function (r::MeanAbsoluteDeviation)(X::AbstractMatrix, w::AbstractVector,
+                                    fees::Fees = Fees())
+    x = calc_net_returns(X, w, fees)
+    mu = calc_target_ret_mu(x, w, r)
+    we = r.we
+    return isnothing(we) ? mean(abs.(x .- mu)) : mean(abs.(x .- mu), we)
+end
+
+export MeanAbsoluteDeviation
