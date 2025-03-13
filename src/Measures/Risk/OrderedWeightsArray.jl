@@ -8,6 +8,9 @@ end
 function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              formulation::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
                              w::Union{Nothing, <:AbstractVector} = nothing)
+    if isa(w, AbstractVector)
+        @smart_assert(!isempty(w))
+    end
     return OrderedWeightsArray{typeof(settings), typeof(formulation), typeof(w)}(settings,
                                                                                  formulation,
                                                                                  w)

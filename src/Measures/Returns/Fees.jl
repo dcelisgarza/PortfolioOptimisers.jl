@@ -16,6 +16,18 @@ function Fees(; long::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
               fixed_short::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
               turnover::AbstractTurnover = NoTurnover(),
               tol_kwargs::NamedTuple = (; atol = 1e-8))
+    if isa(long, AbstractVector)
+        @smart_assert(!isempty(long))
+    end
+    if isa(short, AbstractVector)
+        @smart_assert(!isempty(short))
+    end
+    if isa(fixed_long, AbstractVector)
+        @smart_assert(!isempty(fixed_long))
+    end
+    if isa(fixed_short, AbstractVector)
+        @smart_assert(!isempty(fixed_short))
+    end
     @smart_assert(all(long .>= zero(long)))
     @smart_assert(all(short .>= zero(short)))
     @smart_assert(all(fixed_long .>= zero(fixed_long)))
@@ -24,27 +36,17 @@ function Fees(; long::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
                 typeof(turnover), typeof(tol_kwargs)}(long, short, fixed_long, fixed_short,
                                                       turnover, tol_kwargs)
 end
-function cluster_fees_long_factory(fees_long::Real, ::AbstractVector)
-    return fees_long
-end
-function cluster_fees_long_factory(fees_long::AbstractVector{<:Real},
-                                   cluster::AbstractVector)
-    if !isempty(fees_long)
-        fees_long = view(fees_long, cluster)
-    end
-    return fees_long
-end
 function cluster_turnover_fees_factory(turnover::NoTurnover, ::AbstractVector)
     return turnover
 end
 function cluster_turnover_fees_factory(turnover::Turnover, cluster::AbstractVector)
-    val = cluster_fees_long_factory(turnover.val, cluster)
+    val = cluster_real_or_vector_factory(turnover.val, cluster)
     w = view(turnover.w, cluster)
     return Turnover(; val = val, w = w)
 end
 function cluster_fees_factory(fees::Fees; cluster::AbstractVector, kwargs...)
-    long = cluster_fees_long_factory(fees.long, cluster)
-    fixed_long = cluster_fees_long_factory(fees.fixed_long, cluster)
+    long = cluster_real_or_vector_factory(fees.long, cluster)
+    fixed_long = cluster_real_or_vector_factory(fees.fixed_long, cluster)
     turnover = cluster_turnover_fees_factory(fees.turnover, cluster)
     return Fees(; long = long, fixed_long = fixed_long, turnover = turnover,
                 tol_kwargs = fees.tol_kwargs)

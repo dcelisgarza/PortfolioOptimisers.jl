@@ -5,7 +5,10 @@ struct StandardDeviation{T1 <: RiskMeasureSettings,
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                            sigma::Union{Nothing, <:AbstractMatrix} = nothing)
-    issquarepermissive(sigma)
+    if isa(sigma, AbstractMatrix)
+        @smart_assert(!isempty(sigma))
+        issquare(sigma)
+    end
     return StandardDeviation{typeof(settings), typeof(sigma)}(settings, sigma)
 end
 function (r::StandardDeviation)(w::AbstractVector)

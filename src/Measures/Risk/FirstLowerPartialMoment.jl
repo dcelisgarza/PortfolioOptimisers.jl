@@ -12,6 +12,9 @@ function FirstLowerPartialModel(; settings::RiskMeasureSettings = RiskMeasureSet
                                 target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
                                 w::Union{Nothing, <:AbstractWeights} = nothing,
                                 mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+    if isa(mu, AbstractVector)
+        @smart_assert(!isempty(mu))
+    end
     return FirstLowerPartialModel{typeof(settings), typeof(target), typeof(w), typeof(mu)}(settings,
                                                                                            target,
                                                                                            w,

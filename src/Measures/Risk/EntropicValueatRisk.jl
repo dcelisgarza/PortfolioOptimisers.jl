@@ -8,6 +8,9 @@ end
 function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              alpha::Real = 0.05,
                              solvers::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing)
+    if isa(solvers, AbstractVector)
+        @smart_assert(!isempty(solvers))
+    end
     @smart_assert(zero(alpha) < alpha < one(alpha))
     return EntropicValueatRisk{typeof(settings), typeof(alpha), typeof(solvers)}(settings,
                                                                                  alpha,

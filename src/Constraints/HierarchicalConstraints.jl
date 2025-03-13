@@ -13,6 +13,7 @@ function HierarchicalConstraint(; group = nothing, name = nothing,
     hi_flag = isa(hi, AbstractVector)
     if any((group_flag, name_flag, lo_flag, hi_flag))
         @smart_assert(all((group_flag, name_flag, lo_flag, hi_flag)))
+        @smart_assert(!isempty(group) && !isempty(name) && !isempty(lo) && !isempty(hi))
         @smart_assert(length(group) == length(name) == length(lo) == length(hi))
         for (g, n) ∈ zip(group, name)
             if isnothing(g) || isnothing(n)

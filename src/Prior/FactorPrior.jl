@@ -12,6 +12,21 @@ end
 function FactorPriorModel(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
                           chol::AbstractMatrix, f_mu::AbstractVector,
                           f_sigma::AbstractMatrix, loadings::LoadingsMatrix)
+    if isa(X, AbstractMatrix)
+        @smart_assert(!isempty(X))
+    end
+    if isa(mu, AbstractVector)
+        @smart_assert(!isempty(mu))
+    end
+    if isa(sigma, AbstractMatrix)
+        @smart_assert(!isempty(sigma))
+    end
+    if isa(f_mu, AbstractVector)
+        @smart_assert(!isempty(f_mu))
+    end
+    if isa(f_sigma, AbstractMatrix)
+        @smart_assert(!isempty(f_sigma))
+    end
     @smart_assert(size(X, 2) ==
                   length(mu) ==
                   size(sigma, 1) ==

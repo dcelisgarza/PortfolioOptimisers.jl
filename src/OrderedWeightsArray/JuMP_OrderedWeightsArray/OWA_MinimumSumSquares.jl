@@ -9,6 +9,9 @@ end
 function OWA_MinimumSumSquares(; max_phi::Real = 0.5, scale_constr::Real = 1.0,
                                scale_obj::Real = 1.0,
                                solvers::Union{Solver, <:AbstractVector{Solver}} = Solver())
+    if isa(solvers, AbstractVector)
+        @smart_assert(!isempty(solvers))
+    end
     @smart_assert(zero(max_phi) < max_phi < one(max_phi))
     @smart_assert(scale_constr > zero(scale_constr))
     @smart_assert(scale_obj > zero(scale_obj))

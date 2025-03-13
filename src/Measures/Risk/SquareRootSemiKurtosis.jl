@@ -11,8 +11,15 @@ function SquareRootSemiKurtosis(; settings::RiskMeasureSettings = RiskMeasureSet
                                 w::Union{Nothing, <:AbstractWeights} = nothing,
                                 mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                 kt::Union{Nothing, <:AbstractMatrix, Nothing} = nothing)
-    if !isnothing(kt) && !isempty(kt)
-        @smart_assert(size(kt, 1) == size(kt, 2))
+    if isa(mu, AbstractVector)
+        @smart_assert(!isempty(mu))
+    end
+    if isa(kt, AbstractMatrix)
+        @smart_assert(!isempty(kt))
+        issquare(kt)
+    end
+    if isa(mu, AbstractVector) && isa(kt, AbstractMatrix)
+        @smart_assert(length(mu)^2 == size(kt, 2))
     end
     return SquareRootSemiKurtosis{typeof(settings), typeof(w), typeof(mu), typeof(kt)}(settings,
                                                                                        w,

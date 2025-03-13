@@ -235,6 +235,7 @@ include("./Utils/Assertions.jl")
 include("./PreSelection/PreSelection.jl")
 
 # Risk measure
+include("./Measures/Factories/ArrayClusterFactories.jl")
 include("./Measures/Factories/RiskMeasureSolverFactories.jl")
 include("./Measures/Factories/RiskMeasureFactories.jl")
 include("./Measures/Factories/RiskMeasureClusterFactories.jl")

@@ -5,6 +5,15 @@ struct EmpiricalPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
     sigma::T3
 end
 function EmpiricalPriorModel(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix)
+    if isa(X, AbstractMatrix)
+        @smart_assert(!isempty(X))
+    end
+    if isa(mu, AbstractVector)
+        @smart_assert(!isempty(mu))
+    end
+    if isa(sigma, AbstractMatrix)
+        @smart_assert(!isempty(sigma))
+    end
     @smart_assert(size(X, 2) == length(mu))
     issquare(sigma)
     @smart_assert(length(mu) == size(sigma, 1))

@@ -12,6 +12,12 @@ function SemiStandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSett
                                target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                                w::Union{Nothing, <:AbstractWeights} = nothing,
                                mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+    if isa(target, AbstractVector)
+        @smart_assert(!isempty(target))
+    end
+    if isa(mu, AbstractVector)
+        @smart_assert(!isempty(mu))
+    end
     return SemiStandardDeviation{typeof(settings), typeof(target), typeof(w), typeof(mu)}(settings,
                                                                                           target,
                                                                                           w,

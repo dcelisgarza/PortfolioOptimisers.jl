@@ -10,6 +10,9 @@ function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureS
                                   alpha::Real = 0.05, beta::Real = 0.05,
                                   solvers::Union{Nothing, <:Solver,
                                                  <:AbstractVector{<:Solver}} = nothing)
+    if isa(solvers, AbstractVector)
+        @smart_assert(!isempty(solvers))
+    end
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(beta) < beta < one(beta))
     return EntropicValueatRiskRange{typeof(settings), typeof(alpha), typeof(beta),

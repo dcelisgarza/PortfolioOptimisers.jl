@@ -21,6 +21,33 @@ function AugmentedBlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVect
                                            loadings::LoadingsMatrix, P::AbstractMatrix,
                                            Q::AbstractVector, f_P::AbstractMatrix,
                                            f_Q::AbstractVector)
+    if isa(X, AbstractMatrix)
+        @smart_assert(!isempty(X))
+    end
+    if isa(mu, AbstractVector)
+        @smart_assert(!isempty(mu))
+    end
+    if isa(sigma, AbstractMatrix)
+        @smart_assert(!isempty(sigma))
+    end
+    if isa(f_mu, AbstractVector)
+        @smart_assert(!isempty(f_mu))
+    end
+    if isa(f_sigma, AbstractMatrix)
+        @smart_assert(!isempty(f_sigma))
+    end
+    if isa(P, AbstractMatrix)
+        @smart_assert(!isempty(P))
+    end
+    if isa(Q, AbstractVector)
+        @smart_assert(!isempty(Q))
+    end
+    if isa(f_P, AbstractMatrix)
+        @smart_assert(!isempty(f_P))
+    end
+    if isa(f_Q, AbstractVector)
+        @smart_assert(!isempty(f_Q))
+    end
     @smart_assert(size(X, 2) ==
                   length(mu) ==
                   size(sigma, 1) ==

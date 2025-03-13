@@ -14,6 +14,12 @@ function MeanAbsoluteDeviation(; settings::RiskMeasureSettings = RiskMeasureSett
                                w::Union{Nothing, <:AbstractWeights} = nothing,
                                mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                we::Union{Nothing, <:AbstractWeights} = nothing)
+    if isa(target, AbstractVector)
+        @smart_assert(!isempty(target))
+    end
+    if isa(mu, AbstractVector)
+        @smart_assert(!isempty(mu))
+    end
     return MeanAbsoluteDeviation{typeof(settings), typeof(target), typeof(w), typeof(mu),
                                  typeof(we)}(settings, target, w, mu, we)
 end

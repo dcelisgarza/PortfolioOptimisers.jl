@@ -17,8 +17,17 @@ function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   sigma::Union{Nothing, <:AbstractMatrix} = nothing,
                   a_rc::Union{Nothing, <:AbstractMatrix} = nothing,
                   b_rc::Union{Nothing, <:AbstractVector} = nothing)
-    issquarepermissive(sigma)
-    if !isnothing(a_rc) && !isnothing(b_rc) && !isempty(a_rc) && !isempty(b_rc)
+    if isa(sigma, AbstractMatrix)
+        @smart_assert(!isempty(sigma))
+        issquare(sigma)
+    end
+    if isa(a_rc, AbstractMatrix)
+        @smart_assert(!isempty(a_rc))
+    end
+    if isa(b_rc, AbstractVector)
+        @smart_assert(!isempty(b_rc))
+    end
+    if !isnothing(a_rc) && !isnothing(b_rc)
         @smart_assert(size(a_rc, 1) == length(b_rc))
     end
     return Variance{typeof(settings), typeof(formulation), typeof(sigma), typeof(a_rc),

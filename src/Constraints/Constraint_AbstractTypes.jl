@@ -27,6 +27,7 @@ function LinearConstraintAtom(; group = nothing, name = nothing,
     coef_flag = isa(coef, AbstractVector)
     if any((group_flag, name_flag, coef_flag))
         @smart_assert(all((group_flag, name_flag, coef_flag)))
+        @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
         for (g, n) ∈ zip(group, name)
             if isnothing(g) || isnothing(n)
@@ -43,4 +44,5 @@ function LinearConstraintAtom(; group = nothing, name = nothing,
                                                                                          coef,
                                                                                          cnst)
 end
+
 export EQ, LEQ, GEQ

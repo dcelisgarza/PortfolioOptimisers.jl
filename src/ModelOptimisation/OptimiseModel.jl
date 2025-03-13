@@ -1,5 +1,8 @@
 function optimise_JuMP_model(model::JuMP.Model,
                              solvers::Union{<:Solver, <:AbstractVector{<:Solver}})
+    if isa(solvers, AbstractVector)
+        @smart_assert(!isempty(solvers))
+    end
     solvers_tried = Dict()
     success = false
     for solver ∈ solvers

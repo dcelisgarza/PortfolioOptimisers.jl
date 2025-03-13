@@ -8,6 +8,9 @@ end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 uncertainty_set::UncertaintySet = NoUncertaintySet(),
                                 sigma::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing)
+    if isa(sigma, AbstractMatrix)
+        @smart_assert(!isempty(sigma))
+    end
     return UncertaintySetVariance{typeof(settings), typeof(uncertainty_set), typeof(sigma)}(settings,
                                                                                             uncertainty_set,
                                                                                             sigma)

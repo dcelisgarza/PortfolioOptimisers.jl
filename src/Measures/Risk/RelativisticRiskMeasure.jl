@@ -1,5 +1,8 @@
 function RRM(x::AbstractVector, solvers::Union{<:Solver, <:AbstractVector{<:Solver}},
              alpha::Real = 0.05, kappa::Real = 0.3)
+    if isa(solvers, AbstractVector)
+        @smart_assert(!isempty(solvers))
+    end
     T = length(x)
     at = alpha * T
     invat = 1 / at

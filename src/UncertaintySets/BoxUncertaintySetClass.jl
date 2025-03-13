@@ -6,8 +6,7 @@ struct BoxUncertaintySet{T1 <: Union{<:AbstractVector, <:AbstractMatrix},
 end
 function BoxUncertaintySet(; lo::Union{<:AbstractVector, <:AbstractMatrix},
                            hi::Union{<:AbstractVector, <:AbstractMatrix})
-    @smart_assert(!isempty(lo))
-    @smart_assert(!isempty(hi))
+    @smart_assert(!isempty(lo) && !isempty(hi))
     @smart_assert(size(lo) == size(hi))
     return BoxUncertaintySet{typeof(lo), typeof(hi)}(lo, hi)
 end

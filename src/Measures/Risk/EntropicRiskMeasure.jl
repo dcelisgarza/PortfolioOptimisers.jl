@@ -1,5 +1,8 @@
 function ERM(x::AbstractVector{<:Real},
              solvers::Union{<:Solver, <:AbstractVector{<:Solver}}, alpha::Real = 0.05)
+    if isa(solvers, AbstractVector)
+        @smart_assert(!isempty(solvers))
+    end
     model = JuMP.Model()
     set_string_names_on_creation(model, false)
     T = length(x)

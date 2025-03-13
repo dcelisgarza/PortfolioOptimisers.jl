@@ -11,6 +11,9 @@ function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(), alpha::R
                                     kappa = 0.3,
                                     solvers::Union{Nothing, <:Solver,
                                                    <:AbstractVector{<:Solver}} = nothing)
+    if isa(solvers, AbstractVector)
+        @smart_assert(!isempty(solvers))
+    end
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(kappa) < kappa < one(kappa))
     return RelativisticDrawdownatRisk{typeof(settings), typeof(alpha), typeof(kappa),

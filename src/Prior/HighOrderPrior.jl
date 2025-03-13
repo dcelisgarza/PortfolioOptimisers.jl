@@ -27,7 +27,25 @@ function HighOrderPriorModel(; pm::LowOrderAbstractPriorModel,
                              ssk::Union{Nothing, <:AbstractMatrix},
                              SV::Union{Nothing, <:AbstractMatrix},
                              sskmp::Union{Nothing, <:MatrixProcessing})
-    issquarepermissive(kt)
+    if isa(kt, AbstractMatrix)
+        @smart_assert(!isempty(kt))
+    end
+    if isa(skt, AbstractMatrix)
+        @smart_assert(!isempty(skt))
+    end
+    if isa(sk, AbstractMatrix)
+        @smart_assert(!isempty(sk))
+    end
+    if isa(V, AbstractMatrix)
+        @smart_assert(!isempty(V))
+    end
+    if isa(ssk, AbstractMatrix)
+        @smart_assert(!isempty(ssk))
+    end
+    if isa(SV, AbstractMatrix)
+        @smart_assert(!isempty(SV))
+    end
+    issquare(kt)
     csk_invalid = isnothing(sk) || isempty(sk)
     v_invalid = isnothing(V) || isempty(V)
     if any((csk_invalid, v_invalid))
@@ -37,7 +55,7 @@ function HighOrderPriorModel(; pm::LowOrderAbstractPriorModel,
         @smart_assert(size(sk, 1)^2 == size(sk, 2))
         issquare(V)
     end
-    issquarepermissive(skt)
+    issquare(skt)
     cssk_invalid = isnothing(ssk) || isempty(ssk)
     sv_invalid = isnothing(SV) || isempty(SV)
     if any((cssk_invalid, sv_invalid))

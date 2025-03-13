@@ -25,6 +25,7 @@ function get_asset_constraint_data(lca::LinearConstraintAtom{<:AbstractVector,
                                                              <:AbstractVector,
                                                              <:AbstractVector, <:Real},
                                    sets::DataFrame; strict::Bool = false)
+    @smart_assert(!isempty(sets))
     group_names = names(sets)
     N = nrow(sets)
     A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)

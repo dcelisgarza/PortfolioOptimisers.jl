@@ -10,8 +10,14 @@ function NegativeQuadraticSkewness(; settings::RiskMeasureSettings = RiskMeasure
                                    mp::MatrixProcessing = NonPositiveDefiniteMatrixProcessing(),
                                    sk::Union{Nothing, <:AbstractMatrix} = nothing,
                                    V::Union{Nothing, <:AbstractMatrix} = nothing)
-    csk_invalid = isnothing(sk) || isempty(sk)
-    v_invalid = isnothing(V) || isempty(V)
+    if isa(sk, AbstractMatrix)
+        @smart_assert(!isempty(sk))
+    end
+    if isa(V, AbstractMatrix)
+        @smart_assert(!isempty(V))
+    end
+    csk_invalid = isnothing(sk)
+    v_invalid = isnothing(V)
     if any((csk_invalid, v_invalid))
         @smart_assert(all((csk_invalid, v_invalid)),
                       "If either sk or V, is nothing or empty, both must be nothing or empty.")

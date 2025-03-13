@@ -49,7 +49,7 @@ const MuRiskMeasures = Union{MuRiskMeasure, MuHierarchicalRiskMeasure,
                              MuNoOptimisationRiskMeasure}
 function calc_ret_mu(x::AbstractVector, w::AbstractVector, rm::MuRiskMeasures)
     mu = rm.mu
-    return mu = if isnothing(mu) || isempty(mu)
+    return mu = if isnothing(mu)
         wi = rm.w
         isnothing(wi) ? mean(x) : mean(x, wi)
     else
@@ -59,7 +59,7 @@ end
 const TargetRiskMeasures = Union{TargetRiskMeasure, TargetHierarchicalRiskMeasure}
 function calc_target_ret_mu(x::AbstractVector, w::AbstractVector, rm::TargetRiskMeasures)
     target = rm.target
-    if isnothing(target) || isa(target, AbstractVector) && isempty(target)
+    if isnothing(target)
         target = calc_ret_mu(x, w, rm)
     end
     return target

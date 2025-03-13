@@ -16,6 +16,9 @@ function RelativisticValueatRiskRange(;
                                       beta::Real = 0.05, kappa_b::Real = 0.3,
                                       solvers::Union{Nothing, <:Solver,
                                                      <:AbstractVector{<:Solver}} = nothing)
+    if isa(solvers, AbstractVector)
+        @smart_assert(!isempty(solvers))
+    end
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(kappa_a) < kappa_a < one(kappa_a))
     @smart_assert(zero(beta) < beta < one(beta))
