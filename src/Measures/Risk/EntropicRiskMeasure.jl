@@ -4,7 +4,6 @@ function ERM(x::AbstractVector{<:Real},
     set_string_names_on_creation(model, false)
     T = length(x)
     at = alpha * T
-
     @variables(model, begin
                    t
                    z >= 0

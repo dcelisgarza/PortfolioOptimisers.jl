@@ -1,4 +1,4 @@
-mutable struct ConditionalValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real} <: RiskMeasure
+struct ConditionalValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real} <: RiskMeasure
     settings::T1
     alpha::T2
 end

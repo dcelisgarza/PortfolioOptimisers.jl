@@ -1,7 +1,6 @@
-mutable struct EntropicValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
-                                   T3 <:
-                                   Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}} <:
-               SolverRiskMeasure
+struct EntropicValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
+                           T3 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}} <:
+       SolverRiskMeasure
     settings::T1
     alpha::T2
     solvers::T3
