@@ -3,24 +3,30 @@ struct HighOrderPriorModel{T1 <: LowOrderAbstractPriorModel,
                            T3 <: Union{Nothing, <:AbstractMatrix},
                            T4 <: Union{Nothing, <:AbstractMatrix},
                            T5 <: Union{Nothing, <:AbstractMatrix},
-                           T6 <: Union{Nothing, <:AbstractMatrix},
-                           T7 <: Union{Nothing, <:AbstractMatrix}} <:
+                           T6 <: Union{Nothing, <:MatrixProcessing},
+                           T7 <: Union{Nothing, <:AbstractMatrix},
+                           T8 <: Union{Nothing, <:AbstractMatrix},
+                           T9 <: Union{Nothing, <:MatrixProcessing}} <:
        AbstractHighOrderPriorModel
     pm::T1
     kt::T2
     skt::T3
     sk::T4
     V::T5
-    ssk::T6
-    SV::T7
+    skmp::T6
+    ssk::T7
+    SV::T8
+    sskmp::T9
 end
 function HighOrderPriorModel(; pm::LowOrderAbstractPriorModel,
                              kt::Union{Nothing, <:AbstractMatrix},
                              skt::Union{Nothing, <:AbstractMatrix},
                              sk::Union{Nothing, <:AbstractMatrix},
+                             skmp::Union{Nothing, <:MatrixProcessing},
                              V::Union{Nothing, <:AbstractMatrix},
                              ssk::Union{Nothing, <:AbstractMatrix},
-                             SV::Union{Nothing, <:AbstractMatrix})
+                             SV::Union{Nothing, <:AbstractMatrix},
+                             sskmp::Union{Nothing, <:MatrixProcessing})
     issquarepermissive(kt)
     csk_invalid = isnothing(sk) || isempty(sk)
     v_invalid = isnothing(V) || isempty(V)
@@ -42,7 +48,13 @@ function HighOrderPriorModel(; pm::LowOrderAbstractPriorModel,
         issquare(SV)
     end
     return HighOrderPriorModel{typeof(pm), typeof(kt), typeof(skt), typeof(sk), typeof(V),
-                               typeof(ssk), typeof(SV)}(pm, kt, skt, sk, V, ssk, SV)
+                               typeof(skmp), typeof(ssk), typeof(SV), typeof(sskmp)}(pm, kt,
+                                                                                     skt,
+                                                                                     sk, V,
+                                                                                     skmp,
+                                                                                     ssk,
+                                                                                     SV,
+                                                                                     sskmp)
 end
 function Base.getproperty(obj::HighOrderPriorModel, sym::Symbol)
     return if sym == :X
@@ -85,8 +97,9 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix, args...; dims::In
     skt = skurt ? cokurtosis(pe.skte, pm.X) : nothing
     sk, V = skew ? coskewness(pe.ske, pm.X) : (nothing, nothing)
     ssk, SV = sskew ? coskewness(pe.sske, pm.X) : (nothing, nothing)
-    return HighOrderPriorModel(; pm = pm, kt = kt, skt = skt, sk = sk, V = V, ssk = ssk,
-                               SV = SV)
+    return HighOrderPriorModel(; pm = pm, kt = kt, skt = skt, sk = sk, V = V,
+                               skmp = isnothing(sk) ? nothing : pe.ske.mp, ssk = ssk,
+                               SV = SV, sskmp = isnothing(ssk) ? nothing : pe.sske.mp)
 end
 
 export HighOrderPriorModel, HighOrderPriorEstimator

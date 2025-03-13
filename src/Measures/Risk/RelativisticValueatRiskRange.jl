@@ -39,5 +39,10 @@ function risk_measure_factory(r::RelativisticValueatRiskRange;
                                         kappa_a = r.kappa_a, beta = r.beta,
                                         kappa_b = r.kappa_b, solvers = solvers)
 end
+function cluster_risk_measure_factory(r::RelativisticValueatRiskRange;
+                                      solvers::Union{Nothing, <:Solver,
+                                                     <:AbstractVector{<:Solver}}, kwargs...)
+    return risk_measure_factory(r; solvers = solvers, kwargs = kwargs)
+end
 
 export RelativisticValueatRiskRange

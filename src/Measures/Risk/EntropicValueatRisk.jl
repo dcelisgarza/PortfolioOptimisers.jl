@@ -22,5 +22,10 @@ function risk_measure_factory(r::EntropicValueatRisk;
     solvers = risk_measure_solver_factory(r.solvers, solvers)
     return EntropicValueatRisk(; settings = r.settings, alpha = r.alpha, solvers = solvers)
 end
+function cluster_risk_measure_factory(r::EntropicValueatRisk;
+                                      solvers::Union{Nothing, <:Solver,
+                                                     <:AbstractVector{<:Solver}}, kwargs...)
+    return risk_measure_factory(r; solvers = solvers, kwargs = kwargs)
+end
 
 export EntropicValueatRisk

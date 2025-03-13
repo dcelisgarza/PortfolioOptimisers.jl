@@ -24,25 +24,6 @@ function (r::SquareRootKurtosis)(X::AbstractMatrix, w::AbstractVector, fees::Fee
     val = x .- mu
     return sqrt(sum(val .^ 4) / length(x))
 end
-function _cluster_risk_measure_factory(r::SquareRootKurtosis, prior::HighOrderPriorModel,
-                                       cluster::AbstractVector)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    idx = fourth_moment_cluster_factory(size(prior.X, 2), cluster)
-    kt = risk_measure_nothing_matrix_factory(r.kt, prior.kt, idx)
-    return SquareRootKurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt)
-end
-function _cluster_risk_measure_factory(r::SquareRootKurtosis,
-                                       prior::LowOrderAbstractPriorModel,
-                                       cluster::AbstractVector)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    idx = fourth_moment_cluster_factory(size(prior.X, 2), cluster)
-    kt = risk_measure_nothing_matrix_factory(r.kt, nothing, idx)
-    return SquareRootKurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt)
-end
-function cluster_risk_measure_factory(r::SquareRootKurtosis; prior::AbstractPriorModel,
-                                      cluster::AbstractVector, kwargs...)
-    return _cluster_risk_measure_factory(r, prior, cluster)
-end
 function _risk_measure_factory(r::SquareRootKurtosis, prior::HighOrderPriorModel)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
     kt = risk_measure_nothing_matrix_factory(r.kt, prior.kt)
@@ -55,6 +36,25 @@ function _risk_measure_factory(r::SquareRootKurtosis, prior::LowOrderAbstractPri
 end
 function risk_measure_factory(r::SquareRootKurtosis; prior::AbstractPriorModel, kwargs...)
     return _risk_measure_factory(r, prior)
+end
+function _cluster_risk_measure_factory(r::SquareRootKurtosis, prior::HighOrderPriorModel,
+                                       cluster::AbstractVector)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
+    idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
+    kt = risk_measure_nothing_matrix_factory(r.kt, prior.kt, idx)
+    return SquareRootKurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt)
+end
+function _cluster_risk_measure_factory(r::SquareRootKurtosis,
+                                       prior::LowOrderAbstractPriorModel,
+                                       cluster::AbstractVector)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
+    idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
+    kt = risk_measure_nothing_matrix_factory(r.kt, nothing, idx)
+    return SquareRootKurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt)
+end
+function cluster_risk_measure_factory(r::SquareRootKurtosis; prior::AbstractPriorModel,
+                                      cluster::AbstractVector, kwargs...)
+    return _cluster_risk_measure_factory(r, prior, cluster)
 end
 
 export SquareRootKurtosis

@@ -646,6 +646,7 @@
         X = randn(rng, 100, 10)
         pe = HighOrderPriorEstimator()
         pm = prior(pe, transpose(X); dims = 2)
+        @test isapprox(pm.X, X)
         @test isapprox(pm.mu, vec(mean(SimpleExpectedReturns(), X)))
         @test isapprox(pm.sigma, cov(PortfolioOptimisersCovariance(), X))
         @test isapprox(pm.kt, cokurtosis(FullCokurtosis(), X))
