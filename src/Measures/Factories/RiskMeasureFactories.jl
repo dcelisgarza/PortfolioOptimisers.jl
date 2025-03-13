@@ -1,17 +1,17 @@
-function risk_measure_nothing_vec_factory(risk_variable::AbstractVector{<:Real}, ::Any)
-    return risk_variable
-end
 function risk_measure_nothing_vec_factory(::Nothing, ::Nothing)
     throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
+end
+function risk_measure_nothing_vec_factory(risk_variable::AbstractVector{<:Real}, ::Any)
+    return risk_variable
 end
 function risk_measure_nothing_vec_factory(::Nothing, prior_variable::AbstractVector{<:Real})
     return prior_variable
 end
-function risk_measure_nothing_matrix_factory(risk_variable::AbstractMatrix{<:Real}, ::Any)
-    return risk_variable
-end
 function risk_measure_nothing_matrix_factory(::Nothing, ::Nothing)
     throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
+end
+function risk_measure_nothing_matrix_factory(risk_variable::AbstractMatrix{<:Real}, ::Any)
+    return risk_variable
 end
 function risk_measure_nothing_matrix_factory(::Nothing,
                                              prior_variable::AbstractMatrix{<:Real})

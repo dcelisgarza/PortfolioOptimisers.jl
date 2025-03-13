@@ -30,12 +30,11 @@
                                fixed_short = 0.07, turnover = NoTurnover()),
                           Fees(; long = lw, short = sw, fixed_long = flw, fixed_short = slw,
                                turnover = Turnover(; val = tv, w = w2)),
-                          Fees(; long = Float64[], short = Float64[],
-                               fixed_long = Float64[], fixed_short = Float64[],
-                               turnover = Turnover(; val = Float64[], w = w2)),
-                          Fees(; long = Float64[], short = Float64[],
-                               fixed_long = Float64[], fixed_short = Float64[],
-                               turnover = Turnover(; val = Float64[], w = Float64[]))]
+                          Fees(; long = 0.0, short = 0.0, fixed_long = 0.0,
+                               fixed_short = 0.0, turnover = Turnover(; val = 0.0, w = w2)),
+                          Fees(; long = 0.0, short = 0.0, fixed_long = 0.0,
+                               fixed_short = 0.0,
+                               turnover = Turnover(; val = 0.0, w = zeros(length(w2))))]
         f1_t = CSV.read(joinpath(@__DIR__, "assets/Fees.csv"), DataFrame)
         f2_t = CSV.read(joinpath(@__DIR__, "assets/Asset-Fees.csv"), DataFrame)
 

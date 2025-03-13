@@ -62,7 +62,7 @@ function calc_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Real,
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
                    fees::AbstractVector{<:Real}, op::Function)
-    return if !(isempty(fees) || all(iszero.(fees)))
+    return if !all(iszero.(fees))
         idx = op(w, zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees))))
         dot(fees[idx], w[idx] .* latest_prices[idx])
     else
@@ -107,7 +107,7 @@ function calc_fees(w::AbstractVector, fees::Real, op::Function)
     end
 end
 function calc_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function)
-    return if !(isempty(fees) || all(iszero.(fees)))
+    return if !all(iszero.(fees))
         idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
         dot(fees[idx], w[idx])
     else
@@ -144,7 +144,7 @@ function calc_fixed_fees(w::AbstractVector, fees::Real, tol_kwargs::NamedTuple,
 end
 function calc_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
                          tol_kwargs::NamedTuple, op::Function)
-    return if !(isempty(fees) || all(iszero.(fees)))
+    return if !all(iszero.(fees))
         idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
         idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees)));
                            tol_kwargs...)
@@ -171,7 +171,7 @@ function calc_asset_fees(w::AbstractVector, fees::Real, op::Function)
 end
 function calc_asset_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
-    if !(isempty(fees) || all(iszero.(fees)))
+    if !all(iszero.(fees))
         idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
         fees_w[idx] .= fees[idx] .* w[idx]
     end
@@ -211,7 +211,7 @@ end
 function calc_asset_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
                                tol_kwargs::NamedTuple, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
-    if !(isempty(fees) || all(iszero.(fees)))
+    if !all(iszero.(fees))
         idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
         idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees)));
                            tol_kwargs...)
@@ -239,7 +239,7 @@ end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
                          fees::AbstractVector{<:Real}, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(latest_prices), eltype(fees)), length(w))
-    if !(isempty(fees) || all(iszero.(fees)))
+    if !all(iszero.(fees))
         idx = op(w, zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees))))
         fees_w[idx] .= fees[idx] .* w[idx] .* latest_prices[idx]
     end
