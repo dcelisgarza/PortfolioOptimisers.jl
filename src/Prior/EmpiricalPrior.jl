@@ -24,7 +24,7 @@ function EmpiricalPriorEstimator(;
     return EmpiricalPriorEstimator{typeof(ce), typeof(me), typeof(horizon)}(ce, me, horizon)
 end
 function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, Nothing}, X::AbstractMatrix,
-               args...; dims::Int = 1)
+               args...; dims::Int = 1, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
@@ -34,7 +34,7 @@ function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, Nothing}, X::AbstractMa
     return EmpiricalPriorModel(; X = X, mu = mu, sigma = sigma)
 end
 function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMatrix,
-               args...; dims::Int = 1)
+               args...; dims::Int = 1, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)

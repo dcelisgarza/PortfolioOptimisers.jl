@@ -69,7 +69,7 @@ function BlackLittermanPriorEstimator(;
                                                                                      tau)
 end
 function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix, args...; dims::Int = 1,
-               strict::Bool = false)
+               strict::Bool = false, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)

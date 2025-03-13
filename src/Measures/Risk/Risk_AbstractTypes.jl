@@ -159,6 +159,16 @@ end
 function risk_measure_solver_factory(::Nothing, ::Nothing)
     throw(ArgumentError("Both risk_solver and prior_solver are nothing, cannot solve JuMP model."))
 end
+function fourt_moment_cluster_factory(N::Integer, cluster_index::BitVector)
+    idx = Int[]
+    cluster = findall(cluster_index)
+    Nc = length(cluster)
+    sizehint!(idx, Nc^2)
+    for c ∈ cluster
+        append!(idx, (((c - 1) * N + 1):(c * N))[cluster])
+    end
+    return idx
+end
 
 export RiskMeasureSettings, HierarchicalRiskMeasureSettings, ExactOrderedWeightsArray,
        ApproxOrderedWeightsArray

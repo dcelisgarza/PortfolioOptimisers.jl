@@ -204,12 +204,13 @@ include("./Regression/DimensionReductionRegression/PCARegression/PCARegression.j
 
 # Prior
 include("./Prior/Prior_AbstractTypes.jl")
-include("./Prior/EmpiricalPriorModel.jl")
+include("./Prior/EmpiricalPrior.jl")
 include("./Prior/BlackLittermanPrior.jl")
-include("./Prior/FactorPriorModel.jl")
+include("./Prior/FactorPrior.jl")
 include("./Prior/BayesianBlackLittermanPrior.jl")
 include("./Prior/FactorBlackLittermanPrior.jl")
 include("./Prior/AugmentedBlackLittermanPrior.jl")
+include("./Prior/HighOrderPrior.jl")
 
 # Uncertainty sets
 include("./UncertaintySets/UncertaintySets_AbstractTypes.jl")
@@ -258,6 +259,7 @@ include("./Measures/Risk/ConditionalDrawdownatRisk.jl")
 include("./Measures/Risk/UlcerIndex.jl")
 include("./Measures/Risk/EntropicDrawdownatRisk.jl")
 include("./Measures/Risk/RelativisticDrawdownatRisk.jl")
+include("./Measures/Risk/SquareRootKurtosis.jl")
 include("./Measures/Risk/SquaredRiskMeasures.jl")
 
 end
