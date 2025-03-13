@@ -21,22 +21,24 @@ function HighOrderPriorModel(; pm::LowOrderAbstractPriorModel,
                              V::Union{Nothing, <:AbstractMatrix},
                              ssk::Union{Nothing, <:AbstractMatrix},
                              SV::Union{Nothing, <:AbstractMatrix})
-    issquarepermissive(sk)
+    issquarepermissive(kt)
     csk_invalid = isnothing(sk) || isempty(sk)
     v_invalid = isnothing(V) || isempty(V)
     if any((csk_invalid, v_invalid))
-        @smart_assert(all((csk_invalid, v_invalid),
-                          "If either sk or V, is nothing or empty, both must be nothing or empty."))
+        @smart_assert(all((csk_invalid, v_invalid)),
+                      "If either sk or V, is nothing or empty, both must be nothing or empty.")
     else
+        @smart_assert(size(sk, 1)^2 == size(sk, 2))
         issquare(V)
     end
-    issquarepermissive(ssk)
+    issquarepermissive(skt)
     cssk_invalid = isnothing(ssk) || isempty(ssk)
     sv_invalid = isnothing(SV) || isempty(SV)
     if any((cssk_invalid, sv_invalid))
-        @smart_assert(all((cssk_invalid, sv_invalid),
-                          "If either ssk or SV, is nothing or empty, both must be nothing or empty."))
+        @smart_assert(all((cssk_invalid, sv_invalid)),
+                      "If either ssk or SV, is nothing or empty, both must be nothing or empty.")
     else
+        @smart_assert(size(ssk, 1)^2 == size(ssk, 2))
         issquare(SV)
     end
     return HighOrderPriorModel{typeof(pm), typeof(kt), typeof(skt), typeof(sk), typeof(V),

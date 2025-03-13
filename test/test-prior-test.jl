@@ -641,4 +641,24 @@
             @test res3
         end
     end
+    @testset "High Order Prior" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 100, 10)
+        pe = HighOrderPriorEstimator()
+        pm = prior(pe, transpose(X); dims = 2)
+        @test isapprox(pm.mu, vec(mean(SimpleExpectedReturns(), X)))
+        @test isapprox(pm.sigma, cov(PortfolioOptimisersCovariance(), X))
+        @test isapprox(pm.kt, cokurtosis(FullCokurtosis(), X))
+        @test isapprox(pm.skt, cokurtosis(SemiCokurtosis(), X))
+        @test all(isapprox.((pm.sk, pm.V), coskewness(FullCoskewness(), X)))
+        @test all(isapprox.((pm.ssk, pm.SV), coskewness(SemiCoskewness(), X)))
+        pm = prior(pe, transpose(X); dims = 2, kurt = false, skurt = false, skew = false,
+                   sskew = false)
+        @test isnothing(pm.kt)
+        @test isnothing(pm.skt)
+        @test isnothing(pm.sk)
+        @test isnothing(pm.V)
+        @test isnothing(pm.ssk)
+        @test isnothing(pm.SV)
+    end
 end
