@@ -260,6 +260,7 @@ include("./Measures/Risk/UlcerIndex.jl")
 include("./Measures/Risk/EntropicDrawdownatRisk.jl")
 include("./Measures/Risk/RelativisticDrawdownatRisk.jl")
 include("./Measures/Risk/SquareRootKurtosis.jl")
+include("./Measures/Risk/SquareRootSemiKurtosis.jl")
 include("./Measures/Risk/SquaredRiskMeasures.jl")
 
 end

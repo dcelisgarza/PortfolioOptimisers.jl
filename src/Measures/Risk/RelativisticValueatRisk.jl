@@ -18,10 +18,10 @@ end
 function (r::RelativisticValueatRisk)(x::AbstractVector)
     return RRM(x, r.solvers, r.alpha, r.kappa)
 end
-function risk_measure_factory(r::RelativisticValueatRisk,
-                              prior_solvers::Union{Nothing, <:Solver,
-                                                   <:AbstractVector{<:Solver}})
-    solvers = risk_measure_solver_factory(r.solvers, prior_solvers)
+function risk_measure_factory(r::RelativisticValueatRisk;
+                              solvers::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
+                              kwargs...)
+    solvers = risk_measure_solver_factory(r.solvers, solvers)
     return RelativisticValueatRisk(; settings = r.settings, alpha = r.alpha,
                                    kappa = r.kappa, solvers = solvers)
 end

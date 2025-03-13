@@ -31,10 +31,10 @@ end
 function (r::RelativisticValueatRiskRange)(x::AbstractVector)
     return RRM(x, r.solvers, r.alpha, r.kappa_a) + RRM(-x, r.solvers, r.beta, r.kappa_b)
 end
-function risk_measure_factory(r::RelativisticValueatRiskRange,
-                              prior_solvers::Union{Nothing, <:Solver,
-                                                   <:AbstractVector{<:Solver}})
-    solvers = risk_measure_solver_factory(r.solvers, prior_solvers)
+function risk_measure_factory(r::RelativisticValueatRiskRange;
+                              solvers::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
+                              kwargs...)
+    solvers = risk_measure_solver_factory(r.solvers, solvers)
     return RelativisticValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                         kappa_a = r.kappa_a, beta = r.beta,
                                         kappa_b = r.kappa_b, solvers = solvers)

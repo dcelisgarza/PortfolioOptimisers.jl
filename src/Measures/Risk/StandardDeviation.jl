@@ -11,12 +11,12 @@ end
 function (r::StandardDeviation)(w::AbstractVector)
     return sqrt(dot(w, r.sigma, w))
 end
-function risk_measure_factory(r::StandardDeviation, prior::AbstractPriorModel,
-                              cluster::AbstractVector)
+function risk_measure_factory(r::StandardDeviation; prior::AbstractPriorModel,
+                              cluster::AbstractVector, kwargs...)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, cluster)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
-function risk_measure_factory(r::StandardDeviation, prior::AbstractPriorModel)
+function risk_measure_factory(r::StandardDeviation; prior::AbstractPriorModel, kwargs...)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end

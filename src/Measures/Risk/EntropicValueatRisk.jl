@@ -16,10 +16,10 @@ end
 function (r::EntropicValueatRisk)(x::AbstractVector)
     return ERM(x, r.solvers, r.alpha)
 end
-function risk_measure_factory(r::EntropicValueatRisk,
-                              prior_solvers::Union{Nothing, <:Solver,
-                                                   <:AbstractVector{<:Solver}})
-    solvers = risk_measure_solver_factory(r.solvers, prior_solvers)
+function risk_measure_factory(r::EntropicValueatRisk;
+                              solvers::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
+                              kwargs...)
+    solvers = risk_measure_solver_factory(r.solvers, solvers)
     return EntropicValueatRisk(; settings = r.settings, alpha = r.alpha, solvers = solvers)
 end
 

@@ -5,7 +5,7 @@ abstract type AbstractPriorEstimator end
 # 0 = no factor, 1 = factor + chol, 2 = factor
 # 0 = no factor views, 1 = factor views
 
-abstract type LowOrderAbstractPriorModel end
+abstract type LowOrderAbstractPriorModel <: AbstractPriorModel end
 # Asset
 abstract type AbstractPriorModel_A <: LowOrderAbstractPriorModel end
 # Asset + factor + chol

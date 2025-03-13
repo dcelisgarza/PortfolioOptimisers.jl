@@ -31,10 +31,10 @@ function (r::RelativisticDrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     return RRM(dd, r.solvers, r.alpha, r.kappa)
 end
-function risk_measure_factory(r::RelativisticDrawdownatRisk,
-                              prior_solvers::Union{Nothing, <:Solver,
-                                                   <:AbstractVector{<:Solver}})
-    solvers = risk_measure_solver_factory(r.solvers, prior_solvers)
+function risk_measure_factory(r::RelativisticDrawdownatRisk;
+                              solvers::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
+                              kwargs...)
+    solvers = risk_measure_solver_factory(r.solvers, solvers)
     return RelativisticDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
                                       kappa = r.kappa, solvers = solvers)
 end

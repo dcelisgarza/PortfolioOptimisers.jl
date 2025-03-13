@@ -1,4 +1,5 @@
-const SquaredRiskMeasures = Union{<:Variance, <:SquareRootKurtosis}
+const SquaredRiskMeasures = Union{<:Variance, <:SquareRootKurtosis,
+                                  <:SquareRootSemiKurtosis}
 # , <:SemiVariance, <:WorstCaseVariance,
 # , <:SquareRootSemiKurtosis,
 # <:BrownianDistanceVariance, <:NegativeQuadraticSkewness,
