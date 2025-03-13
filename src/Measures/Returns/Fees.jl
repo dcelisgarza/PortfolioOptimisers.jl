@@ -29,7 +29,7 @@ function cluster_fees_long_factory(fees_long::Real, ::AbstractVector)
 end
 function cluster_fees_long_factory(fees_long::AbstractVector{<:Real},
                                    cluster::AbstractVector)
-    if !(isempty(fees_long) || all(iszero.(fees_long)))
+    if !isempty(fees_long)
         fees_long = view(fees_long, cluster)
     end
     return fees_long
