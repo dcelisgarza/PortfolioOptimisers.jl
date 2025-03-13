@@ -9,6 +9,9 @@ function EquilibriumExpectedReturns(;
                                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                     l::Real = 1.0,
                                     w::Union{Nothing, <:AbstractVector} = nothing)
+    if isa(w, AbstractVector)
+        @smart_assert(!isempty(w))
+    end
     return EquilibriumExpectedReturns{typeof(ce), typeof(l), typeof(w)}(ce, l, w)
 end
 function StatsBase.mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1)

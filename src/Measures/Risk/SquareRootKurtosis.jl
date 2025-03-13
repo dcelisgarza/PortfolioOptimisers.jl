@@ -11,14 +11,16 @@ function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSetting
                             w::Union{Nothing, <:AbstractWeights} = nothing,
                             mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                             kt::Union{Nothing, <:AbstractMatrix} = nothing)
-    if isa(mu, AbstractVector)
+    mu_flag = isa(mu, AbstractVector)
+    kt_flag = isa(kt, AbstractMatrix)
+    if mu_flag
         @smart_assert(!isempty(mu))
     end
-    if isa(kt, AbstractMatrix)
+    if kt_flag
         @smart_assert(!isempty(kt))
         issquare(kt)
     end
-    if isa(mu, AbstractVector) && isa(kt, AbstractMatrix)
+    if mu_flag && kt_flag
         @smart_assert(length(mu)^2 == size(kt, 2))
     end
     return SquareRootKurtosis{typeof(settings), typeof(w), typeof(mu), typeof(kt)}(settings,

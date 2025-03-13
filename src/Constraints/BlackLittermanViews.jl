@@ -77,6 +77,9 @@ end
 function views_constraints(lcas::Union{<:LinearConstraintAtom,
                                        <:AbstractVector{<:LinearConstraintAtom}},
                            sets::DataFrame; datatype::Type = Float64, strict::Bool = false)
+    if isa(lcas, AbstractVector)
+        @smart_assert(!isempty(lcas))
+    end
     N = nrow(sets)
 
     P = Vector{datatype}(undef, 0)

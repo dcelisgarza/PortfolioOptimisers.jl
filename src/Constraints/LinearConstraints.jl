@@ -70,6 +70,9 @@ end
 function linear_constraints(lcs::Union{<:LinearConstraint,
                                        <:AbstractVector{<:LinearConstraint}},
                             sets::DataFrame; datatype::Type = Float64, strict::Bool = false)
+    if isa(lcs, AbstractVector)
+        @smart_assert(!isempty(lcs))
+    end
     N = nrow(sets)
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)

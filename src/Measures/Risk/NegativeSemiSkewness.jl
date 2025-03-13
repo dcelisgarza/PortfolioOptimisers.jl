@@ -10,26 +10,16 @@ function NegativeSemiSkewness(; settings::RiskMeasureSettings = RiskMeasureSetti
                               mp::MatrixProcessing = NonPositiveDefiniteMatrixProcessing(),
                               sk::Union{Nothing, <:AbstractMatrix} = nothing,
                               V::Union{Nothing, <:AbstractMatrix} = nothing)
-    if isa(sk, AbstractMatrix)
-        @smart_assert(!isempty(sk))
-    end
-    if isa(V, AbstractMatrix)
-        @smart_assert(!isempty(V))
-    end
-    csk_invalid = isnothing(sk)
-    v_invalid = isnothing(V)
-    if any((csk_invalid, v_invalid))
-        @smart_assert(all((csk_invalid, v_invalid)),
-                      "If either sk or V, is nothing or empty, both must be nothing or empty.")
+    sk_flag = isa(sk, AbstractMatrix)
+    V_flag = isa(V, AbstractMatrix)
+    if any((!sk_flag, !V_flag))
+        @smart_assert(all((!sk_flag, !V_flag)),
+                      "If either sk or V, is nothing, both must be nothing.")
     else
+        @smart_assert(!isempty(sk))
+        @smart_assert(!isempty(V))
         @smart_assert(size(sk, 1)^2 == size(sk, 2))
         issquare(V)
-    end
-    if !isnothing(sk) && !isempty(sk)
-        @smart_assert(size(sk, 1)^2 == size(sk, 2))
-    end
-    if !isnothing(V) && !isempty(V)
-        @smart_assert(size(V, 1) == size(V, 2))
     end
     return NegativeSemiSkewness{typeof(settings), typeof(mp), typeof(sk), typeof(V)}(settings,
                                                                                      mp, sk,
@@ -59,42 +49,11 @@ end
 function cluster_negative_skewness(skew_rm::NegativeSemiSkewness{<:Any, <:Any,
                                                                  <:AbstractMatrix, <:Any},
                                    prior::AbstractPriorModel, cluster::AbstractVector)
-    if !isempty(skew_rm.sk)
-        idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
-        sk = view(skew_rm.sk, cluster, idx)
-        V = __coskewness(sk, prior.X, skew_rm.mp)
-        if all(iszero.(diag(V)))
-            V += eps(eltype(sk)) * I
-        end
-    else
-        throw(ArgumentError("Neither the risk measure, nor the prior have the required data."))
-    end
-    return sk, V
-end
-function cluster_negative_skewness(skew_rm::NegativeSemiSkewness{<:Any, <:Any,
-                                                                 <:AbstractMatrix, <:Any},
-                                   prior::HighOrderPriorModel{<:Any, <:Any, <:Any, <:Any,
-                                                              <:Any, <:Any,
-                                                              <:AbstractMatrix,
-                                                              <:AbstractMatrix,
-                                                              <:MatrixProcessing},
-                                   cluster::AbstractVector)
-    if !isempty(skew_rm.sk)
-        idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
-        sk = view(skew_rm.sk, cluster, idx)
-        V = __coskewness(sk, prior.X, skew_rm.mp)
-        if all(iszero.(diag(V)))
-            V += eps(eltype(sk)) * I
-        end
-    elseif !isempty(prior.ssk)
-        idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
-        sk = view(prior.ssk, cluster, idx)
-        V = __coskewness(sk, prior.X, prior.sskmp)
-        if all(iszero.(diag(V)))
-            V += eps(eltype(sk)) * I
-        end
-    else
-        throw(ArgumentError("Neither the risk measure, nor the prior have the required data."))
+    idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
+    sk = view(skew_rm.sk, cluster, idx)
+    V = __coskewness(sk, prior.X, skew_rm.mp)
+    if all(iszero.(diag(V)))
+        V += eps(eltype(sk)) * I
     end
     return sk, V
 end
@@ -105,15 +64,11 @@ function cluster_negative_skewness(::NegativeSemiSkewness{<:Any, <:Any, Nothing,
                                                               <:AbstractMatrix,
                                                               <:MatrixProcessing},
                                    cluster::AbstractVector)
-    if !isempty(prior.ssk)
-        idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
-        sk = view(prior.ssk, cluster, idx)
-        V = __coskewness(sk, prior.X, prior.sskmp)
-        if all(iszero.(diag(V)))
-            V += eps(eltype(sk)) * I
-        end
-    else
-        throw(ArgumentError("Neither the risk measure, nor the prior have the required data."))
+    idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
+    sk = view(prior.ssk, cluster, idx)
+    V = __coskewness(sk, prior.X, prior.sskmp)
+    if all(iszero.(diag(V)))
+        V += eps(eltype(sk)) * I
     end
     return sk, V
 end

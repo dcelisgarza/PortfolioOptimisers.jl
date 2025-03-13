@@ -81,9 +81,16 @@ function BayesianBlackLittermanPriorEstimator(;
                                               sets::DataFrame = DataFrame(), rf::Real = 0.0,
                                               views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                               tau::Union{Nothing, <:Real} = nothing)
-    if !isnothing(views_conf)
+    if isa(views_conf, AbstractVector)
+        @smart_assert(isa(views, AbstractVector))
+        @smart_assert(!isempty(views))
+        @smart_assert(!isempty(views_conf))
         @smart_assert(length(views) == length(views_conf))
         @smart_assert(all(zero(eltype(views_conf)) .< views_conf .< one(eltype(views_conf))))
+    else
+        if isa(views, AbstractVector)
+            @smart_assert(!isempty(views))
+        end
     end
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))

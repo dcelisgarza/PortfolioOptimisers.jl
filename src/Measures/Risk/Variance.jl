@@ -21,13 +21,12 @@ function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
         @smart_assert(!isempty(sigma))
         issquare(sigma)
     end
-    if isa(a_rc, AbstractMatrix)
+    a_flag = isa(a_rc, AbstractMatrix)
+    b_flag = isa(b_rc, AbstractVector)
+    if any((a_flag, b_flag))
+        @smart_assert(all((a_flag, b_flag)))
         @smart_assert(!isempty(a_rc))
-    end
-    if isa(b_rc, AbstractVector)
         @smart_assert(!isempty(b_rc))
-    end
-    if !isnothing(a_rc) && !isnothing(b_rc)
         @smart_assert(size(a_rc, 1) == length(b_rc))
     end
     return Variance{typeof(settings), typeof(formulation), typeof(sigma), typeof(a_rc),

@@ -29,41 +29,41 @@ function HighOrderPriorModel(; pm::LowOrderAbstractPriorModel,
                              sskmp::Union{Nothing, <:MatrixProcessing})
     if isa(kt, AbstractMatrix)
         @smart_assert(!isempty(kt))
+        issquare(kt)
+        @smart_assert(length(pm.mu)^2 == size(kt, 1))
     end
     if isa(skt, AbstractMatrix)
         @smart_assert(!isempty(skt))
+        issquare(skt)
+        @smart_assert(length(pm.mu)^2 == size(skt, 1))
     end
-    if isa(sk, AbstractMatrix)
+    sk_flag = isa(sk, AbstractMatrix)
+    V_flag = isa(V, AbstractMatrix)
+    if sk_flag
         @smart_assert(!isempty(sk))
+        @smart_assert(length(pm.mu)^2 == size(sk, 2))
     end
-    if isa(V, AbstractMatrix)
+    if V_flag
         @smart_assert(!isempty(V))
-    end
-    if isa(ssk, AbstractMatrix)
-        @smart_assert(!isempty(ssk))
-    end
-    if isa(SV, AbstractMatrix)
-        @smart_assert(!isempty(SV))
-    end
-    issquare(kt)
-    csk_invalid = isnothing(sk) || isempty(sk)
-    v_invalid = isnothing(V) || isempty(V)
-    if any((csk_invalid, v_invalid))
-        @smart_assert(all((csk_invalid, v_invalid)),
-                      "If either sk or V, is nothing or empty, both must be nothing or empty.")
-    else
-        @smart_assert(size(sk, 1)^2 == size(sk, 2))
         issquare(V)
     end
-    issquare(skt)
-    cssk_invalid = isnothing(ssk) || isempty(ssk)
-    sv_invalid = isnothing(SV) || isempty(SV)
-    if any((cssk_invalid, sv_invalid))
-        @smart_assert(all((cssk_invalid, sv_invalid)),
-                      "If either ssk or SV, is nothing or empty, both must be nothing or empty.")
-    else
-        @smart_assert(size(ssk, 1)^2 == size(ssk, 2))
+    if any((sk_flag, V_flag))
+        @smart_assert(all((sk_flag, V_flag)),
+                      "If either sk or V, is nothing, both must be nothing.")
+    end
+    ssk_flag = isa(ssk, AbstractMatrix)
+    SV_flag = isa(SV, AbstractMatrix)
+    if ssk_flag
+        @smart_assert(!isempty(ssk))
+        @smart_assert(length(pm.mu)^2 == size(ssk, 2))
+    end
+    if SV_flag
+        @smart_assert(!isempty(SV))
         issquare(SV)
+    end
+    if any((ssk_flag, SV_flag))
+        @smart_assert(all((ssk_flag, SV_flag)),
+                      "If either ssk or SV, is nothing or empty, both must be nothing or empty.")
     end
     return HighOrderPriorModel{typeof(pm), typeof(kt), typeof(skt), typeof(sk), typeof(V),
                                typeof(skmp), typeof(ssk), typeof(SV), typeof(sskmp)}(pm, kt,

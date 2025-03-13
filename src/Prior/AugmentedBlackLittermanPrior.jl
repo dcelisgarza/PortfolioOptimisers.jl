@@ -116,17 +116,34 @@ function AugmentedBlackLittermanPriorEstimator(;
                                                w::Union{Nothing, <:AbstractVector}                                              = nothing,
                                                l::Union{Nothing, <:Real}                                                        = nothing,
                                                tau::Union{Nothing, <:Real}                                                      = nothing)
-    if !isnothing(a_views_conf)
+    if isa(w, AbstractVector)
+        @smart_assert(!isempty(w))
+    end
+    if isa(a_views_conf, AbstractVector)
+        @smart_assert(isa(a_views, AbstractVector))
+        @smart_assert(!isempty(a_views))
+        @smart_assert(!isempty(a_views_conf))
         @smart_assert(length(a_views) == length(a_views_conf))
         @smart_assert(all(zero(eltype(a_views_conf)) .<
                           a_views_conf .<
                           one(eltype(a_views_conf))))
+    else
+        if isa(a_views, AbstractVector)
+            @smart_assert(!isempty(a_views))
+        end
     end
-    if !isnothing(f_views_conf)
+    if isa(f_views_conf, AbstractVector)
+        @smart_assert(isa(f_views, AbstractVector))
+        @smart_assert(!isempty(f_views))
+        @smart_assert(!isempty(f_views_conf))
         @smart_assert(length(f_views) == length(f_views_conf))
         @smart_assert(all(zero(eltype(f_views_conf)) .<
                           f_views_conf .<
                           one(eltype(f_views_conf))))
+    else
+        if isa(f_views, AbstractVector)
+            @smart_assert(!isempty(f_views))
+        end
     end
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))
@@ -168,6 +185,14 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     end
     @smart_assert(nrow(pe.a_sets) == size(X, 2))
     @smart_assert(nrow(pe.f_sets) == size(F, 2))
+    if !isnothing(pe.l)
+        w = if !isnothing(pe.w)
+            @smart_assert(length(pe.w) == size(X, 2))
+            pe.w
+        else
+            fill(inv(size(X, 2)), size(X, 2))
+        end
+    end
     # Asset prior.
     a_prior = prior(pe.a_pe, X)
     a_prior_mu, a_prior_sigma = a_prior.mu, a_prior.sigma
@@ -211,12 +236,6 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     aug_omega = hcat(vcat(a_omega, zeros(size(f_omega, 1), size(a_omega, 1))),
                      vcat(zeros(size(a_omega, 1), size(f_omega, 1)), f_omega))
     aug_prior_mu = if !isnothing(pe.l)
-        w = if !isnothing(pe.w)
-            @smart_assert(length(pe.w) == size(X, 2))
-            pe.w
-        else
-            fill(inv(size(X, 2)), size(X, 2))
-        end
         pe.l * (vcat(a_prior_sigma, f_prior_sigma * transpose(M))) * w
     else
         vcat(a_prior_mu, f_prior_mu) .- pe.rf

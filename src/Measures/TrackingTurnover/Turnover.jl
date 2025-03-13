@@ -11,6 +11,7 @@ function Turnover(; val::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
         @smart_assert(!isempty(val))
         @smart_assert(length(val) == length(w))
     end
+    @smart_assert(!isempty(w))
     return Turnover{typeof(val), typeof(w)}(val, w)
 end
 

@@ -9,10 +9,6 @@ function risk_measure_nothing_vec_factory(::Nothing, prior_variable::AbstractVec
                                           cluster::AbstractVector)
     return view(prior_variable, cluster)
 end
-function risk_measure_nothing_vec_factory(risk_variable::AbstractVector{<:Real}, ::Any,
-                                          cluster::AbstractVector)
-    return view(risk_variable, cluster)
-end
 function risk_measure_nothing_matrix_factory(::Nothing, ::Nothing, cluster::AbstractVector)
     throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
 end

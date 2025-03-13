@@ -2,7 +2,7 @@ struct GiniMeanDifference{T1 <: RiskMeasureSettings,
                           T2 <: OrderedWeightsArrayFormulation} <:
        OrderedWeightsArrayRiskMeasure
     settings::T1
-    formulation:::T2
+    formulation::T2
 end
 function GiniMeanDifference(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                             formulation::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
