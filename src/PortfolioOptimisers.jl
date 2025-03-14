@@ -168,11 +168,17 @@ include("./Moments/Distance/CanonicalDistance/CanonicalDistanceDistance.jl")
 include("./Moments/Distance/GeneralCanonicalDistance/GeneralCanonicalDistance.jl")
 include("./Moments/Distance/GeneralCanonicalDistance/GeneralCanonicalDistanceDistance.jl")
 
-# DBHTs
-include("./DBHT/Clustering/DBHT.jl")
-include("./DBHT/LoGo/LoGo_AbstractTypes.jl")
-include("./DBHT/LoGo/NoLoGo.jl")
-include("./DBHT/LoGo/LoGo.jl")
+# Clustering
+## DBHTs
+include("./Clustering/Clustering_AbstractTypes.jl")
+include("./Clustering/NumberClustersHeuristic/NumberClustersValidation.jl")
+include("./Clustering/NumberClustersHeuristic/SecondOrderDifference.jl")
+include("./Clustering/NumberClustersHeuristic/StandardisedSilhouetteScore.jl")
+include("./Clustering/NumberClustersHeuristic/PredefinedNumber.jl")
+include("./Clustering/Hierarchical/HierarchicalClustering.jl")
+include("./Clustering/Hierarchical/DBHT/DBHT.jl")
+include("./Clustering/Hierarchical/DBHT/LoGo.jl")
+include("./Clustering/ClusteringEstimator.jl")
 
 # Matrix Processing
 include("./MatrixProcessing/MatrixProcessing_AbstractTypes.jl")

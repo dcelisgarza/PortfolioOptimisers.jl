@@ -24,9 +24,9 @@
         similarity = DBHT_MaximumDistanceSimilarity()
         S = dbht_similarity(similarity, rho, dist)
 
-        root_method = DBHT_UniqueRoot()
+        root = DBHT_UniqueRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z1, dbht = DBHTs(dist, S; branchorder = :default,
-                                                 root_method = root_method)
+                                                 root = root)
         m1 = Z1[:, 1] .< 0
         m2 = Z1[:, 2] .< 0
         Z1[.!m1, 1] .+= size(Z1, 1) + 1
@@ -139,9 +139,9 @@
         similarity = DBHT_ExponentialSimilarity()
         S = dbht_similarity(similarity, rho, dist)
 
-        root_method = DBHT_EqualRoot()
+        root = DBHT_EqualRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z2, dbht = DBHTs(dist, S; branchorder = :optimal,
-                                                 root_method = root_method)
+                                                 root = root)
         m1 = Z2[:, 1] .< 0
         m2 = Z2[:, 2] .< 0
         Z2[.!m1, 1] .+= size(Z2, 1) + 1
@@ -240,8 +240,7 @@
         @test isapprox(cliques2, cliques2_t)
         @test isapprox(cliqueTree2, cliqueTree2_t)
 
-        T8, Rpm, Adjv, Dpm, Mv, Z3, dbht = DBHTs(dist, S; branchorder = :r,
-                                                 root_method = root_method)
+        T8, Rpm, Adjv, Dpm, Mv, Z3, dbht = DBHTs(dist, S; branchorder = :r, root = root)
         m1 = Z3[:, 1] .< 0
         m2 = Z3[:, 2] .< 0
         Z3[.!m1, 1] .+= size(Z3, 1) + 1

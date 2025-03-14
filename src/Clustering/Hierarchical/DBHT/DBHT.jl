@@ -24,6 +24,14 @@ function dbht_similarity(::DBHT_MaximumDistanceSimilarity, S, D)
     return ceil(maximum(D)^2) .- D .^ 2
 end
 export dbht_similarity
+struct DBHT{T1 <: SimilarityMatrixEstimator, T2 <: DBHT_RootMethod} <: ClusteringAlgorithm
+    similarity::T1
+    root::T2
+end
+function DBHT(; similarity::SimilarityMatrixEstimator = DBHT_MaximumDistanceSimilarity(),
+              root::DBHT_RootMethod = DBHT_UniqueRoot())
+    return DBHT{typeof(similarity), typeof(root)}(similarity, root)
+end
 
 """
 ```
@@ -592,7 +600,7 @@ Looks for 3-cliques of a Maximal Planar Graph (MPG), then construct a hierarchy 
   - `Sb`: `Nc×1` vector. `Sb[n] = 1` indicates 3-clique `n` is separating.
 """
 function CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real},
-                             root_method::DBHT_RootMethod = DBHT_UniqueRoot())
+                             root::DBHT_RootMethod = DBHT_UniqueRoot())
     N = size(Apm, 1)
     A = Apm .!= 0
     K3, E, clique = clique3(A)
@@ -619,7 +627,7 @@ function CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real},
     Pred = BuildHierarchy(M)
     Root = findall(Pred .== 0)
 
-    H = CliqueRoot(root_method, Root, Pred, Nc, A, CliqList)
+    H = CliqueRoot(root, Root, Pred, Nc, A, CliqList)
 
     if !isempty(H)
         H2, Mb = BubbleHierarchy(Pred, Sb)
@@ -1093,8 +1101,7 @@ Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering a
   - `Z_hclust`: Z matrix in [Clustering.Hclust](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format.
 """
 function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
-               branchorder::Symbol = :optimal,
-               root_method::DBHT_RootMethod = DBHT_UniqueRoot())
+               branchorder::Symbol = :optimal, root::DBHT_RootMethod = DBHT_UniqueRoot())
     @assert(issymmetric(D), "Distance matrix should be symmetric.")
     @assert(issymmetric(S), "Similarity matrix should be symmetric.")
 
@@ -1103,7 +1110,7 @@ function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
     Apm[Apm .!= 0] .= D[Apm .!= 0]
     Dpm = distance_wei(Apm)[1]
 
-    H1, Hb, Mb, CliqList, Sb = CliqHierarchyTree2s(Rpm, root_method)
+    H1, Hb, Mb, CliqList, Sb = CliqHierarchyTree2s(Rpm, root)
 
     Mb = Mb[1:size(CliqList, 1), :]
 
@@ -1138,7 +1145,6 @@ function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
 
     return T8, Rpm, Adjv, Dpm, Mv, Z, Z_hclust
 end
-
 function jlogo!(jlogo, sigma, source, sign)
     tmp = Matrix{eltype(sigma)}(undef, size(source, 2), size(source, 2))
     for i ∈ axes(source, 1)
@@ -1178,5 +1184,33 @@ function J_LoGo(sigma, separators, cliques)
     jlogo!(jlogo, sigma, separators, -1)
     return jlogo
 end
+struct DBHTClusteringResult{T1 <: Clustering.ClusteringResult, T2 <: AbstractMatrix,
+                            T3 <: AbstractMatrix, T4 <: Integer} <:
+       AbstractPortfolioOptimisersClusteringResult
+    clustering::T1
+    S::T2
+    D::T3
+    k::T4
+end
+function DBHTClusteringResult(; clustering::Clustering.ClusteringResult, S::AbstractMatrix,
+                              D::AbstractMatrix, k::Integer)
+    @smart_assert(!isempty(S) && !isempty(D))
+    @smart_assert(k >= 1)
+    return DBHTClusteringResult{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering,
+                                                                                     S, D,
+                                                                                     k)
+end
+function _clusterise(alg::DBHT, X::AbstractMatrix{<:Real};
+                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                     de::PortfolioOptimisersUnionDistanceMetric = CanonicalDistance(),
+                     nch::Union{<:Integer, NumberClustersHeuristic} = SecondOrderDifference(),
+                     branchorder::Symbol = :optimal, dims::Int = 1)
+    S = cor(ce, X; dims = dims)
+    D = distance(de, S, X; dims = dims)
+    S = dbht_similarity(alg.similarity, S, D)
+    clustering = DBHTs(D, S; branchorder = branchorder, root = alg.root)[end]
+    k = optimal_number_clusters(nch, D, clustering)
+    return DBHTClusteringResult(; clustering = clustering, S = S, D = D, k = k)
+end
 
-export PMFG_T2s, DBHTs, J_LoGo, DBHT_UniqueRoot, DBHT_EqualRoot
+export PMFG_T2s, DBHTs, J_LoGo, DBHT_UniqueRoot, DBHT_EqualRoot, DBHTClusteringResult
