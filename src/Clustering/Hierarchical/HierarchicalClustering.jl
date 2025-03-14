@@ -1,8 +1,8 @@
-struct HAC{T1 <: Symbol} <: ClusteringAlgorithm
+struct HierarchicalClustering{T1 <: Symbol} <: ClusteringAlgorithm
     linkage::T1
 end
-function HAC(; linkage::Symbol = :ward)
-    return HAC{typeof(linkage)}(linkage)
+function HierarchicalClustering(; linkage::Symbol = :ward)
+    return HierarchicalClustering{typeof(linkage)}(linkage)
 end
 struct ClusterNode{tid, tl, tr, td, tcnt}
     id::tid
@@ -80,22 +80,22 @@ function to_tree(a::Hclust)
     end
     return nd, d
 end
-struct HACClusteringResult{T1 <: Clustering.ClusteringResult, T2 <: AbstractMatrix,
-                           T3 <: AbstractMatrix, T4 <: Integer} <:
+struct HierarchicalClusteringResult{T1 <: Clustering.Hclust, T2 <: AbstractMatrix,
+                                    T3 <: AbstractMatrix, T4 <: Integer} <:
        AbstractPortfolioOptimisersClusteringResult
     clustering::T1
     S::T2
     D::T3
     k::T4
 end
-function HACClusteringResult(; clustering::Clustering.ClusteringResult, S::AbstractMatrix,
-                             D::AbstractMatrix, k::Integer)
+function HierarchicalClusteringResult(; clustering::Clustering.Hclust, S::AbstractMatrix,
+                                      D::AbstractMatrix, k::Integer)
     @smart_assert(!isempty(S) && !isempty(D))
     @smart_assert(k >= 1)
-    return HACClusteringResult{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering,
-                                                                                    S, D, k)
+    return HierarchicalClusteringResult{typeof(clustering), typeof(S), typeof(D),
+                                        typeof(k)}(clustering, S, D, k)
 end
-function _clusterise(alg::HAC, X::AbstractMatrix{<:Real};
+function _clusterise(alg::HierarchicalClustering, X::AbstractMatrix{<:Real};
                      ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                      de::PortfolioOptimisersUnionDistanceMetric = CanonicalDistance(),
                      nch::Union{<:Integer, NumberClustersHeuristic} = SecondOrderDifference(),
@@ -103,8 +103,8 @@ function _clusterise(alg::HAC, X::AbstractMatrix{<:Real};
     S = cor(ce, X; dims = dims)
     D = distance(de, S, X; dims = dims)
     clustering = hclust(D; linkage = alg.linkage, branchorder = branchorder)
-    k = optimal_number_clusters(nch, D, clustering)
-    return HACClusteringResult(; clustering = clustering, S = S, D = D, k = k)
+    k = optimal_number_clusters(nch, clustering, D)
+    return HierarchicalClusteringResult(; clustering = clustering, S = S, D = D, k = k)
 end
 
-export HAC, ClusterNode, HACClusteringResult
+export HierarchicalClustering, ClusterNode, HierarchicalClusteringResult

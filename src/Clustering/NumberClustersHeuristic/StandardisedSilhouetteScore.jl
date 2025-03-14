@@ -27,7 +27,7 @@ function optimal_number_clusters(nch::StandardisedSilhouetteScore, clustering::H
         msl = mean(sl)
         W_list[i] = msl / std(sl; mean = msl)
     end
-    return valid_k_clusters(W_list, clustering)
+    return valid_k_clusters(clustering, W_list)
 end
 
 export StandardisedSilhouetteScore

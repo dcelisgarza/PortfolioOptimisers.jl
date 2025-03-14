@@ -1184,7 +1184,7 @@ function J_LoGo(sigma, separators, cliques)
     jlogo!(jlogo, sigma, separators, -1)
     return jlogo
 end
-struct DBHTClusteringResult{T1 <: Clustering.ClusteringResult, T2 <: AbstractMatrix,
+struct DBHTClusteringResult{T1 <: Clustering.Hclust, T2 <: AbstractMatrix,
                             T3 <: AbstractMatrix, T4 <: Integer} <:
        AbstractPortfolioOptimisersClusteringResult
     clustering::T1
@@ -1192,7 +1192,7 @@ struct DBHTClusteringResult{T1 <: Clustering.ClusteringResult, T2 <: AbstractMat
     D::T3
     k::T4
 end
-function DBHTClusteringResult(; clustering::Clustering.ClusteringResult, S::AbstractMatrix,
+function DBHTClusteringResult(; clustering::Clustering.Hclust, S::AbstractMatrix,
                               D::AbstractMatrix, k::Integer)
     @smart_assert(!isempty(S) && !isempty(D))
     @smart_assert(k >= 1)
@@ -1209,7 +1209,7 @@ function _clusterise(alg::DBHT, X::AbstractMatrix{<:Real};
     D = distance(de, S, X; dims = dims)
     S = dbht_similarity(alg.similarity, S, D)
     clustering = DBHTs(D, S; branchorder = branchorder, root = alg.root)[end]
-    k = optimal_number_clusters(nch, D, clustering)
+    k = optimal_number_clusters(nch, clustering, D)
     return DBHTClusteringResult(; clustering = clustering, S = S, D = D, k = k)
 end
 
