@@ -36,18 +36,10 @@ function Fees(; long::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
                 typeof(turnover), typeof(tol_kwargs)}(long, short, fixed_long, fixed_short,
                                                       turnover, tol_kwargs)
 end
-function cluster_turnover_fees_factory(turnover::NoTurnover, ::AbstractVector)
-    return turnover
-end
-function cluster_turnover_fees_factory(turnover::Turnover, cluster::AbstractVector)
-    val = cluster_real_or_vector_factory(turnover.val, cluster)
-    w = view(turnover.w, cluster)
-    return Turnover(; val = val, w = w)
-end
-function cluster_fees_factory(fees::Fees; cluster::AbstractVector, kwargs...)
+function cluster_fees_factory(fees::Fees, cluster::AbstractVector; kwargs...)
     long = cluster_real_or_vector_factory(fees.long, cluster)
     fixed_long = cluster_real_or_vector_factory(fees.fixed_long, cluster)
-    turnover = cluster_turnover_fees_factory(fees.turnover, cluster)
+    turnover = cluster_turnover_factory(fees.turnover, cluster)
     return Fees(; long = long, fixed_long = fixed_long, turnover = turnover,
                 tol_kwargs = fees.tol_kwargs)
 end

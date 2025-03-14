@@ -1,9 +1,7 @@
-const SquaredRiskMeasures = Union{<:Variance, <:SquareRootKurtosis,
+const SquaredRiskMeasures = Union{<:Variance, <:SemiVariance, <:SquareRootKurtosis,
                                   <:SquareRootSemiKurtosis, <:BrownianDistanceVariance,
                                   <:NegativeQuadraticSkewness,
                                   <:NegativeQuadraticSemiSkewness, <:UncertaintySetVariance}
-# , <:SemiVariance, 
-
 function adjust_risk_contribution(::Any, val)
     return val
 end
