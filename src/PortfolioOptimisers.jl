@@ -248,27 +248,28 @@ include("./Measures/Risk/RelativisticRiskMeasure.jl")
 
 ## Optimisation risk measures
 ### Dispersion
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/MeanAbsoluteDeviation.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/StandardDeviation.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Variance.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/SemiVariance.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/UncertaintyVariance.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/SemiStandardDeviation.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/FirstLowerPartialMoment.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/SquareRootKurtosis.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/SquareRootSemiKurtosis.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/GiniMeanDifference.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/BrownianDistanceVariance.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/NegativeQuadraticSkewness.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/NegativeQuadraticSemiSkewness.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/NegativeSkewness.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/NegativeSemiSkewness.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/EntropicValueatRiskRange.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/RelativisticValueatRiskRange.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Range.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/ConditionalValueatRiskRange.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/TailGiniRange.jl")
-
+#### Full dispersion
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/MeanAbsoluteDeviation.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/StandardDeviation.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/Variance.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/EntropicValueatRiskRange.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/RelativisticValueatRiskRange.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/Range.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/ConditionalValueatRiskRange.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/TailGiniRange.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/SquareRootKurtosis.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/NegativeQuadraticSkewness.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/NegativeSkewness.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/UncertaintyVariance.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/GiniMeanDifference.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Full/BrownianDistanceVariance.jl")
+#### Downside dispersion
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Downside/SemiVariance.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Downside/SemiStandardDeviation.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Downside/FirstLowerPartialMoment.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Downside/SquareRootSemiKurtosis.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Downside/NegativeQuadraticSemiSkewness.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Dispersion/Downside/NegativeSemiSkewness.jl")
 ### Downside
 include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Downside/ConditionalValueatRisk.jl")
 include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Downside/DistributionallyRobustConditionalValueatRisk.jl")
@@ -276,46 +277,43 @@ include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Downside/Entropic
 include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Downside/RelativisticValueatRisk.jl")
 include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Downside/WorstRealisation.jl")
 include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Downside/TailGini.jl")
-
 ### Drawdowns
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdowns/MaximumDrawdown.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdowns/AverageDrawdown.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdowns/ConditionalDrawdownatRisk.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdowns/UlcerIndex.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdowns/EntropicDrawdownatRisk.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdowns/RelativisticDrawdownatRisk.jl")
-
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdown/MaximumDrawdown.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdown/AverageDrawdown.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdown/ConditionalDrawdownatRisk.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdown/UlcerIndex.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdown/EntropicDrawdownatRisk.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/Drawdown/RelativisticDrawdownatRisk.jl")
 ### Misc
 include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/OrderedWeightsArray.jl")
-
 ### Tracking and turnover
 include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/TrackingTurnover/TrackingRiskMeasure.jl")
 include("./Measures/Risk/OptimisationRiskMeasures/RiskMeasures/TrackingTurnover/TurnoverRiskMeasure.jl")
-
 ## Hierarchical risk measures
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/ValueatRisk.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/ValueatRiskRange.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/DrawdownatRisk.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/RelativeDrawdownatRisk.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/RelativeMaximumDrawdown.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/RelativeAverageDrawdown.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/RelativeConditionalDrawdownatRisk.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/RelativeUlcerIndex.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/RelativeEntropicDrawdownatRisk.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/RelativeRelativisticDrawdownatRisk.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Dispersion/Full/ValueatRiskRange.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Dispersion/Full/FourthCentralMoment.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Dispersion/Full/Kurtosis.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Dispersion/Downside/ThirdLowerPartialMoment.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Dispersion/Downside/FourthLowerPartialMoment.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Dispersion/Downside/SemiSkewness.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Dispersion/Downside/SemiKurtosis.jl")
+### Downside
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Downside/ValueatRisk.jl")
+### Drawdown
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Drawdown/DrawdownatRisk.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Drawdown/RelativeDrawdownatRisk.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Drawdown/RelativeMaximumDrawdown.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Drawdown/RelativeAverageDrawdown.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Drawdown/RelativeConditionalDrawdownatRisk.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Drawdown/RelativeUlcerIndex.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Drawdown/RelativeEntropicDrawdownatRisk.jl")
+include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Drawdown/RelativeRelativisticDrawdownatRisk.jl")
+### Misc
 include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/EqualRiskMeasure.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/ThirdLowerPartialMoment.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/FourthCentralMoment.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/FourthLowerPartialMoment.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/SemiSkewness.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/Kurtosis.jl")
-include("./Measures/Risk/OptimisationRiskMeasures/HierarchicalRiskMeasures/SemiKurtosis.jl")
-
 ## No optimisation risk measures
 include("./Measures/Risk/NoOptimisationRiskMeasures/MeanReturn.jl")
 include("./Measures/Risk/NoOptimisationRiskMeasures/ThirdCentralMoment.jl")
 include("./Measures/Risk/NoOptimisationRiskMeasures/Skewness.jl")
-
 include("./Measures/Risk/AdjustRiskContributions.jl")
 
 end
