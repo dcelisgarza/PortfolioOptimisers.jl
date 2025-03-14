@@ -18,7 +18,7 @@ function (::AverageDrawdown{<:Any, Nothing})(x::AbstractVector)
             peak = i
         end
         dd = peak - i
-        if dd > 0
+        if dd > zero(dd)
             val += dd
         end
     end
@@ -26,24 +26,23 @@ function (::AverageDrawdown{<:Any, Nothing})(x::AbstractVector)
     return val / T
 end
 function (r::AverageDrawdown{<:Any, <:AbstractWeights})(x::AbstractVector)
-    w = r.w
+    @smart_assert(length(r.w) == length(x))
     pushfirst!(x, 1)
     cs = cumsum(x)
     val = zero(eltype(x))
     peak = -Inf
-    @smart_assert(length(w) == length(x))
     for (idx, i) ∈ pairs(cs)
         if i > peak
             peak = i
         end
         dd = peak - i
-        if dd > 0
-            wi = isone(idx) ? 1 : w[idx - 1]
+        if dd > zero(dd)
+            wi = isone(idx) ? one(eltype(r.w)) : r.w[idx - 1]
             val += dd * wi
         end
     end
     popfirst!(x)
-    return val / sum(w)
+    return val / sum(r.w)
 end
 
 export AverageDrawdown

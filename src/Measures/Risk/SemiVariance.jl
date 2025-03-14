@@ -1,8 +1,7 @@
-mutable struct SemiVariance{T1 <: RiskMeasureSettings, T2 <: VarianceFormulation,
-                            T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                            T4 <: Union{Nothing, <:AbstractWeights},
-                            T5 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
-               TargetRiskMeasure
+struct SemiVariance{T1 <: RiskMeasureSettings, T2 <: VarianceFormulation,
+                    T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                    T4 <: Union{Nothing, <:AbstractWeights},
+                    T5 <: Union{Nothing, <:AbstractVector{<:Real}}} <: TargetRiskMeasure
     settings::T1
     formulation::T2
     target::T3

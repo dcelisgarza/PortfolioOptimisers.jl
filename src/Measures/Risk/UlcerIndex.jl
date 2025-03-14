@@ -15,7 +15,7 @@ function (::UCI)(x::AbstractVector)
             peak = i
         end
         dd = peak - i
-        if dd > 0
+        if dd > zero(dd)
             val += dd^2
         end
     end

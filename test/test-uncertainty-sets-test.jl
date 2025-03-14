@@ -11,6 +11,11 @@
             end
         end
     end
+    @testset "No uncertainty sets" begin
+        @test isa(uncertainty_set(NoUncertaintySetEstimator()), NoUncertaintySet)
+        @test isa(mu_uncertainty_set(NoUncertaintySetEstimator()), NoUncertaintySet)
+        @test isa(sigma_uncertainty_set(NoUncertaintySetEstimator()), NoUncertaintySet)
+    end
     @testset "Box Uncertainty sets" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
