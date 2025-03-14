@@ -42,6 +42,9 @@
             end
             @test res
         end
+        @test_throws AssertionError OWA_MaximumEntropy(solvers = Solver[])
+        @test_throws AssertionError OWA_MinimumSquareDistance(solvers = Solver[])
+        @test_throws AssertionError OWA_MinimumSumSquares(solvers = Solver[])
     end
     @testset "OWA weight vectors" begin
         owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_weights.csv"), DataFrame)

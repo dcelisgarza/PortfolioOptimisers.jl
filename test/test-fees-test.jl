@@ -34,7 +34,12 @@
                                fixed_short = 0.0, turnover = Turnover(; val = 0.0, w = w2)),
                           Fees(; long = 0.0, short = 0.0, fixed_long = 0.0,
                                fixed_short = 0.0,
-                               turnover = Turnover(; val = 0.0, w = zeros(length(w2))))]
+                               turnover = Turnover(; val = 0.0, w = zeros(length(w2)))),
+                          Fees(; long = zeros(length(w2)), short = zeros(length(w2)),
+                               fixed_long = zeros(length(w2)),
+                               fixed_short = zeros(length(w2)),
+                               turnover = Turnover(; val = zeros(length(w2)),
+                                                   w = zeros(length(w2))))]
         f1_t = CSV.read(joinpath(@__DIR__, "assets/Fees.csv"), DataFrame)
         f2_t = CSV.read(joinpath(@__DIR__, "assets/Asset-Fees.csv"), DataFrame)
 

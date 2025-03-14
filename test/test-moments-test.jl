@@ -94,6 +94,7 @@
             end
             @test res
         end
+        @test_throws AssertionError EquilibriumExpectedReturns(w = [])
     end
     @testset "Absolute Distances" begin
         rng = StableRNG(123456789)
