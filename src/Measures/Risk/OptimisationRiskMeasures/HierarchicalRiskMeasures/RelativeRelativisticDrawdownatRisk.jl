@@ -23,8 +23,8 @@ function RelativeRelativisticDrawdownatRisk(;
                                                                               alpha, kappa,
                                                                               solvers)
 end
-function (rldar_r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
-    x .= pushfirst!(x, 0) .+ 1
+function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
+    x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
     peak = -Inf
     dd = similar(cs)
@@ -35,7 +35,7 @@ function (rldar_r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
         dd[idx] = i / peak - 1
     end
     popfirst!(dd)
-    return RRM(dd, rldar_r.solvers, rldar_r.alpha, rldar_r.kappa)
+    return RRM(dd, r.solvers, r.alpha, r.kappa)
 end
 function risk_measure_factory(r::RelativeRelativisticDrawdownatRisk;
                               solvers::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},

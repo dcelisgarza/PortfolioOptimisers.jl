@@ -5,24 +5,7 @@ end
 function cluster_risk_measure_factory(r::AbstractRiskMeasure, args...; kwargs...)
     return r
 end
-abstract type OptimisationRiskMeasure <: AbstractRiskMeasure end
-abstract type NoOptimisationRiskMeasure <: AbstractRiskMeasure end
 abstract type AbstractRiskMeasureSettings end
-abstract type RiskMeasure <: OptimisationRiskMeasure end
-abstract type HierarchicalRiskMeasure <: OptimisationRiskMeasure end
-abstract type OrderedWeightsArrayFormulation end
-abstract type SolverRiskMeasure <: RiskMeasure end
-abstract type SolverHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
-abstract type SigmaRiskMeasure <: RiskMeasure end
-abstract type RiskContributionSigmaRiskMeasure <: SigmaRiskMeasure end
-abstract type SkewRiskMeasure <: RiskMeasure end
-abstract type OrderedWeightsArrayRiskMeasure <: RiskMeasure end
-abstract type MuRiskMeasure <: RiskMeasure end
-abstract type MuHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
-abstract type MuNoOptimisationRiskMeasure <: NoOptimisationRiskMeasure end
-abstract type TargetNoOptimisationRiskMeasure <: MuNoOptimisationRiskMeasure end
-abstract type TargetRiskMeasure <: MuRiskMeasure end
-abstract type TargetHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
 struct RiskMeasureSettings{T1 <: Bool, T2 <: Real, T3 <: Real} <:
        AbstractRiskMeasureSettings
     flag::T1
@@ -38,6 +21,25 @@ end
 function HierarchicalRiskMeasureSettings(; scale::Real = 1.0)
     return HierarchicalRiskMeasureSettings{typeof(scale)}(scale)
 end
+
+abstract type OptimisationRiskMeasure <: AbstractRiskMeasure end
+abstract type RiskMeasure <: OptimisationRiskMeasure end
+abstract type HierarchicalRiskMeasure <: OptimisationRiskMeasure end
+abstract type OrderedWeightsArrayFormulation end
+abstract type SolverRiskMeasure <: RiskMeasure end
+abstract type SolverHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
+abstract type SigmaRiskMeasure <: RiskMeasure end
+abstract type RiskContributionSigmaRiskMeasure <: SigmaRiskMeasure end
+abstract type SkewRiskMeasure <: RiskMeasure end
+abstract type OrderedWeightsArrayRiskMeasure <: RiskMeasure end
+abstract type MuRiskMeasure <: RiskMeasure end
+abstract type MuHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
+abstract type TargetRiskMeasure <: MuRiskMeasure end
+abstract type TargetHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
+abstract type NoOptimisationRiskMeasure <: AbstractRiskMeasure end
+abstract type MuNoOptimisationRiskMeasure <: NoOptimisationRiskMeasure end
+abstract type TargetNoOptimisationRiskMeasure <: MuNoOptimisationRiskMeasure end
+
 struct ExactOrderedWeightsArray <: OrderedWeightsArrayFormulation end
 struct ApproxOrderedWeightsArray{T1 <: AbstractVector{<:Real}} <:
        OrderedWeightsArrayFormulation
