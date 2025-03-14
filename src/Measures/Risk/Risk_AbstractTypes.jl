@@ -20,6 +20,7 @@ abstract type OrderedWeightsArrayRiskMeasure <: RiskMeasure end
 abstract type MuRiskMeasure <: RiskMeasure end
 abstract type MuHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
 abstract type MuNoOptimisationRiskMeasure <: NoOptimisationRiskMeasure end
+abstract type TargetNoOptimisationRiskMeasure <: MuNoOptimisationRiskMeasure end
 abstract type TargetRiskMeasure <: MuRiskMeasure end
 abstract type TargetHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
 struct RiskMeasureSettings{T1 <: Bool, T2 <: Real, T3 <: Real} <:
@@ -58,7 +59,8 @@ function calc_ret_mu(x::AbstractVector, w::AbstractVector, rm::MuRiskMeasures)
         dot(mu, w)
     end
 end
-const TargetRiskMeasures = Union{TargetRiskMeasure, TargetHierarchicalRiskMeasure}
+const TargetRiskMeasures = Union{TargetRiskMeasure, TargetHierarchicalRiskMeasure,
+                                 TargetNoOptimisationRiskMeasure}
 function calc_target_ret_mu(x::AbstractVector, w::AbstractVector, rm::TargetRiskMeasures)
     target = rm.target
     if isnothing(target)
