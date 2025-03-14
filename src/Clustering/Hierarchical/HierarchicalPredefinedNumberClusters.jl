@@ -1,12 +1,3 @@
-struct PredefinedNumberClusters{T1 <: Integer, T2 <: Integer} <: NumberClustersHeuristic
-    k::T1
-    max_k::T2
-end
-function PredefinedNumberClusters(; k::Integer = 1, max_k::Integer = 0)
-    @smart_assert(k >= 1)
-    @smart_assert(max_k >= 0)
-    return PredefinedNumberClusters{typeof(k), typeof(max_k)}(k, max_k)
-end
 function optimal_number_clusters(nch::PredefinedNumberClusters, clustering::Hclust, args...)
     k = nch.k
     max_k = nch.max_k
@@ -63,5 +54,3 @@ function optimal_number_clusters(nch::PredefinedNumberClusters, clustering::Hclu
     end
     return k
 end
-
-export PredefinedNumberClusters

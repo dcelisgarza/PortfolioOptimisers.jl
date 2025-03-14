@@ -171,10 +171,13 @@ include("./Moments/Distance/GeneralCanonicalDistance/GeneralCanonicalDistanceDis
 # Clustering
 ## DBHTs
 include("./Clustering/Clustering_AbstractTypes.jl")
-include("./Clustering/NumberClustersHeuristic/NumberClustersValidation.jl")
-include("./Clustering/NumberClustersHeuristic/SecondOrderDifference.jl")
-include("./Clustering/NumberClustersHeuristic/StandardisedSilhouetteScore.jl")
-include("./Clustering/NumberClustersHeuristic/PredefinedNumber.jl")
+include("./Clustering/SecondOrderDifference.jl")
+include("./Clustering/StandardisedSilhouetteScore.jl")
+include("./Clustering/PredefinedNumberClusters.jl")
+include("./Clustering/Hierarchical/HierarchicalNumberClustersValidation.jl")
+include("./Clustering/Hierarchical/HierarchicalSecondOrderDifference.jl")
+include("./Clustering/Hierarchical/HierarchicalStandardisedSilhouetteScore.jl")
+include("./Clustering/Hierarchical/HierarchicalPredefinedNumberClusters.jl")
 include("./Clustering/Hierarchical/HierarchicalClustering.jl")
 include("./Clustering/Hierarchical/DBHT/DBHT.jl")
 include("./Clustering/Hierarchical/DBHT/LoGo.jl")

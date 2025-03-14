@@ -78,7 +78,10 @@
         @test 2 == PortfolioOptimisers.optimal_number_clusters(StandardisedSilhouetteScore(;
                                                                                            max_k = 100),
                                                                clr.clustering, clr.D)
-
+        @test 5 ==
+              PortfolioOptimisers.optimal_number_clusters(PredefinedNumberClusters(; k = 10,
+                                                                                   max_k = 0),
+                                                          clr.clustering, clr.D)
         @test 1 ==
               PortfolioOptimisers.optimal_number_clusters(PredefinedNumberClusters(; k = 1,
                                                                                    max_k = 5),

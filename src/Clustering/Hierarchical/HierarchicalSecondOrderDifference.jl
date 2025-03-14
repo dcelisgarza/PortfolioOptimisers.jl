@@ -1,10 +1,3 @@
-struct SecondOrderDifference{T1 <: Integer} <: NumberClustersHeuristic
-    max_k::T1
-end
-function SecondOrderDifference(; max_k::Integer = 0)
-    @smart_assert(max_k >= 0)
-    return SecondOrderDifference{typeof(max_k)}(max_k)
-end
 function optimal_number_clusters(nch::SecondOrderDifference, clustering::Hclust,
                                  dist::AbstractMatrix)
     max_k = nch.max_k
@@ -45,4 +38,3 @@ function optimal_number_clusters(nch::SecondOrderDifference, clustering::Hclust,
     end
     return valid_k_clusters(clustering, gaps)
 end
-export SecondOrderDifference

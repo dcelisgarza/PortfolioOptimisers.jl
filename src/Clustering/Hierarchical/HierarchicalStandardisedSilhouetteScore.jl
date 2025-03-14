@@ -1,14 +1,3 @@
-struct StandardisedSilhouetteScore{T1 <: Union{Nothing, <:Distances.SemiMetric},
-                                   T2 <: Integer} <: NumberClustersHeuristic
-    metric::T1
-    max_k::T2
-end
-function StandardisedSilhouetteScore(;
-                                     metric::Union{Nothing, <:Distances.SemiMetric} = nothing,
-                                     max_k::Integer = 0)
-    @smart_assert(max_k >= 0)
-    return StandardisedSilhouetteScore{typeof(metric), typeof(max_k)}(metric, max_k)
-end
 function optimal_number_clusters(nch::StandardisedSilhouetteScore, clustering::Hclust,
                                  dist::AbstractMatrix)
     metric = nch.metric
@@ -29,5 +18,3 @@ function optimal_number_clusters(nch::StandardisedSilhouetteScore, clustering::H
     end
     return valid_k_clusters(clustering, W_list)
 end
-
-export StandardisedSilhouetteScore
