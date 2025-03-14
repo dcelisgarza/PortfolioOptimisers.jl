@@ -1213,4 +1213,4 @@ function _clusterise(alg::DBHT, X::AbstractMatrix{<:Real};
     return DBHTClusteringResult(; clustering = clustering, S = S, D = D, k = k)
 end
 
-export PMFG_T2s, DBHTs, J_LoGo, DBHT_UniqueRoot, DBHT_EqualRoot, DBHTClusteringResult
+export PMFG_T2s, DBHTs, J_LoGo, DBHT_UniqueRoot, DBHT_EqualRoot, DBHTClusteringResult, DBHT
