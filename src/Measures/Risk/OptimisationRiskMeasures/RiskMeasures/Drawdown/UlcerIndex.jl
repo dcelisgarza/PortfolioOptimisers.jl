@@ -1,11 +1,10 @@
-struct UCI{T1 <: RiskMeasureSettings} <: RiskMeasure
+struct UlcerIndex{T1 <: RiskMeasureSettings} <: RiskMeasure
     settings::T1
 end
-function UCI(; settings::RiskMeasureSettings = RiskMeasureSettings())
-    return UCI{typeof(settings)}(settings)
+function UlcerIndex(; settings::RiskMeasureSettings = RiskMeasureSettings())
+    return UlcerIndex{typeof(settings)}(settings)
 end
-function (::UCI)(x::AbstractVector)
-    T = length(x)
+function (::UlcerIndex)(x::AbstractVector)
     pushfirst!(x, 1)
     cs = cumsum(x)
     val = zero(eltype(x))
@@ -20,5 +19,5 @@ function (::UCI)(x::AbstractVector)
         end
     end
     popfirst!(x)
-    return sqrt(val / T)
+    return sqrt(val / length(x))
 end

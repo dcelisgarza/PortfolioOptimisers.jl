@@ -1,13 +1,13 @@
 abstract type BrownianDistanceVarianceFormulation end
-struct BrownianDistanceVarianceAbsVal <: BrownianDistanceVarianceFormulation end
-struct BrownianDistanceVarianceIneq <: BrownianDistanceVarianceFormulation end
+struct NormOneConeBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
+struct IneqBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
 struct BrownianDistanceVariance{T1 <: RiskMeasureSettings,
                                 T2 <: BrownianDistanceVarianceFormulation} <: RiskMeasure
     settings::T1
     formulation::T2
 end
 function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                  formulation::BrownianDistanceVarianceFormulation = BrownianDistanceVarianceAbsVal())
+                                  formulation::BrownianDistanceVarianceFormulation = NormOneConeBrownianDistanceVariance())
     return BrownianDistanceVariance{typeof(settings), typeof(formulation)}(settings,
                                                                            formulation)
 end

@@ -8,7 +8,6 @@ function AverageDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings()
     return AverageDrawdown{typeof(settings), typeof(w)}(settings, w)
 end
 function (::AverageDrawdown{<:Any, Nothing})(x::AbstractVector)
-    T = length(x)
     pushfirst!(x, 1)
     cs = cumsum(x)
     val = zero(eltype(x))
@@ -23,7 +22,7 @@ function (::AverageDrawdown{<:Any, Nothing})(x::AbstractVector)
         end
     end
     popfirst!(x)
-    return val / T
+    return val / length(x)
 end
 function (r::AverageDrawdown{<:Any, <:AbstractWeights})(x::AbstractVector)
     @smart_assert(length(r.w) == length(x))

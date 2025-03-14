@@ -225,12 +225,6 @@ include("./UncertaintySets/NormalUncertaintySets/NormalUncertaintySets.jl")
 include("./UncertaintySets/NormalUncertaintySets/NormalBoxUncertaintySets.jl")
 include("./UncertaintySets/NormalUncertaintySets/NormalEllipseUncertaintySets.jl")
 
-# Utils
-include("./Utils/BaseFunctionOverloads.jl")
-include("./Utils/EquationParsing.jl")
-include("./Utils/PricesToReturns.jl")
-include("./Utils/Assertions.jl")
-
 # Preselection
 include("./PreSelection/PreSelection.jl")
 
@@ -315,5 +309,11 @@ include("./Measures/Risk/NoOptimisationRiskMeasures/MeanReturn.jl")
 include("./Measures/Risk/NoOptimisationRiskMeasures/ThirdCentralMoment.jl")
 include("./Measures/Risk/NoOptimisationRiskMeasures/Skewness.jl")
 include("./Measures/Risk/AdjustRiskContributions.jl")
+
+# Utils
+include("./Utils/BaseFunctionOverloads.jl")
+include("./Utils/EquationParsing.jl")
+include("./Utils/PricesToReturns.jl")
+include("./Utils/Assertions.jl")
 
 end
