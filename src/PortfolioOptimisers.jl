@@ -325,4 +325,11 @@ include("./Utils/EquationParsing.jl")
 include("./Utils/PricesToReturns.jl")
 include("./Utils/Assertions.jl")
 
+# Optimisation
+include("./Optimisation/Traditional/ReturnTypes/ReturnTypes_AbstractTypes.jl")
+include("./Optimisation/Traditional/ReturnTypes/ArithmeticReturns.jl")
+include("./Optimisation/Traditional/ObjectiveFunctions_AbstractTypes.jl")
+include("./Optimisation/Traditional/MeanRisk/ObjectiveFunctions/MinimumRisk.jl")
+include("./Optimisation/Traditional/MeanRisk/ObjectiveFunctions/MaximumUtility.jl")
+
 end

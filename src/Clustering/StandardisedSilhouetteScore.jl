@@ -6,7 +6,7 @@ end
 function StandardisedSilhouetteScore(;
                                      metric::Union{Nothing, <:Distances.SemiMetric} = nothing,
                                      max_k::Integer = 0)
-    @smart_assert(max_k >= 0)
+    @smart_assert(max_k >= zero(max_k))
     return StandardisedSilhouetteScore{typeof(metric), typeof(max_k)}(metric, max_k)
 end
 
