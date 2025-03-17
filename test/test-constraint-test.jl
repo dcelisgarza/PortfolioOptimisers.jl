@@ -6,39 +6,39 @@
         loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         lhs_1 = LinearConstraintAtom(; group = :Assets, name = 1)
-        rhs_1 = LinearConstraintAtom(; cnst = 0.35)
+        rhs_1 = LinearConstraintAtom()
         lhs_2 = LinearConstraintAtom(; group = :Assets, name = 1)
         rhs_2 = LinearConstraintAtom(; group = [:Assets, :Assets], name = [1, 3],
-                                     coef = [0, 0.3], cnst = 0.25)
-        lhs_3 = LinearConstraintAtom(; group = :Assets, name = 5, cnst = -0.5)
+                                     coef = [0, 0.3])
+        lhs_3 = LinearConstraintAtom(; group = :Assets, name = 5)
         rhs_3 = LinearConstraintAtom(;)
         lhs_4 = LinearConstraintAtom(; group = :Clusters, name = 3, coef = 2)
         rhs_4 = LinearConstraintAtom(; group = :Clusters, name = 2, coef = 3)
         lhs_5 = LinearConstraintAtom(; group = [:Clusters, :Clusters], name = [1, 3],
-                                     coef = [-1, 2], cnst = 0.1)
+                                     coef = [-1, 2])
         rhs_5 = LinearConstraintAtom(; group = :Clusters, name = 2, coef = 3)
         lhs_6 = LinearConstraintAtom(; group = fill(:Assets, 10), name = assets,
                                      coef = loadings.MTUM)
         rhs_6 = LinearConstraintAtom(; group = fill(:Assets, 10), name = assets,
-                                     coef = loadings.QUAL, cnst = 0.9)
+                                     coef = loadings.QUAL)
         lhs_7 = LinearConstraintAtom(;)
         rhs_7 = LinearConstraintAtom(; group = [:Clusters, :Assets], name = [2, 7],
-                                     coef = [1, 1], cnst = 0.7)
+                                     coef = [1, 1])
         lhs_8 = LinearConstraintAtom(;)
-        rhs_8 = LinearConstraintAtom(; group = :Assets, name = 1, coef = -1, cnst = 4)
+        rhs_8 = LinearConstraintAtom(; group = :Assets, name = 1, coef = -1)
         lhs_9 = LinearConstraintAtom(; group = :Assets, name = 1)
         rhs_9 = LinearConstraintAtom(; group = [:Assets, :Assets], name = [1, 3],
-                                     coef = [1, -1], cnst = 5)
-        lhs_10 = LinearConstraintAtom(; group = :Assets, name = 5, cnst = -7)
+                                     coef = [1, -1])
+        lhs_10 = LinearConstraintAtom(; group = :Assets, name = 5)
         rhs_10 = LinearConstraintAtom(;)
-        lhs_11 = LinearConstraintAtom(; group = :Clusters, name = 3, cnst = 5)
-        rhs_11 = LinearConstraintAtom(; group = :Clusters, name = 2, cnst = 8)
+        lhs_11 = LinearConstraintAtom(; group = :Clusters, name = 3)
+        rhs_11 = LinearConstraintAtom(; group = :Clusters, name = 2)
         lhs_12 = LinearConstraintAtom(; group = [:Clusters, :Clusters], name = [1, 3],
-                                      coef = [1, 1], cnst = -3)
-        rhs_12 = LinearConstraintAtom(; group = :Clusters, name = 2, cnst = 4)
+                                      coef = [1, 1])
+        rhs_12 = LinearConstraintAtom(; group = :Clusters, name = 2)
         lhs_13 = LinearConstraintAtom(;)
         rhs_13 = LinearConstraintAtom(; group = [:Clusters, :Assets], name = [2, 7],
-                                      coef = [1, 1], cnst = 8)
+                                      coef = [1, 1])
 
         constr = [LinearConstraint(; lhs = lhs_1, rhs = rhs_1, comp = EQ()),
                   LinearConstraint(; lhs = lhs_2, rhs = rhs_2, comp = LEQ()),
@@ -89,7 +89,7 @@
         @test isnothing(B_eq)
 
         lhs = LinearConstraintAtom(; group = [:Foo], name = [20], coef = [5])
-        rhs = LinearConstraintAtom(; cnst = 0.35)
+        rhs = LinearConstraintAtom()
         (; ineq, eq) = linear_constraints(LinearConstraint(; lhs = lhs, rhs = rhs), sets)
         A_ineq, B_ineq = ineq.A, ineq.B
         A_eq, B_eq = eq.A, eq.B
@@ -99,20 +99,18 @@
         @test isnothing(B_eq)
 
         @test_throws AssertionError LinearConstraintAtom(; group = [nothing], name = ["a"],
-                                                         coef = [2], cnst = 0)
-        lcs = LinearConstraintAtom(; group = [nothing], name = [nothing], coef = [2],
-                                   cnst = 0)
+                                                         coef = [2])
+        lcs = LinearConstraintAtom(; group = [nothing], name = [nothing], coef = [2])
         @test isnothing(lcs.group[1])
         @test isnothing(lcs.name[1])
 
         lhs_1 = LinearConstraintAtom(; group = :Assets, name = 1)
-        rhs_1 = LinearConstraintAtom(; cnst = 0.35)
+        rhs_1 = LinearConstraintAtom()
         constr = LinearConstraint(; lhs = lhs_1, rhs = rhs_1, comp = EQ())
         @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
 
         lhs_1 = LinearConstraintAtom(; group = :Assets, name = 1)
-        rhs_1 = LinearConstraintAtom(; group = [:Foo], name = [:Bar], coef = [1],
-                                     cnst = 0.35)
+        rhs_1 = LinearConstraintAtom(; group = [:Foo], name = [:Bar], coef = [1])
         constr = LinearConstraint(; lhs = lhs_1, rhs = rhs_1, comp = EQ())
         @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
     end
@@ -165,5 +163,47 @@
         (; w_min, w_max) = hc_constraints(hcc_1, sets)
         @test all(iszero.(w_min))
         @test all(isone.(w_max))
+    end
+    @testset "Risk budget constraints" begin
+        c1 = PartialLinearConstraintAtom(; group = :Assets, name = 1)
+        c2 = PartialLinearConstraintAtom(; group = [:Assets, :Assets], name = [1, 3],
+                                         coef = [0.6, 0.3])
+        c3 = PartialLinearConstraintAtom(; group = :Clusters, name = 3, coef = 0.25)
+        c4 = PartialLinearConstraintAtom(; group = [:Clusters, :Clusters, :Clusters],
+                                         name = [1, 2, 3],
+                                         coef = [inv(length(sets[!, :Clusters][sets[!, :Clusters] .== i]))
+                                                 for i ∈ 1:3])
+
+        assets = 1:10
+        sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+
+        rb = risk_budget_constraints(c1, sets)
+        @test isapprox(rb[1] / rb[2], 10)
+
+        rb = risk_budget_constraints(c2, sets)
+        @test isapprox(rb[1] / rb[2], 6)
+        @test isapprox(rb[3] / rb[2], 3)
+
+        rb = risk_budget_constraints(c3, sets)
+        idx = sets[!, :Clusters] .== 3
+        @test isapprox(rb[idx][1] / rb[.!idx][1], 2.5)
+
+        rb = risk_budget_constraints(c4, sets)
+        idx1 = sets[!, :Clusters] .== 1
+        idx2 = sets[!, :Clusters] .== 2
+        idx3 = sets[!, :Clusters] .== 3
+        @test isapprox(rb[idx1][1], 1 / 3 / 3)
+        @test isapprox(rb[idx2][1], 1 / 3 / 3)
+        @test isapprox(rb[idx3][1], 1 / 4 / 3)
+
+        c1 = PartialLinearConstraintAtom(;)
+        rb = risk_budget_constraints(c1, sets)
+        @test isapprox(rb, fill(inv(10), 10))
+        @test_throws ArgumentError risk_budget_constraints(c1, sets, strict = true)
+
+        c1 = PartialLinearConstraintAtom(; group = [nothing], name = [nothing], coef = [1])
+        rb = risk_budget_constraints(c1, sets)
+        @test isapprox(rb, fill(inv(10), 10))
+        @test_throws ArgumentError risk_budget_constraints(c1, sets, strict = true)
     end
 end
