@@ -1,28 +1,23 @@
-struct BlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
-                                T3 <: AbstractMatrix, T4 <: AbstractMatrix,
-                                T5 <: AbstractVector} <: AbstractPriorModel_AV
-    X::T1
-    mu::T2
-    sigma::T3
-    P::T4
-    Q::T5
+struct BlackLittermanPriorModel{T1 <: EmpiricalPriorModel,
+                                T2 <: BlackLittermanViewsModel} <: AbstractPriorModel_AV
+    pm::T1
+    views::T2
 end
-function BlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVector,
-                                  sigma::AbstractMatrix, P::AbstractMatrix,
-                                  Q::AbstractVector)
-    @smart_assert(!isempty(X) &&
-                  !isempty(mu) &&
-                  !isempty(sigma) &&
-                  !isempty(P) &&
-                  !isempty(Q))
-    @smart_assert(size(X, 2) ==
-                  length(mu) ==
-                  size(sigma, 1) ==
-                  size(sigma, 2) ==
-                  size(P, 2))
-    @smart_assert(length(Q) == size(P, 1))
-    return BlackLittermanPriorModel{typeof(X), typeof(mu), typeof(sigma), typeof(P),
-                                    typeof(Q)}(X, mu, sigma, P, Q)
+function BlackLittermanPriorModel(; pm::EmpiricalPriorModel,
+                                  views::BlackLittermanViewsModel)
+    @smart_assert(size(pm.X, 2) == size(views.P, 2))
+    return BlackLittermanPriorModel{typeof(pm), typeof(views)}(pm, views)
+end
+function Base.getproperty(obj::BlackLittermanPriorModel, sym::Symbol)
+    return if sym == :X
+        obj.pm.X
+    elseif sym == :mu
+        obj.pm.mu
+    elseif sym == :sigma
+        obj.pm.sigma
+    else
+        getfield(obj, sym)
+    end
 end
 struct BlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
                                     T2 <: MatrixProcessing,
@@ -91,8 +86,8 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix, args...; dim
     prior_model = prior(pe.pe, X, args...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
 
-    P, Q = views_constraints(pe.views, pe.sets; datatype = eltype(posterior_X),
-                             strict = strict)
+    (; P, Q) = views = views_constraints(pe.views, pe.sets; datatype = eltype(posterior_X),
+                                         strict = strict)
     @smart_assert(!isempty(P))
 
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
@@ -112,8 +107,11 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix, args...; dim
     posterior_mu = prior_mu + v1 * (v2 \ v3) .+ pe.rf
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     mtx_process!(pe.mp, posterior_sigma, posterior_X)
-    return BlackLittermanPriorModel(; X = posterior_X, mu = posterior_mu,
-                                    sigma = posterior_sigma, P = P, Q = Q)
+    return BlackLittermanPriorModel(;
+                                    pm = EmpiricalPriorModel(; X = posterior_X,
+                                                             mu = posterior_mu,
+                                                             sigma = posterior_sigma),
+                                    views = views)
 end
 
 export BlackLittermanPriorModel, BlackLittermanPriorEstimator

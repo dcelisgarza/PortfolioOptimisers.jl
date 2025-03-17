@@ -56,7 +56,7 @@
                   LinearConstraint(; kind = FactorLinearConstraint(), lhs = lhs_12,
                                    rhs = rhs_12, comp = LEQ()),
                   LinearConstraint(; lhs = lhs_13, rhs = rhs_13, comp = EQ())]
-        A_ineq, B_ineq, A_eq, B_eq = linear_constraints(constr, sets)
+        (; A_ineq, B_ineq, A_eq, B_eq) = linear_constraints(constr, sets)
         A_ineq_t = reshape([1.0, -0.0, -1.0, 2.0, 0.0, -0.0, -1.0, 0.0, -0.0, -1.0, 0.0,
                             0.0, -0.0, -1.0, -0.3, -2.0, 2.0, -2.0, 1.0, -1.0, -1.0, 0.0,
                             3.0, -3.0, 1.0, 0.0, 1.0, 1.0, 0.0, -2.0, 2.0, 1.0, 0.0, -1.0,
@@ -76,21 +76,24 @@
         @test isapprox(A_eq, A_eq_t)
         @test isapprox(B_eq, B_eq_t)
 
-        a, b, c, d = linear_constraints(LinearConstraint(; lhs = LinearConstraintAtom(),
-                                                         rhs = LinearConstraintAtom()),
-                                        sets)
-        @test isempty(a)
-        @test isempty(b)
-        @test isempty(c)
-        @test isempty(d)
+        (; A_ineq, B_ineq, A_eq, B_eq) = linear_constraints(LinearConstraint(;
+                                                                             lhs = LinearConstraintAtom(),
+                                                                             rhs = LinearConstraintAtom()),
+                                                            sets)
+        @test isnothing(A_ineq)
+        @test isnothing(B_ineq)
+        @test isnothing(A_eq)
+        @test isnothing(B_eq)
 
         lhs = LinearConstraintAtom(; group = [:Foo], name = [20], coef = [5])
         rhs = LinearConstraintAtom(; cnst = 0.35)
-        a, b, c, d = linear_constraints(LinearConstraint(; lhs = lhs, rhs = rhs), sets)
-        @test isempty(a)
-        @test isempty(b)
-        @test isempty(c)
-        @test isempty(d)
+        (; A_ineq, B_ineq, A_eq, B_eq) = linear_constraints(LinearConstraint(; lhs = lhs,
+                                                                             rhs = rhs),
+                                                            sets)
+        @test isnothing(A_ineq)
+        @test isnothing(B_ineq)
+        @test isnothing(A_eq)
+        @test isnothing(B_eq)
 
         @test_throws AssertionError LinearConstraintAtom(; group = [nothing], name = ["a"],
                                                          coef = [2], cnst = 0)
@@ -117,18 +120,18 @@
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
 
         hcc_1 = HierarchicalConstraint(; group = :Assets, name = 1, lo = 0.7, hi = 0.8)
-        w_min, w_max = hc_constraints(hcc_1, sets)
+        (; w_min, w_max) = hc_constraints(hcc_1, sets)
         @test isapprox(w_min, [0.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         @test isapprox(w_max, [0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
         hcc_2 = HierarchicalConstraint(; group = [:Assets, :Assets], name = [1, 5],
                                        lo = [0.7, 0.3], hi = [0.8, 0.6])
-        w_min, w_max = hc_constraints(hcc_2, sets)
+        (; w_min, w_max) = hc_constraints(hcc_2, sets)
         @test isapprox(w_min, [0.7, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0])
         @test isapprox(w_max, [0.8, 1.0, 1.0, 1.0, 0.6, 1.0, 1.0, 1.0, 1.0, 1.0])
 
         hcc_3 = HierarchicalConstraint(; group = :Clusters, name = 3, lo = 0.2, hi = 0.5)
-        w_min, w_max = hc_constraints(hcc_3, sets)
+        (; w_min, w_max) = hc_constraints(hcc_3, sets)
         @test isapprox(w_min, [0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2, 0.2])
         @test isapprox(w_max, [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5])
 
@@ -151,12 +154,12 @@
                                        hi = [0.8])
         @test_throws ArgumentError hc_constraints(hcc_1, sets, strict = true)
 
-        w_min, w_max = hc_constraints(hcc_1, sets)
+        (; w_min, w_max) = hc_constraints(hcc_1, sets)
         @test all(iszero.(w_min))
         @test all(isone.(w_max))
 
         hcc_1 = HierarchicalConstraint(; group = :Foo, name = :Bar, lo = 0.7, hi = 0.8)
-        w_min, w_max = hc_constraints(hcc_1, sets)
+        (; w_min, w_max) = hc_constraints(hcc_1, sets)
         @test all(iszero.(w_min))
         @test all(isone.(w_max))
     end

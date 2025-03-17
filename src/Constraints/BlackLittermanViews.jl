@@ -1,3 +1,13 @@
+struct BlackLittermanViewsModel{T1 <: AbstractMatrix, T2 <: AbstractVector}
+    P::T1
+    Q::T2
+end
+function BlackLittermanViewsModel(; P::AbstractMatrix, Q::AbstractVector)
+    @smart_assert(!isempty(P))
+    @smart_assert(!isempty(Q))
+    @smart_assert(size(P, 1) == length(Q))
+    return BlackLittermanViewsModel{typeof(P), typeof(Q)}(P, Q)
+end
 function get_black_litterman_views_data(lca::LinearConstraintAtom{<:AbstractVector,
                                                                   <:AbstractVector,
                                                                   <:AbstractVector, <:Real},
@@ -102,7 +112,7 @@ function views_constraints(lcas::Union{<:LinearConstraintAtom,
         Q = convert.(typeof(promote(Q...)[1]), Q)
     end
 
-    return P, Q
+    return BlackLittermanViewsModel(; P = P, Q = Q)
 end
 
 export views_constraints

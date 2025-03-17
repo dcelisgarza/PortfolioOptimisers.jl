@@ -1,54 +1,41 @@
-struct FactorBlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
-                                      T3 <: AbstractMatrix, T4 <: AbstractMatrix,
-                                      T5 <: AbstractVector, T6 <: AbstractMatrix,
-                                      T7 <: LoadingsMatrix, T8 <: AbstractMatrix,
-                                      T9 <: AbstractVector} <: AbstractPriorModel_AFVC
-    X::T1
-    mu::T2
-    sigma::T3
-    chol::T4
-    f_mu::T5
-    f_sigma::T6
-    loadings::T7
-    f_P::T8
-    f_Q::T9
+struct FactorBlackLittermanPriorModel{T1 <: EmpiricalPriorModel, T3 <: AbstractMatrix,
+                                      T4 <: AbstractVector, T5 <: AbstractMatrix,
+                                      T6 <: LoadingsMatrix,
+                                      T7 <: BlackLittermanViewsModel} <:
+       AbstractPriorModel_AFVC
+    pm::T1
+    chol::T3
+    f_mu::T4
+    f_sigma::T5
+    loadings::T6
+    f_views::T7
 end
-function FactorBlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVector,
-                                        sigma::AbstractMatrix, chol::AbstractMatrix,
+function FactorBlackLittermanPriorModel(; pm::EmpiricalPriorModel, chol::AbstractMatrix,
                                         f_mu::AbstractVector, f_sigma::AbstractMatrix,
-                                        loadings::LoadingsMatrix, f_P::AbstractMatrix,
-                                        f_Q::AbstractVector)
-    @smart_assert(!isempty(X) &&
-                  !isempty(mu) &&
-                  !isempty(sigma) &&
-                  !isempty(chol) &&
-                  !isempty(f_mu) &&
-                  !isempty(f_sigma) &&
-                  !isempty(f_P) &&
-                  !isempty(f_Q))
-    @smart_assert(size(X, 2) ==
-                  length(mu) ==
-                  size(sigma, 1) ==
-                  size(sigma, 2) ==
-                  size(chol, 2) ==
-                  size(loadings.M, 1) ==
-                  length(loadings.b))
+                                        loadings::LoadingsMatrix,
+                                        f_views::BlackLittermanViewsModel)
+    @smart_assert(!isempty(chol) && !isempty(f_mu) && !isempty(f_sigma))
+    @smart_assert(size(pm.X, 2) == size(chol, 2) == size(loadings.M, 1))
     @smart_assert(length(f_mu) ==
                   size(f_sigma, 1) ==
                   size(f_sigma, 2) ==
                   size(loadings.M, 2) ==
-                  size(f_P, 2))
-    @smart_assert(length(f_Q) == size(f_P, 1))
-    return FactorBlackLittermanPriorModel{typeof(X), typeof(mu), typeof(sigma),
-                                          typeof(chol), typeof(f_mu), typeof(f_sigma),
-                                          typeof(loadings), typeof(f_P), typeof(f_Q)}(X, mu,
-                                                                                      sigma,
-                                                                                      chol,
-                                                                                      f_mu,
-                                                                                      f_sigma,
-                                                                                      loadings,
-                                                                                      f_P,
-                                                                                      f_Q)
+                  size(f_views.P, 2))
+    return FactorBlackLittermanPriorModel{typeof(pm), typeof(chol), typeof(f_mu),
+                                          typeof(f_sigma), typeof(loadings),
+                                          typeof(f_views)}(pm, chol, f_mu, f_sigma,
+                                                           loadings, f_views)
+end
+function Base.getproperty(obj::FactorBlackLittermanPriorModel, sym::Symbol)
+    return if sym == :X
+        obj.pm.X
+    elseif sym == :mu
+        obj.pm.mu
+    elseif sym == :sigma
+        obj.pm.sigma
+    else
+        getfield(obj, sym)
+    end
 end
 struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
                                           T2 <: MatrixProcessing, T3 <: MatrixProcessing,
@@ -135,9 +122,9 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
     loadings = regression(pe.re, X, F)
     (; b, M) = loadings
     posterior_X = F * transpose(M) .+ transpose(b)
-    f_P, f_Q = views_constraints(pe.views, pe.sets; datatype = eltype(posterior_X),
-                                 strict = strict)
-    @smart_assert(!isempty(f_P))
+    f_views = views_constraints(pe.views, pe.sets; datatype = eltype(posterior_X),
+                                strict = strict)
+    f_P, f_Q = f_views.P, f_views.Q
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
     views_conf = pe.views_conf
     f_omega = tau * Diagonal(if isnothing(views_conf)
@@ -176,13 +163,15 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    return FactorBlackLittermanPriorModel(; X = posterior_X, mu = posterior_mu,
-                                          sigma = posterior_sigma,
+    return FactorBlackLittermanPriorModel(;
+                                          pm = EmpiricalPriorModel(; X = posterior_X,
+                                                                   mu = posterior_mu,
+                                                                   sigma = posterior_sigma),
                                           chol = transpose(reshape(posterior_csigma,
                                                                    length(posterior_mu), :)),
                                           f_mu = f_posterior_mu,
                                           f_sigma = f_posterior_sigma, loadings = loadings,
-                                          f_P = f_P, f_Q = f_Q)
+                                          f_views = f_views)
 end
 
 export FactorBlackLittermanPriorModel, FactorBlackLittermanPriorEstimator

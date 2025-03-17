@@ -210,10 +210,9 @@
             @test res2
         end
 
-        P, Q = views_constraints(LinearConstraintAtom(; group = :Foo, name = 2, coef = 1,
-                                                      cnst = 0.003), sets)
-        @test isempty(P)
-        @test isempty(Q)
+        @test_throws TypeError views_constraints(LinearConstraintAtom(; group = :Foo,
+                                                                      name = 2, coef = 1,
+                                                                      cnst = 0.003), sets)
 
         @test_throws ArgumentError views_constraints(LinearConstraintAtom(; group = :Foo,
                                                                           name = 2,
@@ -221,10 +220,10 @@
                                                                           cnst = 0.003),
                                                      sets; strict = true)
 
-        P, Q = views_constraints(LinearConstraintAtom(; group = [:Foo], name = [2],
-                                                      coef = [1], cnst = 0.003), sets)
-        @test isempty(P)
-        @test isempty(Q)
+        @test_throws TypeError views_constraints(LinearConstraintAtom(; group = [:Foo],
+                                                                      name = [2],
+                                                                      coef = [1],
+                                                                      cnst = 0.003), sets)
 
         @test_throws ArgumentError views_constraints(LinearConstraintAtom(; group = [:Foo],
                                                                           name = [2],
@@ -232,10 +231,9 @@
                                                                           cnst = 0.003),
                                                      sets; strict = true)
 
-        P, Q = views_constraints(LinearConstraintAtom(; group = :Asset, name = 11, coef = 1,
-                                                      cnst = 0.003), sets)
-        @test isempty(P)
-        @test isempty(Q)
+        @test_throws TypeError views_constraints(LinearConstraintAtom(; group = :Asset,
+                                                                      name = 11, coef = 1,
+                                                                      cnst = 0.003), sets)
 
         @test_throws ArgumentError views_constraints(LinearConstraintAtom(; group = :Asset,
                                                                           name = 11,
@@ -243,10 +241,10 @@
                                                                           cnst = 0.003),
                                                      sets, strict = true)
 
-        P, Q = views_constraints(LinearConstraintAtom(; group = [:Asset], name = [11],
-                                                      coef = [1], cnst = 0.003), sets)
-        @test isempty(P)
-        @test isempty(Q)
+        @test_throws TypeError views_constraints(LinearConstraintAtom(; group = [:Asset],
+                                                                      name = [11],
+                                                                      coef = [1],
+                                                                      cnst = 0.003), sets)
 
         @test_throws ArgumentError views_constraints(LinearConstraintAtom(;
                                                                           group = [:Asset],
@@ -533,7 +531,6 @@
                                     coef = [1, -1], cnst = 0.007)
         vc_5 = LinearConstraintAtom(; group = :Clusters, name = 2, coef = 1, cnst = 0.001)
         a_views = [vc_1, vc_2, vc_3, vc_4, vc_5]
-        P, Q = views_constraints(a_views, a_sets)
 
         f_sets = DataFrame(:Factor => [1, 2, 3, 4])
         vc_1 = LinearConstraintAtom(; group = :Factor, name = 2, coef = 1, cnst = 0.003)
@@ -542,8 +539,6 @@
         vc_3 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [2, 3],
                                     coef = [1, -1], cnst = 0.002)
         f_views = [vc_1, vc_2, vc_3]
-        f_P, f_Q = views_constraints(f_views, f_sets)
-
         pes = [AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets),
                AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,

@@ -1,45 +1,39 @@
-struct BayesianBlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
-                                        T3 <: AbstractMatrix, T4 <: AbstractVector,
-                                        T5 <: AbstractMatrix, T6 <: LoadingsMatrix,
-                                        T7 <: AbstractMatrix, T8 <: AbstractVector} <:
+struct BayesianBlackLittermanPriorModel{T1 <: EmpiricalPriorModel, T3 <: AbstractVector,
+                                        T4 <: AbstractMatrix, T5 <: LoadingsMatrix,
+                                        T6 <: BlackLittermanViewsModel} <:
        AbstractPriorModel_AFV
-    X::T1
-    mu::T2
-    sigma::T3
-    f_mu::T4
-    f_sigma::T5
-    loadings::T6
-    f_P::T7
-    f_Q::T8
+    pm::T1
+    f_mu::T3
+    f_sigma::T4
+    loadings::T5
+    f_views::T6
 end
-function BayesianBlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVector,
-                                          sigma::AbstractMatrix, f_mu::AbstractVector,
+function BayesianBlackLittermanPriorModel(; pm::EmpiricalPriorModel, f_mu::AbstractVector,
                                           f_sigma::AbstractMatrix, loadings::LoadingsMatrix,
-                                          f_P::AbstractMatrix, f_Q::AbstractVector)
-    @smart_assert(!isempty(X) &&
-                  !isempty(mu) &&
-                  !isempty(sigma) &&
-                  !isempty(f_mu) &&
-                  !isempty(f_sigma) &&
-                  !isempty(f_P) &&
-                  !isempty(f_Q))
-    @smart_assert(size(X, 2) ==
-                  length(mu) ==
-                  size(sigma, 1) ==
-                  size(sigma, 2) ==
-                  size(loadings.M, 1) ==
-                  length(loadings.b))
+                                          f_views::BlackLittermanViewsModel)
+    @smart_assert(!isempty(f_mu) && !isempty(f_sigma))
+    @smart_assert(size(pm.X, 2) == size(loadings.M, 1))
     @smart_assert(length(f_mu) ==
                   size(f_sigma, 1) ==
                   size(f_sigma, 2) ==
                   size(loadings.M, 2) ==
-                  size(f_P, 2))
-    @smart_assert(length(f_Q) == size(f_P, 1))
-    return BayesianBlackLittermanPriorModel{typeof(X), typeof(mu), typeof(sigma),
-                                            typeof(f_mu), typeof(f_sigma), typeof(loadings),
-                                            typeof(f_P), typeof(f_Q)}(X, mu, sigma, f_mu,
-                                                                      f_sigma, loadings,
-                                                                      f_P, f_Q)
+                  size(f_views.P, 2))
+    return BayesianBlackLittermanPriorModel{typeof(pm), typeof(f_mu), typeof(f_sigma),
+                                            typeof(loadings), typeof(f_views)}(pm, f_mu,
+                                                                               f_sigma,
+                                                                               loadings,
+                                                                               f_views)
+end
+function Base.getproperty(obj::BayesianBlackLittermanPriorModel, sym::Symbol)
+    return if sym == :X
+        obj.pm.X
+    elseif sym == :mu
+        obj.pm.mu
+    elseif sym == :sigma
+        obj.pm.sigma
+    else
+        getfield(obj, sym)
+    end
 end
 struct BayesianBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_2,
                                             T2 <: MatrixProcessing,
@@ -111,9 +105,9 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
                                                         prior_model.f_mu,
                                                         prior_model.f_sigma,
                                                         prior_model.loadings
-    f_P, f_Q = views_constraints(pe.views, pe.sets; datatype = eltype(posterior_X),
-                                 strict = strict)
-    @smart_assert(!isempty(f_P))
+    f_views = views_constraints(pe.views, pe.sets; datatype = eltype(posterior_X),
+                                strict = strict)
+    f_P, f_Q = f_views.P, f_views.Q
     tau = isnothing(pe.tau) ? inv(size(F, 1)) : pe.tau
     views_conf = pe.views_conf
     f_omega = tau * Diagonal(if isnothing(views_conf)
@@ -133,10 +127,12 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_sigma = inv(v3 - v1 * (v2 \ transpose(M)) * v3)
     mtx_process!(pe.mp, posterior_sigma, posterior_X)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat) .+ pe.rf .+ b
-    return BayesianBlackLittermanPriorModel(; X = posterior_X, mu = posterior_mu,
-                                            sigma = posterior_sigma, f_mu = f_mu,
-                                            f_sigma = f_sigma, loadings = loadings,
-                                            f_P = f_P, f_Q = f_Q)
+    return BayesianBlackLittermanPriorModel(;
+                                            pm = EmpiricalPriorModel(; X = posterior_X,
+                                                                     mu = posterior_mu,
+                                                                     sigma = posterior_sigma),
+                                            f_mu = f_mu, f_sigma = f_sigma,
+                                            loadings = loadings, f_views = f_views)
 end
 
 export BayesianBlackLittermanPriorEstimator

@@ -21,6 +21,34 @@ end
 function relative_factor_constraint_sign(::FactorLinearConstraint)
     return -1
 end
+struct LinearConstraintModel{T1 <: Union{Nothing, <:AbstractMatrix},
+                             T2 <: Union{Nothing, <:AbstractVector},
+                             T3 <: Union{Nothing, <:AbstractMatrix},
+                             T4 <: Union{Nothing, <:AbstractVector}}
+    A_ineq::T1
+    B_ineq::T2
+    A_eq::T3
+    B_eq::T4
+end
+function LinearConstraintModel(; A_ineq::Union{Nothing, <:AbstractMatrix} = nothing,
+                               B_ineq::Union{Nothing, <:AbstractVector} = nothing,
+                               A_eq::Union{Nothing, <:AbstractMatrix} = nothing,
+                               B_eq::Union{Nothing, <:AbstractVector} = nothing)
+    if any(isnothing.((A_ineq, B_ineq)))
+        @smart_assert(all(isnothing.((A_ineq, B_ineq))))
+    else
+        @smart_assert(!isempty(A_ineq))
+        @smart_assert(!isempty(B_ineq))
+    end
+    if any(isnothing.((A_eq, B_eq)))
+        @smart_assert(all(isnothing.((A_eq, B_eq))))
+    else
+        @smart_assert(!isempty(A_eq))
+        @smart_assert(!isempty(B_eq))
+    end
+    return LinearConstraintModel{typeof(A_ineq), typeof(B_ineq), typeof(A_eq),
+                                 typeof(B_eq)}(A_ineq, B_ineq, A_eq, B_eq)
+end
 function get_asset_constraint_data(lca::LinearConstraintAtom{<:AbstractVector,
                                                              <:AbstractVector,
                                                              <:AbstractVector, <:Real},
@@ -116,15 +144,22 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
         A_ineq = transpose(reshape(A_ineq, N, :))
         A_ineq = convert.(typeof(promote(A_ineq...)[1]), A_ineq)
         B_ineq = convert.(typeof(promote(B_ineq...)[1]), B_ineq)
+    else
+        A_ineq = nothing
+        B_ineq = nothing
     end
     if !isempty(A_eq)
         A_eq = transpose(reshape(A_eq, N, :))
         A_eq = convert.(typeof(promote(A_eq...)[1]), A_eq)
         B_eq = convert.(typeof(promote(B_eq...)[1]), B_eq)
+    else
+        A_eq = nothing
+        B_eq = nothing
     end
 
-    return A_ineq, B_ineq, A_eq, B_eq
+    return LinearConstraintModel(; A_ineq = A_ineq, B_ineq = B_ineq, A_eq = A_eq,
+                                 B_eq = B_eq)
 end
 
 export linear_constraints, LinearConstraintAtom, LinearConstraint, AssetLinearConstraint,
-       FactorLinearConstraint
+       FactorLinearConstraint, LinearConstraintModel

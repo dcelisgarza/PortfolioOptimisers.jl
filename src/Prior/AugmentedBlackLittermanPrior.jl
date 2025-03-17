@@ -1,55 +1,42 @@
-struct AugmentedBlackLittermanPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
-                                         T3 <: AbstractMatrix, T4 <: AbstractVector,
-                                         T5 <: AbstractMatrix, T6 <: LoadingsMatrix,
-                                         T7 <: AbstractMatrix, T8 <: AbstractVector,
-                                         T9 <: AbstractMatrix, T10 <: AbstractVector} <:
+struct AugmentedBlackLittermanPriorModel{T1 <: EmpiricalPriorModel, T2 <: AbstractVector,
+                                         T3 <: AbstractMatrix, T4 <: LoadingsMatrix,
+                                         T5 <: BlackLittermanViewsModel,
+                                         T6 <: BlackLittermanViewsModel} <:
        AbstractPriorModel_AVFV
-    X::T1
-    mu::T2
-    sigma::T3
-    f_mu::T4
-    f_sigma::T5
-    loadings::T6
-    P::T7
-    Q::T8
-    f_P::T9
-    f_Q::T10
+    pm::T1
+    f_mu::T2
+    f_sigma::T3
+    loadings::T4
+    a_views::T5
+    f_views::T6
 end
-function AugmentedBlackLittermanPriorModel(; X::AbstractMatrix, mu::AbstractVector,
-                                           sigma::AbstractMatrix, f_mu::AbstractVector,
+function AugmentedBlackLittermanPriorModel(; pm::EmpiricalPriorModel, f_mu::AbstractVector,
                                            f_sigma::AbstractMatrix,
-                                           loadings::LoadingsMatrix, P::AbstractMatrix,
-                                           Q::AbstractVector, f_P::AbstractMatrix,
-                                           f_Q::AbstractVector)
-    @smart_assert(!isempty(X) &&
-                  !isempty(mu) &&
-                  !isempty(sigma) &&
-                  !isempty(f_mu) &&
-                  !isempty(f_sigma) &&
-                  !isempty(P) &&
-                  !isempty(Q) &&
-                  !isempty(f_P) &&
-                  !isempty(f_Q))
-    @smart_assert(size(X, 2) ==
-                  length(mu) ==
-                  size(sigma, 1) ==
-                  size(sigma, 2) ==
-                  size(loadings.M, 1) ==
-                  length(loadings.b) ==
-                  size(P, 2))
+                                           loadings::LoadingsMatrix,
+                                           a_views::BlackLittermanViewsModel,
+                                           f_views::BlackLittermanViewsModel)
+    @smart_assert(!isempty(f_mu) && !isempty(f_sigma))
+    @smart_assert(size(pm.X, 2) == size(loadings.M, 1) == size(a_views.P, 2))
     @smart_assert(length(f_mu) ==
                   size(f_sigma, 1) ==
                   size(f_sigma, 2) ==
                   size(loadings.M, 2) ==
-                  size(f_P, 2))
-    @smart_assert(length(f_Q) == size(f_P, 1))
-    @smart_assert(length(Q) == size(P, 1))
-    return AugmentedBlackLittermanPriorModel{typeof(X), typeof(mu), typeof(sigma),
-                                             typeof(f_mu), typeof(f_sigma),
-                                             typeof(loadings), typeof(P), typeof(Q),
-                                             typeof(f_P), typeof(f_Q)}(X, mu, sigma, f_mu,
-                                                                       f_sigma, loadings, P,
-                                                                       Q, f_P, f_Q)
+                  size(f_views.P, 2))
+    return AugmentedBlackLittermanPriorModel{typeof(pm), typeof(f_mu), typeof(f_sigma),
+                                             typeof(loadings), typeof(a_views),
+                                             typeof(f_views)}(pm, f_mu, f_sigma, loadings,
+                                                              a_views, f_views)
+end
+function Base.getproperty(obj::AugmentedBlackLittermanPriorModel, sym::Symbol)
+    return if sym == :X
+        obj.pm.X
+    elseif sym == :mu
+        obj.pm.mu
+    elseif sym == :sigma
+        obj.pm.sigma
+    else
+        getfield(obj, sym)
+    end
 end
 struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
                                              T2 <: AbstractPriorEstimatorMap_2_1,
@@ -185,12 +172,11 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     loadings = regression(pe.re, X, F)
     (; b, M) = loadings
     posterior_X = F * transpose(M) .+ transpose(b)
-    P, Q = views_constraints(pe.a_views, pe.a_sets; datatype = eltype(posterior_X),
-                             strict = strict)
-    @smart_assert(!isempty(P))
-    f_P, f_Q = views_constraints(pe.f_views, pe.f_sets; datatype = eltype(posterior_X),
-                                 strict = strict)
-    @smart_assert(!isempty(f_P))
+    (; P, Q) = a_views = views_constraints(pe.a_views, pe.a_sets;
+                                           datatype = eltype(posterior_X), strict = strict)
+    f_views = views_constraints(pe.f_views, pe.f_sets; datatype = eltype(posterior_X),
+                                strict = strict)
+    f_P, f_Q = f_views.P, f_views.Q
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
     a_views_conf = pe.a_views_conf
     a_omega = tau * Diagonal(if isnothing(a_views_conf)
@@ -231,10 +217,13 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     mtx_process!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
     posterior_mu = aug_posterior_mu[1:size(X, 2)] .+ pe.rf .+ b
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
-    return AugmentedBlackLittermanPriorModel(; X = posterior_X, mu = posterior_mu,
-                                             sigma = posterior_sigma, f_mu = f_prior_mu,
-                                             f_sigma = f_prior_sigma, loadings = loadings,
-                                             P = P, Q = Q, f_P = f_P, f_Q = f_Q)
+    return AugmentedBlackLittermanPriorModel(;
+                                             pm = EmpiricalPriorModel(; X = posterior_X,
+                                                                      mu = posterior_mu,
+                                                                      sigma = posterior_sigma),
+                                             f_mu = f_prior_mu, f_sigma = f_prior_sigma,
+                                             loadings = loadings, a_views = a_views,
+                                             f_views = f_views)
 end
 
 export AugmentedBlackLittermanPriorModel, AugmentedBlackLittermanPriorEstimator

@@ -1,39 +1,39 @@
-struct FactorPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector, T3 <: AbstractMatrix,
-                        T4 <: AbstractMatrix, T5 <: AbstractVector, T6 <: AbstractMatrix,
-                        T7 <: LoadingsMatrix} <: AbstractPriorModel_AFC
-    X::T1
-    mu::T2
-    sigma::T3
-    chol::T4
-    f_mu::T5
-    f_sigma::T6
-    loadings::T7
+struct PartialFactorModel{T1 <: AbstractVector, T2 <: AbstractMatrix, T3 <: LoadingsMatrix}
+    mu::T1
+    sigma::T2
+    loadings::T3
 end
-function FactorPriorModel(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                          chol::AbstractMatrix, f_mu::AbstractVector,
-                          f_sigma::AbstractMatrix, loadings::LoadingsMatrix)
-    @smart_assert(!isempty(X) &&
-                  !isempty(mu) &&
-                  !isempty(sigma) &&
-                  !isempty(chol) &&
-                  !isempty(f_mu) &&
-                  !isempty(f_sigma))
-    @smart_assert(size(X, 2) ==
-                  length(mu) ==
-                  size(sigma, 1) ==
-                  size(sigma, 2) ==
-                  size(loadings.M, 1) ==
-                  length(loadings.b))
+struct FactorPriorModel{T1 <: EmpiricalPriorModel, T2 <: AbstractMatrix,
+                        T3 <: AbstractVector, T4 <: AbstractMatrix, T5 <: LoadingsMatrix} <:
+       AbstractPriorModel_AFC
+    pm::T1
+    chol::T2
+    f_mu::T3
+    f_sigma::T4
+    loadings::T5
+end
+function FactorPriorModel(; pm::EmpiricalPriorModel, chol::AbstractMatrix,
+                          f_mu::AbstractVector, f_sigma::AbstractMatrix,
+                          loadings::LoadingsMatrix)
+    @smart_assert(!isempty(chol) && !isempty(f_mu) && !isempty(f_sigma))
+    @smart_assert(size(pm.X, 2) == size(chol, 2) == size(loadings.M, 1))
     @smart_assert(length(f_mu) ==
                   size(f_sigma, 1) ==
                   size(f_sigma, 2) ==
                   size(loadings.M, 2))
-    @smart_assert(size(chol, 2) == length(mu))
-    return FactorPriorModel{typeof(X), typeof(mu), typeof(sigma), typeof(chol),
-                            typeof(f_mu), typeof(f_sigma), typeof(loadings)}(X, mu, sigma,
-                                                                             chol, f_mu,
-                                                                             f_sigma,
-                                                                             loadings)
+    return FactorPriorModel{typeof(pm), typeof(chol), typeof(f_mu), typeof(f_sigma),
+                            typeof(loadings)}(pm, chol, f_mu, f_sigma, loadings)
+end
+function Base.getproperty(obj::FactorPriorModel, sym::Symbol)
+    return if sym == :X
+        obj.pm.X
+    elseif sym == :mu
+        obj.pm.mu
+    elseif sym == :sigma
+        obj.pm.sigma
+    else
+        getfield(obj, sym)
+    end
 end
 struct FactorPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1, T2 <: MatrixProcessing,
                             T3 <: RegressionMethod,
@@ -85,7 +85,9 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    return FactorPriorModel(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
+    return FactorPriorModel(;
+                            pm = EmpiricalPriorModel(; X = posterior_X, mu = posterior_mu,
+                                                     sigma = posterior_sigma),
                             chol = transpose(reshape(posterior_csigma, length(posterior_mu),
                                                      :)), f_mu = f_mu, f_sigma = f_sigma,
                             loadings = loadings)

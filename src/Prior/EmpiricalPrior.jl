@@ -8,7 +8,6 @@ function EmpiricalPriorModel(; X::AbstractMatrix, mu::AbstractVector, sigma::Abs
     @smart_assert(!isempty(X) && !isempty(mu) && !isempty(sigma))
     @smart_assert(size(X, 2) == length(mu))
     issquare(sigma)
-    @smart_assert(length(mu) == size(sigma, 1))
     return EmpiricalPriorModel{typeof(X), typeof(mu), typeof(sigma)}(X, mu, sigma)
 end
 struct EmpiricalPriorEstimator{T1 <: StatsBase.CovarianceEstimator,
