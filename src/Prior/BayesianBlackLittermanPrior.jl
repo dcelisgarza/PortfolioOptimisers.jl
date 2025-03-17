@@ -1,28 +1,15 @@
-struct BayesianBlackLittermanPriorModel{T1 <: EmpiricalPriorModel, T3 <: AbstractVector,
-                                        T4 <: AbstractMatrix, T5 <: LoadingsMatrix,
-                                        T6 <: BlackLittermanViewsModel} <:
+struct BayesianBlackLittermanPriorModel{T1 <: EmpiricalPriorModel, T2 <: PartialFactorModel,
+                                        T3 <: BlackLittermanViewsModel} <:
        AbstractPriorModel_AFV
     pm::T1
-    f_mu::T3
-    f_sigma::T4
-    loadings::T5
-    f_views::T6
+    fm::T2
+    f_views::T3
 end
-function BayesianBlackLittermanPriorModel(; pm::EmpiricalPriorModel, f_mu::AbstractVector,
-                                          f_sigma::AbstractMatrix, loadings::LoadingsMatrix,
+function BayesianBlackLittermanPriorModel(; pm::EmpiricalPriorModel, fm::PartialFactorModel,
                                           f_views::BlackLittermanViewsModel)
-    @smart_assert(!isempty(f_mu) && !isempty(f_sigma))
-    @smart_assert(size(pm.X, 2) == size(loadings.M, 1))
-    @smart_assert(length(f_mu) ==
-                  size(f_sigma, 1) ==
-                  size(f_sigma, 2) ==
-                  size(loadings.M, 2) ==
-                  size(f_views.P, 2))
-    return BayesianBlackLittermanPriorModel{typeof(pm), typeof(f_mu), typeof(f_sigma),
-                                            typeof(loadings), typeof(f_views)}(pm, f_mu,
-                                                                               f_sigma,
-                                                                               loadings,
-                                                                               f_views)
+    @smart_assert(length(fm.mu) == size(f_views.P, 2))
+    return BayesianBlackLittermanPriorModel{typeof(pm), typeof(fm), typeof(f_views)}(pm, fm,
+                                                                                     f_views)
 end
 function Base.getproperty(obj::BayesianBlackLittermanPriorModel, sym::Symbol)
     return if sym == :X
@@ -31,6 +18,12 @@ function Base.getproperty(obj::BayesianBlackLittermanPriorModel, sym::Symbol)
         obj.pm.mu
     elseif sym == :sigma
         obj.pm.sigma
+    elseif sym == :f_mu
+        obj.fm.mu
+    elseif sym == :f_sigma
+        obj.fm.sigma
+    elseif sym == :loadings
+        obj.fm.loadings
     else
         getfield(obj, sym)
     end
@@ -131,8 +124,10 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
                                             pm = EmpiricalPriorModel(; X = posterior_X,
                                                                      mu = posterior_mu,
                                                                      sigma = posterior_sigma),
-                                            f_mu = f_mu, f_sigma = f_sigma,
-                                            loadings = loadings, f_views = f_views)
+                                            fm = PartialFactorModel(; mu = f_mu,
+                                                                    sigma = f_sigma,
+                                                                    loadings = loadings),
+                                            f_views = f_views)
 end
 
 export BayesianBlackLittermanPriorEstimator

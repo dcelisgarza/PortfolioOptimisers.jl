@@ -1,31 +1,21 @@
-struct AugmentedBlackLittermanPriorModel{T1 <: EmpiricalPriorModel, T2 <: AbstractVector,
-                                         T3 <: AbstractMatrix, T4 <: LoadingsMatrix,
-                                         T5 <: BlackLittermanViewsModel,
-                                         T6 <: BlackLittermanViewsModel} <:
+struct AugmentedBlackLittermanPriorModel{T1 <: EmpiricalPriorModel,
+                                         T2 <: PartialFactorModel,
+                                         T3 <: BlackLittermanViewsModel,
+                                         T4 <: BlackLittermanViewsModel} <:
        AbstractPriorModel_AVFV
     pm::T1
-    f_mu::T2
-    f_sigma::T3
-    loadings::T4
-    a_views::T5
-    f_views::T6
+    fm::T2
+    a_views::T3
+    f_views::T4
 end
-function AugmentedBlackLittermanPriorModel(; pm::EmpiricalPriorModel, f_mu::AbstractVector,
-                                           f_sigma::AbstractMatrix,
-                                           loadings::LoadingsMatrix,
+function AugmentedBlackLittermanPriorModel(; pm::EmpiricalPriorModel,
+                                           fm::PartialFactorModel,
                                            a_views::BlackLittermanViewsModel,
                                            f_views::BlackLittermanViewsModel)
-    @smart_assert(!isempty(f_mu) && !isempty(f_sigma))
-    @smart_assert(size(pm.X, 2) == size(loadings.M, 1) == size(a_views.P, 2))
-    @smart_assert(length(f_mu) ==
-                  size(f_sigma, 1) ==
-                  size(f_sigma, 2) ==
-                  size(loadings.M, 2) ==
-                  size(f_views.P, 2))
-    return AugmentedBlackLittermanPriorModel{typeof(pm), typeof(f_mu), typeof(f_sigma),
-                                             typeof(loadings), typeof(a_views),
-                                             typeof(f_views)}(pm, f_mu, f_sigma, loadings,
-                                                              a_views, f_views)
+    @smart_assert(size(pm.X, 2) == size(a_views.P, 2))
+    @smart_assert(length(fm.mu) == size(f_views.P, 2))
+    return AugmentedBlackLittermanPriorModel{typeof(pm), typeof(fm), typeof(a_views),
+                                             typeof(f_views)}(pm, fm, a_views, f_views)
 end
 function Base.getproperty(obj::AugmentedBlackLittermanPriorModel, sym::Symbol)
     return if sym == :X
@@ -34,6 +24,12 @@ function Base.getproperty(obj::AugmentedBlackLittermanPriorModel, sym::Symbol)
         obj.pm.mu
     elseif sym == :sigma
         obj.pm.sigma
+    elseif sym == :f_mu
+        obj.fm.mu
+    elseif sym == :f_sigma
+        obj.fm.sigma
+    elseif sym == :loadings
+        obj.fm.loadings
     else
         getfield(obj, sym)
     end
@@ -221,9 +217,10 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
                                              pm = EmpiricalPriorModel(; X = posterior_X,
                                                                       mu = posterior_mu,
                                                                       sigma = posterior_sigma),
-                                             f_mu = f_prior_mu, f_sigma = f_prior_sigma,
-                                             loadings = loadings, a_views = a_views,
-                                             f_views = f_views)
+                                             fm = PartialFactorModel(; mu = f_prior_mu,
+                                                                     sigma = f_prior_sigma,
+                                                                     loadings = loadings),
+                                             a_views = a_views, f_views = f_views)
 end
 
 export AugmentedBlackLittermanPriorModel, AugmentedBlackLittermanPriorEstimator

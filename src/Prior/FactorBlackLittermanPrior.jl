@@ -1,30 +1,13 @@
-struct FactorBlackLittermanPriorModel{T1 <: EmpiricalPriorModel, T3 <: AbstractMatrix,
-                                      T4 <: AbstractVector, T5 <: AbstractMatrix,
-                                      T6 <: LoadingsMatrix,
-                                      T7 <: BlackLittermanViewsModel} <:
+struct FactorBlackLittermanPriorModel{T1 <: FactorPriorModel,
+                                      T2 <: BlackLittermanViewsModel} <:
        AbstractPriorModel_AFVC
     pm::T1
-    chol::T3
-    f_mu::T4
-    f_sigma::T5
-    loadings::T6
-    f_views::T7
+    f_views::T2
 end
-function FactorBlackLittermanPriorModel(; pm::EmpiricalPriorModel, chol::AbstractMatrix,
-                                        f_mu::AbstractVector, f_sigma::AbstractMatrix,
-                                        loadings::LoadingsMatrix,
+function FactorBlackLittermanPriorModel(; pm::FactorPriorModel,
                                         f_views::BlackLittermanViewsModel)
-    @smart_assert(!isempty(chol) && !isempty(f_mu) && !isempty(f_sigma))
-    @smart_assert(size(pm.X, 2) == size(chol, 2) == size(loadings.M, 1))
-    @smart_assert(length(f_mu) ==
-                  size(f_sigma, 1) ==
-                  size(f_sigma, 2) ==
-                  size(loadings.M, 2) ==
-                  size(f_views.P, 2))
-    return FactorBlackLittermanPriorModel{typeof(pm), typeof(chol), typeof(f_mu),
-                                          typeof(f_sigma), typeof(loadings),
-                                          typeof(f_views)}(pm, chol, f_mu, f_sigma,
-                                                           loadings, f_views)
+    @smart_assert(length(pm.f_mu) == size(f_views.P, 2))
+    return FactorBlackLittermanPriorModel{typeof(pm), typeof(f_views)}(pm, f_views)
 end
 function Base.getproperty(obj::FactorBlackLittermanPriorModel, sym::Symbol)
     return if sym == :X
@@ -33,6 +16,14 @@ function Base.getproperty(obj::FactorBlackLittermanPriorModel, sym::Symbol)
         obj.pm.mu
     elseif sym == :sigma
         obj.pm.sigma
+    elseif sym == :f_mu
+        obj.pm.f_mu
+    elseif sym == :f_sigma
+        obj.pm.f_sigma
+    elseif sym == :loadings
+        obj.pm.loadings
+    elseif sym == :chol
+        obj.pm.chol
     else
         getfield(obj, sym)
     end
@@ -164,13 +155,18 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
     return FactorBlackLittermanPriorModel(;
-                                          pm = EmpiricalPriorModel(; X = posterior_X,
-                                                                   mu = posterior_mu,
-                                                                   sigma = posterior_sigma),
-                                          chol = transpose(reshape(posterior_csigma,
-                                                                   length(posterior_mu), :)),
-                                          f_mu = f_posterior_mu,
-                                          f_sigma = f_posterior_sigma, loadings = loadings,
+                                          pm = FactorPriorModel(;
+                                                                pm = EmpiricalPriorModel(;
+                                                                                         X = posterior_X,
+                                                                                         mu = posterior_mu,
+                                                                                         sigma = posterior_sigma),
+                                                                fm = PartialFactorModel(;
+                                                                                        mu = f_posterior_mu,
+                                                                                        sigma = f_posterior_sigma,
+                                                                                        loadings = loadings),
+                                                                chol = transpose(reshape(posterior_csigma,
+                                                                                         length(posterior_mu),
+                                                                                         :))),
                                           f_views = f_views)
 end
 

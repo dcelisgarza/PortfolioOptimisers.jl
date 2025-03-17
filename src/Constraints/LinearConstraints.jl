@@ -21,38 +21,34 @@ end
 function relative_factor_constraint_sign(::FactorLinearConstraint)
     return -1
 end
-struct LinearConstraintModel{T1 <: Union{Nothing, <:AbstractMatrix},
-                             T2 <: Union{Nothing, <:AbstractVector},
-                             T3 <: Union{Nothing, <:AbstractMatrix},
-                             T4 <: Union{Nothing, <:AbstractVector}}
-    A_ineq::T1
-    B_ineq::T2
-    A_eq::T3
-    B_eq::T4
+struct PartialLinearConstraintModel{T1 <: Union{Nothing, <:AbstractMatrix},
+                                    T2 <: Union{Nothing, <:AbstractVector}}
+    A::T1
+    B::T2
 end
-function LinearConstraintModel(; A_ineq::Union{Nothing, <:AbstractMatrix} = nothing,
-                               B_ineq::Union{Nothing, <:AbstractVector} = nothing,
-                               A_eq::Union{Nothing, <:AbstractMatrix} = nothing,
-                               B_eq::Union{Nothing, <:AbstractVector} = nothing)
-    if any(isnothing.((A_ineq, B_ineq)))
-        @smart_assert(all(isnothing.((A_ineq, B_ineq))))
+function PartialLinearConstraintModel(; A::Union{Nothing, <:AbstractMatrix} = nothing,
+                                      B::Union{Nothing, <:AbstractVector} = nothing)
+    if any(isnothing.((A, B)))
+        @smart_assert(all(isnothing.((A, B))))
     else
-        @smart_assert(!isempty(A_ineq))
-        @smart_assert(!isempty(B_ineq))
+        @smart_assert(!isempty(A) && !isempty(B))
     end
-    if any(isnothing.((A_eq, B_eq)))
-        @smart_assert(all(isnothing.((A_eq, B_eq))))
-    else
-        @smart_assert(!isempty(A_eq))
-        @smart_assert(!isempty(B_eq))
-    end
-    return LinearConstraintModel{typeof(A_ineq), typeof(B_ineq), typeof(A_eq),
-                                 typeof(B_eq)}(A_ineq, B_ineq, A_eq, B_eq)
+    return PartialLinearConstraintModel{typeof(A), typeof(B)}(A, B)
 end
-function get_asset_constraint_data(lca::LinearConstraintAtom{<:AbstractVector,
-                                                             <:AbstractVector,
-                                                             <:AbstractVector, <:Real},
-                                   sets::DataFrame; strict::Bool = false)
+struct LinearConstraintModel{T1 <: PartialLinearConstraintModel,
+                             T2 <: PartialLinearConstraintModel}
+    ineq::T1
+    eq::T2
+end
+function LinearConstraintModel(; ineq::PartialLinearConstraintModel,
+                               eq::PartialLinearConstraintModel)
+    return LinearConstraintModel{typeof(ineq), typeof(eq)}(ineq, eq)
+end
+function get_asset_constraint_data(lca::LinearConstraintAtom{<:PartialLinearConstraintAtom{<:AbstractVector,
+                                                                                           <:AbstractVector,
+                                                                                           <:AbstractVector},
+                                                             <:Real}, sets::DataFrame;
+                                   strict::Bool = false)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     N = nrow(sets)
@@ -76,8 +72,11 @@ function get_asset_constraint_data(lca::LinearConstraintAtom{<:AbstractVector,
         vec(sum(reshape(A, N, :); dims = 2)), tcnst
     end
 end
-function get_asset_constraint_data(lca::LinearConstraintAtom{<:Any, <:Any, <:Real, <:Real},
-                                   sets::DataFrame; strict::Bool = false)
+function get_asset_constraint_data(lca::LinearConstraintAtom{<:PartialLinearConstraintAtom{<:Any,
+                                                                                           <:Any,
+                                                                                           <:Real},
+                                                             <:Real}, sets::DataFrame;
+                                   strict::Bool = false)
     group_names = names(sets)
     N = nrow(sets)
     A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)
@@ -157,9 +156,11 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
         B_eq = nothing
     end
 
-    return LinearConstraintModel(; A_ineq = A_ineq, B_ineq = B_ineq, A_eq = A_eq,
-                                 B_eq = B_eq)
+    return LinearConstraintModel(;
+                                 ineq = PartialLinearConstraintModel(; A = A_ineq,
+                                                                     B = B_ineq),
+                                 eq = PartialLinearConstraintModel(; A = A_eq, B = B_eq))
 end
 
-export linear_constraints, LinearConstraintAtom, LinearConstraint, AssetLinearConstraint,
-       FactorLinearConstraint, LinearConstraintModel
+export linear_constraints, LinearConstraint, AssetLinearConstraint, FactorLinearConstraint,
+       LinearConstraintModel

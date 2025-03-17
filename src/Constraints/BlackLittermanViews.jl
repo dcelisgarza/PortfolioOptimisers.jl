@@ -8,10 +8,11 @@ function BlackLittermanViewsModel(; P::AbstractMatrix, Q::AbstractVector)
     @smart_assert(size(P, 1) == length(Q))
     return BlackLittermanViewsModel{typeof(P), typeof(Q)}(P, Q)
 end
-function get_black_litterman_views_data(lca::LinearConstraintAtom{<:AbstractVector,
-                                                                  <:AbstractVector,
-                                                                  <:AbstractVector, <:Real},
-                                        sets::DataFrame; strict::Bool = false)
+function get_black_litterman_views_data(lca::LinearConstraintAtom{<:PartialLinearConstraintAtom{<:AbstractVector,
+                                                                                                <:AbstractVector,
+                                                                                                <:AbstractVector},
+                                                                  <:Real}, sets::DataFrame;
+                                        strict::Bool = false)
     group_names = names(sets)
     N = nrow(sets)
     A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)
@@ -49,7 +50,9 @@ function get_black_litterman_views_data(lca::LinearConstraintAtom{<:AbstractVect
         vec(sum(reshape(A, N, :); dims = 2)), tcnst
     end
 end
-function get_black_litterman_views_data(lca::LinearConstraintAtom{<:Any, <:Any, <:Real,
+function get_black_litterman_views_data(lca::LinearConstraintAtom{<:PartialLinearConstraintAtom{<:Any,
+                                                                                                <:Any,
+                                                                                                <:Real},
                                                                   <:Real}, sets::DataFrame;
                                         strict::Bool = false)
     group_names = names(sets)

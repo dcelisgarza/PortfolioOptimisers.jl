@@ -13,15 +13,14 @@ end
 function comparison_sign_ineq_flag(::GEQ)
     return -1, true
 end
-struct LinearConstraintAtom{T1, T2, T3, T4 <: Real}
+#! This can be used like black litterman views to construct risk budget constraints
+struct PartialLinearConstraintAtom{T1, T2, T3}
     group::T1
     name::T2
     coef::T3
-    cnst::T4
 end
-function LinearConstraintAtom(; group = nothing, name = nothing,
-                              coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
-                              cnst::Real = 0.0)
+function PartialLinearConstraintAtom(; group = nothing, name = nothing,
+                                     coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
@@ -39,10 +38,30 @@ function LinearConstraintAtom(; group = nothing, name = nothing,
             @smart_assert(isnothing(group) && isnothing(name))
         end
     end
-    return LinearConstraintAtom{typeof(group), typeof(name), typeof(coef), typeof(cnst)}(group,
-                                                                                         name,
-                                                                                         coef,
-                                                                                         cnst)
+    return PartialLinearConstraintAtom{typeof(group), typeof(name), typeof(coef)}(group,
+                                                                                  name,
+                                                                                  coef)
+end
+struct LinearConstraintAtom{T1 <: PartialLinearConstraintAtom, T2 <: Real}
+    plca::T1
+    cnst::T2
+end
+function LinearConstraintAtom(; group = nothing, name = nothing,
+                              coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                              cnst::Real = 0.0)
+    plca = PartialLinearConstraintAtom(; group = group, name = name, coef = coef)
+    return LinearConstraintAtom{typeof(plca), typeof(cnst)}(plca, cnst)
+end
+function Base.getproperty(obj::LinearConstraintAtom, sym::Symbol)
+    return if sym == :group
+        obj.plca.group
+    elseif sym == :name
+        obj.plca.name
+    elseif sym == :coef
+        obj.plca.coef
+    else
+        return getfield(obj, sym)
+    end
 end
 
-export EQ, LEQ, GEQ
+export EQ, LEQ, GEQ, PartialLinearConstraintAtom, LinearConstraintAtom

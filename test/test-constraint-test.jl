@@ -56,7 +56,9 @@
                   LinearConstraint(; kind = FactorLinearConstraint(), lhs = lhs_12,
                                    rhs = rhs_12, comp = LEQ()),
                   LinearConstraint(; lhs = lhs_13, rhs = rhs_13, comp = EQ())]
-        (; A_ineq, B_ineq, A_eq, B_eq) = linear_constraints(constr, sets)
+        (; ineq, eq) = linear_constraints(constr, sets)
+        A_ineq, B_ineq = ineq.A, ineq.B
+        A_eq, B_eq = eq.A, eq.B
         A_ineq_t = reshape([1.0, -0.0, -1.0, 2.0, 0.0, -0.0, -1.0, 0.0, -0.0, -1.0, 0.0,
                             0.0, -0.0, -1.0, -0.3, -2.0, 2.0, -2.0, 1.0, -1.0, -1.0, 0.0,
                             3.0, -3.0, 1.0, 0.0, 1.0, 1.0, 0.0, -2.0, 2.0, 1.0, 0.0, -1.0,
@@ -76,10 +78,11 @@
         @test isapprox(A_eq, A_eq_t)
         @test isapprox(B_eq, B_eq_t)
 
-        (; A_ineq, B_ineq, A_eq, B_eq) = linear_constraints(LinearConstraint(;
-                                                                             lhs = LinearConstraintAtom(),
-                                                                             rhs = LinearConstraintAtom()),
-                                                            sets)
+        (; ineq, eq) = linear_constraints(LinearConstraint(; lhs = LinearConstraintAtom(),
+                                                           rhs = LinearConstraintAtom()),
+                                          sets)
+        A_ineq, B_ineq = ineq.A, ineq.B
+        A_eq, B_eq = eq.A, eq.B
         @test isnothing(A_ineq)
         @test isnothing(B_ineq)
         @test isnothing(A_eq)
@@ -87,9 +90,9 @@
 
         lhs = LinearConstraintAtom(; group = [:Foo], name = [20], coef = [5])
         rhs = LinearConstraintAtom(; cnst = 0.35)
-        (; A_ineq, B_ineq, A_eq, B_eq) = linear_constraints(LinearConstraint(; lhs = lhs,
-                                                                             rhs = rhs),
-                                                            sets)
+        (; ineq, eq) = linear_constraints(LinearConstraint(; lhs = lhs, rhs = rhs), sets)
+        A_ineq, B_ineq = ineq.A, ineq.B
+        A_eq, B_eq = eq.A, eq.B
         @test isnothing(A_ineq)
         @test isnothing(B_ineq)
         @test isnothing(A_eq)

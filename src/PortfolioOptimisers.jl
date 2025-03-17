@@ -19,7 +19,9 @@ include("./LinearAlgebra/Operators.jl")
 include("./Constraints/Constraint_AbstractTypes.jl")
 include("./Constraints/LinearConstraints.jl")
 include("./Constraints/BlackLittermanViews.jl")
+include("./Constraints/RiskBudgetConstraints.jl")
 include("./Constraints/HierarchicalConstraints.jl")
+include("./Constraints/EntropyPoolingViews.jl")
 
 # Solver
 include("./ModelOptimisation/Solver.jl")
