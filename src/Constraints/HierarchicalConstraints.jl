@@ -68,6 +68,7 @@ end
 function hc_constraints(hcc::HierarchicalConstraint{<:AbstractVector, <:AbstractVector,
                                                     <:AbstractVector, <:AbstractVector},
                         sets::DataFrame; strict::Bool = false)
+    @smart_assert(!isempty(sets))
     group_names = names(sets)
     N = nrow(sets)
     w_min = zeros(promote_type(eltype(hcc.lo), eltype(hcc.hi)), N)

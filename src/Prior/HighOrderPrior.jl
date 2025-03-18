@@ -1,4 +1,4 @@
-struct HighOrderPriorModel{T1 <: LowOrderAbstractPriorModel,
+struct HighOrderPriorModel{T1 <: AbstractLowOrderPriorModel,
                            T2 <: Union{Nothing, <:AbstractMatrix},
                            T3 <: Union{Nothing, <:AbstractMatrix},
                            T4 <: Union{Nothing, <:AbstractMatrix},
@@ -18,7 +18,7 @@ struct HighOrderPriorModel{T1 <: LowOrderAbstractPriorModel,
     SV::T8
     sskmp::T9
 end
-function HighOrderPriorModel(; pm::LowOrderAbstractPriorModel,
+function HighOrderPriorModel(; pm::AbstractLowOrderPriorModel,
                              kt::Union{Nothing, <:AbstractMatrix},
                              skt::Union{Nothing, <:AbstractMatrix},
                              sk::Union{Nothing, <:AbstractMatrix},
@@ -103,14 +103,19 @@ function HighOrderPriorEstimator(;
     return HighOrderPriorEstimator{typeof(pe), typeof(kte), typeof(skte), typeof(ske),
                                    typeof(sske)}(pe, kte, skte, ske, sske)
 end
-function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix, args...; dims::Int = 1,
-               kurt::Bool = true, skurt::Bool = true, skew::Bool = true, sskew = true,
+function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
+               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
+               kurt::Bool = true, skurt::Bool = true, skew::Bool = true, sskew::Bool = true,
                kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
+        if !isnothing(F)
+            F = transpose(F)
+        end
     end
-    pm = prior(pe.pe, X, args...)
+    pm = prior(pe.pe, X, F; kurt = kurt, skurt = skurt, skew = skew, sskew = sskew,
+               kwargs...)
     kt = kurt ? cokurtosis(pe.kte, pm.X) : nothing
     skt = skurt ? cokurtosis(pe.skte, pm.X) : nothing
     sk, V = skew ? coskewness(pe.ske, pm.X) : (nothing, nothing)

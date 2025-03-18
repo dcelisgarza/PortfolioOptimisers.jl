@@ -13,7 +13,6 @@ end
 function comparison_sign_ineq_flag(::GEQ)
     return -1, true
 end
-#! This can be used like black litterman views to construct risk budget constraints
 struct PartialLinearConstraintAtom{T1, T2, T3}
     group::T1
     name::T2

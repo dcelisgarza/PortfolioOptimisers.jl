@@ -93,6 +93,7 @@ function views_constraints(lcas::Union{<:LinearConstraintAtom,
     if isa(lcas, AbstractVector)
         @smart_assert(!isempty(lcas))
     end
+    @smart_assert(!isempty(sets))
     N = nrow(sets)
 
     P = Vector{datatype}(undef, 0)

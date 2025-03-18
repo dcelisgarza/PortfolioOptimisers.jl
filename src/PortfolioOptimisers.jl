@@ -21,7 +21,6 @@ include("./Constraints/LinearConstraints.jl")
 include("./Constraints/BlackLittermanViews.jl")
 include("./Constraints/RiskBudgetConstraints.jl")
 include("./Constraints/HierarchicalConstraints.jl")
-include("./Constraints/EntropyPoolingViews.jl")
 
 # Solver
 include("./ModelOptimisation/Solver.jl")
@@ -222,6 +221,7 @@ include("./Prior/BayesianBlackLittermanPrior.jl")
 include("./Prior/FactorBlackLittermanPrior.jl")
 include("./Prior/AugmentedBlackLittermanPrior.jl")
 include("./Prior/HighOrderPrior.jl")
+include("./Constraints/EntropyPoolingViews.jl")
 include("./Prior/EntropyPooling.jl")
 
 # Uncertainty sets

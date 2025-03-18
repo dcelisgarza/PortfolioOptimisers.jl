@@ -75,21 +75,23 @@ function BlackLittermanPriorEstimator(;
                                                                                      views_conf,
                                                                                      tau)
 end
-function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix, args...; dims::Int = 1,
+function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
+               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
+        if !isnothing(F)
+            F = transpose(F)
+        end
     end
     @smart_assert(nrow(pe.sets) == size(X, 2))
 
-    prior_model = prior(pe.pe, X, args...)
+    prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
 
     (; P, Q) = views = views_constraints(pe.views, pe.sets; datatype = eltype(posterior_X),
                                          strict = strict)
-    @smart_assert(!isempty(P))
-
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
     views_conf = pe.views_conf
     omega = tau * Diagonal(if isnothing(views_conf)

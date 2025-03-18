@@ -5,19 +5,19 @@ abstract type AbstractPriorEstimator end
 # 0 = no factor, 1 = factor + chol, 2 = factor
 # 0 = no factor views, 1 = factor views
 
-abstract type LowOrderAbstractPriorModel <: AbstractPriorModel end
+abstract type AbstractLowOrderPriorModel <: AbstractPriorModel end
 # Asset
-abstract type AbstractPriorModel_A <: LowOrderAbstractPriorModel end
+abstract type AbstractPriorModel_A <: AbstractLowOrderPriorModel end
 # Asset + factor + chol
-abstract type AbstractPriorModel_AFC <: LowOrderAbstractPriorModel end
+abstract type AbstractPriorModel_AFC <: AbstractLowOrderPriorModel end
 # Asset + asset views
-abstract type AbstractPriorModel_AV <: LowOrderAbstractPriorModel end
+abstract type AbstractPriorModel_AV <: AbstractLowOrderPriorModel end
 # Asset + factor + factor views + chol
-abstract type AbstractPriorModel_AFVC <: LowOrderAbstractPriorModel end
+abstract type AbstractPriorModel_AFVC <: AbstractLowOrderPriorModel end
 # Asset + factor + factor views
-abstract type AbstractPriorModel_AFV <: LowOrderAbstractPriorModel end
+abstract type AbstractPriorModel_AFV <: AbstractLowOrderPriorModel end
 # Asset + asset views + factor + factor views 
-abstract type AbstractPriorModel_AVFV <: LowOrderAbstractPriorModel end
+abstract type AbstractPriorModel_AVFV <: AbstractLowOrderPriorModel end
 
 abstract type AbstractHighOrderPriorModel <: AbstractPriorModel end
 

@@ -35,7 +35,7 @@ function _risk_measure_factory(r::NegativeQuadraticSemiSkewness, prior::HighOrde
     return NegativeQuadraticSemiSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V)
 end
 function _risk_measure_factory(r::NegativeQuadraticSemiSkewness,
-                               ::LowOrderAbstractPriorModel)
+                               ::AbstractLowOrderPriorModel)
     sk = risk_measure_nothing_matrix_factory(r.sk, nothing)
     V = risk_measure_nothing_matrix_factory(r.V, nothing)
     return NegativeQuadraticSemiSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V)

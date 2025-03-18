@@ -54,6 +54,7 @@ function risk_budget_constraints(plcas::Union{<:PartialLinearConstraintAtom,
     if isa(plcas, AbstractVector)
         @smart_assert(!isempty(plcas))
     end
+    @smart_assert(!isempty(sets))
     rb = Vector{datatype}(undef, nrow(sets))
     fill!(rb, inv(nrow(sets)))
     for plc ∈ plcas

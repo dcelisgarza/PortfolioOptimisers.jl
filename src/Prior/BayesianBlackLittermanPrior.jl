@@ -93,7 +93,7 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
         F = transpose(F)
     end
     @smart_assert(nrow(pe.sets) == size(F, 2))
-    prior_model = prior(pe.pe, X, F)
+    prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_sigma, f_mu, f_sigma, loadings = prior_model.X, prior_model.sigma,
                                                         prior_model.f_mu,
                                                         prior_model.f_sigma,

@@ -34,7 +34,7 @@ function _risk_measure_factory(r::NegativeQuadraticSkewness, prior::HighOrderPri
     V = risk_measure_nothing_matrix_factory(r.V, prior.SV)
     return NegativeQuadraticSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V)
 end
-function _risk_measure_factory(r::NegativeQuadraticSkewness, ::LowOrderAbstractPriorModel)
+function _risk_measure_factory(r::NegativeQuadraticSkewness, ::AbstractLowOrderPriorModel)
     sk = risk_measure_nothing_matrix_factory(r.sk, nothing)
     V = risk_measure_nothing_matrix_factory(r.V, nothing)
     return NegativeQuadraticSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V)

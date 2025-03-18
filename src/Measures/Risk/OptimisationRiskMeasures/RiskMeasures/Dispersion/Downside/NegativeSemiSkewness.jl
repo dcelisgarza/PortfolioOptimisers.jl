@@ -33,7 +33,7 @@ function _risk_measure_factory(r::NegativeSemiSkewness, prior::HighOrderPriorMod
     V = risk_measure_nothing_matrix_factory(r.V, prior.SV)
     return NegativeSemiSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V)
 end
-function _risk_measure_factory(r::NegativeSemiSkewness, ::LowOrderAbstractPriorModel)
+function _risk_measure_factory(r::NegativeSemiSkewness, ::AbstractLowOrderPriorModel)
     sk = risk_measure_nothing_matrix_factory(r.sk, nothing)
     V = risk_measure_nothing_matrix_factory(r.V, nothing)
     return NegativeSemiSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V)

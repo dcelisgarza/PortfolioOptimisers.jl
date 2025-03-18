@@ -44,12 +44,24 @@ function LinearConstraintModel(; ineq::PartialLinearConstraintModel,
                                eq::PartialLinearConstraintModel)
     return LinearConstraintModel{typeof(ineq), typeof(eq)}(ineq, eq)
 end
+function Base.getproperty(obj::LinearConstraintModel, sym::Symbol)
+    return if sym == :A_ineq
+        obj.ineq.A
+    elseif sym == :B_ineq
+        obj.ineq.B
+    elseif sym == :A_eq
+        obj.eq.A
+    elseif sym == :B_eq
+        obj.eq.B
+    else
+        getfield(obj, sym)
+    end
+end
 function get_asset_constraint_data(lca::LinearConstraintAtom{<:PartialLinearConstraintAtom{<:AbstractVector,
                                                                                            <:AbstractVector,
                                                                                            <:AbstractVector},
                                                              <:Real}, sets::DataFrame;
                                    strict::Bool = false)
-    @smart_assert(!isempty(sets))
     group_names = names(sets)
     N = nrow(sets)
     A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)
@@ -100,6 +112,7 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
     if isa(lcs, AbstractVector)
         @smart_assert(!isempty(lcs))
     end
+    @smart_assert(!isempty(sets))
     N = nrow(sets)
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)
@@ -163,4 +176,4 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
 end
 
 export linear_constraints, LinearConstraint, AssetLinearConstraint, FactorLinearConstraint,
-       LinearConstraintModel
+       LinearConstraintModel, PartialLinearConstraintModel

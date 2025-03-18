@@ -40,7 +40,7 @@ function _risk_measure_factory(r::SquareRootSemiKurtosis, prior::HighOrderPriorM
     skt = risk_measure_nothing_matrix_factory(r.kt, prior.skt)
     return SquareRootSemiKurtosis(; settings = r.settings, w = r.w, mu = mu, kt = skt)
 end
-function _risk_measure_factory(r::SquareRootSemiKurtosis, prior::LowOrderAbstractPriorModel)
+function _risk_measure_factory(r::SquareRootSemiKurtosis, prior::AbstractLowOrderPriorModel)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
     skt = risk_measure_nothing_matrix_factory(r.kt, nothing)
     return SquareRootSemiKurtosis(; settings = r.settings, w = r.w, mu = mu, kt = skt)
@@ -57,7 +57,7 @@ function _cluster_risk_measure_factory(r::SquareRootSemiKurtosis,
     return SquareRootSemiKurtosis(; settings = r.settings, w = r.w, mu = mu, kt = skt)
 end
 function _cluster_risk_measure_factory(r::SquareRootSemiKurtosis,
-                                       prior::LowOrderAbstractPriorModel,
+                                       prior::AbstractLowOrderPriorModel,
                                        cluster::AbstractVector)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
     idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)

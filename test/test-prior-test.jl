@@ -208,6 +208,7 @@
                 find_tol(pm.sigma, sigma_t; name1 = :er, name2 = :er_t)
             end
             @test res2
+            @test size(pm.X) == size(X)
         end
 
         @test_throws TypeError views_constraints(LinearConstraintAtom(; group = :Foo,
@@ -346,6 +347,11 @@
                 find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
             end
             @test res3
+            @test length(pm.f_mu) ==
+                  size(pm.f_sigma, 1) ==
+                  size(pm.f_sigma, 2) ==
+                  size(pm.loadings.M, 2)
+            @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
         end
     end
     @testset "Factor Black Litterman Prior" begin
@@ -436,6 +442,11 @@
                 find_tol(pm.chol, chol_t; name1 = :chol, name2 = :chol_t)
             end
             @test res4
+            @test length(pm.f_mu) ==
+                  size(pm.f_sigma, 1) ==
+                  size(pm.f_sigma, 2) ==
+                  size(pm.loadings.M, 2)
+            @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
         end
 
         pes = [FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
@@ -634,6 +645,11 @@
                 find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
             end
             @test res3
+            @test length(pm.f_mu) ==
+                  size(pm.f_sigma, 1) ==
+                  size(pm.f_sigma, 2) ==
+                  size(pm.loadings.M, 2)
+            @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
         end
     end
     @testset "High Order Prior" begin
