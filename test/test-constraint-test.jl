@@ -6,39 +6,39 @@
         loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         lhs_1 = LinearConstraintAtom(; group = :Assets, name = 1)
-        rhs_1 = LinearConstraintAtom()
+        rhs_1 = LinearConstraintAtom(; cnst = 0.35)
         lhs_2 = LinearConstraintAtom(; group = :Assets, name = 1)
         rhs_2 = LinearConstraintAtom(; group = [:Assets, :Assets], name = [1, 3],
-                                     coef = [0, 0.3])
-        lhs_3 = LinearConstraintAtom(; group = :Assets, name = 5)
+                                     coef = [0, 0.3], cnst = 0.25)
+        lhs_3 = LinearConstraintAtom(; group = :Assets, name = 5, cnst = -0.5)
         rhs_3 = LinearConstraintAtom(;)
         lhs_4 = LinearConstraintAtom(; group = :Clusters, name = 3, coef = 2)
         rhs_4 = LinearConstraintAtom(; group = :Clusters, name = 2, coef = 3)
         lhs_5 = LinearConstraintAtom(; group = [:Clusters, :Clusters], name = [1, 3],
-                                     coef = [-1, 2])
+                                     coef = [-1, 2], cnst = 0.1)
         rhs_5 = LinearConstraintAtom(; group = :Clusters, name = 2, coef = 3)
         lhs_6 = LinearConstraintAtom(; group = fill(:Assets, 10), name = assets,
                                      coef = loadings.MTUM)
         rhs_6 = LinearConstraintAtom(; group = fill(:Assets, 10), name = assets,
-                                     coef = loadings.QUAL)
+                                     coef = loadings.QUAL, cnst = 0.9)
         lhs_7 = LinearConstraintAtom(;)
         rhs_7 = LinearConstraintAtom(; group = [:Clusters, :Assets], name = [2, 7],
-                                     coef = [1, 1])
+                                     coef = [1, 1], cnst = 0.7)
         lhs_8 = LinearConstraintAtom(;)
-        rhs_8 = LinearConstraintAtom(; group = :Assets, name = 1, coef = -1)
+        rhs_8 = LinearConstraintAtom(; group = :Assets, name = 1, coef = -1, cnst = 4)
         lhs_9 = LinearConstraintAtom(; group = :Assets, name = 1)
         rhs_9 = LinearConstraintAtom(; group = [:Assets, :Assets], name = [1, 3],
-                                     coef = [1, -1])
-        lhs_10 = LinearConstraintAtom(; group = :Assets, name = 5)
+                                     coef = [1, -1], cnst = 5)
+        lhs_10 = LinearConstraintAtom(; group = :Assets, name = 5, cnst = -7)
         rhs_10 = LinearConstraintAtom(;)
-        lhs_11 = LinearConstraintAtom(; group = :Clusters, name = 3)
-        rhs_11 = LinearConstraintAtom(; group = :Clusters, name = 2)
+        lhs_11 = LinearConstraintAtom(; group = :Clusters, name = 3, cnst = 5)
+        rhs_11 = LinearConstraintAtom(; group = :Clusters, name = 2, cnst = 8)
         lhs_12 = LinearConstraintAtom(; group = [:Clusters, :Clusters], name = [1, 3],
-                                      coef = [1, 1])
-        rhs_12 = LinearConstraintAtom(; group = :Clusters, name = 2)
+                                      coef = [1, 1], cnst = -3)
+        rhs_12 = LinearConstraintAtom(; group = :Clusters, name = 2, cnst = 4)
         lhs_13 = LinearConstraintAtom(;)
         rhs_13 = LinearConstraintAtom(; group = [:Clusters, :Assets], name = [2, 7],
-                                      coef = [1, 1])
+                                      coef = [1, 1], cnst = 8)
 
         constr = [LinearConstraint(; lhs = lhs_1, rhs = rhs_1, comp = EQ()),
                   LinearConstraint(; lhs = lhs_2, rhs = rhs_2, comp = LEQ()),
@@ -89,7 +89,7 @@
         @test isnothing(B_eq)
 
         lhs = LinearConstraintAtom(; group = [:Foo], name = [20], coef = [5])
-        rhs = LinearConstraintAtom()
+        rhs = LinearConstraintAtom(; cnst = 0.35)
         (; ineq, eq) = linear_constraints(LinearConstraint(; lhs = lhs, rhs = rhs), sets)
         A_ineq, B_ineq = ineq.A, ineq.B
         A_eq, B_eq = eq.A, eq.B
@@ -105,12 +105,13 @@
         @test isnothing(lcs.name[1])
 
         lhs_1 = LinearConstraintAtom(; group = :Assets, name = 1)
-        rhs_1 = LinearConstraintAtom()
+        rhs_1 = LinearConstraintAtom(; cnst = 0.35)
         constr = LinearConstraint(; lhs = lhs_1, rhs = rhs_1, comp = EQ())
         @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
 
         lhs_1 = LinearConstraintAtom(; group = :Assets, name = 1)
-        rhs_1 = LinearConstraintAtom(; group = [:Foo], name = [:Bar], coef = [1])
+        rhs_1 = LinearConstraintAtom(; group = [:Foo], name = [:Bar], coef = [1],
+                                     cnst = 0.35)
         constr = LinearConstraint(; lhs = lhs_1, rhs = rhs_1, comp = EQ())
         @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
     end
