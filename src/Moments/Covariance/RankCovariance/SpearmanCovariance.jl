@@ -20,5 +20,9 @@ function StatsBase.cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1,
     std_vec = std(ce.ve, X; dims = 1)
     return corspearman(X) .* (std_vec ⊗ std_vec)
 end
+function moment_factory_w(ce::SpearmanCovariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return SpearmanCovariance(; ve = moment_factory_w(ce.ve, w))
+end
 
 export SpearmanCovariance

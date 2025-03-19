@@ -20,5 +20,9 @@ function StatsBase.cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1, 
     std_vec = std(ce.ve, X; dims = 1)
     return corkendall(X) .* (std_vec ⊗ std_vec)
 end
+function moment_factory_w(ce::KendallCovariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return KendallCovariance(; ve = moment_factory_w(ce.ve, w))
+end
 
 export KendallCovariance

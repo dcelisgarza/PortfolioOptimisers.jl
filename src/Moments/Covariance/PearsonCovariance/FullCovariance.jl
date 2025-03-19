@@ -14,5 +14,10 @@ function StatsBase.cor(ce::FullCovariance, X::AbstractMatrix; dims::Int = 1, kwa
     mu = mean(ce.me, X; dims = dims)
     return robust_cor(ce.ce, X; dims = dims, mean = mu)
 end
+function moment_factory_w(ce::FullCovariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return FullCovariance(; me = moment_factory_w(ce.me, w),
+                          ce = moment_factory_w(ce.ce, w))
+end
 
 export FullCovariance

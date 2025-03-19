@@ -1,16 +1,15 @@
-struct JamesSteinExpectedReturns{T1 <: StatsBase.CovarianceEstimator,
-                                 T2 <: ExpectedReturnsEstimator,
+struct JamesSteinExpectedReturns{T1 <: ExpectedReturnsEstimator,
+                                 T2 <: StatsBase.CovarianceEstimator,
                                  T3 <: ShrunkExpectedReturnsTarget} <:
        ShrunkExpectedReturnsEstimator
-    ce::T1
-    me::T2
+    me::T1
+    ce::T2
     target::T3
 end
-function JamesSteinExpectedReturns(;
+function JamesSteinExpectedReturns(; me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
                                    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                   me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
                                    target::ShrunkExpectedReturnsTarget = SERT_GrandMean())
-    return JamesSteinExpectedReturns{typeof(ce), typeof(me), typeof(target)}(ce, me, target)
+    return JamesSteinExpectedReturns{typeof(me), typeof(ce), typeof(target)}(me, ce, target)
 end
 function StatsBase.mean(me::JamesSteinExpectedReturns, X::AbstractMatrix; dims::Int = 1)
     mu = mean(me.me, X; dims = dims)
@@ -25,6 +24,11 @@ function StatsBase.mean(me::JamesSteinExpectedReturns, X::AbstractMatrix; dims::
     mb = mu - b
     alpha = (N * mean(evals) - 2 * maximum(evals)) / dot(mb, mb) / T
     return (1 - alpha) * mu + alpha * b
+end
+function moment_factory_w(ce::JamesSteinExpectedReturns,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return JamesSteinExpectedReturns(; me = moment_factory_w(ce.me, w),
+                                     ce = moment_factory_w(ce.ce, w), target = ce.target)
 end
 
 export JamesSteinExpectedReturns

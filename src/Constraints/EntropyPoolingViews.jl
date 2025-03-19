@@ -382,16 +382,12 @@ function entropy_pooling_views(pm::AbstractPriorModel,
 
     if !isempty(A_ineq)
         A_ineq = transpose(reshape(A_ineq, size(pm.X, 1), :))
-        A_ineq = convert.(typeof(promote(A_ineq...)[1]), A_ineq)
-        B_ineq = convert.(typeof(promote(B_ineq...)[1]), B_ineq)
     else
         A_ineq = nothing
         B_ineq = nothing
     end
     if !isempty(A_eq)
         A_eq = transpose(reshape(A_eq, size(pm.X, 1), :))
-        A_eq = convert.(typeof(promote(A_eq...)[1]), A_eq)
-        B_eq = convert.(typeof(promote(B_eq...)[1]), B_eq)
     else
         A_eq = nothing
         B_eq = nothing

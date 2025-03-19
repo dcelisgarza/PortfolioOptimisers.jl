@@ -87,7 +87,8 @@ function Base.getproperty(obj::HighOrderPriorModel, sym::Symbol)
 end
 struct HighOrderPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
                                T2 <: CokurtosisEstimator, T3 <: CokurtosisEstimator,
-                               T4 <: CoskewnessEstimator, T5 <: CoskewnessEstimator}
+                               T4 <: CoskewnessEstimator, T5 <: CoskewnessEstimator} <:
+       AbstractPriorEstimator_1o2_1o2
     pe::T1
     kte::T2
     skte::T3
@@ -102,6 +103,15 @@ function HighOrderPriorEstimator(;
                                  sske::CoskewnessEstimator = SemiCoskewness())
     return HighOrderPriorEstimator{typeof(pe), typeof(kte), typeof(skte), typeof(ske),
                                    typeof(sske)}(pe, kte, skte, ske, sske)
+end
+function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
+    return if sym == :me
+        obj.pe.me
+    elseif sym == :ce
+        obj.pe.ce
+    else
+        getfield(obj, sym)
+    end
 end
 function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,

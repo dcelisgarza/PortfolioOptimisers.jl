@@ -26,5 +26,9 @@ function StatsBase.cor(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::I
         robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean)
     end
 end
+function moment_factory_w(ce::GeneralWeightedCovariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return GeneralWeightedCovariance(; ce = ce.ce, w = w)
+end
 
 export GeneralWeightedCovariance

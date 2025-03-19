@@ -66,6 +66,38 @@ function EntropyPoolingPriorEstimator(;
                                                                              sets, alg, opt,
                                                                              p)
 end
+function Base.getproperty(obj::EntropyPoolingPriorEstimator, sym::Symbol)
+    return if sym == :me
+        obj.pe.me
+    elseif sym == :ce
+        obj.pe.ce
+    else
+        getfield(obj, sym)
+    end
+end
+struct EntropyPoolingModel{T1 <: AbstractPriorModel, T2 <: LinearConstraintModel,
+                           T3 <: AbstractVector} <: AbstractEntropyPoolingPriorModel
+    pm::T1
+    views::T2
+    p::T3
+end
+function EntropyPoolingModel(; pm::AbstractPriorModel, views::LinearConstraintModel,
+                             p::AbstractVector)
+    @smart_assert(!isempty(p))
+    @smart_assert(size(pm.X, 1) == length(p))
+    return EntropyPoolingModel{typeof(pm), typeof(views), typeof(p)}(pm, views, p)
+end
+function Base.getproperty(obj::EntropyPoolingModel, sym::Symbol)
+    return if sym == :X
+        obj.pm.X
+    elseif sym == :mu
+        obj.pm.mu
+    elseif sym == :sigma
+        obj.pm.sigma
+    else
+        getfield(obj, sym)
+    end
+end
 function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_EntropyPooling,
                                                 <:Any, <:Any}, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
@@ -85,10 +117,11 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_Entrop
     end
     @smart_assert(length(p) == T)
     @smart_assert(nrow(pe.sets) == N)
-    prior_model = prior(pe.pe, T * p .* X, F; strict = strict, kwargs...)
-    lc = entropy_pooling_views(prior_model, pe.views, pe.sets; strict = strict)
-    p = entropy_pooling(p, lc, pe.opt)
-    return prior(pe.pe, T * p .* X, F; strict = strict, kwargs...)
+    prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
+    views = entropy_pooling_views(prior_model, pe.views, pe.sets; strict = strict)
+    p = entropy_pooling(p, views, pe.opt)
+    return EntropyPoolingModel(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
+                               views = views, p = p)
 end
 function entropy_pooling(p::AbstractVector, epcs::LinearConstraintModel,
                          optim::OptimEntropyPooling)

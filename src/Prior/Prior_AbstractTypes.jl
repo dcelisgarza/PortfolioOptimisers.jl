@@ -20,6 +20,7 @@ abstract type AbstractPriorModel_AFV <: AbstractLowOrderPriorModel end
 abstract type AbstractPriorModel_AVFV <: AbstractLowOrderPriorModel end
 
 abstract type AbstractHighOrderPriorModel <: AbstractPriorModel end
+abstract type AbstractEntropyPoolingPriorModel <: AbstractPriorModel end
 
 abstract type AbstractPriorEstimator_1_0 <: AbstractPriorEstimator end
 abstract type AbstractPriorEstimator_2_1 <: AbstractPriorEstimator end

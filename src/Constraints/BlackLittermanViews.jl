@@ -112,8 +112,6 @@ function views_constraints(lcas::Union{<:LinearConstraintAtom,
 
     if !isempty(P)
         P = transpose(reshape(P, N, :))
-        P = convert.(typeof(promote(P...)[1]), P)
-        Q = convert.(typeof(promote(Q...)[1]), Q)
     end
 
     return BlackLittermanViewsModel(; P = P, Q = Q)

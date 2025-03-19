@@ -19,5 +19,9 @@ function StatsBase.mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims:
     w = !isnothing(me.w) ? me.w : fill(inv(size(sigma, 1)), size(sigma, 1))
     return me.l * sigma * w
 end
+function moment_factory_w(ce::EquilibriumExpectedReturns,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return EquilibriumExpectedReturns(; ce = moment_factory_w(ce.ce, w), l = ce.l, w = ce.w)
+end
 
 export EquilibriumExpectedReturns

@@ -1,16 +1,15 @@
-struct BayesSteinExpectedReturns{T1 <: StatsBase.CovarianceEstimator,
-                                 T2 <: ExpectedReturnsEstimator,
+struct BayesSteinExpectedReturns{T1 <: ExpectedReturnsEstimator,
+                                 T2 <: StatsBase.CovarianceEstimator,
                                  T3 <: ShrunkExpectedReturnsTarget} <:
        ShrunkExpectedReturnsEstimator
-    ce::T1
-    me::T2
+    me::T1
+    ce::T2
     target::T3
 end
-function BayesSteinExpectedReturns(;
+function BayesSteinExpectedReturns(; me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
                                    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                   me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
                                    target::ShrunkExpectedReturnsTarget = SERT_GrandMean())
-    return BayesSteinExpectedReturns{typeof(ce), typeof(me), typeof(target)}(ce, me, target)
+    return BayesSteinExpectedReturns{typeof(me), typeof(ce), typeof(target)}(me, ce, target)
 end
 function StatsBase.mean(me::BayesSteinExpectedReturns, X::AbstractMatrix; dims::Int = 1)
     mu = mean(me.me, X; dims = dims)
@@ -25,6 +24,11 @@ function StatsBase.mean(me::BayesSteinExpectedReturns, X::AbstractMatrix; dims::
     mb = vec(mu - b)
     alpha = (N + 2) / ((N + 2) + T * dot(mb, isigma, mb))
     return (one(alpha) - alpha) * mu + alpha * b
+end
+function moment_factory_w(ce::BayesSteinExpectedReturns,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return BayesSteinExpectedReturns(; me = moment_factory_w(ce.me, w),
+                                     ce = moment_factory_w(ce.ce, w), target = ce.target)
 end
 
 export BayesSteinExpectedReturns
