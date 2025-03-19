@@ -1147,15 +1147,30 @@ function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
 end
 function jlogo!(jlogo, sigma, source, sign)
     tmp = Matrix{eltype(sigma)}(undef, size(source, 2), size(source, 2))
-    for i ∈ axes(source, 1)
-        v = source[i, :]
-        idx = Iterators.product(v, v)
-        for (j, k) ∈ enumerate(idx) #! Do not change this enumerate to pairs.
-            tmp[j] = sigma[k[1], k[2]]
+
+    # Pre-compute indices for better cache locality
+    @inbounds for i ∈ axes(source, 1)
+        v = view(source, i, :)
+
+        # Fill temp matrix directly
+        idx = 1
+        for b ∈ axes(source, 2)
+            for a ∈ axes(source, 2)
+                tmp[idx] = sigma[v[a], v[b]]
+                idx += 1
+            end
         end
-        tmp = inv(tmp)
-        for (j, k) ∈ enumerate(idx) #! Do not change this enumerate to pairs.
-            jlogo[k[1], k[2]] += sign * tmp[j]
+
+        # Compute inverse once
+        tmp_inv = inv(tmp)
+
+        # Update jlogo matrix directly
+        idx = 1
+        for b ∈ axes(source, 2)
+            for a ∈ axes(source, 2)
+                jlogo[v[a], v[b]] += sign * tmp_inv[idx]
+                idx += 1
+            end
         end
     end
     return nothing
