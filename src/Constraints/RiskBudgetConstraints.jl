@@ -26,7 +26,7 @@ function set_risk_budget!(rb::AbstractVector,
 end
 function set_risk_budget!(rb::AbstractVector,
                           plca::PartialLinearConstraintAtom{<:Any, <:Any, <:Real},
-                          sets::DataFrame; strict::Bool = false)
+                          sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     (; group, name, coef) = plca
     if !(isnothing(group) || string(group) ∉ group_names)
@@ -58,7 +58,7 @@ function risk_budget_constraints(plcas::Union{<:PartialLinearConstraintAtom,
     rb = Vector{datatype}(undef, nrow(sets))
     fill!(rb, inv(nrow(sets)))
     for plc ∈ plcas
-        set_risk_budget!(rb, plc, sets; strict = strict)
+        set_risk_budget!(rb, plc, sets, strict)
     end
     rb ./= sum(rb)
     return rb

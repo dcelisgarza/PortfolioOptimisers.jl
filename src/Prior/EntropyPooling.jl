@@ -81,8 +81,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_Entrop
     @smart_assert(length(p) == T)
     @smart_assert(nrow(pe.sets) == N)
     prior_model = prior(pe.pe, T * p .* X, F; strict = strict, kwargs...)
-    lc = entropy_pooling_views(prior_model, pe.views, pe.sets; strict = strict,
-                               datatype = eltype(prior_model.X))
+    lc = entropy_pooling_views(prior_model, pe.views, pe.sets; strict = strict)
     p = entropy_pooling(p, lc, pe.opt)
     return prior(pe.pe, T * p .* X, F; strict = strict, kwargs...)
 end
@@ -90,8 +89,6 @@ function entropy_pooling(p::AbstractVector, epcs::LinearConstraintModel,
                          optim::OptimEntropyPooling)
     (; A_eq, B_eq, A_ineq, B_ineq) = epcs
     lhs, rhs, lb, ub = if !isnothing(A_eq) && !isnothing(B_eq)
-        @smart_assert(!isempty(A_eq))
-        @smart_assert(!isempty(B_eq))
         A_eq = vcat(ones(eltype(A_eq), 1, size(A_eq, 2)), A_eq)
         B_eq = vcat(eltype(B_eq)[1], B_eq)
         A_eq, B_eq, fill(-Inf, length(B_eq)), fill(Inf, length(B_eq))
@@ -99,9 +96,7 @@ function entropy_pooling(p::AbstractVector, epcs::LinearConstraintModel,
         ones(eltype(p), 1, length(p)), eltype(p)[1], [-Inf], [Inf]
     end
     lhs_ineq, rhs_ineq, lb_ineq, ub_ineq = if !isnothing(A_ineq) && !isnothing(B_ineq)
-        @smart_assert(!isempty(A_ineq))
-        @smart_assert(!isempty(B_ineq))
-        A_ineq, B_ineq, fill(-Inf, length(B_ineq)), fill(Inf, length(B_ineq))
+        A_ineq, B_ineq, fill(0, length(B_ineq)), fill(Inf, length(B_ineq))
     else
         nothing, nothing, nothing, nothing
     end
@@ -112,7 +107,7 @@ function entropy_pooling(p::AbstractVector, epcs::LinearConstraintModel,
         ub = vcat(ub, ub_ineq)
     end
     log_p = log.(p)
-    x0 = zeros(size(lhs, 1))
+    x0 = fill(inv(length(p)), size(lhs, 1))
     G = similar(x0)
     last_x = similar(x0)
     grad = similar(G)
@@ -128,12 +123,12 @@ function entropy_pooling(p::AbstractVector, epcs::LinearConstraintModel,
     end
     function f(x)
         common_op(x)
-        return scale * (dot(x, grad) - dot(y, log_x - log_p))
+        return optim.scale * (dot(x, grad) - dot(y, log_x - log_p))
     end
     function g!(G, x)
         common_op(x)
         G .= grad
-        return scale * G
+        return optim.scale * G
     end
     result = Optim.optimize(f, g!, lb, ub, x0, optim.args...; optim.kwargs...)
     # Compute posterior probabilities

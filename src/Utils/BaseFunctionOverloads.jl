@@ -16,8 +16,8 @@ for (op, name) ∈
          RelativisticValueatRisk, TailGini, WorstRealisation, AverageDrawdown,
          ConditionalDrawdownatRisk, EntropicDrawdownatRisk, MaximumDrawdown,
          RelativisticDrawdownatRisk, UlcerIndex, TrackingRiskMeasure, TurnoverRiskMeasure,
-         OrderedWeightsArray, C0_EntropyPoolingView, C1_EntropyPoolingView,
-         C2_EntropyPoolingView, C4_EntropyPoolingView),
+         OrderedWeightsArray, EntropyPoolingView, C0_EntropyPoolingView,
+         C1_EntropyPoolingView, C2_EntropyPoolingView, C4_EntropyPoolingView),
         ("Solver", "LinearConstraint", "PartialLinearConstraintAtom",
          "LinearConstraintAtom", "MeanReturn", "Skewness", "ThirdCentralMoment",
          "FourthLowerPartialMoment", "SemiKurtosis", "SemiSkewness",
@@ -37,8 +37,9 @@ for (op, name) ∈
          "RelativisticValueatRisk", "TailGini", "WorstRealisation", "AverageDrawdown",
          "ConditionalDrawdownatRisk", "EntropicDrawdownatRisk", "MaximumDrawdown",
          "RelativisticDrawdownatRisk", "UlcerIndex", "TrackingRiskMeasure",
-         "TurnoverRiskMeasure", "OrderedWeightsArray", "C0_EntropyPoolingView",
-         "C1_EntropyPoolingView", "C2_EntropyPoolingView", "C4_EntropyPoolingView"))
+         "TurnoverRiskMeasure", "OrderedWeightsArray", "EntropyPoolingView",
+         "C0_EntropyPoolingView", "C1_EntropyPoolingView", "C2_EntropyPoolingView",
+         "C4_EntropyPoolingView"))
     eval(quote
              Base.iterate(S::$op, state = 1) = state > 1 ? nothing : (S, state + 1)
              function Base.String(s::$op)

@@ -119,11 +119,8 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
     A_eq = Vector{datatype}(undef, 0)
     B_eq = Vector{datatype}(undef, 0)
     for lc ∈ lcs
-        lhs = lc.lhs
-        rhs = lc.rhs
-
-        lhs_A, lhs_B = get_asset_constraint_data(lhs, sets, strict)
-        rhs_A, rhs_B = get_asset_constraint_data(rhs, sets, strict)
+        lhs_A, lhs_B = get_asset_constraint_data(lc.lhs, sets, strict)
+        rhs_A, rhs_B = get_asset_constraint_data(lc.rhs, sets, strict)
 
         lhs_flag = isempty(lhs_A) || all(iszero.(lhs_A))
         rhs_flag = isempty(rhs_A) || all(iszero.(rhs_A))

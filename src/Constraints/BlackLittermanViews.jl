@@ -11,7 +11,7 @@ end
 function get_black_litterman_views_data(lca::LinearConstraintAtom{<:PartialLinearConstraintAtom{<:AbstractVector,
                                                                                                 <:AbstractVector,
                                                                                                 <:AbstractVector},
-                                                                  <:Real}, sets::DataFrame;
+                                                                  <:Real}, sets::DataFrame,
                                         strict::Bool = false)
     group_names = names(sets)
     N = nrow(sets)
@@ -53,7 +53,7 @@ end
 function get_black_litterman_views_data(lca::LinearConstraintAtom{<:PartialLinearConstraintAtom{<:Any,
                                                                                                 <:Any,
                                                                                                 <:Real},
-                                                                  <:Real}, sets::DataFrame;
+                                                                  <:Real}, sets::DataFrame,
                                         strict::Bool = false)
     group_names = names(sets)
     N = nrow(sets)
@@ -100,7 +100,7 @@ function views_constraints(lcas::Union{<:LinearConstraintAtom,
     Q = Vector{datatype}(undef, 0)
 
     for lc ∈ lcas
-        lc_A, lc_B = get_black_litterman_views_data(lc, sets; strict = strict)
+        lc_A, lc_B = get_black_litterman_views_data(lc, sets, strict)
 
         if isempty(lc_A) || all(iszero.(lc_A))
             continue
