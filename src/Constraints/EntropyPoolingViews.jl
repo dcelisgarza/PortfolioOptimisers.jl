@@ -110,8 +110,9 @@ struct C0_EntropyPoolingView{T1 <: LinearEntropyConstraintAtom,
     comp::T3
     kind::T4
 end
-function C0_EntropyPoolingView(; lhs::LinearEntropyConstraintAtom,
-                               rhs::LinearEntropyConstraintAtom,
+function C0_EntropyPoolingView(;
+                               lhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
+                               rhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
                                comp::ComparisonOperators = LEQ(),
                                kind::MeanEntropyPoolingViewKind = AbsoluteMeanEntropyPoolingView())
     return C0_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,
@@ -127,8 +128,9 @@ struct C1_EntropyPoolingView{T1 <: LinearEntropyConstraintAtom,
     comp::T3
     kind::T4
 end
-function C1_EntropyPoolingView(; lhs::LinearEntropyConstraintAtom,
-                               rhs::LinearEntropyConstraintAtom,
+function C1_EntropyPoolingView(;
+                               lhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
+                               rhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
                                comp::ComparisonOperators = LEQ(),
                                kind::VolatilityEntropyPoolingViewKind = AbsoluteVolatilityEntropyPoolingView())
     return C1_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,
@@ -144,8 +146,9 @@ struct C2_EntropyPoolingView{T1 <: LinearEntropyConstraintAtom,
     comp::T3
     kind::T4
 end
-function C2_EntropyPoolingView(; lhs::LinearEntropyConstraintAtom,
-                               rhs::LinearEntropyConstraintAtom,
+function C2_EntropyPoolingView(;
+                               lhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
+                               rhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
                                comp::ComparisonOperators = LEQ(),
                                kind::SkewKurtEntropyPoolingViewKind = SkewnessEntropyPoolingView())
     return C2_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,
@@ -162,8 +165,9 @@ struct C4_EntropyPoolingView{T1 <: QuadraticEntropyConstraintAtom,
     comp::T3
     kind::T4
 end
-function C4_EntropyPoolingView(; lhs::QuadraticEntropyConstraintAtom,
-                               rhs::QuadraticEntropyConstraintAtom,
+function C4_EntropyPoolingView(;
+                               lhs::QuadraticEntropyConstraintAtom = QuadraticEntropyConstraintAtom(),
+                               rhs::QuadraticEntropyConstraintAtom = QuadraticEntropyConstraintAtom(),
                                comp::ComparisonOperators = LEQ(),
                                kind::CorrelationEntropyPoolingViewKind = AbsoluteCorrelationEntropyPoolingView())
     return C4_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,

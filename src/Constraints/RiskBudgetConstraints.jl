@@ -2,7 +2,7 @@ function set_risk_budget!(rb::AbstractVector,
                           plca::PartialLinearConstraintAtom{<:AbstractVector,
                                                             <:AbstractVector,
                                                             <:AbstractVector},
-                          sets::DataFrame; strict::Bool = false)
+                          sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     for (group, name, coef) ∈ zip(plca.group, plca.name, plca.coef)
         if !(isnothing(group) || string(group) ∉ group_names)

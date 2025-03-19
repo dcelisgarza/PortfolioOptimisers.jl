@@ -8,7 +8,8 @@ struct LinearConstraint{T1 <: LinearConstraintAtom, T2 <: LinearConstraintAtom,
     comp::T3
     kind::T4
 end
-function LinearConstraint(; lhs::LinearConstraintAtom, rhs::LinearConstraintAtom,
+function LinearConstraint(; lhs::LinearConstraintAtom = LinearConstraintAtom(),
+                          rhs::LinearConstraintAtom = LinearConstraintAtom(),
                           comp::ComparisonOperators = LEQ(),
                           kind::LinearConstraintKind = AssetLinearConstraint())
     return LinearConstraint{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs, rhs,
