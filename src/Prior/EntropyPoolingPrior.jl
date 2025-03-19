@@ -33,8 +33,8 @@ function JuMPEntropyPooling(; solvers::Union{<:Solver, <:AbstractVector{<:Solver
                                                                                         solvers)
 end
 struct EntropyPoolingPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
-                                    T2 <: Union{<:LinearConstraint,
-                                                <:AbstractVector{<:LinearConstraint}},
+                                    T2 <: Union{<:EntropyPoolingView,
+                                                <:AbstractVector{<:EntropyPoolingView}},
                                     T3 <: DataFrame, T4 <: EntropyPoolingAlgorithm,
                                     T5 <: EntropyPoolingOptimisation,
                                     T6 <: Union{Nothing, <:AbstractVector}} <:
@@ -48,8 +48,8 @@ struct EntropyPoolingPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
 end
 function EntropyPoolingPriorEstimator(;
                                       pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
-                                      views::Union{<:LinearConstraint,
-                                                   <:AbstractVector{<:LinearConstraint}} = LinearConstraint(),
+                                      views::Union{<:EntropyPoolingView,
+                                                   <:AbstractVector{<:EntropyPoolingView}} = C0_EntropyPoolingView(),
                                       sets::DataFrame = DataFrame(),
                                       alg::EntropyPoolingAlgorithm = H0_EntropyPooling(),
                                       opt::EntropyPoolingOptimisation = OptimEntropyPooling(),
@@ -57,9 +57,14 @@ function EntropyPoolingPriorEstimator(;
     if isa(views, AbstractVector)
         @smart_assert(!isempty(views))
     end
+    if isa(p, AbstractVector)
+        @smart_assert(!isempty(p))
+        p = p / sum(p)
+    end
     return EntropyPoolingPriorEstimator{typeof(pe), typeof(views), typeof(sets),
                                         typeof(alg), typeof(opt), typeof(p)}(pe, views,
-                                                                             sets, opt, p)
+                                                                             sets, alg, opt,
+                                                                             p)
 end
 function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_EntropyPooling,
                                                 <:Any, <:Any}, X::AbstractMatrix,
@@ -74,7 +79,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_Entrop
     end
     T, N = size(X)
     p = if isnothing(pe.p)
-        fill(inv(T), T)
+        range(; start = inv(T), stop = inv(T), length = T)
     else
         pe.p
     end
@@ -173,4 +178,4 @@ function entropy_pooling(p::AbstractVector, epcs::LinearConstraintModel,
 end
 
 export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling, OptimEntropyPooling,
-       JuMPEntropyPooling, entropy_pooling
+       JuMPEntropyPooling, entropy_pooling, EntropyPoolingPriorEstimator

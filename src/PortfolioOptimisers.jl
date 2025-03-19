@@ -222,7 +222,7 @@ include("./Prior/FactorBlackLittermanPrior.jl")
 include("./Prior/AugmentedBlackLittermanPrior.jl")
 include("./Prior/HighOrderPrior.jl")
 include("./Constraints/EntropyPoolingViews.jl")
-include("./Prior/EntropyPooling.jl")
+include("./Prior/EntropyPoolingPrior.jl")
 
 # Uncertainty sets
 include("./UncertaintySets/UncertaintySets_AbstractTypes.jl")

@@ -223,16 +223,16 @@ end
 function A_B_entropy_pooling_stats(::AbsoluteCorrelationEntropyPoolingView,
                                    pm::AbstractPriorModel, idx1::AbstractVector,
                                    idx2::AbstractVector, coef::Real, cnst::Real)
-    return coef * (pm.X[:, idx1] .- transpose(pm.mu[idx1])) .*
-           (pm.X[:, idx2] .- transpose(pm.mu[idx2])), [cnst]
+    return coef * vec((pm.X[:, idx1] .- transpose(pm.mu[idx1])) .*
+                      (pm.X[:, idx2] .- transpose(pm.mu[idx2]))), [cnst]
 end
 function A_B_entropy_pooling_stats(::RelativeCorrelationEntropyPoolingView,
                                    pm::AbstractPriorModel, idx1::AbstractVector,
                                    idx2::AbstractVector, coef::Real, cnst::Real)
     dsigma = diag(pm.sigma)
     B = cnst * vec(sqrt.(dsigma[idx1]) .* sqrt.(dsigma[idx2]))
-    return coef * (pm.X[:, idx1] .- transpose(pm.mu[idx1])) .*
-           (pm.X[:, idx2] .- transpose(pm.mu[idx2])), B
+    return coef * vec((pm.X[:, idx1] .- transpose(pm.mu[idx1])) .*
+                      (pm.X[:, idx2] .- transpose(pm.mu[idx2]))), B
 end
 function get_entropy_pooling_view_data(pm::AbstractPriorModel,
                                        lca::LinearEntropyConstraintAtom{<:PartialLinearConstraintAtom{<:Any,
@@ -295,7 +295,7 @@ function get_entropy_pooling_view_data(pm::AbstractPriorModel,
                 isnothing(group2) ||
                 string(group2) ∉ group_names)
         idx1 = sets[!, group1] .== name1
-        idx2 = sets[!, group1] .== name2
+        idx2 = sets[!, group2] .== name2
         A_B_entropy_pooling_stats(kind, pm, idx1, idx2, coef, cnst)
     elseif strict
         throw(ArgumentError("$(string(group1)) or $(string(group2)) is not in $(group_names).\n$(lca)"))
@@ -364,11 +364,11 @@ function entropy_pooling_views(pm::AbstractPriorModel,
 
         d, flag_ineq = comparison_sign_ineq_flag(lc.comp)
         rlhs_A, rlhs_B = if lhs_flag
-            -rhs_A * d, -lhs_B * d
+            -rhs_A * d, rhs_B * d
         elseif rhs_flag
-            lhs_A * d, lhs_B * d
+            lhs_A * d, -lhs_B * d
         else
-            (lhs_A .- rhs_A) * d, (rhs_B .- lhs_B) * d
+            (lhs_A - rhs_A) * d, (rhs_B - lhs_B) * d
         end
 
         if flag_ineq
