@@ -1,6 +1,10 @@
 abstract type EntropyPoolingViewKind end
-struct AbsoluteEntropyPoolingView <: EntropyPoolingViewKind end
-struct RelativeEntropyPoolingView <: EntropyPoolingViewKind end
+abstract type AbsRelEntropyPoolingViewKind <: EntropyPoolingViewKind end
+struct AbsoluteEntropyPoolingView <: AbsRelEntropyPoolingViewKind end
+struct RelativeEntropyPoolingView <: AbsRelEntropyPoolingViewKind end
+abstract type SkewKurtEntropyPoolingViewKind <: EntropyPoolingViewKind end
+struct SkewnessEntropyPoolingView <: SkewKurtEntropyPoolingViewKind end
+struct KurtosisEntropyPoolingView <: SkewKurtEntropyPoolingViewKind end
 struct EntropyConstraintAtom{T1 <: PartialLinearConstraintAtom,
                              T2 <: Union{<:Real, <:AbstractVector{<:Real}}}
     plca::T1
@@ -116,7 +120,7 @@ function get_mean_entropy_pooling_data(pm::AbstractPriorModel,
                                                                                                 <:Any,
                                                                                                 <:Real},
                                                                   <:Real},
-                                       kind::EntropyPoolingViewKind, sets::DataFrame;
+                                       kind::EntropyPoolingViewKind, sets::DataFrame,
                                        strict::Bool = false)
     group_names = names(sets)
     (; group, name, coef, cnst) = lca
@@ -140,7 +144,7 @@ function get_mean_entropy_pooling_data(pm::AbstractPriorModel,
                                                                                                 <:AbstractVector,
                                                                                                 <:AbstractVector},
                                                                   <:AbstractVector},
-                                       kind::EntropyPoolingViewKind, sets::DataFrame;
+                                       kind::EntropyPoolingViewKind, sets::DataFrame,
                                        strict::Bool = false)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
@@ -173,7 +177,7 @@ function get_vol_entropy_pooling_data(pm::AbstractPriorModel,
                                                                                                <:Any,
                                                                                                <:Real},
                                                                  <:Real},
-                                      kind::EntropyPoolingViewKind, sets::DataFrame;
+                                      kind::EntropyPoolingViewKind, sets::DataFrame,
                                       strict::Bool = false)
     group_names = names(sets)
     (; group, name, coef, cnst) = lca
@@ -197,7 +201,7 @@ function get_vol_entropy_pooling_data(pm::AbstractPriorModel,
                                                                                                <:AbstractVector,
                                                                                                <:AbstractVector},
                                                                  <:AbstractVector},
-                                      kind::EntropyPoolingViewKind, sets::DataFrame;
+                                      kind::EntropyPoolingViewKind, sets::DataFrame,
                                       strict::Bool = false)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
@@ -230,9 +234,10 @@ function get_skew_kurt_entropy_pooling_data(pm::AbstractPriorModel,
                                                                                                      <:Any,
                                                                                                      <:Real},
                                                                        <:Real},
-                                            sets::DataFrame, skew::Bool = true;
+                                            sets::DataFrame,
+                                            skew::SkewKurtEntropyPoolingViewKind,
                                             strict::Bool = false)
-    d = skew ? 3 : 4
+    d = isa(skew, SkewnessEntropyPoolingView) ? 3 : 4
     group_names = names(sets)
     (; group, name, coef, cnst) = lca
     if !(isnothing(group) || string(group) ∉ group_names)
@@ -252,9 +257,10 @@ function get_skew_kurt_entropy_pooling_data(pm::AbstractPriorModel,
                                                                                                      <:AbstractVector,
                                                                                                      <:AbstractVector},
                                                                        <:AbstractVector},
-                                            sets::DataFrame, skew::Bool = true;
+                                            sets::DataFrame,
+                                            skew::SkewKurtEntropyPoolingViewKind,
                                             strict::Bool = false)
-    d = skew ? 3 : 4
+    d = isa(skew, SkewnessEntropyPoolingView) ? 3 : 4
     group_names = names(sets)
     T = size(pm.X, 1)
     A = Vector{eltype(pm.X)}(undef, 0)
@@ -283,7 +289,7 @@ function get_cor_entropy_pooling_data(pm::AbstractPriorModel,
                                       lca::QuadraticEntropyConstraintAtom{<:Any, <:Any,
                                                                           <:Any, <:Any,
                                                                           <:Real, <:Real},
-                                      kind::EntropyPoolingViewKind, sets::DataFrame;
+                                      kind::AbsRelEntropyPoolingViewKind, sets::DataFrame,
                                       strict::Bool = false)
     group_names = names(sets)
     (; group1, name1, group2, name2, coef, cnst) = lca
@@ -314,7 +320,7 @@ function get_cor_entropy_pooling_data(pm::AbstractPriorModel,
                                                                           <:AbstractVector,
                                                                           <:AbstractVector,
                                                                           <:AbstractVector},
-                                      kind::EntropyPoolingViewKind, sets::DataFrame;
+                                      kind::AbsRelEntropyPoolingViewKind, sets::DataFrame,
                                       strict::Bool = false)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
@@ -358,8 +364,8 @@ export EntropyConstraintAtom, MeanEntropyPoolingConstraint, AbsoluteEntropyPooli
 
 abstract type EntropyPoolingView end
 struct C0_EntropyPoolingView{T1 <: EntropyConstraintAtom, T2 <: EntropyConstraintAtom,
-                             T3 <: ComparisonOperators, T4 <: EntropyPoolingViewKind} <:
-       EntropyPoolingView
+                             T3 <: ComparisonOperators,
+                             T4 <: AbsRelEntropyPoolingViewKind} <: EntropyPoolingView
     lhs::T1
     rhs::T2
     comp::T3
@@ -367,15 +373,15 @@ struct C0_EntropyPoolingView{T1 <: EntropyConstraintAtom, T2 <: EntropyConstrain
 end
 function C0_EntropyPoolingView(; lhs::EntropyConstraintAtom, rhs::EntropyConstraintAtom,
                                comp::ComparisonOperators = LEQ(),
-                               kind::EntropyPoolingViewKind = AbsoluteEntropyPoolingView())
+                               kind::AbsRelEntropyPoolingViewKind = AbsoluteEntropyPoolingView())
     return C0_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,
                                                                                        rhs,
                                                                                        comp,
                                                                                        kind)
 end
 struct C1_EntropyPoolingView{T1 <: EntropyConstraintAtom, T2 <: EntropyConstraintAtom,
-                             T3 <: ComparisonOperators, T4 <: EntropyPoolingViewKind} <:
-       EntropyPoolingView
+                             T3 <: ComparisonOperators,
+                             T4 <: AbsRelEntropyPoolingViewKind} <: EntropyPoolingView
     lhs::T1
     rhs::T2
     comp::T3
@@ -383,7 +389,7 @@ struct C1_EntropyPoolingView{T1 <: EntropyConstraintAtom, T2 <: EntropyConstrain
 end
 function C1_EntropyPoolingView(; lhs::EntropyConstraintAtom, rhs::EntropyConstraintAtom,
                                comp::ComparisonOperators = LEQ(),
-                               kind::EntropyPoolingViewKind = AbsoluteEntropyPoolingView())
+                               kind::AbsRelEntropyPoolingViewKind = AbsoluteEntropyPoolingView())
     return C1_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,
                                                                                        rhs,
                                                                                        comp,
@@ -399,7 +405,7 @@ struct C2_EntropyPoolingView{T1 <: EntropyConstraintAtom, T2 <: EntropyConstrain
 end
 function C2_EntropyPoolingView(; lhs::EntropyConstraintAtom, rhs::EntropyConstraintAtom,
                                comp::ComparisonOperators = LEQ(),
-                               kind::EntropyPoolingViewKind = AbsoluteEntropyPoolingView())
+                               kind::SkewKurtEntropyPoolingViewKind = SkewnessEntropyPoolingView())
     return C2_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,
                                                                                        rhs,
                                                                                        comp,
@@ -417,7 +423,7 @@ end
 function C4_EntropyPoolingView(; lhs::QuadraticEntropyConstraintAtom,
                                rhs::QuadraticEntropyConstraintAtom,
                                comp::ComparisonOperators = LEQ(),
-                               kind::EntropyPoolingViewKind = AbsoluteEntropyPoolingView())
+                               kind::AbsRelEntropyPoolingViewKind = AbsoluteEntropyPoolingView())
     return C4_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,
                                                                                        rhs,
                                                                                        comp,
@@ -437,6 +443,90 @@ function get_view_level(::C4_EntropyPoolingView)
 end
 function Base.isless(a::EntropyPoolingView, b::EntropyPoolingView)
     return Base.isless(get_view_level(a), get_view_level(b))
+end
+function get_entropy_pooling_view_data(pm::AbstractPriorModel, lc::C0_EntropyPoolingView,
+                                       sets, left::Bool = true, strict::Bool = false)
+    hs = left ? lc.lhs : lc.rhs
+    return get_mean_entropy_pooling_data(pm, hs, lc.kind, sets, strict)
+end
+function get_entropy_pooling_view_data(pm::AbstractPriorModel, lc::C1_EntropyPoolingView,
+                                       sets, left::Bool = true, strict::Bool = false)
+    hs = left ? lc.lhs : lc.rhs
+    return get_vol_entropy_pooling_data(pm, hs, lc.kind, sets, strict)
+end
+function get_entropy_pooling_view_data(pm::AbstractPriorModel, lc::C2_EntropyPoolingView,
+                                       sets, left::Bool = true, strict::Bool = false)
+    hs = left ? lc.lhs : lc.rhs
+    return get_skew_kurt_entropy_pooling_data(pm, hs, lc.kind, sets, strict)
+end
+function get_entropy_pooling_view_data(pm::AbstractPriorModel, lc::C4_EntropyPoolingView,
+                                       sets, left::Bool = true, strict::Bool = false)
+    hs = left ? lc.lhs : lc.rhs
+    return get_cor_entropy_pooling_data(pm, hs, lc.kind, sets, strict)
+end
+function entropy_pooling_views(pm::AbstractPriorModel,
+                               lcs::Union{<:EntropyPoolingView,
+                                          <:AbstractVector{<:EntropyPoolingView}},
+                               sets::DataFrame; datatype::Type = Float64,
+                               strict::Bool = false)
+    if isa(lcs, AbstractVector)
+        @smart_assert(!isempty(lcs))
+    end
+    @smart_assert(!isempty(sets))
+    N = nrow(sets)
+    A_ineq = Vector{datatype}(undef, 0)
+    B_ineq = Vector{datatype}(undef, 0)
+    A_eq = Vector{datatype}(undef, 0)
+    B_eq = Vector{datatype}(undef, 0)
+    for lc ∈ lcs
+        lhs_A, lhs_B = get_entropy_pooling_view_data(pm, lc, sets, true, strict)
+        rhs_A, rhs_B = get_entropy_pooling_view_data(pm, lc, sets, false, strict)
+
+        lhs_flag = isempty(lhs_A) || all(iszero.(lhs_A))
+        rhs_flag = isempty(rhs_A) || all(iszero.(rhs_A))
+
+        if lhs_flag && rhs_flag
+            continue
+        end
+
+        d, flag_ineq = comparison_sign_ineq_flag(lc.comp)
+        rlhs_A = if lhs_flag
+            -rhs_A * d
+        elseif rhs_flag
+            lhs_A * d
+        end
+        rlhs_B = (rhs_B - lhs_B) * d
+
+        if flag_ineq
+            append!(A_ineq, rlhs_A)
+            append!(B_ineq, rlhs_B)
+        else
+            append!(A_eq, rlhs_A)
+            append!(B_eq, rlhs_B)
+        end
+    end
+
+    if !isempty(A_ineq)
+        A_ineq = transpose(reshape(A_ineq, N, :))
+        A_ineq = convert.(typeof(promote(A_ineq...)[1]), A_ineq)
+        B_ineq = convert.(typeof(promote(B_ineq...)[1]), B_ineq)
+    else
+        A_ineq = nothing
+        B_ineq = nothing
+    end
+    if !isempty(A_eq)
+        A_eq = transpose(reshape(A_eq, N, :))
+        A_eq = convert.(typeof(promote(A_eq...)[1]), A_eq)
+        B_eq = convert.(typeof(promote(B_eq...)[1]), B_eq)
+    else
+        A_eq = nothing
+        B_eq = nothing
+    end
+
+    return LinearConstraintModel(;
+                                 ineq = PartialLinearConstraintModel(; A = A_ineq,
+                                                                     B = B_ineq),
+                                 eq = PartialLinearConstraintModel(; A = A_eq, B = B_eq))
 end
 
 export C0_EntropyPoolingView, C1_EntropyPoolingView, C2_EntropyPoolingView,

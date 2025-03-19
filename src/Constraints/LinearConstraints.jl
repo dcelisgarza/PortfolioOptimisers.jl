@@ -60,7 +60,7 @@ end
 function get_asset_constraint_data(lca::LinearConstraintAtom{<:PartialLinearConstraintAtom{<:AbstractVector,
                                                                                            <:AbstractVector,
                                                                                            <:AbstractVector},
-                                                             <:Real}, sets::DataFrame;
+                                                             <:Real}, sets::DataFrame,
                                    strict::Bool = false)
     group_names = names(sets)
     N = nrow(sets)
@@ -87,7 +87,7 @@ end
 function get_asset_constraint_data(lca::LinearConstraintAtom{<:PartialLinearConstraintAtom{<:Any,
                                                                                            <:Any,
                                                                                            <:Real},
-                                                             <:Real}, sets::DataFrame;
+                                                             <:Real}, sets::DataFrame,
                                    strict::Bool = false)
     group_names = names(sets)
     N = nrow(sets)
@@ -122,8 +122,8 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
         lhs = lc.lhs
         rhs = lc.rhs
 
-        lhs_A, lhs_B = get_asset_constraint_data(lhs, sets; strict = strict)
-        rhs_A, rhs_B = get_asset_constraint_data(rhs, sets; strict = strict)
+        lhs_A, lhs_B = get_asset_constraint_data(lhs, sets, strict)
+        rhs_A, rhs_B = get_asset_constraint_data(rhs, sets, strict)
 
         lhs_flag = isempty(lhs_A) || all(iszero.(lhs_A))
         rhs_flag = isempty(rhs_A) || all(iszero.(rhs_A))
