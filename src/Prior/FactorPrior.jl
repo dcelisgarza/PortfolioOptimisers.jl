@@ -49,7 +49,8 @@ struct FactorPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1, T2 <: MatrixPro
     ve::T4
     residuals::T5
 end
-function FactorPriorEstimator(; pe::AbstractPriorEstimatorMap_2_1 = FactorPriorEstimator(),
+function FactorPriorEstimator(;
+                              pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                               mp::MatrixProcessing = DefaultMatrixProcessing(),
                               re::RegressionMethod = ForwardRegression(),
                               ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
