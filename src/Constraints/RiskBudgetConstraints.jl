@@ -1,8 +1,7 @@
 function set_risk_budget!(rb::AbstractVector,
-                          plca::PartialLinearConstraintAtom{<:AbstractVector,
-                                                            <:AbstractVector,
-                                                            <:AbstractVector},
-                          sets::DataFrame, strict::Bool = false)
+                          plca::A_LinearConstraint{<:AbstractVector, <:AbstractVector,
+                                                   <:AbstractVector}, sets::DataFrame,
+                          strict::Bool = false)
     group_names = names(sets)
     for (group, name, coef) ∈ zip(plca.group, plca.name, plca.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
@@ -25,8 +24,8 @@ function set_risk_budget!(rb::AbstractVector,
     return nothing
 end
 function set_risk_budget!(rb::AbstractVector,
-                          plca::PartialLinearConstraintAtom{<:Any, <:Any, <:Real},
-                          sets::DataFrame, strict::Bool = false)
+                          plca::A_LinearConstraint{<:Any, <:Any, <:Real}, sets::DataFrame,
+                          strict::Bool = false)
     group_names = names(sets)
     (; group, name, coef) = plca
     if !(isnothing(group) || string(group) ∉ group_names)
@@ -47,8 +46,8 @@ function set_risk_budget!(rb::AbstractVector,
     end
     return nothing
 end
-function risk_budget_constraints(plcas::Union{<:PartialLinearConstraintAtom,
-                                              <:AbstractVector{<:PartialLinearConstraintAtom}},
+function risk_budget_constraints(plcas::Union{<:A_LinearConstraint,
+                                              <:AbstractVector{<:A_LinearConstraint}},
                                  sets::DataFrame; datatype::Type = Float64,
                                  strict::Bool = false)
     if isa(plcas, AbstractVector)

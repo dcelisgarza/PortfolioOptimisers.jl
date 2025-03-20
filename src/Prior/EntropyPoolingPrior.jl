@@ -49,7 +49,7 @@ end
 function EntropyPoolingPriorEstimator(;
                                       pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
                                       views::Union{<:EntropyPoolingView,
-                                                   <:AbstractVector{<:EntropyPoolingView}} = C0_EntropyPoolingView(),
+                                                   <:AbstractVector{<:EntropyPoolingView}} = EntropyPoolingView(),
                                       sets::DataFrame = DataFrame(),
                                       alg::EntropyPoolingAlgorithm = H0_EntropyPooling(),
                                       opt::EntropyPoolingOptimisation = OptimEntropyPooling(),
@@ -123,7 +123,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_Entrop
     @smart_assert(length(w) == T)
     @smart_assert(nrow(pe.sets) == N)
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
-    views = entropy_pooling_views(prior_model, pe.views, pe.sets; strict = strict)
+    views = entropy_pooling_views(prior_model, pe.views, pe.sets, w; strict = strict)
     w = entropy_pooling(w, views, pe.opt)
     pe = moment_factory_w(pe, w)
     return EntropyPoolingModel(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
@@ -153,17 +153,18 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H1_Entrop
     @smart_assert(length(w0) == T)
     @smart_assert(nrow(pe.sets) == N)
     wi = w0
-    vls = get_view_level.(pe.views)
+    views = sort(pe.views)
+    vls = get_view_level.(views)
     uvls = sort!(unique(vls))
+    mask = falses(length(views))
     for uvl ∈ uvls
         pe = moment_factory_w(pe, wi)
-        idx = vls .== uvl
+        idx = mask .|| (vls .== uvl)
         prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
-        (; A_ineq, B_ineq, A_eq, B_eq) = views = entropy_pooling_views(prior_model,
-                                                                       pe.views[idx],
-                                                                       pe.sets;
-                                                                       strict = strict)
-        wi = entropy_pooling(w0, views, pe.opt)
+        (; A_ineq, B_ineq, A_eq, B_eq) = lcm = entropy_pooling_views(prior_model,
+                                                                     views[idx], pe.sets,
+                                                                     wi; strict = strict)
+        wi = entropy_pooling(w0, lcm, pe.opt)
         if !isnothing(A_ineq)
             append!(all_A_ineq, vec(A_ineq))
             append!(all_B_ineq, B_ineq)
@@ -172,7 +173,10 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H1_Entrop
             append!(all_A_eq, vec(A_eq))
             append!(all_B_eq, B_eq)
         end
+        views[idx] = fixed_entropy_pooling_view_factory.(views[idx])
+        mask = idx
     end
+
     if !isempty(all_A_ineq)
         all_A_ineq = transpose(reshape(all_A_ineq, T, :))
     else
@@ -219,17 +223,18 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H2_Entrop
     @smart_assert(length(w0) == T)
     @smart_assert(nrow(pe.sets) == N)
     wi = w0
-    vls = get_view_level.(pe.views)
+    views = sort(pe.views)
+    vls = get_view_level.(views)
     uvls = sort!(unique(vls))
+    mask = falses(length(views))
     for uvl ∈ uvls
         pe = moment_factory_w(pe, wi)
-        idx = vls .== uvl
+        idx = mask .|| (vls .== uvl)
         prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
-        (; A_ineq, B_ineq, A_eq, B_eq) = views = entropy_pooling_views(prior_model,
-                                                                       pe.views[idx],
-                                                                       pe.sets;
-                                                                       strict = strict)
-        wi = entropy_pooling(wi, views, pe.opt)
+        (; A_ineq, B_ineq, A_eq, B_eq) = lcm = entropy_pooling_views(prior_model,
+                                                                     views[idx], pe.sets,
+                                                                     wi; strict = strict)
+        wi = entropy_pooling(wi, lcm, pe.opt)
         if !isnothing(A_ineq)
             append!(all_A_ineq, vec(A_ineq))
             append!(all_B_ineq, B_ineq)
@@ -238,7 +243,10 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H2_Entrop
             append!(all_A_eq, vec(A_eq))
             append!(all_B_eq, B_eq)
         end
+        views[idx] = fixed_entropy_pooling_view_factory.(views[idx])
+        mask = idx
     end
+
     if !isempty(all_A_ineq)
         all_A_ineq = transpose(reshape(all_A_ineq, T, :))
     else
