@@ -14,6 +14,10 @@ function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                                                                                      kwargs,
                                                                                      w)
 end
+function moment_factory_w(ce::DistanceCovariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs, w = w)
+end
 function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
     N = length(v1)
     @smart_assert(N == length(v2) && N > 1)

@@ -49,14 +49,18 @@ struct FactorPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1, T2 <: MatrixPro
     ve::T4
     residuals::T5
 end
-function FactorPriorEstimator(;
-                              pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
+function FactorPriorEstimator(; pe::AbstractPriorEstimatorMap_2_1 = FactorPriorEstimator(),
                               mp::MatrixProcessing = DefaultMatrixProcessing(),
                               re::RegressionMethod = ForwardRegression(),
                               ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                               residuals::Bool = true)
     return FactorPriorEstimator{typeof(pe), typeof(mp), typeof(re), typeof(ve),
                                 typeof(residuals)}(pe, mp, re, ve, residuals)
+end
+function moment_factory_w(pe::FactorPriorEstimator,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return FactorPriorEstimator(; pe = moment_factory_w(pe.pe, w), mp = pe.mp, re = pe.re,
+                                ve = moment_factory_w(pe.ve, w), residuals = pe.residuals)
 end
 function Base.getproperty(obj::FactorPriorEstimator, sym::Symbol)
     return if sym == :me

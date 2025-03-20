@@ -13,6 +13,13 @@ struct KurtosisEntropyPoolingView <: SkewKurtEntropyPoolingViewKind end
 abstract type CorrelationEntropyPoolingViewKind <: EntropyPoolingViewKind end
 struct AbsoluteCorrelationEntropyPoolingView <: CorrelationEntropyPoolingViewKind end
 struct RelativeCorrelationEntropyPoolingView <: CorrelationEntropyPoolingViewKind end
+#! change linear and quadratic entropy constraint atom.
+#! group, name, coef1, coef2, moment
+#! coef1[1] * X[!, "name"] - coef2[1] * mu - coef2[2] * sigma
+#! this can let us do something like c1*mu - c2*sigma
+#! Make a factory for creating a fixed view from a predefined view.
+#! this may need to change. Add factory to entropy pooling view 
+#! for adding the fixed views at every iteration.
 struct LinearEntropyConstraintAtom{T1 <: PartialLinearConstraintAtom,
                                    T2 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
        EntropyConstraintAtom

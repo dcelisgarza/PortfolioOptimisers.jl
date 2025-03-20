@@ -76,6 +76,13 @@ function BayesianBlackLittermanPriorEstimator(;
                                                                                  views_conf,
                                                                                  tau)
 end
+function moment_factory_w(pe::BayesianBlackLittermanPriorEstimator,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return BayesianBlackLittermanPriorEstimator(; pe = moment_factory_w(pe.pe, w),
+                                                mp = pe.mp, views = pe.views,
+                                                sets = pe.sets, rf = pe.rf,
+                                                views_conf = pe.views_conf, tau = pe.tau)
+end
 function Base.getproperty(obj::BayesianBlackLittermanPriorEstimator, sym::Symbol)
     return if sym == :me
         obj.pe.me

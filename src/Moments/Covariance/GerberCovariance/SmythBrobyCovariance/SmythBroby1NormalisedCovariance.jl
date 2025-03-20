@@ -26,6 +26,13 @@ function SmythBroby1NormalisedCovariance(;
                                            typeof(c3), typeof(n)}(me, ve, fnpdm, threshold,
                                                                   c1, c2, c3, n)
 end
+function moment_factory_w(ce::SmythBroby1NormalisedCovariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return SmythBroby1NormalisedCovariance(; me = moment_factory_w(ce.me, w),
+                                           ve = moment_factory_w(ce.ve, w),
+                                           fnpdm = ce.fnpdm, threshold = ce.threshold,
+                                           c1 = ce.c1, c2 = ce.c2, c3 = ce.c3, n = ce.n)
+end
 function _smythbroby1normalised(ce::SmythBroby1NormalisedCovariance, X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)

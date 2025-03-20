@@ -26,6 +26,13 @@ function SmythBrobyGerber1Covariance(;
                                        typeof(c3), typeof(n)}(me, ve, fnpdm, threshold, c1,
                                                               c2, c3, n)
 end
+function moment_factory_w(ce::SmythBrobyGerber1Covariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return SmythBrobyGerber1Covariance(; me = moment_factory_w(ce.me, w),
+                                       ve = moment_factory_w(ce.ve, w), fnpdm = ce.fnpdm,
+                                       threshold = ce.threshold, c1 = ce.c1, c2 = ce.c2,
+                                       c3 = ce.c3, n = ce.n)
+end
 function _smythbrobygerber1(ce::SmythBrobyGerber1Covariance, X::AbstractMatrix, mean_vec,
                             std_vec)
     T, N = size(X)

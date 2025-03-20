@@ -9,6 +9,9 @@ function LTDCovariance(; ve::PortfolioOptimisersVarianceEstimator = SimpleVarian
     @smart_assert(zero(alpha) < alpha < one(alpha))
     return LTDCovariance{typeof(ve), typeof(alpha)}(ve, alpha)
 end
+function moment_factory_w(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return LTDCovariance(; ve = moment_factory_w(ce.ve, w), alpha = ce.alpha)
+end
 function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05)
     T, N = size(X)
     k = ceil(Int, T * alpha)

@@ -16,5 +16,9 @@ function coskewness(ske::SemiCoskewness, X::AbstractMatrix; dims::Int = 1)
     y = min.(X .- mu, zero(eltype(X)))
     return _coskewness(y, X, ske.mp)
 end
+function moment_factory_w(ce::SemiCoskewness,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return SemiCoskewness(; me = moment_factory_w(ce.me, w), mp = ce.mp)
+end
 
 export SemiCoskewness

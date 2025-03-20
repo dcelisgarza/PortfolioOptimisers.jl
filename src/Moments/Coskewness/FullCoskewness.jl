@@ -16,5 +16,9 @@ function coskewness(ske::FullCoskewness, X::AbstractMatrix; dims::Int = 1)
     y = X .- mu
     return _coskewness(y, X, ske.mp)
 end
+function moment_factory_w(ce::FullCoskewness,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return FullCoskewness(; me = moment_factory_w(ce.me, w), mp = ce.mp)
+end
 
 export FullCoskewness

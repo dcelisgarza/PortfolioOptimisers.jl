@@ -9,6 +9,10 @@ function PortfolioOptimisersCovariance(;
                                        mp::MatrixProcessing = DefaultMatrixProcessing())
     return PortfolioOptimisersCovariance{typeof(ce), typeof(mp)}(ce, mp)
 end
+function moment_factory_w(ce::PortfolioOptimisersCovariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return PortfolioOptimisersCovariance(; ce = moment_factory_w(ce.ce, w), mp = ce.mp)
+end
 function StatsBase.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
                        kwargs...)
     @smart_assert(dims ∈ (1, 2))

@@ -16,6 +16,12 @@ function Gerber1NormalisedCovariance(;
     return Gerber1NormalisedCovariance{typeof(me), typeof(ve), typeof(fnpdm),
                                        typeof(threshold)}(me, ve, fnpdm, threshold)
 end
+function moment_factory_w(ce::Gerber1NormalisedCovariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return Gerber1NormalisedCovariance(; me = moment_factory_w(ce.me, w),
+                                       ve = moment_factory_w(ce.ve, w), fnpdm = ce.fnpdm,
+                                       threshold = ce.threshold)
+end
 function _gerber1normalised(ce::Gerber1NormalisedCovariance, X::AbstractMatrix)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)

@@ -14,6 +14,11 @@ function MutualInfoCovariance(; ve::PortfolioOptimisersVarianceEstimator = Simpl
     return MutualInfoCovariance{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins,
                                                                              normalise)
 end
+function moment_factory_w(ce::MutualInfoCovariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return MutualInfoCovariance(; ve = moment_factory_w(ce.ve, w), bins = ce.bins,
+                                normalise = ce.normalise)
+end
 function StatsBase.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
                        kwargs...)
     @smart_assert(dims ∈ (1, 2))

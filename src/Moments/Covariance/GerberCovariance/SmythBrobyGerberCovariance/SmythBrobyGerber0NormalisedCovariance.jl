@@ -28,6 +28,14 @@ function SmythBrobyGerber0NormalisedCovariance(;
                                                                         threshold, c1, c2,
                                                                         c3, n)
 end
+function moment_factory_w(ce::SmythBrobyGerber0NormalisedCovariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return SmythBrobyGerber0NormalisedCovariance(; me = moment_factory_w(ce.me, w),
+                                                 ve = moment_factory_w(ce.ve, w),
+                                                 fnpdm = ce.fnpdm, threshold = ce.threshold,
+                                                 c1 = ce.c1, c2 = ce.c2, c3 = ce.c3,
+                                                 n = ce.n)
+end
 function _smythbrobygerber0normalised(ce::SmythBrobyGerber0NormalisedCovariance,
                                       X::AbstractMatrix)
     T, N = size(X)

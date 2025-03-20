@@ -90,6 +90,16 @@ function FactorBlackLittermanPriorEstimator(;
                                                            sets, rf, residuals, views_conf,
                                                            w, l, tau)
 end
+function moment_factory_w(pe::FactorBlackLittermanPriorEstimator,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return FactorBlackLittermanPriorEstimator(; pe = moment_factory_w(pe.pe, w),
+                                              f_mp = pe.f_mp, mp = pe.mp, re = pe.re,
+                                              ve = moment_factory_w(pe.ve, w),
+                                              views = pe.views, sets = pe.sets, rf = pe.rf,
+                                              residuals = pe.residuals,
+                                              views_conf = pe.views_conf, w = pe.w,
+                                              l = pe.l, tau = pe.tau)
+end
 function Base.getproperty(obj::FactorBlackLittermanPriorEstimator, sym::Symbol)
     return if sym == :me
         obj.pe.me

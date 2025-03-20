@@ -132,6 +132,18 @@ function AugmentedBlackLittermanPriorEstimator(;
                                                                                     w, l,
                                                                                     tau)
 end
+function moment_factory_w(pe::AugmentedBlackLittermanPriorEstimator,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return AugmentedBlackLittermanPriorEstimator(; a_pe = moment_factory_w(pe.a_pe, w),
+                                                 f_pe = moment_factory_w(pe.f_pe, w),
+                                                 mp = pe.mp, re = pe.re,
+                                                 ve = moment_factory_w(pe.ve, w),
+                                                 a_views = pe.a_views, f_views = pe.f_views,
+                                                 a_sets = pe.a_sets, f_sets = pe.f_sets,
+                                                 rf = pe.rf, a_views_conf = pe.a_views_conf,
+                                                 f_views_conf = pe.f_views_conf, w = pe.w,
+                                                 l = pe.l, tau = pe.tau)
+end
 function Base.getproperty(obj::AugmentedBlackLittermanPriorEstimator, sym::Symbol)
     return if sym == :me
         obj.a_pe.me

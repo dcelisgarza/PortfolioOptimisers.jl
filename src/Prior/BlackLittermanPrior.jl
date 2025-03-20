@@ -75,6 +75,12 @@ function BlackLittermanPriorEstimator(;
                                                                                      views_conf,
                                                                                      tau)
 end
+function moment_factory_w(pe::BlackLittermanPriorEstimator,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return BlackLittermanPriorEstimator(; pe = moment_factory_w(pe.pe, w), mp = pe.mp,
+                                        views = pe.views, sets = pe.sets, rf = pe.rf,
+                                        views_conf = pe.views_conf, tau = pe.tau)
+end
 function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)

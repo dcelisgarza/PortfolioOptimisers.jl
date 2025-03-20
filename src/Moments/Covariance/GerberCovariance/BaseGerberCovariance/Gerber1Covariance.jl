@@ -12,6 +12,11 @@ function Gerber1Covariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(
     return Gerber1Covariance{typeof(ve), typeof(fnpdm), typeof(threshold)}(ve, fnpdm,
                                                                            threshold)
 end
+function moment_factory_w(ce::Gerber1Covariance,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+    return Gerber1Covariance(; ve = moment_factory_w(ce.ve, w), fnpdm = ce.fnpdm,
+                             threshold = ce.threshold)
+end
 function _gerber1(ce::Gerber1Covariance, X::AbstractMatrix, std_vec)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
