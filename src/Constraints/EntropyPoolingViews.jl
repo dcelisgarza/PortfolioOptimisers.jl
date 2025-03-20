@@ -1,90 +1,139 @@
-abstract type EntropyPoolingView end
-abstract type EntropyConstraintAtom end
-abstract type EntropyPoolingViewKind end
-abstract type MeanEntropyPoolingViewKind <: EntropyPoolingViewKind end
-struct AbsoluteMeanEntropyPoolingView <: MeanEntropyPoolingViewKind end
-struct RelativeMeanEntropyPoolingView <: MeanEntropyPoolingViewKind end
-abstract type VolatilityEntropyPoolingViewKind <: EntropyPoolingViewKind end
-struct AbsoluteVolatilityEntropyPoolingView <: VolatilityEntropyPoolingViewKind end
-struct RelativeVolatilityEntropyPoolingView <: VolatilityEntropyPoolingViewKind end
-abstract type SkewKurtEntropyPoolingViewKind <: EntropyPoolingViewKind end
-struct SkewnessEntropyPoolingView <: SkewKurtEntropyPoolingViewKind end
-struct KurtosisEntropyPoolingView <: SkewKurtEntropyPoolingViewKind end
-abstract type CorrelationEntropyPoolingViewKind <: EntropyPoolingViewKind end
-struct AbsoluteCorrelationEntropyPoolingView <: CorrelationEntropyPoolingViewKind end
-struct RelativeCorrelationEntropyPoolingView <: CorrelationEntropyPoolingViewKind end
-#! change linear and quadratic entropy constraint atom.
-#! group, name, coef1, coef2, moment
-#! coef1[1] * X[!, "name"] - coef2[1] * mu - coef2[2] * sigma
-#! this can let us do something like c1*mu - c2*sigma
-#! Make a factory for creating a fixed view from a predefined view.
-#! this may need to change. Add factory to entropy pooling view 
-#! for adding the fixed views at every iteration.
-struct LinearEntropyConstraintAtom{T1 <: PartialLinearConstraintAtom,
-                                   T2 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
-       EntropyConstraintAtom
-    plca::T1
-    cnst::T2
+abstract type EntropyPoolingConstraint end
+abstract type AbstractConstantEntropyPoolingConstraint <: EntropyPoolingConstraint end
+abstract type AbstractNonConstantEntropyPoolingConstraint <: EntropyPoolingConstraint end
+abstract type LinearEntropyPoolingConstraint <: AbstractNonConstantEntropyPoolingConstraint end
+abstract type BilinearEntropyPoolingConstraint <:
+              AbstractNonConstantEntropyPoolingConstraint end
+struct ConstantEntropyPoolingConstraint{T1 <: Real} <:
+       AbstractConstantEntropyPoolingConstraint
+    coef::T1
 end
-function LinearEntropyConstraintAtom(; group = nothing, name = nothing,
-                                     coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
-                                     cnst::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
-    plca = PartialLinearConstraintAtom(; group = group, name = name, coef = coef)
-    if isa(group, AbstractVector)
-        @smart_assert(isa(cnst, AbstractVector) &&
-                      !isempty(cnst) &&
-                      length(group) == length(cnst))
+function ConstantEntropyPoolingConstraint(; coef::Real = 0.0)
+    return ConstantEntropyPoolingConstraint{typeof(coef)}(coef)
+end
+struct C0_LinearEntropyPoolingConstraint{T1, T2,
+                                         T3 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
+       LinearEntropyPoolingConstraint
+    group::T1
+    name::T2
+    coef::T3
+end
+function C0_LinearEntropyPoolingConstraint(; group = nothing, name = nothing,
+                                           coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
+    group_flag = isa(group, AbstractVector)
+    name_flag = isa(name, AbstractVector)
+    coef_flag = isa(coef, AbstractVector)
+    if any((group_flag, name_flag, coef_flag))
+        @smart_assert(all((group_flag, name_flag, coef_flag)))
+        @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
+        @smart_assert(length(group) == length(name) == length(coef))
+        for (g, n) ∈ zip(group, name)
+            if isnothing(g) || isnothing(n)
+                @smart_assert(isnothing(g) && isnothing(n))
+            end
+        end
     else
-        @smart_assert(isa(cnst, Real))
+        if isnothing(group) || isnothing(name)
+            @smart_assert(isnothing(group) && isnothing(name))
+        end
     end
-    return LinearEntropyConstraintAtom{typeof(plca), typeof(cnst)}(plca, cnst)
+    return C0_LinearEntropyPoolingConstraint{typeof(group), typeof(name), typeof(coef)}(group,
+                                                                                        name,
+                                                                                        coef)
 end
-function Base.getproperty(obj::LinearEntropyConstraintAtom, sym::Symbol)
-    return if sym == :group
-        obj.plca.group
-    elseif sym == :name
-        obj.plca.name
-    elseif sym == :coef
-        obj.plca.coef
+struct C1_LinearEntropyPoolingConstraint{T1, T2,
+                                         T3 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
+       LinearEntropyPoolingConstraint
+    group::T1
+    name::T2
+    coef::T3
+end
+function C1_LinearEntropyPoolingConstraint(; group = nothing, name = nothing,
+                                           coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
+    group_flag = isa(group, AbstractVector)
+    name_flag = isa(name, AbstractVector)
+    coef_flag = isa(coef, AbstractVector)
+    if any((group_flag, name_flag, coef_flag))
+        @smart_assert(all((group_flag, name_flag, coef_flag)))
+        @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
+        @smart_assert(length(group) == length(name) == length(coef))
+        for (g, n) ∈ zip(group, name)
+            if isnothing(g) || isnothing(n)
+                @smart_assert(isnothing(g) && isnothing(n))
+            end
+        end
     else
-        return getfield(obj, sym)
+        if isnothing(group) || isnothing(name)
+            @smart_assert(isnothing(group) && isnothing(name))
+        end
     end
+    return C1_LinearEntropyPoolingConstraint{typeof(group), typeof(name), typeof(coef)}(group,
+                                                                                        name,
+                                                                                        coef)
 end
-struct QuadraticEntropyConstraintAtom{T1, T2, T3, T4, T5,
-                                      T6 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
-       EntropyConstraintAtom
+abstract type C2_EntropyPoolingKind end
+struct SkewnessEntropyPoolingView <: C2_EntropyPoolingKind end
+struct KurtosisEntropyPoolingView <: C2_EntropyPoolingKind end
+struct C2_LinearEntropyPoolingConstraint{T1, T2,
+                                         T3 <: Union{<:Real, <:AbstractVector{<:Real}},
+                                         T4 <: C2_EntropyPoolingKind} <:
+       LinearEntropyPoolingConstraint
+    group::T1
+    name::T2
+    coef::T3
+    kind::T4
+end
+function C2_LinearEntropyPoolingConstraint(; group = nothing, name = nothing,
+                                           coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                                           kind::C2_EntropyPoolingKind = SkewnessEntropyPoolingView())
+    group_flag = isa(group, AbstractVector)
+    name_flag = isa(name, AbstractVector)
+    coef_flag = isa(coef, AbstractVector)
+    if any((group_flag, name_flag, coef_flag))
+        @smart_assert(all((group_flag, name_flag, coef_flag)))
+        @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
+        @smart_assert(length(group) == length(name) == length(coef))
+        for (g, n) ∈ zip(group, name)
+            if isnothing(g) || isnothing(n)
+                @smart_assert(isnothing(g) && isnothing(n))
+            end
+        end
+    else
+        if isnothing(group) || isnothing(name)
+            @smart_assert(isnothing(group) && isnothing(name))
+        end
+    end
+    return C2_LinearEntropyPoolingConstraint{typeof(group), typeof(name), typeof(coef),
+                                             typeof(kind)}(group, name, coef, kind)
+end
+struct C4_LinearEntropyPoolingConstraint{T1, T2, T3, T4,
+                                         T5 <: Union{<:Real, <:AbstractVector{<:Real}}}
     group1::T1
     group2::T2
     name1::T3
     name2::T4
     coef::T5
-    cnst::T6
 end
-function QuadraticEntropyConstraintAtom(; group1 = nothing, name1 = nothing,
-                                        group2 = nothing, name2 = nothing,
-                                        coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
-                                        cnst::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
+function C4_LinearEntropyPoolingConstraint(; group1 = nothing, name1 = nothing,
+                                           group2 = nothing, name2 = nothing,
+                                           coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,)
     group1_flag = isa(group1, AbstractVector)
-    group2_flag = isa(group2, AbstractVector)
     name1_flag = isa(name1, AbstractVector)
-    name2_flag = isa(name2, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
-    cnst_flag = isa(cnst, AbstractVector)
-    if any((group1_flag, name1_flag, group2_flag, name2_flag, coef_flag, cnst_flag))
-        @smart_assert(all((group1_flag, name1_flag, group2_flag, name2_flag, coef_flag,
-                           cnst_flag)))
+    group2_flag = isa(group2, AbstractVector)
+    name2_flag = isa(name2, AbstractVector)
+    if any((group1_flag, name1_flag, coef_flag, group2_flag, name2_flag))
+        @smart_assert(all((group1_flag, name1_flag, coef_flag, group2_flag, name2_flag)))
         @smart_assert(!isempty(group1) &&
                       !isempty(name1) &&
-                      !isempty(group2) &&
-                      !isempty(name2) &&
                       !isempty(coef) &&
-                      !isempty(cnst))
+                      !isempty(group2) &&
+                      !isempty(name2))
         @smart_assert(length(group1) ==
                       length(name1) ==
-                      length(group2) ==
-                      length(name2) ==
                       length(coef) ==
-                      length(cnst))
+                      length(group2) ==
+                      length(name2))
         for (g1, n1, g2, n2) ∈ zip(group1, name1, group2, name2)
             if isnothing(g1) || isnothing(n1) || isnothing(g2) || isnothing(n2)
                 @smart_assert(isnothing(g1) &&
@@ -101,97 +150,40 @@ function QuadraticEntropyConstraintAtom(; group1 = nothing, name1 = nothing,
                           isnothing(name2))
         end
     end
-    return QuadraticEntropyConstraintAtom{typeof(group1), typeof(group2), typeof(name1),
-                                          typeof(name2), typeof(coef), typeof(cnst)}(group1,
-                                                                                     group2,
-                                                                                     name1,
-                                                                                     name2,
-                                                                                     coef,
-                                                                                     cnst)
+    return C4_LinearEntropyPoolingConstraint{typeof(group1), typeof(group2), typeof(name1),
+                                             typeof(name2), typeof(coef)}(group1, group2,
+                                                                          name1, name2,
+                                                                          coef)
 end
-struct C0_EntropyPoolingView{T1 <: LinearEntropyConstraintAtom,
-                             T2 <: LinearEntropyConstraintAtom, T3 <: ComparisonOperators,
-                             T4 <: MeanEntropyPoolingViewKind} <: EntropyPoolingView
-    lhs::T1
-    rhs::T2
+struct EntropyPoolingView{T1 <: AbstractNonConstantEntropyPoolingConstraint,
+                          T2 <: Union{<:EntropyPoolingConstraint,
+                                      <:AbstractVector{<:EntropyPoolingConstraint}},
+                          T3 <: ComparisonOperators}
+    A::T1
+    B::T2
     comp::T3
-    kind::T4
 end
-function C0_EntropyPoolingView(;
-                               lhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
-                               rhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
-                               comp::ComparisonOperators = LEQ(),
-                               kind::MeanEntropyPoolingViewKind = AbsoluteMeanEntropyPoolingView())
-    return C0_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,
-                                                                                       rhs,
-                                                                                       comp,
-                                                                                       kind)
+function EntropyPoolingView(;
+                            A::AbstractNonConstantEntropyPoolingConstraint = C0_LinearEntropyPoolingConstraint(),
+                            B::Union{<:EntropyPoolingConstraint,
+                                     <:AbstractVector{<:EntropyPoolingConstraint}} = C0_LinearEntropyPoolingConstraint(),
+                            comp::ComparisonOperators = LEQ())
+    return EntropyPoolingView{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
-struct C1_EntropyPoolingView{T1 <: LinearEntropyConstraintAtom,
-                             T2 <: LinearEntropyConstraintAtom, T3 <: ComparisonOperators,
-                             T4 <: VolatilityEntropyPoolingViewKind} <: EntropyPoolingView
-    lhs::T1
-    rhs::T2
-    comp::T3
-    kind::T4
-end
-function C1_EntropyPoolingView(;
-                               lhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
-                               rhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
-                               comp::ComparisonOperators = LEQ(),
-                               kind::VolatilityEntropyPoolingViewKind = AbsoluteVolatilityEntropyPoolingView())
-    return C1_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,
-                                                                                       rhs,
-                                                                                       comp,
-                                                                                       kind)
-end
-struct C2_EntropyPoolingView{T1 <: LinearEntropyConstraintAtom,
-                             T2 <: LinearEntropyConstraintAtom, T3 <: ComparisonOperators,
-                             T4 <: EntropyPoolingViewKind} <: EntropyPoolingView
-    lhs::T1
-    rhs::T2
-    comp::T3
-    kind::T4
-end
-function C2_EntropyPoolingView(;
-                               lhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
-                               rhs::LinearEntropyConstraintAtom = LinearEntropyConstraintAtom(),
-                               comp::ComparisonOperators = LEQ(),
-                               kind::SkewKurtEntropyPoolingViewKind = SkewnessEntropyPoolingView())
-    return C2_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,
-                                                                                       rhs,
-                                                                                       comp,
-                                                                                       kind)
-end
-struct C4_EntropyPoolingView{T1 <: QuadraticEntropyConstraintAtom,
-                             T2 <: QuadraticEntropyConstraintAtom,
-                             T3 <: ComparisonOperators,
-                             T4 <: CorrelationEntropyPoolingViewKind} <: EntropyPoolingView
-    lhs::T1
-    rhs::T2
-    comp::T3
-    kind::T4
-end
-function C4_EntropyPoolingView(;
-                               lhs::QuadraticEntropyConstraintAtom = QuadraticEntropyConstraintAtom(),
-                               rhs::QuadraticEntropyConstraintAtom = QuadraticEntropyConstraintAtom(),
-                               comp::ComparisonOperators = LEQ(),
-                               kind::CorrelationEntropyPoolingViewKind = AbsoluteCorrelationEntropyPoolingView())
-    return C4_EntropyPoolingView{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs,
-                                                                                       rhs,
-                                                                                       comp,
-                                                                                       kind)
-end
-function get_view_level(::C0_EntropyPoolingView)
+function get_view_level(::EntropyPoolingView{<:C0_LinearEntropyPoolingConstraint, <:Any,
+                                             <:Any})
     return 0
 end
-function get_view_level(::C1_EntropyPoolingView)
+function get_view_level(::EntropyPoolingView{<:C1_LinearEntropyPoolingConstraint, <:Any,
+                                             <:Any})
     return 1
 end
-function get_view_level(::C2_EntropyPoolingView)
+function get_view_level(::EntropyPoolingView{<:C2_LinearEntropyPoolingConstraint, <:Any,
+                                             <:Any})
     return 2
 end
-function get_view_level(::C4_EntropyPoolingView)
+function get_view_level(::EntropyPoolingView{<:C4_LinearEntropyPoolingConstraint, <:Any,
+                                             <:Any})
     return 4
 end
 function Base.isless(a::EntropyPoolingView, b::EntropyPoolingView)
@@ -241,43 +233,252 @@ function A_B_entropy_pooling_stats(::RelativeCorrelationEntropyPoolingView,
     return coef * vec((pm.X[:, idx1] .- transpose(pm.mu[idx1])) .*
                       (pm.X[:, idx2] .- transpose(pm.mu[idx2]))), B
 end
-function get_entropy_pooling_view_data(pm::AbstractPriorModel,
-                                       lca::LinearEntropyConstraintAtom{<:PartialLinearConstraintAtom{<:Any,
-                                                                                                      <:Any,
-                                                                                                      <:Real},
-                                                                        <:Real},
-                                       kind::EntropyPoolingViewKind, sets::DataFrame,
-                                       strict::Bool = false)
+function _get_B_entropy_pooling_view_data(::AbstractPriorModel,
+                                          lcb::ConstantEntropyPoolingConstraint,
+                                          ::DataFrame, ::Bool)
+    return lcb.coef
+end
+function _get_B_entropy_pooling_view_data(::C0_LinearEntropyPoolingConstraint,
+                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          coef::Real)
+    return coef * sum(pm.mu[idx])
+end
+function _get_B_entropy_pooling_view_data(::C1_LinearEntropyPoolingConstraint,
+                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          coef::Real)
+    return coef * sum(diag(pm.sigma)[idx])
+end
+function _get_B_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraint,
+                                          pm::AbstractPriorModel, idx1::AbstractVector,
+                                          idx2::AbstractVector, coef::Real)
+    dsigma = diag(pm.sigma)
+    return coef * sum(sqrt.(dsigma[idx1]) .* sqrt.(dsigma[idx2]))
+end
+function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
+                                         lcb::C4_LinearEntropyPoolingConstraint{<:Any,
+                                                                                <:Any,
+                                                                                <:Real},
+                                         sets::DataFrame, strict::Bool = false)
+    @smart_assert(!isempty(sets))
     group_names = names(sets)
-    (; group, name, coef, cnst) = lca
-    A, B = if !(isnothing(group) || string(group) ∉ group_names)
+    (; group1, group2, name1, name2, coef) = lcb
+    B = if !(isnothing(group1) ||
+             string(group1) ∉ group_names ||
+             isnothing(group2) ||
+             string(group2) ∉ group_names)
+        idx1 = sets[!, group1] .== name1
+        idx2 = sets[!, group1] .== name2
+        _get_B_entropy_pooling_view_data(lcb, pm, idx1, idx2, coef)
+    elseif strict
+        throw(ArgumentError("$(string(group1)) or $(string(group2)) are not in $(group_names).\n$(lcb)"))
+    else
+        @warn("$(string(group1)) or $(string(group2)) are not in $(group_names).\n$(lcb)")
+        zero(eltype(pm.X))
+    end
+    return B
+end
+function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
+                                         lcb::C4_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                                                <:AbstractVector,
+                                                                                <:AbstractVector},
+                                         sets::DataFrame, strict::Bool = false)
+    @smart_assert(!isempty(sets))
+    group_names = names(sets)
+    B = zero(eltype(pm.X))
+    for (group1, group2, name1, name2, coef) ∈
+        zip(lcb.group1, lcb.group2, lcb.name1, lcb.name2, lcb.coef)
+        if !(isnothing(group1) ||
+             string(group1) ∉ group_names ||
+             isnothing(group2) ||
+             string(group2) ∉ group_names)
+            idx1 = sets[!, group1] .== name1
+            idx2 = sets[!, group1] .== name2
+            B += _get_B_entropy_pooling_view_data(lcb, pm, idx1, idx2, coef)
+        elseif strict
+            throw(ArgumentError("$(string(group1)) or $(string(group2)) are not in $(group_names).\n$(lcb)."))
+        else
+            @warn("$(string(group1)) or $(string(group2)) are not in $(group_names).\n$(lcb).")
+        end
+    end
+    return B
+end
+function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
+                                         lcb::Union{<:C0_LinearEntropyPoolingConstraint{<:Any,
+                                                                                        <:Any,
+                                                                                        <:Real},
+                                                    <:C1_LinearEntropyPoolingConstraint{<:Any,
+                                                                                        <:Any,
+                                                                                        <:Real},
+                                                    <:C2_LinearEntropyPoolingConstraint{<:Any,
+                                                                                        <:Any,
+                                                                                        <:Real}},
+                                         sets::DataFrame, strict::Bool = false)
+    @smart_assert(!isempty(sets))
+    group_names = names(sets)
+    (; group, name, coef) = lcb
+    B = if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
-        A_B_entropy_pooling_stats(kind, pm, idx, coef, cnst)
+        _get_B_entropy_pooling_view_data(lcb, pm, idx, coef)
+    elseif strict
+        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lcb)"))
+    else
+        @warn("$(string(group)) is not in $(group_names).\n$(lcb)")
+        zero(eltype(pm.X))
+    end
+    return B
+end
+function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
+                                         lcb::Union{<:C0_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                                                        <:AbstractVector,
+                                                                                        <:AbstractVector},
+                                                    <:C1_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                                                        <:AbstractVector,
+                                                                                        <:AbstractVector},
+                                                    <:C2_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                                                        <:AbstractVector,
+                                                                                        <:AbstractVector}},
+                                         sets::DataFrame, strict::Bool = false)
+    @smart_assert(!isempty(sets))
+    group_names = names(sets)
+    B = zero(eltype(pm.X))
+    for (group, name, coef) ∈ zip(lcb.group, lcb.name, lcb.coef)
+        if !(isnothing(group) || string(group) ∉ group_names)
+            idx = sets[!, group] .== name
+            B += _get_B_entropy_pooling_view_data(lcb, pm, idx, coef)
+        elseif strict
+            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lcb)."))
+        else
+            @warn("$(string(group)) is not in $(group_names).\n$(lcb).")
+        end
+    end
+    return B
+end
+function _get_A_entropy_pooling_view_data(::C0_LinearEntropyPoolingConstraint,
+                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          coef::Real)
+    return coef * pm.X[:, idx]
+end
+function _get_A_entropy_pooling_view_data(::C1_LinearEntropyPoolingConstraint,
+                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          coef::Real)
+    return coef * (pm.X[:, idx] .- transpose(pm.mu[idx])) .^ 2
+end
+function _get_A_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
+                                                                              <:Any,
+                                                                              <:SkewnessEntropyPoolingView},
+                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          coef::Real)
+    dsigma = diag(pm.sigma)[idx]
+    return coef * ((pm.X[:, idx] .- transpose(pm.mu[idx])) .^ 3) ./
+           (dsigma .* sqrt.(dsigma))
+end
+function _get_A_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
+                                                                              <:Any,
+                                                                              <:KurtosisEntropyPoolingView},
+                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          coef::Real)
+    dsigma = diag(pm.sigma)[idx]
+    return coef * ((pm.X[:, idx] .- transpose(pm.mu[idx])) .^ 4) ./ (dsigma .^ 2)
+end
+function _get_A_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraint,
+                                          pm::AbstractPriorModel, idx1::AbstractVector,
+                                          idx2::AbstractVector, coef::Real)
+    return coef * vec((pm.X[:, idx1] .- transpose(pm.mu[idx1])) .*
+                      (pm.X[:, idx2] .- transpose(pm.mu[idx2])))
+end
+function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
+                                         lca::C4_LinearEntropyPoolingConstraint{<:Any,
+                                                                                <:Any,
+                                                                                <:Real},
+                                         sets::DataFrame, strict::Bool = false)
+    @smart_assert(!isempty(sets))
+    group_names = names(sets)
+    (; group1, group2, name1, name2, coef) = lca
+    A = if !(isnothing(group1) ||
+             string(group1) ∉ group_names ||
+             isnothing(group2) ||
+             string(group2) ∉ group_names)
+        idx1 = sets[!, group1] .== name1
+        idx2 = sets[!, group2] .== name2
+        _get_A_entropy_pooling_view_data(lca, pm, idx1, idx2, coef)
+    elseif strict
+        throw(ArgumentError("$(string(group1)) or $(string(group1)) are not in $(group_names).\n$(lca)."))
+    else
+        @warn("$(string(group1)) or $(string(group1)) are not in $(group_names).\n$(lca).")
+    end
+    return A
+end
+function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
+                                         lca::C4_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                                                <:AbstractVector,
+                                                                                <:AbstractVector},
+                                         sets::DataFrame, strict::Bool = false)
+    @smart_assert(!isempty(sets))
+    group_names = names(sets)
+    A = Vector{eltype(pm.X)}(undef, 0)
+    for (group1, group2, name1, name2, coef1, coef2) ∈
+        zip(lca.group1, lca.group2, lca.name1, lca.name2, lca.coef)
+        if !(isnothing(group1) ||
+             string(group1) ∉ group_names ||
+             isnothing(group2) ||
+             string(group2) ∉ group_names)
+            idx1 = sets[!, group1] .== name1
+            idx2 = sets[!, group2] .== name2
+            append!(A, _get_A_entropy_pooling_view_data(lca, pm, idx1, idx2, coef))
+        elseif strict
+            throw(ArgumentError("$(string(group1)) or $(string(group1)) are not in $(group_names).\n$(lca)."))
+        else
+            @warn("$(string(group1)) or $(string(group1)) are not in $(group_names).\n$(lca).")
+        end
+    end
+    if !isempty(A)
+        A = vec(sum(reshape(A, size(pm.X, 1), :); dims = 2))
+    end
+    return A
+end
+function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
+                                         lca::Union{<:C0_LinearEntropyPoolingConstraint{<:Any,
+                                                                                        <:Any,
+                                                                                        <:Real},
+                                                    <:C1_LinearEntropyPoolingConstraint{<:Any,
+                                                                                        <:Any,
+                                                                                        <:Real},
+                                                    <:C2_LinearEntropyPoolingConstraint{<:Any,
+                                                                                        <:Any,
+                                                                                        <:Real}},
+                                         sets::DataFrame, strict::Bool = false)
+    @smart_assert(!isempty(sets))
+    group_names = names(sets)
+    (; group, name, coef) = lca
+    A = if !(isnothing(group) || string(group) ∉ group_names)
+        idx = sets[!, group] .== name
+        _get_A_entropy_pooling_view_data(lca, pm, idx, coef)
     elseif strict
         throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lca)"))
     else
         @warn("$(string(group)) is not in $(group_names).\n$(lca)")
-        Vector{eltype(pm.X)}(undef, 0), Vector{eltype(pm.X)}(undef, 0)
+        Vector{eltype(pm.X)}(undef, 0)
     end
-    return A, B
+    return A
 end
-function get_entropy_pooling_view_data(pm::AbstractPriorModel,
-                                       lca::LinearEntropyConstraintAtom{<:PartialLinearConstraintAtom{<:AbstractVector,
-                                                                                                      <:AbstractVector,
-                                                                                                      <:AbstractVector},
-                                                                        <:AbstractVector},
-                                       kind::EntropyPoolingViewKind, sets::DataFrame,
-                                       strict::Bool = false)
+function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
+                                         lca::Union{<:C0_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                                                        <:AbstractVector,
+                                                                                        <:AbstractVector},
+                                                    <:C1_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                                                        <:AbstractVector,
+                                                                                        <:AbstractVector},
+                                                    <:C2_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                                                        <:AbstractVector,
+                                                                                        <:AbstractVector}},
+                                         sets::DataFrame, strict::Bool = false)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     A = Vector{eltype(pm.X)}(undef, 0)
-    B = Vector{eltype(pm.X)}(undef, 0)
-    for (group, name, coef, cnst) ∈ zip(lca.group, lca.name, lca.coef, lca.cnst)
+    for (group, name, coef) ∈ zip(lca.group, lca.name, lca.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
-            _A, _B = A_B_entropy_pooling_stats(kind, pm, idx, coef, cnst)
-            append!(A, _A)
-            append!(B, _B)
+            append!(A, _get_A_entropy_pooling_view_data(lca, pm, idx, coef))
         elseif strict
             throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lca)."))
         else
@@ -287,7 +488,7 @@ function get_entropy_pooling_view_data(pm::AbstractPriorModel,
     if !isempty(A)
         A = vec(sum(reshape(A, size(pm.X, 1), :); dims = 2))
     end
-    return A, B
+    return A
 end
 function get_entropy_pooling_view_data(pm::AbstractPriorModel,
                                        lca::QuadraticEntropyConstraintAtom{<:Any, <:Any,
@@ -359,31 +560,24 @@ function entropy_pooling_views(pm::AbstractPriorModel,
     A_eq = Vector{eltype(pm.X)}(undef, 0)
     B_eq = Vector{eltype(pm.X)}(undef, 0)
     for lc ∈ lcs
-        lhs_A, lhs_B = get_entropy_pooling_view_data(pm, lc.lhs, lc.kind, sets, strict)
-        rhs_A, rhs_B = get_entropy_pooling_view_data(pm, lc.rhs, lc.kind, sets, strict)
+        A, B = get_entropy_pooling_view_data(pm, lc, sets, strict)
 
-        lhs_flag = isempty(lhs_A) || all(iszero.(lhs_A))
-        rhs_flag = isempty(rhs_A) || all(iszero.(rhs_A))
+        lhs_flag = isempty(A)
 
-        if lhs_flag && rhs_flag
+        if lhs_flag
             continue
         end
 
         d, flag_ineq = comparison_sign_ineq_flag(lc.comp)
-        rlhs_A, rlhs_B = if lhs_flag
-            -rhs_A * d, rhs_B * d
-        elseif rhs_flag
-            lhs_A * d, -lhs_B * d
-        else
-            (lhs_A - rhs_A) * d, (rhs_B - lhs_B) * d
-        end
+        A = d * A
+        B = d * B
 
         if flag_ineq
-            append!(A_ineq, rlhs_A)
-            append!(B_ineq, rlhs_B)
+            append!(A_ineq, A)
+            append!(B_ineq, B)
         else
-            append!(A_eq, rlhs_A)
-            append!(B_eq, rlhs_B)
+            append!(A_eq, A)
+            append!(B_eq, B)
         end
     end
 
