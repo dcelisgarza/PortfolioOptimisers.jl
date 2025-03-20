@@ -13,6 +13,35 @@ end
 function comparison_sign_ineq_flag(::GEQ)
     return -1, true
 end
+abstract type ConstraintSide end
+abstract type A_Constraint <: ConstraintSide end
+struct A_LinearConstraint{T1, T2, T3 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
+       A_Constraint
+    group::T1
+    name::T2
+    coef::T3
+end
+function A_LinearConstraint(; group = nothing, name = nothing,
+                            coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
+    group_flag = isa(group, AbstractVector)
+    name_flag = isa(name, AbstractVector)
+    coef_flag = isa(coef, AbstractVector)
+    if any((group_flag, name_flag, coef_flag))
+        @smart_assert(all((group_flag, name_flag, coef_flag)))
+        @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
+        @smart_assert(length(group) == length(name) == length(coef))
+        for (g, n) ∈ zip(group, name)
+            if isnothing(g) || isnothing(n)
+                @smart_assert(isnothing(g) && isnothing(n))
+            end
+        end
+    else
+        if isnothing(group) || isnothing(name)
+            @smart_assert(isnothing(group) && isnothing(name))
+        end
+    end
+    return A_LinearConstraint{typeof(group), typeof(name), typeof(coef)}(group, name, coef)
+end
 struct PartialLinearConstraintAtom{T1, T2, T3}
     group::T1
     name::T2
@@ -63,4 +92,4 @@ function Base.getproperty(obj::LinearConstraintAtom, sym::Symbol)
     end
 end
 
-export EQ, LEQ, GEQ, PartialLinearConstraintAtom, LinearConstraintAtom
+export EQ, LEQ, GEQ, A_LinearConstraint, PartialLinearConstraintAtom, LinearConstraintAtom

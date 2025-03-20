@@ -1,26 +1,14 @@
 abstract type LinearConstraintKind end
 struct AssetLinearConstraint <: LinearConstraintKind end
 struct FactorLinearConstraint <: LinearConstraintKind end
-struct LinearConstraint{T1 <: LinearConstraintAtom, T2 <: LinearConstraintAtom,
-                        T3 <: ComparisonOperators, T4 <: LinearConstraintKind}
-    lhs::T1
-    rhs::T2
+struct LinearConstraint{T1 <: A_LinearConstraint, T2 <: Real, T3 <: ComparisonOperators}
+    A::T1
+    B::T2
     comp::T3
-    kind::T4
 end
-function LinearConstraint(; lhs::LinearConstraintAtom = LinearConstraintAtom(),
-                          rhs::LinearConstraintAtom = LinearConstraintAtom(),
-                          comp::ComparisonOperators = LEQ(),
-                          kind::LinearConstraintKind = AssetLinearConstraint())
-    return LinearConstraint{typeof(lhs), typeof(rhs), typeof(comp), typeof(kind)}(lhs, rhs,
-                                                                                  comp,
-                                                                                  kind)
-end
-function relative_factor_constraint_sign(::AssetLinearConstraint)
-    return 1
-end
-function relative_factor_constraint_sign(::FactorLinearConstraint)
-    return -1
+function LinearConstraint(; A::A_LinearConstraint = A_LinearConstraint(), B::Real = 0.0,
+                          comp::ComparisonOperators = LEQ())
+    return LinearConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
 struct PartialLinearConstraintModel{T1 <: Union{Nothing, <:AbstractMatrix},
                                     T2 <: Union{Nothing, <:AbstractVector}}
@@ -58,54 +46,42 @@ function Base.getproperty(obj::LinearConstraintModel, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function get_asset_constraint_data(lca::LinearConstraintAtom{<:PartialLinearConstraintAtom{<:AbstractVector,
-                                                                                           <:AbstractVector,
-                                                                                           <:AbstractVector},
-                                                             <:Real}, sets::DataFrame,
-                                   strict::Bool = false)
+function get_A_constraint_data(A_lc::A_LinearConstraint{<:Any, <:Any, <:Any},
+                               sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
-    N = nrow(sets)
-    A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)
-    sizehint!(A, length(lca.group))
-    for (group, name, coef) ∈ zip(lca.group, lca.name, lca.coef)
-        if !(isnothing(group) || string(group) ∉ group_names)
-            idx = sets[!, group] .== name
-            idx = coef * idx
-            append!(A, idx)
-        elseif strict
-            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lca)."))
-        else
-            @warn("$(string(group)) is not in $(group_names).\n$(lca).")
-        end
-    end
-    tcnst = lca.cnst
-    return if isempty(A)
-        A, tcnst
-    else
-        vec(sum(reshape(A, N, :); dims = 2)), tcnst
-    end
-end
-function get_asset_constraint_data(lca::LinearConstraintAtom{<:PartialLinearConstraintAtom{<:Any,
-                                                                                           <:Any,
-                                                                                           <:Real},
-                                                             <:Real}, sets::DataFrame,
-                                   strict::Bool = false)
-    group_names = names(sets)
-    N = nrow(sets)
-    A = Vector{promote_type(eltype(lca.coef), typeof(lca.cnst))}(undef, 0)
-    sizehint!(A, N)
-    (; group, name, coef) = lca
+    A = Vector{eltype(A_lc.coef)}(undef, 0)
+    (; group, name, coef) = A_lc
     if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
         idx = coef * idx
         append!(A, idx)
     elseif strict
-        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lca)"))
+        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(A_lc)"))
     else
-        @warn("$(string(group)) is not in $(group_names).\n$(lca)")
+        @warn("$(string(group)) is not in $(group_names).\n$(A_lc)")
     end
-    tcnst = lca.cnst
-    return A, tcnst
+    return A
+end
+function get_A_constraint_data(A_lc::A_LinearConstraint{<:AbstractVector, <:AbstractVector,
+                                                        <:AbstractVector}, sets::DataFrame,
+                               strict::Bool = false)
+    group_names = names(sets)
+    A = Vector{eltype(A_lc.coef)}(undef, 0)
+    for (group, name, coef) ∈ zip(A_lc.group, A_lc.name, A_lc.coef)
+        if !(isnothing(group) || string(group) ∉ group_names)
+            idx = sets[!, group] .== name
+            idx = coef * idx
+            append!(A, idx)
+        elseif strict
+            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(A_lc)."))
+        else
+            @warn("$(string(group)) is not in $(group_names).\n$(A_lc).")
+        end
+    end
+    if !isempty(A)
+        A = vec(sum(reshape(A, nrow(sets), :); dims = 2))
+    end
+    return A
 end
 function linear_constraints(lcs::Union{<:LinearConstraint,
                                        <:AbstractVector{<:LinearConstraint}},
@@ -114,55 +90,40 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
         @smart_assert(!isempty(lcs))
     end
     @smart_assert(!isempty(sets))
-    N = nrow(sets)
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)
     A_eq = Vector{datatype}(undef, 0)
     B_eq = Vector{datatype}(undef, 0)
     for lc ∈ lcs
-        lhs_A, lhs_B = get_asset_constraint_data(lc.lhs, sets, strict)
-        rhs_A, rhs_B = get_asset_constraint_data(lc.rhs, sets, strict)
-
-        lhs_flag = isempty(lhs_A) || all(iszero.(lhs_A))
-        rhs_flag = isempty(rhs_A) || all(iszero.(rhs_A))
-
-        if lhs_flag && rhs_flag
+        A = get_A_constraint_data(lc.A, sets, strict)
+        B = lc.B
+        lhs_flag = isempty(A) || all(iszero.(A))
+        if lhs_flag
             continue
         end
-
         d, flag_ineq = comparison_sign_ineq_flag(lc.comp)
-        rlhs_A = if lhs_flag
-            -rhs_A * d
-        elseif rhs_flag
-            lhs_A * d
-        else
-            sign = relative_factor_constraint_sign(lc.kind)
-            sign * (lhs_A - rhs_A) * d
-        end
-        rlhs_B = (rhs_B - lhs_B) * d
-
+        A = d * A
+        B = d * lc.B
         if flag_ineq
-            append!(A_ineq, rlhs_A)
-            append!(B_ineq, rlhs_B)
+            append!(A_ineq, A)
+            append!(B_ineq, B)
         else
-            append!(A_eq, rlhs_A)
-            append!(B_eq, rlhs_B)
+            append!(A_eq, A)
+            append!(B_eq, B)
         end
     end
-
     if !isempty(A_ineq)
-        A_ineq = transpose(reshape(A_ineq, N, :))
+        A_ineq = transpose(reshape(A_ineq, nrow(sets), :))
     else
         A_ineq = nothing
         B_ineq = nothing
     end
     if !isempty(A_eq)
-        A_eq = transpose(reshape(A_eq, N, :))
+        A_eq = transpose(reshape(A_eq, nrow(sets), :))
     else
         A_eq = nothing
         B_eq = nothing
     end
-
     return LinearConstraintModel(;
                                  ineq = PartialLinearConstraintModel(; A = A_ineq,
                                                                      B = B_ineq),
