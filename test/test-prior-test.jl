@@ -167,14 +167,24 @@
         assets = 1:10
         sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
 
-        vc_1 = LinearConstraintAtom(; group = :Asset, name = 2, coef = 1, cnst = 0.003)
-        vc_2 = LinearConstraintAtom(; group = [:Asset, :Asset], name = [3, 8],
-                                    coef = [1, -1], cnst = -0.001)
-        vc_3 = LinearConstraintAtom(; group = [:Clusters, :Asset], name = [3, 9],
-                                    coef = [1, -1], cnst = 0.002)
-        vc_4 = LinearConstraintAtom(; group = [:Asset, :Clusters], name = [5, 1],
-                                    coef = [1, -1], cnst = 0.007)
-        vc_5 = LinearConstraintAtom(; group = :Clusters, name = 2, coef = 1, cnst = 0.001)
+        vc_1 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = :Asset, name = 2,
+                                                         coef = 1.0), B = 0.003)
+        vc_2 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Asset, :Asset],
+                                                         name = [3, 8], coef = [1.0, -1]),
+                                  B = -0.001)
+        vc_3 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Clusters, :Asset],
+                                                         name = [3, 9], coef = [1.0, -1]),
+                                  B = 0.002)
+        vc_4 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Asset, :Clusters],
+                                                         name = [5, 1], coef = [1.0, -1]),
+                                  B = 0.007)
+        vc_5 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = :Clusters, name = 2,
+                                                         coef = 1.0), B = 0.001)
         views = [vc_1, vc_2, vc_3, vc_4, vc_5]
         pes = [BlackLittermanPriorEstimator(; views = views, sets = sets),
                BlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.0001),
@@ -211,48 +221,65 @@
             @test size(pm.X) == size(X)
         end
 
-        @test_throws TypeError views_constraints(LinearConstraintAtom(; group = :Foo,
-                                                                      name = 2, coef = 1,
-                                                                      cnst = 0.003), sets)
+        @test_throws TypeError views_constraints(BlackLittermanView(;
+                                                                    A = A_LinearConstraint(;
+                                                                                           group = :Foo,
+                                                                                           name = 2,
+                                                                                           coef = 1),
+                                                                    B = 0.003), sets)
 
-        @test_throws ArgumentError views_constraints(LinearConstraintAtom(; group = :Foo,
-                                                                          name = 2,
-                                                                          coef = 1,
-                                                                          cnst = 0.003),
-                                                     sets; strict = true)
+        @test_throws ArgumentError views_constraints(BlackLittermanView(;
+                                                                        A = A_LinearConstraint(;
+                                                                                               group = :Foo,
+                                                                                               name = 2,
+                                                                                               coef = 1),
+                                                                        B = 0.003), sets;
+                                                     strict = true)
 
-        @test_throws TypeError views_constraints(LinearConstraintAtom(; group = [:Foo],
-                                                                      name = [2],
-                                                                      coef = [1],
-                                                                      cnst = 0.003), sets)
+        @test_throws TypeError views_constraints(BlackLittermanView(;
+                                                                    A = A_LinearConstraint(;
+                                                                                           group = [:Foo],
+                                                                                           name = [2],
+                                                                                           coef = [1]),
+                                                                    B = 0.003), sets)
 
-        @test_throws ArgumentError views_constraints(LinearConstraintAtom(; group = [:Foo],
-                                                                          name = [2],
-                                                                          coef = [1],
-                                                                          cnst = 0.003),
-                                                     sets; strict = true)
+        @test_throws ArgumentError views_constraints(BlackLittermanView(;
+                                                                        A = A_LinearConstraint(;
+                                                                                               group = [:Foo],
+                                                                                               name = [2],
+                                                                                               coef = [1]),
+                                                                        B = 0.003), sets;
+                                                     strict = true)
 
-        @test_throws TypeError views_constraints(LinearConstraintAtom(; group = :Asset,
-                                                                      name = 11, coef = 1,
-                                                                      cnst = 0.003), sets)
+        @test_throws TypeError views_constraints(BlackLittermanView(;
+                                                                    A = A_LinearConstraint(;
+                                                                                           group = :Asset,
+                                                                                           name = 11,
+                                                                                           coef = 1),
+                                                                    B = 0.003), sets)
 
-        @test_throws ArgumentError views_constraints(LinearConstraintAtom(; group = :Asset,
-                                                                          name = 11,
-                                                                          coef = 1,
-                                                                          cnst = 0.003),
-                                                     sets, strict = true)
+        @test_throws ArgumentError views_constraints(BlackLittermanView(;
+                                                                        A = A_LinearConstraint(;
+                                                                                               group = :Asset,
+                                                                                               name = 11,
+                                                                                               coef = 1),
+                                                                        B = 0.003), sets,
+                                                     strict = true)
 
-        @test_throws TypeError views_constraints(LinearConstraintAtom(; group = [:Asset],
-                                                                      name = [11],
-                                                                      coef = [1],
-                                                                      cnst = 0.003), sets)
+        @test_throws TypeError views_constraints(BlackLittermanView(;
+                                                                    A = A_LinearConstraint(;
+                                                                                           group = [:Asset],
+                                                                                           name = [11],
+                                                                                           coef = [1]),
+                                                                    B = 0.003), sets)
 
-        @test_throws ArgumentError views_constraints(LinearConstraintAtom(;
-                                                                          group = [:Asset],
-                                                                          name = [11],
-                                                                          coef = [1],
-                                                                          cnst = 0.003),
-                                                     sets, strict = true)
+        @test_throws ArgumentError views_constraints(BlackLittermanView(;
+                                                                        A = A_LinearConstraint(;
+                                                                                               group = [:Asset],
+                                                                                               name = [11],
+                                                                                               coef = [1]),
+                                                                        B = 0.003), sets,
+                                                     strict = true)
     end
     @testset "Factor Prior" begin
         rng = StableRNG(123456789)
@@ -293,11 +320,17 @@
         F = X[:, [3, 8, 5, 10]]
         assets = 1:10
         sets = DataFrame(:Factor => [1, 2, 3, 4])
-        vc_1 = LinearConstraintAtom(; group = :Factor, name = 2, coef = 1, cnst = 0.003)
-        vc_2 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [4, 1],
-                                    coef = [1, -1], cnst = -0.001)
-        vc_3 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [2, 3],
-                                    coef = [1, -1], cnst = 0.002)
+        vc_1 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = :Factor, name = 2,
+                                                         coef = 1), B = 0.003)
+        vc_2 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Factor, :Factor],
+                                                         name = [4, 1], coef = [1, -1.0]),
+                                  B = -0.001)
+        vc_3 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Factor, :Factor],
+                                                         name = [2, 3], coef = [1, -1.0]),
+                                  B = 0.002)
         views = [vc_1, vc_2, vc_3]
         pes = [BayesianBlackLittermanPriorEstimator(;
                                                     pe = FactorPriorEstimator(;
@@ -359,11 +392,17 @@
         X = randn(rng, 100, 10) * 0.001
         F = X[:, [3, 8, 5, 10]]
 
-        vc_1 = LinearConstraintAtom(; group = :Factor, name = 2, coef = 1, cnst = 0.003)
-        vc_2 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [4, 1],
-                                    coef = [1, -1], cnst = -0.001)
-        vc_3 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [2, 3],
-                                    coef = [1, -1], cnst = 0.002)
+        vc_1 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = :Factor, name = 2,
+                                                         coef = 1), B = 0.003)
+        vc_2 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Factor, :Factor],
+                                                         name = [4, 1], coef = [1, -1.0]),
+                                  B = -0.001)
+        vc_3 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Factor, :Factor],
+                                                         name = [2, 3], coef = [1, -1.0]),
+                                  B = 0.002)
         views = [vc_1, vc_2, vc_3]
         sets = DataFrame(:Factor => [1, 2, 3, 4])
 
@@ -533,22 +572,38 @@
 
         assets = 1:10
         a_sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-        vc_1 = LinearConstraintAtom(; group = :Asset, name = 2, coef = 1, cnst = 0.003)
-        vc_2 = LinearConstraintAtom(; group = [:Asset, :Asset], name = [3, 8],
-                                    coef = [1, -1], cnst = -0.001)
-        vc_3 = LinearConstraintAtom(; group = [:Clusters, :Asset], name = [3, 9],
-                                    coef = [1, -1], cnst = 0.002)
-        vc_4 = LinearConstraintAtom(; group = [:Asset, :Clusters], name = [5, 1],
-                                    coef = [1, -1], cnst = 0.007)
-        vc_5 = LinearConstraintAtom(; group = :Clusters, name = 2, coef = 1, cnst = 0.001)
+        vc_1 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = :Asset, name = 2,
+                                                         coef = 1.0), B = 0.003)
+        vc_2 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Asset, :Asset],
+                                                         name = [3, 8], coef = [1, -1.0]),
+                                  B = -0.001)
+        vc_3 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Clusters, :Asset],
+                                                         name = [3, 9], coef = [1, -1.0]),
+                                  B = 0.002)
+        vc_4 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Asset, :Clusters],
+                                                         name = [5, 1], coef = [1, -1.0]),
+                                  B = 0.007)
+        vc_5 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = :Clusters, name = 2,
+                                                         coef = 1.0), B = 0.001)
         a_views = [vc_1, vc_2, vc_3, vc_4, vc_5]
 
         f_sets = DataFrame(:Factor => [1, 2, 3, 4])
-        vc_1 = LinearConstraintAtom(; group = :Factor, name = 2, coef = 1, cnst = 0.003)
-        vc_2 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [4, 1],
-                                    coef = [1, -1], cnst = -0.001)
-        vc_3 = LinearConstraintAtom(; group = [:Factor, :Factor], name = [2, 3],
-                                    coef = [1, -1], cnst = 0.002)
+        vc_1 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = :Factor, name = 2,
+                                                         coef = 1.0), B = 0.003)
+        vc_2 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Factor, :Factor],
+                                                         name = [4, 1], coef = [1, -1.0]),
+                                  B = -0.001)
+        vc_3 = BlackLittermanView(;
+                                  A = A_LinearConstraint(; group = [:Factor, :Factor],
+                                                         name = [2, 3], coef = [1, -1.0]),
+                                  B = 0.002)
         f_views = [vc_1, vc_2, vc_3]
         pes = [AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets),

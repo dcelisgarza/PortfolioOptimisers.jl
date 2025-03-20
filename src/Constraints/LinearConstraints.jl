@@ -1,6 +1,3 @@
-abstract type LinearConstraintKind end
-struct AssetLinearConstraint <: LinearConstraintKind end
-struct FactorLinearConstraint <: LinearConstraintKind end
 struct LinearConstraint{T1 <: A_LinearConstraint, T2 <: Real, T3 <: ComparisonOperators}
     A::T1
     B::T2
@@ -130,5 +127,5 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
                                  eq = PartialLinearConstraintModel(; A = A_eq, B = B_eq))
 end
 
-export linear_constraints, LinearConstraint, AssetLinearConstraint, FactorLinearConstraint,
-       LinearConstraintModel, PartialLinearConstraintModel
+export linear_constraints, LinearConstraint, LinearConstraintModel,
+       PartialLinearConstraintModel
