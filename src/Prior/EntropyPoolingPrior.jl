@@ -74,13 +74,17 @@ function Base.getproperty(obj::EntropyPoolingPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
-struct EntropyPoolingModel{T1 <: AbstractPriorModel, T2 <: LinearConstraintModel,
+struct EntropyPoolingModel{T1 <: AbstractPriorModel,
+                           T2 <: Union{<:LinearConstraintModel,
+                                       <:AbstractVector{<:LinearConstraintModel}},
                            T3 <: AbstractWeights} <: AbstractEntropyPoolingPriorModel
     pm::T1
     views::T2
     w::T3
 end
-function EntropyPoolingModel(; pm::AbstractPriorModel, views::LinearConstraintModel,
+function EntropyPoolingModel(; pm::AbstractPriorModel,
+                             views::Union{<:LinearConstraintModel,
+                                          <:AbstractVector{<:LinearConstraintModel}},
                              w::AbstractWeights)
     @smart_assert(!isempty(w))
     @smart_assert(size(pm.X, 1) == length(w))
@@ -146,58 +150,28 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H1_Entrop
     else
         pweights(pe.w)
     end
-    all_A_ineq = Vector{eltype(X)}(undef, 0)
-    all_B_ineq = Vector{eltype(X)}(undef, 0)
-    all_A_eq = Vector{eltype(X)}(undef, 0)
-    all_B_eq = Vector{eltype(X)}(undef, 0)
     @smart_assert(length(w0) == T)
     @smart_assert(nrow(pe.sets) == N)
     wi = w0
     views = sort(pe.views)
     vls = get_view_level.(views)
     uvls = sort!(unique(vls))
-    mask = falses(length(views))
+    idx = falses(length(views))
+    view_models = LinearConstraintModel[]
+    sizehint!(view_models, length(views))
     for uvl ∈ uvls
-        pe = moment_factory_w(pe, wi)
-        idx = mask .|| (vls .== uvl)
-        prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
-        (; A_ineq, B_ineq, A_eq, B_eq) = lcm = entropy_pooling_views(prior_model,
-                                                                     views[idx], pe.sets,
-                                                                     wi; strict = strict)
-        wi = entropy_pooling(w0, lcm, pe.opt)
-        if !isnothing(A_ineq)
-            append!(all_A_ineq, vec(A_ineq))
-            append!(all_B_ineq, B_ineq)
-        end
-        if !isnothing(A_eq)
-            append!(all_A_eq, vec(A_eq))
-            append!(all_B_eq, B_eq)
-        end
         views[idx] = fixed_entropy_pooling_view_factory.(views[idx])
-        mask = idx
+        pe = moment_factory_w(pe, wi)
+        idx = idx .|| (vls .== uvl)
+        prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
+        views_model_i = entropy_pooling_views(prior_model, views[idx], pe.sets, wi;
+                                              strict = strict)
+        wi = entropy_pooling(w0, views_model_i, pe.opt)
+        push!(view_models, views_model_i)
     end
-
-    if !isempty(all_A_ineq)
-        all_A_ineq = transpose(reshape(all_A_ineq, T, :))
-    else
-        all_A_ineq = nothing
-        all_B_ineq = nothing
-    end
-    if !isempty(all_A_eq)
-        all_A_eq = transpose(reshape(all_A_eq, T, :))
-    else
-        all_A_eq = nothing
-        all_B_eq = nothing
-    end
+    pe = moment_factory_w(pe, wi)
     return EntropyPoolingModel(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
-                               views = LinearConstraintModel(;
-                                                             ineq = PartialLinearConstraintModel(;
-                                                                                                 A = all_A_ineq,
-                                                                                                 B = all_B_ineq),
-                                                             eq = PartialLinearConstraintModel(;
-                                                                                               A = all_A_eq,
-                                                                                               B = all_B_eq)),
-                               w = wi)
+                               views = view_models, w = wi)
 end
 function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H2_EntropyPooling,
                                                 <:Any, <:Any}, X::AbstractMatrix,
@@ -216,58 +190,28 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H2_Entrop
     else
         pweights(pe.w)
     end
-    all_A_ineq = Vector{eltype(X)}(undef, 0)
-    all_B_ineq = Vector{eltype(X)}(undef, 0)
-    all_A_eq = Vector{eltype(X)}(undef, 0)
-    all_B_eq = Vector{eltype(X)}(undef, 0)
     @smart_assert(length(w0) == T)
     @smart_assert(nrow(pe.sets) == N)
     wi = w0
     views = sort(pe.views)
     vls = get_view_level.(views)
     uvls = sort!(unique(vls))
-    mask = falses(length(views))
+    idx = falses(length(views))
+    view_models = LinearConstraintModel[]
+    sizehint!(view_models, length(views))
     for uvl ∈ uvls
-        pe = moment_factory_w(pe, wi)
-        idx = mask .|| (vls .== uvl)
-        prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
-        (; A_ineq, B_ineq, A_eq, B_eq) = lcm = entropy_pooling_views(prior_model,
-                                                                     views[idx], pe.sets,
-                                                                     wi; strict = strict)
-        wi = entropy_pooling(wi, lcm, pe.opt)
-        if !isnothing(A_ineq)
-            append!(all_A_ineq, vec(A_ineq))
-            append!(all_B_ineq, B_ineq)
-        end
-        if !isnothing(A_eq)
-            append!(all_A_eq, vec(A_eq))
-            append!(all_B_eq, B_eq)
-        end
         views[idx] = fixed_entropy_pooling_view_factory.(views[idx])
-        mask = idx
+        pe = moment_factory_w(pe, wi)
+        idx = idx .|| (vls .== uvl)
+        prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
+        views_model_i = entropy_pooling_views(prior_model, views[idx], pe.sets, wi;
+                                              strict = strict)
+        wi = entropy_pooling(wi, views_model_i, pe.opt)
+        push!(view_models, views_model_i)
     end
-
-    if !isempty(all_A_ineq)
-        all_A_ineq = transpose(reshape(all_A_ineq, T, :))
-    else
-        all_A_ineq = nothing
-        all_B_ineq = nothing
-    end
-    if !isempty(all_A_eq)
-        all_A_eq = transpose(reshape(all_A_eq, T, :))
-    else
-        all_A_eq = nothing
-        all_B_eq = nothing
-    end
+    pe = moment_factory_w(pe, wi)
     return EntropyPoolingModel(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
-                               views = LinearConstraintModel(;
-                                                             ineq = PartialLinearConstraintModel(;
-                                                                                                 A = all_A_ineq,
-                                                                                                 B = all_B_ineq),
-                                                             eq = PartialLinearConstraintModel(;
-                                                                                               A = all_A_eq,
-                                                                                               B = all_B_eq)),
-                               w = wi)
+                               views = view_models, w = wi)
 end
 function entropy_pooling(w::AbstractVector, epcs::LinearConstraintModel,
                          optim::OptimEntropyPooling)
