@@ -127,56 +127,24 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_Entrop
     @smart_assert(length(w) == T)
     @smart_assert(nrow(pe.sets) == N)
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
-    views = entropy_pooling_views(prior_model, pe.views, pe.sets, w; strict = strict)
+    views = entropy_pooling_views(prior_model, pe.views, pe.sets; strict = strict,
+                                  old_w = w)
     w = entropy_pooling(w, views, pe.opt)
     pe = moment_factory_w(pe, w)
     return EntropyPoolingModel(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
                                views = views, w = w)
 end
-function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H1_EntropyPooling,
-                                                <:Any, <:Any}, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
-               strict::Bool = false, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
-    if dims == 2
-        X = transpose(X)
-        if !isnothing(F)
-            F = transpose(F)
-        end
-    end
-    T, N = size(X)
-    w0 = if isnothing(pe.w)
-        pweights(range(; start = inv(T), stop = inv(T), length = T))
-    else
-        pweights(pe.w)
-    end
-    @smart_assert(length(w0) == T)
-    @smart_assert(nrow(pe.sets) == N)
-    wi = w0
-    views = sort(pe.views)
-    vls = get_view_level.(views)
-    uvls = sort!(unique(vls))
-    idx = falses(length(views))
-    view_models = LinearConstraintModel[]
-    sizehint!(view_models, length(views))
-    for uvl ∈ uvls
-        views[idx] = fixed_entropy_pooling_view_factory.(views[idx])
-        pe = moment_factory_w(pe, wi)
-        idx = idx .|| (vls .== uvl)
-        prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
-        views_model_i = entropy_pooling_views(prior_model, views[idx], pe.sets, wi;
-                                              strict = strict)
-        wi = entropy_pooling(w0, views_model_i, pe.opt)
-        push!(view_models, views_model_i)
-    end
-    pe = moment_factory_w(pe, wi)
-    return EntropyPoolingModel(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
-                               views = view_models, w = wi)
+function _get_epw(::H1_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
+    return w0
 end
-function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H2_EntropyPooling,
-                                                <:Any, <:Any}, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
-               strict::Bool = false, kwargs...)
+function _get_epw(::H2_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
+    return wi
+end
+function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
+                                                <:Union{<:H1_EntropyPooling,
+                                                        <:H2_EntropyPooling}, <:Any, <:Any},
+               X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
+               dims::Int = 1, strict::Bool = false, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
@@ -197,17 +165,32 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H2_Entrop
     vls = get_view_level.(views)
     uvls = sort!(unique(vls))
     idx = falses(length(views))
+    old_mu = nothing
+    old_sigma = nothing
     view_models = LinearConstraintModel[]
     sizehint!(view_models, length(views))
-    for uvl ∈ uvls
-        views[idx] = fixed_entropy_pooling_view_factory.(views[idx])
+    for (i, uvl) ∈ enumerate(uvls)
         pe = moment_factory_w(pe, wi)
-        idx = idx .|| (vls .== uvl)
+        views[idx] = fixed_entropy_pooling_view_factory.(views[idx])
+        l_idx = vls .== uvl
+        idx = idx .|| l_idx
+        excluded = findall(l_idx)[isfixed.(views[l_idx])]
+        included = setdiff(findall(idx), excluded)
+        if isempty(included)
+            continue
+        end
+        views_i = views[included]
         prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
-        views_model_i = entropy_pooling_views(prior_model, views[idx], pe.sets, wi;
-                                              strict = strict)
-        wi = entropy_pooling(wi, views_model_i, pe.opt)
+        views_model_i = entropy_pooling_views(prior_model, views_i, pe.sets; old_w = w0,
+                                              strict = strict, old_mu = old_mu,
+                                              old_sigma = old_sigma)
+        wi = entropy_pooling(_get_epw(pe.alg, w0, wi), views_model_i, pe.opt)
         push!(view_models, views_model_i)
+        if i == 1
+            old_mu = prior_model.mu
+            old_sigma = prior_model.sigma
+        end
+        # old_sigma = uvl == 0 ? prior_model.sigma : nothing
     end
     pe = moment_factory_w(pe, wi)
     return EntropyPoolingModel(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),

@@ -3,7 +3,8 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                            missing_col_percent::Real = 1.0, missing_row_percent::Real = 1.0,
                            collapse_args::Tuple = (),
                            map_func::Union{Nothing, Function} = nothing,
-                           join_method::Symbol = :outer)
+                           join_method::Symbol = :outer,
+                           impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
     @smart_assert(zero(missing_col_percent) <
                   missing_col_percent <=
                   one(missing_col_percent))
@@ -35,6 +36,9 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
             x
         end
     DataFrames.transform!(X, 2:ncol(X) .=> ByRow((x) -> f(x)); renamecols = false)
+    if !isnothing(impute_method)
+        X = Impute.impute(X, impute_method)
+    end
     missing_mtx = ismissing.(Matrix(X[!, 2:end]))
     missings_cols = vec(count(missing_mtx; dims = 2))
     keep_rows = missings_cols .<= (ncol(X) - 1) * missing_col_percent
@@ -51,8 +55,10 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     X = DataFrame(percentchange(TimeArray(X; timestamp = :timestamp), ret_method;
                                 padding = padding))
     col_names = names(X)
-    return X[!, intersect(col_names, asset_names)], X[!,
-                                                      intersect(col_names, factor_names)]
+    ac = intersect(col_names, asset_names)
+    fc = intersect(col_names, factor_names)
+    oc = setdiff(col_names, union(ac, fc))
+    return X[!, oc], X[!, ac], X[!, fc]
 end
 
 export prices_to_returns

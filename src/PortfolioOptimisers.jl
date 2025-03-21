@@ -1,6 +1,6 @@
 module PortfolioOptimisers
 
-using AverageShiftedHistograms, Clustering, Distances, Distributions, GLM, JuMP,
+using AverageShiftedHistograms, Clustering, Distances, Distributions, GLM, Impute, JuMP,
       LinearAlgebra, MultivariateStats, NearestCorrelationMatrix, Optim, Graphs,
       SimpleWeightedGraphs, PythonCall, Random, SmartAsserts, SparseArrays, Statistics,
       StatsBase, DataFrames, TimeSeries
