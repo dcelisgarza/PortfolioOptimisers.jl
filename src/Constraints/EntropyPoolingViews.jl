@@ -243,37 +243,44 @@ end
 function _get_B_entropy_pooling_view_data(::C0_LinearEntropyPoolingConstraint,
                                           pm::AbstractPriorModel, idx::AbstractVector,
                                           coef::Real, args...)
-    return coef * sum(pm.mu[idx])
+    mu = view(pm.mu, idx)
+    return coef * sum(mu)
 end
 function _get_B_entropy_pooling_view_data(::C1_LinearEntropyPoolingConstraint,
                                           pm::AbstractPriorModel, idx::AbstractVector,
                                           coef::Real, args...)
-    return coef * sum(diag(pm.sigma)[idx])
+    dsigma = view(diag(pm.sigma), idx)
+    return coef * sum(dsigma)
 end
 function _get_B_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
                                                                               <:Any,
                                                                               <:SkewnessEntropyPoolingView},
                                           pm::AbstractPriorModel, idx::AbstractVector,
                                           coef::Real, w::AbstractWeights)
-    return coef * sum([skewness(pm.X[:, i], w) for i ∈ findall(idx)])
+    X = view(pm.X, :, idx)
+    return coef * sum(skewness(X, w))
 end
 function _get_B_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
                                                                               <:Any,
                                                                               <:KurtosisEntropyPoolingView},
                                           pm::AbstractPriorModel, idx::AbstractVector,
                                           coef::Real, w::AbstractWeights)
-    return coef * sum([kurtosis(pm.X[:, i], w) + 3 for i ∈ findall(idx)])
+    X = view(pm.X, :, idx)
+    return coef * sum(kurtosis(X, w) .+ 3)
 end
 function _get_B_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraint,
                                           pm::AbstractPriorModel, idx::AbstractVector,
                                           coef::Real, args...)
-    return coef * sum(diag(pm.sigma)[idx])
+    dsigma = view(diag(pm.sigma), idx)
+    return coef * sum(dsigma)
 end
-function _get_B_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraint,
-                                          pm::AbstractPriorModel, idx1::AbstractVector,
-                                          idx2::AbstractVector, coef::Real, args...)
+function A_B_entropy_pooling_stats(::RelativeCorrelationEntropyPoolingView,
+                                   pm::AbstractPriorModel, idx1::AbstractVector,
+                                   idx2::AbstractVector, coef::Real, cnst::Real)
     dsigma = diag(pm.sigma)
-    return coef * sum(sqrt.(dsigma[idx1]) .* sqrt.(dsigma[idx2]))
+    dsigma1 = view(dsigma, idx1)
+    dsigma2 = view(dsigma, idx2)
+    return coef * sum(sqrt.(dsigma1) .* sqrt.(dsigma2))
 end
 function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
                                          lcb::C4_LinearEntropyPoolingConstraint{<:Any,
@@ -381,35 +388,44 @@ end
 function _get_A_entropy_pooling_view_data(::C0_LinearEntropyPoolingConstraint,
                                           pm::AbstractPriorModel, idx::AbstractVector,
                                           coef::Real)
-    return coef * pm.X[:, idx]
+    X = view(pm.X, :, idx)
+    return coef * X
 end
 function _get_A_entropy_pooling_view_data(::C1_LinearEntropyPoolingConstraint,
                                           pm::AbstractPriorModel, idx::AbstractVector,
                                           coef::Real)
-    return coef * (pm.X[:, idx] .- transpose(pm.mu[idx])) .^ 2
+    X = view(pm.X, :, idx)
+    mu = view(pm.mu, idx)
+    return coef * (X .- transpose(view(pm.mu, idx))) .^ 2
 end
 function _get_A_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
                                                                               <:Any,
                                                                               <:SkewnessEntropyPoolingView},
                                           pm::AbstractPriorModel, idx::AbstractVector,
                                           coef::Real)
-    dsigma = diag(pm.sigma)[idx]
-    return coef * ((pm.X[:, idx] .- transpose(pm.mu[idx])) .^ 3) ./
-           (dsigma .* sqrt.(dsigma))
+    X = view(pm.X, :, idx)
+    mu = view(pm.mu, idx)
+    dsigma = view(diag(pm.sigma), idx)
+    return coef * ((X .- transpose(mu)) .^ 3) ./ (dsigma .* sqrt.(dsigma))
 end
 function _get_A_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
                                                                               <:Any,
                                                                               <:KurtosisEntropyPoolingView},
                                           pm::AbstractPriorModel, idx::AbstractVector,
                                           coef::Real)
-    dsigma = diag(pm.sigma)[idx]
-    return coef * ((pm.X[:, idx] .- transpose(pm.mu[idx])) .^ 4) ./ (dsigma .^ 2)
+    X = view(pm.X, :, idx)
+    mu = view(pm.mu, idx)
+    dsigma = view(diag(pm.sigma), idx)
+    return coef * ((X .- transpose(mu)) .^ 4) ./ (dsigma .^ 2)
 end
 function _get_A_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraint,
                                           pm::AbstractPriorModel, idx1::AbstractVector,
                                           idx2::AbstractVector, coef::Real)
-    return coef * vec((pm.X[:, idx1] .- transpose(pm.mu[idx1])) .*
-                      (pm.X[:, idx2] .- transpose(pm.mu[idx2])))
+    X1 = view(pm.X, :, idx1)
+    X2 = view(pm.X, :, idx2)
+    mu1 = view(pm.mu, idx1)
+    mu2 = view(pm.mu, idx2)
+    return coef * vec((X1 .- transpose(mu1)) .* (X2 .- transpose(mu2)))
 end
 function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
                                          lca::C4_LinearEntropyPoolingConstraint{<:Any,
