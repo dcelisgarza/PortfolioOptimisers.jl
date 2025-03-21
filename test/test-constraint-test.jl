@@ -176,14 +176,14 @@
     @testset "Risk budget constraints" begin
         assets = 1:10
         sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-        c1 = PartialLinearConstraintAtom(; group = :Assets, name = 1)
-        c2 = PartialLinearConstraintAtom(; group = [:Assets, :Assets], name = [1, 3],
-                                         coef = [0.6, 0.3])
-        c3 = PartialLinearConstraintAtom(; group = :Clusters, name = 3, coef = 0.25)
-        c4 = PartialLinearConstraintAtom(; group = [:Clusters, :Clusters, :Clusters],
-                                         name = [1, 2, 3],
-                                         coef = [inv(length(sets[!, :Clusters][sets[!, :Clusters] .== i]))
-                                                 for i ∈ 1:3])
+        c1 = A_LinearConstraint(; group = :Assets, name = 1)
+        c2 = A_LinearConstraint(; group = [:Assets, :Assets], name = [1, 3],
+                                coef = [0.6, 0.3])
+        c3 = A_LinearConstraint(; group = :Clusters, name = 3, coef = 0.25)
+        c4 = A_LinearConstraint(; group = [:Clusters, :Clusters, :Clusters],
+                                name = [1, 2, 3],
+                                coef = [inv(length(sets[!, :Clusters][sets[!, :Clusters] .== i]))
+                                        for i ∈ 1:3])
 
         rb = risk_budget_constraints(c1, sets)
         @test isapprox(rb[1] / rb[2], 10)
@@ -204,12 +204,12 @@
         @test isapprox(rb[idx2][1], 1 / 3 / 3)
         @test isapprox(rb[idx3][1], 1 / 4 / 3)
 
-        c1 = PartialLinearConstraintAtom(;)
+        c1 = A_LinearConstraint(;)
         rb = risk_budget_constraints(c1, sets)
         @test isapprox(rb, fill(inv(10), 10))
         @test_throws ArgumentError risk_budget_constraints(c1, sets, strict = true)
 
-        c1 = PartialLinearConstraintAtom(; group = [nothing], name = [nothing], coef = [1])
+        c1 = A_LinearConstraint(; group = [nothing], name = [nothing], coef = [1])
         rb = risk_budget_constraints(c1, sets)
         @test isapprox(rb, fill(inv(10), 10))
         @test_throws ArgumentError risk_budget_constraints(c1, sets, strict = true)
