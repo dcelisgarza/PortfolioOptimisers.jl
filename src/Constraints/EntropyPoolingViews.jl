@@ -274,14 +274,6 @@ function _get_B_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraint,
     dsigma = view(diag(pm.sigma), idx)
     return coef * sum(dsigma)
 end
-function A_B_entropy_pooling_stats(::RelativeCorrelationEntropyPoolingView,
-                                   pm::AbstractPriorModel, idx1::AbstractVector,
-                                   idx2::AbstractVector, coef::Real, cnst::Real)
-    dsigma = diag(pm.sigma)
-    dsigma1 = view(dsigma, idx1)
-    dsigma2 = view(dsigma, idx2)
-    return coef * sum(sqrt.(dsigma1) .* sqrt.(dsigma2))
-end
 function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
                                          lcb::C4_LinearEntropyPoolingConstraint{<:Any,
                                                                                 <:Any,
