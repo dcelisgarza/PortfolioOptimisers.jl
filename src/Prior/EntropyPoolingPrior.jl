@@ -175,6 +175,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
         constant_entropy_pooling_constraint!(pm, cache, [excluded;
                                                          included], views, pe.sets;
                                              strict = strict, w = w0)
+
         V_idx = vls .== uvl
         idx = idx .|| V_idx
         # Excluded contains all free parameters for this iteration. Meaning they are unrestricted and will be secondarily affected by the views.
