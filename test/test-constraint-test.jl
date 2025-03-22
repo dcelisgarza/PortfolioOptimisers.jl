@@ -231,5 +231,6 @@
                                                                                 name = ["a"],
                                                                                 coef = [2])],
                                                             set)
+        @test_throws AssertionError risk_budget_constraints(A_LinearConstraint[], set)
     end
 end

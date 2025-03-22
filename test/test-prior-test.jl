@@ -1074,7 +1074,7 @@
         @test d.coef == -1
 
         c = EntropyPoolingView()
-        @test c[5] == c
+        @test c == (c[5] = c)
         @test sort(c) == c
     end
 end

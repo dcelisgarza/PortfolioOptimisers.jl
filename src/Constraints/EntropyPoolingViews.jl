@@ -251,12 +251,12 @@ function freeze_A_view(A::C4_LinearEntropyPoolingConstraint{<:AbstractVector,
                                              coef = sign.(A.coef))
 end
 function _freeze_view(epc::C0_LinearEntropyPoolingConstraint, pm::AbstractPriorModel,
-                      idx::AbstractVector; kwargs...)
+                      idx::AbstractVector, coef::Real; kwargs...)
     mu = view(pm.mu, idx)
-    return sum(sign.(epc.coef) .* mu)
+    return sign(coef) * sum(mu)
 end
 function _freeze_view(epc::C1_LinearEntropyPoolingConstraint, pm::AbstractPriorModel,
-                      idx::AbstractVector; kwargs...)
+                      idx::AbstractVector, coef::Real; kwargs...)
     sigma = pm.sigma
     dsigma = view(diag(sigma), idx)
     if !isone(epc.exponent)
@@ -268,33 +268,33 @@ function _freeze_view(epc::C1_LinearEntropyPoolingConstraint, pm::AbstractPriorM
             dsigma = dsigma .^ epc.exponent
         end
     end
-    return sum(sign.(epc.coef) .* dsigma)
+    return sign(coef) * sum(dsigma)
 end
 function _freeze_view(epc::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any,
                                                              <:SkewnessEntropyPoolingView},
-                      pm::AbstractPriorModel, idx::AbstractVector;
+                      pm::AbstractPriorModel, idx::AbstractVector, coef::Real;
                       w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                           length = size(pm.X, 1))),
                       kwargs...)
     X = view(pm.X, :, idx)
-    return sum(sign.(epc.coef) .* [skewness(X[:, i], w) for i ∈ axes(X, 2)])
+    return sign(coef) * sum([skewness(X[:, i], w) for i ∈ axes(X, 2)])
 end
 function _freeze_view(epc::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any,
                                                              <:KurtosisEntropyPoolingView},
-                      pm::AbstractPriorModel, idx::AbstractVector;
+                      pm::AbstractPriorModel, idx::AbstractVector, coef::Real;
                       w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                           length = size(pm.X, 1))),
                       kwargs...)
     X = view(pm.X, :, idx)
-    return sum(sign.(epc.coef) .* [kurtosis(X[:, i], w) + 3 for i ∈ axes(X, 2)])
+    return sign(coef) * sum([kurtosis(X[:, i], w) + 3 for i ∈ axes(X, 2)])
 end
 function _freeze_view(epc::C4_LinearEntropyPoolingConstraint, pm::AbstractPriorModel,
-                      idx1::AbstractVector, idx2::AbstractVector; kwargs...)
+                      idx1::AbstractVector, idx2::AbstractVector, coef::Real; kwargs...)
     sigma = pm.sigma
     dsigma = diag(sigma)
     dsigma1 = sqrt.(view(dsigma, idx1))
     dsigma2 = sqrt.(view(dsigma, idx2))
-    return sum(sign.(epc.coef) .* dsigma1 .* dsigma2)
+    return sign(coef) * sum(dsigma1 .* dsigma2)
 end
 function freeze_B_view(::AbstractPriorModel, epv::ConstantEntropyPoolingConstraint,
                        ::DataFrame, ::Bool, args...; kwargs...)
@@ -310,7 +310,7 @@ function freeze_B_view(pm::AbstractPriorModel,
                        kwargs...)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
-    (; group, name) = epv
+    (; group, name, coef) = epv
     return ConstantEntropyPoolingConstraint(;
                                             coef = if !(isnothing(group) ||
                                                         string(group) ∉ group_names)
@@ -323,7 +323,7 @@ function freeze_B_view(pm::AbstractPriorModel,
                                                     end
                                                     zero(eltype(pm.X))
                                                 else
-                                                    _freeze_view(epv, pm, idx; w = w)
+                                                    _freeze_view(epv, pm, idx, coef; w = w)
                                                 end
                                             elseif strict
                                                 throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(epv)"))
@@ -349,7 +349,7 @@ function freeze_B_view(pm::AbstractPriorModel,
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     B = Vector{eltype(pm.X)}(undef, 0)
-    for (group, name) ∈ zip(epv.group, epv.name)
+    for (group, name, coef) ∈ zip(epv.group, epv.name, epv.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
             if all(iszero.(idx))
@@ -360,7 +360,7 @@ function freeze_B_view(pm::AbstractPriorModel,
                 end
                 continue
             end
-            append!(B, _freeze_view(epv, pm, idx; w = w))
+            append!(B, _freeze_view(epv, pm, idx, coef; w = w))
         elseif strict
             throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(epv)."))
         else
@@ -382,7 +382,7 @@ function freeze_B_view(pm::AbstractPriorModel,
                        kwargs...)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
-    (; group1, group2, name1, name2) = epv
+    (; group1, group2, name1, name2, coef) = epv
     return ConstantEntropyPoolingConstraint(;
                                             coef = if !(isnothing(group1) ||
                                                         string(group1) ∉ group_names ||
@@ -398,7 +398,7 @@ function freeze_B_view(pm::AbstractPriorModel,
                                                     end
                                                     zero(eltype(pm.X))
                                                 else
-                                                    _freeze_view(epv, pm, idx1, idx2;
+                                                    _freeze_view(epv, pm, idx1, idx2, coef;
                                                                  w = w)
                                                 end
                                             elseif strict
@@ -420,7 +420,7 @@ function freeze_B_view(pm::AbstractPriorModel,
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     B = Vector{eltype(pm.X)}(undef, 0)
-    for (group1, group2, name1, name2) ∈
+    for (group1, group2, name1, name2, coef) ∈
         zip(epv.group1, epv.group2, epv.name1, epv.name2, epv.coef)
         if !(isnothing(group1) ||
              string(group1) ∉ group_names ||
@@ -436,7 +436,7 @@ function freeze_B_view(pm::AbstractPriorModel,
                 end
                 continue
             end
-            append!(B, _freeze_view(epv, pm, idx1, idx2; w = w))
+            append!(B, _freeze_view(epv, pm, idx1, idx2, coef; w = w))
         elseif strict
             throw(ArgumentError("$(string(group1)) or $(string(group1)) are not in $(group_names).\n$(epv)."))
         else
