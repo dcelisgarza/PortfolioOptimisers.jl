@@ -860,12 +860,12 @@
             ens = effective_number_scenarios(pm.w,
                                              range(; start = inv(100), stop = inv(100),
                                                    length = 100))
-            res = isapprox(re, re_t, 5e-7)
+            res = isapprox(re, re_t; rtol = 5e-7)
             if !res
                 println("Test Fails on iteration $i re")
                 find_tol(re, re_t; name1 = :re, name2 = :re_t)
             end
-            res = isapprox(ens, ens_t, 5e-7)
+            res = isapprox(ens, ens_t; rtol = 5e-7)
             if !res
                 println("Test Fails on iteration $i ens")
                 find_tol(ens, ens_t; name1 = :ens, name2 = :ens_t)
@@ -874,16 +874,3 @@
         end
     end
 end
-
-function find_tol(a1, a2; name1 = :a1, name2 = :a2)
-    for rtol ∈
-        [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
-         5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0, 1.4e0,
-         1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
-        if isapprox(a1, a2; rtol = rtol)
-            println("isapprox($name1, $name2, rtol = $(rtol))")
-            break
-        end
-    end
-end
-find_tol(0.031413908040281616, 0.03141389772080837)
