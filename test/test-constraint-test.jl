@@ -216,12 +216,16 @@
 
         c1 = A_LinearConstraint(; group = :Assets, name = -1)
         @test_throws ArgumentError risk_budget_constraints(c1, sets; strict = true)
-
-        c1 = A_LinearConstraint(; group = [:Assets], name = [-1], coef = [1])
         rb = risk_budget_constraints(c1, sets; strict = false)
         @test isapprox(rb, fill(1 / 10, 10))
 
-        risk_budget_constraints(c1, sets; strict = true)
+        c1 = A_LinearConstraint(; group = [:Assets], name = [-1], coef = [1])
+        @test_throws ArgumentError risk_budget_constraints(c1, sets; strict = true)
+
+        rb = risk_budget_constraints(c1, sets; strict = false)
+        @test isapprox(rb, fill(1 / 10, 10))
+
+        rb = risk_budget_constraints(c1, sets; strict = false)
         @test_throws AssertionError risk_budget_constraints([A_LinearConstraint(;
                                                                                 group = [nothing],
                                                                                 name = ["a"],
