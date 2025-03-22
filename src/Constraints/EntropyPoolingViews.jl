@@ -201,22 +201,50 @@ function constant_entropy_pooling_constraint!(pm::AbstractPriorModel, cache::Abs
     end
     return nothing
 end
-function freeze_A_view(A::C0_LinearEntropyPoolingConstraint)
+function freeze_A_view(A::C0_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any})
     return C0_LinearEntropyPoolingConstraint(; group = A.group, name = A.name,
-                                             coef = sign(A.coef) * 1)
+                                             coef = sign(A.coef))
 end
-function freeze_A_view(A::C1_LinearEntropyPoolingConstraint)
+function freeze_A_view(A::C1_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any})
     return C1_LinearEntropyPoolingConstraint(; group = A.group, name = A.name,
-                                             coef = sign(A.coef) * 1)
+                                             coef = sign(A.coef))
 end
-function freeze_A_view(A::C2_LinearEntropyPoolingConstraint)
+function freeze_A_view(A::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any})
     return C2_LinearEntropyPoolingConstraint(; group = A.group, name = A.name,
-                                             coef = sign(A.coef) * 1, kind = A.kind)
+                                             coef = sign(A.coef), kind = A.kind)
 end
-function freeze_A_view(A::C4_LinearEntropyPoolingConstraint)
+function freeze_A_view(A::C4_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any, <:Any,
+                                                            <:Any})
     return C4_LinearEntropyPoolingConstraint(; group1 = A.group1, group2 = A.group2,
                                              name1 = A.name1, name2 = A.name2,
-                                             coef = sign(A.coef) * 1)
+                                             coef = sign(A.coef))
+end
+function freeze_A_view(A::C0_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                            <:AbstractVector,
+                                                            <:AbstractVector})
+    return C0_LinearEntropyPoolingConstraint(; group = A.group, name = A.name,
+                                             coef = sign.(A.coef))
+end
+function freeze_A_view(A::C1_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                            <:AbstractVector,
+                                                            <:AbstractVector})
+    return C1_LinearEntropyPoolingConstraint(; group = A.group, name = A.name,
+                                             coef = sign.(A.coef))
+end
+function freeze_A_view(A::C2_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                            <:AbstractVector,
+                                                            <:AbstractVector})
+    return C2_LinearEntropyPoolingConstraint(; group = A.group, name = A.name,
+                                             coef = sign.(A.coef), kind = A.kind)
+end
+function freeze_A_view(A::C4_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                            <:AbstractVector,
+                                                            <:AbstractVector,
+                                                            <:AbstractVector,
+                                                            <:AbstractVector})
+    return C4_LinearEntropyPoolingConstraint(; group1 = A.group1, group2 = A.group2,
+                                             name1 = A.name1, name2 = A.name2,
+                                             coef = sign.(A.coef))
 end
 function _freeze_view(epc::C0_LinearEntropyPoolingConstraint, pm::AbstractPriorModel,
                       idx::AbstractVector; kwargs...)

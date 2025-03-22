@@ -1019,5 +1019,66 @@
             end
             @test ens == exp(-re)
         end
+
+        c = C0_LinearEntropyPoolingConstraint(; group = [nothing, nothing],
+                                              name = [nothing, nothing], coef = [-3, -3.5])
+        @test all(isnothing.(c.group)) && all(isnothing.(c.name))
+        d = PortfolioOptimisers.freeze_A_view(c)
+        @test all(d.coef .== -1)
+        c = C0_LinearEntropyPoolingConstraint(; group = nothing, name = nothing, coef = -4)
+        @test isnothing(c.group) && isnothing(c.name)
+        d = PortfolioOptimisers.freeze_A_view(c)
+        @test d.coef == -1
+
+        c = C1_LinearEntropyPoolingConstraint(; group = [nothing, nothing],
+                                              name = [nothing, nothing], coef = [-5, -5.5])
+        @test all(isnothing.(c.group)) && all(isnothing.(c.name))
+        d = PortfolioOptimisers.freeze_A_view(c)
+        @test all(d.coef .== -1)
+        c = C1_LinearEntropyPoolingConstraint(; group = nothing, name = nothing, coef = -6)
+        @test isnothing(c.group) && isnothing(c.name)
+        d = PortfolioOptimisers.freeze_A_view(c)
+        @test d.coef == -1
+
+        c = C1_LinearEntropyPoolingConstraint(; group = [nothing, nothing],
+                                              name = [nothing, nothing], coef = [-5, -5.5])
+        @test all(isnothing.(c.group)) && all(isnothing.(c.name))
+        d = PortfolioOptimisers.freeze_A_view(c)
+        @test all(d.coef .== -1)
+        c = C1_LinearEntropyPoolingConstraint(; group = nothing, name = nothing, coef = -6)
+        @test isnothing(c.group) && isnothing(c.name)
+        d = PortfolioOptimisers.freeze_A_view(c)
+        @test d.coef == -1
+
+        c = C2_LinearEntropyPoolingConstraint(; group = [nothing, nothing],
+                                              name = [nothing, nothing], coef = [-7, -7.5])
+        @test all(isnothing.(c.group)) && all(isnothing.(c.name))
+        d = PortfolioOptimisers.freeze_A_view(c)
+        @test all(d.coef .== -1)
+
+        c = C2_LinearEntropyPoolingConstraint(; group = nothing, name = nothing, coef = -8)
+        @test isnothing(c.group) && isnothing(c.name)
+        d = PortfolioOptimisers.freeze_A_view(c)
+        @test d.coef == -1
+
+        c = C4_LinearEntropyPoolingConstraint(; group1 = [nothing, nothing],
+                                              group2 = [nothing, nothing],
+                                              name1 = [nothing, nothing],
+                                              name2 = [nothing, nothing], coef = [-9, -9.5])
+        @test all(isnothing.(c.group1)) && all(isnothing.(c.name1))
+        @test all(isnothing.(c.group2)) && all(isnothing.(c.name2))
+        d = PortfolioOptimisers.freeze_A_view(c)
+        @test all(d.coef .== -1)
+
+        c = C4_LinearEntropyPoolingConstraint(; group1 = nothing, name1 = nothing,
+                                              group2 = nothing, name2 = nothing, coef = -10)
+        @test isnothing(c.group1) && isnothing(c.name1)
+        @test isnothing(c.group2) && isnothing(c.name2)
+        d = PortfolioOptimisers.freeze_A_view(c)
+        @test d.coef == -1
+
+        c = EntropyPoolingView()
+        @test c[5] == c
+        @test sort(c) == c
     end
 end
