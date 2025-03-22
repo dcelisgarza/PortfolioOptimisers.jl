@@ -165,18 +165,16 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
     idx = falses(length(views))
     excluded = Int[]
     included = Int[]
+    cache = Set{Int}()
     V_i = nothing
     # Compute the prior observations.
     pe = moment_factory_w(pe, w0)
     pm = prior(pe.pe, X, F; strict = strict, kwargs...)
     for uvl ∈ uvls
         # Freeze updated parameters, ie parameters which were free in the previous iteration plus the ones which were adjusted via views. If there were no views the previous iteration, the free parameters become the new updated parameters and therefore frozen. In the first iteration, there is nothing to freeze.
-        views[[excluded; included]] = create_constant_entropy_pooling_constraint(pm,
-                                                                                 views[[excluded;
-                                                                                        included]],
-                                                                                 pe.sets;
-                                                                                 strict = strict,
-                                                                                 w = w0)
+        constant_entropy_pooling_constraint!(pm, cache, [excluded;
+                                                         included], views, pe.sets;
+                                             strict = strict, w = w0)
         V_idx = vls .== uvl
         idx = idx .|| V_idx
         # Excluded contains all free parameters for this iteration. Meaning they are unrestricted and will be secondarily affected by the views.

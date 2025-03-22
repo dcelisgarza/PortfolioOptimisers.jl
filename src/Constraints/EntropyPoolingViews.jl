@@ -181,28 +181,25 @@ end
 function to_be_frozen(epv::EntropyPoolingView)
     return isequal(epv.A, epv.B)
 end
-function create_constant_entropy_pooling_constraint(pm::AbstractPriorModel,
-                                                    epvs::Union{<:EntropyPoolingView,
-                                                                <:AbstractVector{<:EntropyPoolingView}},
-                                                    sets::DataFrame; strict::Bool = false,
-                                                    w::AbstractWeights = pweights(range(;
-                                                                                        start = 1,
-                                                                                        stop = 1,
-                                                                                        length = size(pm.X,
-                                                                                                      1))))
-    res = EntropyPoolingView[]
-    for epv ∈ epvs
-        push!(res,
-              EntropyPoolingView(;
-                                 B = ConstantEntropyPoolingConstraint(;
-                                                                      coef = freeze_B_view(pm,
-                                                                                           epv.B,
-                                                                                           sets,
-                                                                                           strict;
-                                                                                           w = w)),
-                                 A = freeze_A_view(epv.A), comp = epv.comp))
+function constant_entropy_pooling_constraint!(pm::AbstractPriorModel, cache::AbstractSet,
+                                              idx::AbstractVector,
+                                              epvs::Union{<:EntropyPoolingView,
+                                                          <:AbstractVector{<:EntropyPoolingView}},
+                                              sets::DataFrame; strict::Bool = false,
+                                              w::AbstractWeights = pweights(range(;
+                                                                                  start = 1,
+                                                                                  stop = 1,
+                                                                                  length = size(pm.X,
+                                                                                                1))))
+    for (i, epv) ∈ zip(idx, view(epvs, idx))
+        if i ∈ cache
+            continue
+        end
+        epv = EntropyPoolingView(; B = freeze_B_view(pm, epv.B, sets, strict; w = w),
+                                 A = freeze_A_view(epv.A), comp = epv.comp)
+        push!(cache, i)
     end
-    return res
+    return nothing
 end
 function freeze_A_view(A::C0_LinearEntropyPoolingConstraint)
     return C0_LinearEntropyPoolingConstraint(; group = A.group, name = A.name,
@@ -269,7 +266,7 @@ function _freeze_view(epc::C4_LinearEntropyPoolingConstraint, pm::AbstractPriorM
 end
 function freeze_B_view(::AbstractPriorModel, epvb::ConstantEntropyPoolingConstraint,
                        ::DataFrame, ::Bool, args...; kwargs...)
-    return epvb.coef
+    return epvb
 end
 function freeze_B_view(pm::AbstractPriorModel,
                        epva::Union{<:C0_LinearEntropyPoolingConstraint{<:Any, <:Any,
@@ -285,16 +282,17 @@ function freeze_B_view(pm::AbstractPriorModel,
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     (; group, name) = epva
-    B = if !(isnothing(group) || string(group) ∉ group_names)
-        idx = sets[!, group] .== name
-        _freeze_view(epva, pm, idx; w = w)
-    elseif strict
-        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(epva)"))
-    else
-        @warn("$(string(group)) is not in $(group_names).\n$(epva)")
-        zero(eltype(pm.X))
-    end
-    return B
+    return ConstantEntropyPoolingConstraint(;
+                                            coef = if !(isnothing(group) ||
+                                                        string(group) ∉ group_names)
+                                                idx = sets[!, group] .== name
+                                                _freeze_view(epva, pm, idx; w = w)
+                                            elseif strict
+                                                throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(epva)"))
+                                            else
+                                                @warn("$(string(group)) is not in $(group_names).\n$(epva)")
+                                                zero(eltype(pm.X))
+                                            end)
 end
 function freeze_B_view(pm::AbstractPriorModel,
                        epva::Union{<:C0_LinearEntropyPoolingConstraint{<:AbstractVector,
@@ -323,7 +321,11 @@ function freeze_B_view(pm::AbstractPriorModel,
             @warn("$(string(group)) is not in $(group_names).\n$(epva).")
         end
     end
-    return !isempty(B) ? sum(B) : zero(eltype(pm.X))
+    return ConstantEntropyPoolingConstraint(; coef = if !isempty(B)
+                                                sum(B)
+                                            else
+                                                zero(eltype(pm.X))
+                                            end)
 end
 function freeze_B_view(pm::AbstractPriorModel,
                        epva::C4_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any, <:Any,
@@ -335,19 +337,19 @@ function freeze_B_view(pm::AbstractPriorModel,
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     (; group1, group2, name1, name2) = epva
-    B = if !(isnothing(group1) ||
-             string(group1) ∉ group_names ||
-             isnothing(group2) ||
-             string(group2) ∉ group_names)
-        idx1 = sets[!, group1] .== name1
-        idx2 = sets[!, group2] .== name2
-        _freeze_view(epva, pm, idx1, idx2; w = w)
-    elseif strict
-        throw(ArgumentError("$(string(group1)) or $(string(group1)) are not in $(group_names).\n$(epva)."))
-    else
-        @warn("$(string(group1)) or $(string(group1)) are not in $(group_names).\n$(epva).")
-    end
-    return B
+    return ConstantEntropyPoolingConstraint(;
+                                            coef = if !(isnothing(group1) ||
+                                                        string(group1) ∉ group_names ||
+                                                        isnothing(group2) ||
+                                                        string(group2) ∉ group_names)
+                                                idx1 = sets[!, group1] .== name1
+                                                idx2 = sets[!, group2] .== name2
+                                                _freeze_view(epva, pm, idx1, idx2; w = w)
+                                            elseif strict
+                                                throw(ArgumentError("$(string(group1)) or $(string(group1)) are not in $(group_names).\n$(epva)."))
+                                            else
+                                                @warn("$(string(group1)) or $(string(group1)) are not in $(group_names).\n$(epva).")
+                                            end)
 end
 function freeze_B_view(pm::AbstractPriorModel,
                        epva::C4_LinearEntropyPoolingConstraint{<:AbstractVector,
@@ -377,7 +379,11 @@ function freeze_B_view(pm::AbstractPriorModel,
             @warn("$(string(group1)) or $(string(group1)) are not in $(group_names).\n$(epva).")
         end
     end
-    return !isempty(B) ? sum(B) : zero(eltype(pm.X))
+    return ConstantEntropyPoolingConstraint(; coef = if !isempty(B)
+                                                sum(B)
+                                            else
+                                                zero(eltype(pm.X))
+                                            end)
 end
 function get_view_level(::EntropyPoolingView{<:C0_LinearEntropyPoolingConstraint, <:Any,
                                              <:Any})
