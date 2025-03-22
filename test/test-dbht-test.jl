@@ -25,8 +25,8 @@
         S = dbht_similarity(similarity, rho, dist)
 
         root = DBHT_UniqueRoot()
-        @time T8, Rpm, Adjv, Dpm, Mv, Z1, dbht = DBHTs(dist, S; branchorder = :default,
-                                                       root = root)
+        T8, Rpm, Adjv, Dpm, Mv, Z1, dbht = DBHTs(dist, S; branchorder = :default,
+                                                 root = root)
         m1 = Z1[:, 1] .< 0
         m2 = Z1[:, 2] .< 0
         Z1[.!m1, 1] .+= size(Z1, 1) + 1
@@ -140,8 +140,8 @@
         S = dbht_similarity(similarity, rho, dist)
 
         root = DBHT_EqualRoot()
-        @time T8, Rpm, Adjv, Dpm, Mv, Z2, dbht = DBHTs(dist, S; branchorder = :optimal,
-                                                       root = root)
+        T8, Rpm, Adjv, Dpm, Mv, Z2, dbht = DBHTs(dist, S; branchorder = :optimal,
+                                                 root = root)
         m1 = Z2[:, 1] .< 0
         m2 = Z2[:, 2] .< 0
         Z2[.!m1, 1] .+= size(Z2, 1) + 1
@@ -276,8 +276,8 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            @time LoGo!(PortfolioOptimisers.LoGo(; dist = des[i]),
-                        FNPDM_NearestCorrelationMatrix(), sigma1, X)
+            LoGo!(PortfolioOptimisers.LoGo(; dist = des[i]),
+                  FNPDM_NearestCorrelationMatrix(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
