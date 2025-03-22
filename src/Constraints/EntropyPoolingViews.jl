@@ -178,54 +178,8 @@ end
 function Base.sort(obj::EntropyPoolingView)
     return obj
 end
-function isfixed(epv::EntropyPoolingView)
+function to_be_frozen(epv::EntropyPoolingView)
     return isequal(epv.A, epv.B)
-end
-function fixed_entropy_pooling_view_factory(epv::EntropyPoolingView{<:C0_LinearEntropyPoolingConstraint,
-                                                                    <:Any, <:Any})
-    A = C0_LinearEntropyPoolingConstraint(; group = epv.A.group, name = epv.A.name,
-                                          coef = if isa(epv.A.group, AbstractVector)
-                                              range(; start = 1, stop = 1,
-                                                    length = length(epv.A.group))
-                                          else
-                                              1
-                                          end)
-    return EntropyPoolingView(; A = A, B = A, comp = EQ())
-end
-function fixed_entropy_pooling_view_factory(epv::EntropyPoolingView{<:C1_LinearEntropyPoolingConstraint,
-                                                                    <:Any, <:Any})
-    A = C1_LinearEntropyPoolingConstraint(; group = epv.A.group, name = epv.A.name,
-                                          coef = if isa(epv.A.group, AbstractVector)
-                                              range(; start = 1, stop = 1,
-                                                    length = length(epv.A.group))
-                                          else
-                                              1
-                                          end, exponent = epv.A.exponent)
-    return EntropyPoolingView(; A = A, B = A, comp = EQ())
-end
-function fixed_entropy_pooling_view_factory(epv::EntropyPoolingView{<:C2_LinearEntropyPoolingConstraint,
-                                                                    <:Any, <:Any})
-    # return epv
-    A = C2_LinearEntropyPoolingConstraint(; group = epv.A.group, name = epv.A.name,
-                                          coef = if isa(epv.A.group, AbstractVector)
-                                              range(; start = 1, stop = 1,
-                                                    length = length(epv.A.group))
-                                          else
-                                              1
-                                          end, kind = epv.A.kind)
-    return EntropyPoolingView(; A = A, B = A, comp = EQ())
-end
-function fixed_entropy_pooling_view_factory(epv::EntropyPoolingView{<:C4_LinearEntropyPoolingConstraint,
-                                                                    <:Any, <:Any})
-    A = C4_LinearEntropyPoolingConstraint(; group1 = epv.A.group1, group2 = epv.A.group2,
-                                          name1 = epv.A.name1, name2 = epv.A.name2,
-                                          coef = if isa(epv.A.group1, AbstractVector)
-                                              range(; start = 1, stop = 1,
-                                                    length = length(epv.A.group1))
-                                          else
-                                              1
-                                          end)
-    return EntropyPoolingView(; A = A, B = A, comp = EQ())
 end
 function get_view_level(::EntropyPoolingView{<:C0_LinearEntropyPoolingConstraint, <:Any,
                                              <:Any})
@@ -259,10 +213,8 @@ function _get_B_entropy_pooling_view_data(::C0_LinearEntropyPoolingConstraint,
 end
 function _get_B_entropy_pooling_view_data(epc::C1_LinearEntropyPoolingConstraint,
                                           pm::AbstractPriorModel, idx::AbstractVector,
-                                          coef::Real, args...;
-                                          old_sigma::Union{Nothing, AbstractMatrix} = nothing,
-                                          kwargs...)
-    sigma = isnothing(old_sigma) ? pm.sigma : old_sigma
+                                          coef::Real, args...; kwargs...)
+    sigma = pm.sigma
     dsigma = view(diag(sigma), idx)
     if !isone(epc.exponent)
         if isapprox(epc.exponent, 1 / 2)
@@ -280,35 +232,32 @@ function _get_B_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:
                                                                               <:SkewnessEntropyPoolingView},
                                           pm::AbstractPriorModel, idx::AbstractVector,
                                           coef::Real;
-                                          old_w::AbstractWeights = pweights(range(;
-                                                                                  start = 1,
-                                                                                  stop = 1,
-                                                                                  length = size(pm.X,
-                                                                                                1))),
+                                          w::AbstractWeights = pweights(range(; start = 1,
+                                                                              stop = 1,
+                                                                              length = size(pm.X,
+                                                                                            1))),
                                           kwargs...)
     X = view(pm.X, :, idx)
-    return coef * sum([skewness(X[:, i], old_w)] for i ∈ axes(X, 2))
+    return coef * sum([skewness(X[:, i], w)] for i ∈ axes(X, 2))
 end
 function _get_B_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
                                                                               <:Any,
                                                                               <:KurtosisEntropyPoolingView},
                                           pm::AbstractPriorModel, idx::AbstractVector,
                                           coef::Real;
-                                          old_w::AbstractWeights = pweights(range(;
-                                                                                  start = 1,
-                                                                                  stop = 1,
-                                                                                  length = size(pm.X,
-                                                                                                1))),
+                                          w::AbstractWeights = pweights(range(; start = 1,
+                                                                              stop = 1,
+                                                                              length = size(pm.X,
+                                                                                            1))),
                                           kwargs...)
     X = view(pm.X, :, idx)
-    return coef * sum([kurtosis(X[:, i], old_w) + 3] for i ∈ axes(X, 2))
+    return coef * sum([kurtosis(X[:, i], w) + 3] for i ∈ axes(X, 2))
 end
 function _get_B_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraint,
                                           pm::AbstractPriorModel, idx1::AbstractVector,
                                           idx2::AbstractVector, coef::Real, args...;
-                                          old_sigma::Union{Nothing, AbstractMatrix} = nothing,
                                           kwargs...)
-    sigma = isnothing(old_sigma) ? pm.sigma : old_sigma
+    sigma = pm.sigma
     dsigma = diag(sigma)
     dsigma1 = sqrt.(view(dsigma, idx1))
     dsigma2 = sqrt.(view(dsigma, idx2))
@@ -317,18 +266,13 @@ end
 function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
                                          epvbs::AbstractVector{<:EntropyPoolingConstraint},
                                          sets::DataFrame, strict::Bool = false, args...;
-                                         old_mu::Union{Nothing, AbstractVector} = nothing,
-                                         old_sigma::Union{Nothing, AbstractMatrix} = nothing,
-                                         old_w::AbstractWeights = pweights(range(;
-                                                                                 start = 1,
-                                                                                 stop = 1,
-                                                                                 length = size(pm.X,
-                                                                                               1))))
+                                         w::AbstractWeights = pweights(range(; start = 1,
+                                                                             stop = 1,
+                                                                             length = size(pm.X,
+                                                                                           1))))
     B = zero(eltype(pm.X))
     for epvb ∈ epvbs
-        B += get_B_entropy_pooling_view_data(pm, epvb, sets, strict, args...;
-                                             old_mu = old_mu, old_sigma = old_sigma,
-                                             old_w = old_w)
+        B += get_B_entropy_pooling_view_data(pm, epvb, sets, strict, args...; w = w)
     end
     return B
 end
@@ -339,13 +283,10 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
                                                                                  <:Any,
                                                                                  <:Real},
                                          sets::DataFrame, strict::Bool = false, args...;
-                                         old_mu::Union{Nothing, AbstractVector} = nothing,
-                                         old_sigma::Union{Nothing, AbstractMatrix} = nothing,
-                                         old_w::AbstractWeights = pweights(range(;
-                                                                                 start = 1,
-                                                                                 stop = 1,
-                                                                                 length = size(pm.X,
-                                                                                               1))))
+                                         w::AbstractWeights = pweights(range(; start = 1,
+                                                                             stop = 1,
+                                                                             length = size(pm.X,
+                                                                                           1))))
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     (; group1, group2, name1, name2, coef) = epvb
@@ -355,9 +296,7 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
              string(group2) ∉ group_names)
         idx1 = sets[!, group1] .== name1
         idx2 = sets[!, group1] .== name2
-        _get_B_entropy_pooling_view_data(epvb, pm, idx1, idx2, coef, args...;
-                                         old_mu = old_mu, old_sigma = old_sigma,
-                                         old_w = old_w)
+        _get_B_entropy_pooling_view_data(epvb, pm, idx1, idx2, coef, args...; w = w)
     elseif strict
         throw(ArgumentError("$(string(group1)) or $(string(group2)) are not in $(group_names).\n$(epvb)"))
     else
@@ -373,13 +312,10 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
                                                                                  <:AbstractVector,
                                                                                  <:AbstractVector},
                                          sets::DataFrame, strict::Bool = false, args...;
-                                         old_mu::Union{Nothing, AbstractVector} = nothing,
-                                         old_sigma::Union{Nothing, AbstractMatrix} = nothing,
-                                         old_w::AbstractWeights = pweights(range(;
-                                                                                 start = 1,
-                                                                                 stop = 1,
-                                                                                 length = size(pm.X,
-                                                                                               1))))
+                                         w::AbstractWeights = pweights(range(; start = 1,
+                                                                             stop = 1,
+                                                                             length = size(pm.X,
+                                                                                           1))))
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     B = zero(eltype(pm.X))
@@ -392,8 +328,7 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
             idx1 = sets[!, group1] .== name1
             idx2 = sets[!, group1] .== name2
             B += _get_B_entropy_pooling_view_data(epvb, pm, idx1, idx2, coef, args...;
-                                                  old_mu = old_mu, old_sigma = old_sigma,
-                                                  old_w = old_w)
+                                                  w = w)
         elseif strict
             throw(ArgumentError("$(string(group1)) or $(string(group2)) are not in $(group_names).\n$(epvb)."))
         else
@@ -413,20 +348,16 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
                                                                                          <:Any,
                                                                                          <:Real}},
                                          sets::DataFrame, strict::Bool = false, args...;
-                                         old_mu::Union{Nothing, AbstractVector} = nothing,
-                                         old_sigma::Union{Nothing, AbstractMatrix} = nothing,
-                                         old_w::AbstractWeights = pweights(range(;
-                                                                                 start = 1,
-                                                                                 stop = 1,
-                                                                                 length = size(pm.X,
-                                                                                               1))))
+                                         w::AbstractWeights = pweights(range(; start = 1,
+                                                                             stop = 1,
+                                                                             length = size(pm.X,
+                                                                                           1))))
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     (; group, name, coef) = epvb
     B = if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
-        _get_B_entropy_pooling_view_data(epvb, pm, idx, coef, args...; old_mu = old_mu,
-                                         old_sigma = old_sigma, old_w = old_w)
+        _get_B_entropy_pooling_view_data(epvb, pm, idx, coef, args...; w = w)
     elseif strict
         throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(epvb)"))
     else
@@ -434,6 +365,46 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
         zero(eltype(pm.X))
     end
     return B
+end
+function get_view_index(epvb::Union{<:C0_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                                        <:AbstractVector,
+                                                                        <:AbstractVector},
+                                    <:C1_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                                        <:AbstractVector,
+                                                                        <:AbstractVector},
+                                    <:C2_LinearEntropyPoolingConstraint{<:AbstractVector,
+                                                                        <:AbstractVector,
+                                                                        <:AbstractVector}},
+                        sets::DataFrame, strict::Bool = false, args...)
+    @smart_assert(!isempty(sets))
+    group_names = names(sets)
+    return for (group, name) ∈ zip(epvb.group, epvb.name)
+        if !(isnothing(group) || string(group) ∉ group_names)
+            sets[!, group] .== name
+        elseif strict
+            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(epvb)."))
+        else
+            @warn("$(string(group)) is not in $(group_names).\n$(epvb).")
+        end
+    end
+end
+function get_view_index(epvb::Union{<:C0_LinearEntropyPoolingConstraint{<:Any, <:Any,
+                                                                        <:Real},
+                                    <:C1_LinearEntropyPoolingConstraint{<:Any, <:Any,
+                                                                        <:Real},
+                                    <:C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
+                                                                        <:Real}},
+                        sets::DataFrame, strict::Bool = false, args...)
+    @smart_assert(!isempty(sets))
+    group_names = names(sets)
+    (; group, name) = epvb
+    return if !(isnothing(group) || string(group) ∉ group_names)
+        sets[!, group] .== name
+    elseif strict
+        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(epvb)"))
+    else
+        @warn("$(string(group)) is not in $(group_names).\n$(epvb)")
+    end
 end
 function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
                                          epvb::Union{<:C0_LinearEntropyPoolingConstraint{<:AbstractVector,
@@ -446,22 +417,17 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
                                                                                          <:AbstractVector,
                                                                                          <:AbstractVector}},
                                          sets::DataFrame, strict::Bool = false, args...;
-                                         old_mu::Union{Nothing, AbstractVector} = nothing,
-                                         old_sigma::Union{Nothing, AbstractMatrix} = nothing,
-                                         old_w::AbstractWeights = pweights(range(;
-                                                                                 start = 1,
-                                                                                 stop = 1,
-                                                                                 length = size(pm.X,
-                                                                                               1))))
+                                         w::AbstractWeights = pweights(range(; start = 1,
+                                                                             stop = 1,
+                                                                             length = size(pm.X,
+                                                                                           1))))
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     B = zero(eltype(pm.X))
     for (group, name, coef) ∈ zip(epvb.group, epvb.name, epvb.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
-            B += _get_B_entropy_pooling_view_data(epvb, pm, idx, coef, args...;
-                                                  old_mu = old_mu, old_sigma = old_sigma,
-                                                  old_w = old_w)
+            B += _get_B_entropy_pooling_view_data(epvb, pm, idx, coef, args...; w = w)
         elseif strict
             throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(epvb)."))
         else
@@ -624,12 +590,8 @@ function entropy_pooling_views(pm::AbstractPriorModel,
                                epvs::Union{<:EntropyPoolingView,
                                            <:AbstractVector{<:EntropyPoolingView}},
                                sets::DataFrame; strict::Bool = false,
-                               old_mu::Union{Nothing, AbstractVector} = nothing,
-                               old_sigma::Union{Nothing, AbstractMatrix} = nothing,
-                               old_w::AbstractWeights = pweights(range(; start = 1,
-                                                                       stop = 1,
-                                                                       length = size(pm.X,
-                                                                                     1))))
+                               w::AbstractWeights = pweights(range(; start = 1, stop = 1,
+                                                                   length = size(pm.X, 1))))
     if isa(epvs, AbstractVector)
         @smart_assert(!isempty(epvs))
     end
@@ -640,8 +602,7 @@ function entropy_pooling_views(pm::AbstractPriorModel,
     B_eq = Vector{eltype(pm.X)}(undef, 0)
     for epv ∈ epvs
         A = get_A_entropy_pooling_view_data(pm, epv.A, sets, strict)
-        B = get_B_entropy_pooling_view_data(pm, epv.B, sets, strict; old_mu = old_mu,
-                                            old_sigma = old_sigma, old_w = old_w)
+        B = get_B_entropy_pooling_view_data(pm, epv.B, sets, strict; w = w)
 
         if isempty(A)
             continue
@@ -683,4 +644,4 @@ export entropy_pooling_views, ConstantEntropyPoolingConstraint,
        C0_LinearEntropyPoolingConstraint, C1_LinearEntropyPoolingConstraint,
        SkewnessEntropyPoolingView, KurtosisEntropyPoolingView,
        C2_LinearEntropyPoolingConstraint, C4_LinearEntropyPoolingConstraint,
-       EntropyPoolingView, isfixed
+       EntropyPoolingView, to_be_frozen
