@@ -149,7 +149,7 @@ function create_constant_entropy_pooling_constraint(pm::AbstractPriorModel,
                                                                                         length = size(pm.X,
                                                                                                       1))))
     res = EntropyPoolingView[]
-    for (i, epv) ∈ enumerate(epvs)
+    for epv ∈ epvs
         push!(res,
               EntropyPoolingView(;
                                  B = ConstantEntropyPoolingConstraint(;
@@ -157,9 +157,7 @@ function create_constant_entropy_pooling_constraint(pm::AbstractPriorModel,
                                                                                            epv.B,
                                                                                            sets,
                                                                                            strict;
-                                                                                           w = w,
-                                                                                           counter = (i,
-                                                                                                      epv.B.coef))),
+                                                                                           w = w)),
                                  A = freeze_A_view(epv.A), comp = epv.comp))
     end
     return res
@@ -364,10 +362,18 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
     vls = get_view_level.(views)
     uvls = sort!(unique(vls))
     idx = falses(length(views))
+    excluded = Int[]
+    included = Int[]
+    V_i = nothing
     pe = moment_factory_w(pe, w0)
     pm = prior(pe.pe, X, F; strict = strict, kwargs...)
-    V_i = nothing
-    for (i, uvl) ∈ enumerate(uvls)
+    for uvl ∈ uvls
+        views[[excluded; included]] = create_constant_entropy_pooling_constraint(pm,
+                                                                                 views[[excluded;
+                                                                                        included]],
+                                                                                 pe.sets;
+                                                                                 strict = strict,
+                                                                                 w = w0)
         V_idx = vls .== uvl
         idx = idx .|| V_idx
         excluded = findall(V_idx)[to_be_frozen.(views[V_idx])]
@@ -380,17 +386,6 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
         wi = entropy_pooling(_get_epw(pe.alg, w0, wi), V_i, pe.opt)
         pe = moment_factory_w(pe, wi)
         pm = prior(pe.pe, X, F; strict = strict, kwargs...)
-        views[[excluded; included]] = create_constant_entropy_pooling_constraint(pm,
-                                                                                 views[[excluded;
-                                                                                        included]],
-                                                                                 pe.sets;
-                                                                                 strict = strict,
-                                                                                 w = w0)
-        if i == 4
-            return EntropyPoolingModel(; pm = pm, views = V_i, w = wi)
-        end
-        # println(included)
-        # println(excluded)
     end
     return EntropyPoolingModel(; pm = pm, views = V_i, w = wi)
 end
