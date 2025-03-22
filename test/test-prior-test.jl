@@ -872,5 +872,152 @@
             end
             @test ens == exp(-re)
         end
+
+        views = [EntropyPoolingView(;
+                                    A = C0_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [1]),
+                                    B = ConstantEntropyPoolingConstraint(; coef = 0.1),
+                                    comp = EQ()),
+                 EntropyPoolingView(;
+                                    A = C0_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [2]),
+                                    B = C0_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [2])),
+                 EntropyPoolingView(;
+                                    A = C1_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [2]),
+                                    B = ConstantEntropyPoolingConstraint(; coef = 0.95),
+                                    comp = LEQ()),
+                 EntropyPoolingView(;
+                                    A = C0_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [3]),
+                                    B = C0_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [3])),
+                 EntropyPoolingView(;
+                                    A = C1_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [3]),
+                                    B = C1_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [3])),
+                 EntropyPoolingView(;
+                                    A = C2_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          name = [3],
+                                                                          coef = [1],
+                                                                          kind = SkewnessEntropyPoolingView()),
+                                    B = ConstantEntropyPoolingConstraint(; coef = -0.2),
+                                    comp = GEQ()),
+                 EntropyPoolingView(;
+                                    A = C0_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [4]),
+                                    B = C0_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [4])),
+                 EntropyPoolingView(;
+                                    A = C1_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [4]),
+                                    B = C1_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          coef = [1],
+                                                                          name = [4])),
+                 EntropyPoolingView(;
+                                    A = C2_LinearEntropyPoolingConstraint(;
+                                                                          group = [:Assets],
+                                                                          name = [4],
+                                                                          coef = [1],
+                                                                          kind = KurtosisEntropyPoolingView()),
+                                    B = ConstantEntropyPoolingConstraint(; coef = 5.1),
+                                    comp = LEQ()),
+                 EntropyPoolingView(;
+                                    A = C4_LinearEntropyPoolingConstraint(;
+                                                                          group1 = [:Assets],
+                                                                          group2 = [:Assets],
+                                                                          name1 = [1],
+                                                                          name2 = [2],
+                                                                          coef = [1]),
+                                    B = C4_LinearEntropyPoolingConstraint(;
+                                                                          group1 = [:Assets],
+                                                                          group2 = [:Assets],
+                                                                          name1 = [1],
+                                                                          name2 = [2],
+                                                                          coef = [0.05]),
+                                    comp = GEQ())]
+
+        res = (0.03400712888845852, 0.031413900180612686, 0.0314139001804876,
+               0.03400712973024464, 0.03141390069527771, 0.03141389772080837)
+
+        enss = (0.966564614081624, 0.969074389991833, 0.9690743899919543,
+                0.9665646132679833, 0.9690743894930843, 0.9690743923755664)
+
+        for (pe, re_t, ens_t) ∈ zip(pes, res, enss)
+            pm = prior(pe, transpose(X); dims = 2)
+            res = isapprox(pm.mu[1], 0.1)
+            if !res
+                println("Test Fails on array views iteration $i mu")
+                find_tol(pm.mu[1], 0.1; name1 = mu, name2 = "== 0.1")
+            end
+            @test res
+            res = diag(pm.sigma)[2] <= 0.95
+            if !res
+                println("Test Fails on array views iteration $i sigma")
+                find_tol(pm.sigma[1], 0.95; name1 = mu, name2 = "<= 0.95")
+            end
+            @test res
+            res = skewness(pm.X[:, 3], pm.w) >= -0.2
+            if !res
+                println("Test Fails on array views iteration $i skewness")
+                find_tol(skewness(pm.X[:, 3], pm.w), -0.2; name1 = mu, name2 = ">= -0.2")
+            end
+            @test res
+            res = kurtosis(pm.X[:, 4], pm.w) + 3 <= 5.1
+            if !res
+                println("Test Fails on array views iteration $i kurtosis")
+                find_tol(kurtosis(pm.X[:, 3], pm.w), 5.1; name1 = mu, name2 = "<= 5.1")
+            end
+            @test res
+            res = cov2cor(pm.sigma)[1, 2] >= 0.05
+            if !res
+                println("Test Fails on array views iteration $i correlation")
+                find_tol(cov2cor(pm.sigma)[1, 2], 0.05; name1 = mu, name2 = ">= 0.05")
+            end
+            @test res
+
+            re = relative_entropy(pm.w,
+                                  range(; start = inv(100), stop = inv(100), length = 100))
+            ens = effective_number_scenarios(pm.w,
+                                             range(; start = inv(100), stop = inv(100),
+                                                   length = 100))
+            res = isapprox(re, re_t; rtol = 5e-7)
+            if !res
+                println("Test Fails on array views iteration $i re")
+                find_tol(re, re_t; name1 = :re, name2 = :re_t)
+            end
+            res = isapprox(ens, ens_t; rtol = 5e-7)
+            if !res
+                println("Test Fails on array views iteration $i ens")
+                find_tol(ens, ens_t; name1 = :ens, name2 = :ens_t)
+            end
+            @test ens == exp(-re)
+        end
     end
 end
