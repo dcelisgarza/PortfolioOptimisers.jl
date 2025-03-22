@@ -178,6 +178,9 @@ end
 function Base.sort(obj::EntropyPoolingView)
     return obj
 end
+function Base.sort!(obj::EntropyPoolingView)
+    return obj
+end
 function to_be_frozen(epv::EntropyPoolingView)
     return isequal(epv.A, epv.B)
 end
@@ -195,7 +198,8 @@ function constant_entropy_pooling_constraint!(pm::AbstractPriorModel, cache::Abs
         if i ∈ cache
             continue
         end
-        epvs[i] = EntropyPoolingView(; B = freeze_B_view(pm, epv.B, sets, strict; w = w),
+        # Sets A to be constant with its updated value.
+        epvs[i] = EntropyPoolingView(; B = freeze_B_view(pm, epv.A, sets, strict; w = w),
                                      A = freeze_A_view(epv.A), comp = epv.comp)
         push!(cache, i)
     end
@@ -249,7 +253,7 @@ end
 function _freeze_view(epc::C0_LinearEntropyPoolingConstraint, pm::AbstractPriorModel,
                       idx::AbstractVector; kwargs...)
     mu = view(pm.mu, idx)
-    return sign(epc.coef) * sum(mu)
+    return sum(sign.(epc.coef) .* mu)
 end
 function _freeze_view(epc::C1_LinearEntropyPoolingConstraint, pm::AbstractPriorModel,
                       idx::AbstractVector; kwargs...)
@@ -264,7 +268,7 @@ function _freeze_view(epc::C1_LinearEntropyPoolingConstraint, pm::AbstractPriorM
             dsigma = dsigma .^ epc.exponent
         end
     end
-    return sign(epc.coef) * sum(dsigma)
+    return sum(sign.(epc.coef) .* dsigma)
 end
 function _freeze_view(epc::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any,
                                                              <:SkewnessEntropyPoolingView},
@@ -273,7 +277,7 @@ function _freeze_view(epc::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any
                                                           length = size(pm.X, 1))),
                       kwargs...)
     X = view(pm.X, :, idx)
-    return sign(epc.coef) * sum([skewness(X[:, i], w)] for i ∈ axes(X, 2))
+    return sum(sign.(epc.coef) .* [skewness(X[:, i], w) for i ∈ axes(X, 2)])
 end
 function _freeze_view(epc::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any,
                                                              <:KurtosisEntropyPoolingView},
@@ -282,7 +286,7 @@ function _freeze_view(epc::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any
                                                           length = size(pm.X, 1))),
                       kwargs...)
     X = view(pm.X, :, idx)
-    return sign(epc.coef) * sum([kurtosis(X[:, i], w) + 3] for i ∈ axes(X, 2))
+    return sum(sign.(epc.coef) .* [kurtosis(X[:, i], w) + 3 for i ∈ axes(X, 2)])
 end
 function _freeze_view(epc::C4_LinearEntropyPoolingConstraint, pm::AbstractPriorModel,
                       idx1::AbstractVector, idx2::AbstractVector; kwargs...)
@@ -290,7 +294,7 @@ function _freeze_view(epc::C4_LinearEntropyPoolingConstraint, pm::AbstractPriorM
     dsigma = diag(sigma)
     dsigma1 = sqrt.(view(dsigma, idx1))
     dsigma2 = sqrt.(view(dsigma, idx2))
-    return sign(epc.coef) * sum(dsigma1 .* dsigma2)
+    return sum(sign.(epc.coef) .* dsigma1 .* dsigma2)
 end
 function freeze_B_view(::AbstractPriorModel, epv::ConstantEntropyPoolingConstraint,
                        ::DataFrame, ::Bool, args...; kwargs...)

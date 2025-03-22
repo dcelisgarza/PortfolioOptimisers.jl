@@ -174,7 +174,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
         # Freeze updated parameters, ie parameters which were free in the previous iteration plus the ones which were adjusted via views. If there were no views the previous iteration, the free parameters become the new updated parameters and therefore frozen. In the first iteration, there is nothing to freeze.
         constant_entropy_pooling_constraint!(pm, cache, [excluded;
                                                          included], views, pe.sets;
-                                             strict = strict, w = w0)
+                                             strict = strict, w = wi)
 
         V_idx = vls .== uvl
         idx = idx .|| V_idx
@@ -193,6 +193,9 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
         wi = entropy_pooling(_get_epw(pe.alg, w0, wi), V_i, pe.opt)
         pe = moment_factory_w(pe, wi)
         pm = prior(pe.pe, X, F; strict = strict, kwargs...)
+        if uvl == 1
+            return EntropyPoolingModel(; pm = pm, views = V_i, w = wi)
+        end
     end
     return EntropyPoolingModel(; pm = pm, views = V_i, w = wi)
 end
