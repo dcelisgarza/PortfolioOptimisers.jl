@@ -282,6 +282,16 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintModel,
         pweights(fill(NaN, length(q)))
     end
 end
+function relative_entropy(x::AbstractVector, y::AbstractVector)
+    @smart_assert(all(x .>= 0))
+    @smart_assert(all(y .>= 0))
+    @smart_assert(length(x) == length(y))
+    return dot(x, log.(x) - log.(y))
+end
+function effective_number_scenarios(x::AbstractVector, y::AbstractVector)
+    return exp(-relative_entropy(x, y))
+end
 
 export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling, OptimEntropyPooling,
-       JuMPEntropyPooling, entropy_pooling, EntropyPoolingPriorEstimator
+       JuMPEntropyPooling, entropy_pooling, EntropyPoolingPriorEstimator, relative_entropy,
+       effective_number_scenarios
