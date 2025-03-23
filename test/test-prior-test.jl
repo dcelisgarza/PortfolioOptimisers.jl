@@ -1016,6 +1016,20 @@
             @test ens == exp(-re)
         end
 
+        w = pweights(range(; start = inv(size(X, 1)), stop = inv(size(X, 1)),
+                           length = size(X, 1)))
+        pm0 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets, w = w), X)
+        pm1 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets,), X)
+        @test isapprox(pm0.mu, pm1.mu)
+        @test isapprox(pm0.sigma, pm1.sigma)
+
+        pm0 = EntropyPoolingPriorEstimator(; views = views, sets = sets,
+                                           alg = H1_EntropyPooling(), w = w)
+        pm1 = EntropyPoolingPriorEstimator(; views = views, sets = sets,
+                                           alg = H1_EntropyPooling())
+        @test isapprox(pm0.mu, pm1.mu)
+        @test isapprox(pm0.sigma, pm1.sigma)
+
         c = C0_LinearEntropyPoolingConstraint(; group = [nothing, nothing],
                                               name = [nothing, nothing], coef = [-3, -3.5])
         @test all(isnothing.(c.group)) && all(isnothing.(c.name))
@@ -1076,5 +1090,10 @@
         c = EntropyPoolingView()
         @test c == (c[5] = c)
         @test sort(c) == c
+
+        @test_throws AssertionError JuMPEntropyPooling(; solvers = Solver[])
+        pe = EntropyPoolingPriorEstimator(;)
+        @test isa(pe.ce, PortfolioOptimisersCovariance)
+        @test isa(pe.me, SimpleExpectedReturns)
     end
 end
