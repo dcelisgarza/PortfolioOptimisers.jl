@@ -28,19 +28,5 @@ function (r::FourthLowerPartialMoment)(X::AbstractMatrix, w::AbstractVector,
     val = x .- target
     return sum(val[val .<= zero(eltype(val))] .^ 4) / length(x)
 end
-function risk_measure_factory(r::FourthLowerPartialMoment; prior::AbstractPriorModel,
-                              kwargs...)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    return FourthLowerPartialMoment(; settings = r.settings, target = r.target, w = r.w,
-                                    mu = mu)
-end
-function cluster_risk_measure_factory(r::FourthLowerPartialMoment;
-                                      prior::AbstractPriorModel, cluster::AbstractVector,
-                                      kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    return FourthLowerPartialMoment(; settings = r.settings, target = target, w = r.w,
-                                    mu = mu)
-end
 
 export FourthLowerPartialMoment

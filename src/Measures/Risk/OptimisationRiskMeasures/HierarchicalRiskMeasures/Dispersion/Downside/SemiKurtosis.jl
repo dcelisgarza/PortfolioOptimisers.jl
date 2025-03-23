@@ -31,15 +31,5 @@ function (r::SemiKurtosis)(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fe
     sigma = std(r.ve, val; mean = zero(target))
     return sum(val[val <= zero(target)] .^ 4) / length(x) / sigma^4
 end
-function risk_measure_factory(r::SemiKurtosis; prior::AbstractPriorModel, kwargs...)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    return SemiKurtosis(; settings = r.settings, target = r.target, w = r.w, mu = mu)
-end
-function cluster_risk_measure_factory(r::SemiKurtosis; prior::AbstractPriorModel,
-                                      cluster::AbstractVector, kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    return SemiKurtosis(; settings = r.settings, target = target, w = r.w, mu = mu)
-end
 
 export SemiKurtosis

@@ -22,15 +22,5 @@ function (r::SemiVariance)(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fe
     val = val[val .<= zero(eltype(val))]
     return dot(val, val) / (length(x) - 1)
 end
-function risk_measure_factory(r::SemiVariance; prior::AbstractPriorModel, kwargs...)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    return SemiVariance(; settings = r.settings, target = r.target, w = r.w, mu = mu)
-end
-function cluster_risk_measure_factory(r::SemiVariance; prior::AbstractPriorModel,
-                                      cluster::AbstractVector, kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    return SemiVariance(; settings = r.settings, target = target, w = r.w, mu = mu)
-end
 
 export SemiVariance

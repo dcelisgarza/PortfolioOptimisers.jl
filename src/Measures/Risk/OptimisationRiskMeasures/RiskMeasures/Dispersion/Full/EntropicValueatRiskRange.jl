@@ -22,17 +22,4 @@ function (r::EntropicValueatRiskRange)(x::AbstractVector)
     return ERM(x, r.solvers, r.alpha) + ERM(-x, r.solvers, r.beta)
 end
 
-function risk_measure_factory(r::EntropicValueatRiskRange;
-                              solvers::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                              kwargs...)
-    solvers = risk_measure_solver_factory(r.solvers, solvers)
-    return EntropicValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
-                                    solvers = solvers)
-end
-function cluster_risk_measure_factory(r::EntropicValueatRiskRange;
-                                      solvers::Union{Nothing, <:Solver,
-                                                     <:AbstractVector{<:Solver}}, kwargs...)
-    return risk_measure_factory(r; solvers = solvers, kwargs = kwargs)
-end
-
 export EntropicValueatRiskRange

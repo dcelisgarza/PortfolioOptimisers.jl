@@ -33,15 +33,5 @@ function (r::Kurtosis)(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fees()
     sigma = std(r.ve, x)
     return sum(val .^ 4) / length(x) / sigma^4
 end
-function risk_measure_factory(r::Kurtosis; prior::AbstractPriorModel, kwargs...)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    return Kurtosis(; settings = r.settings, target = r.target, w = r.w, mu = mu)
-end
-function cluster_risk_measure_factory(r::Kurtosis; prior::AbstractPriorModel,
-                                      cluster::AbstractVector, kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    return Kurtosis(; settings = r.settings, target = target, w = r.w, mu = mu)
-end
 
 export Kurtosis

@@ -33,15 +33,5 @@ function (r::Skewness)(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fees()
     sigma = std(r.ve, x)
     return sum(val .^ 3) / length(x) / sigma^3
 end
-function risk_measure_factory(r::Skewness; prior::AbstractPriorModel, kwargs...)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    return Skewness(; settings = r.settings, target = r.target, w = r.w, mu = mu)
-end
-function cluster_risk_measure_factory(r::Skewness; prior::AbstractPriorModel,
-                                      cluster::AbstractVector, kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    return Skewness(; settings = r.settings, target = target, w = r.w, mu = mu)
-end
 
 export Skewness

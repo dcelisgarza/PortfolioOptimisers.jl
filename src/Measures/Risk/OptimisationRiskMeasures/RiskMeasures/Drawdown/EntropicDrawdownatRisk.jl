@@ -32,17 +32,5 @@ function (r::EntropicDrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     return ERM(dd, r.solvers, r.alpha)
 end
-function risk_measure_factory(r::EntropicDrawdownatRisk;
-                              solvers::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                              kwargs...)
-    solvers = risk_measure_solver_factory(r.solvers, solvers)
-    return EntropicDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
-                                  solvers = solvers)
-end
-function cluster_risk_measure_factory(r::EntropicDrawdownatRisk;
-                                      solvers::Union{Nothing, <:Solver,
-                                                     <:AbstractVector{<:Solver}}, kwargs...)
-    return risk_measure_factory(r; solvers = solvers, kwargs = kwargs)
-end
 
 export EntropicDrawdownatRisk

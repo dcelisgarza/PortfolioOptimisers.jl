@@ -2,8 +2,8 @@ module PortfolioOptimisers
 
 using AverageShiftedHistograms, Clustering, Distances, Distributions, GLM, Impute, JuMP,
       LinearAlgebra, MultivariateStats, NearestCorrelationMatrix, Optim, Graphs,
-      SimpleWeightedGraphs, PythonCall, Random, SmartAsserts, SparseArrays, Statistics,
-      StatsBase, DataFrames, TimeSeries
+      InteractiveUtils, SimpleWeightedGraphs, PythonCall, Random, SmartAsserts,
+      SparseArrays, Statistics, StatsBase, DataFrames, TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let
@@ -241,17 +241,12 @@ include("./UncertaintySets/NormalUncertaintySets/NormalEllipseUncertaintySets.jl
 include("./PreSelection/PreSelection.jl")
 
 # Risk measure
-include("./Measures/Factories/ArrayClusterFactories.jl")
-include("./Measures/Factories/RiskMeasureSolverFactories.jl")
-include("./Measures/Factories/RiskMeasureFactories.jl")
-include("./Measures/Factories/RiskMeasureClusterFactories.jl")
+include("./Measures/Risk/Risk_AbstractTypes.jl")
 include("./Measures/TrackingTurnover/Turnover.jl")
 include("./Measures/Returns/Fees.jl")
 include("./Measures/TrackingTurnover/Tracking.jl")
-include("./Measures/Risk/Risk_AbstractTypes.jl")
 include("./Measures/Risk/EntropicRiskMeasure.jl")
 include("./Measures/Risk/RelativisticRiskMeasure.jl")
-
 ## Optimisation risk measures
 ### Dispersion
 #### Full dispersion
@@ -321,6 +316,12 @@ include("./Measures/Risk/NoOptimisationRiskMeasures/MeanReturn.jl")
 include("./Measures/Risk/NoOptimisationRiskMeasures/ThirdCentralMoment.jl")
 include("./Measures/Risk/NoOptimisationRiskMeasures/Skewness.jl")
 include("./Measures/Risk/AdjustRiskContributions.jl")
+
+## Risk measure factories
+include("./Measures/Factories/ArrayClusterFactories.jl")
+include("./Measures/Factories/RiskMeasureSolverFactories.jl")
+include("./Measures/Factories/RiskMeasureFactories.jl")
+include("./Measures/Factories/RiskMeasureClusterFactories.jl")
 
 # Utils
 include("./Utils/BaseFunctionOverloads.jl")

@@ -29,15 +29,5 @@ function (r::ThirdCentralMoment)(X::AbstractMatrix, w::AbstractVector, fees::Fee
     val = x .- target
     return sum(val .^ 3) / length(x)
 end
-function risk_measure_factory(r::ThirdCentralMoment; prior::AbstractPriorModel, kwargs...)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    return ThirdCentralMoment(; settings = r.settings, target = r.target, w = r.w, mu = mu)
-end
-function cluster_risk_measure_factory(r::ThirdCentralMoment; prior::AbstractPriorModel,
-                                      cluster::AbstractVector, kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    return ThirdCentralMoment(; settings = r.settings, target = target, w = r.w, mu = mu)
-end
 
 export ThirdCentralMoment

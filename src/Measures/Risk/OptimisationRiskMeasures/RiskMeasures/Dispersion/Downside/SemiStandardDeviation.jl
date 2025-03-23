@@ -31,17 +31,5 @@ function (r::SemiStandardDeviation)(X::AbstractMatrix, w::AbstractVector,
     val = val[val .<= zero(eltype(val))]
     return sqrt(dot(val, val) / (length(x) - 1))
 end
-function risk_measure_factory(r::SemiStandardDeviation; prior::AbstractPriorModel,
-                              kwargs...)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    return SemiStandardDeviation(; settings = r.settings, target = r.target, w = r.w,
-                                 mu = mu)
-end
-function cluster_risk_measure_factory(r::SemiStandardDeviation; prior::AbstractPriorModel,
-                                      cluster::AbstractVector, kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    return SemiStandardDeviation(; settings = r.settings, target = target, w = r.w, mu = mu)
-end
 
 export SemiStandardDeviation
