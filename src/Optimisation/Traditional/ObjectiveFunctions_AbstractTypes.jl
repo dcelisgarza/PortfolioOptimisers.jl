@@ -9,21 +9,21 @@ abstract type CustomConstraint end
 struct NoCustomConstraint <: CustomConstraint end
 function add_objective_function_penalty!(port, obj_expr, c)
     model = port.model
-    if haskey(model, :l1_reg)
-        l1_reg = model[:l1_reg]
-        add_to_expression!(obj_expr, c, l1_reg)
+    if haskey(model, :l1)
+        l1 = model[:l1]
+        add_to_expression!(obj_expr, c, l1)
     end
-    if haskey(model, :l2_reg)
-        l2_reg = model[:l2_reg]
-        add_to_expression!(obj_expr, c, l2_reg)
+    if haskey(model, :l2)
+        l2 = model[:l2]
+        add_to_expression!(obj_expr, c, l2)
     end
-    if haskey(model, :network_penalty)
-        network_penalty = model[:network_penalty]
-        add_to_expression!(obj_expr, c, network_penalty)
+    if haskey(model, :np)
+        np = model[:np]
+        add_to_expression!(obj_expr, c, np)
     end
-    if haskey(model, :cluster_penalty)
-        cluster_penalty = model[:cluster_penalty]
-        add_to_expression!(obj_expr, c, cluster_penalty)
+    if haskey(model, :cp)
+        cp = model[:cp]
+        add_to_expression!(obj_expr, c, cp)
     end
     return nothing
 end

@@ -8,7 +8,8 @@ function LinearConstraint(; A::A_LinearConstraint = A_LinearConstraint(), B::Rea
     return LinearConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
 struct PartialLinearConstraintModel{T1 <: Union{Nothing, <:AbstractMatrix},
-                                    T2 <: Union{Nothing, <:AbstractVector}}
+                                    T2 <: Union{Nothing, <:AbstractVector}} <:
+       ConstraintModel
     A::T1
     B::T2
 end
@@ -22,7 +23,7 @@ function PartialLinearConstraintModel(; A::Union{Nothing, <:AbstractMatrix} = no
     return PartialLinearConstraintModel{typeof(A), typeof(B)}(A, B)
 end
 struct LinearConstraintModel{T1 <: PartialLinearConstraintModel,
-                             T2 <: PartialLinearConstraintModel}
+                             T2 <: PartialLinearConstraintModel} <: ConstraintModel
     ineq::T1
     eq::T2
 end

@@ -4,6 +4,7 @@ abstract type InequalityComparisonOperators <: ComparisonOperators end
 struct EQ <: EqualityComparisonOperators end
 struct LEQ <: InequalityComparisonOperators end
 struct GEQ <: InequalityComparisonOperators end
+abstract type ConstraintModel end
 function comparison_sign_ineq_flag(::EQ)
     return 1, false
 end

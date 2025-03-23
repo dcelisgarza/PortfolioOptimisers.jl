@@ -3,42 +3,29 @@ struct Budget{T1 <: Real} <: BudgetConstraints
     val::T1
 end
 function Budget(; val::Real = 1.0)
+    @smart_assert(isfinite(val))
     return Budget{typeof(val)}(val)
 end
 function set_budget_constraints!(model::JuMP.Model, b::Budget)
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
-    model[:w_budget] = @constraint(model, sc * sum(w) == sc * k * b.val)
+    w, k, sc = get_w_k_sc(model)
+    @constraint(model, wb, sc * sum(w) == sc * k * b.val)
     return nothing
 end
-struct BudgetRange{T1 <: Union{Nothing, <:Real}, T2 <: Union{Nothing, <:Real}} <:
-       BudgetConstraints
+struct BudgetRange{T1 <: Real, T2 <: Real} <: BudgetConstraints
     lb::T1
     ub::T2
 end
-function BudgetRange(; lb::Union{Nothing, <:Real} = 1.0, ub::Union{Nothing, <:Real} = 1.0)
+function BudgetRange(; lb::Real = 1.0, ub::Real = 1.0)
+    @smart_assert(isinf(lb) ⊼ isinf(ub))
     return BudgetRange{typeof(lb), typeof(ub)}(lb, ub)
 end
-function set_budget_constraints!(model::JuMP.Model, b::BudgetRange{<:Real, <:Real})
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
-    model[:w_budget_lb] = @constraint(model, sc * sum(w) >= sc * k * b.lb)
-    model[:w_budget_ub] = @constraint(model, sc * sum(w) <= sc * k * b.ub)
-    return nothing
-end
-function set_budget_constraints!(model::JuMP.Model, b::BudgetRange{Nothing, <:Real})
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
-    model[:w_budget_ub] = @constraint(model, sc * sum(w) <= sc * k * b.ub)
-    return nothing
-end
-function set_budget_constraints!(model::JuMP.Model, b::BudgetRange{<:Real, Nothing})
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
-    model[:w_budget_lb] = @constraint(model, sc * sum(w) >= sc * k * b.lb)
+function set_budget_constraints!(model::JuMP.Model, b::BudgetRange)
+    w, k, sc = get_w_k_sc(model)
+    if isfinite(b.lb)
+        @constraint(model, wb_lb, sc * sum(w) >= sc * k * b.lb)
+    end
+    if isfinite(b.ub)
+        @constraint(model, wb_ub, sc * sum(w) <= sc * k * b.ub)
+    end
     return nothing
 end

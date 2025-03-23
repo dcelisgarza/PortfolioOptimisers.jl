@@ -5,39 +5,45 @@ struct WeightLimits{T1 <: Union{<:Real, <:AbstractVector},
 end
 function WeightLimits(; lb::Union{<:Real, <:AbstractVector} = 0.0,
                       ub::Union{<:Real, <:AbstractVector} = 1.0)
-    if isa(lb, AbstractVector)
+    lb_flag = isa(lb, AbstractVector)
+    ub_flag = isa(ub, AbstractVector)
+    if lb_flag
         @smart_assert(!isempty(lb))
     end
-    if isa(ub, AbstractVector)
+    if ub_flag
         @smart_assert(!isempty(ub))
+    end
+    if lb_flag && ub_flag
+        @smart_assert(length(lb) == length(ub))
+        @smart_assert(all(iszero.(lb)) && all(iszero.(ub)))
     end
     @smart_assert(all(lb .<= ub))
     return WeightLimits{typeof(lb), typeof(ub)}(lb, ub)
 end
 function _w_limit_flag(wl::Real)
-    return ifelse(isfinite(wl), true, false)
+    return isfinite(wl)
 end
 function _w_limit_flag(wl::AbstractVector)
-    return ifelse(all(isfinite.(wl)), true, false)
+    return all(isfinite.(wl))
 end
 function _w_neg_flag(wl::Real)
-    return ifelse(wl < zero(wl), true, false)
+    return wl < zero(wl)
 end
 function _w_neg_flag(wl::AbstractVector)
-    return ifelse(any(wl .< zero(eltype(wl))), true, false)
+    return any(wl .< zero(eltype(wl)))
 end
 function set_weight_constraints!(model::JuMP.Model, wl::WeightLimits,
                                  long_only::Bool = false)
-    @smart_assert(long_only && _w_neg_flag(wl.lb),
-                  "Negative lower weight limits are not allowed when shorting is unavailable.")
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
+    if long_only && _w_neg_flag(wl.lb)
+        throw(ArgumentError("Long-only strategy cannot have negative weight limits"))
+    end
+
+    w, k, sc = get_w_k_sc(model)
     if _w_limit_flag(wl.lb)
-        model[:w_lb] = @constraint(model, sc * w >= sc * k * wl.lb)
+        @constraint(model, w_lb, sc * w >= sc * k * wl.lb)
     end
     if _w_limit_flag(wl.ub)
-        model[:w_ub] = @constraint(model, sc * w <= sc * k * wl.ub)
+        @constraint(model, w_ub, sc * w <= sc * k * wl.ub)
     end
     return nothing
 end
