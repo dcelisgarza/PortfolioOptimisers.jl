@@ -5,6 +5,8 @@ abstract type TraditionalOptimisationType <: OptimisationType end
 abstract type ObjectiveFunction end
 abstract type CustomObjective end
 struct NoCustomObjective <: CustomObjective end
+abstract type CustomConstraint end
+struct NoCustomConstraint <: CustomConstraint end
 function add_objective_function_penalty!(port, obj_expr, c)
     model = port.model
     if haskey(model, :l1_reg)

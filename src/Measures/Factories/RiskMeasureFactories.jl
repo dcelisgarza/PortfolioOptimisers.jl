@@ -123,17 +123,17 @@ for risk_measure ∈ risk_measures
                  V = risk_measure_nothing_matrix_factory(r.V, nothing)
                  return $(risk_measure)(; settings = r.settings, mp = r.mp, sk = sk, V = V)
              end
-             function cluster_negative_skewness(::$(risk_measure){<:Any, <:Any, Nothing,
-                                                                  <:Any}, ::Nothing,
-                                                prior::AbstractPriorModel,
-                                                cluster::AbstractVector)
+             function _cluster_risk_measure_factory(::$(risk_measure){<:Any, <:Any, Nothing,
+                                                                      <:Any}, ::Nothing,
+                                                    prior::AbstractPriorModel,
+                                                    cluster::AbstractVector)
                  throw(ArgumentError("Neither the risk measure, nor the prior have the required data."))
              end
-             function cluster_negative_skewness(skew_rm::$(risk_measure){<:Any, <:Any,
-                                                                         <:AbstractMatrix,
-                                                                         <:Any},
-                                                prior::AbstractPriorModel,
-                                                cluster::AbstractVector)
+             function _cluster_risk_measure_factory(skew_rm::$(risk_measure){<:Any, <:Any,
+                                                                             <:AbstractMatrix,
+                                                                             <:Any},
+                                                    prior::AbstractPriorModel,
+                                                    cluster::AbstractVector)
                  idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
                  sk = view(skew_rm.sk, cluster, idx)
                  V = __coskewness(sk, prior.X, skew_rm.mp)
@@ -142,15 +142,15 @@ for risk_measure ∈ risk_measures
                  end
                  return sk, V
              end
-             function cluster_negative_skewness(::$(risk_measure){<:Any, <:Any, Nothing,
-                                                                  <:Any},
-                                                prior::HighOrderPriorModel{<:Any, <:Any,
-                                                                           <:Any, <:Any,
-                                                                           <:Any, <:Any,
-                                                                           <:AbstractMatrix,
-                                                                           <:AbstractMatrix,
-                                                                           <:MatrixProcessing},
-                                                cluster::AbstractVector)
+             function _cluster_risk_measure_factory(::$(risk_measure){<:Any, <:Any, Nothing,
+                                                                      <:Any},
+                                                    prior::HighOrderPriorModel{<:Any, <:Any,
+                                                                               <:Any, <:Any,
+                                                                               <:Any, <:Any,
+                                                                               <:AbstractMatrix,
+                                                                               <:AbstractMatrix,
+                                                                               <:MatrixProcessing},
+                                                    cluster::AbstractVector)
                  idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
                  sk = view(_get_sk($(risk_measure), prior), cluster, idx)
                  V = __coskewness(sk, prior.X, _get_smp($(risk_measure), prior))
@@ -166,7 +166,7 @@ for risk_measure ∈ risk_measures
              function cluster_risk_measure_factory(r::$(risk_measure);
                                                    prior::AbstractPriorModel,
                                                    cluster::AbstractVector, kwargs...)
-                 sk, V = cluster_negative_skewness(r, prior, cluster)
+                 sk, V = _cluster_risk_measure_factory(r, prior, cluster)
                  return $(risk_measure)(; settings = r.settings, mp = r.mp, sk = sk, V = V)
              end
          end)
@@ -194,6 +194,21 @@ for risk_measure ∈ risk_measures
                  kt = risk_measure_nothing_matrix_factory(r.kt, nothing)
                  return $(risk_measure)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
              end
+             function _cluster_risk_measure_factory(r::$(risk_measure){<:Any, <:Any, <:Any,
+                                                                       <:Nothing},
+                                                    prior::AbstractPriorModel,
+                                                    cluster::AbstractVector)
+                 throw(ArgumentError("Neither the risk measure, nor the prior have the required data."))
+             end
+             function _cluster_risk_measure_factory(r::$(risk_measure){<:Any, <:Any, <:Any,
+                                                                       <:AbstractMatrix},
+                                                    prior::AbstractPriorModel,
+                                                    cluster::AbstractVector)
+                 mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
+                 idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
+                 kt = risk_measure_nothing_matrix_factory(r.kt, nothing, idx)
+                 return $(risk_measure)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
+             end
              function _cluster_risk_measure_factory(r::$(risk_measure),
                                                     prior::HighOrderPriorModel,
                                                     cluster::AbstractVector)
@@ -202,14 +217,6 @@ for risk_measure ∈ risk_measures
                  kt = risk_measure_nothing_matrix_factory(r.kt,
                                                           _get_kt($(risk_measure), prior),
                                                           idx)
-                 return $(risk_measure)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
-             end
-             function _cluster_risk_measure_factory(r::$(risk_measure),
-                                                    prior::AbstractLowOrderPriorModel,
-                                                    cluster::AbstractVector)
-                 mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-                 idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
-                 kt = risk_measure_nothing_matrix_factory(r.kt, nothing, idx)
                  return $(risk_measure)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
              end
              function risk_measure_factory(r::$(risk_measure); prior::AbstractPriorModel,
