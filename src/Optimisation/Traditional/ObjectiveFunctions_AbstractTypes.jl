@@ -1,7 +1,11 @@
+abstract type OptimisationType end
+abstract type ClusteringOptimisationType <: OptimisationType end
+abstract type HierarchicalClusteringOptimisationType <: ClusteringOptimisationType end
+abstract type TraditionalOptimisationType <: OptimisationType end
 abstract type ObjectiveFunction end
 abstract type CustomObjective end
 struct NoCustomObjective <: CustomObjective end
-function add_objective_function_penalty(port, obj_expr, c)
+function add_objective_function_penalty!(port, obj_expr, c)
     model = port.model
     if haskey(model, :l1_reg)
         l1_reg = model[:l1_reg]
@@ -21,9 +25,9 @@ function add_objective_function_penalty(port, obj_expr, c)
     end
     return nothing
 end
-function custom_objective(port, obj_func::ObjectiveFunction,
-                          ret_type::OptimisationReturnsType, custom_obj::NoCustomObjective,
-                          obj_expr)
+function add_custom_objective_term!(port, obj_func::ObjectiveFunction,
+                                    ret_type::PortfolioReturnType,
+                                    custom_obj::NoCustomObjective, obj_expr)
     return nothing
 end
 

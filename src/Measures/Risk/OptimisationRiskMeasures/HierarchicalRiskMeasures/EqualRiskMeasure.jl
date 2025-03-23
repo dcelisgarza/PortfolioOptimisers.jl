@@ -1,5 +1,4 @@
-mutable struct EqualRiskMeasure{T1 <: HierarchicalRiskMeasureSettings} <:
-               HierarchicalRiskMeasure
+struct EqualRiskMeasure{T1 <: HierarchicalRiskMeasureSettings} <: HierarchicalRiskMeasure
     settings::T1
 end
 function EqualRiskMeasure(;

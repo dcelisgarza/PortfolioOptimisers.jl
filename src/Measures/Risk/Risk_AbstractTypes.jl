@@ -39,7 +39,6 @@ abstract type TargetHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
 abstract type NoOptimisationRiskMeasure <: AbstractRiskMeasure end
 abstract type MuNoOptimisationRiskMeasure <: NoOptimisationRiskMeasure end
 abstract type TargetNoOptimisationRiskMeasure <: MuNoOptimisationRiskMeasure end
-
 struct ExactOrderedWeightsArray <: OrderedWeightsArrayFormulation end
 struct ApproxOrderedWeightsArray{T1 <: AbstractVector{<:Real}} <:
        OrderedWeightsArrayFormulation

@@ -1095,6 +1095,7 @@
         c = EntropyPoolingView()
         @test c == (c[5] = c)
         @test sort(c) == c
+        @test sort!(c) == c
 
         @test_throws AssertionError JuMPEntropyPooling(; solvers = Solver[])
         pe = EntropyPoolingPriorEstimator(;)

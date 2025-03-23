@@ -328,11 +328,19 @@ include("./Utils/EquationParsing.jl")
 include("./Utils/PricesToReturns.jl")
 include("./Utils/Assertions.jl")
 
+# Portfolio
+include("./Portfolio/Portfolio_AbstractTypes.jl")
+include("./Portfolio/Portfolio.jl")
+
 # Optimisation
 include("./Optimisation/Traditional/ReturnTypes/ReturnTypes_AbstractTypes.jl")
-include("./Optimisation/Traditional/ReturnTypes/ArithmeticReturns.jl")
+include("./Optimisation/Traditional/ReturnTypes/ArithmeticReturn.jl")
+include("./Optimisation/Traditional/ReturnTypes/ExactKellyReturn.jl")
 include("./Optimisation/Traditional/ObjectiveFunctions_AbstractTypes.jl")
 include("./Optimisation/Traditional/MeanRisk/ObjectiveFunctions/MinimumRisk.jl")
 include("./Optimisation/Traditional/MeanRisk/ObjectiveFunctions/MaximumUtility.jl")
+include("./Optimisation/Traditional/MeanRisk/ObjectiveFunctions/MaximumRatio.jl")
+include("./Optimisation/Traditional/MeanRisk/ObjectiveFunctions/MaximumReturn.jl")
+include("./Optimisation/Traditional/MeanRisk/MeanRisk.jl")
 
 end
