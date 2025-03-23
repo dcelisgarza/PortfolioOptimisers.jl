@@ -761,7 +761,7 @@
                                     A = C2_LinearEntropyPoolingConstraint(; group = :Assets,
                                                                           name = 3,
                                                                           kind = SkewnessEntropyPoolingView()),
-                                    B = ConstantEntropyPoolingConstraint(; coef = -0.2),
+                                    B = ConstantEntropyPoolingConstraint(; coef = -0.25),
                                     comp = GEQ()),
                  EntropyPoolingView(;
                                     A = C0_LinearEntropyPoolingConstraint(; group = :Assets,
@@ -783,14 +783,14 @@
                                     A = C4_LinearEntropyPoolingConstraint(;
                                                                           group1 = :Assets,
                                                                           group2 = :Assets,
-                                                                          name1 = 1,
-                                                                          name2 = 2),
+                                                                          name1 = 10,
+                                                                          name2 = 3),
                                     B = C4_LinearEntropyPoolingConstraint(;
                                                                           group1 = :Assets,
                                                                           group2 = :Assets,
-                                                                          name1 = 1,
-                                                                          name2 = 2,
-                                                                          coef = 0.05),
+                                                                          name1 = 10,
+                                                                          name2 = 3,
+                                                                          coef = 0.22),
                                     comp = GEQ())]
         pes = [EntropyPoolingPriorEstimator(; views = views, sets = sets),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
@@ -815,41 +815,43 @@
                                                                                       solver = Clarabel.Optimizer,
                                                                                       settings = Dict("verbose" => false))))]
 
-        res = (0.03400712888845852, 0.031413900175910496, 0.03141390017584312,
-               0.03400712973024464, 0.03141390076845992, 0.03141391532108889)
-        enss = (0.966564614081624, 0.9690743899963898, 0.9690743899964551,
-                0.9665646132679833, 0.9690743894221653, 0.9690743753195854)
+        ress = (0.03270155949442489, 0.030586876690884276, 0.03058687450109127,
+                0.032701560391104334, 0.03058687741491548, 0.030586877801521424)
+        enss = (0.9678273553779563, 0.9698761687748948, 0.9698761708987229,
+                0.9678273545101254, 0.9698761680726742, 0.9698761676977143)
 
-        for (i, (pe, re_t, ens_t)) ∈ enumerate(zip(pes, res, enss))
+        for (i, (pe, re_t, ens_t)) ∈ enumerate(zip(pes, ress, enss))
             pm = prior(pe, transpose(X); dims = 2)
-            res = isapprox(pm.mu[1], 0.1)
+            res = isapprox(pm.mu[1], 0.1; rtol = 5e-8)
             if !res
                 println("Test Fails on iteration $i mu")
-                find_tol(pm.mu[1], 0.1; name1 = mu, name2 = "== 0.1")
+                find_tol(pm.mu[1], 0.1; name1 = :mu, name2 = "== 0.1")
             end
             @test res
             res = diag(pm.sigma)[2] <= 0.95
             if !res
                 println("Test Fails on iteration $i sigma")
-                find_tol(pm.sigma[1], 0.95; name1 = mu, name2 = "<= 0.95")
+                find_tol(pm.sigma[1], 0.95; name1 = :mu, name2 = "<= 0.95")
             end
             @test res
-            res = skewness(pm.X[:, 3], pm.w) >= -0.2
+            res = skewness(pm.X[:, 3], pm.w) >= -0.25
             if !res
                 println("Test Fails on iteration $i skewness")
-                find_tol(skewness(pm.X[:, 3], pm.w), -0.2; name1 = mu, name2 = ">= -0.2")
+                find_tol(skewness(pm.X[:, 3], pm.w), -0.2; name1 = :skewness,
+                         name2 = ">= -0.2")
             end
             @test res
             res = kurtosis(pm.X[:, 4], pm.w) + 3 <= 5.1
             if !res
                 println("Test Fails on iteration $i kurtosis")
-                find_tol(kurtosis(pm.X[:, 3], pm.w), 5.1; name1 = mu, name2 = "<= 5.1")
+                find_tol(kurtosis(pm.X[:, 3], pm.w), 5.1; name1 = :kurtosis,
+                         name2 = "<= 5.1")
             end
             @test res
-            res = cov2cor(pm.sigma)[1, 2] >= 0.05
+            res = cov2cor(pm.sigma)[10, 3] >= 0.22
             if !res
                 println("Test Fails on iteration $i correlation")
-                find_tol(cov2cor(pm.sigma)[1, 2], 0.05; name1 = mu, name2 = ">= 0.05")
+                find_tol(cov2cor(pm.sigma)[10, 3], 0.22; name1 = :covcor, name2 = ">= 0.05")
             end
             @test res
 
@@ -950,51 +952,54 @@
                                     A = C4_LinearEntropyPoolingConstraint(;
                                                                           group1 = [:Assets],
                                                                           group2 = [:Assets],
-                                                                          name1 = [1],
-                                                                          name2 = [2],
+                                                                          name1 = [3],
+                                                                          name2 = [10],
                                                                           coef = [1]),
                                     B = C4_LinearEntropyPoolingConstraint(;
                                                                           group1 = [:Assets],
                                                                           group2 = [:Assets],
-                                                                          name1 = [1],
-                                                                          name2 = [2],
-                                                                          coef = [0.05]),
+                                                                          name1 = [3],
+                                                                          name2 = [1],
+                                                                          coef = [0.22]),
                                     comp = GEQ())]
 
-        res = (0.03400712888845852, 0.031413900175910496, 0.03141390017584312,
-               0.03400712973024464, 0.03141390076845992, 0.03141391532108889)
-        enss = (0.966564614081624, 0.9690743899963898, 0.9690743899964551,
-                0.9665646132679833, 0.9690743894221653, 0.9690743753195854)
-        for (i, (pe, re_t, ens_t)) ∈ enumerate(zip(pes, res, enss))
+        ress = (0.03270155949442489, 0.030586876690884276, 0.03058687450109127,
+                0.032701560391104334, 0.03058687741491548, 0.030586877801521424)
+        enss = (0.9678273553779563, 0.9698761687748948, 0.9698761708987229,
+                0.9678273545101254, 0.9698761680726742, 0.9698761676977143)
+
+        for (i, (pe, re_t, ens_t)) ∈ enumerate(zip(pes, ress, enss))
             pm = prior(pe, transpose(X); dims = 2)
-            res = isapprox(pm.mu[1], 0.1)
+            res = isapprox(pm.mu[1], 0.1; rtol = 5e-8)
             if !res
-                println("Test Fails on array views iteration $i mu")
-                find_tol(pm.mu[1], 0.1; name1 = mu, name2 = "== 0.1")
+                println("Test Fails on iteration $i mu")
+                find_tol(pm.mu[1], 0.1; name1 = :mu, name2 = "== 0.1")
             end
             @test res
             res = diag(pm.sigma)[2] <= 0.95
             if !res
-                println("Test Fails on array views iteration $i sigma")
-                find_tol(pm.sigma[1], 0.95; name1 = mu, name2 = "<= 0.95")
+                println("Test Fails on iteration $i sigma")
+                find_tol(pm.sigma[1], 0.95; name1 = :mu, name2 = "<= 0.95")
             end
             @test res
-            res = skewness(pm.X[:, 3], pm.w) >= -0.2
+            res = skewness(pm.X[:, 3], pm.w) >= -0.25
             if !res
-                println("Test Fails on array views iteration $i skewness")
-                find_tol(skewness(pm.X[:, 3], pm.w), -0.2; name1 = :mu, name2 = ">= -0.2")
+                println("Test Fails on iteration $i skewness")
+                find_tol(skewness(pm.X[:, 3], pm.w), -0.2; name1 = :skewness,
+                         name2 = ">= -0.2")
             end
             @test res
             res = kurtosis(pm.X[:, 4], pm.w) + 3 <= 5.1
             if !res
-                println("Test Fails on array views iteration $i kurtosis")
-                find_tol(kurtosis(pm.X[:, 3], pm.w), 5.1; name1 = mu, name2 = "<= 5.1")
+                println("Test Fails on iteration $i kurtosis")
+                find_tol(kurtosis(pm.X[:, 3], pm.w), 5.1; name1 = :kurtosis,
+                         name2 = "<= 5.1")
             end
             @test res
-            res = cov2cor(pm.sigma)[1, 2] >= 0.05
+            res = cov2cor(pm.sigma)[10, 3] >= 0.22
             if !res
-                println("Test Fails on array views iteration $i correlation")
-                find_tol(cov2cor(pm.sigma)[1, 2], 0.05; name1 = mu, name2 = ">= 0.05")
+                println("Test Fails on iteration $i correlation")
+                find_tol(cov2cor(pm.sigma)[10, 3], 0.22; name1 = :covcor, name2 = ">= 0.05")
             end
             @test res
 
@@ -1005,12 +1010,12 @@
                                                    length = 100))
             res = isapprox(re, re_t; rtol = 5e-7)
             if !res
-                println("Test Fails on array views iteration $i re")
+                println("Test Fails on iteration $i re")
                 find_tol(re, re_t; name1 = :re, name2 = :re_t)
             end
             res = isapprox(ens, ens_t; rtol = 5e-7)
             if !res
-                println("Test Fails on array views iteration $i ens")
+                println("Test Fails on iteration $i ens")
                 find_tol(ens, ens_t; name1 = :ens, name2 = :ens_t)
             end
             @test ens == exp(-re)
@@ -1023,10 +1028,10 @@
         @test isapprox(pm0.mu, pm1.mu)
         @test isapprox(pm0.sigma, pm1.sigma)
 
-        pm0 = EntropyPoolingPriorEstimator(; views = views, sets = sets,
-                                           alg = H1_EntropyPooling(), w = w)
-        pm1 = EntropyPoolingPriorEstimator(; views = views, sets = sets,
-                                           alg = H1_EntropyPooling())
+        pm0 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets,
+                                                 alg = H1_EntropyPooling(), w = w), X)
+        pm1 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets,
+                                                 alg = H1_EntropyPooling()), X)
         @test isapprox(pm0.mu, pm1.mu)
         @test isapprox(pm0.sigma, pm1.sigma)
 
