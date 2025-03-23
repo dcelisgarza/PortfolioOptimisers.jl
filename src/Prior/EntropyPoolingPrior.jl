@@ -193,9 +193,6 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
         wi = entropy_pooling(_get_epw(pe.alg, w0, wi), V_i, pe.opt)
         pe = moment_factory_w(pe, wi)
         pm = prior(pe.pe, X, F; strict = strict, kwargs...)
-        if uvl == 1
-            return EntropyPoolingModel(; pm = pm, views = V_i, w = wi)
-        end
     end
     return EntropyPoolingModel(; pm = pm, views = V_i, w = wi)
 end
