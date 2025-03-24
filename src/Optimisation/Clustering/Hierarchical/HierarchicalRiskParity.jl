@@ -25,9 +25,9 @@ function optimise!(hc::HierarchicalRiskParity, rd::ReturnsData = ReturnsData())
     r = risk_measure_factory(hc.r; prior = pm, solvers = hc.opt.slv)
     rku = unitary_expected_risks(r, pm.X, hc.opt.fees, hc.opt.sce)
     w = ones(eltype(pm.X), size(pm.X, 2))
+    wl = create_array_weight_limits(hc.opt.wl, length(w))
     wu = Matrix{eltype(pm.X)}(undef, size(pm.X, 2), 2)
     items = [clm.clustering.order]
-    wl = create_array_weight_limits(hc.opt.wl, length(w))
     @inbounds while length(items) > 0
         items = [i[j:k] for i ∈ items
                  for (j, k) ∈ ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
@@ -52,4 +52,5 @@ function optimise!(hc::HierarchicalRiskParity, rd::ReturnsData = ReturnsData())
     end
     return finalise_hierarchical_weights(hc.opt.cwf, hc.opt.wl, w / sum(w))
 end
-export HierarchicalRiskParity, optimise!
+
+export HierarchicalRiskParity

@@ -34,5 +34,6 @@ function set_w!(model::JuMP.Model, X::AbstractMatrix, wi::AbstractVector)
     set_initial_w!(w, wi)
     return nothing
 end
+function optimise! end
 
-export NoCustomObjective
+export NoCustomObjective, optimise!

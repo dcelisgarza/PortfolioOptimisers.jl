@@ -362,5 +362,6 @@ include("./Optimisation/Traditional/MeanRisk/MeanRisk.jl")
 include("./Optimisation/Clustering/ClusteringWeightFinaliser.jl")
 include("./Optimisation/Clustering/Hierarchical/HierarchicalOptimiser.jl")
 include("./Optimisation/Clustering/Hierarchical/HierarchicalRiskParity.jl")
+include("./Optimisation/Clustering/Hierarchical/HierarchicalEqualRiskParity.jl")
 
 end
