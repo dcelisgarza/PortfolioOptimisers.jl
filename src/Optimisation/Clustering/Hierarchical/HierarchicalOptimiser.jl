@@ -1,20 +1,28 @@
-struct HierarchicalOptimiser{T1 <: AbstractPriorEstimator, T2 <: ClusteringEstimator,
-                             T3 <: WeightLimits, T4 <: Fees, T5 <: Scalariser,
-                             T6 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}}
+struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel},
+                             T2 <: Union{<:ClusteringEstimator,
+                                         <:AbstractPortfolioOptimisersClusteringResult},
+                             T3 <: Fees, T4 <: Scalariser, T5 <: WeightLimits,
+                             T6 <: ClusteringWeightFinaliser,
+                             T7 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}}
     pe::T1
     cle::T2
-    wl::T3
-    fees::T4
-    sce::T5
-    slv::T6
+    fees::T3
+    sce::T4
+    wl::T5
+    cwf::T6
+    slv::T7
 end
-function HierarchicalOptimiser(; pe::AbstractPriorEstimator = EmpiricalPriorEstimator(),
-                               cle::ClusteringEstimator = ClusteringEstimator(),
-                               wl::WeightLimits = WeightLimits(), fees::Fees = Fees(),
-                               sce::Scalariser = SumScalariser(),
-                               slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,)
-    return HierarchicalOptimiser{typeof(pe), typeof(cle), typeof(wl), typeof(fees),
-                                 typeof(sce), typeof(slv)}(pe, cle, wl, fees, sce, slv)
+function HierarchicalOptimiser(;
+                               pe::Union{<:AbstractPriorEstimator, <:AbstractPriorModel} = EmpiricalPriorEstimator(),
+                               cle::Union{<:ClusteringEstimator,
+                                          <:AbstractPortfolioOptimisersClusteringResult} = ClusteringEstimator(),
+                               fees::Fees = Fees(), sce::Scalariser = SumScalariser(),
+                               wl::WeightLimits = WeightLimits(),
+                               cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
+                               slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing)
+    return HierarchicalOptimiser{typeof(pe), typeof(cle), typeof(fees), typeof(sce),
+                                 typeof(wl), typeof(cwf), typeof(slv)}(pe, cle, fees, sce,
+                                                                       wl, cwf, slv)
 end
 function unitary_expected_risks(r::Union{<:OptimisationRiskMeasure,
                                          <:AbstractVector{<:OptimisationRiskMeasure}},
@@ -29,3 +37,4 @@ function unitary_expected_risks(r::Union{<:OptimisationRiskMeasure,
     end
     return rk
 end
+export HierarchicalOptimiser

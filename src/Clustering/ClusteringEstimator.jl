@@ -22,4 +22,4 @@ function clusterise(cle::ClusteringEstimator, X::AbstractMatrix{<:Real};
                        branchorder = branchorder, dims = dims)
 end
 
-export ClusteringEstimator, clusterise
+export ClusteringEstimator

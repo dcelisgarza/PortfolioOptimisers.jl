@@ -15,7 +15,7 @@ function WeightLimits(; lb::Union{<:Real, <:AbstractVector} = 0.0,
     end
     if lb_flag && ub_flag
         @smart_assert(length(lb) == length(ub))
-        @smart_assert(all(iszero.(lb)) && all(iszero.(ub)))
+        @smart_assert(all(iszero.(lb)) ⊼ all(iszero.(ub)))
     end
     @smart_assert(all(lb .<= ub))
     return WeightLimits{typeof(lb), typeof(ub)}(lb, ub)
@@ -49,6 +49,25 @@ function set_weight_constraints!(model::JuMP.Model, wl::WeightLimits,
         @constraint(model, w_ub, sc * w <= sc * k * wl.ub)
     end
     return nothing
+end
+function create_array_weight_limits(wl::WeightLimits, N::Integer)
+    lb_flag = isa(wl.lb, Real)
+    ub_flag = isa(wl.ub, Real)
+    return if any((lb_flag, ub_flag))
+        lb = if lb_flag
+            range(; start = wl.lb, stop = wl.lb, length = N)
+        else
+            wl.lb
+        end
+        ub = if ub_flag
+            range(; start = wl.ub, stop = wl.ub, length = N)
+        else
+            wl.ub
+        end
+        WeightLimits(; lb = lb, ub = ub)
+    else
+        wl
+    end
 end
 
 export WeightLimits

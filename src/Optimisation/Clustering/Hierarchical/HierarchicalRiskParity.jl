@@ -12,14 +12,22 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
     end
     return HierarchicalRiskParity{typeof(opt), typeof(r)}(opt, r)
 end
-function optimise!(rd::ReturnsData, hc::HierarchicalRiskParity)
+function split_factor_weight_constraints(alpha::Real, wl::WeightLimits, w::AbstractVector,
+                                         lc::AbstractVector, rc::AbstractVector)
+    alpha = min(sum(view(wl.ub, lc)) / w[lc[1]],
+                max(sum(view(wl.lb, lc)) / w[lc[1]], alpha))
+    return one(alpha) - min(sum(view(wl.ub, rc)) / w[rc[1]],
+                            max(sum(view(wl.lb, rc)) / w[rc[1]], one(alpha) - alpha))
+end
+function optimise!(hc::HierarchicalRiskParity, rd::ReturnsData = ReturnsData())
     pm = prior(hc.opt.pe, rd.X, rd.F)
-    r = risk_measure_factory(hc.r; prior = pm, solvers = hc.opt.slv)
     clm = clusterise(hc.opt.cle, pm.X)
+    r = risk_measure_factory(hc.r; prior = pm, solvers = hc.opt.slv)
     rku = unitary_expected_risks(r, pm.X, hc.opt.fees, hc.opt.sce)
     w = ones(eltype(pm.X), size(pm.X, 2))
     wu = Matrix{eltype(pm.X)}(undef, size(pm.X, 2), 2)
     items = [clm.clustering.order]
+    wl = create_array_weight_limits(hc.opt.wl, length(w))
     @inbounds while length(items) > 0
         items = [i[j:k] for i ∈ items
                  for (j, k) ∈ ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
@@ -36,11 +44,12 @@ function optimise!(rd::ReturnsData, hc::HierarchicalRiskParity)
             rrisk = expected_risk(r, view(wu, :, 2), pm.X, hc.opt.fees, hc.opt.sce)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
+            alpha = split_factor_weight_constraints(alpha, wl, w, lc, rc)
             # Weight constraints.
             w[lc] *= alpha
             w[rc] *= one(alpha) - alpha
         end
     end
-    return w / sum(w)
+    return finalise_hierarchical_weights(hc.opt.cwf, hc.opt.wl, w / sum(w))
 end
 export HierarchicalRiskParity, optimise!

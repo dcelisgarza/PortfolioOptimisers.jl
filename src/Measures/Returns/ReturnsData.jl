@@ -1,4 +1,5 @@
-struct ReturnsData{T1 <: AbstractVector, T2 <: AbstractMatrix,
+struct ReturnsData{T1 <: Union{Nothing, <:AbstractVector},
+                   T2 <: Union{Nothing, AbstractMatrix},
                    T3 <: Union{Nothing, <:AbstractVector},
                    T4 <: Union{Nothing, <:AbstractMatrix},
                    T5 <: Union{Nothing, <:AbstractVector}}
@@ -8,15 +9,21 @@ struct ReturnsData{T1 <: AbstractVector, T2 <: AbstractMatrix,
     F::T4
     ts::T5
 end
-function ReturnsData(; nx::AbstractVector, X::AbstractMatrix,
+function ReturnsData(; nx::Union{Nothing, <:AbstractVector} = nothing,
+                     X::Union{Nothing, AbstractMatrix} = nothing,
                      nf::Union{Nothing, AbstractVector} = nothing,
                      F::Union{Nothing, AbstractMatrix} = nothing,
                      ts::Union{Nothing, AbstractVector} = nothing)
-    @smart_assert(!isempty(nx) && !isempty(X))
-    @smart_assert(length(nx) == size(X, 2))
+    nxs_flag = !isnothing(nx)
+    X_flag = !isnothing(X)
+    if any((nxs_flag, X_flag))
+        @smart_assert(all((nxs_flag, X_flag)))
+        @smart_assert(!isempty(nx) && !isempty(X))
+        @smart_assert(length(nx) == size(X, 2))
+    end
     nfs_flag = !isnothing(nf)
     F_flag = !isnothing(F)
-    if any((nfs_flag, F_flag))
+    if any((nfs_flag, F_flag)) && nxs_flag
         @smart_assert(all((nfs_flag, F_flag)))
         @smart_assert(!isempty(nf) && !isempty(F))
         @smart_assert(length(nf) == size(F, 2))
