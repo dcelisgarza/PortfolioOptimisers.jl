@@ -41,5 +41,20 @@ function set_portfolio_objective_function!(port, obj_func::MaximumRatio,
     end
     return nothing
 end
+function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::AbstractVector,
+                                             obj::MaximumRatio)
+    ohf = if iszero(obj.ohf)
+        min(1e3, max(1e-3, mean(abs.(mu))))
+    else
+        obj.ohf
+    end
+    @expression(model, ohf, ohf)
+    @variable(model, k >= 0)
+    return nothing
+end
+function set_maximum_ratio_factor_variables!(model::JuMP.Model, args...)
+    @expression(model, k, 1)
+    return nothing
+end
 
 export MaximumRatio
