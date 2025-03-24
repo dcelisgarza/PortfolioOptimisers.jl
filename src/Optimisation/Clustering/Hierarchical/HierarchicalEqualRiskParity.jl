@@ -36,7 +36,7 @@ function optimise!(hc::HierarchicalEqualRiskParity, rd::ReturnsData = ReturnsDat
     cls = [findall(x -> x == i, idx) for i ∈ 1:(clm.k)]
     rkbo = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
     rkcl = Vector{eltype(pm.X)}(undef, clm.k)
-    w = ones(eltype(pm.X), size(pm.X, 2))
+    w = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
     for (i, cl) ∈ pairs(cls)
         fill!(rkbo, zero(eltype(pm.X)))
         rkbo[cl] = inv.(view(roku, cl))
@@ -84,14 +84,12 @@ function optimise!(hc::HierarchicalEqualRiskParity, rd::ReturnsData = ReturnsDat
         # for (i, cl) ∈ pairs(cls)
         #     w[cl] *= view(rkcl, i)
         # end
-        # because we ln and rn contain cl.
+        # because `ln` and `rn` contain `cl`.
         w[ln] *= alpha
         w[rn] *= one(alpha) - alpha
     end
 
-    return finalise_hierarchical_weights(hc.opt.cwf,
-                                         create_array_weight_limits(hc.opt.wl, length(w)),
-                                         w / sum(w))
+    return finalise_hierarchical_weights(hc.opt.cwf, hc.opt.wl, w / sum(w))
 end
 
 export HierarchicalEqualRiskParity

@@ -67,14 +67,11 @@ function to_tree(a::Hclust)
     merges = a.merges
     heights = a.heights
     nd = nothing
-
     for (i, height) ∈ pairs(heights)
         fi = merges[i, 1]
         fj = merges[i, 2]
-
-        fi = fi < 0 ? -fi : fi + N
-        fj = fj < 0 ? -fj : fj + N
-
+        fi = ifelse(fi < zero(eltype(merges)), -fi, fi + N)
+        fj = ifelse(fj < zero(eltype(merges)), -fj, fj + N)
         nd = ClusterNode(i + N, d[fi], d[fj], height)
         d[N + i] = nd
     end

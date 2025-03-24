@@ -36,4 +36,5 @@ function ReturnsData(; nx::Union{Nothing, <:AbstractVector} = nothing,
     return ReturnsData{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts)}(nx, X, nf,
                                                                                  F, ts)
 end
+
 export ReturnsData
