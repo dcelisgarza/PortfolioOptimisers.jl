@@ -34,24 +34,21 @@ function optimise!(hc::HierarchicalEqualRiskParity, rd::ReturnsData = ReturnsDat
     clm = clusterise(hc.opt.cle, pm.X)
     idx = cutree(clm.clustering; k = clm.k)
     cls = [findall(x -> x == i, idx) for i ∈ 1:(clm.k)]
-    rkbi = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
     rkbo = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
     rkcl = Vector{eltype(pm.X)}(undef, clm.k)
     w = ones(eltype(pm.X), size(pm.X, 2))
     for (i, cl) ∈ pairs(cls)
-        fill!(rkbi, zero(eltype(pm.X)))
         fill!(rkbo, zero(eltype(pm.X)))
         rkbo[cl] = inv.(view(roku, cl))
         rkbo /= sum(rkbo)
         rkcl[i] = expected_risk(ro, rkbo, pm.X, hc.opt.fees, hc.opt.sce)
-        rkbi[cl] = inv.(view(riku, cl))
+        rkbi = inv.(view(riku, cl))
         rkbi /= sum(rkbi)
-        w[cl] .*= view(rkbi, cl)
+        w[cl] = rkbi
     end
     nd = to_tree(clm.clustering)[2]
     hs = [i.height for i ∈ nd]
     nd = nd[sortperm(hs; rev = true)]
-
     # Treat each cluster as its own portfolio and optimise each one individually.
     # Calculate the weight of each cluster relative to the other clusters.
     for i ∈ nd[1:(clm.k - 1)]
@@ -75,10 +72,23 @@ function optimise!(hc::HierarchicalEqualRiskParity, rd::ReturnsData = ReturnsDat
         risk = lrisk + rrisk
         # Allocate weight to clusters.
         alpha = one(lrisk) - lrisk / risk
-        # Weight constraints.
+        # This implicitly multiplies the asset risks by the cluster risk. We eliminate the allocation of a vector of cluster weights, and a loop at the end.
+        # wcl = ones(eltype(pm.X), clm.k)
+        # for i ∈ nd[1:(clm.k - 1)]
+        #     ...
+        #     <this loop>
+        #     ...
+        #     wcl[lc] *= alpha
+        #     wcl[rc] *= one(alpha) - alpha
+        # end
+        # for (i, cl) ∈ pairs(cls)
+        #     w[cl] *= view(rkcl, i)
+        # end
+        # because we ln and rn contain cl.
         w[ln] *= alpha
         w[rn] *= one(alpha) - alpha
     end
+
     return finalise_hierarchical_weights(hc.opt.cwf,
                                          create_array_weight_limits(hc.opt.wl, length(w)),
                                          w / sum(w))

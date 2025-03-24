@@ -17,7 +17,7 @@ function expected_risk(r::Union{WorstRealisation, ValueatRisk, ValueatRiskRange,
                        fees::Fees = Fees(), args...; kwargs...)
     return r(calc_net_returns(X, w, fees))
 end
-function expected_risk(r::Union{MeanAbsDeviation, SemiStandardDeviation,
+function expected_risk(r::Union{MeanAbsoluteDeviation, SemiStandardDeviation,
                                 FirstLowerPartialMoment, ThirdLowerPartialMoment,
                                 FourthLowerPartialMoment, TrackingRiskMeasure,
                                 SquareRootKurtosis, SquareRootSemiKurtosis, SemiVariance,
