@@ -16,20 +16,28 @@
         dfy[!, :date] = (today() - Day(100)):Day(1):today()
         Py = TimeArray(dfy; timestamp = :date)
 
-        ts1, X1, F1 = prices_to_returns(Px, Py; missing_col_percent = 0.1,
-                                        missing_row_percent = 0.5)
-        ts2, X2, F2 = prices_to_returns(Px, Py; missing_col_percent = 0.1,
-                                        missing_row_percent = Inf)
+        rd = prices_to_returns(Px, Py; missing_col_percent = 0.1, missing_row_percent = 0.5)
+        ts1 = rd.ts
+        X1 = rd.X
+        F1 = rd.F
+        rd = prices_to_returns(Px, Py; missing_col_percent = 0.1, missing_row_percent = Inf)
+        ts2 = rd.ts
+        X2 = rd.X
+        F2 = rd.F
 
         df = CSV.read(joinpath(@__DIR__, "assets/prices_to_returns_X_F.csv"), DataFrame)
         @test hcat(vcat(X1, X2), vcat(F1, F2)) == df
 
-        ts3, X3, F3 = prices_to_returns(Px; missing_col_percent = 0.1,
-                                        missing_row_percent = 0.5)
+        rd = prices_to_returns(Px; missing_col_percent = 0.1, missing_row_percent = 0.5)
+        ts3 = rd.ts
+        X3 = rd.X
+        F3 = rd.F
         @test isempty(F3)
 
-        ts4, X4, F4 = prices_to_returns(Px; missing_col_percent = 0.1,
-                                        missing_row_percent = Inf)
+        rd = prices_to_returns(Px; missing_col_percent = 0.1, missing_row_percent = Inf)
+        ts4 = rd.ts
+        X4 = rd.X
+        F4 = rd.F
         @test isempty(F4)
 
         df = CSV.read(joinpath(@__DIR__, "assets/prices_to_returns_X.csv"), DataFrame)

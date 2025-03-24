@@ -230,3 +230,6 @@ for risk_measure ∈ risk_measures
              end
          end)
 end
+function risk_measure_factory(rs::AbstractVector{<:OptimisationRiskMeasure}; kwargs...)
+    return risk_measure_factory.(rs; kwargs...)
+end

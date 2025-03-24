@@ -84,7 +84,7 @@ function calc_fees(w::AbstractVector, latest_prices::AbstractVector, ::NoTurnove
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Fees = Fees())
     fees_long = calc_fees(w, latest_prices, fees.long, .>=)
-    fees_short = calc_fees(w, latest_prices, -fees.short, .<)
+    fees_short = calc_fees(-w, latest_prices, fees.short, .<)
     fees_fixed_long = calc_fixed_fees(w, fees.fixed_long, fees.tol_kwargs, .>=)
     fees_fixed_short = calc_fixed_fees(w, fees.fixed_short, fees.tol_kwargs, .<)
     fees_turnover = calc_fees(w, latest_prices, fees.turnover)
