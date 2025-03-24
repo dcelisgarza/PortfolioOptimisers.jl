@@ -21,10 +21,10 @@ function WeightLimits(; lb::Union{<:Real, <:AbstractVector} = 0.0,
     return WeightLimits{typeof(lb), typeof(ub)}(lb, ub)
 end
 function _w_limit_flag(wl::Real)
-    return isfinite(wl)
+    return isinf(wl)
 end
 function _w_limit_flag(wl::AbstractVector)
-    return all(isfinite.(wl))
+    return all(isinf.(wl))
 end
 function _w_neg_flag(wl::Real)
     return wl < zero(wl)
@@ -34,15 +34,18 @@ function _w_neg_flag(wl::AbstractVector)
 end
 function set_weight_constraints!(model::JuMP.Model, wl::WeightLimits,
                                  long_only::Bool = false)
-    if long_only && _w_neg_flag(wl.lb)
-        throw(ArgumentError("Long-only strategy cannot have negative weight limits"))
+    lb_flag = _w_limit_flag(wl.lb)
+    ub_flag = _w_limit_flag(wl.ub)
+    if lb_flag && ub_flag
+        return nothing
     end
-
+    @smart_assert(long_only ⊼ _w_neg_flag(wl.lb),
+                  "Long-only strategy cannot have negative weight limits")
     w, k, sc = get_w_k_sc(model)
-    if _w_limit_flag(wl.lb)
+    if !lb_flag
         @constraint(model, w_lb, sc * w >= sc * k * wl.lb)
     end
-    if _w_limit_flag(wl.ub)
+    if !ub_flag
         @constraint(model, w_ub, sc * w <= sc * k * wl.ub)
     end
     return nothing

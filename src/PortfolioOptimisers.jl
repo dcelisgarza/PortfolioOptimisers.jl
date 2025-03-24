@@ -354,6 +354,8 @@ include("./Optimisation/ConstraintModel/LinearConstraints.jl")
 include("./Optimisation/ConstraintModel/NumberEffectiveAssetsConstraints.jl")
 include("./Optimisation/ConstraintModel/AdjacencyConstraints.jl")
 include("./Optimisation/ConstraintModel/MixedIntegerProgrammingConstraints.jl")
+include("./Optimisation/ConstraintModel/SemiDefiniteProgrammingConstraints.jl")
+include("./Optimisation/ConstraintModel/RegularisationConstraints.jl")
 include("./Optimisation/Traditional/MeanRisk/MeanRisk.jl")
 
 end

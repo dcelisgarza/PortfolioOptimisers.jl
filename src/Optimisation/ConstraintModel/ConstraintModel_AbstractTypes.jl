@@ -1,3 +1,8 @@
+abstract type CustomConstraint end
+struct NoCustomConstraint <: CustomConstraint end
+function set_custom_constraint!(::Any, ::NoCustomConstraint)
+    return nothing
+end
 function get_w_k_sc(model::JuMP.Model)
     w = model[:w]
     k = model[:k]

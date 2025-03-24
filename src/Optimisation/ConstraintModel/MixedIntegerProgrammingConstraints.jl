@@ -1,5 +1,7 @@
 function _short_mip_threshold_constraints(model::JuMP.Model, ss::Real, wl::WeightLimits,
-                                          fees::Fees, lbi::Union{<:Real, <:AbstractVector},
+                                          ffl::Union{<:Real, <:AbstractVector},
+                                          ffs::Union{<:Real, <:AbstractVector},
+                                          lbi::Union{<:Real, <:AbstractVector},
                                           sbi::Union{<:Real, <:AbstractVector},
                                           lbi_flag::Bool, sbi_flag::Bool, ffl_flag::Bool,
                                           ffs_flag::Bool)
@@ -46,14 +48,15 @@ function _short_mip_threshold_constraints(model::JuMP.Model, ss::Real, wl::Weigh
         @constraint(model, w_mip_sbi, sc * w <= sc * (is .* sbi .+ ss * (1 .- isb)))
     end
     if ffl_flag
-        @expression(model, ffl, sum(fees.fixed_long .* il))
+        @expression(model, ffl, sum(ffl .* il))
     end
     if ffs_flag
-        @expression(model, ffs, sum(fees.fixed_short .* is))
+        @expression(model, ffs, sum(ffs .* is))
     end
     return ib
 end
-function _mip_constraints(model::JuMP.Model, ss::Real, wl::WeightLimits, fees::Fees,
+function _mip_constraints(model::JuMP.Model, ss::Real, wl::WeightLimits,
+                          ffl::Union{<:Real, <:AbstractVector},
                           lbi::Union{<:Real, <:AbstractVector}, lbi_flag::Bool,
                           ffl_flag::Bool)
     w, k, sc = get_w_k_sc(model)
@@ -75,7 +78,7 @@ function _mip_constraints(model::JuMP.Model, ss::Real, wl::WeightLimits, fees::F
         @constraint(model, w_mip_lbi, sc * w >= sc * i_mip .* lbi)
     end
     if ffl_flag
-        @expression(model, ffl, sum(fees.fixed_long .* i_mip))
+        @expression(model, ffl, sum(ffl .* i_mip))
     end
     if haskey(model, :sw)
         @constraint(model, w_mip_lb, sc * w >= sc * i_mip .* wl.lb)
@@ -86,7 +89,7 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
                               gcard::Union{Nothing, <:PartialLinearConstraintModel},
                               lbi::Union{<:Real, <:AbstractVector},
                               sbi::Union{<:Real, <:AbstractVector}, fees::Fees,
-                              nadj::AdjacencyConstraint, cadj::AdjacencyConstraint,
+                              cadj::AdjacencyConstraint, nadj::AdjacencyConstraint,
                               wl::WeightLimits, ss::Real = 100_000.0)
     card_flag = card > zero(card)
     gcard_flag = !isa(gcard, <:PartialLinearConstraintModel{Nothing, Nothing})
@@ -94,12 +97,12 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
     sbi_flag = non_zero_real_or_vec(sbi)
     ffl_flag = non_zero_real_or_vec(fees.fixed_long)
     ffs_flag = non_zero_real_or_vec(fees.fixed_short)
-    n_flag = isa(nadj, IP)
     c_flag = isa(cadj, IP)
+    n_flag = isa(nadj, IP)
     if !(card_flag ||
          gcard_flag ||
-         sbi_flag ||
          lbi_flag ||
+         sbi_flag ||
          ffl_flag ||
          ffs_flag ||
          n_flag ||
@@ -107,10 +110,10 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
         return nothing
     end
     ib = if (sbi_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
-        _short_mip_threshold_constraints(model, ss, wl, fees, lbi, sbi, lbi_flag, sbi_flag,
-                                         ffl_flag, ffs_flag)
+        _short_mip_threshold_constraints(model, ss, wl, fees.fixed_long, fees.fixed_short,
+                                         lbi, sbi, lbi_flag, sbi_flag, ffl_flag, ffs_flag)
     else
-        _mip_constraints(model, ss, wl, fees, lbi, lbi_flag, ffl_flag)
+        _mip_constraints(model, ss, wl, fees.fixed_long, lbi, lbi_flag, ffl_flag)
     end
     if card_flag
         @constraint(model, card, sum(ib) <= card)
@@ -118,11 +121,11 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
     if gcard_flag
         @constraint(model, gcard, gcard.A * ib <= gcard.B)
     end
-    if n_flag
-        @constraint(model, ncard, nadj.A * ib <= nadj.B)
-    end
     if c_flag
         @constraint(model, ccard, cadj.A * ib <= cadj.B)
+    end
+    if n_flag
+        @constraint(model, ncard, nadj.A * ib <= nadj.B)
     end
     return nothing
 end

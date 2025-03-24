@@ -1,14 +1,10 @@
 abstract type BudgetConstraints <: ConstraintModel end
-struct Budget{T1 <: Real} <: BudgetConstraints
-    val::T1
-end
-function Budget(; val::Real = 1.0)
-    @smart_assert(isfinite(val))
-    return Budget{typeof(val)}(val)
-end
-function set_budget_constraints!(model::JuMP.Model, b::Budget)
+function set_budget_constraints!(model::JuMP.Model, val::Real)
+    if isinf(val)
+        return nothing
+    end
     w, k, sc = get_w_k_sc(model)
-    @constraint(model, wb, sc * sum(w) == sc * k * b.val)
+    @constraint(model, wb, sc * sum(w) == sc * k * val)
     return nothing
 end
 struct BudgetRange{T1 <: Real, T2 <: Real} <: BudgetConstraints
@@ -17,6 +13,7 @@ struct BudgetRange{T1 <: Real, T2 <: Real} <: BudgetConstraints
 end
 function BudgetRange(; lb::Real = 1.0, ub::Real = 1.0)
     @smart_assert(isinf(lb) ⊼ isinf(ub))
+    @smart_assert(lb <= ub)
     return BudgetRange{typeof(lb), typeof(ub)}(lb, ub)
 end
 function set_budget_constraints!(model::JuMP.Model, b::BudgetRange)
