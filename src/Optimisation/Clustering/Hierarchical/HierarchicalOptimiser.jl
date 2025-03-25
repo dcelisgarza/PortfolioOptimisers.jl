@@ -26,14 +26,14 @@ function HierarchicalOptimiser(;
 end
 function unitary_expected_risks(r::Union{<:OptimisationRiskMeasure,
                                          <:AbstractVector{<:OptimisationRiskMeasure}},
-                                X::AbstractMatrix, fees::Fees = Fees(),
-                                sce::Scalariser = SumScalariser())
+                                X::AbstractMatrix; fees::Fees = Fees(),
+                                scalariser::Scalariser = SumScalariser())
     w = zeros(eltype(X), size(X, 2))
     rk = zeros(eltype(X), size(X, 2))
     for i ∈ eachindex(w)
         fill!(w, zero(eltype(X)))
         w[i] = one(eltype(X))
-        rk[i] = expected_risk(r, w, X, fees, sce)
+        rk[i] = expected_risk(r, w, X; fees = fees, scalariser = scalariser)
     end
     return rk
 end

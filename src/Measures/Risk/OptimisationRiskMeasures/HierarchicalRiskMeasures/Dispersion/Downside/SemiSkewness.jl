@@ -23,8 +23,8 @@ function SemiSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
     return SemiSkewness{typeof(settings), typeof(ve), typeof(target), typeof(w),
                         typeof(mu)}(settings, ve, target, w, mu)
 end
-function (r::SemiSkewness)(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fees())
-    x = calc_net_returns(X, w, fees)
+function (r::SemiSkewness)(w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
+    x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     val = val[val <= zero(target)]

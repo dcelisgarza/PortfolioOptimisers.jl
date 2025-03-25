@@ -28,9 +28,9 @@ function SquareRootSemiKurtosis(; settings::RiskMeasureSettings = RiskMeasureSet
                                                                                        mu,
                                                                                        kt)
 end
-function (r::SquareRootSemiKurtosis)(X::AbstractMatrix, w::AbstractVector,
+function (r::SquareRootSemiKurtosis)(w::AbstractVector, X::AbstractMatrix,
                                      fees::Fees = Fees())
-    x = calc_net_returns(X, w, fees)
+    x = calc_net_returns(w, X, fees)
     mu = calc_ret_mu(x, w, r)
     val = x .- mu
     return sqrt(sum(val[val .<= zero(eltype(val))] .^ 4) / length(x))

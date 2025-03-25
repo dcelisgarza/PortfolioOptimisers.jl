@@ -23,8 +23,8 @@ function FourthCentralMoment(; settings::RiskMeasureSettings = RiskMeasureSettin
                                                                                         w,
                                                                                         mu)
 end
-function (r::FourthCentralMoment)(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fees())
-    x = calc_net_returns(X, w, fees)
+function (r::FourthCentralMoment)(w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
+    x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     return sum(val .^ 4) / length(x)

@@ -26,8 +26,8 @@ function Skewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                                                          w,
                                                                                          mu)
 end
-function (r::Skewness)(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fees())
-    x = calc_net_returns(X, w, fees)
+function (r::Skewness)(w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
+    x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     sigma = std(r.ve, x)

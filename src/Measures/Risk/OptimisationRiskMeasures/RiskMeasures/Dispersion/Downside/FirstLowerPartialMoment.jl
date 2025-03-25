@@ -23,9 +23,9 @@ function FirstLowerPartialMoment(; settings::RiskMeasureSettings = RiskMeasureSe
                                                                                             w,
                                                                                             mu)
 end
-function (r::FirstLowerPartialMoment)(X::AbstractMatrix, w::AbstractVector,
+function (r::FirstLowerPartialMoment)(w::AbstractVector, X::AbstractMatrix,
                                       fees::Fees = Fees())
-    x = calc_net_returns(X, w, fees)
+    x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     val = val[val .<= zero(eltype(val))]

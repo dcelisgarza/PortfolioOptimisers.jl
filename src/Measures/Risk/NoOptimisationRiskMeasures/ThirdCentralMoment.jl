@@ -23,8 +23,8 @@ function ThirdCentralMoment(; settings::RiskMeasureSettings = RiskMeasureSetting
                                                                                        w,
                                                                                        mu)
 end
-function (r::ThirdCentralMoment)(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fees())
-    x = calc_net_returns(X, w, fees)
+function (r::ThirdCentralMoment)(w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
+    x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     return sum(val .^ 3) / length(x)

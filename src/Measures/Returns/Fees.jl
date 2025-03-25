@@ -267,10 +267,10 @@ function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
     fees_turnover = calc_asset_fees(w, latest_prices, fees.turnover)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
-function calc_net_returns(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fees())
+function calc_net_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
     return X * w .- calc_fees(w, fees)
 end
-function calc_net_asset_returns(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fees())
+function calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
     return X .* transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
 

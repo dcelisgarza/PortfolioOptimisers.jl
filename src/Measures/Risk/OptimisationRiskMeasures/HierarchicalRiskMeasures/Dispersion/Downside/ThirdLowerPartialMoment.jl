@@ -23,9 +23,9 @@ function ThirdLowerPartialMoment(; settings::RiskMeasureSettings = RiskMeasureSe
                                                                                             w,
                                                                                             mu)
 end
-function (r::ThirdLowerPartialMoment)(X::AbstractMatrix, w::AbstractVector,
+function (r::ThirdLowerPartialMoment)(w::AbstractVector, X::AbstractMatrix,
                                       fees::Fees = Fees())
-    x = calc_net_returns(X, w, fees)
+    x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     return -sum(val[val .<= zero(eltype(val))] .^ 3) / length(x)

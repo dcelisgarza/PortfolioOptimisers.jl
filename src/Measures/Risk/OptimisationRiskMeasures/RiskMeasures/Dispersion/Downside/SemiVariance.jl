@@ -15,8 +15,8 @@ function SemiVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                       mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     return SemiVariance(settings, formulation, target, w, mu)
 end
-function (r::SemiVariance)(X::AbstractMatrix, w::AbstractVector, fees::Fees = Fees())
-    x = calc_net_returns(X, w, fees)
+function (r::SemiVariance)(w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
+    x = calc_net_returns(w, X, fees)
     mu = calc_target_ret_mu(x, w, r)
     val = x .- mu
     val = val[val .<= zero(eltype(val))]

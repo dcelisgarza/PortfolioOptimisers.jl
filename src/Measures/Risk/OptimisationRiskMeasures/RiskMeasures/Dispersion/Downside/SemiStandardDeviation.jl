@@ -23,9 +23,9 @@ function SemiStandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSett
                                                                                           w,
                                                                                           mu)
 end
-function (r::SemiStandardDeviation)(X::AbstractMatrix, w::AbstractVector,
+function (r::SemiStandardDeviation)(w::AbstractVector, X::AbstractMatrix,
                                     fees::Fees = Fees())
-    x = calc_net_returns(X, w, fees)
+    x = calc_net_returns(w, X, fees)
     mu = calc_target_ret_mu(x, w, r)
     val = x .- mu
     val = val[val .<= zero(eltype(val))]

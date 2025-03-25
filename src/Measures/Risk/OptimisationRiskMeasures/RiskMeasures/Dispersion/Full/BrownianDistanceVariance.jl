@@ -11,9 +11,9 @@ function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureS
     return BrownianDistanceVariance{typeof(settings), typeof(formulation)}(settings,
                                                                            formulation)
 end
-function (::BrownianDistanceVariance)(X::AbstractMatrix, w::AbstractVector,
+function (::BrownianDistanceVariance)(w::AbstractVector, X::AbstractMatrix,
                                       fees::Fees = Fees())
-    x = calc_net_returns(X, w, fees)
+    x = calc_net_returns(w, X, fees)
     T = length(x)
     iT2 = inv(T^2)
     D = Matrix{eltype(x)}(undef, T, T)
