@@ -3,18 +3,17 @@ function owa_model_setup(method::JuMP_OrderedWeightsArray, weights::AbstractMatr
     T, N = size(weights)
     model = JuMP.Model()
     max_phi = method.max_phi
-    scale_constr = method.scale_constr
+    sc = method.sc
     @variables(model, begin
                    theta[1:T]
                    phi[1:N]
                end)
-    @constraints(model,
-                 begin
-                     scale_constr * 0 .<= scale_constr * phi .<= scale_constr * max_phi
-                     scale_constr * sum(phi) == scale_constr * 1
-                     scale_constr * theta .== scale_constr * weights * phi
-                     scale_constr * phi[2:end] .<= scale_constr * phi[1:(end - 1)]
-                     scale_constr * theta[2:end] .>= scale_constr * theta[1:(end - 1)]
+    @constraints(model, begin
+                     sc * 0 .<= sc * phi .<= sc * max_phi
+                     sc * sum(phi) == sc * 1
+                     sc * theta .== sc * weights * phi
+                     sc * phi[2:end] .<= sc * phi[1:(end - 1)]
+                     sc * theta[2:end] .>= sc * theta[1:(end - 1)]
                  end)
     return model
 end

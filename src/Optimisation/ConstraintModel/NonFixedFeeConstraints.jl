@@ -16,17 +16,17 @@ function set_turnover_fees!(model::JuMP.Model, turnover::Turnover)
     return nothing
 end
 function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
-    if non_zero_real_or_vec(fees.long)
-        if !haskey(model, :lw)
-            w, k, sc = get_w_k_sc(model)
-            @variable(model, lw[1:length(w)] >= 0)
-            @constraints(model, begin
-                             w_lw, sc * w <= sc * lw
-                             lw_ub, sc * sum(lw) <= sc * k
-                         end)
-        else
-            lw = model[:lw]
-        end
+    if haskey(model, :lw) && non_zero_real_or_vec(fees.long)
+        @expression(model, fl, sum(fees.long .* lw))
+    elseif !haskey(model, :lw) && non_zero_real_or_vec(fees.long)
+        @warn("Long fees require")
+        w, k, sc = get_w_k_sc(model)
+        N = length(w)
+        @variable(model, lw[1:N] >= 0)
+        @constraints(model, begin
+                         w_lw, sc * w <= sc * lw
+                         lw_ub, sc * sum(lw) <= sc * k * 1
+                     end)
         @expression(model, fl, sum(fees.long .* lw))
     end
     if haskey(model, :sw) && non_zero_real_or_vec(fees.short)

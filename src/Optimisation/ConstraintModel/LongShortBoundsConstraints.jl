@@ -9,21 +9,16 @@ function LongShortBounds(; s_lb::Real = 1.0, l_ub::Real = 1.0)
 end
 function set_long_short_bounds_constraints!(model::JuMP.Model, lsb::LongShortBounds,
                                             long_only::Bool = false)
-    ub_flag = isinf(lsb.l_ub)
-    lb_flag = isinf(lsb.s_lb)
-    if long_only || (ub_flag && lb_flag)
-        return nothing
-    end
     w, k, sc = get_w_k_sc(model)
     N = length(w)
-    if !ub_flag
+    if isfinite(lsb.l_ub)
         @variable(model, lw[1:N] >= 0)
         @constraints(model, begin
                          w_lw, sc * w <= sc * lw
                          lw_ub, sc * sum(lw) <= sc * k * lsb.l_ub
                      end)
     end
-    if !lb_flag
+    if !long_only && isfinite(lsb.s_lb)
         @variable(model, sw[1:N] >= 0)
         @constraints(model, begin
                          w_sw, sc * w >= -sc * sw
