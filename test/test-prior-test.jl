@@ -1092,13 +1092,28 @@
         d = PortfolioOptimisers.freeze_A_view(c)
         @test d.coef == -1
 
-        c = EntropyPoolingView()
+        c = EntropyPoolingView(;
+                               A = C1_LinearEntropyPoolingConstraint(; group = nothing,
+                                                                     name = nothing,
+                                                                     coef = -6),
+                               B = C1_LinearEntropyPoolingConstraint(; group = nothing,
+                                                                     name = nothing,
+                                                                     coef = -6))
         @test c == (c[5] = c)
         @test sort(c) == c
         @test sort!(c) == c
 
         @test_throws AssertionError JuMPEntropyPooling(; solvers = Solver[])
-        pe = EntropyPoolingPriorEstimator(;)
+        pe = EntropyPoolingPriorEstimator(;
+                                          views = EntropyPoolingView(;
+                                                                     A = C1_LinearEntropyPoolingConstraint(;
+                                                                                                           group = nothing,
+                                                                                                           name = nothing,
+                                                                                                           coef = -6),
+                                                                     B = C1_LinearEntropyPoolingConstraint(;
+                                                                                                           group = nothing,
+                                                                                                           name = nothing,
+                                                                                                           coef = -6)))
         @test isa(pe.ce, PortfolioOptimisersCovariance)
         @test isa(pe.me, SimpleExpectedReturns)
     end

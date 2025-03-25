@@ -18,7 +18,7 @@ struct C0_LinearEntropyPoolingConstraint{T1, T2,
     name::T2
     coef::T3
 end
-function C0_LinearEntropyPoolingConstraint(; group = nothing, name = nothing,
+function C0_LinearEntropyPoolingConstraint(; group, name,
                                            coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
@@ -27,15 +27,6 @@ function C0_LinearEntropyPoolingConstraint(; group = nothing, name = nothing,
         @smart_assert(all((group_flag, name_flag, coef_flag)))
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
-        for (g, n) ∈ zip(group, name)
-            if isnothing(g) || isnothing(n)
-                @smart_assert(isnothing(g) && isnothing(n))
-            end
-        end
-    else
-        if isnothing(group) || isnothing(name)
-            @smart_assert(isnothing(group) && isnothing(name))
-        end
     end
     return C0_LinearEntropyPoolingConstraint{typeof(group), typeof(name), typeof(coef)}(group,
                                                                                         name,
@@ -49,7 +40,7 @@ struct C1_LinearEntropyPoolingConstraint{T1, T2,
     coef::T3
     exponent::T4
 end
-function C1_LinearEntropyPoolingConstraint(; group = nothing, name = nothing,
+function C1_LinearEntropyPoolingConstraint(; group, name,
                                            coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
                                            exponent::Real = 1)
     group_flag = isa(group, AbstractVector)
@@ -59,15 +50,6 @@ function C1_LinearEntropyPoolingConstraint(; group = nothing, name = nothing,
         @smart_assert(all((group_flag, name_flag, coef_flag)))
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
-        for (g, n) ∈ zip(group, name)
-            if isnothing(g) || isnothing(n)
-                @smart_assert(isnothing(g) && isnothing(n))
-            end
-        end
-    else
-        if isnothing(group) || isnothing(name)
-            @smart_assert(isnothing(group) && isnothing(name))
-        end
     end
     return C1_LinearEntropyPoolingConstraint{typeof(group), typeof(name), typeof(coef),
                                              typeof(exponent)}(group, name, coef, exponent)
@@ -84,7 +66,7 @@ struct C2_LinearEntropyPoolingConstraint{T1, T2,
     coef::T3
     kind::T4
 end
-function C2_LinearEntropyPoolingConstraint(; group = nothing, name = nothing,
+function C2_LinearEntropyPoolingConstraint(; group, name,
                                            coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
                                            kind::C2_EntropyPoolingKind = SkewnessEntropyPoolingView())
     group_flag = isa(group, AbstractVector)
@@ -94,15 +76,6 @@ function C2_LinearEntropyPoolingConstraint(; group = nothing, name = nothing,
         @smart_assert(all((group_flag, name_flag, coef_flag)))
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
-        for (g, n) ∈ zip(group, name)
-            if isnothing(g) || isnothing(n)
-                @smart_assert(isnothing(g) && isnothing(n))
-            end
-        end
-    else
-        if isnothing(group) || isnothing(name)
-            @smart_assert(isnothing(group) && isnothing(name))
-        end
     end
     return C2_LinearEntropyPoolingConstraint{typeof(group), typeof(name), typeof(coef),
                                              typeof(kind)}(group, name, coef, kind)
@@ -136,21 +109,6 @@ function C4_LinearEntropyPoolingConstraint(; group1 = nothing, name1 = nothing,
                       length(coef) ==
                       length(group2) ==
                       length(name2))
-        for (g1, n1, g2, n2) ∈ zip(group1, name1, group2, name2)
-            if isnothing(g1) || isnothing(n1) || isnothing(g2) || isnothing(n2)
-                @smart_assert(isnothing(g1) &&
-                              isnothing(n1) &&
-                              isnothing(g2) &&
-                              isnothing(n2))
-            end
-        end
-    else
-        if isnothing(group1) || isnothing(name1) || isnothing(group2) || isnothing(name2)
-            @smart_assert(isnothing(group1) &&
-                          isnothing(name1) &&
-                          isnothing(group2) &&
-                          isnothing(name2))
-        end
     end
     return C4_LinearEntropyPoolingConstraint{typeof(group1), typeof(group2), typeof(name1),
                                              typeof(name2), typeof(coef)}(group1, group2,

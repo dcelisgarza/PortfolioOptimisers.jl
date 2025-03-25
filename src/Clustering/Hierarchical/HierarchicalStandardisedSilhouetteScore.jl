@@ -1,9 +1,8 @@
 function optimal_number_clusters(nch::StandardisedSilhouetteScore, clustering::Hclust,
                                  dist::AbstractMatrix)
-    metric = nch.metric
     max_k = nch.max_k
     N = size(dist, 1)
-    if iszero(max_k)
+    if isnothing(max_k)
         max_k = ceil(Int, sqrt(N))
     end
     c1 = min(ceil(Int, sqrt(N)), max_k)
@@ -12,7 +11,7 @@ function optimal_number_clusters(nch::StandardisedSilhouetteScore, clustering::H
     W_list[1] = -Inf
     for i ∈ 2:c1
         lvl = cluster_lvls[i]
-        sl = silhouettes(lvl, dist; metric = metric)
+        sl = silhouettes(lvl, dist; metric = nch.metric)
         msl = mean(sl)
         W_list[i] = msl / std(sl; mean = msl)
     end

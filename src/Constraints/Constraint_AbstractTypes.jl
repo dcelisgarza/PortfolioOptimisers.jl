@@ -4,7 +4,7 @@ abstract type InequalityComparisonOperators <: ComparisonOperators end
 struct EQ <: EqualityComparisonOperators end
 struct LEQ <: InequalityComparisonOperators end
 struct GEQ <: InequalityComparisonOperators end
-abstract type ConstraintModel end
+abstract type AbstractConstraintModel end
 function comparison_sign_ineq_flag(::EQ)
     return 1, false
 end
@@ -16,19 +16,19 @@ function comparison_sign_ineq_flag(::GEQ)
 end
 abstract type ConstraintSide end
 abstract type A_Constraint <: ConstraintSide end
-struct A_LinearConstraint{T1, T2, T3 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
+struct A_LinearConstraint{T1, T2, T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
        A_Constraint
     group::T1
     name::T2
     coef::T3
 end
 function A_LinearConstraint(; group = nothing, name = nothing,
-                            coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
+                            coef::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
-    if any((group_flag, name_flag, coef_flag))
-        @smart_assert(all((group_flag, name_flag, coef_flag)))
+    if group_flag || name_flag || coef_flag
+        @smart_assert(group_flag && name_flag && coef_flag)
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
         for (g, n) ∈ zip(group, name)
@@ -37,8 +37,8 @@ function A_LinearConstraint(; group = nothing, name = nothing,
             end
         end
     else
-        if isnothing(group) || isnothing(name)
-            @smart_assert(isnothing(group) && isnothing(name))
+        if isnothing(group) || isnothing(name) || isnothing(coef)
+            @smart_assert(isnothing(group) && isnothing(name) && isnothing(coef))
         end
     end
     return A_LinearConstraint{typeof(group), typeof(name), typeof(coef)}(group, name, coef)

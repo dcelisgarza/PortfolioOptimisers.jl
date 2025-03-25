@@ -2,7 +2,7 @@ function optimal_number_clusters(nch::SecondOrderDifference, clustering::Hclust,
                                  dist::AbstractMatrix)
     max_k = nch.max_k
     N = size(dist, 1)
-    if iszero(max_k)
+    if isnothing(max_k)
         max_k = ceil(Int, sqrt(N))
     end
     c1 = min(ceil(Int, sqrt(N)), max_k)

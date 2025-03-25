@@ -1210,7 +1210,8 @@ end
 function DBHTClusteringResult(; clustering::Clustering.Hclust, S::AbstractMatrix,
                               D::AbstractMatrix, k::Integer)
     @smart_assert(!isempty(S) && !isempty(D))
-    @smart_assert(k >= 1)
+    @smart_assert(size(S) == size(D))
+    @smart_assert(k >= one(k))
     return DBHTClusteringResult{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering,
                                                                                      S, D,
                                                                                      k)

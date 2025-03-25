@@ -1,8 +1,10 @@
-struct SecondOrderDifference{T1 <: Integer} <: NumberClustersHeuristic
+struct SecondOrderDifference{T1 <: Union{Nothing, <:Integer}} <: NumberClustersHeuristic
     max_k::T1
 end
-function SecondOrderDifference(; max_k::Integer = 0)
-    @smart_assert(max_k >= zero(max_k))
+function SecondOrderDifference(; max_k::Union{Nothing, <:Integer} = nothing)
+    if !isnothing(max_k)
+        @smart_assert(max_k >= one(max_k))
+    end
     return SecondOrderDifference{typeof(max_k)}(max_k)
 end
 

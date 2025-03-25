@@ -1,4 +1,4 @@
-struct LongShortBounds{T1 <: Real, T2 <: Real} <: ConstraintModel
+struct LongShortBounds{T1 <: Real, T2 <: Real} <: AbstractConstraintModel
     s_lb::T1
     l_ub::T2
 end

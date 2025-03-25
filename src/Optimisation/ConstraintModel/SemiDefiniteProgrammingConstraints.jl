@@ -24,8 +24,8 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
 end
 function set_sdp_network_cluster_constraints!(model::JuMP.Model, cadj::AdjacencyConstraint,
                                               nadj::AdjacencyConstraint)
-    c_flag = isa(cadj, SDP)
-    n_flag = isa(nadj, SDP)
+    c_flag = isa(cadj, SemiDefiniteAdjacency)
+    n_flag = isa(nadj, SemiDefiniteAdjacency)
     if !(n_flag || c_flag)
         return nothing
     end
@@ -49,8 +49,8 @@ end
 function set_sdp_frc_network_cluster_constraints!(model::JuMP.Model,
                                                   cadj::AdjacencyConstraint,
                                                   nadj::AdjacencyConstraint)
-    c_flag = isa(cadj, SDP)
-    n_flag = isa(nadj, SDP)
+    c_flag = isa(cadj, SemiDefiniteAdjacency)
+    n_flag = isa(nadj, SemiDefiniteAdjacency)
     if !(n_flag || c_flag)
         return nothing
     end

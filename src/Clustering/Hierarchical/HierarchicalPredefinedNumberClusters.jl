@@ -2,7 +2,7 @@ function optimal_number_clusters(nch::PredefinedNumberClusters, clustering::Hclu
     k = nch.k
     max_k = nch.max_k
     N = length(clustering.order)
-    if iszero(max_k)
+    if isnothing(max_k)
         max_k = ceil(Int, sqrt(N))
     end
     max_k = min(ceil(Int, sqrt(N)), max_k)

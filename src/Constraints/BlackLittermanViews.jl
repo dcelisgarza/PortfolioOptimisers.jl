@@ -10,8 +10,7 @@ struct BlackLittermanViewsModel{T1 <: AbstractMatrix, T2 <: AbstractVector}
     Q::T2
 end
 function BlackLittermanViewsModel(; P::AbstractMatrix, Q::AbstractVector)
-    @smart_assert(!isempty(P))
-    @smart_assert(!isempty(Q))
+    @smart_assert(!isempty(P) && !isempty(Q))
     @smart_assert(size(P, 1) == length(Q))
     return BlackLittermanViewsModel{typeof(P), typeof(Q)}(P, Q)
 end

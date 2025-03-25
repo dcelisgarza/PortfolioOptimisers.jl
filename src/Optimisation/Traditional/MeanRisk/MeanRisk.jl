@@ -22,16 +22,6 @@ function MeanRisk(; risk::Union{RiskMeasure, AbstractVector{<:RiskMeasure}} = Va
 end
 function optimise!(X::AbstractMatrix, opt::MeanRisk; os::Real = 1.0, cs::Real = 1.0,
                    str_names::Bool = false)
-    pm = prior(EmpiricalPriorEstimator(), X)
-    model = JuMP.Model()
-    set_string_names_on_creation(model, str_names)
-    set_objective_penalty!(model)
-    set_maximum_ratio_factor_variables!(model, pm.mu, opt.obj)
-    set_model_scales!(model, os, cs)
-    set_w!(model, pm.X, opt.wi)
-    set_budget_constraints!(model, 1.0)
-    set_weight_constraints!(model, WeightLimits())
-    set_portfolio_objective_function!((; model = model), opt.obj, opt.ret, opt.co)
     return nothing
 end
 

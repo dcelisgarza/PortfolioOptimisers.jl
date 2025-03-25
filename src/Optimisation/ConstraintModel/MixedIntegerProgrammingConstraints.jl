@@ -1,3 +1,19 @@
+struct BuyInThreshold{T1 <: Union{<:Real, <:AbstractVector{<:Real}},
+                      T2 <: Union{<:Real, <:AbstractVector{<:Real}}}
+    sbi::T1
+    lbi::T2
+end
+function BuyInThreshold(; sbi::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
+                        lbi::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
+    if isa(sbi, Real)
+        @smart_assert(isfinite(sbi) && isfinite(lbi))
+        @smart_assert(sbi >= zero(sbi) && lbi >= zero(lbi))
+    else
+        @smart_assert(!isempty(sbi) && !isempty(lbi) && length(sbi) == length(lbi))
+        @smart_assert(all(sbi .>= zero(sbi)) && all(lbi .>= zero(lbi)))
+    end
+    return BuyInThreshold{typeof(sbi), typeof(lbi)}(sbi, lbi)
+end
 function _short_mip_threshold_constraints(model::JuMP.Model, ss::Real, wl::WeightLimits,
                                           ffl::Union{<:Real, <:AbstractVector},
                                           ffs::Union{<:Real, <:AbstractVector},
@@ -86,19 +102,18 @@ function _mip_constraints(model::JuMP.Model, ss::Real, wl::WeightLimits,
     return ib
 end
 function set_mip_constraints!(model::JuMP.Model, card::Integer,
-                              gcard::Union{Nothing, <:PartialLinearConstraintModel},
-                              lbi::Union{<:Real, <:AbstractVector},
-                              sbi::Union{<:Real, <:AbstractVector}, fees::Fees,
-                              cadj::AdjacencyConstraint, nadj::AdjacencyConstraint,
-                              wl::WeightLimits, ss::Real = 100_000.0)
+                              gcard::PartialLinearConstraintModel, bit::BuyInThreshold,
+                              fees::Fees, cadj::AdjacencyConstraint,
+                              nadj::AdjacencyConstraint, wl::WeightLimits,
+                              ss::Real = 100_000.0)
     card_flag = card > zero(card)
     gcard_flag = !isa(gcard, <:PartialLinearConstraintModel{Nothing, Nothing})
-    lbi_flag = non_zero_real_or_vec(lbi)
-    sbi_flag = non_zero_real_or_vec(sbi)
+    lbi_flag = non_zero_real_or_vec(bit.lbi)
+    sbi_flag = non_zero_real_or_vec(bit.sbi)
     ffl_flag = non_zero_real_or_vec(fees.fixed_long)
     ffs_flag = non_zero_real_or_vec(fees.fixed_short)
-    c_flag = isa(cadj, IP)
-    n_flag = isa(nadj, IP)
+    c_flag = isa(cadj, IntegerAdjacency)
+    n_flag = isa(nadj, IntegerAdjacency)
     if !(card_flag ||
          gcard_flag ||
          lbi_flag ||
@@ -111,9 +126,10 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
     end
     ib = if (sbi_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
         _short_mip_threshold_constraints(model, ss, wl, fees.fixed_long, fees.fixed_short,
-                                         lbi, sbi, lbi_flag, sbi_flag, ffl_flag, ffs_flag)
+                                         bit.lbi, bit.sbi, lbi_flag, sbi_flag, ffl_flag,
+                                         ffs_flag)
     else
-        _mip_constraints(model, ss, wl, fees.fixed_long, lbi, lbi_flag, ffl_flag)
+        _mip_constraints(model, ss, wl, fees.fixed_long, bit.lbi, lbi_flag, ffl_flag)
     end
     if card_flag
         @constraint(model, card, sum(ib) <= card)

@@ -49,7 +49,7 @@ end
 function EntropyPoolingPriorEstimator(;
                                       pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
                                       views::Union{<:EntropyPoolingView,
-                                                   <:AbstractVector{<:EntropyPoolingView}} = EntropyPoolingView(),
+                                                   <:AbstractVector{<:EntropyPoolingView}},
                                       sets::DataFrame = DataFrame(),
                                       alg::EntropyPoolingAlgorithm = H0_EntropyPooling(),
                                       opt::EntropyPoolingOptimisation = OptimEntropyPooling(),
