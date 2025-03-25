@@ -9,7 +9,7 @@ function set_turnover_fees!(model::JuMP.Model, turnover::Turnover)
     N = length(w)
     @variable(model, t_trfs[1:N])
     @expressions(model, begin
-                     x_trfs, w .- turnover.w * k
+                     x_trfs, w - turnover.w * k
                      trfs, sum(turnover.val .* t_trfs)
                  end)
     @constraint(model, ctrfs[i = 1:N], sc * [t_trfs[i]; x_trfs[i]] ∈ MOI.NormOneCone(2))
