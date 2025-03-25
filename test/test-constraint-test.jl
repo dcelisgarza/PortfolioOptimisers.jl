@@ -87,7 +87,11 @@
         @test isapprox(A_eq, A_eq_t)
         @test isapprox(B_eq, B_eq_t)
 
-        (; ineq, eq) = linear_constraints(LinearConstraint(;), sets)
+        (; ineq, eq) = linear_constraints(LinearConstraint(;
+                                                           A = A_LinearConstraint(;
+                                                                                  group = nothing,
+                                                                                  name = nothing)),
+                                          sets)
         A_ineq, B_ineq = ineq.A, ineq.B
         A_eq, B_eq = eq.A, eq.B
         @test isnothing(A_ineq)
@@ -108,8 +112,7 @@
         @test isnothing(A_eq)
         @test isnothing(B_eq)
 
-        @test_throws AssertionError A_LinearConstraint(; group = [nothing], name = ["a"],
-                                                       coef = [2])
+        @test_throws UndefKeywordError A_LinearConstraint(; coef = [2])
         lcs = A_LinearConstraint(; group = [nothing], name = [nothing], coef = [2])
         @test isnothing(lcs.group[1])
         @test isnothing(lcs.name[1])
@@ -145,13 +148,13 @@
         @test isapprox(w_min, [0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2, 0.2])
         @test isapprox(w_max, [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5])
 
-        @test_throws AssertionError HierarchicalConstraint(group = :Asset)
-        hcc = HierarchicalConstraint()
+        @test_throws UndefKeywordError HierarchicalConstraint(group = :Asset)
+        hcc = HierarchicalConstraint(; group = nothing, name = nothing)
         @test isnothing(hcc.group)
         @test isnothing(hcc.name)
 
-        @test_throws AssertionError HierarchicalConstraint(; group = [nothing],
-                                                           name = ["a"], hi = [2], lo = [1])
+        @test_throws UndefKeywordError HierarchicalConstraint(; group = [nothing], hi = [2],
+                                                              lo = [1])
         lcs = HierarchicalConstraint(; group = [nothing], name = [nothing], hi = [5],
                                      lo = [3])
         @test isnothing(lcs.group[1])
@@ -204,7 +207,7 @@
         @test isapprox(rb[idx2][1], 1 / 3 / 3)
         @test isapprox(rb[idx3][1], 1 / 4 / 3)
 
-        c1 = A_LinearConstraint(;)
+        c1 = A_LinearConstraint(; group = nothing, name = nothing)
         rb = risk_budget_constraints(c1, sets)
         @test isapprox(rb, fill(inv(10), 10))
         @test_throws ArgumentError risk_budget_constraints(c1, sets, strict = true)
@@ -226,11 +229,10 @@
         @test isapprox(rb, fill(1 / 10, 10))
 
         rb = risk_budget_constraints(c1, sets; strict = false)
-        @test_throws AssertionError risk_budget_constraints([A_LinearConstraint(;
-                                                                                group = [nothing],
-                                                                                name = ["a"],
-                                                                                coef = [2])],
-                                                            sets)
+        @test_throws UndefKeywordError risk_budget_constraints([A_LinearConstraint(;
+                                                                                   group = [nothing],
+                                                                                   coef = [2])],
+                                                               sets)
         @test_throws AssertionError risk_budget_constraints(A_LinearConstraint[], sets)
     end
 end

@@ -49,7 +49,7 @@ function BlackLittermanPriorEstimator(;
                                                                                                       me = EquilibriumExpectedReturns()),
                                       mp::MatrixProcessing = DefaultMatrixProcessing(),
                                       views::Union{<:BlackLittermanView,
-                                                   <:AbstractVector{<:BlackLittermanView}} = BlackLittermanView(),
+                                                   <:AbstractVector{<:BlackLittermanView}},
                                       sets::DataFrame = DataFrame(), rf::Real = 0.0,
                                       views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                       tau::Union{Nothing, <:Real} = nothing)

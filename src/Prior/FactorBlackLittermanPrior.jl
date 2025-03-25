@@ -61,7 +61,7 @@ function FactorBlackLittermanPriorEstimator(;
                                             re::RegressionMethod = ForwardRegression(),
                                             ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                                             views::Union{<:BlackLittermanView,
-                                                         <:AbstractVector{<:BlackLittermanView}} = BlackLittermanView(),
+                                                         <:AbstractVector{<:BlackLittermanView}},
                                             sets::DataFrame = DataFrame(), rf::Real = 0.0,
                                             residuals::Bool = true,
                                             views_conf::Union{Nothing, <:AbstractVector} = nothing,

@@ -3,7 +3,7 @@ struct LinearConstraint{T1 <: A_LinearConstraint, T2 <: Real, T3 <: ComparisonOp
     B::T2
     comp::T3
 end
-function LinearConstraint(; A::A_LinearConstraint = A_LinearConstraint(), B::Real = 0.0,
+function LinearConstraint(; A::A_LinearConstraint, B::Real = 0.0,
                           comp::ComparisonOperators = LEQ())
     return LinearConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
@@ -13,10 +13,10 @@ struct PartialLinearConstraintModel{T1 <: Union{Nothing, <:AbstractMatrix},
     A::T1
     B::T2
 end
-function PartialLinearConstraintModel(; A::Union{Nothing, <:AbstractMatrix} = nothing,
-                                      B::Union{Nothing, <:AbstractVector} = nothing)
-    if any(isnothing.((A, B)))
-        @smart_assert(all(isnothing.((A, B))))
+function PartialLinearConstraintModel(; A::Union{Nothing, <:AbstractMatrix},
+                                      B::Union{Nothing, <:AbstractVector})
+    if isnothing(A) || isnothing(B)
+        @smart_assert(isnothing(A) && isnothing(B))
     else
         @smart_assert(!isempty(A) && !isempty(B))
     end

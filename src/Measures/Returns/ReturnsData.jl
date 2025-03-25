@@ -16,15 +16,15 @@ function ReturnsData(; nx::Union{Nothing, <:AbstractVector} = nothing,
                      ts::Union{Nothing, AbstractVector} = nothing)
     nxs_flag = !isnothing(nx)
     X_flag = !isnothing(X)
-    if any((nxs_flag, X_flag))
-        @smart_assert(all((nxs_flag, X_flag)))
+    if nxs_flag || X_flag
+        @smart_assert(nxs_flag && X_flag)
         @smart_assert(!isempty(nx) && !isempty(X))
         @smart_assert(length(nx) == size(X, 2))
     end
     nfs_flag = !isnothing(nf)
     F_flag = !isnothing(F)
-    if any((nfs_flag, F_flag)) && nxs_flag
-        @smart_assert(all((nfs_flag, F_flag)))
+    if (nfs_flag || F_flag) && nxs_flag
+        @smart_assert(nfs_flag && F_flag)
         @smart_assert(!isempty(nf) && !isempty(F))
         @smart_assert(length(nf) == size(F, 2))
         @smart_assert(size(X, 1) == size(F, 1))

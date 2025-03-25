@@ -2,7 +2,7 @@ struct BlackLittermanView{T1 <: A_LinearConstraint, T2 <: Real}
     A::T1
     B::T2
 end
-function BlackLittermanView(; A::A_LinearConstraint = A_LinearConstraint(), B::Real = 0.0)
+function BlackLittermanView(; A::A_LinearConstraint, B::Real = 0.0)
     return BlackLittermanView{typeof(A), typeof(B)}(A, B)
 end
 struct BlackLittermanViewsModel{T1 <: AbstractMatrix, T2 <: AbstractVector}

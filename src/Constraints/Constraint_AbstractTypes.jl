@@ -22,8 +22,8 @@ struct A_LinearConstraint{T1, T2, T3 <: Union{Nothing, <:Real, <:AbstractVector{
     name::T2
     coef::T3
 end
-function A_LinearConstraint(; group = nothing, name = nothing,
-                            coef::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+function A_LinearConstraint(; group, name,
+                            coef::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
@@ -31,15 +31,6 @@ function A_LinearConstraint(; group = nothing, name = nothing,
         @smart_assert(group_flag && name_flag && coef_flag)
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
-        for (g, n) ∈ zip(group, name)
-            if isnothing(g) || isnothing(n)
-                @smart_assert(isnothing(g) && isnothing(n))
-            end
-        end
-    else
-        if isnothing(group) || isnothing(name) || isnothing(coef)
-            @smart_assert(isnothing(group) && isnothing(name) && isnothing(coef))
-        end
     end
     return A_LinearConstraint{typeof(group), typeof(name), typeof(coef)}(group, name, coef)
 end

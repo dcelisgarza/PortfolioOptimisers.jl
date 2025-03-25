@@ -23,8 +23,8 @@ function C0_LinearEntropyPoolingConstraint(; group, name,
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
-    if any((group_flag, name_flag, coef_flag))
-        @smart_assert(all((group_flag, name_flag, coef_flag)))
+    if group_flag || name_flag || coef_flag
+        @smart_assert(group_flag && name_flag && coef_flag)
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
     end
@@ -46,8 +46,8 @@ function C1_LinearEntropyPoolingConstraint(; group, name,
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
-    if any((group_flag, name_flag, coef_flag))
-        @smart_assert(all((group_flag, name_flag, coef_flag)))
+    if group_flag || name_flag || coef_flag
+        @smart_assert(group_flag && name_flag && coef_flag)
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
     end
@@ -68,12 +68,12 @@ struct C2_LinearEntropyPoolingConstraint{T1, T2,
 end
 function C2_LinearEntropyPoolingConstraint(; group, name,
                                            coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
-                                           kind::C2_EntropyPoolingKind = SkewnessEntropyPoolingView())
+                                           kind::C2_EntropyPoolingKind)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
-    if any((group_flag, name_flag, coef_flag))
-        @smart_assert(all((group_flag, name_flag, coef_flag)))
+    if group_flag || name_flag || coef_flag
+        @smart_assert(group_flag && name_flag && coef_flag)
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
     end
@@ -89,16 +89,15 @@ struct C4_LinearEntropyPoolingConstraint{T1, T2, T3, T4,
     name2::T4
     coef::T5
 end
-function C4_LinearEntropyPoolingConstraint(; group1 = nothing, name1 = nothing,
-                                           group2 = nothing, name2 = nothing,
+function C4_LinearEntropyPoolingConstraint(; group1, name1, group2, name2,
                                            coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,)
     group1_flag = isa(group1, AbstractVector)
     name1_flag = isa(name1, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
     group2_flag = isa(group2, AbstractVector)
     name2_flag = isa(name2, AbstractVector)
-    if any((group1_flag, name1_flag, coef_flag, group2_flag, name2_flag))
-        @smart_assert(all((group1_flag, name1_flag, coef_flag, group2_flag, name2_flag)))
+    if group1_flag || name1_flag || coef_flag || group2_flag || name2_flag
+        @smart_assert(group1_flag && name1_flag && coef_flag && group2_flag && name2_flag)
         @smart_assert(!isempty(group1) &&
                       !isempty(name1) &&
                       !isempty(coef) &&
@@ -123,10 +122,9 @@ struct EntropyPoolingView{T1 <: AbstractNonConstantEntropyPoolingConstraint,
     B::T2
     comp::T3
 end
-function EntropyPoolingView(;
-                            A::AbstractNonConstantEntropyPoolingConstraint = C0_LinearEntropyPoolingConstraint(),
+function EntropyPoolingView(; A::AbstractNonConstantEntropyPoolingConstraint,
                             B::Union{<:EntropyPoolingConstraint,
-                                     <:AbstractVector{<:EntropyPoolingConstraint}} = C0_LinearEntropyPoolingConstraint(),
+                                     <:AbstractVector{<:EntropyPoolingConstraint}},
                             comp::ComparisonOperators = LEQ())
     return EntropyPoolingView{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
@@ -171,7 +169,7 @@ function freeze_A_view(A::C1_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any}
     return C1_LinearEntropyPoolingConstraint(; group = A.group, name = A.name,
                                              coef = sign(A.coef))
 end
-function freeze_A_view(A::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any})
+function freeze_A_view(A::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any, <:Any})
     return C2_LinearEntropyPoolingConstraint(; group = A.group, name = A.name,
                                              coef = sign(A.coef), kind = A.kind)
 end
@@ -195,7 +193,7 @@ function freeze_A_view(A::C1_LinearEntropyPoolingConstraint{<:AbstractVector,
 end
 function freeze_A_view(A::C2_LinearEntropyPoolingConstraint{<:AbstractVector,
                                                             <:AbstractVector,
-                                                            <:AbstractVector})
+                                                            <:AbstractVector, <:Any})
     return C2_LinearEntropyPoolingConstraint(; group = A.group, name = A.name,
                                              coef = sign.(A.coef), kind = A.kind)
 end
@@ -261,7 +259,8 @@ end
 function freeze_B_view(pm::AbstractPriorModel,
                        epv::Union{<:C0_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Real},
                                   <:C1_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Real},
-                                  <:C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Real}},
+                                  <:C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Real,
+                                                                      <:Any}},
                        sets::DataFrame, strict::Bool = false;
                        w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                            length = size(pm.X, 1))),
@@ -299,7 +298,8 @@ function freeze_B_view(pm::AbstractPriorModel,
                                                                       <:AbstractVector},
                                   <:C2_LinearEntropyPoolingConstraint{<:AbstractVector,
                                                                       <:AbstractVector,
-                                                                      <:AbstractVector}},
+                                                                      <:AbstractVector,
+                                                                      <:Any}},
                        sets::DataFrame, strict::Bool = false;
                        w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                            length = size(pm.X, 1))),
@@ -588,7 +588,8 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
                                                                                         <:Real},
                                                     <:C2_LinearEntropyPoolingConstraint{<:Any,
                                                                                         <:Any,
-                                                                                        <:Real}},
+                                                                                        <:Real,
+                                                                                        <:Any}},
                                          sets::DataFrame, strict::Bool = false, args...;
                                          w::AbstractWeights = pweights(range(; start = 1,
                                                                              stop = 1,
@@ -625,7 +626,8 @@ function get_view_index(epv::Union{<:C0_LinearEntropyPoolingConstraint{<:Abstrac
                                                                        <:AbstractVector},
                                    <:C2_LinearEntropyPoolingConstraint{<:AbstractVector,
                                                                        <:AbstractVector,
-                                                                       <:AbstractVector}},
+                                                                       <:AbstractVector,
+                                                                       <:Any}},
                         sets::DataFrame, strict::Bool = false, args...)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
@@ -643,8 +645,8 @@ function get_view_index(epv::Union{<:C0_LinearEntropyPoolingConstraint{<:Any, <:
                                                                        <:Real},
                                    <:C1_LinearEntropyPoolingConstraint{<:Any, <:Any,
                                                                        <:Real},
-                                   <:C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
-                                                                       <:Real}},
+                                   <:C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Real,
+                                                                       <:Any}},
                         sets::DataFrame, strict::Bool = false, args...)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
@@ -666,7 +668,8 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
                                                                                         <:AbstractVector},
                                                     <:C2_LinearEntropyPoolingConstraint{<:AbstractVector,
                                                                                         <:AbstractVector,
-                                                                                        <:AbstractVector}},
+                                                                                        <:AbstractVector,
+                                                                                        <:Any}},
                                          sets::DataFrame, strict::Bool = false, args...;
                                          w::AbstractWeights = pweights(range(; start = 1,
                                                                              stop = 1,
@@ -818,7 +821,8 @@ function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
                                                                                         <:Real},
                                                     <:C2_LinearEntropyPoolingConstraint{<:Any,
                                                                                         <:Any,
-                                                                                        <:Real}},
+                                                                                        <:Real,
+                                                                                        <:Any}},
                                          sets::DataFrame, strict::Bool = false)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
@@ -852,7 +856,8 @@ function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
                                                                                         <:AbstractVector},
                                                     <:C2_LinearEntropyPoolingConstraint{<:AbstractVector,
                                                                                         <:AbstractVector,
-                                                                                        <:AbstractVector}},
+                                                                                        <:AbstractVector,
+                                                                                        <:Any}},
                                          sets::DataFrame, strict::Bool = false)
     @smart_assert(!isempty(sets))
     group_names = names(sets)

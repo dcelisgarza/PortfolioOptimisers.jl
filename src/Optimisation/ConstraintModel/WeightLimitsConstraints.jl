@@ -53,7 +53,7 @@ end
 function create_array_weight_limits(wl::WeightLimits, N::Integer)
     lb_flag = isa(wl.lb, Real)
     ub_flag = isa(wl.ub, Real)
-    return if any((lb_flag, ub_flag))
+    return if lb_flag || ub_flag
         lb = if lb_flag
             range(; start = wl.lb, stop = wl.lb, length = N)
         else

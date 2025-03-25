@@ -47,8 +47,8 @@ function HighOrderPriorModel(; pm::AbstractLowOrderPriorModel,
         @smart_assert(!isempty(V))
         issquare(V)
     end
-    if any((sk_flag, V_flag))
-        @smart_assert(all((sk_flag, V_flag)),
+    if sk_flag || V_flag
+        @smart_assert(sk_flag && V_flag,
                       "If either sk or V, is nothing, both must be nothing.")
     end
     ssk_flag = isa(ssk, AbstractMatrix)
@@ -61,8 +61,8 @@ function HighOrderPriorModel(; pm::AbstractLowOrderPriorModel,
         @smart_assert(!isempty(SV))
         issquare(SV)
     end
-    if any((ssk_flag, SV_flag))
-        @smart_assert(all((ssk_flag, SV_flag)),
+    if ssk_flag || SV_flag
+        @smart_assert(ssk_flag && SV_flag,
                       "If either ssk or SV, is nothing or empty, both must be nothing or empty.")
     end
     return HighOrderPriorModel{typeof(pm), typeof(kt), typeof(skt), typeof(sk), typeof(V),

@@ -12,10 +12,10 @@ function NegativeQuadraticSemiSkewness(;
                                        mp::MatrixProcessing = NonPositiveDefiniteMatrixProcessing(),
                                        sk::Union{Nothing, <:AbstractMatrix} = nothing,
                                        V::Union{Nothing, <:AbstractMatrix} = nothing)
-    sk_flag = isa(sk, AbstractMatrix)
-    V_flag = isa(V, AbstractMatrix)
-    if any((!sk_flag, !V_flag))
-        @smart_assert(all((!sk_flag, !V_flag)),
+    sk_flag = isnothing(sk)
+    V_flag = isnothing(V)
+    if sk_flag || V_flag
+        @smart_assert(sk_flag && V_flag,
                       "If either sk or V, is nothing, both must be nothing.")
     else
         @smart_assert(!isempty(sk))

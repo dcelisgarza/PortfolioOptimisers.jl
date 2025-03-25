@@ -23,8 +23,8 @@ function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
     end
     a_flag = isa(a_rc, AbstractMatrix)
     b_flag = isa(b_rc, AbstractVector)
-    if any((a_flag, b_flag))
-        @smart_assert(all((a_flag, b_flag)))
+    if a_flag || b_flag
+        @smart_assert(a_flag && b_flag)
         @smart_assert(!isempty(a_rc))
         @smart_assert(!isempty(b_rc))
         @smart_assert(size(a_rc, 1) == length(b_rc))
