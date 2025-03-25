@@ -11,10 +11,9 @@ function expected_risk(r::Union{WorstRealisation, ValueatRisk, ValueatRiskRange,
                                 RelativeUlcerIndex, RelativeEntropicDrawdownatRisk,
                                 RelativeRelativisticDrawdownatRisk, GiniMeanDifference,
                                 Range, ConditionalValueatRiskRange, TailGini, TailGiniRange,
-                                OrderedWeightsArray, ThirdLowerPartialMoment,
-                                FourthCentralMoment, Skewness, SemiSkewness, Kurtosis,
-                                SemiKurtosis}, w::AbstractVector, X::AbstractMatrix,
-                       fees::Fees = Fees(), args...; kwargs...)
+                                OrderedWeightsArray, FourthCentralMoment, Skewness,
+                                SemiSkewness, Kurtosis, SemiKurtosis}, w::AbstractVector,
+                       X::AbstractMatrix, fees::Fees = Fees(), args...; kwargs...)
     return r(calc_net_returns(X, w, fees))
 end
 function expected_risk(r::Union{MeanAbsoluteDeviation, SemiStandardDeviation,

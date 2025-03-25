@@ -58,7 +58,8 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     ac = intersect(col_names, asset_names)
     fc = intersect(col_names, factor_names)
     oc = setdiff(col_names, union(ac, fc))
-    return ReturnsData(; ts = X[!, oc], nx = ac, X = X[!, ac], nf = fc, F = X[!, fc])
+    return ReturnsData(; ts = vec(Matrix(X[!, oc])), nx = ac, X = Matrix(X[!, ac]), nf = fc,
+                       F = Matrix(X[!, fc]))
 end
 
 export prices_to_returns
