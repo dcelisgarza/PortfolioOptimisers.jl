@@ -26,23 +26,23 @@
         F2 = rd.F
 
         df = CSV.read(joinpath(@__DIR__, "assets/prices_to_returns_X_F.csv"), DataFrame)
-        @test hcat(vcat(X1, X2), vcat(F1, F2)) == df
+        @test hcat(vcat(X1, X2), vcat(F1, F2)) == Matrix(df)
 
         rd = prices_to_returns(Px; missing_col_percent = 0.1, missing_row_percent = 0.5)
         ts3 = rd.ts
         X3 = rd.X
         F3 = rd.F
-        @test isempty(F3)
+        @test isnothing(F3)
 
         rd = prices_to_returns(Px; missing_col_percent = 0.1, missing_row_percent = Inf)
         ts4 = rd.ts
         X4 = rd.X
         F4 = rd.F
-        @test isempty(F4)
+        @test isnothing(F4)
 
         df = CSV.read(joinpath(@__DIR__, "assets/prices_to_returns_X.csv"), DataFrame)
-        @test vcat(X3, X4) == df
+        @test vcat(X3, X4) == Matrix(df)
 
-        @test dfy[2:end, :date] == ts1[!, 1] == ts2[!, 1] == ts3[!, 1] == ts4[!, 1]
+        @test dfy[2:end, :date] == ts1 == ts2 == ts3 == ts4
     end
 end

@@ -58,8 +58,20 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     ac = intersect(col_names, asset_names)
     fc = intersect(col_names, factor_names)
     oc = setdiff(col_names, union(ac, fc))
-    return ReturnsData(; ts = vec(Matrix(X[!, oc])), nx = ac, X = Matrix(X[!, ac]), nf = fc,
-                       F = Matrix(X[!, fc]))
+    ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
+    if isempty(fc)
+        fc = nothing
+        F = nothing
+    else
+        F = Matrix(X[!, fc])
+    end
+    if isempty(ac)
+        ac = nothing
+        X = nothing
+    else
+        X = Matrix(X[!, ac])
+    end
+    return ReturnsData(; ts = ts, nx = ac, X = X, nf = fc, F = F)
 end
 
 export prices_to_returns
