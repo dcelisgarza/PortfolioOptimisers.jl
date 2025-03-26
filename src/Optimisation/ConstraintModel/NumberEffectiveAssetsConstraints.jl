@@ -1,7 +1,4 @@
 function set_number_effective_assets!(model::JuMP.Model, val::Real)
-    if val <= zero(val)
-        return nothing
-    end
     w, k, sc = get_w_k_sc(model)
     @variable(model, nea)
     @constraints(model, begin

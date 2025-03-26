@@ -1,16 +1,41 @@
-struct BuyInThreshold{T1 <: Union{<:Real, <:AbstractVector{<:Real}},
-                      T2 <: Union{<:Real, <:AbstractVector{<:Real}}}
+struct BuyInThreshold{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                      T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}}
     sbi::T1
     lbi::T2
 end
-function BuyInThreshold(; sbi::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
-                        lbi::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
-    if isa(sbi, Real)
-        @smart_assert(isfinite(sbi) && isfinite(lbi))
-        @smart_assert(sbi >= zero(sbi) && lbi >= zero(lbi))
-    else
-        @smart_assert(!isempty(sbi) && !isempty(lbi) && length(sbi) == length(lbi))
-        @smart_assert(all(sbi .>= zero(sbi)) && all(lbi .>= zero(lbi)))
+function BuyInThreshold(; sbi::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
+                        lbi::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0)
+    sbi_flag = !isnothing(sbi)
+    lbi_flag = !isnothing(lbi)
+    @smart_assert(!sbi_flag ⊼ !lbi_flag)
+    if sbi_flag && lbi_flag
+        sbi_flag = isa(sbi, Real)
+        lbi_flag = isa(lbi, Real)
+        if sbi_flag
+            @smart_assert(isfinite(sbi) && sbi >= zero(sbi))
+        else
+            @smart_assert(all(isfinite.(sbi)) && all(sbi .>= zero(sbi)))
+        end
+        if lbi_flag
+            @smart_assert(isfinite(lbi) && lbi >= zero(lbi))
+        else
+            @smart_assert(all(isfinite.(lbi)) && all(lbi .>= zero(lbi)))
+        end
+        if !sbi_flag && !lbi_flag
+            @smart_assert(length(sbi) == length(lbi))
+        end
+    elseif lbi_flag && !sbi_flag
+        if isa(sbi, Real)
+            @smart_assert(isfinite(sbi) && sbi >= zero(sbi))
+        else
+            @smart_assert(all(isfinite.(sbi)) && all(sbi .>= zero(sbi)))
+        end
+    elseif !lbi_flag && sbi_flag
+        if isa(lbi, Real)
+            @smart_assert(isfinite(lbi) && lbi >= zero(lbi))
+        else
+            @smart_assert(all(isfinite.(lbi)) && all(lbi .>= zero(lbi)))
+        end
     end
     return BuyInThreshold{typeof(sbi), typeof(lbi)}(sbi, lbi)
 end
@@ -102,16 +127,30 @@ function _mip_constraints(model::JuMP.Model, ss::Real, wb::WeightBounds,
     return ib
 end
 function set_mip_constraints!(model::JuMP.Model, card::Integer,
-                              gcard::PartialLinearConstraintModel, bit::BuyInThreshold,
-                              fees::Fees, cadj::AdjacencyConstraint,
-                              nadj::AdjacencyConstraint, wb::WeightBounds,
+                              gcard::Union{Nothing, <:LinearConstraintModel},
+                              bit::Union{Nothing, <:BuyInThreshold},
+                              fees::Union{Nothing, <:Fees},
+                              cadj::Union{Nothing, <:AdjacencyConstraint},
+                              nadj::Union{Nothing, <:AdjacencyConstraint}, wb::WeightBounds,
                               ss::Real = 100_000.0)
     card_flag = card > zero(card)
-    gcard_flag = !isa(gcard, <:PartialLinearConstraintModel{Nothing, Nothing})
-    lbi_flag = non_zero_real_or_vec(bit.lbi)
-    sbi_flag = non_zero_real_or_vec(bit.sbi)
-    ffl_flag = non_zero_real_or_vec(fees.fixed_long)
-    ffs_flag = non_zero_real_or_vec(fees.fixed_short)
+    gcard_flag = !isa(gcard,
+                      Union{Nothing,
+                            <:LinearConstraintModel{<:PartialLinearConstraintModel{Nothing,
+                                                                                   Nothing},
+                                                    <:PartialLinearConstraintModel{Nothing,
+                                                                                   Nothing}}})
+    lbi_flag, sbi_flag = if !isnothing(bit)
+        non_zero_real_or_vec(bit.lbi), non_zero_real_or_vec(bit.sbi)
+    else
+        false, false
+    end
+    ffl_flag, ffs_flag = if !isnothing(fees)
+        non_zero_real_or_vec(fees.fixed_long)
+        non_zero_real_or_vec(fees.fixed_short)
+    else
+        false, false
+    end
     c_flag = isa(cadj, IntegerAdjacency)
     n_flag = isa(nadj, IntegerAdjacency)
     if !(card_flag ||
@@ -135,6 +174,13 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
         @constraint(model, card, sum(ib) <= card)
     end
     if gcard_flag
+        w, k, sc = get_w_k_sc(model)
+        if !isnothing(gcard.A_ineq)
+            @constraint(model, gcard_ineq, sc * gcard.A_ineq * w <= sc * k * gcard.B_ineq)
+        end
+        if !isnothing(gcard.A_eq)
+            @constraint(model, gcard_eq, sc * gcard.A_eq * w == sc * k * gcard.B_eq)
+        end
         @constraint(model, gcard, gcard.A * ib <= gcard.B)
     end
     if c_flag

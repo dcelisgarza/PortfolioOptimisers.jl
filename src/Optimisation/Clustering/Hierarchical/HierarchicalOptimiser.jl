@@ -1,7 +1,7 @@
 struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel},
                              T2 <: Union{<:ClusteringEstimator,
                                          <:AbstractPortfolioOptimisersClusteringResult},
-                             T3 <: Fees, T4 <: Scalariser,
+                             T3 <: Union{Nothing, Fees}, T4 <: Scalariser,
                              T5 <: Union{<:WeightBounds, WeightBoundsConstraints},
                              T6 <: ClusteringWeightFinaliser,
                              T7 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}}

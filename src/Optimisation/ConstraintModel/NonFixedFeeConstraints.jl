@@ -15,6 +15,9 @@ function set_turnover_fees!(model::JuMP.Model, turnover::Turnover)
     @constraint(model, ctrfs[i = 1:N], sc * [t_trfs[i]; x_trfs[i]] ∈ MOI.NormOneCone(2))
     return nothing
 end
+function set_non_fixed_fees!(model::JuMP.Model, ::Nothing)
+    return nothing
+end
 function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
     if haskey(model, :lw) && non_zero_real_or_vec(fees.long)
         @expression(model, fl, sum(fees.long .* lw))

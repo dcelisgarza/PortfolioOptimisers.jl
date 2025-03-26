@@ -1,26 +1,28 @@
-struct HierarchicalEqualRiskParity{T1 <: HierarchicalOptimiser,
-                                   T2 <: Union{<:OptimisationRiskMeasure,
-                                               <:AbstractVector{<:OptimisationRiskMeasure}},
-                                   T3 <: Union{<:OptimisationRiskMeasure,
-                                               <:AbstractVector{<:OptimisationRiskMeasure}}}
+struct HierarchicalEqualRiskContribution{T1 <: HierarchicalOptimiser,
+                                         T2 <: Union{<:OptimisationRiskMeasure,
+                                                     <:AbstractVector{<:OptimisationRiskMeasure}},
+                                         T3 <: Union{<:OptimisationRiskMeasure,
+                                                     <:AbstractVector{<:OptimisationRiskMeasure}}}
     opt::T1
     ri::T2
     ro::T3
 end
-function HierarchicalEqualRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-                                     ri::Union{<:OptimisationRiskMeasure,
-                                               <:AbstractVector{<:OptimisationRiskMeasure}} = Variance(),
-                                     ro::Union{<:OptimisationRiskMeasure,
-                                               <:AbstractVector{<:OptimisationRiskMeasure}} = ri)
+function HierarchicalEqualRiskContribution(;
+                                           opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+                                           ri::Union{<:OptimisationRiskMeasure,
+                                                     <:AbstractVector{<:OptimisationRiskMeasure}} = Variance(),
+                                           ro::Union{<:OptimisationRiskMeasure,
+                                                     <:AbstractVector{<:OptimisationRiskMeasure}} = ri)
     if isa(ri, AbstractVector)
         @smart_assert(!isempty(ri))
     end
     if isa(ro, AbstractVector)
         @smart_assert(!isempty(ro))
     end
-    return HierarchicalEqualRiskParity{typeof(opt), typeof(ri), typeof(ro)}(opt, ri, ro)
+    return HierarchicalEqualRiskContribution{typeof(opt), typeof(ri), typeof(ro)}(opt, ri,
+                                                                                  ro)
 end
-function optimise!(hc::HierarchicalEqualRiskParity, rd::ReturnsData = ReturnsData();
+function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = ReturnsData();
                    strict::Bool = false)
     pm = prior(hc.opt.pe, rd.X, rd.F)
     ri = risk_measure_factory(hc.ri; prior = pm, solvers = hc.opt.slv)
@@ -96,4 +98,4 @@ function optimise!(hc::HierarchicalEqualRiskParity, rd::ReturnsData = ReturnsDat
                                          w / sum(w))
 end
 
-export HierarchicalEqualRiskParity
+export HierarchicalEqualRiskContribution

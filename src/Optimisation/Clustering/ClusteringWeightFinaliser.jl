@@ -85,10 +85,10 @@ function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wb::WeightBounds
     @expression(model, so, cwf.so)
     @variable(model, w[1:length(wi)])
     @constraint(model, sum(w) == sum(wi))
-    if !_w_bounds_flag(wb.lb)
+    if !isnothing(wb.lb)
         @constraint(model, sc * w >= sc * wb.lb)
     end
-    if !_w_bounds_flag(wb.ub)
+    if !isnothing(wb.ub)
         @constraint(model, sc * w <= sc * wb.ub)
     end
     set_clustering_weight_finaliser_version!(model, cwf.v, wi)

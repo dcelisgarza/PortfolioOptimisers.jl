@@ -7,7 +7,7 @@ end
 function tracking_error_benchmark(tracking::ReturnsTracking, args...)
     return tracking.w
 end
-function set_tracking_error_constraints!(::JuMP.Model, ::Nothing)
+function set_tracking_error_constraints!(::JuMP.Model, X::AbstractMatrix, ::Nothing)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, X::AbstractMatrix,

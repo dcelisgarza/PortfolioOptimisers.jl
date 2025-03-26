@@ -1,23 +1,47 @@
-struct WeightBounds{T1 <: Union{<:Real, <:AbstractVector},
-                    T2 <: Union{<:Real, <:AbstractVector}}
+struct WeightBounds{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                    T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}}
     lb::T1
     ub::T2
 end
-function WeightBounds(; lb::Union{<:Real, <:AbstractVector} = 0.0,
-                      ub::Union{<:Real, <:AbstractVector} = 1.0)
-    lb_flag = isa(lb, AbstractVector)
-    ub_flag = isa(ub, AbstractVector)
-    if lb_flag
-        @smart_assert(!isempty(lb))
-    end
-    if ub_flag
-        @smart_assert(!isempty(ub))
-    end
+function WeightBounds(; lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
+                      ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
+    lb_flag = !isnothing(lb)
+    ub_flag = !isnothing(ub)
+    @smart_assert(!lb_flag ⊼ !ub_flag)
     if lb_flag && ub_flag
-        @smart_assert(length(lb) == length(ub))
-        @smart_assert(all(iszero.(lb)) ⊼ all(iszero.(ub)))
+        lb_flag = isa(lb, Real)
+        ub_flag = isa(ub, Real)
+        if lb_flag
+            @smart_assert(isfinite(lb) && lb >= zero(lb))
+        else
+            @smart_assert(all(isfinite.(lb)) && all(lb .>= zero(lb)))
+        end
+        if ub_flag
+            @smart_assert(isfinite(ub) && ub >= zero(ub))
+        else
+            @smart_assert(all(isfinite.(ub)) && all(ub .>= zero(ub)))
+        end
+        if lb_flag && ub_flag
+            @smart_assert(lb <= ub)
+        elseif !lb_flag && !ub_flag
+            @smart_assert(length(lb) == length(ub))
+            @smart_assert(all(lb .<= ub))
+        else
+            @smart_assert(all(lb .<= ub))
+        end
+    elseif !lb_flag && ub_flag
+        if isa(lb, Real)
+            @smart_assert(isfinite(lb) && lb >= zero(lb))
+        else
+            @smart_assert(all(isfinite.(lb)) && all(lb .>= zero(lb)))
+        end
+    elseif lb_flag && !ub_flag
+        if isa(ub, Real)
+            @smart_assert(isfinite(ub) && ub >= zero(ub))
+        else
+            @smart_assert(all(isfinite.(ub)) && all(ub .>= zero(ub)))
+        end
     end
-    @smart_assert(all(lb .<= ub))
     return WeightBounds{typeof(lb), typeof(ub)}(lb, ub)
 end
 struct WeightBoundsConstraints{T1, T2, T3 <: Union{<:Real, <:AbstractVector{<:Real}},

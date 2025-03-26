@@ -22,52 +22,29 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
     @constraint(model, M1_PSD, sc * M1 ∈ PSDCone())
     return nothing
 end
-function set_sdp_network_cluster_constraints!(model::JuMP.Model, cadj::AdjacencyConstraint,
-                                              nadj::AdjacencyConstraint)
-    c_flag = isa(cadj, SemiDefiniteAdjacency)
-    n_flag = isa(nadj, SemiDefiniteAdjacency)
-    if !(n_flag || c_flag)
-        return nothing
-    end
+
+function set_sdp_network_cluster_constraints!(::JuMP.Model, adj::Any, ::Symbol)
+    return nothing
+end
+function set_sdp_network_cluster_constraints!(model::JuMP.Model, adj::AdjacencyConstraint,
+                                              key::Symbol)
     sc = model[:sc]
     set_sdp_constraints!(model)
     W = model[:W]
-    if c_flag
-        @constraint(model, csdp, sc * cadj.A .* W == 0)
-        if !haskey(model, :variance_flag)
-            add_to_expression!(model[:obj_pen], cadj.p, tr(W))
-        end
-    end
-    if n_flag
-        @constraint(model, nsdp, sc * nadj.A .* W == 0)
-        if !haskey(model, :variance_flag)
-            add_to_expression!(model[:obj_pen], nadj.p, tr(W))
-        end
+    model[key] = @constraint(model, sc * adj.A .* W == 0)
+    if !haskey(model, :variance_flag)
+        add_to_expression!(model[:obj_pen], adj.p, tr(W))
     end
     return nothing
 end
 function set_sdp_frc_network_cluster_constraints!(model::JuMP.Model,
-                                                  cadj::AdjacencyConstraint,
-                                                  nadj::AdjacencyConstraint)
-    c_flag = isa(cadj, SemiDefiniteAdjacency)
-    n_flag = isa(nadj, SemiDefiniteAdjacency)
-    if !(n_flag || c_flag)
-        return nothing
-    end
+                                                  adj::AdjacencyConstraint, key::Symbol)
     sc = model[:sc]
     set_sdp_frc_constraints!(model)
     W1 = model[:W1]
-    if c_flag
-        @constraint(model, csdp, sc * cadj.A .* W1 == 0)
-        if !haskey(model, :variance_flag)
-            add_to_expression!(model[:obj_pen], cadj.p, tr(W1))
-        end
-    end
-    if n_flag
-        @constraint(model, nsdp, sc * nadj.A .* W1 == 0)
-        if !haskey(model, :variance_flag)
-            add_to_expression!(model[:obj_pen], nadj.p, tr(W1))
-        end
+    model[key] = @constraint(model, sc * adj.A .* W1 == 0)
+    if !haskey(model, :variance_flag)
+        add_to_expression!(model[:obj_pen], adj.p, tr(W1))
     end
     return nothing
 end

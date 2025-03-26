@@ -359,10 +359,11 @@ include("./Optimisation/ConstraintModel/NonFixedFeeConstraints.jl")
 include("./Optimisation/ConstraintModel/ScalariseRiskExpression.jl")
 include("./Optimisation/ConstraintModel/TrackingTurnoverConstraints.jl")
 include("./Optimisation/ConstraintModel/ConstraintModel.jl")
+include("./Optimisation/Traditional/TraditionalOptimiser.jl")
 include("./Optimisation/Traditional/MeanRisk/MeanRisk.jl")
 include("./Optimisation/Clustering/ClusteringWeightFinaliser.jl")
 include("./Optimisation/Clustering/Hierarchical/HierarchicalOptimiser.jl")
 include("./Optimisation/Clustering/Hierarchical/HierarchicalRiskParity.jl")
-include("./Optimisation/Clustering/Hierarchical/HierarchicalEqualRiskParity.jl")
+include("./Optimisation/Clustering/Hierarchical/HierarchicalEqualRiskContribution.jl")
 
 end
