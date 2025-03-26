@@ -24,30 +24,31 @@ end
 function is_leaf(a::ClusterNode)
     return isnothing(a.left)
 end
-function pre_order(a::ClusterNode, func::Function = x -> x.id)
-    n = a.level
-    curNode = Vector{ClusterNode}(undef, 2 * n)
-    lvisited = Set()
-    rvisited = Set()
+abstract type AbstractPreorderBy end
+struct PreorderTreeByID <: AbstractPreorderBy end
+get_node_property(::PreorderTreeByID, a::ClusterNode) = a.id
+function pre_order(a::ClusterNode, preorder_by::AbstractPreorderBy = PreorderTreeByID())
+    curNode = Vector{ClusterNode}(undef, 2 * a.level)
+    lvisited = Set{typeof(get_node_property(preorder_by, a))}()
+    rvisited = Set{typeof(get_node_property(preorder_by, a))}()
     curNode[1] = a
-    k = 1
+    k::Int = 1
     preorder = Int[]
-
     while k >= 1
         nd = curNode[k]
         ndid = nd.id
         if is_leaf(nd)
-            push!(preorder, func(nd))
-            k = k - 1
+            push!(preorder, get_node_property(preorder_by, nd))
+            k = k - one(k)
         else
             if ndid ∉ lvisited
-                curNode[k + 1] = nd.left
+                k = k + one(k)
+                curNode[k] = nd.left
                 push!(lvisited, ndid)
-                k = k + 1
             elseif ndid ∉ rvisited
-                curNode[k + 1] = nd.right
+                k = k + one(k)
+                curNode[k] = nd.right
                 push!(rvisited, ndid)
-                k = k + 1
                 # If we've visited the left and right of this non-leaf
                 # node already, go up in the tree.
             else

@@ -222,6 +222,8 @@ function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = Retu
     nd = nd[sortperm(hs; rev = true)]
     # Treat each cluster as its own portfolio and optimise each one individually.
     # Calculate the weight of each cluster relative to the other clusters.
+    lc = Vector{Int}(undef, 0)
+    rc = Vector{Int}(undef, 0)
     for i ∈ nd[1:(clm.k - 1)]
         if is_leaf(i)
             continue
@@ -229,8 +231,6 @@ function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = Retu
         # Do this recursively accounting for the dendrogram structure.
         ln = pre_order(i.left)
         rn = pre_order(i.right)
-        lc = Int[]
-        rc = Int[]
         for (i, cl) ∈ pairs(cls)
             if issubset(cl, ln)
                 push!(lc, i)
@@ -258,6 +258,8 @@ function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = Retu
         # because `ln` and `rn` contain `cl`.
         w[ln] *= alpha
         w[rn] *= one(alpha) - alpha
+        empty!(lc)
+        empty!(rc)
     end
     return finalise_hierarchical_weights(hc.opt.cwf,
                                          weight_bounds_constraints(hc.opt.wb; N = length(w),

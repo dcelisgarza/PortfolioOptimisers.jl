@@ -47,8 +47,8 @@ function optimise!(hc::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
             alpha = split_factor_weight_constraints(alpha, wb, w, lc, rc)
             # Weight constraints.
-            w[lc] *= alpha
-            w[rc] *= one(alpha) - alpha
+            w[lc] .*= alpha
+            w[rc] .*= one(alpha) - alpha
         end
     end
     return finalise_hierarchical_weights(hc.opt.cwf, wb, w / sum(w))
@@ -141,8 +141,8 @@ function optimise!(hc::HierarchicalRiskParity{<:Any,
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
             alpha = split_factor_weight_constraints(alpha, wb, w, lc, rc)
             # Weight constraints.
-            w[lc] *= alpha
-            w[rc] *= one(alpha) - alpha
+            w[lc] .*= alpha
+            w[rc] .*= one(alpha) - alpha
         end
     end
     return finalise_hierarchical_weights(hc.opt.cwf, wb, w / sum(w))
