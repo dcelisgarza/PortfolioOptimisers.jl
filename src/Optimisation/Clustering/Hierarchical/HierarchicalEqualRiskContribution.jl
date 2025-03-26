@@ -22,17 +22,18 @@ function HierarchicalEqualRiskContribution(;
     return HierarchicalEqualRiskContribution{typeof(opt), typeof(ri), typeof(ro)}(opt, ri,
                                                                                   ro)
 end
-function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = ReturnsData();
-                   strict::Bool = false)
+function optimise!(hc::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
+                                                         <:OptimisationRiskMeasure},
+                   rd::ReturnsData = ReturnsData(); strict::Bool = false)
     pm = prior(hc.opt.pe, rd.X, rd.F)
     ri = risk_measure_factory(hc.ri; prior = pm, solvers = hc.opt.slv)
-    riku = unitary_expected_risks(ri, pm.X; fees = hc.opt.fees, scalariser = hc.opt.sce)
+    riku = unitary_expected_risks(ri, pm.X, hc.opt.fees)
     if hc.ri === hc.ro
         ro = ri
         roku = riku
     else
         ro = risk_measure_factory(hc.ro; prior = pm, solvers = hc.opt.slv)
-        roku = unitary_expected_risks(ro, pm.X; fees = hc.opt.fees, scalariser = hc.opt.sce)
+        roku = unitary_expected_risks(ro, pm.X, hc.opt.fees)
     end
     clm = clusterise(hc.opt.cle, pm.X)
     idx = cutree(clm.clustering; k = clm.k)
@@ -44,7 +45,7 @@ function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = Retu
         fill!(rkbo, zero(eltype(pm.X)))
         rkbo[cl] = inv.(view(roku, cl))
         rkbo /= sum(rkbo)
-        rkcl[i] = expected_risk(ro, rkbo, pm.X; fees = hc.opt.fees, scalariser = hc.opt.sce)
+        rkcl[i] = expected_risk(ro, rkbo, pm.X, hc.opt.fees)
         rkbi = inv.(view(riku, cl))
         rkbi /= sum(rkbi)
         w[cl] = rkbi

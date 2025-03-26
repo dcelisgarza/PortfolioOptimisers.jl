@@ -38,6 +38,9 @@ const AbstractPriorEstimatorMap_1o2_1o2 = Union{<:AbstractPriorEstimator_1_0,
                                                 <:AbstractPriorEstimator_1o2_1o2}
 
 function prior end
+function prior(pm::AbstractPriorEstimator, rd::ReturnsData; kwargs...)
+    return prior(pm, rd.X, rd.F; kwargs...)
+end
 function prior(pm::AbstractPriorModel, args...; kwargs...)
     return pm
 end
