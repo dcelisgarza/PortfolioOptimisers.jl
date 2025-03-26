@@ -35,9 +35,44 @@ function herc_scalarised_risk_o!(::SumScalariser, wk::AbstractVector, riro::Bool
         end
         rkbo[cl] .= inv.(view(roku, cl))
         rkbo[cl] ./= sum(view(rkbo, cl))
-        crisk += expected_risk(ro, rkbo, X, fees)
+        crisk += ro.settings.scale * expected_risk(ro, rkbo, X, fees)
     end
     return crisk
+end
+function herc_scalarised_risk_o!(::MaxScalariser, wk::AbstractVector, riro::Bool,
+                                 roku::AbstractVector, rkbo::AbstractVector,
+                                 cl::AbstractVector,
+                                 ros::AbstractVector{<:OptimisationRiskMeasure},
+                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+    crisk = -Inf
+    for ro ∈ ros
+        if !riro
+            unitary_expected_risks!(wk, roku, ro, X, fees)
+        end
+        rkbo[cl] .= inv.(view(roku, cl))
+        rkbo[cl] ./= sum(view(rkbo, cl))
+        crisk_i = ro.settings.scale * expected_risk(ro, rkbo, X, fees)
+        if crisk_i > crisk
+            crisk = crisk_i
+        end
+    end
+    return crisk
+end
+function herc_scalarised_risk_o!(sce::LogSumExpScalariser, wk::AbstractVector, riro::Bool,
+                                 roku::AbstractVector, rkbo::AbstractVector,
+                                 cl::AbstractVector,
+                                 ros::AbstractVector{<:OptimisationRiskMeasure},
+                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+    crisk = zero(eltype(X))
+    for ro ∈ ros
+        if !riro
+            unitary_expected_risks!(wk, roku, ro, X, fees)
+        end
+        rkbo[cl] .= inv.(view(roku, cl))
+        rkbo[cl] ./= sum(view(rkbo, cl))
+        crisk += ro.settings.scale * sce.gamma * expected_risk(ro, rkbo, X, fees)
+    end
+    return log(exp(crisk)) / sce.gamma
 end
 function herc_scalarised_risk_i!(::SumScalariser, wk::AbstractVector, riku::AbstractVector,
                                  cl::AbstractVector,
@@ -48,9 +83,41 @@ function herc_scalarised_risk_i!(::SumScalariser, wk::AbstractVector, riku::Abst
         unitary_expected_risks!(wk, riku, ri, X, fees)
         risk[:, 1] .= inv.(view(riku, cl))
         risk[:, 1] ./= sum(view(risk, :, 1))
-        risk[:, 2] += view(risk, :, 1)
+        risk[:, 2] .+= ri.settings.scale * view(risk, :, 1)
     end
     return view(risk, :, 2)
+end
+function herc_scalarised_risk_i!(::MaxScalariser, wk::AbstractVector, riku::AbstractVector,
+                                 cl::AbstractVector,
+                                 ris::AbstractVector{<:OptimisationRiskMeasure},
+                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+    risk_t = -Inf
+    risk = zeros(eltype(X), length(cl), 2)
+    for ri ∈ ris
+        unitary_expected_risks!(wk, riku, ri, X, fees)
+        risk[:, 1] .= inv.(view(riku, cl))
+        risk[:, 1] ./= sum(view(risk, :, 1))
+        risk[:, 1] .= ri.settings.scale * view(risk, :, 1)
+        risk_i = sum(view(risk, :, 1))
+        if risk_i > risk_t
+            risk_t = risk_i
+            risk[:, 2] .= view(risk, :, 1)
+        end
+    end
+    return view(risk, :, 2)
+end
+function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::AbstractVector,
+                                 riku::AbstractVector, cl::AbstractVector,
+                                 ris::AbstractVector{<:OptimisationRiskMeasure},
+                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
+    risk = zeros(eltype(X), length(cl), 2)
+    for ri ∈ ris
+        unitary_expected_risks!(wk, riku, ri, X, fees)
+        risk[:, 1] .= inv.(view(riku, cl))
+        risk[:, 1] ./= sum(view(risk, :, 1))
+        risk[:, 2] .+= ri.settings.scale * sce.gamma * view(risk, :, 1)
+    end
+    return log.(exp.(view(risk, :, 2))) / sce.gamma
 end
 function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                          <:OptimisationRiskMeasure},
