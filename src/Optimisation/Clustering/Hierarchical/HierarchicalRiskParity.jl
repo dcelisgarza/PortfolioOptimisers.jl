@@ -38,9 +38,9 @@ function optimise!(hc::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
             lc = items[i]
             rc = items[i + 1]
             wu[lc, 1] .= inv.(view(rku, lc))
-            wu[lc, 1] .= view(wu, lc, 1) / sum(view(wu, lc, 1))
+            wu[lc, 1] ./= sum(view(wu, lc, 1))
             wu[rc, 2] .= inv.(view(rku, rc))
-            wu[rc, 2] .= view(wu, rc, 2) / sum(view(wu, rc, 2))
+            wu[rc, 2] ./= sum(view(wu, rc, 2))
             lrisk = expected_risk(r, view(wu, :, 1), pm.X, hc.opt.fees)
             rrisk = expected_risk(r, view(wu, :, 2), pm.X, hc.opt.fees)
             # Allocate weight to clusters.
@@ -63,9 +63,9 @@ function hrp_scalarised_risk(::SumScalariser, wu::AbstractMatrix, wk::AbstractVe
         fill!(wu, zero(eltype(X)))
         unitary_expected_risks!(wk, rku, r, X, fees)
         wu[lc, 1] .= inv.(view(rku, lc))
-        wu[lc, 1] .= view(wu, lc, 1) / sum(view(wu, lc, 1))
+        wu[lc, 1] ./= sum(view(wu, lc, 1))
         wu[rc, 2] .= inv.(view(rku, rc))
-        wu[rc, 2] .= view(wu, rc, 2) / sum(view(wu, rc, 2))
+        wu[rc, 2] ./= sum(view(wu, rc, 2))
         lrisk += expected_risk(r, view(wu, :, 1), X, fees)
         rrisk += expected_risk(r, view(wu, :, 2), X, fees)
     end
@@ -82,9 +82,9 @@ function hrp_scalarised_risk(::MaxScalariser, wu::AbstractMatrix, wk::AbstractVe
         fill!(wu, zero(eltype(X)))
         unitary_expected_risks!(wk, rku, r, X, fees)
         wu[lc, 1] .= inv.(view(rku, lc))
-        wu[lc, 1] .= view(wu, lc, 1) / sum(view(wu, lc, 1))
+        wu[lc, 1] ./= sum(view(wu, lc, 1))
         wu[rc, 2] .= inv.(view(rku, rc))
-        wu[rc, 2] .= view(wu, rc, 2) / sum(view(wu, rc, 2))
+        wu[rc, 2] ./= sum(view(wu, rc, 2))
         lrisk_i = expected_risk(r, view(wu, :, 1), X, fees)
         rrisk_i = expected_risk(r, view(wu, :, 2), X, fees)
         trisk_i = lrisk_i + rrisk_i
@@ -107,9 +107,9 @@ function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::AbstractMatrix,
         fill!(wu, zero(eltype(X)))
         unitary_expected_risks!(wk, rku, r, X, fees)
         wu[lc, 1] .= inv.(view(rku, lc))
-        wu[lc, 1] .= view(wu, lc, 1) / sum(view(wu, lc, 1))
+        wu[lc, 1] ./= sum(view(wu, lc, 1))
         wu[rc, 2] .= inv.(view(rku, rc))
-        wu[rc, 2] .= view(wu, rc, 2) / sum(view(wu, rc, 2))
+        wu[rc, 2] ./= sum(view(wu, rc, 2))
         scale = r.settings.scale * sce.gamma
         lrisk += expected_risk(r, view(wu, :, 1), X, fees) * scale
         rrisk += expected_risk(r, view(wu, :, 2), X, fees) * scale
