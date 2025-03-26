@@ -20,7 +20,7 @@ include("./Constraints/Constraint_AbstractTypes.jl")
 include("./Constraints/LinearConstraints.jl")
 include("./Constraints/BlackLittermanViews.jl")
 include("./Constraints/RiskBudgetConstraints.jl")
-include("./Constraints/HierarchicalConstraints.jl")
+include("./Constraints/WeightBoundsConstraints.jl")
 
 # Solver
 include("./ModelOptimisation/Solver.jl")
@@ -349,7 +349,7 @@ include("./Optimisation/Traditional/MeanRisk/ObjectiveFunctions/MaximumUtility.j
 include("./Optimisation/Traditional/MeanRisk/ObjectiveFunctions/MaximumRatio.jl")
 include("./Optimisation/Traditional/MeanRisk/ObjectiveFunctions/MaximumReturn.jl")
 include("./Optimisation/ConstraintModel/ConstraintModel_AbstractTypes.jl")
-include("./Optimisation/ConstraintModel/WeightLimitsConstraints.jl")
+include("./Optimisation/ConstraintModel/JuMPWeightBoundsConstraints.jl")
 include("./Optimisation/ConstraintModel/BudgetConstraints.jl")
 include("./Optimisation/ConstraintModel/LongShortBoundsConstraints.jl")
 include("./Optimisation/ConstraintModel/LinearConstraints.jl")

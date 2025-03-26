@@ -126,55 +126,59 @@
         constr = LinearConstraint(; A = lhs_1, B = 0.35, comp = EQ())
         @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
     end
-    @testset "Hierarchical constraints" begin
+    @testset "Weight Bounds constraints" begin
         assets = 1:10
         sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
 
-        hcc_1 = HierarchicalConstraint(; group = :Assets, name = 1, lo = 0.7, hi = 0.8)
-        (; w_min, w_max) = hc_constraints(hcc_1, sets)
-        @test isapprox(w_min, [0.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        @test isapprox(w_max, [0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+        hcc_1 = WeightBoundsConstraints(; sets = sets, group = :Assets, name = 1, lb = 0.7,
+                                        ub = 0.8)
+        (; lb, ub) = weight_bounds_constraints(hcc_1)
+        @test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        @test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
-        hcc_2 = HierarchicalConstraint(; group = [:Assets, :Assets], name = [1, 5],
-                                       lo = [0.7, 0.3], hi = [0.8, 0.6])
-        (; w_min, w_max) = hc_constraints(hcc_2, sets)
-        @test isapprox(w_min, [0.7, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0])
-        @test isapprox(w_max, [0.8, 1.0, 1.0, 1.0, 0.6, 1.0, 1.0, 1.0, 1.0, 1.0])
+        hcc_2 = WeightBoundsConstraints(; sets = sets, group = [:Assets, :Assets],
+                                        name = [1, 5], lb = [0.7, 0.3], ub = [0.8, 0.6])
+        (; lb, ub) = weight_bounds_constraints(hcc_2)
+        @test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0])
+        @test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 0.6, 1.0, 1.0, 1.0, 1.0, 1.0])
 
-        hcc_3 = HierarchicalConstraint(; group = :Clusters, name = 3, lo = 0.2, hi = 0.5)
-        (; w_min, w_max) = hc_constraints(hcc_3, sets)
-        @test isapprox(w_min, [0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2, 0.2])
-        @test isapprox(w_max, [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5])
+        hcc_3 = WeightBoundsConstraints(; sets = sets, group = :Clusters, name = 3,
+                                        lb = 0.2, ub = 0.5)
+        (; lb, ub) = weight_bounds_constraints(hcc_3)
+        @test isapprox(lb, [0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2, 0.2])
+        @test isapprox(ub, [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5])
 
-        @test_throws UndefKeywordError HierarchicalConstraint(group = :Asset)
-        hcc = HierarchicalConstraint(; group = nothing, name = nothing)
+        @test_throws UndefKeywordError WeightBoundsConstraints(group = :Asset)
+        hcc = WeightBoundsConstraints(; sets = sets, group = nothing, name = nothing)
         @test isnothing(hcc.group)
         @test isnothing(hcc.name)
 
-        @test_throws UndefKeywordError HierarchicalConstraint(; group = [nothing], hi = [2],
-                                                              lo = [1])
-        lcs = HierarchicalConstraint(; group = [nothing], name = [nothing], hi = [5],
-                                     lo = [3])
+        @test_throws UndefKeywordError WeightBoundsConstraints(; group = [nothing],
+                                                               ub = [2], lb = [1])
+        lcs = WeightBoundsConstraints(; sets = sets, group = [nothing], name = [nothing],
+                                      ub = [5], lb = [3])
         @test isnothing(lcs.group[1])
         @test isnothing(lcs.name[1])
 
-        hcc_1 = HierarchicalConstraint(; group = :Foo, name = :Bar, lo = 0.7, hi = 0.8)
-        @test_throws ArgumentError hc_constraints(hcc_1, sets, strict = true)
+        hcc_1 = WeightBoundsConstraints(; sets = sets, group = :Foo, name = :Bar, lb = 0.7,
+                                        ub = 0.8)
+        @test_throws ArgumentError weight_bounds_constraints(hcc_1; strict = true)
 
-        hcc_1 = HierarchicalConstraint(; group = [:Foo], name = [:Bar], lo = [0.7],
-                                       hi = [0.8])
-        @test_throws ArgumentError hc_constraints(hcc_1, sets, strict = true)
+        hcc_1 = WeightBoundsConstraints(; sets = sets, group = [:Foo], name = [:Bar],
+                                        lb = [0.7], ub = [0.8])
+        @test_throws ArgumentError weight_bounds_constraints(hcc_1; strict = true)
 
-        (; w_min, w_max) = hc_constraints(hcc_1, sets)
-        @test all(iszero.(w_min))
-        @test all(isone.(w_max))
+        (; lb, ub) = weight_bounds_constraints(hcc_1)
+        @test all(iszero.(lb))
+        @test all(isone.(ub))
 
-        hcc_1 = HierarchicalConstraint(; group = :Foo, name = :Bar, lo = 0.7, hi = 0.8)
-        (; w_min, w_max) = hc_constraints(hcc_1, sets)
-        @test all(iszero.(w_min))
-        @test all(isone.(w_max))
+        hcc_1 = WeightBoundsConstraints(; sets = sets, group = :Foo, name = :Bar, lb = 0.7,
+                                        ub = 0.8)
+        (; lb, ub) = weight_bounds_constraints(hcc_1)
+        @test all(iszero.(lb))
+        @test all(isone.(ub))
     end
     @testset "Risk budget constraints" begin
         assets = 1:10

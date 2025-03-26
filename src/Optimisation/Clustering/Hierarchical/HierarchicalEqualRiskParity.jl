@@ -20,7 +20,8 @@ function HierarchicalEqualRiskParity(; opt::HierarchicalOptimiser = Hierarchical
     end
     return HierarchicalEqualRiskParity{typeof(opt), typeof(ri), typeof(ro)}(opt, ri, ro)
 end
-function optimise!(hc::HierarchicalEqualRiskParity, rd::ReturnsData = ReturnsData())
+function optimise!(hc::HierarchicalEqualRiskParity, rd::ReturnsData = ReturnsData();
+                   strict::Bool = false)
     pm = prior(hc.opt.pe, rd.X, rd.F)
     ri = risk_measure_factory(hc.ri; prior = pm, solvers = hc.opt.slv)
     riku = unitary_expected_risks(ri, pm.X; fees = hc.opt.fees, scalariser = hc.opt.sce)
@@ -89,7 +90,10 @@ function optimise!(hc::HierarchicalEqualRiskParity, rd::ReturnsData = ReturnsDat
         w[rn] *= one(alpha) - alpha
     end
 
-    return finalise_hierarchical_weights(hc.opt.cwf, hc.opt.wl, w / sum(w))
+    return finalise_hierarchical_weights(hc.opt.cwf,
+                                         weight_bounds_constraints(hc.opt.wb; N = length(w),
+                                                                   strict = strict),
+                                         w / sum(w))
 end
 
 export HierarchicalEqualRiskParity

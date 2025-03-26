@@ -16,14 +16,14 @@ function comparison_sign_ineq_flag(::GEQ)
 end
 abstract type ConstraintSide end
 abstract type A_Constraint <: ConstraintSide end
-struct A_LinearConstraint{T1, T2, T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
+struct A_LinearConstraint{T1, T2, T3 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
        A_Constraint
     group::T1
     name::T2
     coef::T3
 end
 function A_LinearConstraint(; group, name,
-                            coef::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
+                            coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)

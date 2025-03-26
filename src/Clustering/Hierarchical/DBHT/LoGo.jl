@@ -1,10 +1,7 @@
-abstract type AbstractLoGo end
-struct NoLoGo <: AbstractLoGo end
-function LoGo!(::NoLoGo, args...; kwargs...)
+function LoGo!(::Nothing, args...; kwargs...)
     return nothing
 end
-struct LoGo{T1 <: PortfolioOptimisersUnionDistanceMetric,
-            T2 <: SimilarityMatrixEstimator} <: AbstractLoGo
+struct LoGo{T1 <: PortfolioOptimisersUnionDistanceMetric, T2 <: SimilarityMatrixEstimator}
     dist::T1
     similarity::T2
 end
@@ -40,4 +37,4 @@ function LoGo!(je::LoGo, fnpdm::FixNonPositiveDefiniteMatrix, sigma::AbstractMat
     return nothing
 end
 
-export NoLoGo, LoGo!, LoGo
+export LoGo!, LoGo

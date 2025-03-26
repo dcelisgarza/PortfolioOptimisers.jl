@@ -35,14 +35,14 @@
         ues_t = CSV.read(joinpath(@__DIR__, "assets/Box-Uncertainty-Sets.csv"), DataFrame)
         for (i, ue) ∈ pairs(ues)
             mu_set1, sigma_set1 = uncertainty_set(ue, transpose(X); dims = 2)
-            mu1 = [mu_set1.lo; mu_set1.hi]
-            sigma1 = [vec(sigma_set1.lo); vec(sigma_set1.hi)]
+            mu1 = [mu_set1.lb; mu_set1.ub]
+            sigma1 = [vec(sigma_set1.lb); vec(sigma_set1.ub)]
 
             mu_set2 = mu_uncertainty_set(ue, transpose(X); dims = 2)
-            mu2 = [mu_set2.lo; mu_set2.hi]
+            mu2 = [mu_set2.lb; mu_set2.ub]
 
             sigma_set2 = sigma_uncertainty_set(ue, transpose(X); dims = 2)
-            sigma2 = [vec(sigma_set2.lo); vec(sigma_set2.hi)]
+            sigma2 = [vec(sigma_set2.lb); vec(sigma_set2.ub)]
 
             res1 = isapprox(mu1, mu2)
             if !res1

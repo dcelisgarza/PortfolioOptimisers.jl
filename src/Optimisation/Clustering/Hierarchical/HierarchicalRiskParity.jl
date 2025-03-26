@@ -12,20 +12,21 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
     end
     return HierarchicalRiskParity{typeof(opt), typeof(r)}(opt, r)
 end
-function split_factor_weight_constraints(alpha::Real, wl::WeightLimits, w::AbstractVector,
+function split_factor_weight_constraints(alpha::Real, wb::WeightBounds, w::AbstractVector,
                                          lc::AbstractVector, rc::AbstractVector)
-    alpha = min(sum(view(wl.ub, lc)) / w[lc[1]],
-                max(sum(view(wl.lb, lc)) / w[lc[1]], alpha))
-    return one(alpha) - min(sum(view(wl.ub, rc)) / w[rc[1]],
-                            max(sum(view(wl.lb, rc)) / w[rc[1]], one(alpha) - alpha))
+    alpha = min(sum(view(wb.ub, lc)) / w[lc[1]],
+                max(sum(view(wb.lb, lc)) / w[lc[1]], alpha))
+    return one(alpha) - min(sum(view(wb.ub, rc)) / w[rc[1]],
+                            max(sum(view(wb.lb, rc)) / w[rc[1]], one(alpha) - alpha))
 end
-function optimise!(hc::HierarchicalRiskParity, rd::ReturnsData = ReturnsData())
+function optimise!(hc::HierarchicalRiskParity, rd::ReturnsData = ReturnsData();
+                   strict::Bool = false)
     pm = prior(hc.opt.pe, rd.X, rd.F)
     clm = clusterise(hc.opt.cle, pm.X)
     r = risk_measure_factory(hc.r; prior = pm, solvers = hc.opt.slv)
     rku = unitary_expected_risks(r, pm.X; fees = hc.opt.fees, scalariser = hc.opt.sce)
     w = ones(eltype(pm.X), size(pm.X, 2))
-    wl = create_array_weight_limits(hc.opt.wl, length(w))
+    wb = weight_bounds_constraints(hc.opt.wb; N = length(w), strict = strict)
     wu = Matrix{eltype(pm.X)}(undef, size(pm.X, 2), 2)
     items = [clm.clustering.order]
     @inbounds while length(items) > 0
@@ -46,13 +47,13 @@ function optimise!(hc::HierarchicalRiskParity, rd::ReturnsData = ReturnsData())
                                   scalariser = hc.opt.sce)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
-            alpha = split_factor_weight_constraints(alpha, wl, w, lc, rc)
+            alpha = split_factor_weight_constraints(alpha, wb, w, lc, rc)
             # Weight constraints.
             w[lc] *= alpha
             w[rc] *= one(alpha) - alpha
         end
     end
-    return finalise_hierarchical_weights(hc.opt.cwf, hc.opt.wl, w / sum(w))
+    return finalise_hierarchical_weights(hc.opt.cwf, wb, w / sum(w))
 end
 
 export HierarchicalRiskParity

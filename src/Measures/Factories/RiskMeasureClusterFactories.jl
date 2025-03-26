@@ -35,8 +35,8 @@ function uncertainty_set_factory(::NoUncertaintySet,
                                  prior_uncertainty_set::BoxUncertaintySet{<:AbstractMatrix,
                                                                           <:AbstractMatrix},
                                  cluster::AbstractVector)
-    return BoxUncertaintySet(; lo = view(prior_uncertainty_set.lo, cluster, cluster),
-                             hi = view(prior_uncertainty_set.hi, cluster, cluster))
+    return BoxUncertaintySet(; lb = view(prior_uncertainty_set.lb, cluster, cluster),
+                             ub = view(prior_uncertainty_set.ub, cluster, cluster))
 end
 function uncertainty_set_factory(::NoUncertaintySet,
                                  prior_uncertainty_set::EllipseUncertaintySet{<:AbstractMatrix,
@@ -52,8 +52,8 @@ function uncertainty_set_factory(::NoUncertaintySet,
                                  prior_uncertainty_set::BoxUncertaintySet{<:AbstractVector,
                                                                           <:AbstractVector},
                                  cluster::AbstractVector)
-    return BoxUncertaintySet(; lo = view(prior_uncertainty_set.lo, cluster),
-                             hi = view(prior_uncertainty_set.hi, cluster))
+    return BoxUncertaintySet(; lb = view(prior_uncertainty_set.lb, cluster),
+                             ub = view(prior_uncertainty_set.ub, cluster))
 end
 function uncertainty_set_factory(::NoUncertaintySet,
                                  prior_uncertainty_set::EllipseUncertaintySet{<:AbstractVector,
@@ -65,8 +65,8 @@ end
 function uncertainty_set_factory(risk_uncertainty_set::BoxUncertaintySet{<:AbstractMatrix,
                                                                          <:AbstractMatrix},
                                  ::Any, cluster::AbstractVector)
-    return BoxUncertaintySet(; lo = view(risk_uncertainty_set.lo, cluster, cluster),
-                             hi = view(risk_uncertainty_set.hi, cluster, cluster))
+    return BoxUncertaintySet(; lb = view(risk_uncertainty_set.lb, cluster, cluster),
+                             ub = view(risk_uncertainty_set.ub, cluster, cluster))
 end
 function uncertainty_set_factory(risk_uncertainty_set::EllipseUncertaintySet{<:AbstractMatrix,
                                                                              <:Any}, ::Any,
@@ -80,8 +80,8 @@ end
 function uncertainty_set_factory(risk_uncertainty_set::BoxUncertaintySet{<:AbstractVector,
                                                                          <:AbstractVector},
                                  ::Any, cluster::AbstractVector)
-    return BoxUncertaintySet(; lo = view(risk_uncertainty_set.lo, cluster),
-                             hi = view(risk_uncertainty_set.hi, cluster))
+    return BoxUncertaintySet(; lb = view(risk_uncertainty_set.lb, cluster),
+                             ub = view(risk_uncertainty_set.ub, cluster))
 end
 function uncertainty_set_factory(risk_uncertainty_set::EllipseUncertaintySet{<:AbstractVector,
                                                                              <:Any}, ::Any,

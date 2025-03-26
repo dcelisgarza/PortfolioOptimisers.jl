@@ -19,8 +19,8 @@ function uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertainty
             sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
         end
     end
-    return BoxUncertaintySet(; lo = mu_l, hi = mu_u),
-           BoxUncertaintySet(; lo = sigma_l, hi = sigma_u)
+    return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
+           BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 function mu_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass,
                                                             <:Any, <:Any, <:Any, <:Any,
@@ -37,7 +37,7 @@ function mu_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertai
         mu_l[j] = quantile(mu_j, q)
         mu_u[j] = quantile(mu_j, one(q) - q)
     end
-    return BoxUncertaintySet(; lo = mu_l, hi = mu_u)
+    return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
 function sigma_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any,
                                                                <:BoxUncertaintySetClass,
@@ -57,5 +57,5 @@ function sigma_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any,
             sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
         end
     end
-    return BoxUncertaintySet(; lo = sigma_l, hi = sigma_u)
+    return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end

@@ -21,8 +21,8 @@ function uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertain
     fix_non_positive_definite_matrix!(ue.pe.ce.mp.fnpdm, sigma_u)
     mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma_mu)) * 2
     mu_l = range(; start = zero(eltype(sigma)), stop = zero(eltype(sigma)), length = N)
-    return BoxUncertaintySet(; lo = mu_l, hi = mu_u),
-           BoxUncertaintySet(; lo = sigma_l, hi = sigma_u)
+    return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
+           BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 function mu_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
                                                               <:BoxUncertaintySetClass,
@@ -34,7 +34,7 @@ function mu_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
     mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma / size(pm.X, 1))) * 2
     mu_l = range(; start = zero(eltype(sigma)), stop = zero(eltype(sigma)),
                  length = size(pm.X, 2))
-    return BoxUncertaintySet(; lo = mu_l, hi = mu_u)
+    return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
 function sigma_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
                                                                  <:BoxUncertaintySetClass,
@@ -58,5 +58,5 @@ function sigma_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
     end
     fix_non_positive_definite_matrix!(ue.pe.ce.mp.fnpdm, sigma_l)
     fix_non_positive_definite_matrix!(ue.pe.ce.mp.fnpdm, sigma_u)
-    return BoxUncertaintySet(; lo = sigma_l, hi = sigma_u)
+    return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end

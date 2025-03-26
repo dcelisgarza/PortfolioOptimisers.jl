@@ -75,9 +75,9 @@ function set_clustering_weight_finaliser_version!(model::JuMP.Model,
     @objective(model, Min, so * t)
     return nothing
 end
-function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wl::WeightLimits,
+function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wb::WeightBounds,
                            wi::AbstractVector)
-    if any(wl.ub .< wi) ⊼ any(wl.lb .> wi)
+    if any(wb.ub .< wi) ⊼ any(wb.lb .> wi)
         return wi
     end
     model = JuMP.Model()
@@ -85,11 +85,11 @@ function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wl::WeightLimits
     @expression(model, so, cwf.so)
     @variable(model, w[1:length(wi)])
     @constraint(model, sum(w) == sum(wi))
-    if !_w_limit_flag(wl.lb)
-        @constraint(model, sc * w >= sc * wl.lb)
+    if !_w_bounds_flag(wb.lb)
+        @constraint(model, sc * w >= sc * wb.lb)
     end
-    if !_w_limit_flag(wl.ub)
-        @constraint(model, sc * w <= sc * wl.ub)
+    if !_w_bounds_flag(wb.ub)
+        @constraint(model, sc * w <= sc * wb.ub)
     end
     set_clustering_weight_finaliser_version!(model, cwf.v, wi)
     success, solvers_tried = optimise_JuMP_model(model, cwf.slv)
@@ -97,24 +97,24 @@ function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wl::WeightLimits
         value.(model[:w])
     else
         @warn("Model could not be optimised satisfactorily.\nVersion: $(cwf.v)\nSolvers: $solvers_tried.\nReverting to Heuristic type.")
-        opt_weight_bounds(HeuristicClusteringWeightFiniliser(), wl, wi)
+        opt_weight_bounds(HeuristicClusteringWeightFiniliser(), wb, wi)
     end
 end
-function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wl, w::AbstractVector)
-    if any(wl.ub .< w) ⊼ any(wl.lb .> w)
+function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wb, w::AbstractVector)
+    if any(wb.ub .< w) ⊼ any(wb.lb .> w)
         return w
     end
     iter = cwf.iter
     s1 = sum(w)
     for _ ∈ 1:iter
-        if !(any(wl.ub .< w) || any(wl.lb .> w))
+        if !(any(wb.ub .< w) || any(wb.lb .> w))
             break
         end
         old_w = copy(w)
-        w = max.(min.(w, wl.ub), wl.lb)
-        idx = w .< wl.ub .&& w .> wl.lb
-        w_add = sum(max.(old_w - wl.ub, zero(eltype(w))))
-        w_sub = sum(min.(old_w - wl.lb, zero(eltype(w))))
+        w = max.(min.(w, wb.ub), wb.lb)
+        idx = w .< wb.ub .&& w .> wb.lb
+        w_add = sum(max.(old_w - wb.ub, zero(eltype(w))))
+        w_sub = sum(min.(old_w - wb.lb, zero(eltype(w))))
         delta = w_add + w_sub
         if delta != 0
             w[idx] += delta * w[idx] / sum(w[idx])
@@ -123,8 +123,8 @@ function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wl, w::Abstr
     end
     return w
 end
-function finalise_hierarchical_weights(cwf::ClusteringWeightFinaliser, wl::WeightLimits,
+function finalise_hierarchical_weights(cwf::ClusteringWeightFinaliser, wb::WeightBounds,
                                        w::AbstractVector)
-    w = opt_weight_bounds(cwf, wl, w)
+    w = opt_weight_bounds(cwf, wb, w)
     return w / sum(w)
 end

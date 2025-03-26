@@ -14,21 +14,21 @@ function uncertainty_set(ue::DeltaUncertaintySetEstimator, X::AbstractMatrix, ar
                          dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     d_sigma = ue.delta_sigma * abs.(pm.sigma)
-    return BoxUncertaintySet(; lo = range(; start = 0, stop = 0, length = length(pm.mu)),
-                             hi = ue.delta_mu * abs.(pm.mu) * 2),
-           BoxUncertaintySet(; lo = pm.sigma - d_sigma, hi = pm.sigma + d_sigma)
+    return BoxUncertaintySet(; lb = range(; start = 0, stop = 0, length = length(pm.mu)),
+                             ub = ue.delta_mu * abs.(pm.mu) * 2),
+           BoxUncertaintySet(; lb = pm.sigma - d_sigma, ub = pm.sigma + d_sigma)
 end
 function mu_uncertainty_set(ue::DeltaUncertaintySetEstimator, X::AbstractMatrix, args...;
                             dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
-    return BoxUncertaintySet(; lo = range(; start = 0, stop = 0, length = length(pm.mu)),
-                             hi = ue.delta_mu * abs.(pm.mu) * 2)
+    return BoxUncertaintySet(; lb = range(; start = 0, stop = 0, length = length(pm.mu)),
+                             ub = ue.delta_mu * abs.(pm.mu) * 2)
 end
 function sigma_uncertainty_set(ue::DeltaUncertaintySetEstimator, X::AbstractMatrix, args...;
                                dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     d_sigma = ue.delta_sigma * abs.(pm.sigma)
-    return BoxUncertaintySet(; lo = pm.sigma - d_sigma, hi = pm.sigma + d_sigma)
+    return BoxUncertaintySet(; lb = pm.sigma - d_sigma, ub = pm.sigma + d_sigma)
 end
 
 export DeltaUncertaintySetEstimator
