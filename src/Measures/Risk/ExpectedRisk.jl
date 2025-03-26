@@ -13,7 +13,7 @@ function expected_risk(r::Union{WorstRealisation, ValueatRisk, ValueatRiskRange,
                                 Range, ConditionalValueatRiskRange, TailGini, TailGiniRange,
                                 OrderedWeightsArray, FourthCentralMoment, Skewness,
                                 SemiSkewness, Kurtosis, SemiKurtosis}, w::AbstractVector,
-                       X::AbstractMatrix; fees::Fees = Fees(), kwargs...)
+                       X::AbstractMatrix; fees::Union{Nothing, <:Fees} = nothing, kwargs...)
     return r(calc_net_returns(w, X, fees))
 end
 function expected_risk(r::Union{MeanAbsoluteDeviation, SemiStandardDeviation,
@@ -21,7 +21,7 @@ function expected_risk(r::Union{MeanAbsoluteDeviation, SemiStandardDeviation,
                                 FourthLowerPartialMoment, TrackingRiskMeasure,
                                 SquareRootKurtosis, SquareRootSemiKurtosis, SemiVariance,
                                 BrownianDistanceVariance}, w::AbstractVector,
-                       X::AbstractMatrix; fees::Fees = Fees(), kwargs...)
+                       X::AbstractMatrix; fees::Union{Nothing, <:Fees} = nothing, kwargs...)
     return r(w, X, fees)
 end
 function expected_risk(r::Union{StandardDeviation, NegativeSkewness, NegativeSemiSkewness,
@@ -31,7 +31,8 @@ function expected_risk(r::Union{StandardDeviation, NegativeSkewness, NegativeSem
     return r(w)
 end
 function _expected_risk(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
-                        w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
+                        w::AbstractVector, X::AbstractMatrix,
+                        fees::Union{Nothing, <:Fees} = nothing)
     rk = zero(eltype(X))
     for r ∈ rs
         rk += r.settings.scale * expected_risk(r, w, X; fees = fees)
@@ -39,7 +40,8 @@ function _expected_risk(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
     return rk
 end
 function _expected_risk(::MaxScalariser, rs::AbstractVector{<:RiskMeasure},
-                        w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
+                        w::AbstractVector, X::AbstractMatrix,
+                        fees::Union{Nothing, <:Fees} = nothing)
     rk = zero(eltype(X))
     for r ∈ rs
         ri = r.settings.scale * expected_risk(r, w, X; fees = fees)
@@ -50,7 +52,8 @@ function _expected_risk(::MaxScalariser, rs::AbstractVector{<:RiskMeasure},
     return rk
 end
 function _expected_risk(sc::LogSumExpScalariser, rs::AbstractVector{<:RiskMeasure},
-                        w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
+                        w::AbstractVector, X::AbstractMatrix,
+                        fees::Union{Nothing, <:Fees} = nothing)
     rk = zero(eltype(X))
     for r ∈ rs
         rk += r.settings.scale * sc.gamma * expected_risk(r, w, X; fees = fees)
@@ -58,7 +61,7 @@ function _expected_risk(sc::LogSumExpScalariser, rs::AbstractVector{<:RiskMeasur
     return log(exp(rk)) / sc.gamma
 end
 function expected_risk(rs::AbstractVector{<:RiskMeasure}, w::AbstractVector,
-                       X::AbstractMatrix; fees::Fees = Fees(),
+                       X::AbstractMatrix; fees::Union{Nothing, <:Fees} = nothing,
                        scalariser::Scalariser = SumScalariser())
     return _expected_risk(scalariser, rs, w, X, fees)
 end

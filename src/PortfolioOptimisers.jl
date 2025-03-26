@@ -37,17 +37,14 @@ include("./OrderedWeightsArray/OWA.jl")
 
 # Fix Non Positive Definite
 include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_AbstractTypes.jl")
-include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_NoFix.jl")
 include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_NearestCorrelationMatrix.jl")
 
 # Detone
 include("./LinearAlgebra/Detone/Detone_AbstractTypes.jl")
-include("./LinearAlgebra/Detone/NoDetone.jl")
 include("./LinearAlgebra/Detone/Detone.jl")
 
 # Denoise
 include("./LinearAlgebra/Denoise/Denoise_AbstractTypes.jl")
-include("./LinearAlgebra/Denoise/NoDenoise.jl")
 include("./LinearAlgebra/Denoise/ShrunkDenoise.jl")
 include("./LinearAlgebra/Denoise/SpectralDenoise.jl")
 include("./LinearAlgebra/Denoise/FixedDenoise.jl")

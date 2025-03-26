@@ -17,8 +17,8 @@ end
 function LoGo_dist_assert(args...)
     return nothing
 end
-function LoGo!(je::LoGo, fnpdm::FixNonPositiveDefiniteMatrix, sigma::AbstractMatrix,
-               X::AbstractMatrix; dims::Int = 1)
+function LoGo!(je::LoGo, fnpdm::Union{Nothing, <:FixNonPositiveDefiniteMatrix},
+               sigma::AbstractMatrix, X::AbstractMatrix; dims::Int = 1)
     issquare(sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)

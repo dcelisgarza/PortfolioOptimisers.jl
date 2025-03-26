@@ -23,7 +23,8 @@ function SemiKurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
     return SemiKurtosis{typeof(settings), typeof(ve), typeof(target), typeof(w),
                         typeof(mu)}(settings, ve, target, w, mu)
 end
-function (r::SemiKurtosis)(w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
+function (r::SemiKurtosis)(w::AbstractVector, X::AbstractMatrix,
+                           fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target

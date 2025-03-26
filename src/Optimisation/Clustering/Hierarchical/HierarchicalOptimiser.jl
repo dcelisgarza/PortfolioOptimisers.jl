@@ -17,7 +17,8 @@ function HierarchicalOptimiser(;
                                pe::Union{<:AbstractPriorEstimator, <:AbstractPriorModel} = EmpiricalPriorEstimator(),
                                cle::Union{<:ClusteringEstimator,
                                           <:AbstractPortfolioOptimisersClusteringResult} = ClusteringEstimator(),
-                               fees::Fees = Fees(), sce::Scalariser = SumScalariser(),
+                               fees::Union{Nothing, <:Fees} = nothing,
+                               sce::Scalariser = SumScalariser(),
                                wb::WeightBounds = WeightBounds(),
                                cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
                                slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing)
@@ -27,7 +28,7 @@ function HierarchicalOptimiser(;
 end
 function unitary_expected_risks(r::Union{<:OptimisationRiskMeasure,
                                          <:AbstractVector{<:OptimisationRiskMeasure}},
-                                X::AbstractMatrix; fees::Fees = Fees(),
+                                X::AbstractMatrix; fees::Union{Nothing, <:Fees} = nothing,
                                 scalariser::Scalariser = SumScalariser())
     w = zeros(eltype(X), size(X, 2))
     rk = zeros(eltype(X), size(X, 2))

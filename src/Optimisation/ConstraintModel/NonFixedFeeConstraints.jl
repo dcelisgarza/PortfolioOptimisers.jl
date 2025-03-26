@@ -1,4 +1,4 @@
-function set_turnover_fees!(::JuMP.Model, ::NoTurnover)
+function set_turnover_fees!(::JuMP.Model, ::Nothing)
     return nothing
 end
 function set_turnover_fees!(model::JuMP.Model, turnover::Turnover)

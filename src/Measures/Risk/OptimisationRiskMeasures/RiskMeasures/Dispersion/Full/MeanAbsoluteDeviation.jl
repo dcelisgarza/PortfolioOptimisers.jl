@@ -24,7 +24,7 @@ function MeanAbsoluteDeviation(; settings::RiskMeasureSettings = RiskMeasureSett
                                  typeof(we)}(settings, target, w, mu, we)
 end
 function (r::MeanAbsoluteDeviation)(w::AbstractVector, X::AbstractMatrix,
-                                    fees::Fees = Fees())
+                                    fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     mu = calc_target_ret_mu(x, w, r)
     we = r.we

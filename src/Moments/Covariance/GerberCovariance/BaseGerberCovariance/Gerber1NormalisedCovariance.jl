@@ -10,7 +10,7 @@ end
 function Gerber1NormalisedCovariance(;
                                      me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
                                      ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                                     fnpdm::FixNonPositiveDefiniteMatrix = FNPDM_NearestCorrelationMatrix(),
+                                     fnpdm::Union{Nothing, <:FixNonPositiveDefiniteMatrix} = FNPDM_NearestCorrelationMatrix(),
                                      threshold::Real = 0.5)
     @smart_assert(zero(threshold) < threshold < one(threshold))
     return Gerber1NormalisedCovariance{typeof(me), typeof(ve), typeof(fnpdm),

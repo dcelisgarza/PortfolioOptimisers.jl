@@ -6,7 +6,7 @@ struct Gerber1Covariance{T1 <: StatsBase.CovarianceEstimator,
     threshold::T3
 end
 function Gerber1Covariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                           fnpdm::FixNonPositiveDefiniteMatrix = FNPDM_NearestCorrelationMatrix(),
+                           fnpdm::Union{Nothing, <:FixNonPositiveDefiniteMatrix} = FNPDM_NearestCorrelationMatrix(),
                            threshold::Real = 0.5)
     @smart_assert(zero(threshold) < threshold < one(threshold))
     return Gerber1Covariance{typeof(ve), typeof(fnpdm), typeof(threshold)}(ve, fnpdm,

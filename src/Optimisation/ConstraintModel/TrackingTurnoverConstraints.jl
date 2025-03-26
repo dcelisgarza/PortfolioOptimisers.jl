@@ -1,10 +1,13 @@
+function tracking_error_benchmark(::Nothing, ::AbstractMatrix)
+    return nothing
+end
 function tracking_error_benchmark(tracking::WeightsTracking, X::AbstractMatrix)
     return calc_net_returns(tracking.w, X, tracking.fees)
 end
 function tracking_error_benchmark(tracking::ReturnsTracking, args...)
     return tracking.w
 end
-function set_tracking_error_constraints!(::JuMP.Model, ::NoTrackingError)
+function set_tracking_error_constraints!(::JuMP.Model, ::Nothing)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, X::AbstractMatrix,
@@ -22,7 +25,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, X::AbstractMatrix,
                  end)
     return nothing
 end
-function turnover_constraints(::JuMP.Model, ::NoTurnover)
+function turnover_constraints(::JuMP.Model, ::Nothing)
     return nothing
 end
 function turnover_constraints(model::JuMP.Model, turnover::Turnover)

@@ -24,7 +24,7 @@ function FirstLowerPartialMoment(; settings::RiskMeasureSettings = RiskMeasureSe
                                                                                             mu)
 end
 function (r::FirstLowerPartialMoment)(w::AbstractVector, X::AbstractMatrix,
-                                      fees::Fees = Fees())
+                                      fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target

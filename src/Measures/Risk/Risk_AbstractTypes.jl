@@ -6,14 +6,15 @@ function cluster_risk_measure_factory(r::AbstractRiskMeasure, args...; kwargs...
     return r
 end
 abstract type AbstractRiskMeasureSettings end
-struct RiskMeasureSettings{T1 <: Bool, T2 <: Real, T3 <: Real} <:
+struct RiskMeasureSettings{T1 <: Bool, T2 <: Real, T3 <: Union{Nothing, <:Real}} <:
        AbstractRiskMeasureSettings
-    flag::T1
+    rke::T1
     scale::T2
     ub::T3
 end
-function RiskMeasureSettings(; flag::Bool = true, scale::Real = 1.0, ub::Real = Inf)
-    return RiskMeasureSettings{typeof(flag), typeof(scale), typeof(ub)}(flag, scale, ub)
+function RiskMeasureSettings(; rke::Bool = true, scale::Real = 1.0,
+                             ub::Union{Nothing, <:Real} = nothing)
+    return RiskMeasureSettings{typeof(rke), typeof(scale), typeof(ub)}(rke, scale, ub)
 end
 struct HierarchicalRiskMeasureSettings{T1 <: Real} <: AbstractRiskMeasureSettings
     scale::T1

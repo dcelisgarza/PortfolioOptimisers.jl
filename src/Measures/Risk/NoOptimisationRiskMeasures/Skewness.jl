@@ -26,7 +26,8 @@ function Skewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                                                          w,
                                                                                          mu)
 end
-function (r::Skewness)(w::AbstractVector, X::AbstractMatrix, fees::Fees = Fees())
+function (r::Skewness)(w::AbstractVector, X::AbstractMatrix,
+                       fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target

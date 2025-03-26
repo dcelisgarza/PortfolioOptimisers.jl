@@ -23,23 +23,12 @@
         P = randn(rng, 20)
         fees_estimator = [Fees(; long = 0.01, short = 0.02, fixed_long = 0.05,
                                fixed_short = 0.07,
-                               turnover = Turnover(; val = 0.11, w = w2)),
-                          Fees(; long = 0.0, short = 0.0, fixed_long = 0.0,
-                               fixed_short = 0.0, turnover = Turnover(; val = 0.0, w = w2)),
+                               turnover = Turnover(; val = 0.11, w = w2)), Fees(;),
                           Fees(; long = 0.01, short = 0.02, fixed_long = 0.05,
-                               fixed_short = 0.07, turnover = NoTurnover()),
+                               fixed_short = 0.07, turnover = Turnover(; w = w2)),
                           Fees(; long = lw, short = sw, fixed_long = flw, fixed_short = slw,
                                turnover = Turnover(; val = tv, w = w2)),
-                          Fees(; long = 0.0, short = 0.0, fixed_long = 0.0,
-                               fixed_short = 0.0, turnover = Turnover(; val = 0.0, w = w2)),
-                          Fees(; long = 0.0, short = 0.0, fixed_long = 0.0,
-                               fixed_short = 0.0,
-                               turnover = Turnover(; val = 0.0, w = zeros(length(w2)))),
-                          Fees(; long = zeros(length(w2)), short = zeros(length(w2)),
-                               fixed_long = zeros(length(w2)),
-                               fixed_short = zeros(length(w2)),
-                               turnover = Turnover(; val = zeros(length(w2)),
-                                                   w = zeros(length(w2))))]
+                          Fees(; turnover = Turnover(; w = w1)), Fees(;), Fees(;)]
         f1_t = CSV.read(joinpath(@__DIR__, "assets/Fees.csv"), DataFrame)
         f2_t = CSV.read(joinpath(@__DIR__, "assets/Asset-Fees.csv"), DataFrame)
 

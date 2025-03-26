@@ -13,7 +13,7 @@ struct SmythBroby2Covariance{T1 <: ExpectedReturnsEstimator,
 end
 function SmythBroby2Covariance(; me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
                                ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                               fnpdm::FixNonPositiveDefiniteMatrix = FNPDM_NearestCorrelationMatrix(),
+                               fnpdm::Union{Nothing, <:FixNonPositiveDefiniteMatrix} = FNPDM_NearestCorrelationMatrix(),
                                threshold::Real = 0.5, c1::Real = 0.5, c2::Real = 0.5,
                                c3::Real = 4.0, n::Real = 2.0)
     @smart_assert(zero(threshold) < threshold < one(threshold))

@@ -28,7 +28,7 @@
         fix_non_positive_definite_matrix!(FNPDM_NearestCorrelationMatrix(), sigma1)
         @test isposdef(sigma1)
 
-        fix_non_positive_definite_matrix!(FNPDM_NoFix(), sigma2)
+        fix_non_positive_definite_matrix!(nothing, sigma2)
         @test !isposdef(sigma2)
         @test isapprox(sigma2, sigma3)
     end
@@ -38,7 +38,7 @@
         T, N = size(X)
         q = T / N
         sigma = cov(X)
-        des = [NoDenoise(), FixedDenoise(), ShrunkDenoise(), SpectralDenoise()]
+        des = [nothing, FixedDenoise(), ShrunkDenoise(), SpectralDenoise()]
         denoise_t = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv"), DataFrame)
         for i ∈ 1:ncol(denoise_t)
             sigma1 = copy(sigma)
@@ -57,7 +57,7 @@
         T, N = size(X)
         q = T / N
         sigma = cov(X)
-        des = [NoDetone(), Detone(), Detone(; n = 3)]
+        des = [nothing, Detone(), Detone(; n = 3)]
         detone = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv"), DataFrame)
         for i ∈ 1:ncol(detone)
             sigma1 = copy(sigma)

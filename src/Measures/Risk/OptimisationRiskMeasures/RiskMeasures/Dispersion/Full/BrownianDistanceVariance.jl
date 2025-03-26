@@ -12,7 +12,7 @@ function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureS
                                                                            formulation)
 end
 function (::BrownianDistanceVariance)(w::AbstractVector, X::AbstractMatrix,
-                                      fees::Fees = Fees())
+                                      fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     T = length(x)
     iT2 = inv(T^2)

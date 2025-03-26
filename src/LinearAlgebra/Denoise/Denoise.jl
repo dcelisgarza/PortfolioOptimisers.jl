@@ -18,8 +18,9 @@ function find_max_eval(vals, q; kernel = AverageShiftedHistograms.Kernels.gaussi
     e_max = x * (1.0 + sqrt(1.0 / q))^2
     return e_max, x
 end
-function denoise!(de::DenoiseAlgorithm, fnpdm::FixNonPositiveDefiniteMatrix,
-                  X::AbstractMatrix, q::Real)
+function denoise!(de::DenoiseAlgorithm,
+                  fnpdm::Union{Nothing, <:FixNonPositiveDefiniteMatrix}, X::AbstractMatrix,
+                  q::Real)
     issquare(X)
     s = diag(X)
     iscov = any(.!isone.(s))
