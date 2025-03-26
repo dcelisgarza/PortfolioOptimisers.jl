@@ -22,7 +22,6 @@ function HierarchicalEqualRiskContribution(;
     return HierarchicalEqualRiskContribution{typeof(opt), typeof(ri), typeof(ro)}(opt, ri,
                                                                                   ro)
 end
-
 function herc_scalarised_risk_o!(::SumScalariser, wk::AbstractVector, riro::Bool,
                                  roku::AbstractVector, rkbo::AbstractVector,
                                  cl::AbstractVector,
@@ -44,7 +43,7 @@ function herc_scalarised_risk_o!(::MaxScalariser, wk::AbstractVector, riro::Bool
                                  cl::AbstractVector,
                                  ros::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
-    crisk = -Inf
+    crisk = typemin(eltype(X))
     for ro ∈ ros
         if !riro
             unitary_expected_risks!(wk, roku, ro, X, fees)
@@ -91,17 +90,16 @@ function herc_scalarised_risk_i!(::MaxScalariser, wk::AbstractVector, riku::Abst
                                  cl::AbstractVector,
                                  ris::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
-    risk_t = -Inf
+    risk_t = typemin(eltype(X))
     risk = zeros(eltype(X), length(cl), 2)
     for ri ∈ ris
         unitary_expected_risks!(wk, riku, ri, X, fees)
-        risk[:, 1] .= inv.(view(riku, cl))
-        risk[:, 1] ./= sum(view(risk, :, 1))
         risk[:, 1] .= ri.settings.scale * view(risk, :, 1)
         risk_i = sum(view(risk, :, 1))
         if risk_i > risk_t
             risk_t = risk_i
-            risk[:, 2] .= view(risk, :, 1)
+            risk[:, 2] .= inv.(view(risk, :, 1))
+            risk[:, 2] .= ri.settings.scale * view(risk, :, 2) / sum(view(risk, :, 2))
         end
     end
     return view(risk, :, 2)
