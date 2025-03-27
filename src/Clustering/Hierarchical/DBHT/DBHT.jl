@@ -778,7 +778,7 @@ function BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real
 
         # Compute the distance between a vertex and the converging bubbles
         Udjv = Dpm * Mdjv * diagm(1 ./ vec(sum(Mdjv .!= 0; dims = 1)))
-        Udjv[iszero.(Adjv)] .= eltype(Udjv)
+        Udjv[iszero.(Adjv)] .= zero(eltype(Udjv))
 
         imn = vec(getindex.(argmin(Udjv[iszero.(vec(sum(Mdjv; dims = 2))), :]; dims = 2),
                             2))  # Look for the closest converging bubble
