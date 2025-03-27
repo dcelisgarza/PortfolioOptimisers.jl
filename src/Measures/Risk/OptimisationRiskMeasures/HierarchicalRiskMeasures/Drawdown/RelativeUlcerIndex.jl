@@ -1,5 +1,5 @@
-struct RelativeUlcerIndex <: HierarchicalRiskMeasure
-    settings::HierarchicalRiskMeasureSettings
+struct RelativeUlcerIndex{T1 <: HierarchicalRiskMeasureSettings} <: HierarchicalRiskMeasure
+    settings::T1
 end
 function RelativeUlcerIndex(;
                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())

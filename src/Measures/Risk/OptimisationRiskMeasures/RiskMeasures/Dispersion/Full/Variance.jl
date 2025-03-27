@@ -35,13 +35,13 @@ end
 function (r::Variance)(w::AbstractVector)
     return dot(w, r.sigma, w)
 end
-function risk_measure_factory(r::Variance; prior::AbstractPriorModel, kwargs...)
+function risk_measure_factory(r::Variance, prior::AbstractPriorModel, args...)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
     return Variance(; settings = r.settings, formulation = r.formulation, sigma = sigma,
                     a_rc = r.a_rc, b_rc = r.b_rc)
 end
-function risk_measure_cluster_factory(r::Variance; prior::AbstractPriorModel,
-                                      cluster::AbstractVector, kwargs...)
+function risk_measure_cluster_factory(r::Variance, prior::AbstractPriorModel,
+                                      cluster::AbstractVector, args...)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, cluster)
     return Variance(; settings = r.settings, formulation = r.formulation, sigma = sigma,
                     a_rc = r.a_rc, b_rc = r.b_rc)

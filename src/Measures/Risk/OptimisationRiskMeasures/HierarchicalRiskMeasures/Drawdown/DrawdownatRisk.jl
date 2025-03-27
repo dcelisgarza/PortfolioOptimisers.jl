@@ -20,8 +20,8 @@ function (r::DrawdownatRisk)(x::AbstractVector)
         end
         dd[idx] = i - peak
     end
-    popfirst!(x)
     popfirst!(dd)
+    popfirst!(x)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
 

@@ -1,12 +1,13 @@
-struct RelativeDrawdownatRisk{T1 <: Real} <: HierarchicalRiskMeasure
-    settings::HierarchicalRiskMeasureSettings
-    alpha::T1
+struct RelativeDrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real} <:
+       HierarchicalRiskMeasure
+    settings::T1
+    alpha::T2
 end
 function RelativeDrawdownatRisk(;
                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                 alpha::Real = 0.05)
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    return RelativeDrawdownatRisk{typeof(alpha)}(settings, alpha)
+    return RelativeDrawdownatRisk{typeof(settings), typeof(alpha)}(settings, alpha)
 end
 function (r::RelativeDrawdownatRisk)(x::AbstractVector)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
@@ -20,6 +21,7 @@ function (r::RelativeDrawdownatRisk)(x::AbstractVector)
         dd[idx] = i / peak - one(peak)
     end
     popfirst!(dd)
+    popfirst!(x)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
 

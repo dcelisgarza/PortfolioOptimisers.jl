@@ -30,5 +30,54 @@ function (r::MeanAbsoluteDeviation)(w::AbstractVector, X::AbstractMatrix,
     we = r.we
     return isnothing(we) ? mean(abs.(x .- mu)) : mean(abs.(x .- mu), we)
 end
+function risk_measure_factory(r::MeanAbsoluteDeviation, prior::AbstractPriorModel, args...)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
+    return MeanAbsoluteDeviation(; settings = r.settings, target = r.target, w = r.w,
+                                 mu = mu, we = r.we)
+end
+function risk_measure_factory(r::MeanAbsoluteDeviation, prior::EntropyPoolingModel, args...)
+    w = risk_measure_nothing_vec_factory(r.w, prior.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
+    we = risk_measure_nothing_vec_factory(r.we, prior.w)
+    return MeanAbsoluteDeviation(; settings = r.settings, target = r.target, w = w, mu = mu,
+                                 we = we)
+end
+function risk_measure_factory(r::MeanAbsoluteDeviation,
+                              (prior::HighOrderPriorModel{<:EntropyPoolingModel, <:Any,
+                                                          <:Any, <:Any, <:Any}), args...)
+    w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
+    we = risk_measure_nothing_vec_factory(r.we, prior.pm.w)
+    return MeanAbsoluteDeviation(; settings = r.settings, target = r.target, w = w, mu = mu,
+                                 we = we)
+end
+function cluster_risk_measure_factory(r::MeanAbsoluteDeviation, prior::AbstractPriorModel,
+                                      cluster::AbstractVector, args...)
+    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
+    return MeanAbsoluteDeviation(; settings = r.settings, target = target, w = r.w, mu = mu,
+                                 we = r.we)
+end
+function cluster_risk_measure_factory(r::MeanAbsoluteDeviation, prior::EntropyPoolingModel,
+                                      cluster::AbstractVector, args...)
+    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
+    w = risk_measure_nothing_vec_factory(r.w, prior.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
+    we = risk_measure_nothing_vec_factory(r.we, prior.w)
+    return MeanAbsoluteDeviation(; settings = r.settings, target = target, w = w, mu = mu,
+                                 we = we)
+end
+function cluster_risk_measure_factory(r::MeanAbsoluteDeviation,
+                                      prior::HighOrderPriorModel{<:EntropyPoolingModel,
+                                                                 <:Any, <:Any, <:Any,
+                                                                 <:Any},
+                                      cluster::AbstractVector, args...)
+    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
+    w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
+    we = risk_measure_nothing_vec_factory(r.we, prior.pm.w)
+    return MeanAbsoluteDeviation(; settings = r.settings, target = target, w = w, mu = mu,
+                                 we = we)
+end
 
 export MeanAbsoluteDeviation

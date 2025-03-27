@@ -26,8 +26,8 @@ function expected_risk(r::Union{MeanAbsoluteDeviation, SemiStandardDeviation,
 end
 function expected_risk(r::Union{StandardDeviation, NegativeSkewness, NegativeSemiSkewness,
                                 TurnoverRiskMeasure, Variance, UncertaintySetVariance,
-                                NegativeQuadraticSkewness, NegativeQuadraticSemiSkewness},
-                       w::AbstractVector, args...; kwargs...)
+                                NegativeQuadraticSkewness, NegativeQuadraticSemiSkewness,
+                                EqualRiskMeasure}, w::AbstractVector, args...; kwargs...)
     return r(w)
 end
 function expected_risk(::SumScalariser, rs::AbstractVector{<:RiskMeasure},

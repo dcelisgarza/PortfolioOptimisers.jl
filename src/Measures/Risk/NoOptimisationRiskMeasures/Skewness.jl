@@ -1,16 +1,14 @@
-struct Skewness{T1 <: RiskMeasureSettings, T2 <: PortfolioOptimisersVarianceEstimator,
-                T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                T4 <: Union{Nothing, <:AbstractWeights},
-                T5 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+struct Skewness{T1 <: PortfolioOptimisersVarianceEstimator,
+                T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                T3 <: Union{Nothing, <:AbstractWeights},
+                T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
        TargetNoOptimisationRiskMeasure
-    settings::T1
-    ve::T2
-    target::T3
-    w::T4
-    mu::T5
+    ve::T1
+    target::T2
+    w::T3
+    mu::T4
 end
-function Skewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
+function Skewness(; ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                   target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                   w::Union{Nothing, <:AbstractWeights} = nothing,
                   mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
@@ -20,11 +18,7 @@ function Skewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
     if isa(mu, AbstractVector)
         @smart_assert(!isempty(mu))
     end
-    return Skewness{typeof(settings), typeof(ve), typeof(target), typeof(w), typeof(mu)}(settings,
-                                                                                         ve,
-                                                                                         target,
-                                                                                         w,
-                                                                                         mu)
+    return Skewness{typeof(ve), typeof(target), typeof(w), typeof(mu)}(ve, target, w, mu)
 end
 function (r::Skewness)(w::AbstractVector, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing)

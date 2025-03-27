@@ -1,6 +1,5 @@
 function risk_measure_solver_factory(risk_solvers::Union{<:Solver,
-                                                         <:AbstractVector{<:Solver}},
-                                     ::Nothing)
+                                                         <:AbstractVector{<:Solver}}, ::Any)
     return risk_solvers
 end
 function risk_measure_solver_factory(::Nothing,

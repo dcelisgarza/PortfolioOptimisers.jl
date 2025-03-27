@@ -28,17 +28,17 @@ function fourth_moment_cluster_index_factory(N::Integer, cluster::AbstractVector
     end
     return idx
 end
-function uncertainty_set_factory(::NoUncertaintySet, ::NoUncertaintySet, ::Any)
-    return NoUncertaintySet()
+function uncertainty_set_factory(::Nothing, ::Nothing, ::Any)
+    return nothing
 end
-function uncertainty_set_factory(::NoUncertaintySet,
+function uncertainty_set_factory(::Nothing,
                                  prior_uncertainty_set::BoxUncertaintySet{<:AbstractMatrix,
                                                                           <:AbstractMatrix},
                                  cluster::AbstractVector)
     return BoxUncertaintySet(; lb = view(prior_uncertainty_set.lb, cluster, cluster),
                              ub = view(prior_uncertainty_set.ub, cluster, cluster))
 end
-function uncertainty_set_factory(::NoUncertaintySet,
+function uncertainty_set_factory(::Nothing,
                                  prior_uncertainty_set::EllipseUncertaintySet{<:AbstractMatrix,
                                                                               <:Any},
                                  cluster::AbstractVector)
@@ -48,14 +48,14 @@ function uncertainty_set_factory(::NoUncertaintySet,
     return EllipseUncertaintySet(; sigma = prior_uncertainty_set.sigma[idx, idx],
                                  k = prior_uncertainty_set.k)
 end
-function uncertainty_set_factory(::NoUncertaintySet,
+function uncertainty_set_factory(::Nothing,
                                  prior_uncertainty_set::BoxUncertaintySet{<:AbstractVector,
                                                                           <:AbstractVector},
                                  cluster::AbstractVector)
     return BoxUncertaintySet(; lb = view(prior_uncertainty_set.lb, cluster),
                              ub = view(prior_uncertainty_set.ub, cluster))
 end
-function uncertainty_set_factory(::NoUncertaintySet,
+function uncertainty_set_factory(::Nothing,
                                  prior_uncertainty_set::EllipseUncertaintySet{<:AbstractVector,
                                                                               <:Any},
                                  cluster::AbstractVector)

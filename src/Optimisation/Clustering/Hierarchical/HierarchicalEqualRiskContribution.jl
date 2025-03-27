@@ -120,13 +120,13 @@ end
 function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                          <:OptimisationRiskMeasure},
                    pm::AbstractPriorModel, cls::AbstractVector)
-    ri = risk_measure_factory(hc.ri; prior = pm, solvers = hc.opt.slv)
+    ri = risk_measure_factory(hc.ri, pm, hc.opt.slv)
     riku = unitary_expected_risks(ri, pm.X, hc.opt.fees)
     if hc.ri === hc.ro
         ro = ri
         roku = riku
     else
-        ro = risk_measure_factory(hc.ro; prior = pm, solvers = hc.opt.slv)
+        ro = risk_measure_factory(hc.ro, pm, hc.opt.slv)
         roku = unitary_expected_risks(ro, pm.X, hc.opt.fees)
     end
     rkbo = zeros(eltype(pm.X), size(pm.X, 2))
@@ -146,7 +146,7 @@ function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any,
                                                          <:AbstractVector{<:OptimisationRiskMeasure},
                                                          <:AbstractVector{<:OptimisationRiskMeasure}},
                    pm::AbstractPriorModel, cls::AbstractVector)
-    ri = risk_measure_factory(hc.ri; prior = pm, solvers = hc.opt.slv)
+    ri = risk_measure_factory(hc.ri, pm, hc.opt.slv)
     riro = false
     riku = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
     if hc.ri === hc.ro
@@ -154,7 +154,7 @@ function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any,
         roku = riku
         riro = true
     else
-        ro = risk_measure_factory(hc.ro; prior = pm, solvers = hc.opt.slv)
+        ro = risk_measure_factory(hc.ro, pm, hc.opt.slv)
         roku = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
     end
     rkbo = zeros(eltype(pm.X), size(pm.X, 2))
@@ -172,9 +172,9 @@ end
 function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                          <:AbstractVector{<:OptimisationRiskMeasure}},
                    pm::AbstractPriorModel, cls::AbstractVector)
-    ri = risk_measure_factory(hc.ri; prior = pm, solvers = hc.opt.slv)
+    ri = risk_measure_factory(hc.ri, pm, hc.opt.slv)
     riku = unitary_expected_risks(ri, pm.X, hc.opt.fees)
-    ro = risk_measure_factory(hc.ro; prior = pm, solvers = hc.opt.slv)
+    ro = risk_measure_factory(hc.ro, pm, hc.opt.slv)
     roku = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
     rkbo = zeros(eltype(pm.X), size(pm.X, 2))
     rkcl = Vector{eltype(pm.X)}(undef, length(cls))
@@ -193,9 +193,9 @@ function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any,
                                                          <:AbstractVector{<:OptimisationRiskMeasure},
                                                          <:OptimisationRiskMeasure},
                    pm::AbstractPriorModel, cls::AbstractVector)
-    ri = risk_measure_factory(hc.ri; prior = pm, solvers = hc.opt.slv)
+    ri = risk_measure_factory(hc.ri, pm, hc.opt.slv)
     riku = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
-    ro = risk_measure_factory(hc.ro; prior = pm, solvers = hc.opt.slv)
+    ro = risk_measure_factory(hc.ro, pm, hc.opt.slv)
     roku = unitary_expected_risks(ro, pm.X, hc.opt.fees)
     rkbo = zeros(eltype(pm.X), size(pm.X, 2))
     rkcl = Vector{eltype(pm.X)}(undef, length(cls))

@@ -4,7 +4,7 @@ function owa_gmd(T::Integer)
     #     w[i] = 2 * i - 1 - T
     # end
     # w = 2 / (T * (T - 1)) * w
-    return collect((4 * range(1; stop = T) .- 2 * (T + 1)) / (T * (T - 1)))
+    return (4 * range(1; stop = T) .- 2 * (T + 1)) / (T * (T - 1))
 end
 function owa_cvar(T::Integer, alpha::Real = 0.05)
     @smart_assert(zero(alpha) < alpha < one(alpha))

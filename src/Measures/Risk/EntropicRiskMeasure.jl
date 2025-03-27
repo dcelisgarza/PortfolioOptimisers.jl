@@ -6,7 +6,6 @@ function ERM(x::AbstractVector{<:Real},
     model = JuMP.Model()
     set_string_names_on_creation(model, false)
     T = length(x)
-    at = alpha * T
     @variables(model, begin
                    t
                    z >= 0
@@ -16,7 +15,7 @@ function ERM(x::AbstractVector{<:Real},
                      sum(u) <= z
                      [i = 1:T], [-x[i] - t, z, u[i]] ∈ MOI.ExponentialCone()
                  end)
-    @expression(model, risk, t - z * log(at))
+    @expression(model, risk, t - z * log(alpha * T))
     @objective(model, Min, risk)
     success, solvers_tried = optimise_JuMP_model(model, solvers)
     return if success

@@ -5,8 +5,8 @@ function EqualRiskMeasure(;
                           settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
     return EqualRiskMeasure{typeof(settings)}(settings)
 end
-function (::EqualRiskMeasure)(w::AbstractVector, delta::Real = 0)
-    return inv(length(w)) + delta
+function (::EqualRiskMeasure)(w::AbstractVector)
+    return inv(length(w))
 end
 
 export EqualRiskMeasure
