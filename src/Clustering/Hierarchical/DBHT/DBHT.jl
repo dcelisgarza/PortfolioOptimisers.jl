@@ -778,11 +778,10 @@ function BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real
 
         # Compute the distance between a vertex and the converging bubbles
         Udjv = Dpm * Mdjv * diagm(1 ./ vec(sum(Mdjv .!= 0; dims = 1)))
-        Udjv[iszero.(Adjv)] .= zero(eltype(Udjv))
+        Udjv[Adjv .== 0] .= typemax(eltype(Dpm))
 
-        imn = vec(getindex.(argmin(Udjv[iszero.(vec(sum(Mdjv; dims = 2))), :]; dims = 2),
-                            2))  # Look for the closest converging bubble
-        Tc[iszero.(Tc)] .= imn # Assign discrete cluster membership according to the distances to the converging bubbles
+        imn = vec(getindex.(argmin(Udjv[vec(sum(Mdjv; dims = 2)) .== 0, :]; dims = 2), 2))  # Look for the closest converging bubble
+        Tc[Tc .== 0] .= imn # Assign discrete cluster membership according to the distances to the converging bubbles
     else
         Tc = ones(Int, N)   # If there is one converging bubble, all vertices belong to a single cluster
     end
@@ -1108,7 +1107,7 @@ function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
 
     Rpm = PMFG_T2s(S)[1]
     Apm = copy(Rpm)
-    Apm[.!iszero.(Apm) .!= 0] .= D[.!iszero.(Apm)]
+    Apm[Apm .!= 0] .= D[Apm .!= 0]
     Dpm = distance_wei(Apm)[1]
 
     H1, Hb, Mb, CliqList, Sb = CliqHierarchyTree2s(Rpm, root)
@@ -1121,7 +1120,7 @@ function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
     nMb = size(Mb, 2)
     for n ∈ axes(Mb, 2)
         vc = spzeros(Int, sRpm)
-        vc[sort!(unique(CliqList[.!iszero.(Mb[:, n]), :]))] .= 1
+        vc[sort!(unique(CliqList[Mb[:, n] .!= 0, :]))] .= 1
         Mv = hcat(Mv, vc)
     end
 

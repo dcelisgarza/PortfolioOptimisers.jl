@@ -111,10 +111,8 @@ risk_measures = risk_measures[isstructtype.(risk_measures)]
 for risk_measure ∈ risk_measures
     eval(quote
              function _risk_measure_factory(r::$(risk_measure), prior::HighOrderPriorModel)
-                 sk = risk_measure_nothing_matrix_factory(r.sk,
-                                                          _get_sk($(risk_measure), prior))
-                 V = risk_measure_nothing_matrix_factory(r.V,
-                                                         _get_V($(risk_measure), prior))
+                 sk = risk_measure_nothing_matrix_factory(r.sk, _get_sk(r, prior))
+                 V = risk_measure_nothing_matrix_factory(r.V, _get_V(r, prior))
                  return $(risk_measure)(; settings = r.settings, mp = r.mp, sk = sk, V = V)
              end
              function _risk_measure_factory(r::$(risk_measure),
@@ -152,8 +150,8 @@ for risk_measure ∈ risk_measures
                                                                                <:MatrixProcessing},
                                                     cluster::AbstractVector)
                  idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
-                 sk = view(_get_sk($(risk_measure), prior), cluster, idx)
-                 V = __coskewness(sk, prior.X, _get_smp($(risk_measure), prior))
+                 sk = view(_get_sk(r, prior), cluster, idx)
+                 V = __coskewness(sk, prior.X, _get_smp(r, prior))
                  if all(iszero.(diag(V)))
                      V += eps(eltype(sk)) * I
                  end
@@ -184,8 +182,7 @@ for risk_measure ∈ risk_measures
     eval(quote
              function _risk_measure_factory(r::$(risk_measure), prior::HighOrderPriorModel)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-                 kt = risk_measure_nothing_matrix_factory(r.kt,
-                                                          _get_kt($(risk_measure), prior))
+                 kt = risk_measure_nothing_matrix_factory(r.kt, _get_kt(r, prior))
                  return $(risk_measure)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
              end
              function _risk_measure_factory(r::$(risk_measure),
@@ -214,9 +211,7 @@ for risk_measure ∈ risk_measures
                                                     cluster::AbstractVector)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
                  idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
-                 kt = risk_measure_nothing_matrix_factory(r.kt,
-                                                          _get_kt($(risk_measure), prior),
-                                                          idx)
+                 kt = risk_measure_nothing_matrix_factory(r.kt, _get_kt(r, prior), idx)
                  return $(risk_measure)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
              end
              function risk_measure_factory(r::$(risk_measure); prior::AbstractPriorModel,
