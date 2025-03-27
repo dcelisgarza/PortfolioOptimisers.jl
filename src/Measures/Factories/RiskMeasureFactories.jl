@@ -143,8 +143,7 @@ risks = (ValueatRisk, ValueatRiskRange, DrawdownatRisk, EqualRiskMeasure,
          UlcerIndex, BrownianDistanceVariance, ConditionalValueatRiskRange,
          GiniMeanDifference, Range, TailGiniRange, ConditionalValueatRisk,
          DistributionallyRobustConditionalValueatRisk, TailGini, WorstRealisation,
-         ConditionalDrawdownatRisk, MaximumDrawdown, TrackingRiskMeasure,
-         TurnoverRiskMeasure)
+         ConditionalDrawdownatRisk, MaximumDrawdown, TurnoverRiskMeasure)
 for r ∈ risks
     eval(quote
              function risk_measure_factory(r::$(r), args...)
@@ -172,6 +171,9 @@ for r ∈ risks
                                                                       <:Any}, args...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
                  return $(r)(; settings = r.settings, w = w)
+             end
+             function cluster_risk_measure_factory(r::$(r), args...)
+                 return r
              end
          end)
 end
