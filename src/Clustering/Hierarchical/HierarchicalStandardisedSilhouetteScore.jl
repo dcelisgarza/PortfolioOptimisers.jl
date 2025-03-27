@@ -8,7 +8,7 @@ function optimal_number_clusters(nch::StandardisedSilhouetteScore, clustering::H
     c1 = min(ceil(Int, sqrt(N)), max_k)
     cluster_lvls = [cutree(clustering; k = i) for i ∈ 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
-    W_list[1] = typemin(eltype(W_list))
+    W_list[1] = typemin(eltype(dist))
     for i ∈ 2:c1
         lvl = cluster_lvls[i]
         sl = silhouettes(lvl, dist; metric = nch.metric)

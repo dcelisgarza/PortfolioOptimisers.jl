@@ -8,7 +8,7 @@ function optimal_number_clusters(nch::SecondOrderDifference, clustering::Hclust,
     c1 = min(ceil(Int, sqrt(N)), max_k)
     cluster_lvls = [cutree(clustering; k = i) for i ∈ 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
-    W_list[1] = typemin(eltype(W_list))
+    W_list[1] = typemin(eltype(dist))
     for i ∈ 2:c1
         lvl = cluster_lvls[i]
         c2 = maximum(unique(lvl))
@@ -32,7 +32,7 @@ function optimal_number_clusters(nch::SecondOrderDifference, clustering::Hclust,
         end
         W_list[i] = sum(D_list)
     end
-    gaps = fill(typemin(c1), c1)
+    gaps = fill(typemin(eltype(dist)), c1)
     if c1 > 2
         gaps[1:(end - 2)] .= W_list[1:(end - 2)] .+ W_list[3:end] .- 2 * W_list[2:(end - 1)]
     end

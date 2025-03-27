@@ -9,8 +9,8 @@ function __coskewness(cskew, X, mp)
         coskew_jk = view(cskew, :, j:k)
         mtx_process!(mp, coskew_jk, X)
         vals, vecs = eigen(coskew_jk)
-        vals .= clamp.(real.(vals), typemin(eltype(cskew)), 0) +
-                clamp.(imag.(vals), typemin(eltype(cskew)), 0)im
+        vals .= clamp.(real.(vals), typemin(eltype(cskew)), zero(eltype(cskew))) +
+                clamp.(imag.(vals), typemin(eltype(cskew)), zero(eltype(cskew)))im
         V .-= real(vecs * Diagonal(vals) * transpose(vecs))
     end
     return V
