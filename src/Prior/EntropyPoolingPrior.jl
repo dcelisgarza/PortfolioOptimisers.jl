@@ -202,12 +202,15 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintModel,
     lhs, rhs, lb, ub = if !isnothing(A_eq) && !isnothing(B_eq)
         A_eq = vcat(ones(eltype(A_eq), 1, size(A_eq, 2)), A_eq)
         B_eq = vcat(eltype(B_eq)[1], B_eq)
-        A_eq, B_eq, fill(-Inf, length(B_eq)), fill(Inf, length(B_eq))
+        A_eq, B_eq, fill(typemin(eltype(B_eq)), length(B_eq)),
+        fill(typemax(eltype(B_eq)), length(B_eq))
     else
-        ones(eltype(w), 1, length(w)), eltype(w)[1], [-Inf], [Inf]
+        ones(eltype(w), 1, length(w)), eltype(w)[1], [typemin(eltype(w))],
+        [typemax(eltype(w))]
     end
     lhs_ineq, rhs_ineq, lb_ineq, ub_ineq = if !isnothing(A_ineq) && !isnothing(B_ineq)
-        A_ineq, B_ineq, fill(0, length(B_ineq)), fill(Inf, length(B_ineq))
+        A_ineq, B_ineq, fill(zero(eltype(B_ineq)), length(B_ineq)),
+        fill(typemax(eltype(B_ineq)), length(B_ineq))
     else
         nothing, nothing, nothing, nothing
     end

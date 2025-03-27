@@ -66,7 +66,7 @@ function variation_info(X::AbstractMatrix,
                 var_ixy = var_ixy / vxy
             end
 
-            var_ixy = clamp(var_ixy, zero(eltype(X)), Inf)
+            var_ixy = clamp(var_ixy, zero(eltype(X)), typemax(eltype(X)))
 
             var_mtx[j, i] = var_mtx[i, j] = var_ixy
         end
@@ -106,8 +106,8 @@ function mutual_variation_info(X::AbstractMatrix,
             #     var_ixy = zero(eltype(X))
             # end
 
-            mut_ixy = clamp(mut_ixy, zero(eltype(X)), Inf)
-            var_ixy = clamp(var_ixy, zero(eltype(X)), Inf)
+            mut_ixy = clamp(mut_ixy, zero(eltype(X)), typemax(eltype(X)))
+            var_ixy = clamp(var_ixy, zero(eltype(X)), typemax(eltype(X)))
 
             mut_mtx[j, i] = mut_mtx[i, j] = mut_ixy
             var_mtx[j, i] = var_mtx[i, j] = var_ixy
@@ -137,7 +137,7 @@ function mutual_info(X::AbstractMatrix,
                 mut_ixy /= min(ex, ey)
             end
 
-            mut_ixy = clamp(mut_ixy, zero(eltype(X)), Inf)
+            mut_ixy = clamp(mut_ixy, zero(eltype(X)), typemax(eltype(X)))
 
             mut_mtx[j, i] = mut_mtx[i, j] = mut_ixy
         end

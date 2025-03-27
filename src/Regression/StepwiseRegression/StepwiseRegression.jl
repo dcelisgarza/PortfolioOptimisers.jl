@@ -44,7 +44,7 @@ function add_best_asset_after_failure_pval!(included::AbstractVector, F::Abstrac
     ovec = range(; start = 1, stop = 1, length = T)
     indices = 1:N
     excluded = setdiff(indices, included)
-    best_pval = Inf
+    best_pval = typemax(eltype(x))
     new_feature = 0
     for i ∈ excluded
         factors = [included; i]

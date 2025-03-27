@@ -9,7 +9,7 @@ function (::RelativeUlcerIndex)(x::AbstractVector)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
     val = zero(eltype(x))
-    peak = -Inf
+    peak = typemin(eltype(x))
     for i ∈ cs
         if i > peak
             peak = i

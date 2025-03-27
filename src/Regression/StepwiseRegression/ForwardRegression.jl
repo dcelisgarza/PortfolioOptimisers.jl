@@ -12,7 +12,7 @@ function _regression(re::ForwardRegression{<:PValue}, x::AbstractVector, F::Abst
     val = zero(promote_type(eltype(F), eltype(x)))
     while val <= re.criterion.threshold
         excluded = setdiff(indices, included)
-        best_pval = Inf
+        best_pval = typemax(eltype(x))
         new_feature = 0
         for i ∈ excluded
             factors = [included; i]

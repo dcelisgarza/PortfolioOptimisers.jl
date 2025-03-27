@@ -26,7 +26,7 @@ end
 function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
-    peak = -Inf
+    peak = typemin(eltype(x))
     dd = similar(cs)
     for (idx, i) ∈ pairs(cs)
         if i > peak

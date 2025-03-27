@@ -12,7 +12,7 @@ function (r::ConditionalDrawdownatRisk)(x::AbstractVector)
     idx = ceil(Int, aT)
     pushfirst!(x, 1)
     cs = cumsum(x)
-    peak = -Inf
+    peak = typemin(eltype(x))
     dd = similar(cs)
     for (idx, i) ∈ pairs(cs)
         if i > peak

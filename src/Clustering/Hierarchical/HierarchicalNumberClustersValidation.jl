@@ -33,6 +33,6 @@ function valid_k_clusters(clustering::Hclust, arr::AbstractVector)
         elseif all(isinf.(arr))
             return 1
         end
-        arr[k] = -Inf
+        arr[k] = typemin(eltype(arr))
     end
 end

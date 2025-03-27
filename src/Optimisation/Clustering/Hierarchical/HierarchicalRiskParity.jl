@@ -77,7 +77,7 @@ function hrp_scalarised_risk(::MaxScalariser, wu::AbstractMatrix, wk::AbstractVe
                              X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
-    trisk = -Inf
+    trisk = typemin(eltype(X))
     for r ∈ rs
         fill!(wu, zero(eltype(X)))
         unitary_expected_risks!(wk, rku, r, X, fees)

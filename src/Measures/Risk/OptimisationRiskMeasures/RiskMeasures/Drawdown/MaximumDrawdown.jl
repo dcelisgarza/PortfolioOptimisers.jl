@@ -8,7 +8,7 @@ function (::MaximumDrawdown)(x::AbstractVector)
     pushfirst!(x, 1)
     cs = cumsum(x)
     val = zero(eltype(x))
-    peak = -Inf
+    peak = typemin(eltype(x))
     for i ∈ cs
         if i > peak
             peak = i

@@ -13,7 +13,7 @@ function (r::RelativeAverageDrawdown{<:Any, Nothing})(x::AbstractVector)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
     val = zero(eltype(x))
-    peak = -Inf
+    peak = typemin(eltype(x))
     for i ∈ cs
         if i > peak
             peak = i
@@ -31,7 +31,7 @@ function (r::RelativeAverageDrawdown{<:Any, <:AbstractWeights})(x::AbstractVecto
     x .= pushfirst!(x, 0) .+ one(eltype(x))
     cs = cumprod(x)
     val = zero(eltype(x))
-    peak = -Inf
+    peak = typemin(eltype(x))
     for (idx, i) ∈ pairs(cs)
         if i > peak
             peak = i

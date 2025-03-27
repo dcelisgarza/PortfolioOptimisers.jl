@@ -22,7 +22,7 @@ end
 function (r::RelativisticDrawdownatRisk)(x::AbstractVector)
     pushfirst!(x, 1)
     cs = cumsum(x)
-    peak = -Inf
+    peak = typemin(eltype(x))
     dd = similar(cs)
     for (idx, i) ∈ pairs(cs)
         if i > peak

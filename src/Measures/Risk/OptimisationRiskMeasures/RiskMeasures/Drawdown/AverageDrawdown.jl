@@ -11,7 +11,7 @@ function (::AverageDrawdown{<:Any, Nothing})(x::AbstractVector)
     pushfirst!(x, 1)
     cs = cumsum(x)
     val = zero(eltype(x))
-    peak = -Inf
+    peak = typemin(eltype(x))
     for i ∈ cs
         if i > peak
             peak = i
@@ -29,7 +29,7 @@ function (r::AverageDrawdown{<:Any, <:AbstractWeights})(x::AbstractVector)
     pushfirst!(x, 1)
     cs = cumsum(x)
     val = zero(eltype(x))
-    peak = -Inf
+    peak = typemin(eltype(x))
     for (idx, i) ∈ pairs(cs)
         if i > peak
             peak = i
