@@ -14,7 +14,8 @@ end
 function risk_measure_factory(r::TrackingRiskMeasure, ::Any, args...)
     return r
 end
-function cluster_risk_measure_factory(r::TrackingRiskMeasure, args...)
+function cluster_risk_measure_factory(r::TrackingRiskMeasure{<:Any, <:ReturnsTracking},
+                                      args...)
     return r
 end
 function cluster_risk_measure_factory(r::TrackingRiskMeasure{<:Any, <:WeightsTracking},

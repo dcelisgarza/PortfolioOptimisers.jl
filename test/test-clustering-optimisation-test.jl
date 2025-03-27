@@ -135,12 +135,12 @@
 
         df = CSV.read(joinpath(@__DIR__, "./assets/HERC_different_risk_measures.csv"),
                       DataFrame)
-        for (i, risk) ∈ enumerate(risks, circshift(risks, 3))
-            w1 = optimise!(HierarchicalEqualRiskContribution(; ri = risk, ro = riskc,
+        for (i, (risk1, risk2)) ∈ enumerate(zip(risks, circshift(risks, 3)))
+            w1 = optimise!(HierarchicalEqualRiskContribution(; ri = risk1, ro = risk2,
                                                              opt = opt))
             res = isapprox(w1, df[:, i])
             if !res
-                println("$i\n$(string(risk)) failed")
+                println("$i\n$(string(risk1))\n$(string(risk2)) failed")
                 find_tol(w1, df[:, i]; name1 = :w1, name2 = :df)
             end
             @test res
