@@ -11,8 +11,10 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
                                  <:AbstractVector{<:CentralityConstraint},
                                  <:LinearConstraintModel}, T10 <: Union{Nothing, DataFrame},
                      T11 <: Union{Nothing, Fees},
-                     T12::Union{Nothing, <:AdjacencyConstraint, <:AdjacencyConstraintModel},
-                     T13::Union{Nothing, <:AdjacencyConstraint, <:AdjacencyConstraintModel},
+                     T12 <:
+                     Union{Nothing, <:AdjacencyConstraint, <:AdjacencyConstraintModel},
+                     T13 <:
+                     Union{Nothing, <:AdjacencyConstraint, <:AdjacencyConstraintModel},
                      T14 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                      T15 <: Scalariser}
     pe::T1
