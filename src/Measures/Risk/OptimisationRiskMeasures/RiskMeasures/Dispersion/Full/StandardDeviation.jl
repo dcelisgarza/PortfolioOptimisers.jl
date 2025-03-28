@@ -14,12 +14,13 @@ end
 function (r::StandardDeviation)(w::AbstractVector)
     return sqrt(dot(w, r.sigma, w))
 end
-function risk_measure_factory(r::StandardDeviation, prior::AbstractPriorModel, args...)
+function risk_measure_factory(r::StandardDeviation, prior::AbstractPriorModel, args...;
+                              kwargs...)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
 function cluster_risk_measure_factory(r::StandardDeviation, prior::AbstractPriorModel,
-                                      cluster::AbstractVector, args...)
+                                      cluster::AbstractVector, args...; kwargs...)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, cluster)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end

@@ -21,7 +21,7 @@ function (r::UncertaintySetVariance)(w::AbstractVector)
 end
 function risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorModel, ::Any,
                               uncertainty_set::Union{Nothing, <:UncertaintySet} = nothing,
-                              args...)
+                              args...; kwargs...)
     uset = uncertainty_set_factory(r.uncertainty_set, uncertainty_set)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, uncertainty_set = uset,
@@ -30,7 +30,7 @@ end
 function cluster_risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorModel,
                                       cluster::AbstractVector, ::Any,
                                       uncertainty_set::Union{Nothing, <:UncertaintySet} = nothing,
-                                      args...)
+                                      args...; kwargs...)
     uset = uncertainty_set_factory(r.uncertainty_set, uncertainty_set, cluster)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, cluster)
     return UncertaintySetVariance(; settings = r.settings, uncertainty_set = uset,
