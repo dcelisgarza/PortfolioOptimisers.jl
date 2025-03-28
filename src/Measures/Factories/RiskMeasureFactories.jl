@@ -196,17 +196,17 @@ risks = (RelativeEntropicDrawdownatRisk, EntropicValueatRisk, EntropicDrawdownat
 for r ∈ risks
     eval(quote
              function risk_measure_factory(r::$(r), ::Any,
-                                           solvers::Union{Nothing, <:Solver,
-                                                          <:AbstractVector{<:Solver}},
-                                           args...; kwargs...)
-                 solvers = risk_measure_solver_factory(r.solvers, solvers)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, solvers = solvers)
+                                           slv::Union{Nothing, <:Solver,
+                                                      <:AbstractVector{<:Solver}}, args...;
+                                           kwargs...)
+                 slv = risk_measure_solver_factory(r.slv, slv)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, slv = slv)
              end
              function cluster_risk_measure_factory(r::$(r), ::Any, ::Any,
-                                                   solvers::Union{Nothing, <:Solver,
-                                                                  <:AbstractVector{<:Solver}},
+                                                   slv::Union{Nothing, <:Solver,
+                                                              <:AbstractVector{<:Solver}},
                                                    args...; kwargs...)
-                 return risk_measure_factory(r; solvers = solvers, kwargs = kwargs)
+                 return risk_measure_factory(r; slv = slv, kwargs = kwargs)
              end
          end)
 end
@@ -216,18 +216,18 @@ risks = (RelativeRelativisticDrawdownatRisk, RelativisticValueatRisk,
 for r ∈ risks
     eval(quote
              function risk_measure_factory(r::$(r), ::Any,
-                                           solvers::Union{Nothing, <:Solver,
-                                                          <:AbstractVector{<:Solver}},
-                                           args...; kwargs...)
-                 solvers = risk_measure_solver_factory(r.solvers, solvers)
+                                           slv::Union{Nothing, <:Solver,
+                                                      <:AbstractVector{<:Solver}}, args...;
+                                           kwargs...)
+                 slv = risk_measure_solver_factory(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
-                             solvers = solvers)
+                             slv = slv)
              end
              function cluster_risk_measure_factory(r::$(r), ::Any, ::Any,
-                                                   solvers::Union{Nothing, <:Solver,
-                                                                  <:AbstractVector{<:Solver}},
+                                                   slv::Union{Nothing, <:Solver,
+                                                              <:AbstractVector{<:Solver}},
                                                    args...; kwargs...)
-                 return risk_measure_factory(r; solvers = solvers, kwargs = kwargs)
+                 return risk_measure_factory(r; slv = slv, kwargs = kwargs)
              end
          end)
 end

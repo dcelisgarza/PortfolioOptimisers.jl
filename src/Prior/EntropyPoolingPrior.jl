@@ -19,18 +19,18 @@ struct JuMPEntropyPooling{T1 <: Real, T2 <: Real,
        EntropyPoolingOptimisation
     constr_scale::T1
     obj_scale::T2
-    solvers::T3
+    slv::T3
 end
-function JuMPEntropyPooling(; solvers::Union{<:Solver, <:AbstractVector{<:Solver}},
+function JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                             constr_scale::Real = 1, obj_scale::Real = 1)
     @smart_assert(constr_scale >= zero(constr_scale))
     @smart_assert(obj_scale >= zero(obj_scale))
-    if isa(solvers, AbstractVector)
-        @smart_assert(!isempty(solvers))
+    if isa(slv, AbstractVector)
+        @smart_assert(!isempty(slv))
     end
-    return JuMPEntropyPooling{typeof(constr_scale), typeof(obj_scale), typeof(solvers)}(constr_scale,
-                                                                                        obj_scale,
-                                                                                        solvers)
+    return JuMPEntropyPooling{typeof(constr_scale), typeof(obj_scale), typeof(slv)}(constr_scale,
+                                                                                    obj_scale,
+                                                                                    slv)
 end
 struct EntropyPoolingPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
                                     T2 <: Union{<:EntropyPoolingView,
@@ -260,7 +260,7 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintModel,
                    t
                end)
     (; A_eq, B_eq, A_ineq, B_ineq) = epcs
-    (; constr_scale, obj_scale, solvers) = optim
+    (; constr_scale, obj_scale, slv) = optim
     # Equality constraints from A_ineq and B_ineq if provided
     if !isnothing(A_eq) && !isnothing(B_eq)
         @constraint(model, constr_eq, constr_scale * A_eq * q == constr_scale * B_eq)
@@ -277,7 +277,7 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintModel,
                  end)
     @objective(model, Min, obj_scale * (t - dot(q, log_p)))
     # Solve the optimization problem
-    success, solvers_tried = optimise_JuMP_model(model, solvers)
+    success, solvers_tried = optimise_JuMP_model(model, slv)
     return if success
         pweights(value.(q))
     else

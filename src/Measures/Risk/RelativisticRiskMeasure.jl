@@ -1,7 +1,7 @@
-function RRM(x::AbstractVector, solvers::Union{<:Solver, <:AbstractVector{<:Solver}},
+function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}},
              alpha::Real = 0.05, kappa::Real = 0.3)
-    if isa(solvers, AbstractVector)
-        @smart_assert(!isempty(solvers))
+    if isa(slv, AbstractVector)
+        @smart_assert(!isempty(slv))
     end
     T = length(x)
     at = alpha * T
@@ -34,7 +34,7 @@ function RRM(x::AbstractVector, solvers::Union{<:Solver, <:AbstractVector{<:Solv
                  end)
     @expression(model, risk, t + ln_k * z + sum(psi .+ theta))
     @objective(model, Min, risk)
-    success, solvers_tried = optimise_JuMP_model(model, solvers)
+    success, solvers_tried = optimise_JuMP_model(model, slv)
     return if success
         objective_value(model)
     else
@@ -53,7 +53,7 @@ function RRM(x::AbstractVector, solvers::Union{<:Solver, <:AbstractVector{<:Solv
                      end)
         @expression(model, risk, -dot(z, x))
         @objective(model, Max, risk)
-        success, solvers_tried = optimise_JuMP_model(model, solvers)
+        success, solvers_tried = optimise_JuMP_model(model, slv)
         if success
             objective_value(model)
         else

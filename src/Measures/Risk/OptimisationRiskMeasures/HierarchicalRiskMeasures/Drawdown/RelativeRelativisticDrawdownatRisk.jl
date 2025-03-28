@@ -6,22 +6,21 @@ struct RelativeRelativisticDrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings,
     settings::T1
     alpha::T2
     kappa::T3
-    solvers::T4
+    slv::T4
 end
 function RelativeRelativisticDrawdownatRisk(;
                                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                             alpha::Real = 0.05, kappa = 0.3,
-                                            solvers::Union{Nothing, <:Solver,
-                                                           <:AbstractVector{<:Solver}} = nothing)
-    if isa(solvers, AbstractVector)
-        @smart_assert(!isempty(solvers))
+                                            slv::Union{Nothing, <:Solver,
+                                                       <:AbstractVector{<:Solver}} = nothing)
+    if isa(slv, AbstractVector)
+        @smart_assert(!isempty(slv))
     end
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(kappa) < kappa < one(kappa))
     return RelativeRelativisticDrawdownatRisk{typeof(settings), typeof(alpha),
-                                              typeof(kappa), typeof(solvers)}(settings,
-                                                                              alpha, kappa,
-                                                                              solvers)
+                                              typeof(kappa), typeof(slv)}(settings, alpha,
+                                                                          kappa, slv)
 end
 function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
@@ -35,7 +34,7 @@ function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
         dd[idx] = i / peak - 1
     end
     popfirst!(dd)
-    return RRM(dd, r.solvers, r.alpha, r.kappa)
+    return RRM(dd, r.slv, r.alpha, r.kappa)
 end
 
 export RelativeRelativisticDrawdownatRisk

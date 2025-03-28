@@ -1,11 +1,11 @@
 function optimise_JuMP_model(model::JuMP.Model,
-                             solvers::Union{<:Solver, <:AbstractVector{<:Solver}})
-    if isa(solvers, AbstractVector)
-        @smart_assert(!isempty(solvers))
+                             slv::Union{<:Solver, <:AbstractVector{<:Solver}})
+    if isa(slv, AbstractVector)
+        @smart_assert(!isempty(slv))
     end
     solvers_tried = Dict()
     success = false
-    for solver ∈ solvers
+    for solver ∈ slv
         name = solver.name
         solver_i = solver.solver
         settings = solver.settings

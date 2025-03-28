@@ -12,19 +12,19 @@
         end
     end
     @testset "OWA l-moments" begin
-        solvers = Solver(; solver = Clarabel.Optimizer,
-                         settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+        slv = Solver(; solver = Clarabel.Optimizer,
+                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
         owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_l_moment_weights.csv"), DataFrame)
         owas = [OWA_NCRRA(; g = 0.75), OWA_NCRRA(), OWA_NCRRA(; g = 0.25),
-                OWA_MaximumEntropy(; max_phi = 0.75, solvers = solvers),
-                OWA_MaximumEntropy(; solvers = solvers),
-                OWA_MaximumEntropy(; max_phi = 0.25, solvers = solvers),
-                OWA_MinimumSumSquares(; max_phi = 0.75, solvers = solvers),
-                OWA_MinimumSumSquares(; solvers = solvers),
-                OWA_MinimumSumSquares(; max_phi = 0.25, solvers = solvers),
-                OWA_MinimumSquareDistance(; max_phi = 0.75, solvers = solvers),
-                OWA_MinimumSquareDistance(; solvers = solvers),
-                OWA_MinimumSquareDistance(; max_phi = 0.25, solvers = solvers)]
+                OWA_MaximumEntropy(; max_phi = 0.75, slv = slv),
+                OWA_MaximumEntropy(; slv = slv),
+                OWA_MaximumEntropy(; max_phi = 0.25, slv = slv),
+                OWA_MinimumSumSquares(; max_phi = 0.75, slv = slv),
+                OWA_MinimumSumSquares(; slv = slv),
+                OWA_MinimumSumSquares(; max_phi = 0.25, slv = slv),
+                OWA_MinimumSquareDistance(; max_phi = 0.75, slv = slv),
+                OWA_MinimumSquareDistance(; slv = slv),
+                OWA_MinimumSquareDistance(; max_phi = 0.25, slv = slv)]
         for i ∈ eachindex(owas)
             owa = owa_l_moment_crm(200; k = 5, method = owas[i])
             res = if i == 4
@@ -42,9 +42,9 @@
             end
             @test res
         end
-        @test_throws AssertionError OWA_MaximumEntropy(solvers = Solver[])
-        @test_throws AssertionError OWA_MinimumSquareDistance(solvers = Solver[])
-        @test_throws AssertionError OWA_MinimumSumSquares(solvers = Solver[])
+        @test_throws AssertionError OWA_MaximumEntropy(slv = Solver[])
+        @test_throws AssertionError OWA_MinimumSquareDistance(slv = Solver[])
+        @test_throws AssertionError OWA_MinimumSumSquares(slv = Solver[])
     end
     @testset "OWA weight vectors" begin
         owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_weights.csv"), DataFrame)

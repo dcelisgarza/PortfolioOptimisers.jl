@@ -4,18 +4,20 @@ struct OWA_MinimumSquareDistance{T1 <: Real, T2 <: Real, T3 <: Real,
     max_phi::T1
     sc::T2
     so::T3
-    solvers::T4
+    slv::T4
 end
 function OWA_MinimumSquareDistance(; max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
-                                   solvers::Union{Solver, <:AbstractVector{Solver}} = Solver())
-    if isa(solvers, AbstractVector)
-        @smart_assert(!isempty(solvers))
+                                   slv::Union{Solver, <:AbstractVector{Solver}} = Solver())
+    if isa(slv, AbstractVector)
+        @smart_assert(!isempty(slv))
     end
     @smart_assert(zero(max_phi) < max_phi < one(max_phi))
     @smart_assert(sc > zero(sc))
     @smart_assert(so > zero(so))
-    return OWA_MinimumSquareDistance{typeof(max_phi), typeof(sc), typeof(so),
-                                     typeof(solvers)}(max_phi, sc, so, solvers)
+    return OWA_MinimumSquareDistance{typeof(max_phi), typeof(sc), typeof(so), typeof(slv)}(max_phi,
+                                                                                           sc,
+                                                                                           so,
+                                                                                           slv)
 end
 function owa_l_moment_crm(method::OWA_MinimumSquareDistance,
                           weights::AbstractMatrix{<:Real})

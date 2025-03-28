@@ -912,21 +912,21 @@
                                             alg = H2_EntropyPooling()),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             opt = JuMPEntropyPooling(;
-                                                                     solvers = Solver(;
-                                                                                      solver = Clarabel.Optimizer,
-                                                                                      settings = Dict("verbose" => false)))),
+                                                                     slv = Solver(;
+                                                                                  solver = Clarabel.Optimizer,
+                                                                                  settings = Dict("verbose" => false)))),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H1_EntropyPooling(),
                                             opt = JuMPEntropyPooling(;
-                                                                     solvers = Solver(;
-                                                                                      solver = Clarabel.Optimizer,
-                                                                                      settings = Dict("verbose" => false)))),
+                                                                     slv = Solver(;
+                                                                                  solver = Clarabel.Optimizer,
+                                                                                  settings = Dict("verbose" => false)))),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H2_EntropyPooling(),
                                             opt = JuMPEntropyPooling(;
-                                                                     solvers = Solver(;
-                                                                                      solver = Clarabel.Optimizer,
-                                                                                      settings = Dict("verbose" => false))))]
+                                                                     slv = Solver(;
+                                                                                  solver = Clarabel.Optimizer,
+                                                                                  settings = Dict("verbose" => false))))]
 
         ress = (0.03270155949442489, 0.030586876690884276, 0.03058687450109127,
                 0.032701560391104334, 0.03058687741491548, 0.030586877801521424)
@@ -1218,7 +1218,7 @@
         @test sort(c) == c
         @test sort!(c) == c
 
-        @test_throws AssertionError JuMPEntropyPooling(; solvers = Solver[])
+        @test_throws AssertionError JuMPEntropyPooling(; slv = Solver[])
         pe = EntropyPoolingPriorEstimator(;
                                           views = EntropyPoolingView(;
                                                                      A = C1_LinearEntropyPoolingConstraint(;

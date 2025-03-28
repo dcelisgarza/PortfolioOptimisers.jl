@@ -4,35 +4,34 @@ struct EntropicValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Rea
     settings::T1
     alpha::T2
     beta::T3
-    solvers::T4
+    slv::T4
 end
 function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   alpha::Real = 0.05, beta::Real = 0.05,
-                                  solvers::Union{Nothing, <:Solver,
-                                                 <:AbstractVector{<:Solver}} = nothing)
-    if isa(solvers, AbstractVector)
-        @smart_assert(!isempty(solvers))
+                                  slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing)
+    if isa(slv, AbstractVector)
+        @smart_assert(!isempty(slv))
     end
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(beta) < beta < one(beta))
     return EntropicValueatRiskRange{typeof(settings), typeof(alpha), typeof(beta),
-                                    typeof(solvers)}(settings, alpha, beta, solvers)
+                                    typeof(slv)}(settings, alpha, beta, slv)
 end
 function (r::EntropicValueatRiskRange)(x::AbstractVector)
-    return ERM(x, r.solvers, r.alpha) + ERM(-x, r.solvers, r.beta)
+    return ERM(x, r.slv, r.alpha) + ERM(-x, r.slv, r.beta)
 end
 function risk_measure_factory(r::EntropicValueatRiskRange, ::Any,
-                              solvers::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
+                              slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                               args...; kwargs...)
-    solvers = risk_measure_solver_factory(r.solvers, solvers)
+    slv = risk_measure_solver_factory(r.slv, slv)
     return EntropicValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
-                                    solvers = solvers)
+                                    slv = slv)
 end
 function cluster_risk_measure_factory(r::EntropicValueatRiskRange, ::Any, ::Any,
-                                      solvers::Union{Nothing, <:Solver,
-                                                     <:AbstractVector{<:Solver}}, args...;
+                                      slv::Union{Nothing, <:Solver,
+                                                 <:AbstractVector{<:Solver}}, args...;
                                       kwargs...)
-    return risk_measure_factory(r, nothing, nothing, solvers, args...; kwargs...)
+    return risk_measure_factory(r, nothing, nothing, slv, args...; kwargs...)
 end
 
 export EntropicValueatRiskRange

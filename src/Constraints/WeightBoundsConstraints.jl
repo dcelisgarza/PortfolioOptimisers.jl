@@ -133,5 +133,9 @@ function weight_bounds_constraints(wb::WeightBounds; N::Integer, kwargs...)
         wb
     end
 end
+function weight_bounds_constraints(wb::Nothing; N::Integer, kwargs...)
+    return WeightBounds(; lb = range(; start = 0, stop = 0, length = N),
+                        ub = range(; start = 1, stop = 1, length = N))
+end
 
 export WeightBoundsConstraints, weight_bounds_constraints

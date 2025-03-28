@@ -299,7 +299,7 @@ function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = Retu
     # Calculate the weight of each cluster relative to the other clusters.
     lc = Vector{Int}(undef, 0)
     rc = Vector{Int}(undef, 0)
-    for i ∈ nd[1:(clm.k - 1)]
+    @inbounds for i ∈ nd[1:(clm.k - 1)]
         if is_leaf(i)
             continue
         end

@@ -19,8 +19,8 @@ function owa_model_setup(method::JuMP_OrderedWeightsArray, weights::AbstractMatr
 end
 function owa_model_solve(model::JuMP.Model, method::JuMP_OrderedWeightsArray,
                          weights::AbstractMatrix)
-    solvers = method.solvers
-    success = optimise_JuMP_model(model, solvers)[1]
+    slv = method.slv
+    success = optimise_JuMP_model(model, slv)[1]
     return if success
         phi = model[:phi]
         phis = value.(phi)

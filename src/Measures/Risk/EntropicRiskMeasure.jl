@@ -1,7 +1,7 @@
-function ERM(x::AbstractVector{<:Real},
-             solvers::Union{<:Solver, <:AbstractVector{<:Solver}}, alpha::Real = 0.05)
-    if isa(solvers, AbstractVector)
-        @smart_assert(!isempty(solvers))
+function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:Solver}},
+             alpha::Real = 0.05)
+    if isa(slv, AbstractVector)
+        @smart_assert(!isempty(slv))
     end
     model = JuMP.Model()
     set_string_names_on_creation(model, false)
@@ -17,7 +17,7 @@ function ERM(x::AbstractVector{<:Real},
                  end)
     @expression(model, risk, t - z * log(alpha * T))
     @objective(model, Min, risk)
-    success, solvers_tried = optimise_JuMP_model(model, solvers)
+    success, solvers_tried = optimise_JuMP_model(model, slv)
     return if success
         objective_value(model)
     else
