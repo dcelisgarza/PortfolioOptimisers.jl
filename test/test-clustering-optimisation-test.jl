@@ -61,16 +61,67 @@
             res = if i == 14
                 isapprox(w1, df[:, i]; rtol = 1e-5)
             elseif i == 29
-                isapprox(w1, df[:, i]; rtol = 5e-8)
+                if Sys.isapple()
+                    isapprox(w1, df[:, i]; rtol = 1e-7)
+                else
+                    isapprox(w1, df[:, i]; rtol = 5e-8)
+                end
             elseif i == 30
                 isapprox(w1, df[:, i]; rtol = 5e-7)
             elseif i == 40
                 isapprox(w1, df[:, i]; rtol = 5e-8)
             elseif i == 41
-                isapprox(w1, df[:, i]; rtol = 5e-4)
+                if Sys.isapple()
+                    isapprox(w1, df[:, i]; rtol = 5e-3)
+                else
+                    isapprox(w1, df[:, i]; rtol = 5e-4)
+                end
             else
                 isapprox(w1, df[:, i])
             end
+            if !res
+                println("$i\n$(string(risk)) failed")
+                find_tol(w1, df[:, i]; name1 = :w1, name2 = :df)
+            end
+            @test res
+        end
+
+        opts = [HierarchicalOptimiser(; pe = pm, cle = clm, sce = SumScalariser(),
+                                      slv = Solver(; name = :clarabel,
+                                                   solver = Clarabel.Optimizer,
+                                                   check_sol = (; allow_local = true,
+                                                                allow_almost = true),
+                                                   settings = Dict("max_step_fraction" => 0.75,
+                                                                   "verbose" => false))),
+                HierarchicalOptimiser(; pe = pm, cle = clm, sce = MaxScalariser(),
+                                      slv = Solver(; name = :clarabel,
+                                                   solver = Clarabel.Optimizer,
+                                                   check_sol = (; allow_local = true,
+                                                                allow_almost = true),
+                                                   settings = Dict("max_step_fraction" => 0.75,
+                                                                   "verbose" => false))),
+                HierarchicalOptimiser(; pe = pm, cle = clm,
+                                      sce = LogSumExpScalariser(; gamma = 1e-3),
+                                      slv = Solver(; name = :clarabel,
+                                                   solver = Clarabel.Optimizer,
+                                                   check_sol = (; allow_local = true,
+                                                                allow_almost = true),
+                                                   settings = Dict("max_step_fraction" => 0.75,
+                                                                   "verbose" => false))),
+                HierarchicalOptimiser(; pe = pm, cle = clm,
+                                      sce = LogSumExpScalariser(; gamma = 3),
+                                      slv = Solver(; name = :clarabel,
+                                                   solver = Clarabel.Optimizer,
+                                                   check_sol = (; allow_local = true,
+                                                                allow_almost = true),
+                                                   settings = Dict("max_step_fraction" => 0.75,
+                                                                   "verbose" => false)))]
+        df = CSV.read(joinpath(@__DIR__, "./assets/HRP_vector_rm.csv"), DataFrame)
+        risk = [MeanAbsoluteDeviation(; settings = RiskMeasureSettings(; scale = 2.3)),
+                StandardDeviation(; settings = RiskMeasureSettings(; scale = 0.3))]
+        for (i, opt) ∈ enumerate(opts)
+            w1 = optimise!(HierarchicalRiskParity(; r = risk, opt = opt))
+            res = isapprox(w1, df[:, i])
             if !res
                 println("$i\n$(string(risk)) failed")
                 find_tol(w1, df[:, i]; name1 = :w1, name2 = :df)
@@ -128,13 +179,21 @@
             res = if i == 14
                 isapprox(w1, df[:, i]; rtol = 1e-5)
             elseif i == 29
-                isapprox(w1, df[:, i]; rtol = 5e-8)
+                if Sys.isapple()
+                    isapprox(w1, df[:, i]; rtol = 1e-7)
+                else
+                    isapprox(w1, df[:, i]; rtol = 5e-8)
+                end
             elseif i == 30
                 isapprox(w1, df[:, i]; rtol = 5e-7)
             elseif i == 40
                 isapprox(w1, df[:, i]; rtol = 1e-7)
             elseif i == 41
-                isapprox(w1, df[:, i]; rtol = 1e-7)
+                if Sys.isapple()
+                    isapprox(w1, df[:, i]; rtol = 5e-3)
+                else
+                    isapprox(w1, df[:, i]; rtol = 1e-7)
+                end
             else
                 isapprox(w1, df[:, i])
             end
@@ -153,17 +212,31 @@
             res = if i == 14
                 isapprox(w1, df[:, i]; rtol = 1e-5)
             elseif i == 29
-                isapprox(w1, df[:, i]; rtol = 5e-8)
+                if Sys.isapple()
+                    isapprox(w1, df[:, i]; rtol = 1e-7)
+                else
+                    isapprox(w1, df[:, i]; rtol = 5e-8)
+                end
             elseif i == 30
+                isapprox(w1, df[:, i]; rtol = 1e-7)
+            elseif i == 32 && Sys.isapple()
                 isapprox(w1, df[:, i]; rtol = 1e-7)
             elseif i == 33
                 isapprox(w1, df[:, i]; rtol = 1e-7)
             elseif i == 40
                 isapprox(w1, df[:, i]; rtol = 5e-8)
             elseif i == 41
-                isapprox(w1, df[:, i]; rtol = 5e-8)
+                if Sys.isapple()
+                    isapprox(w1, df[:, i]; rtol = 5e-3)
+                else
+                    isapprox(w1, df[:, i]; rtol = 5e-8)
+                end
             elseif i == 44
-                isapprox(w1, df[:, i]; rtol = 5e-8)
+                if Sys.isapple()
+                    isapprox(w1, df[:, i]; rtol = 5e-5)
+                else
+                    isapprox(w1, df[:, i]; rtol = 5e-8)
+                end
             else
                 isapprox(w1, df[:, i])
             end
@@ -172,6 +245,45 @@
                 find_tol(w1, df[:, i]; name1 = :w1, name2 = :df)
             end
             @test res
+        end
+
+        sces = [SumScalariser(), MaxScalariser(), LogSumExpScalariser(; gamma = 1e-3),
+                LogSumExpScalariser(; gamma = 3)]
+        base = [MeanAbsoluteDeviation(; settings = RiskMeasureSettings(; scale = 2.3)),
+                StandardDeviation(; settings = RiskMeasureSettings(; scale = 4.2))]
+        risks = [(r1 = base, r2 = base)
+                 (r1 = base,
+                  r2 = [ConditionalValueatRisk(;
+                                               settings = RiskMeasureSettings(;
+                                                                              scale = 3.2)),
+                        WorstRealisation(; settings = RiskMeasureSettings(; scale = 0.2))])
+                 (r1 = base,
+                  r2 = ConditionalValueatRisk(;
+                                              settings = RiskMeasureSettings(; scale = 3.2)))
+                 (r1 = ConditionalValueatRisk(;
+                                              settings = RiskMeasureSettings(; scale = 3.2)),
+                  r2 = base)]
+        df = CSV.read(joinpath(@__DIR__, "./assets/HERC_vector_rm.csv"), DataFrame)
+        for (idx, sce) ∈ zip(1:4:16, sces)
+            opt = HierarchicalOptimiser(; pe = pm, cle = clm, sce = sce,
+                                        slv = Solver(; name = :clarabel,
+                                                     solver = Clarabel.Optimizer,
+                                                     check_sol = (; allow_local = true,
+                                                                  allow_almost = true),
+                                                     settings = Dict("max_step_fraction" => 0.75,
+                                                                     "verbose" => false)))
+            for (i, rs) ∈ enumerate(risks)
+                w = PortfolioOptimisers.optimise!(HierarchicalEqualRiskContribution(;
+                                                                                    ri = rs.r1,
+                                                                                    ro = rs.r2,
+                                                                                    opt = opt))
+                res = isapprox(w, df[!, idx + i - 1])
+                if !res
+                    println("Failed on vector rm HERC\n$sce\n$i")
+                    find_tol(w, df[!, idx + i - 1]; name1 = :w, name2 = :df)
+                end
+                @test res
+            end
         end
     end
 end

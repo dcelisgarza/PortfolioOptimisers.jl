@@ -66,8 +66,8 @@ function hrp_scalarised_risk(::SumScalariser, wu::AbstractMatrix, wk::AbstractVe
         wu[lc, 1] ./= sum(view(wu, lc, 1))
         wu[rc, 2] .= inv.(view(rku, rc))
         wu[rc, 2] ./= sum(view(wu, rc, 2))
-        lrisk += expected_risk(r, view(wu, :, 1), X, fees)
-        rrisk += expected_risk(r, view(wu, :, 2), X, fees)
+        lrisk += expected_risk(r, view(wu, :, 1), X, fees) * r.settings.scale
+        rrisk += expected_risk(r, view(wu, :, 2), X, fees) * r.settings.scale
     end
     return lrisk, rrisk
 end
@@ -85,8 +85,8 @@ function hrp_scalarised_risk(::MaxScalariser, wu::AbstractMatrix, wk::AbstractVe
         wu[lc, 1] ./= sum(view(wu, lc, 1))
         wu[rc, 2] .= inv.(view(rku, rc))
         wu[rc, 2] ./= sum(view(wu, rc, 2))
-        lrisk_i = expected_risk(r, view(wu, :, 1), X, fees)
-        rrisk_i = expected_risk(r, view(wu, :, 2), X, fees)
+        lrisk_i = expected_risk(r, view(wu, :, 1), X, fees) * r.settings.scale
+        rrisk_i = expected_risk(r, view(wu, :, 2), X, fees) * r.settings.scale
         trisk_i = lrisk_i + rrisk_i
         if trisk_i > trisk
             lrisk = lrisk_i
