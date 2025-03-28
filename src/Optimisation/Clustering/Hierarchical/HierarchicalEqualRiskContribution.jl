@@ -92,7 +92,7 @@ function herc_scalarised_risk_o!(sce::LogSumExpScalariser, wk::AbstractVector,
     end
     return log(exp(crisk)) / sce.gamma
 end
-function herc_scalarised_risk_o!(sce::LogSumExpScalariser, wk::AbstractVector,
+function herc_scalarised_risk_o!(sce::LogSumExpScalariser, ::AbstractVector,
                                  roku::AbstractMatrix, rkbo::AbstractVector,
                                  cl::AbstractVector,
                                  ros::AbstractVector{<:OptimisationRiskMeasure},

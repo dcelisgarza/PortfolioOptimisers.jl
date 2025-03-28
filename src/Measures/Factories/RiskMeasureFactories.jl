@@ -402,7 +402,7 @@ function risk_measure_factory(rs::AbstractVector{<:OptimisationRiskMeasure}, arg
                               kwargs...)
     return risk_measure_factory.(rs, args...; kwargs...)
 end
-function cluster_risk_measure_factory(rs::AbstractVector{<:OptimisationRiskMeasure};
+function cluster_risk_measure_factory(rs::AbstractVector{<:OptimisationRiskMeasure},
                                       args...; kwargs...)
     return cluster_risk_measure_factory.(rs, args...; kwargs...)
 end
