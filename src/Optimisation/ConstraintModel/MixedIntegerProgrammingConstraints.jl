@@ -127,24 +127,24 @@ function _mip_constraints(model::JuMP.Model, ss::Real, wb::WeightBounds,
     return ib
 end
 function set_mip_constraints!(model::JuMP.Model, card::Integer,
-                              gcard::Union{Nothing, <:LinearConstraintModel},
                               bit::Union{Nothing, <:BuyInThreshold},
+                              gcard::Union{Nothing, <:LinearConstraintModel},
                               fees::Union{Nothing, <:Fees},
-                              cadj::Union{Nothing, <:AdjacencyConstraint},
-                              nadj::Union{Nothing, <:AdjacencyConstraint}, wb::WeightBounds,
-                              ss::Real = 100_000.0)
+                              cadj::Union{Nothing, <:AdjacencyConstraintModel},
+                              nadj::Union{Nothing, <:AdjacencyConstraintModel},
+                              wb::WeightBounds, ss::Real = 100_000.0)
     card_flag = card > zero(card)
+    lbi_flag, sbi_flag = if !isnothing(bit)
+        non_zero_real_or_vec(bit.lbi), non_zero_real_or_vec(bit.sbi)
+    else
+        false, false
+    end
     gcard_flag = !isa(gcard,
                       Union{Nothing,
                             <:LinearConstraintModel{<:PartialLinearConstraintModel{Nothing,
                                                                                    Nothing},
                                                     <:PartialLinearConstraintModel{Nothing,
                                                                                    Nothing}}})
-    lbi_flag, sbi_flag = if !isnothing(bit)
-        non_zero_real_or_vec(bit.lbi), non_zero_real_or_vec(bit.sbi)
-    else
-        false, false
-    end
     ffl_flag, ffs_flag = if !isnothing(fees)
         non_zero_real_or_vec(fees.fixed_long)
         non_zero_real_or_vec(fees.fixed_short)
@@ -154,9 +154,9 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
     c_flag = isa(cadj, IntegerAdjacency)
     n_flag = isa(nadj, IntegerAdjacency)
     if !(card_flag ||
-         gcard_flag ||
          lbi_flag ||
          sbi_flag ||
+         gcard_flag ||
          ffl_flag ||
          ffs_flag ||
          n_flag ||

@@ -1,10 +1,10 @@
 struct JuMP_ConstraintModel
     lcm::LinearConstraintModel
     budget::Union{<:Real, <:BudgetConstraint}
-    lsb::LongShortBounds
+    lsb::LongShortSum
     bit::BuyInThreshold
     card::Integer
     gcard::PartialLinearConstraintModel
-    cadj::AdjacencyConstraint
-    nadj::AdjacencyConstraint
+    cadj::AdjacencyConstraintModel
+    nadj::AdjacencyConstraintModel
 end

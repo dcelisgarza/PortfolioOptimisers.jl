@@ -26,8 +26,8 @@ end
 function set_sdp_network_cluster_constraints!(::JuMP.Model, adj::Any, ::Symbol)
     return nothing
 end
-function set_sdp_network_cluster_constraints!(model::JuMP.Model, adj::AdjacencyConstraint,
-                                              key::Symbol)
+function set_sdp_network_cluster_constraints!(model::JuMP.Model,
+                                              adj::AdjacencyConstraintModel, key::Symbol)
     sc = model[:sc]
     set_sdp_constraints!(model)
     W = model[:W]
@@ -38,7 +38,8 @@ function set_sdp_network_cluster_constraints!(model::JuMP.Model, adj::AdjacencyC
     return nothing
 end
 function set_sdp_frc_network_cluster_constraints!(model::JuMP.Model,
-                                                  adj::AdjacencyConstraint, key::Symbol)
+                                                  adj::AdjacencyConstraintModel,
+                                                  key::Symbol)
     sc = model[:sc]
     set_sdp_frc_constraints!(model)
     W1 = model[:W1]

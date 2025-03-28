@@ -1,8 +1,8 @@
 abstract type BudgetConstraint <: AbstractConstraintModel end
+function set_budget_constraints!(::JuMP.Model, ::Nothing)
+    return nothing
+end
 function set_budget_constraints!(model::JuMP.Model, val::Real)
-    if isinf(val)
-        return nothing
-    end
     w, k, sc = get_w_k_sc(model)
     @constraint(model, wb, sc * sum(w) == sc * k * val)
     return nothing
@@ -17,21 +17,15 @@ function BudgetRange(; lb::Union{Nothing, <:Real} = 1.0, ub::Union{Nothing, <:Re
     ub_flag = isnothing(ub)
     @smart_assert(lb_flag ⊼ ub_flag)
     if !lb_flag
-        @smart_assert(isfinite(lb) && lb >= zero(lb))
+        @smart_assert(isfinite(lb))
     end
     if !ub_flag
-        @smart_assert(isfinite(ub) && ub >= zero(ub))
+        @smart_assert(isfinite(ub))
     end
     if !lb_flag ⊼ !ub_flag
         @smart_assert(lb <= ub)
     end
     return BudgetRange{typeof(lb), typeof(ub)}(lb, ub)
-end
-function set_budget_constraints!(::JuMP.Model, ::Any)
-    return nothing
-end
-function set_budget_constraints!(::JuMP.Model, ::Nothing)
-    return nothing
 end
 function set_budget_constraints!(model::JuMP.Model, b::BudgetRange)
     w, k, sc = get_w_k_sc(model)

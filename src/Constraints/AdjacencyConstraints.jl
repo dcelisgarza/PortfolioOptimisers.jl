@@ -1,7 +1,6 @@
-abstract type AdjacencyConstraint end
-struct NoAdjacency <: AdjacencyConstraint end
+abstract type AdjacencyConstraintModel end
 struct SemiDefiniteAdjacency{T1 <: AbstractMatrix{<:Real}, T2 <: Real} <:
-       AdjacencyConstraint
+       AdjacencyConstraintModel
     A::T1
     p::T2
 end
@@ -12,7 +11,7 @@ function SemiDefiniteAdjacency(; A::AbstractMatrix{<:Real}, p::Real = 0.05)
 end
 struct IntegerAdjacency{T1 <: AbstractMatrix{<:Real},
                         T2 <: Union{<:Integer, <:AbstractVector{<:Integer}}, T3 <: Real} <:
-       AdjacencyConstraint
+       AdjacencyConstraintModel
     A::T1
     B::T2
     scale::T3
@@ -28,4 +27,15 @@ function IntegerAdjacency(; A::AbstractMatrix{<:Real},
         @smart_assert(B > zero(B))
     end
     return IntegerAdjacency{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
+end
+struct AdjacencyConstraint end
+struct CentralityConstraint end
+#! Similar to linear constraint but using centrality vectors
+function centrality_constraints(::Union{<:CentralityConstraint,
+                                        <:AbstractVector{<:CentralityConstraint}},
+                                sets::DataFrame; kwargs...)
+    return nothing
+end
+function centrality_constraints(::Nothing, args...; kwargs...)
+    return nothing
 end

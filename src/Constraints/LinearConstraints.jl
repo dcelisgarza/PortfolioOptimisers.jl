@@ -127,6 +127,11 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
                                                                      B = B_ineq),
                                  eq = PartialLinearConstraintModel(; A = A_eq, B = B_eq))
 end
-
+function linear_constraints(lcs::LinearConstraintModel, args...; kwargs...)
+    return lcs
+end
+function linear_constraints(::Nothing, args...; kwargs...)
+    return nothing
+end
 export linear_constraints, LinearConstraint, LinearConstraintModel,
        PartialLinearConstraintModel
