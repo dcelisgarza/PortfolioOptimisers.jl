@@ -21,8 +21,8 @@
         rho = cor(ce, X)
         dist = distance(de, rho, X)
 
-        similarity = DBHT_MaximumDistanceSimilarity()
-        S = dbht_similarity(similarity, rho, dist)
+        sim = DBHT_MaximumDistanceSimilarity()
+        S = dbht_similarity(sim, rho, dist)
 
         root = DBHT_UniqueRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z1, dbht = DBHTs(dist, S; branchorder = :default,
@@ -136,8 +136,8 @@
         rho = cor(ce, X)
         dist = distance(de, rho, X)
 
-        similarity = DBHT_ExponentialSimilarity()
-        S = dbht_similarity(similarity, rho, dist)
+        sim = DBHT_ExponentialSimilarity()
+        S = dbht_similarity(sim, rho, dist)
 
         root = DBHT_EqualRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z2, dbht = DBHTs(dist, S; branchorder = :optimal,
@@ -281,7 +281,7 @@
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
-                println("Fails on LoGo MaxDist similarity iteration $i")
+                println("Fails on LoGo MaxDist sim iteration $i")
                 find_tol(sigma1, reshape(logo_t[!, i], MN); name1 = :sigma, name2 = :logo_t)
             end
             @test res1
@@ -301,7 +301,7 @@
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
-                println("Fails on LoGo General distance MaxDist similarity iteration $i")
+                println("Fails on LoGo General distance MaxDist sim iteration $i")
                 find_tol(sigma1, reshape(logo_t[!, i], MN); name1 = :sigma, name2 = :logo_t)
             end
             @test res1
@@ -319,12 +319,12 @@
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             LoGo!(PortfolioOptimisers.LoGo(; dist = des[i],
-                                           similarity = DBHT_ExponentialSimilarity()),
+                                           sim = DBHT_ExponentialSimilarity()),
                   FNPDM_NearestCorrelationMatrix(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
-                println("Fails on LoGo ExpDist similarity iteration $i")
+                println("Fails on LoGo ExpDist sim iteration $i")
                 find_tol(sigma1, reshape(logo_t[!, i], MN); name1 = :sigma, name2 = :logo_t)
             end
             @test res1
@@ -340,12 +340,12 @@
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             LoGo!(PortfolioOptimisers.LoGo(; dist = des[i],
-                                           similarity = DBHT_ExponentialSimilarity()),
+                                           sim = DBHT_ExponentialSimilarity()),
                   FNPDM_NearestCorrelationMatrix(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
-                println("Fails on LoGo General distance ExpDist similarity iteration $i")
+                println("Fails on LoGo General distance ExpDist sim iteration $i")
                 find_tol(sigma1, reshape(logo_t[!, i], MN); name1 = :sigma, name2 = :logo_t)
             end
             @test res1

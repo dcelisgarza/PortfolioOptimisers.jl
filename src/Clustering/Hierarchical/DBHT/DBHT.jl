@@ -25,12 +25,12 @@ function dbht_similarity(::DBHT_MaximumDistanceSimilarity, S, D)
 end
 export dbht_similarity
 struct DBHT{T1 <: SimilarityMatrixEstimator, T2 <: DBHT_RootMethod} <: ClusteringAlgorithm
-    similarity::T1
+    sim::T1
     root::T2
 end
-function DBHT(; similarity::SimilarityMatrixEstimator = DBHT_MaximumDistanceSimilarity(),
+function DBHT(; sim::SimilarityMatrixEstimator = DBHT_MaximumDistanceSimilarity(),
               root::DBHT_RootMethod = DBHT_UniqueRoot())
-    return DBHT{typeof(similarity), typeof(root)}(similarity, root)
+    return DBHT{typeof(sim), typeof(root)}(sim, root)
 end
 
 """
@@ -1077,7 +1077,7 @@ Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering a
 
   - `D`: `N×N` dissimilarity matrix, e.g. a distance matrix.
 
-  - `S`: `N×N` non-negative similarity matrix, examples include:
+  - `S`: `N×N` non-negative sim matrix, examples include:
 
       + ``\\mathbf{S} = \\mathbf{C} + \\lvert \\min \\mathbf{C} \\rvert``.
       + ``\\mathbf{S} = \\lceil\\max \\left(\\mathbf{D}^{\\odot 2}\\right)\\rceil - \\mathbf{D}^{\\odot 2}``.
@@ -1223,7 +1223,7 @@ function _clusterise(alg::DBHT, X::AbstractMatrix{<:Real};
                      branchorder::Symbol = :optimal, dims::Int = 1)
     S = cor(ce, X; dims = dims)
     D = distance(de, S, X; dims = dims)
-    S = dbht_similarity(alg.similarity, S, D)
+    S = dbht_similarity(alg.sim, S, D)
     clustering = DBHTs(D, S; branchorder = branchorder, root = alg.root)[end]
     k = optimal_number_clusters(nch, clustering, D)
     return DBHTClusteringResult(; clustering = clustering, S = S, D = D, k = k)

@@ -21,7 +21,6 @@ include("./Constraints/LinearConstraints.jl")
 include("./Constraints/BlackLittermanViews.jl")
 include("./Constraints/RiskBudgetConstraints.jl")
 include("./Constraints/WeightBoundsConstraints.jl")
-include("./Constraints/AdjacencyConstraints.jl")
 
 # Solver
 include("./ModelOptimisation/Solver.jl")
@@ -181,6 +180,10 @@ include("./Clustering/Hierarchical/HierarchicalClustering.jl")
 include("./Clustering/Hierarchical/DBHT/DBHT.jl")
 include("./Clustering/Hierarchical/DBHT/LoGo.jl")
 include("./Clustering/ClusteringEstimator.jl")
+
+# Network
+include("./Network/Network_AbstractTypes.jl")
+include("./Constraints/AdjacencyConstraints.jl")
 
 # Matrix Processing
 include("./MatrixProcessing/MatrixProcessing_AbstractTypes.jl")
