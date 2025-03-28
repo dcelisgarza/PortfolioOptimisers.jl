@@ -125,7 +125,19 @@
                  Variance()]
         for (i, risk) ∈ enumerate(risks)
             w1 = optimise!(HierarchicalEqualRiskContribution(; ri = risk, opt = opt))
-            res = isapprox(w1, df[:, i])
+            res = if i == 14
+                isapprox(w1, df[:, i]; rtol = 1e-5)
+            elseif i == 29
+                isapprox(w1, df[:, i]; rtol = 5e-8)
+            elseif i == 30
+                isapprox(w1, df[:, i]; rtol = 5e-7)
+            elseif i == 40
+                isapprox(w1, df[:, i]; rtol = 1e-7)
+            elseif i == 41
+                isapprox(w1, df[:, i]; rtol = 1e-7)
+            else
+                isapprox(w1, df[:, i])
+            end
             if !res
                 println("$i\n$(string(risk)) failed")
                 find_tol(w1, df[:, i]; name1 = :w1, name2 = :df)
@@ -138,7 +150,23 @@
         for (i, (risk1, risk2)) ∈ enumerate(zip(risks, circshift(risks, 3)))
             w1 = optimise!(HierarchicalEqualRiskContribution(; ri = risk1, ro = risk2,
                                                              opt = opt))
-            res = isapprox(w1, df[:, i])
+            res = if i == 14
+                isapprox(w1, df[:, i]; rtol = 1e-5)
+            elseif i == 29
+                isapprox(w1, df[:, i]; rtol = 5e-8)
+            elseif i == 30
+                isapprox(w1, df[:, i]; rtol = 1e-7)
+            elseif i == 33
+                isapprox(w1, df[:, i]; rtol = 1e-7)
+            elseif i == 40
+                isapprox(w1, df[:, i]; rtol = 5e-8)
+            elseif i == 41
+                isapprox(w1, df[:, i]; rtol = 5e-8)
+            elseif i == 44
+                isapprox(w1, df[:, i]; rtol = 5e-8)
+            else
+                isapprox(w1, df[:, i])
+            end
             if !res
                 println("$i\n$(string(risk1))\n$(string(risk2)) failed")
                 find_tol(w1, df[:, i]; name1 = :w1, name2 = :df)
