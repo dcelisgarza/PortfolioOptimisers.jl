@@ -132,20 +132,20 @@ function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:TreeType, <:Any},
     S = cor(ne.ce, X; dims = dims)
     D = distance(ne.de, S, X; dims = dims)
     G = SimpleWeightedGraph(D)
-    tree = calc_mst(ne.alg.tree, G)
+    tree = calc_mst(ne.alg, G)
     return adjacency_matrix(SimpleGraph(G[tree]))
 end
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:SimilarityMatrixEstimator,
                                              <:Any}, X::AbstractMatrix; dims::Int = 1)
     S = cor(ne.ce, X; dims = dims)
     D = distance(ne.de, S, X; dims = dims)
-    S = dbht_similarity(ne.alg.sim, S, D)
+    S = dbht_similarity(ne.alg, S, D)
     Rpm = PMFG_T2s(S)[1]
     return adjacency_matrix(SimpleGraph(Rpm))
 end
 function philogeny_matrix(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1)
     A = calc_adjacency(ne, X; dims = dims)
-    P = zeros(eltype(X), size(Matrix(A)))
+    P = zeros(Int, size(Matrix(A)))
     for i ∈ 0:(ne.n)
         P .+= A^i
     end
@@ -176,7 +176,7 @@ function philogeny_matrix(cle::ClusteringEstimator, X::AbstractMatrix;
                           branchorder::Symbol = :optimal, dims::Int = 1)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims)
     clusters = cutree(res.clustering; k = res.k)
-    P = Vector{Int}(undef, size(X, 2), res.k)
+    P = zeros(Int, size(X, 2), res.k)
     for i ∈ axes(P, 2)
         idx = clusters .== i
         P[idx, i] .= one(eltype(P))
@@ -201,4 +201,5 @@ end
 
 export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
        KatzCentrality, Pagerank, RadialityCentrality, StressCentrality, KruskalTree,
-       BoruvkaTree, PrimTree
+       BoruvkaTree, PrimTree, NetworkEstimator, philogeny_matrix, average_centrality,
+       asset_philogeny

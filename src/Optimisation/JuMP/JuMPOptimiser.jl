@@ -10,9 +10,9 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
                      T9 <: Union{Nothing, <:LinearConstraintModel},
                      T10 <: Union{Nothing, DataFrame}, T11 <: Union{Nothing, Fees},
                      T12 <:
-                     Union{Nothing, <:PhilologyEstimator, <:AdjacencyConstraintModel},
+                     Union{Nothing, <:PhilologyEstimator, <:PhilogenyConstraintModel},
                      T13 <:
-                     Union{Nothing, <:PhilologyEstimator, <:AdjacencyConstraintModel},
+                     Union{Nothing, <:PhilologyEstimator, <:PhilogenyConstraintModel},
                      T14 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                      T15 <: Scalariser}
     pe::T1

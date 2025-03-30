@@ -130,8 +130,8 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
                               bit::Union{Nothing, <:BuyInThreshold},
                               gcard::Union{Nothing, <:LinearConstraintModel},
                               fees::Union{Nothing, <:Fees},
-                              cadj::Union{Nothing, <:AdjacencyConstraintModel},
-                              nadj::Union{Nothing, <:AdjacencyConstraintModel},
+                              cadj::Union{Nothing, <:PhilogenyConstraintModel},
+                              nadj::Union{Nothing, <:PhilogenyConstraintModel},
                               wb::WeightBounds, ss::Real = 100_000.0)
     card_flag = card > zero(card)
     lbi_flag, sbi_flag = if !isnothing(bit)
@@ -151,8 +151,8 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
     else
         false, false
     end
-    c_flag = isa(cadj, IntegerAdjacency)
-    n_flag = isa(nadj, IntegerAdjacency)
+    c_flag = isa(cadj, IntegerPhilogeny)
+    n_flag = isa(nadj, IntegerPhilogeny)
     if !(card_flag ||
          lbi_flag ||
          sbi_flag ||

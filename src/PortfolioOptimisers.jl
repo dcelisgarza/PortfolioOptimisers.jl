@@ -183,7 +183,7 @@ include("./Clustering/Hierarchical/DBHT/LoGo.jl")
 
 # Network
 include("./Network/Network_AbstractTypes.jl")
-include("./Constraints/AdjacencyConstraints.jl")
+include("./Constraints/PhilogenyConstraints.jl")
 
 # Matrix Processing
 include("./MatrixProcessing/MatrixProcessing_AbstractTypes.jl")

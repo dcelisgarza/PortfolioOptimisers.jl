@@ -1,22 +1,22 @@
-abstract type AdjacencyConstraintModel end
-struct SemiDefiniteAdjacency{T1 <: AbstractMatrix{<:Real}, T2 <: Real} <:
-       AdjacencyConstraintModel
+abstract type PhilogenyConstraintModel end
+struct SemiDefinitePhilogeny{T1 <: AbstractMatrix{<:Real}, T2 <: Real} <:
+       PhilogenyConstraintModel
     A::T1
     p::T2
 end
-function SemiDefiniteAdjacency(; A::AbstractMatrix{<:Real}, p::Real = 0.05)
+function SemiDefinitePhilogeny(; A::AbstractMatrix{<:Real}, p::Real = 0.05)
     @smart_assert(!isempty(A))
     @smart_assert(p >= zero(p))
-    return SemiDefiniteAdjacency{typeof(A), typeof(p)}(A, p)
+    return SemiDefinitePhilogeny{typeof(A), typeof(p)}(A, p)
 end
-struct IntegerAdjacency{T1 <: AbstractMatrix{<:Real},
+struct IntegerPhilogeny{T1 <: AbstractMatrix{<:Real},
                         T2 <: Union{<:Integer, <:AbstractVector{<:Integer}}, T3 <: Real} <:
-       AdjacencyConstraintModel
+       PhilogenyConstraintModel
     A::T1
     B::T2
     scale::T3
 end
-function IntegerAdjacency(; A::AbstractMatrix{<:Real},
+function IntegerPhilogeny(; A::AbstractMatrix{<:Real},
                           B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                           scale::Real = 100_000.0)
     @smart_assert(!isempty(A))
@@ -26,9 +26,9 @@ function IntegerAdjacency(; A::AbstractMatrix{<:Real},
     else
         @smart_assert(B > zero(B))
     end
-    return IntegerAdjacency{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
+    return IntegerPhilogeny{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
 end
-# struct AdjacencyConstraint
+# struct PhilogenyConstraint
 #     # Union{<:NetworkEstimator, <:ClusteringEstimator}
 # end
 # #! Similar to linear constraint but using centrality vectors

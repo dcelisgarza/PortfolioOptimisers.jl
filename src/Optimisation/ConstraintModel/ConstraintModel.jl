@@ -5,6 +5,6 @@ struct JuMP_ConstraintModel
     bit::BuyInThreshold
     card::Integer
     gcard::PartialLinearConstraintModel
-    cadj::AdjacencyConstraintModel
-    nadj::AdjacencyConstraintModel
+    cadj::PhilogenyConstraintModel
+    nadj::PhilogenyConstraintModel
 end
