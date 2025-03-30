@@ -28,16 +28,15 @@ function IntegerAdjacency(; A::AbstractMatrix{<:Real},
     end
     return IntegerAdjacency{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
 end
-struct AdjacencyConstraint
-    # Union{<:NetworkEstimator, <:ClusteringEstimator}
-end
-struct CentralityConstraint end
-#! Similar to linear constraint but using centrality vectors
-function centrality_constraints(::Union{<:CentralityConstraint,
-                                        <:AbstractVector{<:CentralityConstraint}},
-                                sets::DataFrame; kwargs...)
-    return nothing
-end
-function centrality_constraints(::Nothing, args...; kwargs...)
-    return nothing
-end
+# struct AdjacencyConstraint
+#     # Union{<:NetworkEstimator, <:ClusteringEstimator}
+# end
+# #! Similar to linear constraint but using centrality vectors
+# function centrality_constraints(::Union{<:CentralityConstraint,
+#                                         <:AbstractVector{<:CentralityConstraint}},
+#                                 sets::DataFrame; kwargs...)
+#     return nothing
+# end
+# function centrality_constraints(::Nothing, args...; kwargs...)
+#     return nothing
+# end

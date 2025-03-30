@@ -1216,16 +1216,14 @@ function DBHTClusteringResult(; clustering::Clustering.Hclust, S::AbstractMatrix
                                                                                      S, D,
                                                                                      k)
 end
-function _clusterise(alg::DBHT, X::AbstractMatrix{<:Real};
-                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                     de::PortfolioOptimisersUnionDistanceMetric = CanonicalDistance(),
-                     nch::Union{<:Integer, NumberClustersHeuristic} = SecondOrderDifference(),
-                     branchorder::Symbol = :optimal, dims::Int = 1)
-    S = cor(ce, X; dims = dims)
-    D = distance(de, S, X; dims = dims)
-    S = dbht_similarity(alg.sim, S, D)
-    clustering = DBHTs(D, S; branchorder = branchorder, root = alg.root)[end]
-    k = optimal_number_clusters(nch, clustering, D)
+function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
+                    X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
+                    dims::Int = 1)
+    S = cor(cle.ce, X; dims = dims)
+    D = distance(cle.de, S, X; dims = dims)
+    S = dbht_similarity(cle.alg.sim, S, D)
+    clustering = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
+    k = optimal_number_clusters(cle.nch, clustering, D)
     return DBHTClusteringResult(; clustering = clustering, S = S, D = D, k = k)
 end
 

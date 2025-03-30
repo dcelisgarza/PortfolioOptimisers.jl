@@ -169,6 +169,7 @@ include("./Moments/Distance/GeneralCanonicalDistance/GeneralCanonicalDistanceDis
 # Clustering
 ## DBHTs
 include("./Clustering/Clustering_AbstractTypes.jl")
+include("./Clustering/ClusteringEstimator.jl")
 include("./Clustering/SecondOrderDifference.jl")
 include("./Clustering/StandardisedSilhouetteScore.jl")
 include("./Clustering/PredefinedNumberClusters.jl")
@@ -179,7 +180,6 @@ include("./Clustering/Hierarchical/HierarchicalPredefinedNumberClusters.jl")
 include("./Clustering/Hierarchical/HierarchicalClustering.jl")
 include("./Clustering/Hierarchical/DBHT/DBHT.jl")
 include("./Clustering/Hierarchical/DBHT/LoGo.jl")
-include("./Clustering/ClusteringEstimator.jl")
 
 # Network
 include("./Network/Network_AbstractTypes.jl")

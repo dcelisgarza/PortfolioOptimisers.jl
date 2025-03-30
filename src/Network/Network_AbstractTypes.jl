@@ -47,28 +47,28 @@ end
 function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return StressCentrality{typeof(args), typeof(kwargs)}(args, kwargs)
 end
-function centrality(cent::BetweennessCentrality, g::AbstractGraph)
+function calc_centrality(cent::BetweennessCentrality, g::AbstractGraph)
     return Graphs.betweenness_centrality(g, cent.args...; cent.kwargs...)
 end
-function centrality(cent::ClosenessCentrality, g::AbstractGraph)
+function calc_centrality(cent::ClosenessCentrality, g::AbstractGraph)
     return Graphs.closeness_centrality(g, cent.args...; cent.kwargs...)
 end
-function centrality(cent::DegreeCentrality, g::AbstractGraph)
+function calc_centrality(cent::DegreeCentrality, g::AbstractGraph)
     return Graphs._degree_centrality(g, cent.kind; cent.kwargs...)
 end
-function centrality(::EigenvectorCentrality, g::AbstractGraph)
+function calc_centrality(::EigenvectorCentrality, g::AbstractGraph)
     return Graphs.eigenvector_centrality(g::AbstractGraph)
 end
-function centrality(cent::KatzCentrality, g::AbstractGraph)
+function calc_centrality(cent::KatzCentrality, g::AbstractGraph)
     return Graphs.katz_centrality(g, cent.alpha)
 end
-function centrality(cent::Pagerank, g::AbstractGraph)
+function calc_centrality(cent::Pagerank, g::AbstractGraph)
     return Graphs.pagerank(g, cent.alpha, cent.n, cent.epsilon)
 end
-function centrality(::RadialityCentrality, g::AbstractGraph)
+function calc_centrality(::RadialityCentrality, g::AbstractGraph)
     return Graphs.radiality_centrality(g::AbstractGraph)
 end
-function centrality(cent::StressCentrality, g::AbstractGraph)
+function calc_centrality(cent::StressCentrality, g::AbstractGraph)
     return Graphs.stress_centrality(g, cent.args...; cent.kwargs...)
 end
 abstract type TreeType end
@@ -93,54 +93,112 @@ end
 function PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return PrimTree{typeof(args), typeof(kwargs)}(args, kwargs)
 end
-abstract type NetworkAlgorithm end
-struct TriangulatedMaximallyFilteredGraph{T1 <: CentralityType,
-                                          T2 <: SimilarityMatrixEstimator, T3 <: Integer} <:
-       NetworkAlgorithm
-    cent::T1
-    sim::T2
-    n::T3
-end
-function TriangulatedMaximallyFilteredGraph(; cent::CentralityType = DegreeCentrality(),
-                                            sim::SimilarityMatrixEstimator = DBHT_MaximumDistanceSimilarity(),
-                                            n::Integer = 1)
-    return TriangulatedMaximallyFilteredGraph{typeof(cent), typeof(sim), typeof(n)}(cent,
-                                                                                    sim, n)
-end
-struct MinimumSpanningTree{T1 <: TreeType, T2 <: CentralityType, T3 <: Integer} <:
-       NetworkAlgorithm
-    cent::T1
-    tree::T2
-    n::T3
-end
-function MinimumSpanningTree(; cent::CentralityType = DegreeCentrality(),
-                             tree::TreeType = KruskalTree(), n::Integer = 1,)
-    return MinimumSpanningTree{typeof(cent), typeof(tree), typeof(n)}(cent, tree, n)
-end
-function mst(cent::KruskalTree, g::AbstractGraph)
+function calc_mst(cent::KruskalTree, g::AbstractGraph)
     return Graphs.kruskal_mst(g, cent.args...; cent.kwargs...)
 end
-function mst(cent::BoruvkaTree, g::AbstractGraph)
+function calc_mst(cent::BoruvkaTree, g::AbstractGraph)
     return Graphs.boruvka_mst(g, cent.args...; cent.kwargs...)[1]
 end
-function mst(cent::PrimTree, g::AbstractGraph)
+function calc_mst(cent::PrimTree, g::AbstractGraph)
     return Graphs.prim_mst(g, cent.args...; cent.kwargs...)
 end
-abstract type AbstractNetworkEstimator end
+abstract type AbstractNetworkEstimator <: PhilologyEstimator end
 struct NetworkEstimator{T1 <: StatsBase.CovarianceEstimator,
                         T2 <: PortfolioOptimisersUnionDistanceMetric,
-                        T3 <: NetworkAlgorithm} <: AbstractClusteringEstimator
+                        T3 <: Union{<:SimilarityMatrixEstimator, <:TreeType},
+                        T4 <: Integer} <: AbstractNetworkEstimator
     ce::T1
     de::T2
     alg::T3
+    n::T4
 end
 function NetworkEstimator(;
                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                           de::PortfolioOptimisersUnionDistanceMetric = CanonicalDistance(),
-                          alg::NetworkAlgorithm = MinimumSpanningTree())
-    return NetworkEstimator{typeof(ce), typeof(de), typeof(alg)}(ce, de, alg)
+                          alg::Union{<:SimilarityMatrixEstimator, <:TreeType} = KruskalTree(),
+                          n::Integer = 1)
+    return NetworkEstimator{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
+end
+struct CentralityEstimator{T1 <: CentralityType, T2 <: AbstractNetworkEstimator}
+    cent::T1
+    ne::T2
+end
+function CentralityEstimator(; cent::CentralityType = DegreeCentrality(),
+                             ne::AbstractNetworkEstimator = NetworkEstimator())
+    return CentralityEstimator{typeof(cent), typeof(ne)}(cent, ne)
+end
+function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:TreeType, <:Any},
+                        X::AbstractMatrix; dims::Int = 1)
+    S = cor(ne.ce, X; dims = dims)
+    D = distance(ne.de, S, X; dims = dims)
+    G = SimpleWeightedGraph(D)
+    tree = calc_mst(ne.alg.tree, G)
+    return adjacency_matrix(SimpleGraph(G[tree]))
+end
+function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:SimilarityMatrixEstimator,
+                                             <:Any}, X::AbstractMatrix; dims::Int = 1)
+    S = cor(ne.ce, X; dims = dims)
+    D = distance(ne.de, S, X; dims = dims)
+    S = dbht_similarity(ne.alg.sim, S, D)
+    Rpm = PMFG_T2s(S)[1]
+    return adjacency_matrix(SimpleGraph(Rpm))
+end
+function philogeny_matrix(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1)
+    A = calc_adjacency(ne, X; dims = dims)
+    P = zeros(eltype(X), size(Matrix(A)))
+    for i ∈ 0:(ne.n)
+        P .+= A^i
+    end
+    P .= clamp!(P, 0, 1) - I
+    return P
+end
+function centrality_vector(cent::CentralityType, X::AbstractMatrix; kwargs...)
+    G = SimpleGraph(X)
+    return calc_centrality(cent, G)
+end
+function centrality_vector(cte::CentralityEstimator, X::AbstractMatrix; dims::Int = 1)
+    P = philogeny_matrix(cte.ne, X; dims = dims)
+    G = SimpleGraph(P)
+    return calc_centrality(cte.cent, G)
+end
+function average_centrality(ne::NetworkEstimator, cent::CentralityType, w::AbstractVector,
+                            X::AbstractMatrix; dims::Int = 1)
+    P = philogeny_matrix(ne, X; dims = dims)
+    cv = centrality_vector(cent, P)
+    return dot(cv, w)
+end
+function average_centrality(cte::CentralityEstimator, w::AbstractVector, X::AbstractMatrix;
+                            dims::Int = 1)
+    cv = centrality_vector(cte, X; dims = dims)
+    return dot(cv, w)
+end
+function philogeny_matrix(cle::ClusteringEstimator, X::AbstractMatrix;
+                          branchorder::Symbol = :optimal, dims::Int = 1)
+    res = clusterise(cle, X; branchorder = branchorder, dims = dims)
+    clusters = cutree(res.clustering; k = res.k)
+    P = Vector{Int}(undef, size(X, 2), res.k)
+    for i ∈ axes(P, 2)
+        idx = clusters .== i
+        P[idx, i] .= one(eltype(P))
+    end
+    return P * transpose(P) - I
+end
+function asset_philogeny(w::AbstractVector, X::AbstractMatrix)
+    aw = abs.(w * transpose(w))
+    c = sum(X .* aw)
+    c /= sum(aw)
+    return c
+end
+function asset_philogeny(cle::ClusteringEstimator, w::AbstractVector, X::AbstractMatrix;
+                         branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+    return asset_philogeny(w,
+                           philogeny_matrix(cle, X; branchorder = branchorder, dims = dims))
+end
+function asset_philogeny(ne::NetworkEstimator, w::AbstractVector, X::AbstractMatrix;
+                         dims::Int = 1, kwargs...)
+    return asset_philogeny(w, philogeny_matrix(ne, X; dims = dims))
 end
 
 export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
        KatzCentrality, Pagerank, RadialityCentrality, StressCentrality, KruskalTree,
-       BoruvkaTree, PrimTree, TriangulatedMaximallyFilteredGraph, MinimumSpanningTree
+       BoruvkaTree, PrimTree

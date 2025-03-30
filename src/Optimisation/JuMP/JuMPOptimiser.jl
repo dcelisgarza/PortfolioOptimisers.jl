@@ -7,14 +7,12 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintModel},
                      T8 <: Union{Nothing, <:LinearConstraint,
                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintModel},
-                     T9 <: Union{Nothing, <:CentralityConstraint,
-                                 <:AbstractVector{<:CentralityConstraint},
-                                 <:LinearConstraintModel}, T10 <: Union{Nothing, DataFrame},
-                     T11 <: Union{Nothing, Fees},
-                     T12 <: Union{Nothing, <:NetworkEstimator, <:ClusteringEstimator,
-                                  <:AdjacencyConstraintModel},
-                     T13 <: Union{Nothing, <:NetworkEstimator, <:ClusteringEstimator,
-                                  <:AdjacencyConstraintModel},
+                     T9 <: Union{Nothing, <:LinearConstraintModel},
+                     T10 <: Union{Nothing, DataFrame}, T11 <: Union{Nothing, Fees},
+                     T12 <:
+                     Union{Nothing, <:PhilologyEstimator, <:AdjacencyConstraintModel},
+                     T13 <:
+                     Union{Nothing, <:PhilologyEstimator, <:AdjacencyConstraintModel},
                      T14 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                      T15 <: Scalariser}
     pe::T1
@@ -40,9 +38,7 @@ function JuMPOptimiser(; bgt::Union{Nothing, <:Real, <:BudgetConstraint} = 1.0,
                        lcs::Union{Nothing, <:LinearConstraint,
                                   <:AbstractVector{<:LinearConstraint},
                                   <:LinearConstraintModel} = nothing,
-                       cent::Union{Nothing, <:CentralityConstraint,
-                                   <:AbstractVector{<:CentralityConstraint},
-                                   <:LinearConstraintModel} = nothing,
+                       cent::Union{Nothing, <:LinearConstraintModel} = nothing,
                        sets::Union{Nothing, DataFrame} = nothing)
     if isa(bgt, Real)
         @smart_assert(isfinite(bgt))

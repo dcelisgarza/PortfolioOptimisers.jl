@@ -1,6 +1,4 @@
-struct HierarchicalClustering{T1 <: Symbol} <: ClusteringAlgorithm
-    linkage::T1
-end
+
 function HierarchicalClustering(; linkage::Symbol = :ward)
     return HierarchicalClustering{typeof(linkage)}(linkage)
 end
@@ -94,15 +92,13 @@ function HierarchicalClusteringResult(; clustering::Clustering.Hclust, S::Abstra
     return HierarchicalClusteringResult{typeof(clustering), typeof(S), typeof(D),
                                         typeof(k)}(clustering, S, D, k)
 end
-function _clusterise(alg::HierarchicalClustering, X::AbstractMatrix{<:Real};
-                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                     de::PortfolioOptimisersUnionDistanceMetric = CanonicalDistance(),
-                     nch::Union{<:Integer, NumberClustersHeuristic} = SecondOrderDifference(),
-                     branchorder::Symbol = :optimal, dims::Int = 1)
-    S = cor(ce, X; dims = dims)
-    D = distance(de, S, X; dims = dims)
-    clustering = hclust(D; linkage = alg.linkage, branchorder = branchorder)
-    k = optimal_number_clusters(nch, clustering, D)
+function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HierarchicalClustering, <:Any},
+                    X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
+                    dims::Int = 1)
+    S = cor(cle.ce, X; dims = dims)
+    D = distance(cle.de, S, X; dims = dims)
+    clustering = hclust(D; linkage = cle.alg.linkage, branchorder = branchorder)
+    k = optimal_number_clusters(cle.nch, clustering, D)
     return HierarchicalClusteringResult(; clustering = clustering, S = S, D = D, k = k)
 end
 
