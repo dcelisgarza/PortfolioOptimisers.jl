@@ -34,5 +34,19 @@ function A_LinearConstraint(; group, name,
     end
     return A_LinearConstraint{typeof(group), typeof(name), typeof(coef)}(group, name, coef)
 end
+struct A_CardinalityConstraint{T1, T2} <: A_Constraint
+    group::T1
+    name::T2
+end
+function A_CardinalityConstraint(; group, name)
+    group_flag = isa(group, AbstractVector)
+    name_flag = isa(name, AbstractVector)
+    if group_flag || name_flag
+        @smart_assert(group_flag && name_flag)
+        @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
+        @smart_assert(length(group) == length(name) == length(coef))
+    end
+    return A_CardinalityConstraint{typeof(group), typeof(name)}(group, name)
+end
 
-export EQ, LEQ, GEQ, A_LinearConstraint
+export EQ, LEQ, GEQ, A_LinearConstraint, A_CardinalityConstraint

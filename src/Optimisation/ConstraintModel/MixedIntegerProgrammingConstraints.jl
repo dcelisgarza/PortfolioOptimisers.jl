@@ -126,25 +126,23 @@ function _mip_constraints(model::JuMP.Model, ss::Real, wb::WeightBounds,
     end
     return ib
 end
-function set_mip_constraints!(model::JuMP.Model, card::Integer,
-                              bit::Union{Nothing, <:BuyInThreshold},
-                              gcard::Union{Nothing, <:LinearConstraintModel},
+function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThreshold},
+                              card::Union{Nothing, <:LinearConstraintModel},
                               fees::Union{Nothing, <:Fees},
                               cadj::Union{Nothing, <:PhilogenyConstraintModel},
                               nadj::Union{Nothing, <:PhilogenyConstraintModel},
                               wb::WeightBounds, ss::Real = 100_000.0)
-    card_flag = card > zero(card)
     lbi_flag, sbi_flag = if !isnothing(bit)
         non_zero_real_or_vec(bit.lbi), non_zero_real_or_vec(bit.sbi)
     else
         false, false
     end
-    gcard_flag = !isa(gcard,
-                      Union{Nothing,
-                            <:LinearConstraintModel{<:PartialLinearConstraintModel{Nothing,
-                                                                                   Nothing},
-                                                    <:PartialLinearConstraintModel{Nothing,
-                                                                                   Nothing}}})
+    card_flag = !isa(card,
+                     Union{Nothing,
+                           <:LinearConstraintModel{<:PartialLinearConstraintModel{Nothing,
+                                                                                  Nothing},
+                                                   <:PartialLinearConstraintModel{Nothing,
+                                                                                  Nothing}}})
     ffl_flag, ffs_flag = if !isnothing(fees)
         non_zero_real_or_vec(fees.fixed_long)
         non_zero_real_or_vec(fees.fixed_short)
@@ -153,14 +151,7 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
     end
     c_flag = isa(cadj, IntegerPhilogenyModel)
     n_flag = isa(nadj, IntegerPhilogenyModel)
-    if !(card_flag ||
-         lbi_flag ||
-         sbi_flag ||
-         gcard_flag ||
-         ffl_flag ||
-         ffs_flag ||
-         n_flag ||
-         c_flag)
+    if !(lbi_flag || sbi_flag || card_flag || ffl_flag || ffs_flag || n_flag || c_flag)
         return nothing
     end
     ib = if (sbi_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
@@ -170,24 +161,20 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
     else
         _mip_constraints(model, ss, wb, fees.fixed_long, bit.lbi, lbi_flag, ffl_flag)
     end
+    sc = model[:sc]
     if card_flag
-        @constraint(model, card, sum(ib) <= card)
-    end
-    if gcard_flag
-        w, k, sc = get_w_k_sc(model)
-        if !isnothing(gcard.A_ineq)
-            @constraint(model, gcard_ineq, sc * gcard.A_ineq * w <= sc * k * gcard.B_ineq)
+        if !isnothing(card.A_ineq)
+            @constraint(model, card_ineq, sc * card.A_ineq * ib <= sc * card.B_ineq)
         end
-        if !isnothing(gcard.A_eq)
-            @constraint(model, gcard_eq, sc * gcard.A_eq * w == sc * k * gcard.B_eq)
+        if !isnothing(card.A_eq)
+            @constraint(model, card_eq, sc * card.A_eq * ib == sc * card.B_eq)
         end
-        @constraint(model, gcard, gcard.A * ib <= gcard.B)
     end
     if c_flag
-        @constraint(model, ccard, cadj.A * ib <= cadj.B)
+        @constraint(model, ccard, sc * cadj.A * ib <= sc * cadj.B)
     end
     if n_flag
-        @constraint(model, ncard, nadj.A * ib <= nadj.B)
+        @constraint(model, ncard, sc * nadj.A * ib <= sc * nadj.B)
     end
     return nothing
 end
