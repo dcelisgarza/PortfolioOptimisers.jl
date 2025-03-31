@@ -7,12 +7,14 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintModel},
                      T8 <: Union{Nothing, <:LinearConstraint,
                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintModel},
-                     T9 <: Union{Nothing, <:LinearConstraintModel},
-                     T10 <: Union{Nothing, DataFrame}, T11 <: Union{Nothing, Fees},
+                     T9 <: Union{Nothing, <:CentralityConstraint,
+                                 <:AbstractVector{<:CentralityConstraint},
+                                 <:LinearConstraintModel}, T10 <: Union{Nothing, DataFrame},
+                     T11 <: Union{Nothing, Fees},
                      T12 <:
-                     Union{Nothing, <:PhilologyEstimator, <:PhilogenyConstraintModel},
+                     Union{Nothing, <:PhilogenyEstimator, <:PhilogenyConstraintModel},
                      T13 <:
-                     Union{Nothing, <:PhilologyEstimator, <:PhilogenyConstraintModel},
+                     Union{Nothing, <:PhilogenyEstimator, <:PhilogenyConstraintModel},
                      T14 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                      T15 <: Scalariser}
     pe::T1

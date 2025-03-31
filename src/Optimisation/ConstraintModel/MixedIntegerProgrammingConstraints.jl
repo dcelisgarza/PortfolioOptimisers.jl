@@ -151,8 +151,8 @@ function set_mip_constraints!(model::JuMP.Model, card::Integer,
     else
         false, false
     end
-    c_flag = isa(cadj, IntegerPhilogeny)
-    n_flag = isa(nadj, IntegerPhilogeny)
+    c_flag = isa(cadj, IntegerPhilogenyModel)
+    n_flag = isa(nadj, IntegerPhilogenyModel)
     if !(card_flag ||
          lbi_flag ||
          sbi_flag ||

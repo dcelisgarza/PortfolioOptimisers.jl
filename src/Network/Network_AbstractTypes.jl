@@ -102,7 +102,7 @@ end
 function calc_mst(cent::PrimTree, g::AbstractGraph)
     return Graphs.prim_mst(g, cent.args...; cent.kwargs...)
 end
-abstract type AbstractNetworkEstimator <: PhilologyEstimator end
+abstract type AbstractNetworkEstimator <: PhilogenyEstimator end
 struct NetworkEstimator{T1 <: StatsBase.CovarianceEstimator,
                         T2 <: PortfolioOptimisersUnionDistanceMetric,
                         T3 <: Union{<:SimilarityMatrixEstimator, <:TreeType},
@@ -120,12 +120,12 @@ function NetworkEstimator(;
     return NetworkEstimator{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
 end
 struct CentralityEstimator{T1 <: CentralityType, T2 <: AbstractNetworkEstimator}
-    cent::T1
-    ne::T2
+    ne::T1
+    cent::T2
 end
-function CentralityEstimator(; cent::CentralityType = DegreeCentrality(),
-                             ne::AbstractNetworkEstimator = NetworkEstimator())
-    return CentralityEstimator{typeof(cent), typeof(ne)}(cent, ne)
+function CentralityEstimator(; ne::AbstractNetworkEstimator = NetworkEstimator(),
+                             cent::CentralityType = DegreeCentrality())
+    return CentralityEstimator{typeof(ne), typeof(cent)}(ne, cent)
 end
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:TreeType, <:Any},
                         X::AbstractMatrix; dims::Int = 1)
@@ -143,7 +143,7 @@ function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:SimilarityMatrixEst
     Rpm = PMFG_T2s(S)[1]
     return adjacency_matrix(SimpleGraph(Rpm))
 end
-function philogeny_matrix(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1)
+function philogeny_matrix(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
     A = calc_adjacency(ne, X; dims = dims)
     P = zeros(Int, size(Matrix(A)))
     for i ∈ 0:(ne.n)
@@ -158,8 +158,7 @@ function centrality_vector(cent::CentralityType, X::AbstractMatrix; kwargs...)
 end
 function centrality_vector(cte::CentralityEstimator, X::AbstractMatrix; dims::Int = 1)
     P = philogeny_matrix(cte.ne, X; dims = dims)
-    G = SimpleGraph(P)
-    return calc_centrality(cte.cent, G)
+    return centrality_vector(cte.cent, P)
 end
 function average_centrality(ne::NetworkEstimator, cent::CentralityType, w::AbstractVector,
                             X::AbstractMatrix; dims::Int = 1)
@@ -173,7 +172,7 @@ function average_centrality(cte::CentralityEstimator, w::AbstractVector, X::Abst
     return dot(cv, w)
 end
 function philogeny_matrix(cle::ClusteringEstimator, X::AbstractMatrix;
-                          branchorder::Symbol = :optimal, dims::Int = 1)
+                          branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims)
     clusters = cutree(res.clustering; k = res.k)
     P = zeros(Int, size(X, 2), res.k)
@@ -202,4 +201,4 @@ end
 export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
        KatzCentrality, Pagerank, RadialityCentrality, StressCentrality, KruskalTree,
        BoruvkaTree, PrimTree, NetworkEstimator, philogeny_matrix, average_centrality,
-       asset_philogeny
+       asset_philogeny, CentralityType, CentralityEstimator, centrality_vector

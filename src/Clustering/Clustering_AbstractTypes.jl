@@ -1,6 +1,6 @@
-abstract type PhilologyEstimator end
+abstract type PhilogenyEstimator end
 abstract type ClusteringAlgorithm end
-abstract type AbstractClusteringEstimator <: PhilologyEstimator end
+abstract type AbstractClusteringEstimator <: PhilogenyEstimator end
 abstract type AbstractPortfolioOptimisersClusteringResult <: Clustering.ClusteringResult end
 abstract type NumberClustersHeuristic end
 function optimal_number_clusters end
