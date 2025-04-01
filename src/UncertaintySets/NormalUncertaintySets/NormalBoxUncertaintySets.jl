@@ -1,6 +1,6 @@
-function uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass,
-                                                           <:Any, <:Any, <:Any},
-                         X::AbstractMatrix, args...; dims::Int = 1)
+function ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass, <:Any,
+                                               <:Any, <:Any}, X::AbstractMatrix, args...;
+             dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     T, N = size(pm.X)
     sigma = pm.sigma

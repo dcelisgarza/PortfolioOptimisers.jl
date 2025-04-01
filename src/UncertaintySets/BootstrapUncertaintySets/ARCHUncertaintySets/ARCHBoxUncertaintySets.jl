@@ -1,6 +1,6 @@
-function uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass,
-                                                         <:Any, <:Any, <:Any, <:Any, <:Any},
-                         X::AbstractMatrix, args...; dims::Int = 1)
+function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass, <:Any, <:Any,
+                                             <:Any, <:Any, <:Any}, X::AbstractMatrix,
+             args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     N = size(pm.X, 2)
     mus, sigmas = bootstrap_generator(ue, pm.X)

@@ -29,14 +29,15 @@ function uncertainty_set_factory(::Nothing, ::Nothing)
     return nothing
 end
 function uncertainty_set_factory(::Nothing,
-                                 prior_uncertainty_set::Union{<:BoxUncertaintySet,
-                                                              <:EllipseUncertaintySet})
-    return prior_uncertainty_set
+                                 prior_ucs::Union{<:BoxUncertaintySet,
+                                                  <:EllipseUncertaintySet,
+                                                  <:UncertaintySetEstimator})
+    return prior_ucs
 end
-function uncertainty_set_factory(risk_uncertainty_set::Union{<:BoxUncertaintySet,
-                                                             <:EllipseUncertaintySet},
-                                 ::Any)
-    return risk_uncertainty_set
+function uncertainty_set_factory(risk_ucs::Union{<:BoxUncertaintySet,
+                                                 <:EllipseUncertaintySet,
+                                                 <:UncertaintySetEstimator}, ::Any)
+    return risk_ucs
 end
 
 risks = (Skewness, SemiSkewness, Kurtosis, SemiKurtosis)

@@ -12,7 +12,7 @@
         end
     end
     @testset "No uncertainty sets" begin
-        @test isa(uncertainty_set(nothing), Nothing)
+        @test isa(ucs(nothing), Nothing)
         @test isa(mu_uncertainty_set(nothing), Nothing)
         @test isa(sigma_uncertainty_set(nothing), Nothing)
     end
@@ -34,7 +34,7 @@
                                            seed = 987654321)]
         ues_t = CSV.read(joinpath(@__DIR__, "assets/Box-Uncertainty-Sets.csv"), DataFrame)
         for (i, ue) ∈ pairs(ues)
-            mu_set1, sigma_set1 = uncertainty_set(ue, transpose(X); dims = 2)
+            mu_set1, sigma_set1 = ucs(ue, transpose(X); dims = 2)
             mu1 = [mu_set1.lb; mu_set1.ub]
             sigma1 = [vec(sigma_set1.lb); vec(sigma_set1.ub)]
 
@@ -165,7 +165,7 @@
             if i == 5 && Sys.iswindows()
                 continue
             end
-            mu_set1, sigma_set1 = uncertainty_set(ue, transpose(X); dims = 2)
+            mu_set1, sigma_set1 = ucs(ue, transpose(X); dims = 2)
             mu1 = [vec(mu_set1.sigma); mu_set1.k]
             sigma1 = [vec(sigma_set1.sigma); sigma_set1.k]
 

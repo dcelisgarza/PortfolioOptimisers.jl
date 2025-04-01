@@ -28,64 +28,67 @@ function fourth_moment_cluster_index_factory(N::Integer, cluster::AbstractVector
     end
     return idx
 end
+
+function uncertainty_set_factory(::Nothing,
+                                 prior_ucs::Union{<:BoxUncertaintySet,
+                                                  <:EllipseUncertaintySet,
+                                                  <:UncertaintySetEstimator}, ::Any)
+    return prior_ucs
+end
+function uncertainty_set_factory(risk_ucs::Union{<:BoxUncertaintySet,
+                                                 <:EllipseUncertaintySet,
+                                                 <:UncertaintySetEstimator}, ::Any, ::Any)
+    return risk_ucs
+end
 function uncertainty_set_factory(::Nothing, ::Nothing, ::Any)
     return nothing
 end
 function uncertainty_set_factory(::Nothing,
-                                 prior_uncertainty_set::BoxUncertaintySet{<:AbstractMatrix,
-                                                                          <:AbstractMatrix},
+                                 prior_ucs::BoxUncertaintySet{<:AbstractMatrix,
+                                                              <:AbstractMatrix},
                                  cluster::AbstractVector)
-    return BoxUncertaintySet(; lb = view(prior_uncertainty_set.lb, cluster, cluster),
-                             ub = view(prior_uncertainty_set.ub, cluster, cluster))
+    return BoxUncertaintySet(; lb = view(prior_ucs.lb, cluster, cluster),
+                             ub = view(prior_ucs.ub, cluster, cluster))
 end
 function uncertainty_set_factory(::Nothing,
-                                 prior_uncertainty_set::EllipseUncertaintySet{<:AbstractMatrix,
-                                                                              <:Any},
+                                 prior_ucs::EllipseUncertaintySet{<:AbstractMatrix, <:Any},
                                  cluster::AbstractVector)
-    idx = fourth_moment_cluster_index_factory(floor(Int,
-                                                    sqrt(size(prior_uncertainty_set.sigma,
-                                                              1))), cluster)
-    return EllipseUncertaintySet(; sigma = prior_uncertainty_set.sigma[idx, idx],
-                                 k = prior_uncertainty_set.k)
+    idx = fourth_moment_cluster_index_factory(floor(Int, sqrt(size(prior_ucs.sigma, 1))),
+                                              cluster)
+    return EllipseUncertaintySet(; sigma = prior_ucs.sigma[idx, idx], k = prior_ucs.k)
 end
 function uncertainty_set_factory(::Nothing,
-                                 prior_uncertainty_set::BoxUncertaintySet{<:AbstractVector,
-                                                                          <:AbstractVector},
+                                 prior_ucs::BoxUncertaintySet{<:AbstractVector,
+                                                              <:AbstractVector},
                                  cluster::AbstractVector)
-    return BoxUncertaintySet(; lb = view(prior_uncertainty_set.lb, cluster),
-                             ub = view(prior_uncertainty_set.ub, cluster))
+    return BoxUncertaintySet(; lb = view(prior_ucs.lb, cluster),
+                             ub = view(prior_ucs.ub, cluster))
 end
 function uncertainty_set_factory(::Nothing,
-                                 prior_uncertainty_set::EllipseUncertaintySet{<:AbstractVector,
-                                                                              <:Any},
+                                 prior_ucs::EllipseUncertaintySet{<:AbstractVector, <:Any},
                                  cluster::AbstractVector)
-    return EllipseUncertaintySet(; sigma = prior_uncertainty_set.sigma[cluster, cluster],
-                                 k = prior_uncertainty_set.k)
+    return EllipseUncertaintySet(; sigma = prior_ucs.sigma[cluster, cluster],
+                                 k = prior_ucs.k)
 end
-function uncertainty_set_factory(risk_uncertainty_set::BoxUncertaintySet{<:AbstractMatrix,
-                                                                         <:AbstractMatrix},
+function uncertainty_set_factory(risk_ucs::BoxUncertaintySet{<:AbstractMatrix,
+                                                             <:AbstractMatrix}, ::Any,
+                                 cluster::AbstractVector)
+    return BoxUncertaintySet(; lb = view(risk_ucs.lb, cluster, cluster),
+                             ub = view(risk_ucs.ub, cluster, cluster))
+end
+function uncertainty_set_factory(risk_ucs::EllipseUncertaintySet{<:AbstractMatrix, <:Any},
                                  ::Any, cluster::AbstractVector)
-    return BoxUncertaintySet(; lb = view(risk_uncertainty_set.lb, cluster, cluster),
-                             ub = view(risk_uncertainty_set.ub, cluster, cluster))
+    idx = fourth_moment_cluster_index_factory(floor(Int, sqrt(size(risk_ucs.sigma, 1))),
+                                              cluster)
+    return EllipseUncertaintySet(; sigma = risk_ucs.sigma[idx, idx], k = risk_ucs.k)
 end
-function uncertainty_set_factory(risk_uncertainty_set::EllipseUncertaintySet{<:AbstractMatrix,
-                                                                             <:Any}, ::Any,
+function uncertainty_set_factory(risk_ucs::BoxUncertaintySet{<:AbstractVector,
+                                                             <:AbstractVector}, ::Any,
                                  cluster::AbstractVector)
-    idx = fourth_moment_cluster_index_factory(floor(Int,
-                                                    sqrt(size(risk_uncertainty_set.sigma,
-                                                              1))), cluster)
-    return EllipseUncertaintySet(; sigma = risk_uncertainty_set.sigma[idx, idx],
-                                 k = risk_uncertainty_set.k)
+    return BoxUncertaintySet(; lb = view(risk_ucs.lb, cluster),
+                             ub = view(risk_ucs.ub, cluster))
 end
-function uncertainty_set_factory(risk_uncertainty_set::BoxUncertaintySet{<:AbstractVector,
-                                                                         <:AbstractVector},
+function uncertainty_set_factory(risk_ucs::EllipseUncertaintySet{<:AbstractVector, <:Any},
                                  ::Any, cluster::AbstractVector)
-    return BoxUncertaintySet(; lb = view(risk_uncertainty_set.lb, cluster),
-                             ub = view(risk_uncertainty_set.ub, cluster))
-end
-function uncertainty_set_factory(risk_uncertainty_set::EllipseUncertaintySet{<:AbstractVector,
-                                                                             <:Any}, ::Any,
-                                 cluster::AbstractVector)
-    return EllipseUncertaintySet(; sigma = risk_uncertainty_set.sigma[cluster, cluster],
-                                 k = risk_uncertainty_set.k)
+    return EllipseUncertaintySet(; sigma = risk_ucs.sigma[cluster, cluster], k = risk_ucs.k)
 end

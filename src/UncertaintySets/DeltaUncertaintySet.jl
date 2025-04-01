@@ -10,8 +10,7 @@ function DeltaUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
                                                                                            delta_mu,
                                                                                            delta_sigma)
 end
-function uncertainty_set(ue::DeltaUncertaintySetEstimator, X::AbstractMatrix, args...;
-                         dims::Int = 1)
+function ucs(ue::DeltaUncertaintySetEstimator, X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     d_sigma = ue.delta_sigma * abs.(pm.sigma)
     return BoxUncertaintySet(; lb = range(; start = 0, stop = 0, length = length(pm.mu)),
