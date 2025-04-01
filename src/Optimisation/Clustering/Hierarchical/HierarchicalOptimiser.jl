@@ -5,7 +5,7 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
                              T4 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                              T5 <: Scalariser,
                              T6 <: Union{Nothing, <:WeightBounds, WeightBoundsConstraints},
-                             T7 <: ClusteringWeightFinaliser}
+                             T7 <: ClusteringWeightFinaliser, T8 <: Bool}
     pe::T1
     cle::T2
     fees::T3
@@ -13,6 +13,7 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
     sce::T5
     wb::T6
     cwf::T7
+    strict::T8
 end
 function HierarchicalOptimiser(;
                                pe::Union{<:AbstractPriorEstimator, <:AbstractPriorModel} = EmpiricalPriorEstimator(),
@@ -22,10 +23,17 @@ function HierarchicalOptimiser(;
                                slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
                                sce::Scalariser = SumScalariser(),
                                wb::Union{Nothing, <:WeightBounds, WeightBoundsConstraints} = nothing,
-                               cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser())
+                               cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
+                               strict::Bool = false)
     return HierarchicalOptimiser{typeof(pe), typeof(cle), typeof(fees), typeof(slv),
-                                 typeof(sce), typeof(wb), typeof(cwf)}(pe, cle, fees, slv,
-                                                                       sce, wb, cwf)
+                                 typeof(sce), typeof(wb), typeof(cwf), typeof(strict)}(pe,
+                                                                                       cle,
+                                                                                       fees,
+                                                                                       slv,
+                                                                                       sce,
+                                                                                       wb,
+                                                                                       cwf,
+                                                                                       strict)
 end
 function unitary_expected_risks(r::Union{<:OptimisationRiskMeasure,
                                          <:AbstractVector{<:OptimisationRiskMeasure}},

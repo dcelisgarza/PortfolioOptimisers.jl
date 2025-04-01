@@ -33,7 +33,7 @@ function set_sdp_network_cluster_constraints!(model::JuMP.Model,
     W = model[:W]
     model[key] = @constraint(model, sc * adj.A .* W == 0)
     if !haskey(model, :variance_flag)
-        add_to_expression!(model[:obj_pen], adj.p, tr(W))
+        add_to_expression!(model[:op], adj.p, tr(W))
     end
     return nothing
 end
@@ -45,7 +45,7 @@ function set_sdp_frc_network_cluster_constraints!(model::JuMP.Model,
     W1 = model[:W1]
     model[key] = @constraint(model, sc * adj.A .* W1 == 0)
     if !haskey(model, :variance_flag)
-        add_to_expression!(model[:obj_pen], adj.p, tr(W1))
+        add_to_expression!(model[:op], adj.p, tr(W1))
     end
     return nothing
 end

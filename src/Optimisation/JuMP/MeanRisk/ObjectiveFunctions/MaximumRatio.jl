@@ -13,9 +13,9 @@ function set_portfolio_objective_function!(port, obj_func::MaximumRatio,
     model = port.model
     so = model[:so]
     ret = model[:ret]
-    obj_pen = model[:obj_pen]
+    op = model[:op]
     @expression(model, obj_expr, ret)
-    add_to_expression!(obj_expr, -1, obj_pen)
+    add_to_expression!(obj_expr, -1, op)
     add_custom_objective_term!(port, obj_func, ret_type, custom_obj, obj_expr)
     @objective(model, Max, so * obj_expr)
     return nothing
@@ -25,17 +25,17 @@ function set_portfolio_objective_function!(port, obj_func::MaximumRatio,
                                            custom_obj::CustomObjective)
     model = port.model
     so = model[:so]
-    obj_pen = model[:obj_pen]
+    op = model[:op]
     if haskey(model, :constr_risk_ratio)
         ret = model[:ret]
         @expression(model, obj_expr, ret)
-        add_to_expression!(obj_expr, -1, obj_pen)
+        add_to_expression!(obj_expr, -1, op)
         add_custom_objective_term!(port, obj_func, ret_type, custom_obj, obj_expr)
         @objective(model, Max, so * obj_expr)
     else
         risk = model[:risk]
         @expression(model, obj_expr, risk)
-        add_to_expression!(obj_expr, 1, obj_pen)
+        add_to_expression!(obj_expr, 1, op)
         add_custom_objective_term!(port, obj_func, ret_type, custom_obj, obj_expr)
         @objective(model, Min, so * obj_expr)
     end

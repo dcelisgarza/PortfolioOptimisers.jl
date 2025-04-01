@@ -118,14 +118,14 @@ function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::AbstractMatrix,
 end
 function optimise!(hc::HierarchicalRiskParity{<:Any,
                                               <:AbstractVector{<:OptimisationRiskMeasure}},
-                   rd::ReturnsData = ReturnsData(); strict::Bool = false)
+                   rd::ReturnsData = ReturnsData())
     pm = prior(hc.opt.pe, rd.X, rd.F)
     clm = clusterise(hc.opt.cle, pm.X)
     r = risk_measure_factory(hc.r, pm, hc.opt.slv)
     wu = Matrix{eltype(pm.X)}(undef, size(pm.X, 2), 2)
     wk = zeros(eltype(pm.X), size(pm.X, 2))
     rku = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
-    wb = weight_bounds_constraints(hc.opt.wb; N = size(pm.X, 2), strict = strict)
+    wb = weight_bounds_constraints(hc.opt.wb; N = size(pm.X, 2), strict = hc.opt.strict)
     w = ones(eltype(pm.X), size(pm.X, 2))
     items = [clm.clustering.order]
     @inbounds while length(items) > 0

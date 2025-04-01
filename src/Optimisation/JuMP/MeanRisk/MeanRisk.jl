@@ -1,28 +1,27 @@
 struct MeanRisk{T1 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                T2 <: ObjectiveFunction, T3 <: PortfolioReturnType, T4 <: Scalariser,
-                T5 <: CustomConstraint, T6 <: CustomObjective, T7 <: AbstractVector} <:
-       TraditionalOptimisationType
+                T2 <: ObjectiveFunction, T3 <: JuMPOptimiser} <: JuMPOptimisationType
     risk::T1
     obj::T2
-    ret::T3
-    sc::T4
-    cc::T5
-    co::T6
-    wi::T7
+    opt::T3
 end
-function MeanRisk(; risk::Union{RiskMeasure, AbstractVector{<:RiskMeasure}} = Variance(),
+function MeanRisk(;
+                  risk::Union{RiskMeasure, AbstractVector{<:RiskMeasure}} = StandardDeviation(),
                   obj::ObjectiveFunction = MinimumRisk(),
-                  ret::PortfolioReturnType = ArithmeticReturn(),
-                  sc::Scalariser = SumScalariser(),
-                  cc::CustomConstraint = NoCustomConstraint(),
-                  co::CustomObjective = NoCustomObjective(),
-                  wi::AbstractVector = Vector{Float64}())
-    return MeanRisk{typeof(risk), typeof(obj), typeof(ret), typeof(sc), typeof(cc),
-                    typeof(co), typeof(wi)}(risk, obj, ret, sc, cc, co, wi)
+                  opt::JuMPOptimiser = JuMPOptimiser())
+    return MeanRisk{typeof(risk), typeof(obj), typeof(opt)}(risk, obj, opt)
 end
-function optimise!(X::AbstractMatrix, opt::MeanRisk; os::Real = 1.0, cs::Real = 1.0,
-                   str_names::Bool = false)
-    return nothing
+function optimise!(mr::MeanRisk, rd::ReturnsData = ReturnsData())
+    model = JuMP.Model()
+    set_string_names_on_creation(model, mr.opt.str_names)
+    set_objective_penalty!(model)
+    set_model_scales!(model, mr.opt.sc, mr.opt.so)
+    pm = prior(mr.opt.pe, rd.X, rd.F)
+    set_w!(model, pm.X, mr.opt.wi)
+    set_maximum_ratio_factor_variables!(model, pm.mu, mr.obj)
+    set_weight_constraints!(model, mr.opt.wb)
+    set_long_short_bounds_constraints!(model, mr.opt.lss)
+
+    return model
 end
 
 export MeanRisk

@@ -1,7 +1,7 @@
 abstract type OptimisationType end
 abstract type ClusteringOptimisationType <: OptimisationType end
 abstract type HierarchicalClusteringOptimisationType <: ClusteringOptimisationType end
-abstract type TraditionalOptimisationType <: OptimisationType end
+abstract type JuMPOptimisationType <: OptimisationType end
 abstract type ObjectiveFunction end
 abstract type CustomObjective end
 struct NoCustomObjective <: CustomObjective end
@@ -11,29 +11,28 @@ function add_custom_objective_term!(port, obj_func::ObjectiveFunction,
     return nothing
 end
 function set_objective_penalty!(model::JuMP.Model)
-    @expression(model, obj_pen, zero(AffExpr))
+    @expression(model, op, zero(AffExpr))
     return nothing
 end
-function set_model_scales!(model::JuMP.Model, os::Real, cs::Real)
+function set_model_scales!(model::JuMP.Model, so::Real, sc::Real)
     @expressions(model, begin
-                     os, os
-                     cs, cs
+                     so, so
+                     sc, sc
                  end)
     return nothing
 end
+function set_initial_w!(::AbstractVector, ::Nothing)
+    return nothing
+end
 function set_initial_w!(w::AbstractVector, wi::AbstractVector)
-    if isempty(wi)
-        return nothing
-    end
     @smart_assert(length(wi) == length(w))
     set_start_value.(w, wi)
     return nothing
 end
-function set_w!(model::JuMP.Model, X::AbstractMatrix, wi::AbstractVector)
+function set_w!(model::JuMP.Model, X::AbstractMatrix, wi::Union{Nothing, <:AbstractVector})
     @variable(model, w[1:size(X, 2)])
     set_initial_w!(w, wi)
     return nothing
 end
-function optimise! end
 
-export NoCustomObjective, optimise!
+export NoCustomObjective

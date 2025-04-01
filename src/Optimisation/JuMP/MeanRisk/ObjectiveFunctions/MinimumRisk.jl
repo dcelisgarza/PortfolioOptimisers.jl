@@ -4,10 +4,10 @@ function set_portfolio_objective_function!(port, obj_func::MinimumRisk,
                                            custom_obj::CustomObjective)
     model = port.model
     so = model[:so]
-    obj_pen = model[:obj_pen]
+    op = model[:op]
     risk = model[:risk]
     @expression(model, obj_expr, risk)
-    add_to_expression!(obj_expr, 1, obj_pen)
+    add_to_expression!(obj_expr, 1, op)
     add_custom_objective_term!(port, obj_func, ret_type, custom_obj, obj_expr)
     @objective(model, Min, so * obj_expr)
     return nothing

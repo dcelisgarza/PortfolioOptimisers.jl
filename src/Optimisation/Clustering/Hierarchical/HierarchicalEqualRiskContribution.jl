@@ -285,8 +285,7 @@ function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any,
     end
     return w, rkcl
 end
-function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = ReturnsData();
-                   strict::Bool = false)
+function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = ReturnsData())
     pm = prior(hc.opt.pe, rd.X, rd.F)
     clm = clusterise(hc.opt.cle, pm.X)
     idx = cutree(clm.clustering; k = clm.k)
@@ -338,7 +337,7 @@ function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = Retu
     end
     return finalise_hierarchical_weights(hc.opt.cwf,
                                          weight_bounds_constraints(hc.opt.wb; N = length(w),
-                                                                   strict = strict),
+                                                                   strict = hc.opt.strict),
                                          w / sum(w))
 end
 
