@@ -39,7 +39,7 @@ function BuyInThreshold(; sbi::Union{Nothing, <:Real, <:AbstractVector{<:Real}} 
     end
     return BuyInThreshold{typeof(sbi), typeof(lbi)}(sbi, lbi)
 end
-function _short_mip_threshold_constraints(model::JuMP.Model, ss::Real, wb::WeightBounds,
+function _short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                           ffl::Union{<:Real, <:AbstractVector},
                                           ffs::Union{<:Real, <:AbstractVector},
                                           lbi::Union{<:Real, <:AbstractVector},
@@ -47,6 +47,7 @@ function _short_mip_threshold_constraints(model::JuMP.Model, ss::Real, wb::Weigh
                                           lbi_flag::Bool, sbi_flag::Bool, ffl_flag::Bool,
                                           ffs_flag::Bool)
     w, k, sc = get_w_k_sc(model)
+    ss = model[:ss]
     N = length(w)
     @variables(model, begin
                    ilb[1:N], (binary = true)
@@ -96,7 +97,7 @@ function _short_mip_threshold_constraints(model::JuMP.Model, ss::Real, wb::Weigh
     end
     return ib
 end
-function _mip_constraints(model::JuMP.Model, ss::Real, wb::WeightBounds,
+function _mip_constraints(model::JuMP.Model, wb::WeightBounds,
                           ffl::Union{<:Real, <:AbstractVector},
                           lbi::Union{<:Real, <:AbstractVector}, lbi_flag::Bool,
                           ffl_flag::Bool)
@@ -106,6 +107,7 @@ function _mip_constraints(model::JuMP.Model, ss::Real, wb::WeightBounds,
     if isa(k, Real)
         @expression(model, i_mip, ib)
     else
+        ss = model[:ss]
         @variable(model, ibf[1:N] >= 0)
         @constraints(model, begin
                          ibf_ub, ibf <= k
@@ -131,7 +133,7 @@ function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThre
                               fees::Union{Nothing, <:Fees},
                               cadj::Union{Nothing, <:PhilogenyConstraintModel},
                               nadj::Union{Nothing, <:PhilogenyConstraintModel},
-                              wb::WeightBounds, ss::Real = 100_000.0)
+                              wb::WeightBounds)
     lbi_flag, sbi_flag = if !isnothing(bit)
         non_zero_real_or_vec(bit.lbi), non_zero_real_or_vec(bit.sbi)
     else
@@ -155,12 +157,13 @@ function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThre
         return nothing
     end
     ib = if (sbi_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
-        _short_mip_threshold_constraints(model, ss, wb, fees.fixed_long, fees.fixed_short,
+        _short_mip_threshold_constraints(model, wb, fees.fixed_long, fees.fixed_short,
                                          bit.lbi, bit.sbi, lbi_flag, sbi_flag, ffl_flag,
                                          ffs_flag)
     else
-        _mip_constraints(model, ss, wb, fees.fixed_long, bit.lbi, lbi_flag, ffl_flag)
+        _mip_constraints(model, wb, fees.fixed_long, bit.lbi, lbi_flag, ffl_flag)
     end
+
     sc = model[:sc]
     if card_flag
         if !isnothing(card.A_ineq)
@@ -171,10 +174,10 @@ function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThre
         end
     end
     if c_flag
-        @constraint(model, ccard, sc * cadj.A * ib <= sc * cadj.B)
+        @constraint(model, card_cadj, sc * cadj.A * ib <= sc * cadj.B)
     end
     if n_flag
-        @constraint(model, ncard, sc * nadj.A * ib <= sc * nadj.B)
+        @constraint(model, card_nadj, sc * nadj.A * ib <= sc * nadj.B)
     end
     return nothing
 end

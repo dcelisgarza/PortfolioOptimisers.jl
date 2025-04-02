@@ -1,14 +1,11 @@
 abstract type PhilogenyConstraintModel end
 abstract type PhilogenyConstraint end
-struct SemiDefinitePhilogenyConstraint{T1 <:
-                                       Union{<:NetworkEstimator, <:ClusteringEstimator},
-                                       T2 <: Real} <: PhilogenyConstraint
+struct SemiDefinitePhilogenyConstraint{T1 <: PhilogenyEstimator, T2 <: Real} <:
+       PhilogenyConstraint
     pe::T1
     p::T2
 end
-function SemiDefinitePhilogenyConstraint(;
-                                         pe::Union{<:NetworkEstimator,
-                                                   <:ClusteringEstimator} = NetworkEstimator(),
+function SemiDefinitePhilogenyConstraint(; pe::PhilogenyEstimator = NetworkEstimator(),
                                          p::Real = 0.05)
     @smart_assert(!isempty(pe))
     @smart_assert(p >= zero(p))
@@ -24,15 +21,14 @@ function SemiDefinitePhilogenyModel(; A::AbstractMatrix{<:Real}, p::Real = 0.05)
     @smart_assert(p >= zero(p))
     return SemiDefinitePhilogenyModel{typeof(A), typeof(p)}(A, p)
 end
-struct IntegerPhilogenyConstraint{T1 <: Union{<:NetworkEstimator, <:ClusteringEstimator},
+struct IntegerPhilogenyConstraint{T1 <: PhilogenyEstimator,
                                   T2 <: Union{<:Integer, <:AbstractVector{<:Integer}},
                                   T3 <: Real} <: PhilogenyConstraintModel
     pe::T1
     B::T2
     scale::T3
 end
-function IntegerPhilogenyConstraint(;
-                                    pe::Union{<:NetworkEstimator, <:ClusteringEstimator} = NetworkEstimator(),
+function IntegerPhilogenyConstraint(; pe::PhilogenyEstimator = NetworkEstimator(),
                                     B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                                     scale::Real = 100_000.0)
     @smart_assert(!isempty(pe))

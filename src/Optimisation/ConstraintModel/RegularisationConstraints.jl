@@ -1,3 +1,9 @@
+function set_l1_regularisation!(::JuMP.Model, ::Nothing)
+    return nothing
+end
+function set_l2_regularisation!(::JuMP.Model, ::Nothing)
+    return nothing
+end
 function set_l1_regularisation!(model::JuMP.Model, l1::Real)
     sc = model[:sc]
     w = model[:w]

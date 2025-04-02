@@ -4,20 +4,20 @@ abstract type HierarchicalClusteringOptimisationType <: ClusteringOptimisationTy
 abstract type JuMPOptimisationType <: OptimisationType end
 abstract type ObjectiveFunction end
 abstract type CustomObjective end
-struct NoCustomObjective <: CustomObjective end
-function add_custom_objective_term!(port, obj_func::ObjectiveFunction,
-                                    ret_type::PortfolioReturnType,
-                                    custom_obj::NoCustomObjective, obj_expr)
+function add_custom_objective_term!(obj_func::ObjectiveFunction,
+                                    ret_type::PortfolioReturnType, custom_obj::Nothing,
+                                    obj_expr)
     return nothing
 end
 function set_objective_penalty!(model::JuMP.Model)
     @expression(model, op, zero(AffExpr))
     return nothing
 end
-function set_model_scales!(model::JuMP.Model, so::Real, sc::Real)
+function set_model_scales!(model::JuMP.Model, so::Real, sc::Real, ss::Real)
     @expressions(model, begin
                      so, so
                      sc, sc
+                     ss, ss
                  end)
     return nothing
 end
@@ -34,5 +34,3 @@ function set_w!(model::JuMP.Model, X::AbstractMatrix, wi::Union{Nothing, <:Abstr
     set_initial_w!(w, wi)
     return nothing
 end
-
-export NoCustomObjective

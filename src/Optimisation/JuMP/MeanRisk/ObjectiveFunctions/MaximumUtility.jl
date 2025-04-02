@@ -5,10 +5,9 @@ function Utility(; l::Real = 2.0)
     @smart_assert(l >= zero(l))
     return Utility{typeof(l)}(l)
 end
-function set_portfolio_objective_function!(port, obj_func::MaximumUtility,
+function set_portfolio_objective_function!(model::JuMP.Model, obj_func::MaximumUtility,
                                            ret_type::PortfolioReturnType,
-                                           custom_obj::CustomObjective)
-    model = port.model
+                                           custom_obj::Union{Nothing, <:CustomObjective})
     so = model[:so]
     ret = model[:ret]
     risk = model[:risk]
@@ -16,7 +15,7 @@ function set_portfolio_objective_function!(port, obj_func::MaximumUtility,
     op = model[:op]
     @expression(model, obj_expr, ret - l * risk)
     add_to_expression!(obj_expr, -1, op)
-    add_custom_objective_term!(port, obj_func, ret_type, custom_obj, obj_expr)
+    add_custom_objective_term!(obj_func, ret_type, custom_obj, obj_expr)
     @objective(model, Max, so * obj_expr)
     return nothing
 end

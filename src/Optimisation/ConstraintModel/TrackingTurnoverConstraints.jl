@@ -25,10 +25,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, X::AbstractMatrix,
                  end)
     return nothing
 end
-function turnover_constraints(::JuMP.Model, ::Nothing)
+function set_turnover_constraints!(::JuMP.Model, ::Nothing)
     return nothing
 end
-function turnover_constraints(model::JuMP.Model, turnover::Turnover)
+function set_turnover_constraints!(model::JuMP.Model, turnover::Turnover)
     w, k, sc = get_w_k_sc(model)
     N = length(w)
     @variable(model, t_tr[1:N])

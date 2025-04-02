@@ -1,6 +1,5 @@
 abstract type CustomConstraint end
-struct NoCustomConstraint <: CustomConstraint end
-function set_custom_constraint!(::Any, ::NoCustomConstraint)
+function set_custom_constraint!(::JuMP.Model, ::Nothing, args...)
     return nothing
 end
 function get_w_k_sc(model::JuMP.Model)

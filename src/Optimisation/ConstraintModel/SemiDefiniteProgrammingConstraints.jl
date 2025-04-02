@@ -23,11 +23,11 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
     return nothing
 end
 
-function set_sdp_network_cluster_constraints!(::JuMP.Model, adj::Any, ::Symbol)
+function set_sdp_philogeny_constraints!(::JuMP.Model, args...)
     return nothing
 end
-function set_sdp_network_cluster_constraints!(model::JuMP.Model,
-                                              adj::PhilogenyConstraintModel, key::Symbol)
+function set_sdp_philogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhilogenyModel,
+                                        key::Symbol)
     sc = model[:sc]
     set_sdp_constraints!(model)
     W = model[:W]
@@ -37,9 +37,11 @@ function set_sdp_network_cluster_constraints!(model::JuMP.Model,
     end
     return nothing
 end
-function set_sdp_frc_network_cluster_constraints!(model::JuMP.Model,
-                                                  adj::PhilogenyConstraintModel,
-                                                  key::Symbol)
+function set_sdp_frc_philogeny_constraints!(::JuMP.Model, args...)
+    return nothing
+end
+function set_sdp_frc_philogeny_constraints!(model::JuMP.Model,
+                                            adj::SemiDefinitePhilogenyModel, key::Symbol)
     sc = model[:sc]
     set_sdp_frc_constraints!(model)
     W1 = model[:W1]

@@ -13,9 +13,9 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
                                  <:AbstractVector{<:CentralityConstraint},
                                  <:LinearConstraintModel}, T10 <: Union{Nothing, DataFrame},
                      T11 <:
-                     Union{Nothing, <:PhilogenyEstimator, <:PhilogenyConstraintModel},
+                     Union{Nothing, <:PhilogenyConstraint, <:PhilogenyConstraintModel},
                      T12 <:
-                     Union{Nothing, <:PhilogenyEstimator, <:PhilogenyConstraintModel},
+                     Union{Nothing, <:PhilogenyConstraint, <:PhilogenyConstraintModel},
                      T13 <: Union{Nothing, <:BuyInThreshold},
                      T14 <: Union{Nothing, <:Turnover},
                      T15 <: Union{Nothing, <:TrackingError}, T16 <: Union{Nothing, <:Real},
@@ -23,8 +23,8 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
                      T19 <: Scalariser, T20 <: PortfolioReturnType,
                      T21 <: Union{Nothing, <:CustomConstraint},
                      T22 <: Union{Nothing, <:CustomObjective}, T23 <: Real, T24 <: Real,
-                     T25 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T26 <: Bool,
-                     T27 <: Bool, T28 <: Bool} <: JuMPOptimisationType
+                     T25 <: Real, T26 <: Union{<:Solver, <:AbstractVector{<:Solver}},
+                     T27 <: Bool, T28 <: Bool, T29 <: Bool} <: JuMPOptimisationType
     pe::T1 # PriorEstimator
     wi::T2
     wb::T3 # WeightBounds
@@ -49,10 +49,11 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
     cobj::T22
     sc::T23
     so::T24
-    slv::T25
-    str_names::T26
-    save::T27
-    strict::T28
+    ss::T25
+    slv::T26
+    str_names::T27
+    save::T28
+    strict::T29
 end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorModel} = EmpiricalPriorEstimator(),
@@ -85,7 +86,8 @@ function JuMPOptimiser(;
                        ret::PortfolioReturnType = ArithmeticReturn(),
                        ccnt::Union{Nothing, <:CustomConstraint} = nothing,
                        cobj::Union{Nothing, <:CustomObjective} = nothing, sc::Real = 1,
-                       so::Real = 1, slv::Union{<:Solver, <:AbstractVector{<:Solver}},
+                       so::Real = 1, ss::Real = 100_000.0,
+                       slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                        str_names::Bool = false, save::Bool = false, strict::Bool = false)
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
@@ -117,17 +119,36 @@ function JuMPOptimiser(;
                          typeof(lcs), typeof(lcm), typeof(card), typeof(cent), typeof(sets),
                          typeof(nadj), typeof(cadj), typeof(bit), typeof(tn), typeof(te),
                          typeof(l1), typeof(l2), typeof(fees), typeof(sce), typeof(ret),
-                         typeof(ccnt), typeof(cobj), typeof(sc), typeof(so), typeof(slv),
-                         typeof(str_names), typeof(save), typeof(strict)}(pe, wi, wb, bgt,
-                                                                          lss, lcs, lcm,
-                                                                          card, cent, sets,
-                                                                          nadj, cadj, bit,
-                                                                          tn, te, l1, l2,
-                                                                          fees, sce, ret,
-                                                                          ccnt, cobj, sc,
-                                                                          so, slv,
-                                                                          str_names, save,
-                                                                          strict)
+                         typeof(ccnt), typeof(cobj), typeof(sc), typeof(so), typeof(ss),
+                         typeof(slv), typeof(str_names), typeof(save), typeof(strict)}(pe,
+                                                                                       wi,
+                                                                                       wb,
+                                                                                       bgt,
+                                                                                       lss,
+                                                                                       lcs,
+                                                                                       lcm,
+                                                                                       card,
+                                                                                       cent,
+                                                                                       sets,
+                                                                                       nadj,
+                                                                                       cadj,
+                                                                                       bit,
+                                                                                       tn,
+                                                                                       te,
+                                                                                       l1,
+                                                                                       l2,
+                                                                                       fees,
+                                                                                       sce,
+                                                                                       ret,
+                                                                                       ccnt,
+                                                                                       cobj,
+                                                                                       sc,
+                                                                                       so,
+                                                                                       ss,
+                                                                                       slv,
+                                                                                       str_names,
+                                                                                       save,
+                                                                                       strict)
 end
 
 export JuMPOptimiser

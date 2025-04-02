@@ -24,7 +24,7 @@ function set_long_short_bounds_constraints!(::JuMP.Model, ::LongShortSum{Nothing
 end
 function set_long_short_bounds_constraints!(model::JuMP.Model, lss::LongShortSum,
                                             long_only::Bool = false)
-    if long_only || (!isnothing(lss.ls) && !isnothing(lss.ss))
+    if long_only
         return nothing
     end
     w, k, sc = get_w_k_sc(model)
