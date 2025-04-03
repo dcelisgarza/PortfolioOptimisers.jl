@@ -4,7 +4,7 @@ function set_linear_weight_constraints!(::JuMP.Model,
                                                                                                        Nothing},
                                                                         <:PartialLinearConstraintModel{Nothing,
                                                                                                        Nothing}}},
-                                        args...)
+                                        ::Symbol, ::Symbol)
     return nothing
 end
 function set_linear_weight_constraints!(model::JuMP.Model, lcm::LinearConstraintModel,

@@ -5,23 +5,32 @@ struct WeightBounds{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
 end
 function validate_bounds(lb::Real, ub::Real)
     @smart_assert(lb <= ub)
+    return nothing
 end
 function validate_bounds(lb::AbstractVector, ub::Real)
     @smart_assert(!isempty(lb) && all(lb .<= ub))
+    return nothing
 end
 function validate_bounds(lb::Real, ub::AbstractVector)
     @smart_assert(!isempty(ub) && all(lb .<= ub))
+    return nothing
 end
 function validate_bounds(lb::AbstractVector, ub::AbstractVector)
     @smart_assert(!isempty(lb))
     @smart_assert(!isempty(ub))
     @smart_assert(length(lb) == length(ub))
     @smart_assert(all(lb .<= ub))
-end
-function validate_bounds(::Nothing, ::Any)
     return nothing
 end
-function validate_bounds(::Any, ::Nothing)
+function validate_bounds(lb::AbstractVector, ::Any)
+    @smart_assert(!isempty(lb))
+    return nothing
+end
+function validate_bounds(::Any, ub::AbstractVector)
+    @smart_assert(!isempty(ub))
+    return nothing
+end
+function validate_bounds(args...)
     return nothing
 end
 function WeightBounds(; lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,

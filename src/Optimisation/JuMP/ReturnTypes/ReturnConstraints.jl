@@ -70,12 +70,11 @@ function set_return_constraints!(model::JuMP.Model,
     set_max_ratio_return_constraints!(model, obj, pm.mu)
     return nothing
 end
-function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio)
-    sc = model[:sc]
-    k = model[:k]
+function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio, k, sc, ret)
     ohf = model[:ohf]
     risk = model[:risk]
-    add_to_expression!(ret, -k, obj.rf)
+    rf = obj.rf
+    add_to_expression!(ret, -rf, k)
     @constraint(model, sr_ekelly_risk, sc * risk <= sc * ohf)
 end
 function set_return_constraints!(model::JuMP.Model, pret::ExactKellyReturn,
@@ -88,7 +87,7 @@ function set_return_constraints!(model::JuMP.Model, pret::ExactKellyReturn,
     T = length(X)
     @variable(model, t_ekelly[1:T])
     @expression(model, ret, sum(t_ekelly) / T - fees)
-    set_max_ratio_return_constraints!(model, obj)
+    set_max_ratio_return_constraints!(model, obj, k, sc, ret)
     @expression(model, kret, k .+ X)
     @constraint(model, ekelly_ret[i = 1:T],
                 [sc * t_ekelly[i], sc * k, sc * kret[i]] ∈ MOI.ExponentialCone())

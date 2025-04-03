@@ -1,6 +1,7 @@
 function get_chol_or_sigma_pm(model::JuMP.Model, pm::AbstractPriorModel)
     if !haskey(model, :G)
-        model[:G] = cholesky(pm.sigma).U
+        G = cholesky(pm.sigma).U
+        @expression(model, G, G)
     end
     return model[:G]
 end
@@ -8,14 +9,12 @@ function get_chol_or_sigma_pm(model::JuMP.Model,
                               pm::Union{<:FactorPriorModel,
                                         <:FactorBlackLittermanPriorModel})
     if !haskey(model, :G)
-        model[:G] = pm.chol
+        G = pm.chol
+        @expression(model, G, G)
     end
     return model[:G]
 end
 function set_risk_upper_bound!(args...)
-    return nothing
-end
-function set_risk_upper_bound!(::Any, model::JuMP.Model, ub::Nothing, args...)
     return nothing
 end
 function set_risk_upper_bound!(::MeanRisk, model::JuMP.Model, r_expr, ub::Real, key)
@@ -45,7 +44,7 @@ function set_risk_constraints!(model::JuMP.Model, r::StandardDeviation,
                                pm::AbstractPriorModel, opt::MeanRisk, i::Integer)
     sc = model[:sc]
     w = model[:w]
-    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pm) : cholesky(r.sigma)
+    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pm) : cholesky(r.sigma).L
     key = Symbol("sd_risk_$(i)")
     sd_risk = model[key] = @variable(model)
     model[Symbol("sd_soc_$(i)")] = @constraint(model,

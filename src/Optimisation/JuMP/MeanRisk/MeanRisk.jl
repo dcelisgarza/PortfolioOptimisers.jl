@@ -24,9 +24,8 @@ function optimise!(mr::MeanRisk, rd::ReturnsData = ReturnsData())
     wb = weight_bounds_constraints(mr.opt.wb, mr.opt.sets; N = size(pm.X, 2),
                                    strict = mr.opt.strict)
     set_maximum_ratio_factor_variables!(model, pm.mu, mr.obj)
-    set_weight_constraints!(model, wb)
-    set_budget_constraints!(model, mr.opt.bgt)
-    set_long_short_bounds_constraints!(model, mr.opt.lss)
+    set_weight_constraints!(model, wb, mr.opt.bgt, mr.opt.sbgt)
+    # set_long_short_bounds_constraints!(model, mr.opt.lss)
     set_linear_weight_constraints!(model,
                                    linear_constraints(mr.opt.lcs, mr.opt.sets;
                                                       datatype = eltype(pm.X),
@@ -46,7 +45,7 @@ function optimise!(mr::MeanRisk, rd::ReturnsData = ReturnsData())
     set_tracking_error_constraints!(model, pm.X, mr.opt.te)
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)
-    set_non_fixed_fees!(model, mr.opt.lss, mr.opt.fees)
+    set_non_fixed_fees!(model, mr.opt.fees)
     set_risk_constraints!(model, mr.r, pm, mr)
     scalarise_risk_expression!(model, mr.opt.sce)
     set_return_constraints!(model, mr.opt.ret, mr.obj, pm)

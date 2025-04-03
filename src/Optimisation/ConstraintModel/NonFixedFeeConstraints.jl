@@ -17,59 +17,32 @@ end
 function set_non_fixed_fees!(::JuMP.Model, args...)
     return nothing
 end
-function set_long_non_fixed_fees!(::JuMP.Model, ::LongShortSum, ::Nothing)
+function set_long_non_fixed_fees!(::JuMP.Model, ::Nothing)
     return nothing
 end
-function set_short_non_fixed_fees!(::JuMP.Model, ::LongShortSum, ::Nothing)
+function set_short_non_fixed_fees!(::JuMP.Model, ::Nothing)
     return nothing
 end
-function set_long_non_fixed_fees!(model::JuMP.Model, lss::LongShortSum,
-                                  fl::Union{<:Real, <:AbstractVector})
+function set_long_non_fixed_fees!(model::JuMP.Model, fl::Union{<:Real, <:AbstractVector})
+    lw = model[:lw]
     fees = model[:fees]
-    ls = lss.ls
-    if !isnothing(ls)
-        @expression(model, fl, sum(fl .* w))
-    elseif haskey(model, :lw)
-        @expression(model, fl, sum(fl .* lw))
-    else
-        @warn("Long fees require setting long bounds, default to 1.0.")
-        w, k, sc = get_w_k_sc(model)
-        N = length(w)
-        @variable(model, lw[1:N] >= 0)
-        @constraints(model, begin
-                         w_lw, sc * w <= sc * lw
-                         lw_ub, sc * sum(lw) <= sc * k
-                     end)
-        @expression(model, fl, sum(fl .* lw))
-    end
+    @expression(model, fl, sum(fl .* lw))
     add_to_expression!(fees, fl)
     return nothing
 end
-function set_short_non_fixed_fees!(model::JuMP.Model, lss::LongShortSum,
-                                   fs::Union{<:Real, <:AbstractVector})
-    fees = model[:fees]
-    ss = lss.ss
-    if !isnothing(ss)
-        @expression(model, fs, sum(fs .* w))
-    elseif haskey(model, :sw)
-        @expression(model, fs, sum(fs .* sw))
-    else
-        @warn("Short fees require setting short bounds, default to 1.0.")
-        w, k, sc = get_w_k_sc(model)
-        N = length(w)
-        @variable(model, sw[1:N] >= 0)
-        @constraints(model, begin
-                         w_sw, sc * w >= -sc * sw
-                         sw_lb, sc * sum(sw) <= sc * k
-                     end)
-        @expression(model, fs, sum(fs .* sw))
+function set_short_non_fixed_fees!(model::JuMP.Model, fs::Union{<:Real, <:AbstractVector})
+    if !haskey(model, :sw)
+        return nothing
     end
+    sw = model[:sw]
+    fees = model[:fees]
+    @expression(model, fs, sum(fs .* sw))
     add_to_expression!(fees, fs)
     return nothing
 end
-function set_non_fixed_fees!(model::JuMP.Model, lss::LongShortSum, fees::Fees)
-    set_long_non_fixed_fees!(model, lss, fees.long)
-    set_short_non_fixed_fees!(model, lss, fees.short)
+function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
+    set_long_non_fixed_fees!(model, fees.long)
+    set_short_non_fixed_fees!(model, fees.short)
     set_turnover_fees!(model, fees.turnover)
     return nothing
 end

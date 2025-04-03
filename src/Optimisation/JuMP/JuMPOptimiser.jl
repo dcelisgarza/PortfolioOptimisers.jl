@@ -2,7 +2,7 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
                      T2 <: Union{Nothing, <:AbstractVector{<:Real}},
                      T3 <: Union{Nothing, <:WeightBounds, <:WeightBoundsConstraints},
                      T4 <: Union{Nothing, <:Real, <:BudgetConstraint},
-                     T5 <: Union{Nothing, <:LongShortSum},
+                     T5 <: Union{Nothing, <:Real, <:BudgetConstraint},
                      T6 <: Union{Nothing, <:LinearConstraint,
                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintModel},
                      T7 <: Union{Nothing, <:LinearConstraintModel},
@@ -29,7 +29,7 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
     wi::T2
     wb::T3 # WeightBounds
     bgt::T4 # BudgetConstraint
-    lss::T5 # LongShortSum
+    sbgt::T5 # LongShortSum
     lcs::T6
     lcm::T7
     card::T7
@@ -60,7 +60,7 @@ function JuMPOptimiser(;
                        wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                        wb::Union{Nothing, <:WeightBounds, <:WeightBoundsConstraints} = WeightBounds(),
                        bgt::Union{Nothing, <:Real, <:BudgetConstraint} = 1.0,
-                       lss::Union{Nothing, <:LongShortSum} = nothing,
+                       sbgt::Union{Nothing, <:Real, <:BudgetConstraint} = nothing,
                        lcs::Union{Nothing, <:LinearConstraint,
                                   <:AbstractVector{<:LinearConstraint},
                                   <:LinearConstraintModel} = nothing,
@@ -115,7 +115,7 @@ function JuMPOptimiser(;
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
-    return JuMPOptimiser{typeof(pe), typeof(wi), typeof(wb), typeof(bgt), typeof(lss),
+    return JuMPOptimiser{typeof(pe), typeof(wi), typeof(wb), typeof(bgt), typeof(sbgt),
                          typeof(lcs), typeof(lcm), typeof(card), typeof(cent), typeof(sets),
                          typeof(nadj), typeof(cadj), typeof(bit), typeof(tn), typeof(te),
                          typeof(l1), typeof(l2), typeof(fees), typeof(sce), typeof(ret),
@@ -124,7 +124,7 @@ function JuMPOptimiser(;
                                                                                        wi,
                                                                                        wb,
                                                                                        bgt,
-                                                                                       lss,
+                                                                                       sbgt,
                                                                                        lcs,
                                                                                        lcm,
                                                                                        card,
