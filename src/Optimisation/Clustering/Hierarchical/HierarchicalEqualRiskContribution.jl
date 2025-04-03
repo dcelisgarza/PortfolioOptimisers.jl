@@ -336,7 +336,8 @@ function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = Retu
         empty!(rc)
     end
     return finalise_hierarchical_weights(hc.opt.cwf,
-                                         weight_bounds_constraints(hc.opt.wb; N = length(w),
+                                         weight_bounds_constraints(hc.opt.wb, hc.opt.sets;
+                                                                   N = length(w),
                                                                    strict = hc.opt.strict),
                                          w / sum(w))
 end

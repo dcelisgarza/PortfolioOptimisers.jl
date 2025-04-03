@@ -5,7 +5,8 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
                              T4 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                              T5 <: Scalariser,
                              T6 <: Union{Nothing, <:WeightBounds, WeightBoundsConstraints},
-                             T7 <: ClusteringWeightFinaliser, T8 <: Bool}
+                             T7 <: ClusteringWeightFinaliser,
+                             T8 <: Union{Nothing, DataFrame}, T9 <: Bool}
     pe::T1
     cle::T2
     fees::T3
@@ -13,7 +14,8 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
     sce::T5
     wb::T6
     cwf::T7
-    strict::T8
+    sets::T8
+    strict::T9
 end
 function HierarchicalOptimiser(;
                                pe::Union{<:AbstractPriorEstimator, <:AbstractPriorModel} = EmpiricalPriorEstimator(),
@@ -24,16 +26,15 @@ function HierarchicalOptimiser(;
                                sce::Scalariser = SumScalariser(),
                                wb::Union{Nothing, <:WeightBounds, WeightBoundsConstraints} = nothing,
                                cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
+                               sets::Union{Nothing, DataFrame} = nothing,
                                strict::Bool = false)
+    if isa(sets, DataFrame)
+        @smart_assert(!isempty(sets))
+    end
     return HierarchicalOptimiser{typeof(pe), typeof(cle), typeof(fees), typeof(slv),
-                                 typeof(sce), typeof(wb), typeof(cwf), typeof(strict)}(pe,
-                                                                                       cle,
-                                                                                       fees,
-                                                                                       slv,
-                                                                                       sce,
-                                                                                       wb,
-                                                                                       cwf,
-                                                                                       strict)
+                                 typeof(sce), typeof(wb), typeof(cwf), typeof(sets),
+                                 typeof(strict)}(pe, cle, fees, slv, sce, wb, cwf, sets,
+                                                 strict)
 end
 function unitary_expected_risks(r::Union{<:OptimisationRiskMeasure,
                                          <:AbstractVector{<:OptimisationRiskMeasure}},

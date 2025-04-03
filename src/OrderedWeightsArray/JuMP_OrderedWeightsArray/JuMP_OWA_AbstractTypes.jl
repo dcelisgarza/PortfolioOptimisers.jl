@@ -20,7 +20,7 @@ end
 function owa_model_solve(model::JuMP.Model, method::JuMP_OrderedWeightsArray,
                          weights::AbstractMatrix)
     slv = method.slv
-    success = optimise_JuMP_model(model, slv)[1]
+    success = optimise_JuMP_model!(model, slv)[1]
     return if success
         phi = model[:phi]
         phis = value.(phi)

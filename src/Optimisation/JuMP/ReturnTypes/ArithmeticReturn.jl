@@ -6,12 +6,15 @@ struct ArithmeticReturn{T1 <: Union{Nothing, <:Real},
 end
 function ArithmeticReturn(; lb::Union{Nothing, <:Real} = nothing,
                           ucs::Union{Nothing, <:UncertaintySet, <:UncertaintySetEstimator} = nothing)
+    if isa(lb, Real)
+        @smart_assert(isfinite(lb))
+    end
     return ArithmeticReturn{typeof(lb), typeof(ucs)}(lb, ucs)
 end
 function cluster_return_factory(r::ArithmeticReturn, cluster::AbstractVector,
                                 ucs::Union{Nothing, <:UncertaintySet,
                                            <:UncertaintySetEstimator}, args...)
-    uset = uncertainty_set_factory(r.ucs, ucs, cluster)
+    uset = ucs_factory(r.ucs, ucs, cluster)
     return ArithmeticReturn(; lb = r.lb, ucs = uset)
 end
 

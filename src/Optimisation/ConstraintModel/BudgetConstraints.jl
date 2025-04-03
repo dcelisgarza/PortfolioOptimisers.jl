@@ -30,10 +30,12 @@ end
 function set_budget_constraints!(model::JuMP.Model, b::BudgetRange)
     w, k, sc = get_w_k_sc(model)
     if !isnothing(b.lb)
-        @constraint(model, wb_lb, sc * sum(w) >= sc * k * b.lb)
+        lb = b.lb
+        @constraint(model, wb_lb, sc * sum(w) >= sc * k * lb)
     end
     if !isnothing(b.ub)
-        @constraint(model, wb_ub, sc * sum(w) <= sc * k * b.ub)
+        ub = b.ub
+        @constraint(model, wb_ub, sc * sum(w) <= sc * k * ub)
     end
     return nothing
 end

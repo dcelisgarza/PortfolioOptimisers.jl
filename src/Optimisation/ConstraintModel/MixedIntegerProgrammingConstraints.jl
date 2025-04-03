@@ -39,6 +39,22 @@ function BuyInThreshold(; sbi::Union{Nothing, <:Real, <:AbstractVector{<:Real}} 
     end
     return BuyInThreshold{typeof(sbi), typeof(lbi)}(sbi, lbi)
 end
+function mip_wb(::JuMP.Model, ::Nothing, args...)
+    return nothing
+end
+function mip_wb(model::JuMP.Model, wb::WeightBounds, il, is)
+    sc = model[:sc]
+    w = model[:w]
+    lb = wb.lb
+    if !isnothing(lb) && isfinite(lb)
+        @constraint(model, w_mip_lb, sc * w .>= sc * is .* lb)
+    end
+    ub = wb.ub
+    if !isnothing(ub) && isfinite(ub)
+        @constraint(model, w_mip_ub, sc * w .<= sc * il .* ub)
+    end
+    return nothing
+end
 function _short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                           ffl::Union{<:Real, <:AbstractVector},
                                           ffs::Union{<:Real, <:AbstractVector},
@@ -77,23 +93,24 @@ function _short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                          is, isf
                      end)
     end
-    @constraints(model, begin
-                     i_mip_ub, i_mip <= 1
-                     w_mip_ub, sc * w <= sc * il .* wb.ub
-                     w_mip_lb, sc * w >= sc * is .* wb.lb
-                 end)
-
+    @constraint(model, i_mip_ub, i_mip <= 1)
+    mip_wb(model, wb, il, is)
     if lbi_flag
         @constraint(model, w_mip_lbi, sc * w >= sc * (il .* lbi .- ss * (1 .- ilb)))
     end
     if sbi_flag
         @constraint(model, w_mip_sbi, sc * w <= sc * (is .* sbi .+ ss * (1 .- isb)))
     end
-    if ffl_flag
-        @expression(model, ffl, sum(ffl .* il))
-    end
-    if ffs_flag
-        @expression(model, ffs, sum(ffs .* is))
+    if ffl_flag || ffs_flag
+        fees = model[:fees]
+        if ffl_flag
+            @expression(model, ffl, sum(ffl .* il))
+            add_to_expression!(fees, ffl)
+        end
+        if ffs_flag
+            @expression(model, ffs, sum(ffs .* is))
+            add_to_expression!(fees, ffs)
+        end
     end
     return ib
 end
@@ -116,12 +133,17 @@ function _mip_constraints(model::JuMP.Model, wb::WeightBounds,
                      end)
         @expression(model, i_mip, ibf)
     end
-    @constraint(model, w_mip_ub, sc * w <= sc * i_mip .* wb.ub)
+    ub = wb.ub
+    if !isnothing(ub) && isfinite(ub)
+        @constraint(model, w_mip_ub, sc * w .<= sc * i_mip .* ub)
+    end
     if lbi_flag
-        @constraint(model, w_mip_lbi, sc * w >= sc * i_mip .* lbi)
+        @constraint(model, w_mip_lbi, sc * w .>= sc * i_mip .* lbi)
     end
     if ffl_flag
+        fees = model[:fees]
         @expression(model, ffl, sum(ffl .* i_mip))
+        add_to_expression!(fees, ffl)
     end
     if haskey(model, :sw)
         @constraint(model, w_mip_lb, sc * w >= sc * i_mip .* wb.lb)

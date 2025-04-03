@@ -87,7 +87,7 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
     posterior_mu = M * f_mu .+ b
     posterior_sigma = M * f_sigma * transpose(M)
     mtx_process!(pe.mp, posterior_sigma, posterior_X)
-    posterior_csigma = M * cholesky(f_sigma).L
+    posterior_csigma = M * cholesky(f_sigma).U
     if pe.residuals
         err = X - posterior_X
         err_sigma = diagm(vec(var(pe.ve, err; dims = 1)))
@@ -99,8 +99,7 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
                                                      sigma = posterior_sigma),
                             fm = PartialFactorModel(; mu = f_mu, sigma = f_sigma,
                                                     loadings = loadings),
-                            chol = transpose(reshape(posterior_csigma, length(posterior_mu),
-                                                     :)))
+                            chol = reshape(posterior_csigma, length(posterior_mu), :))
 end
 
 export FactorPriorModel, FactorPriorEstimator

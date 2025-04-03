@@ -13,8 +13,8 @@
     end
     @testset "No uncertainty sets" begin
         @test isa(ucs(nothing), Nothing)
-        @test isa(mu_uncertainty_set(nothing), Nothing)
-        @test isa(sigma_uncertainty_set(nothing), Nothing)
+        @test isa(mu_ucs(nothing), Nothing)
+        @test isa(sigma_ucs(nothing), Nothing)
     end
     @testset "Box Uncertainty sets" begin
         rng = StableRNG(123456789)
@@ -38,10 +38,10 @@
             mu1 = [mu_set1.lb; mu_set1.ub]
             sigma1 = [vec(sigma_set1.lb); vec(sigma_set1.ub)]
 
-            mu_set2 = mu_uncertainty_set(ue, transpose(X); dims = 2)
+            mu_set2 = mu_ucs(ue, transpose(X); dims = 2)
             mu2 = [mu_set2.lb; mu_set2.ub]
 
-            sigma_set2 = sigma_uncertainty_set(ue, transpose(X); dims = 2)
+            sigma_set2 = sigma_ucs(ue, transpose(X); dims = 2)
             sigma2 = [vec(sigma_set2.lb); vec(sigma_set2.ub)]
 
             res1 = isapprox(mu1, mu2)
@@ -169,10 +169,10 @@
             mu1 = [vec(mu_set1.sigma); mu_set1.k]
             sigma1 = [vec(sigma_set1.sigma); sigma_set1.k]
 
-            mu_set2 = mu_uncertainty_set(ue, transpose(X); dims = 2)
+            mu_set2 = mu_ucs(ue, transpose(X); dims = 2)
             mu2 = [vec(mu_set2.sigma); mu_set2.k]
 
-            sigma_set2 = sigma_uncertainty_set(ue, transpose(X); dims = 2)
+            sigma_set2 = sigma_ucs(ue, transpose(X); dims = 2)
             sigma2 = [vec(sigma_set2.sigma); sigma_set2.k]
 
             res1 = isapprox(mu1, mu2)

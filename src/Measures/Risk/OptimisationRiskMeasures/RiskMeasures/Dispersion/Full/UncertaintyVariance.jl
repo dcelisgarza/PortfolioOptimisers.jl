@@ -24,7 +24,7 @@ function risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorMod
                               ucs::Union{Nothing, <:UncertaintySet,
                                          <:UncertaintySetEstimator} = nothing, args...;
                               kwargs...)
-    uset = uncertainty_set_factory(r.ucs, ucs)
+    uset = ucs_factory(r.ucs, ucs)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = uset, sigma = sigma)
 end
@@ -33,7 +33,7 @@ function cluster_risk_measure_factory(r::UncertaintySetVariance, prior::Abstract
                                       ucs::Union{Nothing, <:UncertaintySet,
                                                  <:UncertaintySetEstimator} = nothing,
                                       args...; kwargs...)
-    uset = uncertainty_set_factory(r.ucs, ucs, cluster)
+    uset = ucs_factory(r.ucs, ucs, cluster)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, cluster)
     return UncertaintySetVariance(; settings = r.settings, ucs = uset, sigma = sigma)
 end

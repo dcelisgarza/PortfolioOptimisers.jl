@@ -14,6 +14,7 @@ function set_scalar_risk_expression!(model::JuMP.Model, scalariser::LogSumExpSca
     sc = model[:sc]
     risk_vec = model[:risk_vec]
     N = length(risk_vec)
+    gamma = scalariser.gamma
     @variables(model, begin
                    risk
                    u_risk[1:N]
@@ -22,7 +23,7 @@ function set_scalar_risk_expression!(model::JuMP.Model, scalariser::LogSumExpSca
                  begin
                      cs_risk_lse_u, sc * sum(u_risk) <= sc * 1
                      cs_risk_lse[i = 1:N],
-                     sc * [scalariser.gamma * (risk_vec[i] - risk), 1, u_risk[i]] in
+                     [sc * gamma * (risk_vec[i] - risk), sc, sc * u_risk[i]] in
                      MOI.ExponentialCone()
                  end)
     return nothing

@@ -30,17 +30,19 @@ function set_long_short_bounds_constraints!(model::JuMP.Model, lss::LongShortSum
     w, k, sc = get_w_k_sc(model)
     N = length(w)
     if !isnothing(lss.ls)
+        ls = lss.ls
         @variable(model, lw[1:N] >= 0)
         @constraints(model, begin
                          w_lw, sc * w <= sc * lw
-                         lw_ub, sc * sum(lw) <= sc * k * lss.ls
+                         lw_ub, sc * sum(lw) <= sc * k * ls
                      end)
     end
     if !isnothing(lss.ss)
+        ss = lss.ss
         @variable(model, sw[1:N] >= 0)
         @constraints(model, begin
                          w_sw, sc * w >= -sc * sw
-                         sw_lb, sc * sum(sw) <= sc * k * lss.ss
+                         sw_lb, sc * sum(sw) <= sc * k * ss
                      end)
     end
     return nothing

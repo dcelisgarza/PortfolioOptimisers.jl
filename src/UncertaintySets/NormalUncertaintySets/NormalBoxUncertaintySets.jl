@@ -24,10 +24,9 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass, 
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
-function mu_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
-                                                              <:BoxUncertaintySetClass,
-                                                              <:Any, <:Any, <:Any},
-                            X::AbstractMatrix, args...; dims::Int = 1)
+function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass, <:Any,
+                                                  <:Any, <:Any}, X::AbstractMatrix, args...;
+                dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     sigma = pm.sigma
     q = ue.q * 0.5
@@ -36,10 +35,9 @@ function mu_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
                  length = size(pm.X, 2))
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
-function sigma_uncertainty_set(ue::NormalUncertaintySetEstimator{<:Any,
-                                                                 <:BoxUncertaintySetClass,
-                                                                 <:Any, <:Any, <:Any},
-                               X::AbstractMatrix, args...; dims::Int = 1)
+function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass, <:Any,
+                                                     <:Any, <:Any}, X::AbstractMatrix,
+                   args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     T, N = size(pm.X)
     sigma = pm.sigma

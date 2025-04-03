@@ -17,7 +17,7 @@ function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:
                  end)
     @expression(model, risk, t - z * log(alpha * T))
     @objective(model, Min, risk)
-    success, solvers_tried = optimise_JuMP_model(model, slv)
+    success, solvers_tried = optimise_JuMP_model!(model, slv)
     return if success
         objective_value(model)
     else

@@ -25,7 +25,7 @@ function owa_l_moment_crm(method::OWA_MinimumSumSquares, weights::AbstractMatrix
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     @variable(model, t)
-    @constraint(model, sc * [t; theta] ∈ SecondOrderCone())
+    @constraint(model, [sc * t; sc * theta] ∈ SecondOrderCone())
     @objective(model, Min, so * t)
     return owa_model_solve(model, method, weights)
 end

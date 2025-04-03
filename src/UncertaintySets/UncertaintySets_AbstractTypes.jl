@@ -3,10 +3,14 @@ abstract type UncertaintySetClass end
 abstract type UncertaintySet end
 abstract type UncertaintyKMethod end
 function ucs end
-function mu_uncertainty_set end
-function sigma_uncertainty_set end
+function mu_ucs end
+function sigma_ucs end
 ucs(::Nothing, args...; kwargs...) = nothing
-mu_uncertainty_set(::Nothing, args...; kwargs...) = nothing
-sigma_uncertainty_set(::Nothing, args...; kwargs...) = nothing
+mu_ucs(::Nothing, args...; kwargs...) = nothing
+sigma_ucs(::Nothing, args...; kwargs...) = nothing
 
-export ucs, mu_uncertainty_set, sigma_uncertainty_set
+ucs(uc::UncertaintySet, args...; kwargs...) = uc
+mu_ucs(uc::UncertaintySet, args...; kwargs...) = uc
+sigma_ucs(uc::UncertaintySet, args...; kwargs...) = uc
+
+export ucs, mu_ucs, sigma_ucs

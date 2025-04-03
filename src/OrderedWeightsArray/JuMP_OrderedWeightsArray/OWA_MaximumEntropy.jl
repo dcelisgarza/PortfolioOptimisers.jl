@@ -22,7 +22,7 @@ function owa_l_moment_crm(method::OWA_MaximumEntropy, weights::AbstractMatrix{<:
     T = size(weights, 1)
     sc = method.sc
     so = method.so
-    ovec = range(; start = 1, stop = 1, length = T)
+    ovec = range(; start = sc, stop = sc, length = T)
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     @variables(model, begin
@@ -31,8 +31,8 @@ function owa_l_moment_crm(method::OWA_MaximumEntropy, weights::AbstractMatrix{<:
                end)
     @constraints(model, begin
                      sc * sum(x) == sc * 1
-                     sc * [t; ovec; x] ∈ MOI.RelativeEntropyCone(2 * T + 1)
-                     [i = 1:T], sc * [x[i]; theta[i]] ∈ MOI.NormOneCone(2)
+                     [sc * t; ovec; sc * x] ∈ MOI.RelativeEntropyCone(2 * T + 1)
+                     [i = 1:T], [sc * x[i]; sc * theta[i]] ∈ MOI.NormOneCone(2)
                  end)
     @objective(model, Max, -so * t)
     return owa_model_solve(model, method, weights)

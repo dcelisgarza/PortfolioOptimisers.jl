@@ -25,18 +25,14 @@ function risk_measure_nothing_real_vec_factory(risk_variable::Union{Nothing, Rea
                                                ::AbstractVector)
     return risk_variable
 end
-function uncertainty_set_factory(::Nothing, ::Nothing)
+function ucs_factory(::Nothing, ::Nothing)
     return nothing
 end
-function uncertainty_set_factory(::Nothing,
-                                 prior_ucs::Union{<:BoxUncertaintySet,
-                                                  <:EllipseUncertaintySet,
-                                                  <:UncertaintySetEstimator})
+function ucs_factory(::Nothing,
+                     prior_ucs::Union{<:UncertaintySet, <:UncertaintySetEstimator})
     return prior_ucs
 end
-function uncertainty_set_factory(risk_ucs::Union{<:BoxUncertaintySet,
-                                                 <:EllipseUncertaintySet,
-                                                 <:UncertaintySetEstimator}, ::Any)
+function ucs_factory(risk_ucs::Union{<:UncertaintySet, <:UncertaintySetEstimator}, ::Any)
     return risk_ucs
 end
 

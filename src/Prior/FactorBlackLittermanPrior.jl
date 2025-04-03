@@ -157,7 +157,7 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
     posterior_mu = M * f_posterior_mu .+ b
     posterior_sigma = M * f_posterior_sigma * transpose(M)
     mtx_process!(pe.mp, posterior_sigma, posterior_X)
-    posterior_csigma = M * cholesky(f_posterior_sigma).L
+    posterior_csigma = M * cholesky(f_posterior_sigma).U
     if pe.residuals
         err = X - posterior_X
         err_sigma = diagm(vec(var(pe.ve, err; dims = 1)))
@@ -174,9 +174,9 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
                                                                                         mu = f_posterior_mu,
                                                                                         sigma = f_posterior_sigma,
                                                                                         loadings = loadings),
-                                                                chol = transpose(reshape(posterior_csigma,
-                                                                                         length(posterior_mu),
-                                                                                         :))),
+                                                                chol = reshape(posterior_csigma,
+                                                                               length(posterior_mu),
+                                                                               :)),
                                           f_views = f_views)
 end
 

@@ -17,16 +17,14 @@ function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetClass
     else
         cov(ue.pe.ce, X_mu), cov(ue.pe.ce, X_sigma)
     end
-    k_mu = k_uncertainty_set(ue.class.method, ue.q, X_mu, sigma_mu)
-    k_sigma = k_uncertainty_set(ue.class.method, ue.q, X_sigma, sigma_sigma)
+    k_mu = k_ucs(ue.class.method, ue.q, X_mu, sigma_mu)
+    k_sigma = k_ucs(ue.class.method, ue.q, X_sigma, sigma_sigma)
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu),
            EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma)
 end
-function mu_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any,
-                                                            <:EllipseUncertaintySetClass,
-                                                            <:Any, <:Any, <:Any, <:Any,
-                                                            <:Any}, X::AbstractMatrix,
-                            args...; dims::Int = 1)
+function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetClass, <:Any,
+                                                <:Any, <:Any, <:Any, <:Any},
+                X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     N = size(pm.X, 2)
     mus = mu_bootstrap_generator(ue, pm.X)
@@ -40,14 +38,12 @@ function mu_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any,
     else
         cov(ue.pe.ce, X_mu)
     end
-    k_mu = k_uncertainty_set(ue.class.method, ue.q, X_mu, sigma_mu)
+    k_mu = k_ucs(ue.class.method, ue.q, X_mu, sigma_mu)
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu)
 end
-function sigma_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any,
-                                                               <:EllipseUncertaintySetClass,
-                                                               <:Any, <:Any, <:Any, <:Any,
-                                                               <:Any}, X::AbstractMatrix,
-                               args...; dims::Int = 1)
+function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetClass,
+                                                   <:Any, <:Any, <:Any, <:Any, <:Any},
+                   X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     N = size(pm.X, 2)
     sigmas = sigma_bootstrap_generator(ue, pm.X)
@@ -61,6 +57,6 @@ function sigma_uncertainty_set(ue::ARCHUncertaintySetEstimator{<:Any,
     else
         cov(ue.pe.ce, X_sigma)
     end
-    k_sigma = k_uncertainty_set(ue.class.method, ue.q, X_sigma, sigma_sigma)
+    k_sigma = k_ucs(ue.class.method, ue.q, X_sigma, sigma_sigma)
     return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma)
 end

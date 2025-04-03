@@ -14,6 +14,10 @@ struct RiskMeasureSettings{T1 <: Bool, T2 <: Real, T3 <: Union{Nothing, <:Real}}
 end
 function RiskMeasureSettings(; rke::Bool = true, scale::Real = 1.0,
                              ub::Union{Nothing, <:Real} = nothing)
+    if isa(ub, Real)
+        @smart_assert(isfinite(ub) && ub > zero(ub))
+    end
+    @smart_assert(isfinite(scale))
     return RiskMeasureSettings{typeof(rke), typeof(scale), typeof(ub)}(rke, scale, ub)
 end
 struct HierarchicalRiskMeasureSettings{T1 <: Real} <: AbstractRiskMeasureSettings

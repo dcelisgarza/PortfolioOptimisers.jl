@@ -14,10 +14,11 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
 end
 function split_factor_weight_constraints(alpha::Real, wb::WeightBounds, w::AbstractVector,
                                          lc::AbstractVector, rc::AbstractVector)
-    alpha = min(sum(view(wb.ub, lc)) / w[lc[1]],
-                max(sum(view(wb.lb, lc)) / w[lc[1]], alpha))
-    return one(alpha) - min(sum(view(wb.ub, rc)) / w[rc[1]],
-                            max(sum(view(wb.lb, rc)) / w[rc[1]], one(alpha) - alpha))
+    lb = wb.lb
+    ub = wb.ub
+    alpha = min(sum(view(ub, lc)) / w[lc[1]], max(sum(view(lb, lc)) / w[lc[1]], alpha))
+    return one(alpha) - min(sum(view(ub, rc)) / w[rc[1]],
+                            max(sum(view(lb, rc)) / w[rc[1]], one(alpha) - alpha))
 end
 function optimise!(hc::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsData = ReturnsData(); strict::Bool = false)
@@ -26,7 +27,8 @@ function optimise!(hc::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
     r = risk_measure_factory(hc.r, pm, hc.opt.slv)
     wu = Matrix{eltype(pm.X)}(undef, size(pm.X, 2), 2)
     rku = unitary_expected_risks(r, pm.X, hc.opt.fees)
-    wb = weight_bounds_constraints(hc.opt.wb; N = size(pm.X, 2), strict = strict)
+    wb = weight_bounds_constraints(hc.opt.wb, hc.opt.sets; N = size(pm.X, 2),
+                                   strict = strict)
     w = ones(eltype(pm.X), size(pm.X, 2))
     items = [clm.clustering.order]
     @inbounds while length(items) > 0
@@ -125,7 +127,8 @@ function optimise!(hc::HierarchicalRiskParity{<:Any,
     wu = Matrix{eltype(pm.X)}(undef, size(pm.X, 2), 2)
     wk = zeros(eltype(pm.X), size(pm.X, 2))
     rku = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
-    wb = weight_bounds_constraints(hc.opt.wb; N = size(pm.X, 2), strict = hc.opt.strict)
+    wb = weight_bounds_constraints(hc.opt.wb, hc.opt.sets; N = size(pm.X, 2),
+                                   strict = hc.opt.strict)
     w = ones(eltype(pm.X), size(pm.X, 2))
     items = [clm.clustering.order]
     @inbounds while length(items) > 0

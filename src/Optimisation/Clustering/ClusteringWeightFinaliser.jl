@@ -37,7 +37,8 @@ function set_clustering_weight_finaliser_version!(model::JuMP.Model,
     so = model[:so]
     @variable(model, t)
     @constraint(model,
-                sc * [t; w ./ wi .- one(eltype(wi))] in MOI.NormOneCone(length(w) + 1))
+                [sc * t; sc * (w ./ wi .- one(eltype(wi)))] in
+                MOI.NormOneCone(length(w) + 1))
     @objective(model, Min, so * t)
     return nothing
 end
@@ -49,7 +50,7 @@ function set_clustering_weight_finaliser_version!(model::JuMP.Model,
     sc = model[:sc]
     so = model[:so]
     @variable(model, t)
-    @constraint(model, sc * [t; w ./ wi .- one(eltype(wi))] in SecondOrderCone())
+    @constraint(model, [sc * t; sc * (w ./ wi .- one(eltype(wi)))] in SecondOrderCone())
     @objective(model, Min, so * t)
     return nothing
 end
@@ -60,7 +61,7 @@ function set_clustering_weight_finaliser_version!(model::JuMP.Model,
     sc = model[:sc]
     so = model[:so]
     @variable(model, t)
-    @constraint(model, sc * [t; w - wi] in MOI.NormOneCone(length(w) + 1))
+    @constraint(model, [sc * t; sc * (w - wi)] in MOI.NormOneCone(length(w) + 1))
     @objective(model, Min, so * t)
     return nothing
 end
@@ -71,13 +72,15 @@ function set_clustering_weight_finaliser_version!(model::JuMP.Model,
     sc = model[:sc]
     so = model[:so]
     @variable(model, t)
-    @constraint(model, sc * [t; w - w] in SecondOrderCone())
+    @constraint(model, [sc * t; sc * (w - wi)] in SecondOrderCone())
     @objective(model, Min, so * t)
     return nothing
 end
 function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wb::WeightBounds,
                            wi::AbstractVector)
-    if any(wb.ub .< wi) ⊼ any(wb.lb .> wi)
+    lb = wb.lb
+    ub = wb.ub
+    if any(ub .< wi) ⊼ any(lb .> wi)
         return wi
     end
     model = JuMP.Model()
@@ -85,14 +88,14 @@ function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wb::WeightBounds
     @expression(model, so, cwf.so)
     @variable(model, w[1:length(wi)])
     @constraint(model, sum(w) == sum(wi))
-    if !isnothing(wb.lb)
-        @constraint(model, sc * w >= sc * wb.lb)
+    if !isnothing(lb)
+        @constraint(model, sc * w >= sc * lb)
     end
-    if !isnothing(wb.ub)
-        @constraint(model, sc * w <= sc * wb.ub)
+    if !isnothing(ub)
+        @constraint(model, sc * w <= sc * ub)
     end
     set_clustering_weight_finaliser_version!(model, cwf.v, wi)
-    success, solvers_tried = optimise_JuMP_model(model, cwf.slv)
+    success, solvers_tried = optimise_JuMP_model!(model, cwf.slv)
     return if success
         value.(model[:w])
     else
@@ -100,21 +103,24 @@ function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wb::WeightBounds
         opt_weight_bounds(HeuristicClusteringWeightFiniliser(), wb, wi)
     end
 end
-function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wb, w::AbstractVector)
-    if any(wb.ub .< w) ⊼ any(wb.lb .> w)
+function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wb::WeightBounds,
+                           w::AbstractVector)
+    lb = wb.lb
+    ub = wb.ub
+    if any(ub .< w) ⊼ any(lb .> w)
         return w
     end
     iter = cwf.iter
     s1 = sum(w)
     for _ ∈ 1:iter
-        if !(any(wb.ub .< w) || any(wb.lb .> w))
+        if !(any(ub .< w) || any(lb .> w))
             break
         end
         old_w = copy(w)
-        w = max.(min.(w, wb.ub), wb.lb)
-        idx = w .< wb.ub .&& w .> wb.lb
-        w_add = sum(max.(old_w - wb.ub, zero(eltype(w))))
-        w_sub = sum(min.(old_w - wb.lb, zero(eltype(w))))
+        w = max.(min.(w, ub), lb)
+        idx = w .< ub .&& w .> lb
+        w_add = sum(max.(old_w - ub, zero(eltype(w))))
+        w_sub = sum(min.(old_w - lb, zero(eltype(w))))
         delta = w_add + w_sub
         if delta != 0
             w[idx] += delta * w[idx] / sum(w[idx])

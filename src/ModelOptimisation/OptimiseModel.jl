@@ -1,5 +1,5 @@
-function optimise_JuMP_model(model::JuMP.Model,
-                             slv::Union{<:Solver, <:AbstractVector{<:Solver}})
+function optimise_JuMP_model!(model::JuMP.Model,
+                              slv::Union{<:Solver, <:AbstractVector{<:Solver}})
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end

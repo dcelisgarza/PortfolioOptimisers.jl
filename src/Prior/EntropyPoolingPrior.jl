@@ -277,7 +277,7 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintModel,
                  end)
     @objective(model, Min, obj_scale * (t - dot(q, log_p)))
     # Solve the optimization problem
-    success, solvers_tried = optimise_JuMP_model(model, slv)
+    success, solvers_tried = optimise_JuMP_model!(model, slv)
     return if success
         pweights(value.(q))
     else

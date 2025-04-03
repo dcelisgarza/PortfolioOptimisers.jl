@@ -132,51 +132,47 @@
         loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
 
-        hcc_1 = WeightBoundsConstraints(; sets = sets, group = :Assets, name = 1, lb = 0.7,
-                                        ub = 0.8)
-        (; lb, ub) = weight_bounds_constraints(hcc_1)
+        hcc_1 = WeightBoundsConstraints(; group = :Assets, name = 1, lb = 0.7, ub = 0.8)
+        (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
         @test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         @test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
-        hcc_2 = WeightBoundsConstraints(; sets = sets, group = [:Assets, :Assets],
-                                        name = [1, 5], lb = [0.7, 0.3], ub = [0.8, 0.6])
-        (; lb, ub) = weight_bounds_constraints(hcc_2)
+        hcc_2 = WeightBoundsConstraints(; group = [:Assets, :Assets], name = [1, 5],
+                                        lb = [0.7, 0.3], ub = [0.8, 0.6])
+        (; lb, ub) = weight_bounds_constraints(hcc_2, sets)
         @test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0])
         @test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 0.6, 1.0, 1.0, 1.0, 1.0, 1.0])
 
-        hcc_3 = WeightBoundsConstraints(; sets = sets, group = :Clusters, name = 3,
-                                        lb = 0.2, ub = 0.5)
-        (; lb, ub) = weight_bounds_constraints(hcc_3)
+        hcc_3 = WeightBoundsConstraints(; group = :Clusters, name = 3, lb = 0.2, ub = 0.5)
+        (; lb, ub) = weight_bounds_constraints(hcc_3, sets)
         @test isapprox(lb, [0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2, 0.2])
         @test isapprox(ub, [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5])
 
         @test_throws UndefKeywordError WeightBoundsConstraints(group = :Asset)
-        hcc = WeightBoundsConstraints(; sets = sets, group = nothing, name = nothing)
+        hcc = WeightBoundsConstraints(; group = nothing, name = nothing)
         @test isnothing(hcc.group)
         @test isnothing(hcc.name)
 
         @test_throws UndefKeywordError WeightBoundsConstraints(; group = [nothing],
                                                                ub = [2], lb = [1])
-        lcs = WeightBoundsConstraints(; sets = sets, group = [nothing], name = [nothing],
-                                      ub = [5], lb = [3])
+        lcs = WeightBoundsConstraints(; group = [nothing], name = [nothing], ub = [5],
+                                      lb = [3])
         @test isnothing(lcs.group[1])
         @test isnothing(lcs.name[1])
 
-        hcc_1 = WeightBoundsConstraints(; sets = sets, group = :Foo, name = :Bar, lb = 0.7,
-                                        ub = 0.8)
-        @test_throws ArgumentError weight_bounds_constraints(hcc_1; strict = true)
+        hcc_1 = WeightBoundsConstraints(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
+        @test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
 
-        hcc_1 = WeightBoundsConstraints(; sets = sets, group = [:Foo], name = [:Bar],
-                                        lb = [0.7], ub = [0.8])
-        @test_throws ArgumentError weight_bounds_constraints(hcc_1; strict = true)
+        hcc_1 = WeightBoundsConstraints(; group = [:Foo], name = [:Bar], lb = [0.7],
+                                        ub = [0.8])
+        @test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
 
-        (; lb, ub) = weight_bounds_constraints(hcc_1)
+        (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
         @test all(iszero.(lb))
         @test all(isone.(ub))
 
-        hcc_1 = WeightBoundsConstraints(; sets = sets, group = :Foo, name = :Bar, lb = 0.7,
-                                        ub = 0.8)
-        (; lb, ub) = weight_bounds_constraints(hcc_1)
+        hcc_1 = WeightBoundsConstraints(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
+        (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
         @test all(iszero.(lb))
         @test all(isone.(ub))
     end

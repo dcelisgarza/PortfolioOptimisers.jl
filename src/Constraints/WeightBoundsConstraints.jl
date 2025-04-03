@@ -3,83 +3,75 @@ struct WeightBounds{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
     lb::T1
     ub::T2
 end
+function validate_bounds(lb::Real, ub::Real)
+    @smart_assert(lb <= ub)
+end
+function validate_bounds(lb::AbstractVector, ub::Real)
+    @smart_assert(!isempty(lb) && all(lb .<= ub))
+end
+function validate_bounds(lb::Real, ub::AbstractVector)
+    @smart_assert(!isempty(ub) && all(lb .<= ub))
+end
+function validate_bounds(lb::AbstractVector, ub::AbstractVector)
+    @smart_assert(!isempty(lb))
+    @smart_assert(!isempty(ub))
+    @smart_assert(length(lb) == length(ub))
+    @smart_assert(all(lb .<= ub))
+end
+function validate_bounds(::Nothing, ::Any)
+    return nothing
+end
+function validate_bounds(::Any, ::Nothing)
+    return nothing
+end
 function WeightBounds(; lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
                       ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
-    lb_flag = !isnothing(lb)
-    ub_flag = !isnothing(ub)
-    @smart_assert(!lb_flag ⊼ !ub_flag)
-    if lb_flag && ub_flag
-        lb_flag = isa(lb, Real)
-        ub_flag = isa(ub, Real)
-        if lb_flag
-            @smart_assert(isfinite(lb) && lb >= zero(lb))
-        else
-            @smart_assert(all(isfinite.(lb)) && all(lb .>= zero(lb)))
-        end
-        if ub_flag
-            @smart_assert(isfinite(ub) && ub >= zero(ub))
-        else
-            @smart_assert(all(isfinite.(ub)) && all(ub .>= zero(ub)))
-        end
-        if lb_flag && ub_flag
-            @smart_assert(lb <= ub)
-        elseif !lb_flag && !ub_flag
-            @smart_assert(length(lb) == length(ub))
-            @smart_assert(all(lb .<= ub))
-        else
-            @smart_assert(all(lb .<= ub))
-        end
-    elseif !lb_flag && ub_flag
-        if isa(lb, Real)
-            @smart_assert(isfinite(lb) && lb >= zero(lb))
-        else
-            @smart_assert(all(isfinite.(lb)) && all(lb .>= zero(lb)))
-        end
-    elseif lb_flag && !ub_flag
-        if isa(ub, Real)
-            @smart_assert(isfinite(ub) && ub >= zero(ub))
-        else
-            @smart_assert(all(isfinite.(ub)) && all(ub .>= zero(ub)))
-        end
-    end
+    @smart_assert(isnothing(lb) ⊼ isnothing(ub))
+    validate_bounds(lb, ub)
     return WeightBounds{typeof(lb), typeof(ub)}(lb, ub)
 end
-struct WeightBoundsConstraints{T1, T2, T3 <: Union{<:Real, <:AbstractVector{<:Real}},
-                               T4 <: Union{<:Real, <:AbstractVector{<:Real}},
-                               T5 <: DataFrame}
+struct WeightBoundsConstraints{T1, T2,
+                               T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                               T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}}
     group::T1
     name::T2
     lb::T3
     ub::T4
-    sets::T5
 end
 function WeightBoundsConstraints(; group, name,
-                                 lb::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
-                                 ub::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
-                                 sets::DataFrame)
-    @smart_assert(!isempty(sets))
+                                 lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
+                                 ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
-    lo_flag = isa(lb, AbstractVector)
-    hi_flag = isa(ub, AbstractVector)
-    if group_flag || name_flag || lo_flag || hi_flag
-        @smart_assert(group_flag && name_flag && lo_flag && hi_flag)
+    lb_flag = isa(lb, AbstractVector)
+    ub_flag = isa(ub, AbstractVector)
+    if group_flag || name_flag || lb_flag || ub_flag
+        @smart_assert(group_flag && name_flag)
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(lb) && !isempty(ub))
         @smart_assert(length(group) == length(name) == length(lb) == length(ub))
     end
-    @smart_assert(all(lb .<= ub))
-    return WeightBoundsConstraints{typeof(group), typeof(name), typeof(lb), typeof(ub),
-                                   typeof(sets)}(group, name, lb, ub, sets)
+    validate_bounds(lb, ub)
+    return WeightBoundsConstraints{typeof(group), typeof(name), typeof(lb), typeof(ub)}(group,
+                                                                                        name,
+                                                                                        lb,
+                                                                                        ub)
 end
-function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:Any, <:Any, <:Real,
-                                                                <:Real, <:Any};
-                                   strict::Bool = false)
-    sets = hcc.sets
+function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:Any, <:Any,
+                                                                <:Union{Nothing, <:Real},
+                                                                <:Union{Nothing, <:Real}},
+                                   sets::DataFrame; strict::Bool = false)
+    @smart_assert(!isempty(sets))
     group_names = names(sets)
     N = nrow(sets)
     LB = zeros(promote_type(eltype(hcc.lb), eltype(hcc.ub)), N)
     UB = ones(promote_type(eltype(hcc.lb), eltype(hcc.ub)), N)
     (; group, name, lb, ub) = hcc
+    if isnothing(lb)
+        lb = -Inf
+    end
+    if isnothing(ub)
+        ub = Inf
+    end
     if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
         LB[idx] .= lb
@@ -94,9 +86,9 @@ end
 function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:AbstractVector,
                                                                 <:AbstractVector,
                                                                 <:AbstractVector,
-                                                                <:AbstractVector, <:Any};
-                                   strict::Bool = false, kwargs...)
-    sets = hcc.sets
+                                                                <:AbstractVector},
+                                   sets::DataFrame; strict::Bool = false, kwargs...)
+    @smart_assert(!isempty(sets))
     group_names = names(sets)
     N = nrow(sets)
     LB = zeros(promote_type(eltype(hcc.lb), eltype(hcc.ub)), N)
@@ -114,26 +106,26 @@ function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:AbstractVector
     end
     return WeightBounds(; lb = LB, ub = UB)
 end
-function weight_bounds_constraints(wb::WeightBounds; N::Integer, kwargs...)
-    lb_flag = isa(wb.lb, Real)
-    ub_flag = isa(wb.ub, Real)
-    return if lb_flag || ub_flag
-        lb = if lb_flag
-            range(; start = wb.lb, stop = wb.lb, length = N)
-        else
-            wb.lb
-        end
-        ub = if ub_flag
-            range(; start = wb.ub, stop = wb.ub, length = N)
-        else
-            wb.ub
-        end
-        WeightBounds(; lb = lb, ub = ub)
-    else
-        wb
+function weight_bounds_constraints(wb::WeightBounds, args...; N::Integer, kwargs...)
+    lb = wb.lb
+    ub = wb.ub
+    if isnothing(lb)
+        lb = range(; start = -Inf, stop = -Inf, length = N)
+    elseif isa(lb, Real)
+        lb = range(; start = lb, stop = lb, length = N)
     end
+    if isnothing(ub)
+        ub = range(; start = Inf, stop = Inf, length = N)
+    elseif isa(ub, Real)
+        ub = range(; start = ub, stop = ub, length = N)
+    end
+    return WeightBounds(; lb = lb, ub = ub)
 end
-function weight_bounds_constraints(wb::Nothing; N::Integer, kwargs...)
+function weight_bounds_constraints(wb::WeightBounds{<:AbstractVector, <:AbstractVector},
+                                   args...; kwargs...)
+    return wb
+end
+function weight_bounds_constraints(wb::Nothing, args...; N::Integer, kwargs...)
     return WeightBounds(; lb = range(; start = 0, stop = 0, length = N),
                         ub = range(; start = 1, stop = 1, length = N))
 end

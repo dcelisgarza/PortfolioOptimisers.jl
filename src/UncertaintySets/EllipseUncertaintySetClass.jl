@@ -6,18 +6,18 @@ function NormalKUncertaintyMethod(; kwargs::NamedTuple = (;))
 end
 struct GeneralKUncertaintyMethod <: UncertaintyKMethod end
 struct ChiSqKUncertaintyMethod <: UncertaintyKMethod end
-function k_uncertainty_set(km::NormalKUncertaintyMethod, q::Real, X::AbstractMatrix,
-                           sigma_X::AbstractMatrix)
+function k_ucs(km::NormalKUncertaintyMethod, q::Real, X::AbstractMatrix,
+               sigma_X::AbstractMatrix)
     k_mus = diag(X * (sigma_X \ I) * transpose(X))
     return sqrt(quantile(k_mus, one(q) - q; km.kwargs...))
 end
-function k_uncertainty_set(::GeneralKUncertaintyMethod, q::Real, args...)
+function k_ucs(::GeneralKUncertaintyMethod, q::Real, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_uncertainty_set(::ChiSqKUncertaintyMethod, q::Real, X::AbstractArray, args...)
+function k_ucs(::ChiSqKUncertaintyMethod, q::Real, X::AbstractArray, args...)
     return sqrt(cquantile(Chisq(size(X, 1)), q))
 end
-function k_uncertainty_set(type::Real, args...)
+function k_ucs(type::Real, args...)
     return type
 end
 struct EllipseUncertaintySetClass{T1 <: Bool, T2 <: Union{<:UncertaintyKMethod, Real}} <:

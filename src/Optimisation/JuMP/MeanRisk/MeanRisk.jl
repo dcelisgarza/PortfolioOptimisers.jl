@@ -1,24 +1,31 @@
 struct MeanRisk{T1 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                 T2 <: ObjectiveFunction, T3 <: JuMPOptimiser} <: JuMPOptimisationType
-    risk::T1
+    r::T1
     obj::T2
     opt::T3
 end
 function MeanRisk(;
-                  risk::Union{RiskMeasure, AbstractVector{<:RiskMeasure}} = StandardDeviation(),
+                  r::Union{RiskMeasure, AbstractVector{<:RiskMeasure}} = StandardDeviation(),
                   obj::ObjectiveFunction = MinimumRisk(),
                   opt::JuMPOptimiser = JuMPOptimiser())
-    return MeanRisk{typeof(risk), typeof(obj), typeof(opt)}(risk, obj, opt)
+    return MeanRisk{typeof(r), typeof(obj), typeof(opt)}(r, obj, opt)
+end
+function cleanup_weights(model, ::MeanRisk)
+    return value.(model[:w]) / value(model[:k])
 end
 function optimise!(mr::MeanRisk, rd::ReturnsData = ReturnsData())
     model = JuMP.Model()
     set_string_names_on_creation(model, mr.opt.str_names)
     set_objective_penalty!(model)
     set_model_scales!(model, mr.opt.sc, mr.opt.so, mr.opt.ss)
+    set_model_fees!(model)
     pm = prior(mr.opt.pe, rd.X, rd.F)
     set_w!(model, pm.X, mr.opt.wi)
+    wb = weight_bounds_constraints(mr.opt.wb, mr.opt.sets; N = size(pm.X, 2),
+                                   strict = mr.opt.strict)
     set_maximum_ratio_factor_variables!(model, pm.mu, mr.obj)
-    set_weight_constraints!(model, mr.opt.wb)
+    set_weight_constraints!(model, wb)
+    set_budget_constraints!(model, mr.opt.bgt)
     set_long_short_bounds_constraints!(model, mr.opt.lss)
     set_linear_weight_constraints!(model,
                                    linear_constraints(mr.opt.lcs, mr.opt.sets;
@@ -34,21 +41,20 @@ function optimise!(mr::MeanRisk, rd::ReturnsData = ReturnsData())
                          cardinality_constraints(mr.opt.card, mr.opt.sets;
                                                  datatype = eltype(pm.X),
                                                  strict = mr.opt.strict), mr.opt.fees, cadj,
-                         nadj, mr.opt.wb)
+                         nadj, wb)
     set_turnover_constraints!(model, mr.opt.tn)
     set_tracking_error_constraints!(model, pm.X, mr.opt.te)
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)
-    set_non_fixed_fees!(model, mr.opt.wb, mr.opt.fees)
-    #!risk constraints
-    #!scalarise risk expression
-    #!return constraints
+    set_non_fixed_fees!(model, mr.opt.lss, mr.opt.fees)
+    set_risk_constraints!(model, mr.r, pm, mr)
+    scalarise_risk_expression!(model, mr.opt.sce)
+    set_return_constraints!(model, mr.opt.ret, mr.obj, pm)
     set_sdp_philogeny_constraints!(model, cadj, :sdp_cadj)
     set_sdp_philogeny_constraints!(model, nadj, :sdp_nadj)
     set_custom_constraint!(model, mr.opt.ccnt, pm, mr)
-    #!set_portfolio_objective_function!(model, mr.obj, mr.opt.ret, mr.opt.cobj)
-
-    return model
+    set_portfolio_objective_function!(model, mr.obj, mr.opt.ret, mr.opt.cobj, mr, pm)
+    return optimise_JuMP_model!(model, mr, pm)
 end
 
 export MeanRisk
