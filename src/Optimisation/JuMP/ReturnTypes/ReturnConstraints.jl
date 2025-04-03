@@ -17,9 +17,9 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     k = model[:k]
     ohf = model[:ohf]
     ret = model[:ret]
+    rf = obj.rf
     if haskey(model, :bucs_w) || haskey(model, :t_eucs_gw) || all(mu .<= zero(eltype(mu)))
         risk = model[:risk]
-        rf = obj.rf
         add_to_expression!(ret, -rf, k)
         @constraint(model, sr_risk, sc * risk <= sc * ohf)
     else

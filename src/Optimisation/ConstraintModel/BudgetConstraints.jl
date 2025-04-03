@@ -35,10 +35,10 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::Abstrac
     k = model[:k]
     sc = model[:sc]
     lb = bgt.lb
+    ub = bgt.ub
     if !isnothing(lb)
         model[key_lb] = @constraint(model, sc * sum(w) >= sc * k * lb)
     end
-    ub = bgt.ub
     if !isnothing(ub)
         model[key_ub] = @constraint(model, sc * sum(w) <= sc * k * ub)
     end

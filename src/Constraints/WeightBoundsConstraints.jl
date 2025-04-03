@@ -115,7 +115,11 @@ function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:AbstractVector
     end
     return WeightBounds(; lb = LB, ub = UB)
 end
-function weight_bounds_constraints(wb::WeightBounds, args...; N::Integer, kwargs...)
+function weight_bounds_constraints(wb::WeightBounds, args...; scalar::Bool = false,
+                                   N::Integer, kwargs...)
+    if scalar
+        return wb
+    end
     lb = wb.lb
     ub = wb.ub
     if isnothing(lb)

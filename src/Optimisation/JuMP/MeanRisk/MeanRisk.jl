@@ -20,14 +20,15 @@ function optimise!(mr::MeanRisk, rd::ReturnsData = ReturnsData())
     set_model_scales!(model, mr.opt.sc, mr.opt.so, mr.opt.ss)
     set_model_fees!(model)
     pm = prior(mr.opt.pe, rd.X, rd.F)
+    datatype = eltype(pm.X)
     set_w!(model, pm.X, mr.opt.wi)
-    wb = weight_bounds_constraints(mr.opt.wb, mr.opt.sets; N = size(pm.X, 2),
+    wb = weight_bounds_constraints(mr.opt.wb, mr.opt.sets; scalar = true, N = size(pm.X, 2),
                                    strict = mr.opt.strict)
     set_maximum_ratio_factor_variables!(model, pm.mu, mr.obj)
     set_weight_constraints!(model, wb, mr.opt.bgt, mr.opt.sbgt)
     set_linear_weight_constraints!(model,
                                    linear_constraints(mr.opt.lcs, mr.opt.sets;
-                                                      datatype = eltype(pm.X),
+                                                      datatype = datatype,
                                                       strict = mr.opt.strict), :clcs_ineq,
                                    :clcs_eq)
     set_linear_weight_constraints!(model, centrality_constraints(mr.opt.cent, pm.X),
@@ -37,7 +38,7 @@ function optimise!(mr::MeanRisk, rd::ReturnsData = ReturnsData())
     nadj = philogeny_constraints(mr.opt.nadj, pm.X)
     set_mip_constraints!(model, mr.opt.bit,
                          cardinality_constraints(mr.opt.card, mr.opt.sets;
-                                                 datatype = eltype(pm.X),
+                                                 datatype = datatype,
                                                  strict = mr.opt.strict), mr.opt.fees, cadj,
                          nadj, wb)
     set_turnover_constraints!(model, mr.opt.tn)
@@ -52,7 +53,7 @@ function optimise!(mr::MeanRisk, rd::ReturnsData = ReturnsData())
     set_return_constraints!(model, mr.opt.ret, mr.obj, pm)
     set_custom_constraint!(model, mr.opt.ccnt, mr, pm)
     set_portfolio_objective_function!(model, mr.obj, mr.opt.ret, mr.opt.cobj, mr, pm)
-    return optimise_JuMP_model!(model, mr, eltype(pm.X))
+    return optimise_JuMP_model!(model, mr, datatype)
 end
 
 export MeanRisk
