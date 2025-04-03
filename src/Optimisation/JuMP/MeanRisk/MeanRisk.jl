@@ -25,7 +25,6 @@ function optimise!(mr::MeanRisk, rd::ReturnsData = ReturnsData())
                                    strict = mr.opt.strict)
     set_maximum_ratio_factor_variables!(model, pm.mu, mr.obj)
     set_weight_constraints!(model, wb, mr.opt.bgt, mr.opt.sbgt)
-    # set_long_short_bounds_constraints!(model, mr.opt.lss)
     set_linear_weight_constraints!(model,
                                    linear_constraints(mr.opt.lcs, mr.opt.sets;
                                                       datatype = eltype(pm.X),
@@ -46,14 +45,14 @@ function optimise!(mr::MeanRisk, rd::ReturnsData = ReturnsData())
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)
     set_non_fixed_fees!(model, mr.opt.fees)
-    set_risk_constraints!(model, mr.r, pm, mr)
+    set_risk_constraints!(model, mr.r, mr, pm, cadj, nadj)
     scalarise_risk_expression!(model, mr.opt.sce)
-    set_return_constraints!(model, mr.opt.ret, mr.obj, pm)
     set_sdp_philogeny_constraints!(model, cadj, :sdp_cadj)
     set_sdp_philogeny_constraints!(model, nadj, :sdp_nadj)
-    set_custom_constraint!(model, mr.opt.ccnt, pm, mr)
+    set_return_constraints!(model, mr.opt.ret, mr.obj, pm)
+    set_custom_constraint!(model, mr.opt.ccnt, mr, pm)
     set_portfolio_objective_function!(model, mr.obj, mr.opt.ret, mr.opt.cobj, mr, pm)
-    return optimise_JuMP_model!(model, mr, pm)
+    return optimise_JuMP_model!(model, mr, eltype(pm.X))
 end
 
 export MeanRisk

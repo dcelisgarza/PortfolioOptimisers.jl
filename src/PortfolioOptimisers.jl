@@ -2,8 +2,8 @@ module PortfolioOptimisers
 
 using AverageShiftedHistograms, Clustering, Distances, Distributions, GLM, Impute, JuMP,
       LinearAlgebra, MultivariateStats, NearestCorrelationMatrix, Optim, Graphs,
-      InteractiveUtils, SimpleWeightedGraphs, PythonCall, Random, SmartAsserts,
-      SparseArrays, Statistics, StatsBase, DataFrames, TimeSeries
+      InteractiveUtils, SimpleWeightedGraphs, PythonCall, Random, ShortStrings,
+      SmartAsserts, SparseArrays, Statistics, StatsBase, DataFrames, TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let

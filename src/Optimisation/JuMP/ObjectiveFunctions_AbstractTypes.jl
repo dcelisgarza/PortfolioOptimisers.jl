@@ -5,7 +5,7 @@ abstract type JuMPOptimisationType <: OptimisationType end
 abstract type ObjectiveFunction end
 abstract type CustomObjective end
 function add_custom_objective_term!(obj::ObjectiveFunction, pret::PortfolioReturnType,
-                                    co::Nothing, obj_expr, mr::JuMPOptimisationType,
+                                    cobj::Nothing, obj_expr, mr::JuMPOptimisationType,
                                     pm::AbstractPriorModel)
     return nothing
 end
@@ -72,14 +72,29 @@ function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
 end
 function set_risk_constraints!(model::JuMP.Model,
                                rs::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                               pm::AbstractPriorModel, opt::JuMPOptimisationType)
+                               opt::JuMPOptimisationType, pm::AbstractPriorModel,
+                               cadj::Union{Nothing, <:SemiDefinitePhilogenyModel,
+                                           <:IntegerPhilogenyModel},
+                               nadj::Union{Nothing, <:SemiDefinitePhilogenyModel,
+                                           <:IntegerPhilogenyModel})
     for (i, r) ∈ enumerate(rs)
-        set_risk_constraints!(model, r, pm, opt, i)
+        _set_risk_constraints!(model, r, opt, pm, i, cadj, nadj)
     end
     return nothing
 end
+abstract type JuMPPortfolioSolution end
+struct SolvedPortfolioModel{T1 <: AbstractVector, T2 <: JuMP.Model, T3 <: AbstractDict} <:
+       JuMPPortfolioSolution
+    w::T1
+    model::T2
+    tried::T3
+end
+struct FailedPortfolioModel{T1 <: JuMP.Model, T2 <: AbstractDict} <: JuMPPortfolioSolution
+    model::T1
+    tried::T2
+end
 function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationType,
-                              pm::AbstractPriorModel)
+                              datatype::Type = Float64)
     if isa(opt.opt.slv, AbstractVector)
         @smart_assert(!isempty(opt.opt.slv))
     end
@@ -104,7 +119,7 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationType,
             continue
         end
         all_finite_weights = all(isfinite.(value.(model[:w])))
-        all_non_zero_weights = !all(isapprox.(abs.(value.(model[:w])), zero(eltype(pm.X))))
+        all_non_zero_weights = !all(isapprox.(abs.(value.(model[:w])), zero(datatype)))
         try
             assert_is_solved_and_feasible(model; check_sol...)
             if all_finite_weights && all_non_zero_weights
@@ -121,10 +136,10 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationType,
                            :err => solution_summary(model), :settings => settings))
     end
     return if success
-        cleanup_weights(model, opt), solvers_tried
+        SolvedPortfolioModel(cleanup_weights(model, opt), model, solvers_tried)
     else
         @warn("Model could not be optimised satisfactorily.")
-        Vector{eltype(pm.X)}(undef, 0), solvers_tried
+        FailedPortfolioModel(model, solvers_tried)
     end
 end
 

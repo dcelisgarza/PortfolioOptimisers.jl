@@ -62,5 +62,8 @@ function risk_budget_constraints(plcas::Union{<:A_LinearConstraint,
     rb ./= sum(rb)
     return rb
 end
+function risk_budget_constraints(plca::AbstractArray, args...; kwargs...)
+    return plca
+end
 
 export risk_budget_constraints

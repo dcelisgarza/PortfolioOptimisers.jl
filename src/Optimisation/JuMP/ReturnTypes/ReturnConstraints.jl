@@ -19,10 +19,11 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     ret = model[:ret]
     if haskey(model, :bucs_w) || haskey(model, :t_eucs_gw) || all(mu .<= zero(eltype(mu)))
         risk = model[:risk]
-        add_to_expression!(ret, -obj.rf, k)
+        rf = obj.rf
+        add_to_expression!(ret, -rf, k)
         @constraint(model, sr_risk, sc * risk <= sc * ohf)
     else
-        @constraint(model, sr_ret, sc * (ret - obj.rf * k) == sc * ohf)
+        @constraint(model, sr_ret, sc * (ret - rf * k) == sc * ohf)
     end
     return nothing
 end
@@ -30,9 +31,11 @@ function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{<:Any
                                  obj::ObjectiveFunction, pm::AbstractPriorModel)
     w = model[:w]
     fees = model[:fees]
-    @expression(model, ret, dot(pm.mu, w) - fees)
-    set_return_bounds!(model, pret.lb)
-    set_max_ratio_return_constraints!(model, obj, pm.mu)
+    lb = pret.lb
+    mu = pm.mu
+    @expression(model, ret, dot(mu, w) - fees)
+    set_return_bounds!(model, lb)
+    set_max_ratio_return_constraints!(model, obj, mu)
     return nothing
 end
 function set_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
@@ -65,9 +68,13 @@ function set_return_constraints!(model::JuMP.Model,
                                                         Union{<:UncertaintySet,
                                                               <:UncertaintySetEstimator}},
                                  obj::ObjectiveFunction, pm::AbstractPriorModel)
-    set_return_constraints!(model, mu_ucs(ret.ucs, pm.X), pm.mu)
-    set_return_bounds!(model, pret.lb)
-    set_max_ratio_return_constraints!(model, obj, pm.mu)
+    lb = pret.lb
+    ucs = pret.ucs
+    X = pm.X
+    mu = pm.mu
+    set_return_constraints!(model, mu_ucs(ucs, X), mu)
+    set_return_bounds!(model, lb)
+    set_max_ratio_return_constraints!(model, obj, mu)
     return nothing
 end
 function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio, k, sc, ret)
@@ -82,7 +89,9 @@ function set_return_constraints!(model::JuMP.Model, pret::ExactKellyReturn,
     k = model[:k]
     sc = model[:sc]
     fees = model[:fees]
-    set_portfolio_returns!(model, pm.X)
+    lb = pret.lb
+    X = pm.X
+    set_portfolio_returns!(model, X)
     X = model[:X]
     T = length(X)
     @variable(model, t_ekelly[1:T])
@@ -91,6 +100,6 @@ function set_return_constraints!(model::JuMP.Model, pret::ExactKellyReturn,
     @expression(model, kret, k .+ X)
     @constraint(model, ekelly_ret[i = 1:T],
                 [sc * t_ekelly[i], sc * k, sc * kret[i]] ∈ MOI.ExponentialCone())
-    set_return_bounds!(model, pret.lb)
+    set_return_bounds!(model, lb)
     return nothing
 end

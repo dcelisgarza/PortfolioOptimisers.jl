@@ -9,20 +9,20 @@ function MaximumRatio(; rf::Real = 0.0, ohf::Real = 0.0)
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::ExactKellyReturn,
-                                           co::Union{Nothing, <:CustomObjective},
+                                           cobj::Union{Nothing, <:CustomObjective},
                                            mr::JuMPOptimisationType, pm::AbstractPriorModel)
     so = model[:so]
     ret = model[:ret]
     op = model[:op]
     @expression(model, obj_expr, ret)
     add_to_expression!(obj_expr, -1, op)
-    add_custom_objective_term!(obj, pret, co, obj_expr, mr, pm)
+    add_custom_objective_term!(obj, pret, cobj, obj_expr, mr, pm)
     @objective(model, Max, so * obj_expr)
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
-                                           pret::ArithmeticReturn,
-                                           co::Union{Nothing, <:CustomObjective},
+                                           pret::PortfolioReturnType,
+                                           cobj::Union{Nothing, <:CustomObjective},
                                            mr::JuMPOptimisationType, pm::AbstractPriorModel)
     so = model[:so]
     op = model[:op]
@@ -30,13 +30,13 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
         ret = model[:ret]
         @expression(model, obj_expr, ret)
         add_to_expression!(obj_expr, -1, op)
-        add_custom_objective_term!(obj, pret, co, obj_expr, mr, pm)
+        add_custom_objective_term!(obj, pret, cobj, obj_expr, mr, pm)
         @objective(model, Max, so * obj_expr)
     else
         risk = model[:risk]
         @expression(model, obj_expr, risk)
         add_to_expression!(obj_expr, 1, op)
-        add_custom_objective_term!(obj, pret, co, obj_expr, mr, pm)
+        add_custom_objective_term!(obj, pret, cobj, obj_expr, mr, pm)
         @objective(model, Min, so * obj_expr)
     end
     return nothing
