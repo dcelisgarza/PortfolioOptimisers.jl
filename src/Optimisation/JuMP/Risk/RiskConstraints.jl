@@ -41,10 +41,10 @@ function set_risk_bounds_and_expression!(opt::MeanRisk, model::JuMP.Model, r_exp
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
 end
-function set_risk_bounds_and_expression!(opt::MeanRisk, model::JuMP.Model, r_expr,
-                                         settings::RiskMeasureSettings,
-                                         ub::Union{Nothing, Real}, key)
-    set_risk_upper_bound!(opt, model, r_expr, ub, key)
+function set_risk_bounds_and_expression!(opt::MeanRisk, model::JuMP.Model, r_expr_ub,
+                                         ub::Union{Nothing, Real}, key::Symbol, r_expr,
+                                         settings::RiskMeasureSettings)
+    set_risk_upper_bound!(opt, model, r_expr_ub, ub, key)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
 end
@@ -174,12 +174,8 @@ end
 function rc_variance_constraints!(args...)
     return nothing
 end
-function rc_variance_constraints!(rc_flag::Bool, model::JuMP.Model, i::Integer,
-                                  rc::LinearConstraintModel,
+function rc_variance_constraints!(model::JuMP.Model, i::Integer, rc::LinearConstraintModel,
                                   variance_risk::AbstractJuMPScalar)
-    if !rc_flag
-        return nothing
-    end
     sigma_W = model[Symbol(ShortString("sigma_W_$(i)"))]
     sc = model[:sc]
     if !haskey(model, :rc_variance)
@@ -218,10 +214,11 @@ function _set_risk_constraints!(model::JuMP.Model, r::Variance, opt::MeanRisk,
     sdp_flag = sdp_variance_flag!(model, rc_flag, cadj, nadj)
     key = Symbol(ShortString("variance_risk_$(i)"))
     set_variance_risk!(model, sdp_flag, pm, i, r, key)
-    rc_variance_constraints!(rc_flag, model, i, rc, model[key])
+    variance_risk = model[key]
+    rc_variance_constraints!(model, i, rc, variance_risk)
     var_bound_expr, var_bound_key = variance_risk_bounds_expr(sdp_flag, model, i)
     ub = variance_risk_bounds_val(sdp_flag, r.settings.ub)
-    set_risk_bounds_and_expression!(opt, model, var_bound_expr, r.settings, ub,
-                                    var_bound_key)
+    set_risk_bounds_and_expression!(opt, model, var_bound_expr, ub, var_bound_key,
+                                    variance_risk, r.settings)
     return nothing
 end
