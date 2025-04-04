@@ -6,11 +6,11 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
                      T6 <: Union{Nothing, <:LinearConstraint,
                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintModel},
                      T7 <: Union{Nothing, <:LinearConstraintModel},
-                     T8 <: Union{Nothing, <:CardinalityConstraint,
-                                 <:AbstractVector{<:CardinalityConstraint},
-                                 <:LinearConstraintModel},
-                     T9 <: Union{Nothing, <:CentralityConstraint,
+                     T8 <: Union{Nothing, <:CentralityConstraint,
                                  <:AbstractVector{<:CentralityConstraint},
+                                 <:LinearConstraintModel},
+                     T9 <: Union{Nothing, <:CardinalityConstraint,
+                                 <:AbstractVector{<:CardinalityConstraint},
                                  <:LinearConstraintModel}, T10 <: Union{Nothing, DataFrame},
                      T11 <:
                      Union{Nothing, <:PhilogenyConstraint, <:PhilogenyConstraintModel},
@@ -32,11 +32,11 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
     sbgt::T5 # LongShortSum
     lcs::T6
     lcm::T7
-    card::T7
     cent::T8
+    card::T9
     sets::T10
-    nadj::T11
-    cadj::T12
+    nplg::T11
+    cplg::T12
     bit::T13 # BuyInThreshold
     tn::T14 # Turnover
     te::T15 # TrackingError
@@ -65,16 +65,16 @@ function JuMPOptimiser(;
                                   <:AbstractVector{<:LinearConstraint},
                                   <:LinearConstraintModel} = nothing,
                        lcm::Union{Nothing, <:LinearConstraintModel} = nothing,
-                       card::Union{Nothing, <:CardinalityConstraint,
-                                   <:AbstractVector{<:CardinalityConstraint},
-                                   <:LinearConstraintModel} = nothing,
                        cent::Union{Nothing, <:CentralityConstraint,
                                    <:AbstractVector{<:CentralityConstraint},
                                    <:LinearConstraintModel} = nothing,
+                       card::Union{Nothing, <:CardinalityConstraint,
+                                   <:AbstractVector{<:CardinalityConstraint},
+                                   <:LinearConstraintModel} = nothing,
                        sets::Union{Nothing, DataFrame} = nothing,
-                       nadj::Union{Nothing, <:PhilogenyEstimator,
+                       nplg::Union{Nothing, <:PhilogenyEstimator,
                                    <:PhilogenyConstraintModel} = nothing,
-                       cadj::Union{Nothing, <:PhilogenyEstimator,
+                       cplg::Union{Nothing, <:PhilogenyEstimator,
                                    <:PhilogenyConstraintModel} = nothing,
                        bit::Union{Nothing, <:BuyInThreshold} = nothing,
                        tn::Union{Nothing, <:Turnover} = nothing,
@@ -98,26 +98,26 @@ function JuMPOptimiser(;
     if isa(lcs, AbstractVector)
         @smart_assert(!isempty(lcs))
     end
-    if isa(card, AbstractVector)
-        @smart_assert(!isempty(card))
-    end
     if isa(cent, AbstractVector)
         @smart_assert(!isempty(cent))
     end
+    if isa(card, AbstractVector)
+        @smart_assert(!isempty(card))
+    end
     if isa(lcs, LinearConstraint) ||
        isa(lcs, AbstractVector{<:LinearConstraint}) ||
-       isa(card, CardinalityConstraint) ||
-       isa(card, AbstractVector{<:CardinalityConstraint}) ||
        isa(cent, CentralityConstraint) ||
-       isa(cent, AbstractVector{<:CentralityConstraint})
+       isa(cent, AbstractVector{<:CentralityConstraint}) ||
+       isa(card, CardinalityConstraint) ||
+       isa(card, AbstractVector{<:CardinalityConstraint})
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
     return JuMPOptimiser{typeof(pe), typeof(wi), typeof(wb), typeof(bgt), typeof(sbgt),
-                         typeof(lcs), typeof(lcm), typeof(card), typeof(cent), typeof(sets),
-                         typeof(nadj), typeof(cadj), typeof(bit), typeof(tn), typeof(te),
+                         typeof(lcs), typeof(lcm), typeof(cent), typeof(card), typeof(sets),
+                         typeof(nplg), typeof(cplg), typeof(bit), typeof(tn), typeof(te),
                          typeof(l1), typeof(l2), typeof(fees), typeof(sce), typeof(ret),
                          typeof(ccnt), typeof(cobj), typeof(sc), typeof(so), typeof(ss),
                          typeof(slv), typeof(str_names), typeof(save), typeof(strict)}(pe,
@@ -127,11 +127,11 @@ function JuMPOptimiser(;
                                                                                        sbgt,
                                                                                        lcs,
                                                                                        lcm,
-                                                                                       card,
                                                                                        cent,
+                                                                                       card,
                                                                                        sets,
-                                                                                       nadj,
-                                                                                       cadj,
+                                                                                       nplg,
+                                                                                       cplg,
                                                                                        bit,
                                                                                        tn,
                                                                                        te,

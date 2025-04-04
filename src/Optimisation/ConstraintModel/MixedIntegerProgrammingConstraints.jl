@@ -153,8 +153,8 @@ end
 function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThreshold},
                               card::Union{Nothing, <:LinearConstraintModel},
                               fees::Union{Nothing, <:Fees},
-                              cadj::Union{Nothing, <:PhilogenyConstraintModel},
-                              nadj::Union{Nothing, <:PhilogenyConstraintModel},
+                              nplg::Union{Nothing, <:PhilogenyConstraintModel},
+                              cplg::Union{Nothing, <:PhilogenyConstraintModel},
                               wb::WeightBounds)
     lbi_flag, sbi_flag = if !isnothing(bit)
         non_zero_real_or_vec(bit.lbi), non_zero_real_or_vec(bit.sbi)
@@ -173,8 +173,8 @@ function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThre
     else
         false, false
     end
-    c_flag = isa(cadj, IntegerPhilogenyModel)
-    n_flag = isa(nadj, IntegerPhilogenyModel)
+    n_flag = isa(nplg, IntegerPhilogenyModel)
+    c_flag = isa(cplg, IntegerPhilogenyModel)
     if !(lbi_flag || sbi_flag || card_flag || ffl_flag || ffs_flag || n_flag || c_flag)
         return nothing
     end
@@ -195,11 +195,11 @@ function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThre
             @constraint(model, card_eq, sc * card.A_eq * ib == sc * card.B_eq)
         end
     end
-    if c_flag
-        @constraint(model, card_cadj, sc * cadj.A * ib <= sc * cadj.B)
-    end
     if n_flag
-        @constraint(model, card_nadj, sc * nadj.A * ib <= sc * nadj.B)
+        @constraint(model, card_nplg, sc * nplg.A * ib <= sc * nplg.B)
+    end
+    if c_flag
+        @constraint(model, card_cplg, sc * cplg.A * ib <= sc * cplg.B)
     end
     return nothing
 end

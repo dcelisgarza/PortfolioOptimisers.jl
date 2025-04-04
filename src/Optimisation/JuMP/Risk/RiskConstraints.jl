@@ -1,7 +1,7 @@
 function get_chol_or_sigma_pm(model::JuMP.Model, pm::AbstractPriorModel)
     if !haskey(model, :G)
-        # G = cholesky(pm.sigma).U
-        G = sqrt(pm.sigma)
+        G = cholesky(pm.sigma).U
+        # G = sqrt(pm.sigma)
         @expression(model, G, G)
     end
     return model[:G]
@@ -18,7 +18,8 @@ end
 function set_risk_upper_bound!(args...)
     return nothing
 end
-function set_risk_upper_bound!(::MeanRisk, model::JuMP.Model, r_expr, ub::Real, key)
+function set_risk_upper_bound!(::MeanRiskEstimator, model::JuMP.Model, r_expr, ub::Real,
+                               key)
     k = model[:k]
     sc = model[:sc]
     model[Symbol(ShortString("$(key)_ub"))] = @constraint(model, sc * r_expr <= sc * ub * k)
@@ -35,21 +36,22 @@ function set_risk_expression!(model::JuMP.Model, r_expr, scale::Real, rke::Bool)
     push!(risk_vec, scale * r_expr)
     return nothing
 end
-function set_risk_bounds_and_expression!(opt::MeanRisk, model::JuMP.Model, r_expr,
+function set_risk_bounds_and_expression!(opt::MeanRiskEstimator, model::JuMP.Model, r_expr,
                                          settings::RiskMeasureSettings, key)
     set_risk_upper_bound!(opt, model, r_expr, settings.ub, key)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
 end
-function set_risk_bounds_and_expression!(opt::MeanRisk, model::JuMP.Model, r_expr_ub,
-                                         ub::Union{Nothing, Real}, key::Symbol, r_expr,
-                                         settings::RiskMeasureSettings)
+function set_risk_bounds_and_expression!(opt::MeanRiskEstimator, model::JuMP.Model,
+                                         r_expr_ub, ub::Union{Nothing, Real}, key::Symbol,
+                                         r_expr, settings::RiskMeasureSettings)
     set_risk_upper_bound!(opt, model, r_expr_ub, ub, key)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
 end
-function _set_risk_constraints!(model::JuMP.Model, r::StandardDeviation, opt::MeanRisk,
-                                pm::AbstractPriorModel, i::Integer, args...)
+function _set_risk_constraints!(model::JuMP.Model, r::StandardDeviation,
+                                opt::MeanRiskEstimator, pm::AbstractPriorModel, i::Integer,
+                                args...)
     sc = model[:sc]
     w = model[:w]
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pm) : cholesky(r.sigma).U
@@ -61,7 +63,7 @@ function _set_risk_constraints!(model::JuMP.Model, r::StandardDeviation, opt::Me
     set_risk_bounds_and_expression!(opt, model, sd_risk, r.settings, key)
     return nothing
 end
-function sdp_rc_variance_flag!(::JuMP.Model, ::MeanRisk,
+function sdp_rc_variance_flag!(::JuMP.Model, ::MeanRiskEstimator,
                                ::Union{Nothing,
                                        LinearConstraintModel{<:PartialLinearConstraintModel{Nothing,
                                                                                             Nothing},
@@ -69,19 +71,20 @@ function sdp_rc_variance_flag!(::JuMP.Model, ::MeanRisk,
                                                                                             Nothing}}})
     return false
 end
-function sdp_rc_variance_flag!(model::JuMP.Model, ::MeanRisk, ::LinearConstraintModel)
+function sdp_rc_variance_flag!(model::JuMP.Model, ::MeanRiskEstimator,
+                               ::LinearConstraintModel)
     set_sdp_constraints!(model)
     return true
 end
 function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
-                            cadj::Union{Nothing, <:SemiDefinitePhilogenyModel,
+                            cplg::Union{Nothing, <:SemiDefinitePhilogenyModel,
                                         <:IntegerPhilogenyModel},
-                            nadj::Union{Nothing, <:SemiDefinitePhilogenyModel,
+                            nplg::Union{Nothing, <:SemiDefinitePhilogenyModel,
                                         <:IntegerPhilogenyModel})
     return if rc_flag ||
               haskey(model, :rc_variance) ||
-              isa(cadj, SemiDefinitePhilogenyModel) ||
-              isa(nadj, SemiDefinitePhilogenyModel)
+              isa(cplg, SemiDefinitePhilogenyModel) ||
+              isa(nplg, SemiDefinitePhilogenyModel)
         true
     else
         false
@@ -199,11 +202,11 @@ function rc_variance_constraints!(model::JuMP.Model, i::Integer, rc::LinearConst
     end
     return nothing
 end
-function _set_risk_constraints!(model::JuMP.Model, r::Variance, opt::MeanRisk,
+function _set_risk_constraints!(model::JuMP.Model, r::Variance, opt::MeanRiskEstimator,
                                 pm::AbstractPriorModel, i::Integer,
-                                cadj::Union{Nothing, <:SemiDefinitePhilogenyModel,
+                                cplg::Union{Nothing, <:SemiDefinitePhilogenyModel,
                                             <:IntegerPhilogenyModel},
-                                nadj::Union{Nothing, <:SemiDefinitePhilogenyModel,
+                                nplg::Union{Nothing, <:SemiDefinitePhilogenyModel,
                                             <:IntegerPhilogenyModel})
     if !haskey(model, :variance_flag) && r.settings.rke
         @expression(model, variance_flag, true)
@@ -211,7 +214,7 @@ function _set_risk_constraints!(model::JuMP.Model, r::Variance, opt::MeanRisk,
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pm.X),
                             strict = opt.opt.strict)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
-    sdp_flag = sdp_variance_flag!(model, rc_flag, cadj, nadj)
+    sdp_flag = sdp_variance_flag!(model, rc_flag, cplg, nplg)
     key = Symbol(ShortString("variance_risk_$(i)"))
     set_variance_risk!(model, sdp_flag, pm, i, r, key)
     variance_risk = model[key]

@@ -73,16 +73,18 @@ end
 function set_risk_constraints!(model::JuMP.Model,
                                rs::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                                opt::JuMPOptimisationType, pm::AbstractPriorModel,
-                               cadj::Union{Nothing, <:SemiDefinitePhilogenyModel,
+                               cplg::Union{Nothing, <:SemiDefinitePhilogenyModel,
                                            <:IntegerPhilogenyModel},
-                               nadj::Union{Nothing, <:SemiDefinitePhilogenyModel,
+                               nplg::Union{Nothing, <:SemiDefinitePhilogenyModel,
                                            <:IntegerPhilogenyModel})
     for (i, r) ∈ enumerate(rs)
-        _set_risk_constraints!(model, r, opt, pm, i, cadj, nadj)
+        _set_risk_constraints!(model, r, opt, pm, i, cplg, nplg)
     end
     return nothing
 end
 abstract type JuMPPortfolioSolution end
+abstract type PortfolioModel end
+
 struct SolvedPortfolioModel{T1 <: AbstractVector, T2 <: JuMP.Model, T3 <: AbstractDict} <:
        JuMPPortfolioSolution
     w::T1

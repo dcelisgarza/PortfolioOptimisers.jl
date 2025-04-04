@@ -88,16 +88,15 @@ function set_return_constraints!(model::JuMP.Model, pret::ExactKellyReturn,
                                  obj::ObjectiveFunction, pm::AbstractPriorModel)
     k = model[:k]
     sc = model[:sc]
-    fees = model[:fees]
     lb = pret.lb
     X = pm.X
-    set_portfolio_returns!(model, X)
-    X = model[:X]
-    T = length(X)
+    set_net_portfolio_returns!(model, X)
+    net_X = model[:net_X]
+    T = length(net_X)
     @variable(model, t_ekelly[1:T])
-    @expression(model, ret, sum(t_ekelly) / T - fees)
+    @expression(model, ret, sum(t_ekelly) / T)
     set_max_ratio_return_constraints!(model, obj, k, sc, ret)
-    @expression(model, kret, k .+ X)
+    @expression(model, kret, k .+ net_X)
     @constraint(model, ekelly_ret[i = 1:T],
                 [sc * t_ekelly[i], sc * k, sc * kret[i]] ∈ MOI.ExponentialCone())
     set_return_bounds!(model, lb)
