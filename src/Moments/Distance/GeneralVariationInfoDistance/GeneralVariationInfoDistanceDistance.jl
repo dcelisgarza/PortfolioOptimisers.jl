@@ -14,7 +14,7 @@ struct GeneralVariationInfoDistanceDistance{T1 <: Integer,
 end
 function GeneralVariationInfoDistanceDistance(; power::Integer = 1,
                                               ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
-                                              bins::Union{<:Integer, <:AbstractBins} = B_HacineGharbiRavier(),
+                                              bins::Union{<:Integer, <:AbstractBins} = HacineGharbiRavier(),
                                               normalise::Bool = true,
                                               dist::Distances.Metric = Distances.Euclidean(),
                                               args::Tuple = (), kwargs::NamedTuple = (;))

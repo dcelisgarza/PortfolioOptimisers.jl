@@ -25,7 +25,7 @@
         sigma1 = cov(X)
         sigma2 = copy(sigma1)
         sigma3 = copy(sigma1)
-        fit!(NearestPosDef(), sigma1)
+        fit!(PosDefEstimator(), sigma1)
         @test isposdef(sigma1)
 
         fit!(nothing, sigma2)
@@ -42,7 +42,7 @@
         denoise_t = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv"), DataFrame)
         for i ∈ 1:ncol(denoise_t)
             sigma1 = copy(sigma)
-            fit!(des[i], NearestPosDef(), sigma1, q)
+            fit!(des[i], PosDefEstimator(), sigma1, q)
             MN = size(sigma1)
             res = isapprox(sigma1, reshape(denoise_t[!, i], MN))
             if !res
@@ -51,17 +51,17 @@
             @test res
         end
     end
-    @testset "Detone" begin
+    @testset "DetoneEstimator" begin
         rng = StableRNG(987654321)
         X = randn(rng, 1000, 20)
         T, N = size(X)
         q = T / N
         sigma = cov(X)
-        des = [nothing, Detone(), Detone(; n = 3)]
-        detone = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv"), DataFrame)
+        des = [nothing, DetoneEstimator(), DetoneEstimator(; n = 3)]
+        detone = CSV.read(joinpath(@__DIR__, "./assets/DetoneEstimator.csv"), DataFrame)
         for i ∈ 1:ncol(detone)
             sigma1 = copy(sigma)
-            fit!(des[i], NearestPosDef(), sigma1)
+            fit!(des[i], PosDefEstimator(), sigma1)
             MN = size(sigma1)
             res = isapprox(sigma1, reshape(detone[!, i], MN))
             if !res

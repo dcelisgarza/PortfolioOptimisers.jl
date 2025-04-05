@@ -1,10 +1,10 @@
 
-struct LTDCovariance{T1 <: PortfolioOptimisersVarianceEstimator, T2 <: Real} <:
-       PortfolioOptimisersCovarianceEstimator
+struct LTDCovariance{T1 <: AbstractVarianceEstimator, T2 <: Real} <:
+       AbstractCovarianceEstimator
     ve::T1
     alpha::T2
 end
-function LTDCovariance(; ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
+function LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                        alpha::Real = 0.05)
     @smart_assert(zero(alpha) < alpha < one(alpha))
     return LTDCovariance{typeof(ve), typeof(alpha)}(ve, alpha)
@@ -16,7 +16,6 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05)
     T, N = size(X)
     k = ceil(Int, T * alpha)
     rho = Matrix{eltype(X)}(undef, N, N)
-
     if k > 0
         for j ∈ axes(X, 2)
             xj = view(X, :, j)
@@ -30,7 +29,6 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05)
             end
         end
     end
-
     return rho
 end
 function StatsBase.cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)

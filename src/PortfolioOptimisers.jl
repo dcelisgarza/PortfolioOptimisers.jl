@@ -19,17 +19,19 @@ include("./4_Denoise.jl")
 include("./5_Detone.jl")
 include("./6_MatrixProcessing.jl")
 
-include("7_Moments/1_Base_Moments.jl")
-include("7_Moments/2_SimpleExpectedReturns.jl")
-include("7_Moments/3_PearsonCovariance.jl")
-include("7_Moments/4_FullCovariance.jl")
-include("7_Moments/5_SemiCovariance.jl")
-include("7_Moments/6_SimpleVariance.jl")
-include("7_Moments/7_BaseGerberCovariances.jl")
-include("7_Moments/8_Gerber0Covariances.jl")
-include("7_Moments/9_Gerber1Covariances.jl")
-include("7_Moments/10_Gerber2Covariances.jl")
-include("7_Moments/11_GerberCovariance_getproperty.jl")
+include("./7_Moments/1_Base_Moments.jl")
+include("./7_Moments/2_SimpleExpectedReturns.jl")
+include("./7_Moments/3_PearsonCovariance.jl")
+include("./7_Moments/4_FullCovariance.jl")
+include("./7_Moments/5_SemiCovariance.jl")
+include("./7_Moments/6_SimpleVariance.jl")
+include("./7_Moments/7_GerberCovariances.jl")
+include("./7_Moments/8_SmythBrobyCovariance.jl")
+include("./7_Moments/9_DistanceCovariance.jl")
+include("./7_Moments/10_LTDCovariance.jl")
+include("./7_Moments/11_RankCovariance.jl")
+include("./7_Moments/12_Histogram.jl")
+include("./7_Moments/13_MutualInfoCovariance.jl")
 
 #=
 
@@ -58,11 +60,11 @@ include("./OrderedWeightsArray/OWA.jl")
 
 # Fix Non Positive Definite
 include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_AbstractTypes.jl")
-include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/NearestPosDef.jl")
+include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/PosDefEstimator.jl")
 
-# Detone
-include("./LinearAlgebra/Detone/Detone_AbstractTypes.jl")
-include("./LinearAlgebra/Detone/Detone.jl")
+# DetoneEstimator
+include("./LinearAlgebra/DetoneEstimator/Detone_AbstractTypes.jl")
+include("./LinearAlgebra/DetoneEstimator/DetoneEstimator.jl")
 
 # Histogram
 include("./LinearAlgebra/Histogram/Histogram_AbstractTypes.jl")
@@ -114,13 +116,13 @@ include("./Moments/ExpectedReturns/ExcessExpectedReturns.jl")
 include("./Moments/Covariance/GerberCovariance/GerberCovariance_AbstractTypes.jl")
 
 ## Base Gerber Covariance
-include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/BaseGerberCovariance_AbstractTypes.jl")
-include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber0Covariance.jl")
-include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber0NormalisedCovariance.jl")
-include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber1Covariance.jl")
-include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber1NormalisedCovariance.jl")
-include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber2Covariance.jl")
-include("./Moments/Covariance/GerberCovariance/BaseGerberCovariance/Gerber2NormalisedCovariance.jl")
+include("./Moments/Covariance/GerberCovariance/GerberCovariance/BaseGerberCovariance_AbstractTypes.jl")
+include("./Moments/Covariance/GerberCovariance/GerberCovariance/Gerber0Covariance.jl")
+include("./Moments/Covariance/GerberCovariance/GerberCovariance/Gerber0NormalisedCovariance.jl")
+include("./Moments/Covariance/GerberCovariance/GerberCovariance/Gerber1Covariance.jl")
+include("./Moments/Covariance/GerberCovariance/GerberCovariance/Gerber1NormalisedCovariance.jl")
+include("./Moments/Covariance/GerberCovariance/GerberCovariance/Gerber2Covariance.jl")
+include("./Moments/Covariance/GerberCovariance/GerberCovariance/Gerber2NormalisedCovariance.jl")
 
 ## Smyth Broby Covariance
 include("./Moments/Covariance/GerberCovariance/SmythBrobyCovariance/SmythBrobyCovariance_AbstractTypes.jl")

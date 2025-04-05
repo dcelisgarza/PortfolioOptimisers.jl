@@ -1,48 +1,28 @@
-abstract type AbstractDenoiseEstimator <: AbstractEstimator end
-struct BaseDenoise{T1 <: Integer, T2 <: Integer, T3, T4 <: Tuple, T5 <: NamedTuple} <:
-       AbstractDenoiseEstimator
-    m::T1
-    n::T2
-    kernel::T3
-    args::T4
-    kwargs::T5
+abstract type DenoiseAlgorithm <: AbstractAlgorithm end
+struct SpectralDenoise <: DenoiseAlgorithm end
+struct FixedDenoise <: DenoiseAlgorithm end
+struct ShrunkDenoise{T1 <: Real} <: DenoiseAlgorithm
+    alpha::T1
 end
-function BaseDenoise(; m::Integer = 10, n::Integer = 1000,
-                     kernel = AverageShiftedHistograms.Kernels.gaussian, args::Tuple = (),
-                     kwargs::NamedTuple = (;))
-    return BaseDenoise{typeof(m), typeof(n), typeof(kernel), typeof(args), typeof(kwargs)}(m,
-                                                                                           n,
-                                                                                           kernel,
-                                                                                           args,
-                                                                                           kwargs)
-end
-struct SpectralDenoise{T1 <: BaseDenoise} <: AbstractDenoiseEstimator
-    de::T1
-end
-function SpectralDenoise(; de::BaseDenoise = BaseDenoise())
-    return SpectralDenoise{typeof(de)}(de)
-end
-struct FixedDenoise{T1 <: BaseDenoise} <: AbstractDenoiseEstimator
-    de::T1
-end
-function FixedDenoise(; de::BaseDenoise = BaseDenoise())
-    return FixedDenoise{typeof(de)}(de)
-end
-struct ShrunkDenoise{T1 <: BaseDenoise, T2 <: Real} <: AbstractDenoiseEstimator
-    de::T1
-    alpha::T2
-end
-function ShrunkDenoise(; de::BaseDenoise = BaseDenoise(), alpha::Real = 0.0)
+function ShrunkDenoise(; alpha::Real = 0.0)
     @smart_assert(zero(alpha) <= alpha <= one(alpha))
-    return ShrunkDenoise{typeof(de), typeof(alpha)}(de, alpha)
+    return ShrunkDenoise{typeof(alpha)}(alpha)
 end
-function Base.getproperty(d::Union{<:SpectralDenoise, <:FixedDenoise, <:ShrunkDenoise},
-                          sym::Symbol)
-    if sym ∈ (:m, :n, :kernel, :args, :kwargs)
-        return getfield(d.de, sym)
-    else
-        return getfield(d, sym)
-    end
+struct DenoiseEstimator{T1 <: DenoiseAlgorithm, T2 <: Integer, T3 <: Integer, T4,
+                        T5 <: Tuple, T6 <: NamedTuple} <: AbstractEstimator
+    alg::T1
+    m::T2
+    n::T3
+    kernel::T4
+    args::T5
+    kwargs::T6
+end
+function DenoiseEstimator(; alg::DenoiseAlgorithm = ShrunkDenoise(), m::Integer = 10,
+                          n::Integer = 1000,
+                          kernel = AverageShiftedHistograms.Kernels.gaussian,
+                          args::Tuple = (), kwargs::NamedTuple = (;))
+    return DenoiseEstimator{typeof(alg), typeof(m), typeof(n), typeof(kernel), typeof(args),
+                            typeof(kwargs)}(alg, m, n, kernel, args, kwargs)
 end
 function fit!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
               vecs::AbstractMatrix, num_factors::Integer)
@@ -95,7 +75,7 @@ function find_max_eval(vals, q; kernel = AverageShiftedHistograms.Kernels.gaussi
     e_max = x * (1.0 + sqrt(1.0 / q))^2
     return e_max, x
 end
-function fit!(de::AbstractDenoiseEstimator, pdm::Union{Nothing, <:PosDefMatrixEstimator},
+function fit!(de::DenoiseEstimator, pdm::Union{Nothing, <:PosDefEstimator},
               X::AbstractMatrix, q::Real)
     s = diag(X)
     iscov = any(.!isone.(s))
@@ -107,18 +87,18 @@ function fit!(de::AbstractDenoiseEstimator, pdm::Union{Nothing, <:PosDefMatrixEs
     max_val = find_max_eval(vals, q; kernel = de.kernel, m = de.m, n = de.n, args = de.args,
                             kwargs = de.kwargs)[1]
     num_factors = findlast(vals .< max_val)
-    fit!(de, X, vals, vecs, num_factors)
+    fit!(de.alg, X, vals, vecs, num_factors)
     fit!(pdm, X)
     if iscov
         StatsBase.cor2cov!(X, s)
     end
     return nothing
 end
-function fit(de::AbstractDenoiseEstimator, pdm::Union{Nothing, <:PosDefMatrixEstimator},
+function fit(de::DenoiseEstimator, pdm::Union{Nothing, <:PosDefEstimator},
              X::AbstractMatrix, q::Real)
     X = copy(X)
     fit!(de, pdm, X, q)
     return X
 end
 
-export BaseDenoise, SpectralDenoise, FixedDenoise, ShrunkDenoise
+export DenoiseEstimator, SpectralDenoise, FixedDenoise, ShrunkDenoise

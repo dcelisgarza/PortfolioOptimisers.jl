@@ -1,6 +1,6 @@
 struct DistanceCovariance{T1 <: Distances.Metric, T2 <: Tuple, T3 <: NamedTuple,
                           T4 <: Union{Nothing, <:AbstractWeights}} <:
-       PortfolioOptimisersCovarianceEstimator
+       AbstractCovarianceEstimator
     dist::T1
     args::T2
     kwargs::T3
@@ -21,9 +21,7 @@ end
 function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
     N = length(v1)
     @smart_assert(N == length(v2) && N > 1)
-
     N2 = N^2
-
     a, b = if isnothing(ce.w)
         Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.dist, v2, ce.args...; ce.kwargs...)
@@ -31,23 +29,18 @@ function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
         Distances.pairwise(ce.dist, v1 .* ce.w, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.dist, v2 .* ce.w, ce.args...; ce.kwargs...)
     end
-
     mu_a1, mu_b1 = mean(a; dims = 1), mean(b; dims = 1)
     mu_a2, mu_b2 = mean(a; dims = 2), mean(b; dims = 2)
     mu_a3, mu_b3 = mean(a), mean(b)
-
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
-
     dcov2_xx = sum(A .* A) / N2
     dcov2_xy = sum(A .* B) / N2
     dcov2_yy = sum(B .* B) / N2
-
     return sqrt(dcov2_xy) / sqrt(sqrt(dcov2_xx) * sqrt(dcov2_yy))
 end
 function cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
     N = size(X, 2)
-
     rho = Matrix{eltype(X)}(undef, N, N)
     for j ∈ axes(X, 2)
         xj = view(X, :, j)
@@ -55,7 +48,6 @@ function cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
             rho[j, i] = rho[i, j] = cor_distance(ce, view(X, :, i), xj)
         end
     end
-
     return rho
 end
 function StatsBase.cor(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -68,9 +60,7 @@ end
 function cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
     N = length(v1)
     @smart_assert(N == length(v2) && N > 1)
-
     N2 = N^2
-
     a, b = if isnothing(ce.w)
         Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.dist, v2, ce.args...; ce.kwargs...)
@@ -78,21 +68,16 @@ function cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
         Distances.pairwise(ce.dist, v1 .* ce.w, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.dist, v2 .* ce.w, ce.args...; ce.kwargs...)
     end
-
     mu_a1, mu_b1 = mean(a; dims = 1), mean(b; dims = 1)
     mu_a2, mu_b2 = mean(a; dims = 2), mean(b; dims = 2)
     mu_a3, mu_b3 = mean(a), mean(b)
-
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
-
     dcov2_xy = sum(A .* B) / N2
-
     return sqrt(dcov2_xy)
 end
 function cov_distance(ce::DistanceCovariance, X::AbstractMatrix)
     N = size(X, 2)
-
     rho = Matrix{eltype(X)}(undef, N, N)
     for j ∈ axes(X, 2)
         xj = view(X, :, j)
@@ -100,7 +85,6 @@ function cov_distance(ce::DistanceCovariance, X::AbstractMatrix)
             rho[j, i] = rho[i, j] = cov_distance(ce, view(X, :, i), xj)
         end
     end
-
     return rho
 end
 function StatsBase.cov(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)

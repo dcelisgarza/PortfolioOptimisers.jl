@@ -17,7 +17,7 @@ end
 function LoGo_dist_assert(args...)
     return nothing
 end
-function fit!(je::LoGo, pdm::Union{Nothing, <:PosDefMatrixEstimator}, sigma::AbstractMatrix,
+function fit!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator}, sigma::AbstractMatrix,
               X::AbstractMatrix; dims::Int = 1)
     issquare(sigma)
     LoGo_dist_assert(je.dist, sigma, X)

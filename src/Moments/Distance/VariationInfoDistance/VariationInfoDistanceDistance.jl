@@ -9,7 +9,7 @@ struct VariationInfoDistanceDistance{T1 <: Union{<:Integer, <:AbstractBins}, T2 
     kwargs::T5
 end
 function VariationInfoDistanceDistance(;
-                                       bins::Union{<:Integer, <:AbstractBins} = B_HacineGharbiRavier(),
+                                       bins::Union{<:Integer, <:AbstractBins} = HacineGharbiRavier(),
                                        normalise::Bool = true,
                                        dist::Distances.Metric = Distances.Euclidean(),
                                        args::Tuple = (), kwargs::NamedTuple = (;))

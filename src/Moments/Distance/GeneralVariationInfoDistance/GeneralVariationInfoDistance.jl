@@ -9,7 +9,7 @@ struct GeneralVariationInfoDistance{T1 <: Integer,
 end
 function GeneralVariationInfoDistance(; power::Integer = 1,
                                       ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
-                                      bins::Union{<:Integer, <:AbstractBins} = B_HacineGharbiRavier(),
+                                      bins::Union{<:Integer, <:AbstractBins} = HacineGharbiRavier(),
                                       normalise::Bool = true)
     if isa(bins, Integer)
         @smart_assert(bins > zero(bins))

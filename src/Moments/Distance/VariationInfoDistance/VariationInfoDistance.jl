@@ -4,7 +4,7 @@ struct VariationInfoDistance{T1 <: Union{<:Integer, <:AbstractBins}, T2 <: Bool}
     normalise::T2
 end
 function VariationInfoDistance(;
-                               bins::Union{<:Integer, <:AbstractBins} = B_HacineGharbiRavier(),
+                               bins::Union{<:Integer, <:AbstractBins} = HacineGharbiRavier(),
                                normalise::Bool = true)
     if isa(bins, Integer)
         @smart_assert(bins > zero(bins))

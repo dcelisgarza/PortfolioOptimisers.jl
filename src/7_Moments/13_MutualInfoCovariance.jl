@@ -1,12 +1,12 @@
-struct MutualInfoCovariance{T1 <: PortfolioOptimisersVarianceEstimator,
+struct MutualInfoCovariance{T1 <: AbstractVarianceEstimator,
                             T2 <: Union{<:Integer, <:AbstractBins}, T3 <: Bool} <:
-       PortfolioOptimisersCovarianceEstimator
+       AbstractCovarianceEstimator
     ve::T1
     bins::T2
     normalise::T3
 end
-function MutualInfoCovariance(; ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
-                              bins::Union{<:Integer, <:AbstractBins} = B_HacineGharbiRavier(),
+function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+                              bins::Union{<:Integer, <:AbstractBins} = HacineGharbiRavier(),
                               normalise::Bool = true)
     if isa(bins, Integer)
         @smart_assert(bins > zero(bins))

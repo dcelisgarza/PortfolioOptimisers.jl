@@ -1,3 +1,51 @@
+abstract type AbstractBins <: AbstractAlgorithm end
+abstract type AstroPyBins <: AbstractBins end
+struct Knuth <: AstroPyBins end
+function get_bin_width_func(::Knuth)
+    return pyimport("astropy.stats").knuth_bin_width
+end
+struct FreedmanDiaconis <: AstroPyBins end
+function get_bin_width_func(::FreedmanDiaconis)
+    return pyimport("astropy.stats").freedman_bin_width
+end
+struct Scott <: AstroPyBins end
+function get_bin_width_func(::Scott)
+    return pyimport("astropy.stats").scott_bin_width
+end
+function calc_num_bins(::AstroPyBins, xj::AbstractVector, xi::AbstractVector, j::Integer,
+                       i::Integer, bin_width_func, ::Any)
+    xjl, xju = extrema(xj)
+    k1 = (xju - xjl) / pyconvert(eltype(xj), bin_width_func(Py(xj).to_numpy()))
+    return round(Int,
+                 if j != i
+                     xil, xiu = extrema(xi)
+                     k2 = (xiu - xil) /
+                          pyconvert(eltype(xi), bin_width_func(Py(xi).to_numpy()))
+                     max(k1, k2)
+                 else
+                     k1
+                 end)
+end
+struct HacineGharbiRavier <: AbstractBins end
+function get_bin_width_func(::HacineGharbiRavier)
+    return nothing
+end
+function calc_num_bins(::HacineGharbiRavier, xj::AbstractVector, xi::AbstractVector,
+                       j::Integer, i::Integer, ::Any, T::Integer)
+    corr = cor(xj, xi)
+    return round(Int, if isone(corr)
+                     z = cbrt(8 + 324 * T + 12 * sqrt(36 * T + 729 * T^2))
+                     z / 6 + 2 / (3 * z) + 1 / 3
+                 else
+                     sqrt(1 + sqrt(1 + 24 * T / (1 - corr^2))) / sqrt(2)
+                 end)
+end
+function get_bin_width_func(::Integer)
+    return nothing
+end
+function calc_num_bins(bins::Integer, args...)
+    return bins
+end
 function calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
     bp1 = bins + one(bins)
 
@@ -45,13 +93,11 @@ function intrinsic_mutual_info(X::AbstractMatrix)
     return sum(mi)
 end
 function variation_info(X::AbstractMatrix,
-                        bins::Union{<:AbstractBins, <:Integer} = B_HacineGharbiRavier(),
+                        bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                         normalise::Bool = true)
     T, N = size(X)
     var_mtx = Matrix{eltype(X)}(undef, N, N)
-
     bin_width_func = get_bin_width_func(bins)
-
     for j ∈ axes(X, 2)
         xj = view(X, :, j)
         for i ∈ 1:j
@@ -65,13 +111,10 @@ function variation_info(X::AbstractMatrix,
                 vxy = ex + ey - mut_ixy
                 var_ixy = var_ixy / vxy
             end
-
             var_ixy = clamp(var_ixy, zero(eltype(X)), typemax(eltype(X)))
-
             var_mtx[j, i] = var_mtx[i, j] = var_ixy
         end
     end
-
     return var_mtx
 end
 #=
@@ -118,30 +161,26 @@ function mutual_variation_info(X::AbstractMatrix,
 end
 =#
 function mutual_info(X::AbstractMatrix,
-                     bins::Union{<:AbstractBins, <:Integer} = B_HacineGharbiRavier(),
+                     bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                      normalise::Bool = true)
     T, N = size(X)
     mut_mtx = Matrix{eltype(X)}(undef, N, N)
-
     bin_width_func = get_bin_width_func(bins)
-
     for j ∈ axes(X, 2)
         xj = view(X, :, j)
         for i ∈ 1:j
             xi = view(X, :, i)
             nbins = calc_num_bins(bins, xj, xi, j, i, bin_width_func, T)
             ex, ey, hxy = calc_hist_data(xj, xi, nbins)
-
             mut_ixy = intrinsic_mutual_info(hxy)
             if normalise
                 mut_ixy /= min(ex, ey)
             end
-
             mut_ixy = clamp(mut_ixy, zero(eltype(X)), typemax(eltype(X)))
-
             mut_mtx[j, i] = mut_mtx[i, j] = mut_ixy
         end
     end
-
     return mut_mtx
 end
+
+export Knuth, FreedmanDiaconis, Scott, HacineGharbiRavier

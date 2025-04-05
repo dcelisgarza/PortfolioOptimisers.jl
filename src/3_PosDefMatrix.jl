@@ -1,12 +1,11 @@
-abstract type PosDefMatrixEstimator <: AbstractEstimator end
-struct NearestPosDef{T1 <: NearestCorrelationMatrix.NCMAlgorithm} <: PosDefMatrixEstimator
+struct PosDefEstimator{T1} <: AbstractEstimator
     alg::T1
 end
-function NearestPosDef(;
-                       alg::NearestCorrelationMatrix.NCMAlgorithm = NearestCorrelationMatrix.Newton())
-    return NearestPosDef{typeof(alg)}(alg)
+function PosDefEstimator(; alg = NearestCorrelationMatrix.Newton())
+    return PosDefEstimator{typeof(alg)}(alg)
 end
-function fit!(method::NearestPosDef, X::AbstractMatrix)
+function fit!(method::PosDefEstimator{<:NearestCorrelationMatrix.NCMAlgorithm},
+              X::AbstractMatrix)
     if isposdef(X)
         return nothing
     end
@@ -25,10 +24,11 @@ function fit!(method::NearestPosDef, X::AbstractMatrix)
     end
     return nothing
 end
-function fit(method::NearestPosDef, X::AbstractMatrix)
+function fit(method::PosDefEstimator{<:NearestCorrelationMatrix.NCMAlgorithm},
+             X::AbstractMatrix)
     X = copy(X)
     fit!(method, X)
     return X
 end
 
-export NearestPosDef
+export PosDefEstimator
