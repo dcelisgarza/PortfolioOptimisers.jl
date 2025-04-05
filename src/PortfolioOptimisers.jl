@@ -32,6 +32,7 @@ include("./7_Moments/10_LTDCovariance.jl")
 include("./7_Moments/11_RankCovariance.jl")
 include("./7_Moments/12_Histogram.jl")
 include("./7_Moments/13_MutualInfoCovariance.jl")
+include("./7_Moments/14_PortfolioOptimisersCovariance.jl")
 
 #=
 

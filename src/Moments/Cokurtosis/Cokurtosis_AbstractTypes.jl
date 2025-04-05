@@ -5,7 +5,7 @@ function _cokurosis(X, mp)
     o = transpose(range(; start = one(eltype(X)), stop = one(eltype(X)), length = N))
     z = kron(o, X) .* kron(X, o)
     ckurt = transpose(z) * z / T
-    fit!(mp, ckurt, X)
+    fit_estimator!(mp, ckurt, X)
     return ckurt
 end
 

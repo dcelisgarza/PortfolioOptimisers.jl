@@ -18,19 +18,19 @@ function DefaultMatrixProcessing(;
     return DefaultMatrixProcessing{typeof(pdm), typeof(denoise), typeof(detone),
                                    typeof(alg)}(pdm, denoise, detone, alg)
 end
-function fit!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix, X::AbstractMatrix,
-              args...; kwargs...)
+function fit_estimator!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
+                        X::AbstractMatrix, args...; kwargs...)
     T, N = size(X)
-    fit!(mp.pdm, sigma)
-    fit!(mp.denoise, mp.pdm, sigma, T / N)
-    fit!(mp.detone, mp.pdm, sigma)
-    fit!(mp.alg, mp.pdm, sigma, X)
+    fit_estimator!(mp.pdm, sigma)
+    fit_estimator!(mp.denoise, mp.pdm, sigma, T / N)
+    fit_estimator!(mp.detone, mp.pdm, sigma)
+    fit_estimator!(mp.alg, mp.pdm, sigma, X)
     return nothing
 end
-function fit(mp::DefaultMatrixProcessing, sigma::AbstractMatrix, X::AbstractMatrix, args...;
-             kwargs...)
+function fit_estimator(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
+                       X::AbstractMatrix, args...; kwargs...)
     X = copy(X)
-    fit!(mp, sigma, X, args...; kwargs...)
+    fit_estimator!(mp, sigma, X, args...; kwargs...)
     return X
 end
 struct NonPositiveDefiniteMatrixProcessing{T1 <: Union{Nothing, <:DenoiseEstimator},
@@ -50,19 +50,19 @@ function NonPositiveDefiniteMatrixProcessing(;
     return NonPositiveDefiniteMatrixProcessing{typeof(denoise), typeof(detone),
                                                typeof(alg)}(denoise, detone, alg)
 end
-function fit!(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
-              X::AbstractMatrix, args...; kwargs...)
+function fit_estimator!(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
+                        X::AbstractMatrix, args...; kwargs...)
     T, N = size(X)
-    fit!(nothing, sigma)
-    fit!(mp.denoise, nothing, sigma, T / N)
-    fit!(mp.detone, nothing, sigma)
-    fit!(mp.alg, nothing, sigma, X)
+    fit_estimator!(nothing, sigma)
+    fit_estimator!(mp.denoise, nothing, sigma, T / N)
+    fit_estimator!(mp.detone, nothing, sigma)
+    fit_estimator!(mp.alg, nothing, sigma, X)
     return nothing
 end
-function fit(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
-             X::AbstractMatrix, args...; kwargs...)
+function fit_estimator(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
+                       X::AbstractMatrix, args...; kwargs...)
     X = copy(X)
-    fit!(mp, sigma, X, args...; kwargs...)
+    fit_estimator!(mp, sigma, X, args...; kwargs...)
     return X
 end
 

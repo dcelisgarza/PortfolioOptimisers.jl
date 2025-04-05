@@ -5,8 +5,8 @@ function DetoneEstimator(; n::Integer = 1)
     @smart_assert(n >= zero(n))
     return DetoneEstimator{typeof(n)}(n)
 end
-function fit!(ce::DetoneEstimator, pdm::Union{Nothing, <:PosDefEstimator},
-              X::AbstractMatrix)
+function fit_estimator!(ce::DetoneEstimator, pdm::Union{Nothing, <:PosDefEstimator},
+                        X::AbstractMatrix)
     n = ce.n
     @smart_assert(one(size(X, 1)) <= n <= size(X, 1))
     n -= 1
@@ -21,15 +21,16 @@ function fit!(ce::DetoneEstimator, pdm::Union{Nothing, <:PosDefEstimator},
     _vecs = vecs[:, (end - n):end]
     X .-= _vecs * _vals * transpose(_vecs)
     X .= cov2cor(X)
-    fit!(pdm, X)
+    fit_estimator!(pdm, X)
     if iscov
         StatsBase.cor2cov!(X, s)
     end
     return nothing
 end
-function fit(ce::DetoneEstimator, pdm::Union{Nothing, <:PosDefEstimator}, X::AbstractMatrix)
+function fit_estimator(ce::DetoneEstimator, pdm::Union{Nothing, <:PosDefEstimator},
+                       X::AbstractMatrix)
     X = copy(X)
-    fit!(ce, pdm, X)
+    fit_estimator!(ce, pdm, X)
     return X
 end
 

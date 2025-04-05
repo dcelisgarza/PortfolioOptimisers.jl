@@ -7,7 +7,7 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
     (; X, mu, sigma) = pm
     T, N = size(X)
     sigma_mu = sigma / T
-    fit!(ue.pe.ce.mp.pdm, sigma_mu)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_mu)
     Random.seed!(ue.rng, ue.seed)
     X_mu = transpose(rand(ue.rng, MvNormal(mu, sigma), ue.n_sim))
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
@@ -18,7 +18,7 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
     X_sigma = transpose(reshape(X_sigma, N^2, :))
     K = commutation_matrix(sigma)
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
-    fit!(ue.pe.ce.mp.pdm, sigma_sigma)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.class.diagonal
         sigma_sigma = Diagonal(sigma_sigma)
         sigma_mu = Diagonal(sigma_mu)
@@ -37,10 +37,10 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
     (; X, sigma) = pm
     T = size(X, 1)
     sigma_mu = sigma / T
-    fit!(ue.pe.ce.mp.pdm, sigma_mu)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
-    fit!(ue.pe.ce.mp.pdm, sigma_sigma)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.class.diagonal
         sigma_sigma = Diagonal(sigma_sigma)
         sigma_mu = Diagonal(sigma_mu)
@@ -58,10 +58,10 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
     (; X, sigma) = pm
     T = size(X, 1)
     sigma_mu = sigma / T
-    fit!(ue.pe.ce.mp.pdm, sigma_mu)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
-    fit!(ue.pe.ce.mp.pdm, sigma_sigma)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.class.diagonal
         sigma_sigma = Diagonal(sigma_sigma)
         sigma_mu = Diagonal(sigma_mu)
@@ -80,7 +80,7 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     (; X, mu, sigma) = pm
     T = size(X, 1)
     sigma_mu = sigma / T
-    fit!(ue.pe.ce.mp.pdm, sigma_mu)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_mu)
     Random.seed!(ue.rng, ue.seed)
     X_mu = transpose(rand(ue.rng, MvNormal(mu, sigma), ue.n_sim))
     if ue.class.diagonal
@@ -98,7 +98,7 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     (; X, sigma) = pm
     T = size(X, 1)
     sigma_mu = sigma / T
-    fit!(ue.pe.ce.mp.pdm, sigma_mu)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_mu)
     if ue.class.diagonal
         sigma_mu = Diagonal(sigma_mu)
     end
@@ -114,7 +114,7 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     (; X, sigma) = pm
     T = size(X, 1)
     sigma_mu = sigma / T
-    fit!(ue.pe.ce.mp.pdm, sigma_mu)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_mu)
     if ue.class.diagonal
         sigma_mu = Diagonal(sigma_mu)
     end
@@ -130,7 +130,7 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     (; X, sigma) = pm
     T, N = size(X)
     sigma_mu = sigma / T
-    fit!(ue.pe.ce.mp.pdm, sigma_mu)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_mu)
     Random.seed!(ue.rng, ue.seed)
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
@@ -140,7 +140,7 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     X_sigma = transpose(reshape(X_sigma, N^2, :))
     K = commutation_matrix(sigma)
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
-    fit!(ue.pe.ce.mp.pdm, sigma_sigma)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.class.diagonal
         sigma_sigma = Diagonal(sigma_sigma)
     end
@@ -156,10 +156,10 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     (; X, sigma) = pm
     T = size(X, 1)
     sigma_mu = sigma / T
-    fit!(ue.pe.ce.mp.pdm, sigma_mu)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
-    fit!(ue.pe.ce.mp.pdm, sigma_sigma)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.class.diagonal
         sigma_sigma = Diagonal(sigma_sigma)
     end
@@ -175,10 +175,10 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     (; X, sigma) = pm
     T = size(X, 1)
     sigma_mu = sigma / T
-    fit!(ue.pe.ce.mp.pdm, sigma_mu)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_mu)
     K = commutation_matrix(sigma)
     sigma_sigma = T * (I + K) * kron(sigma_mu, sigma_mu)
-    fit!(ue.pe.ce.mp.pdm, sigma_sigma)
+    fit_estimator!(ue.pe.ce.mp.pdm, sigma_sigma)
     if ue.class.diagonal
         sigma_sigma = Diagonal(sigma_sigma)
     end

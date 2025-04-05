@@ -153,11 +153,11 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
     v3 = f_Q .- f_P * f_prior_mu
     f_posterior_mu = f_prior_mu + v1 * (v2 \ v3) .+ pe.rf
     f_posterior_sigma = f_prior_sigma + tau * f_prior_sigma - v1 * (v2 \ transpose(v1))
-    fit!(pe.f_mp, f_posterior_sigma, F)
+    fit_estimator!(pe.f_mp, f_posterior_sigma, F)
     # Reconstruct the posteriors using the black litterman adjusted factor statistics.
     posterior_mu = M * f_posterior_mu .+ b
     posterior_sigma = M * f_posterior_sigma * transpose(M)
-    fit!(pe.mp, posterior_sigma, posterior_X)
+    fit_estimator!(pe.mp, posterior_sigma, posterior_X)
     posterior_csigma = M * cholesky(f_posterior_sigma).L
     if pe.residuals
         err = X - posterior_X

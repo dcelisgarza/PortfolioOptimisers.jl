@@ -101,7 +101,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:SmythBroby0, <:Any, <:Any, <:Any,
             end
         end
     end
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:SmythBroby1, <:Any, <:Any, <:Any, <:Any,
@@ -144,7 +144,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:SmythBroby1, <:Any, <:Any, <:Any,
             end
         end
     end
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:SmythBroby2, <:Any, <:Any, <:Any, <:Any,
@@ -181,7 +181,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:SmythBroby2, <:Any, <:Any, <:Any,
     end
     h = sqrt.(diag(rho))
     rho .= rho ./ (h * transpose(h))
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:SmythBrobyGerber0, <:Any, <:Any, <:Any,
@@ -227,7 +227,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:SmythBrobyGerber0, <:Any, <:Any, 
             end
         end
     end
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:SmythBrobyGerber1, <:Any, <:Any, <:Any,
@@ -279,7 +279,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:SmythBrobyGerber1, <:Any, <:Any, 
             end
         end
     end
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:SmythBrobyGerber2, <:Any, <:Any, <:Any,
@@ -320,7 +320,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:SmythBrobyGerber2, <:Any, <:Any, 
     end
     h = sqrt.(diag(rho))
     rho .= rho ./ (h * transpose(h))
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function StatsBase.cor(ce::SmythBrobyCovariance, X::AbstractMatrix; dims::Int = 1,
@@ -420,7 +420,7 @@ function smythbroby(ce::NormalisedSmythBrobyCovariance{<:SmythBroby0, <:Any, <:A
             end
         end
     end
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function smythbroby(ce::NormalisedSmythBrobyCovariance{<:SmythBroby1, <:Any, <:Any, <:Any,
@@ -462,7 +462,7 @@ function smythbroby(ce::NormalisedSmythBrobyCovariance{<:SmythBroby1, <:Any, <:A
             end
         end
     end
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function smythbroby(ce::NormalisedSmythBrobyCovariance{<:SmythBroby2, <:Any, <:Any, <:Any,
@@ -497,7 +497,7 @@ function smythbroby(ce::NormalisedSmythBrobyCovariance{<:SmythBroby2, <:Any, <:A
     end
     h = sqrt.(diag(rho))
     rho .= Symmetric(rho ./ (h * transpose(h)), :U)
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function smythbroby(ce::NormalisedSmythBrobyCovariance{<:SmythBrobyGerber0, <:Any, <:Any,
@@ -541,7 +541,7 @@ function smythbroby(ce::NormalisedSmythBrobyCovariance{<:SmythBrobyGerber0, <:An
             end
         end
     end
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function smythbroby(ce::NormalisedSmythBrobyCovariance{<:SmythBrobyGerber1, <:Any, <:Any,
@@ -592,7 +592,7 @@ function smythbroby(ce::NormalisedSmythBrobyCovariance{<:SmythBrobyGerber1, <:An
             end
         end
     end
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function smythbroby(ce::NormalisedSmythBrobyCovariance{<:SmythBrobyGerber2, <:Any, <:Any,
@@ -631,7 +631,7 @@ function smythbroby(ce::NormalisedSmythBrobyCovariance{<:SmythBrobyGerber2, <:An
     end
     h = sqrt.(diag(rho))
     rho .= Symmetric(rho ./ (h * transpose(h)), :U)
-    fit!(ce.pdm, rho)
+    fit_estimator!(ce.pdm, rho)
     return rho
 end
 function StatsBase.cor(ce::NormalisedSmythBrobyCovariance, X::AbstractMatrix; dims::Int = 1,

@@ -24,22 +24,22 @@ function DenoiseEstimator(; alg::DenoiseAlgorithm = ShrunkDenoise(), m::Integer 
     return DenoiseEstimator{typeof(alg), typeof(m), typeof(n), typeof(kernel), typeof(args),
                             typeof(kwargs)}(alg, m, n, kernel, args, kwargs)
 end
-function fit!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
-              vecs::AbstractMatrix, num_factors::Integer)
+function fit_estimator!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
+                        vecs::AbstractMatrix, num_factors::Integer)
     _vals = copy(vals)
     _vals[1:num_factors] .= zero(eltype(X))
     X .= cov2cor(vecs * Diagonal(_vals) * transpose(vecs))
     return nothing
 end
-function fit!(::FixedDenoise, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix,
-              num_factors::Integer)
+function fit_estimator!(::FixedDenoise, X::AbstractMatrix, vals::AbstractVector,
+                        vecs::AbstractMatrix, num_factors::Integer)
     _vals = copy(vals)
     _vals[1:num_factors] .= sum(_vals[1:num_factors]) / num_factors
     X .= cov2cor(vecs * Diagonal(_vals) * transpose(vecs))
     return nothing
 end
-function fit!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
-              vecs::AbstractMatrix, num_factors::Integer)
+function fit_estimator!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
+                        vecs::AbstractMatrix, num_factors::Integer)
     # Small
     vals_l = vals[1:num_factors]
     vecs_l = vecs[:, 1:num_factors]
@@ -75,8 +75,8 @@ function find_max_eval(vals, q; kernel = AverageShiftedHistograms.Kernels.gaussi
     e_max = x * (1.0 + sqrt(1.0 / q))^2
     return e_max, x
 end
-function fit!(de::DenoiseEstimator, pdm::Union{Nothing, <:PosDefEstimator},
-              X::AbstractMatrix, q::Real)
+function fit_estimator!(de::DenoiseEstimator, pdm::Union{Nothing, <:PosDefEstimator},
+                        X::AbstractMatrix, q::Real)
     s = diag(X)
     iscov = any(.!isone.(s))
     if iscov
@@ -87,17 +87,17 @@ function fit!(de::DenoiseEstimator, pdm::Union{Nothing, <:PosDefEstimator},
     max_val = find_max_eval(vals, q; kernel = de.kernel, m = de.m, n = de.n, args = de.args,
                             kwargs = de.kwargs)[1]
     num_factors = findlast(vals .< max_val)
-    fit!(de.alg, X, vals, vecs, num_factors)
-    fit!(pdm, X)
+    fit_estimator!(de.alg, X, vals, vecs, num_factors)
+    fit_estimator!(pdm, X)
     if iscov
         StatsBase.cor2cov!(X, s)
     end
     return nothing
 end
-function fit(de::DenoiseEstimator, pdm::Union{Nothing, <:PosDefEstimator},
-             X::AbstractMatrix, q::Real)
+function fit_estimator(de::DenoiseEstimator, pdm::Union{Nothing, <:PosDefEstimator},
+                       X::AbstractMatrix, q::Real)
     X = copy(X)
-    fit!(de, pdm, X, q)
+    fit_estimator!(de, pdm, X, q)
     return X
 end
 

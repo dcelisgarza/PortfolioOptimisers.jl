@@ -1,11 +1,10 @@
-struct PortfolioOptimisersCovariance{T1 <: PortfolioOptimisersCovarianceEstimator,
+struct PortfolioOptimisersCovariance{T1 <: AbstractCovarianceEstimator,
                                      T2 <: AbstractMatrixProcessingEstimator} <:
-       PortfolioOptimisersCovarianceEstimator
+       AbstractCovarianceEstimator
     ce::T1
     mp::T2
 end
-function PortfolioOptimisersCovariance(;
-                                       ce::PortfolioOptimisersCovarianceEstimator = FullCovariance(),
+function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = FullCovariance(),
                                        mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
     return PortfolioOptimisersCovariance{typeof(ce), typeof(mp)}(ce, mp)
 end
@@ -20,7 +19,7 @@ function StatsBase.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dim
         X = transpose(X)
     end
     sigma = cov(ce.ce, X; kwargs...)
-    fit!(ce.mp, sigma, X)
+    fit_estimator!(ce.mp, sigma, X)
     return sigma
 end
 function StatsBase.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
@@ -30,7 +29,7 @@ function StatsBase.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dim
         X = transpose(X)
     end
     rho = cor(ce.ce, X; kwargs...)
-    fit!(ce.mp, rho, X)
+    fit_estimator!(ce.mp, rho, X)
     return rho
 end
 

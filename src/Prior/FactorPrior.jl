@@ -86,7 +86,7 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
     posterior_X = F * transpose(M) .+ transpose(b)
     posterior_mu = M * f_mu .+ b
     posterior_sigma = M * f_sigma * transpose(M)
-    fit!(pe.mp, posterior_sigma, posterior_X)
+    fit_estimator!(pe.mp, posterior_sigma, posterior_X)
     posterior_csigma = M * cholesky(f_sigma).L
     if pe.residuals
         err = X - posterior_X

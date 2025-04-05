@@ -341,96 +341,108 @@
                                                                             corrected = false,
                                                                             w = ew)),
                DistanceCovariance(), DistanceCovariance(; w = ew), LTDCovariance(),
-               Gerber0Covariance(),
-               Gerber0Covariance(;
-                                 ve = PortfolioOptimisers.SimpleVariance(;
-                                                                         corrected = false,
-                                                                         w = ew)),
-               Gerber0NormalisedCovariance(),
-               Gerber0NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                   corrected = false,
-                                                                                   w = ew)),
-               Gerber1Covariance(),
-               Gerber1Covariance(;
-                                 ve = PortfolioOptimisers.SimpleVariance(;
-                                                                         corrected = false,
-                                                                         w = ew)),
-               Gerber1NormalisedCovariance(),
-               Gerber1NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                   corrected = false,
-                                                                                   w = ew)),
-               Gerber2Covariance(),
-               Gerber2Covariance(;
-                                 ve = PortfolioOptimisers.SimpleVariance(;
-                                                                         corrected = false,
-                                                                         w = ew)),
-               Gerber2NormalisedCovariance(),
-               Gerber2NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                   corrected = false,
-                                                                                   w = ew)),
-               SmythBroby0Covariance(),
-               SmythBroby0Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                     ve = PortfolioOptimisers.SimpleVariance(;
-                                                                             corrected = false,
-                                                                             w = ew)),
-               SmythBroby0NormalisedCovariance(),
-               SmythBroby0NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                               ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                       corrected = false,
-                                                                                       w = ew)),
-               SmythBroby1Covariance(),
-               SmythBroby1Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                     ve = PortfolioOptimisers.SimpleVariance(;
-                                                                             corrected = false,
-                                                                             w = ew)),
-               SmythBroby1NormalisedCovariance(),
-               SmythBroby1NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                               ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                       corrected = false,
-                                                                                       w = ew)),
-               SmythBroby2Covariance(),
-               SmythBroby2Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                     ve = PortfolioOptimisers.SimpleVariance(;
-                                                                             corrected = false,
-                                                                             w = ew)),
-               SmythBroby2NormalisedCovariance(),
-               SmythBroby2NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                               ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                       corrected = false,
-                                                                                       w = ew)),
-               SmythBrobyGerber0Covariance(),
-               SmythBrobyGerber0Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                   corrected = false,
-                                                                                   w = ew)),
-               SmythBrobyGerber0NormalisedCovariance(),
-               SmythBrobyGerber0NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                                     ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                             corrected = false,
-                                                                                             w = ew)),
-               SmythBrobyGerber1Covariance(),
-               SmythBrobyGerber1Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                   corrected = false,
-                                                                                   w = ew)),
-               SmythBrobyGerber1NormalisedCovariance(),
-               SmythBrobyGerber1NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                                     ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                             corrected = false,
-                                                                                             w = ew)),
-               SmythBrobyGerber2Covariance(),
-               SmythBrobyGerber2Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                   corrected = false,
-                                                                                   w = ew)),
-               SmythBrobyGerber2NormalisedCovariance(),
-               SmythBrobyGerber2NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                                     ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                             corrected = false,
-                                                                                             w = ew))]
+               GerberCovariance(; alg = Gerber0()),
+               GerberCovariance(; alg = Gerber0(),
+                                ve = PortfolioOptimisers.SimpleVariance(; corrected = false,
+                                                                        w = ew)),
+               NormalisedGerberCovariance(; alg = Gerber0()),
+               NormalisedGerberCovariance(; alg = Gerber0(),
+                                          me = SimpleExpectedReturns(; w = ew),
+                                          ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                  corrected = false,
+                                                                                  w = ew)),
+               GerberCovariance(; alg = Gerber1()),
+               GerberCovariance(; alg = Gerber1(),
+                                ve = PortfolioOptimisers.SimpleVariance(; corrected = false,
+                                                                        w = ew)),
+               NormalisedGerberCovariance(; alg = Gerber1()),
+               NormalisedGerberCovariance(; alg = Gerber1(),
+                                          me = SimpleExpectedReturns(; w = ew),
+                                          ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                  corrected = false,
+                                                                                  w = ew)),
+               GerberCovariance(; alg = Gerber2()),
+               GerberCovariance(; alg = Gerber2(),
+                                ve = PortfolioOptimisers.SimpleVariance(; corrected = false,
+                                                                        w = ew)),
+               NormalisedGerberCovariance(; alg = Gerber2()),
+               NormalisedGerberCovariance(; alg = Gerber2(),
+                                          me = SimpleExpectedReturns(; w = ew),
+                                          ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                  corrected = false,
+                                                                                  w = ew)),
+               SmythBrobyCovariance(; alg = SmythBroby0()),
+               SmythBrobyCovariance(; alg = SmythBroby0(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = PortfolioOptimisers.SimpleVariance(;
+                                                                            corrected = false,
+                                                                            w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby0()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby0(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                      corrected = false,
+                                                                                      w = ew)),
+               SmythBrobyCovariance(; alg = SmythBroby1()),
+               SmythBrobyCovariance(; alg = SmythBroby1(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = PortfolioOptimisers.SimpleVariance(;
+                                                                            corrected = false,
+                                                                            w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby1()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby1(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                      corrected = false,
+                                                                                      w = ew)),
+               SmythBrobyCovariance(; alg = SmythBroby2()),
+               SmythBrobyCovariance(; alg = SmythBroby2(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = PortfolioOptimisers.SimpleVariance(;
+                                                                            corrected = false,
+                                                                            w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby2()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby2(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                      corrected = false,
+                                                                                      w = ew)),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber0()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber0(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = PortfolioOptimisers.SimpleVariance(;
+                                                                            corrected = false,
+                                                                            w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber0()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber0(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                      corrected = false,
+                                                                                      w = ew)),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber1()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber1(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = PortfolioOptimisers.SimpleVariance(;
+                                                                            corrected = false,
+                                                                            w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber1()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber1(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                      corrected = false,
+                                                                                      w = ew)),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber2()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber2(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = PortfolioOptimisers.SimpleVariance(;
+                                                                            corrected = false,
+                                                                            w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber2()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber2(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                      corrected = false,
+                                                                                      w = ew))]
         cvrt = CSV.read(joinpath(@__DIR__,
                                  "./assets/Covariance-and-Correlation-correctness.csv"),
                         DataFrame)

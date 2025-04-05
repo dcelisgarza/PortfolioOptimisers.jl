@@ -227,7 +227,7 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     aug_posterior_mu = aug_prior_mu + v1 * (v2 \ v3)
     aug_posterior_sigma = aug_prior_sigma + tau * aug_prior_sigma -
                           v1 * (v2 \ transpose(v1))
-    fit!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
+    fit_estimator!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
     posterior_mu = aug_posterior_mu[1:size(X, 2)] .+ pe.rf .+ b
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
     return AugmentedBlackLittermanPriorModel(;

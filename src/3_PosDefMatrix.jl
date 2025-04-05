@@ -4,8 +4,8 @@ end
 function PosDefEstimator(; alg = NearestCorrelationMatrix.Newton())
     return PosDefEstimator{typeof(alg)}(alg)
 end
-function fit!(method::PosDefEstimator{<:NearestCorrelationMatrix.NCMAlgorithm},
-              X::AbstractMatrix)
+function fit_estimator!(method::PosDefEstimator{<:NearestCorrelationMatrix.NCMAlgorithm},
+                        X::AbstractMatrix)
     if isposdef(X)
         return nothing
     end
@@ -24,10 +24,10 @@ function fit!(method::PosDefEstimator{<:NearestCorrelationMatrix.NCMAlgorithm},
     end
     return nothing
 end
-function fit(method::PosDefEstimator{<:NearestCorrelationMatrix.NCMAlgorithm},
-             X::AbstractMatrix)
+function fit_estimator(method::PosDefEstimator{<:NearestCorrelationMatrix.NCMAlgorithm},
+                       X::AbstractMatrix)
     X = copy(X)
-    fit!(method, X)
+    fit_estimator!(method, X)
     return X
 end
 

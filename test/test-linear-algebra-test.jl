@@ -25,10 +25,10 @@
         sigma1 = cov(X)
         sigma2 = copy(sigma1)
         sigma3 = copy(sigma1)
-        fit!(PosDefEstimator(), sigma1)
+        fit_estimator!(PosDefEstimator(), sigma1)
         @test isposdef(sigma1)
 
-        fit!(nothing, sigma2)
+        fit_estimator!(nothing, sigma2)
         @test !isposdef(sigma2)
         @test isapprox(sigma2, sigma3)
     end
@@ -42,7 +42,7 @@
         denoise_t = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv"), DataFrame)
         for i ∈ 1:ncol(denoise_t)
             sigma1 = copy(sigma)
-            fit!(des[i], PosDefEstimator(), sigma1, q)
+            fit_estimator!(des[i], PosDefEstimator(), sigma1, q)
             MN = size(sigma1)
             res = isapprox(sigma1, reshape(denoise_t[!, i], MN))
             if !res
@@ -61,7 +61,7 @@
         detone = CSV.read(joinpath(@__DIR__, "./assets/DetoneEstimator.csv"), DataFrame)
         for i ∈ 1:ncol(detone)
             sigma1 = copy(sigma)
-            fit!(des[i], PosDefEstimator(), sigma1)
+            fit_estimator!(des[i], PosDefEstimator(), sigma1)
             MN = size(sigma1)
             res = isapprox(sigma1, reshape(detone[!, i], MN))
             if !res

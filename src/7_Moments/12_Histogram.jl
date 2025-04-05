@@ -55,17 +55,18 @@ function calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
     xil = minimum(xi) - eps(eltype(xi))
     xih = maximum(xi) + eps(eltype(xi))
 
-    hx = fit(Histogram, xj, range(xjl; stop = xjh, length = bp1)).weights
+    hx = StatsBase.fit(Histogram, xj, range(xjl; stop = xjh, length = bp1)).weights
     hx /= sum(hx)
 
-    hy = fit(Histogram, xi, range(xil; stop = xih, length = bp1)).weights
+    hy = StatsBase.fit(Histogram, xi, range(xil; stop = xih, length = bp1)).weights
     hy /= sum(hy)
 
     ex = entropy(hx)
     ey = entropy(hy)
 
-    hxy = fit(Histogram, (xj, xi),
-              (range(xjl; stop = xjh, length = bp1), range(xil; stop = xih, length = bp1))).weights
+    hxy = StatsBase.fit(Histogram, (xj, xi),
+                        (range(xjl; stop = xjh, length = bp1),
+                         range(xil; stop = xih, length = bp1))).weights
 
     return ex, ey, hxy
 end
