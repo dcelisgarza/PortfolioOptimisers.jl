@@ -294,7 +294,7 @@ for r ∈ risks
                                                                               <:Any, <:Any,
                                                                               <:AbstractMatrix,
                                                                               <:AbstractMatrix,
-                                                                              <:MatrixProcessing},
+                                                                              <:AbstractMatrixProcessingEstimator},
                                                    cluster::AbstractVector, args...;
                                                    kwargs...)
                  idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)

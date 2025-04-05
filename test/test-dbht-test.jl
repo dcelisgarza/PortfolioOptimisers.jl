@@ -276,8 +276,7 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            LoGo!(PortfolioOptimisers.LoGo(; dist = des[i]),
-                  FNPDM_NearestCorrelationMatrix(), sigma1, X)
+            fit!(PortfolioOptimisers.LoGo(; dist = des[i]), NearestPosDef(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -296,8 +295,7 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            LoGo!(PortfolioOptimisers.LoGo(; dist = des[i]),
-                  FNPDM_NearestCorrelationMatrix(), sigma1, X)
+            fit!(PortfolioOptimisers.LoGo(; dist = des[i]), NearestPosDef(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -318,9 +316,9 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            LoGo!(PortfolioOptimisers.LoGo(; dist = des[i],
-                                           sim = DBHT_ExponentialSimilarity()),
-                  FNPDM_NearestCorrelationMatrix(), sigma1, X)
+            fit!(PortfolioOptimisers.LoGo(; dist = des[i],
+                                          sim = DBHT_ExponentialSimilarity()),
+                 NearestPosDef(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -339,9 +337,9 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            LoGo!(PortfolioOptimisers.LoGo(; dist = des[i],
-                                           sim = DBHT_ExponentialSimilarity()),
-                  FNPDM_NearestCorrelationMatrix(), sigma1, X)
+            fit!(PortfolioOptimisers.LoGo(; dist = des[i],
+                                          sim = DBHT_ExponentialSimilarity()),
+                 NearestPosDef(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1

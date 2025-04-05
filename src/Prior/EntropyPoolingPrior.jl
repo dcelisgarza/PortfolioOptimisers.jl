@@ -90,9 +90,9 @@ function EntropyPoolingModel(; pm::AbstractPriorModel,
     @smart_assert(size(pm.X, 1) == length(w))
     return EntropyPoolingModel{typeof(pm), typeof(views), typeof(w)}(pm, views, w)
 end
-function moment_factory_w(pe::EntropyPoolingPriorEstimator,
+function w_moment_factory(pe::EntropyPoolingPriorEstimator,
                           w::Union{Nothing, <:AbstractWeights} = nothing)
-    return EntropyPoolingPriorEstimator(; pe = moment_factory_w(pe.pe, w), views = pe.views,
+    return EntropyPoolingPriorEstimator(; pe = w_moment_factory(pe.pe, w), views = pe.views,
                                         sets = pe.sets, alg = pe.alg, opt = pe.opt, w = w)
 end
 function Base.getproperty(obj::EntropyPoolingModel, sym::Symbol)
@@ -125,11 +125,11 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_Entrop
     end
     @smart_assert(length(w) == T)
     @smart_assert(nrow(pe.sets) == N)
-    pe = moment_factory_w(pe, w)
+    pe = w_moment_factory(pe, w)
     pm = prior(pe.pe, X, F; strict = strict, kwargs...)
     views = entropy_pooling_views(pm, pe.views, pe.sets; strict = strict)
     w = entropy_pooling(w, views, pe.opt)
-    pe = moment_factory_w(pe, w)
+    pe = w_moment_factory(pe, w)
     return EntropyPoolingModel(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
                                views = views, w = w)
 end
@@ -168,7 +168,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
     cache = Set{Int}()
     V_i = nothing
     # Compute the prior observations.
-    pe = moment_factory_w(pe, w0)
+    pe = w_moment_factory(pe, w0)
     pm = prior(pe.pe, X, F; strict = strict, kwargs...)
     for uvl ∈ uvls
         # Freeze updated parameters, ie parameters which were free in the previous iteration plus the ones which were adjusted via views. If there were no views the previous iteration, the free parameters become the new updated parameters and therefore frozen. In the first iteration, there is nothing to freeze.
@@ -191,7 +191,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
         V_i = entropy_pooling_views(pm, v, pe.sets; w = w0, strict = strict)
         # Compute the posterior observations.
         wi = entropy_pooling(_get_epw(pe.alg, w0, wi), V_i, pe.opt)
-        pe = moment_factory_w(pe, wi)
+        pe = w_moment_factory(pe, wi)
         pm = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
     return EntropyPoolingModel(; pm = pm, views = V_i, w = wi)

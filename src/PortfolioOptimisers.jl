@@ -12,6 +12,27 @@ using AverageShiftedHistograms, Clustering, Distances, Distributions, GLM, Imput
     read(path, String)
 end PortfolioOptimisers
 
+include("./1_Tools.jl")
+include("./2_Base.jl")
+include("./3_PosDefMatrix.jl")
+include("./4_Denoise.jl")
+include("./5_Detone.jl")
+include("./6_MatrixProcessing.jl")
+
+include("7_Moments/1_Base_Moments.jl")
+include("7_Moments/2_SimpleExpectedReturns.jl")
+include("7_Moments/3_PearsonCovariance.jl")
+include("7_Moments/4_FullCovariance.jl")
+include("7_Moments/5_SemiCovariance.jl")
+include("7_Moments/6_SimpleVariance.jl")
+include("7_Moments/7_BaseGerberCovariances.jl")
+include("7_Moments/8_Gerber0Covariances.jl")
+include("7_Moments/9_Gerber1Covariances.jl")
+include("7_Moments/10_Gerber2Covariances.jl")
+include("7_Moments/11_GerberCovariance_getproperty.jl")
+
+#=
+
 # Linear Algebra
 include("./LinearAlgebra/Operators.jl")
 
@@ -37,18 +58,11 @@ include("./OrderedWeightsArray/OWA.jl")
 
 # Fix Non Positive Definite
 include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_AbstractTypes.jl")
-include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_NearestCorrelationMatrix.jl")
+include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/NearestPosDef.jl")
 
 # Detone
 include("./LinearAlgebra/Detone/Detone_AbstractTypes.jl")
 include("./LinearAlgebra/Detone/Detone.jl")
-
-# Denoise
-include("./LinearAlgebra/Denoise/Denoise_AbstractTypes.jl")
-include("./LinearAlgebra/Denoise/ShrunkDenoise.jl")
-include("./LinearAlgebra/Denoise/SpectralDenoise.jl")
-include("./LinearAlgebra/Denoise/FixedDenoise.jl")
-include("./LinearAlgebra/Denoise/Denoise.jl")
 
 # Histogram
 include("./LinearAlgebra/Histogram/Histogram_AbstractTypes.jl")
@@ -186,8 +200,8 @@ include("./Network/Network_AbstractTypes.jl")
 include("./Constraints/PhilogenyConstraints.jl")
 
 # Matrix Processing
-include("./MatrixProcessing/MatrixProcessing_AbstractTypes.jl")
-include("./MatrixProcessing/DefaultMatrixProcessing.jl")
+include("./AbstractMatrixProcessingEstimator/MatrixProcessing_AbstractTypes.jl")
+include("./AbstractMatrixProcessingEstimator/DefaultMatrixProcessing.jl")
 
 # PortfolioOptimisers Covariance Estimator
 include("./Moments/Covariance/PortfolioOptimisersCovariance.jl")
@@ -368,5 +382,5 @@ include("./Optimisation/Clustering/ClusteringWeightFinaliser.jl")
 include("./Optimisation/Clustering/Hierarchical/HierarchicalOptimiser.jl")
 include("./Optimisation/Clustering/Hierarchical/HierarchicalRiskParity.jl")
 include("./Optimisation/Clustering/Hierarchical/HierarchicalEqualRiskContribution.jl")
-
+=#
 end

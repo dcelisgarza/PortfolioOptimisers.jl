@@ -1,10 +1,10 @@
-struct FullCokurtosis{T1 <: ExpectedReturnsEstimator, T2 <: MatrixProcessing} <:
-       CokurtosisEstimator
+struct FullCokurtosis{T1 <: AbstractExpectedReturnsEstimator,
+                      T2 <: AbstractMatrixProcessingEstimator} <: CokurtosisEstimator
     me::T1
     mp::T2
 end
-function FullCokurtosis(; me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
-                        mp::MatrixProcessing = DefaultMatrixProcessing())
+function FullCokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                        mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
     return FullCokurtosis{typeof(me), typeof(mp)}(me, mp)
 end
 function cokurtosis(ke::FullCokurtosis, X::AbstractMatrix; dims::Int = 1)
@@ -16,9 +16,9 @@ function cokurtosis(ke::FullCokurtosis, X::AbstractMatrix; dims::Int = 1)
     X = X .- mu
     return _cokurosis(X, ke.mp)
 end
-function moment_factory_w(ce::FullCokurtosis,
+function w_moment_factory(ce::FullCokurtosis,
                           w::Union{Nothing, <:AbstractWeights} = nothing)
-    return FullCokurtosis(; me = moment_factory_w(ce.me, w), mp = ce.mp)
+    return FullCokurtosis(; me = w_moment_factory(ce.me, w), mp = ce.mp)
 end
 
 export FullCokurtosis

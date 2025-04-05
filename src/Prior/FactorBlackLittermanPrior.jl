@@ -29,7 +29,8 @@ function Base.getproperty(obj::FactorBlackLittermanPriorModel, sym::Symbol)
     end
 end
 struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
-                                          T2 <: MatrixProcessing, T3 <: MatrixProcessing,
+                                          T2 <: AbstractMatrixProcessingEstimator,
+                                          T3 <: AbstractMatrixProcessingEstimator,
                                           T4 <: RegressionMethod,
                                           T5 <: PortfolioOptimisersVarianceEstimator,
                                           T6 <: Union{<:BlackLittermanView,
@@ -56,8 +57,8 @@ struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
 end
 function FactorBlackLittermanPriorEstimator(;
                                             pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
-                                            f_mp::MatrixProcessing = DefaultMatrixProcessing(),
-                                            mp::MatrixProcessing = DefaultMatrixProcessing(),
+                                            f_mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                                            mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                             re::RegressionMethod = ForwardRegression(),
                                             ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                                             views::Union{<:BlackLittermanView,
@@ -90,11 +91,11 @@ function FactorBlackLittermanPriorEstimator(;
                                                            sets, rf, residuals, views_conf,
                                                            w, l, tau)
 end
-function moment_factory_w(pe::FactorBlackLittermanPriorEstimator,
+function w_moment_factory(pe::FactorBlackLittermanPriorEstimator,
                           w::Union{Nothing, <:AbstractWeights} = nothing)
-    return FactorBlackLittermanPriorEstimator(; pe = moment_factory_w(pe.pe, w),
+    return FactorBlackLittermanPriorEstimator(; pe = w_moment_factory(pe.pe, w),
                                               f_mp = pe.f_mp, mp = pe.mp, re = pe.re,
-                                              ve = moment_factory_w(pe.ve, w),
+                                              ve = w_moment_factory(pe.ve, w),
                                               views = pe.views, sets = pe.sets, rf = pe.rf,
                                               residuals = pe.residuals,
                                               views_conf = pe.views_conf, w = pe.w,
@@ -152,11 +153,11 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
     v3 = f_Q .- f_P * f_prior_mu
     f_posterior_mu = f_prior_mu + v1 * (v2 \ v3) .+ pe.rf
     f_posterior_sigma = f_prior_sigma + tau * f_prior_sigma - v1 * (v2 \ transpose(v1))
-    mtx_process!(pe.f_mp, f_posterior_sigma, F)
+    fit!(pe.f_mp, f_posterior_sigma, F)
     # Reconstruct the posteriors using the black litterman adjusted factor statistics.
     posterior_mu = M * f_posterior_mu .+ b
     posterior_sigma = M * f_posterior_sigma * transpose(M)
-    mtx_process!(pe.mp, posterior_sigma, posterior_X)
+    fit!(pe.mp, posterior_sigma, posterior_X)
     posterior_csigma = M * cholesky(f_posterior_sigma).L
     if pe.residuals
         err = X - posterior_X

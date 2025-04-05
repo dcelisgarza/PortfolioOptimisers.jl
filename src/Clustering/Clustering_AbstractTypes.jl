@@ -1,4 +1,3 @@
-abstract type PhilogenyEstimator end
 abstract type ClusteringAlgorithm end
 abstract type AbstractClusteringEstimator <: PhilogenyEstimator end
 abstract type AbstractPortfolioOptimisersClusteringResult <: Clustering.ClusteringResult end

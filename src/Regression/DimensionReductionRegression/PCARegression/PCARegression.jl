@@ -1,11 +1,11 @@
-struct PCARegression{T1 <: ExpectedReturnsEstimator,
+struct PCARegression{T1 <: AbstractExpectedReturnsEstimator,
                      T2 <: PortfolioOptimisersVarianceEstimator, T3 <: AbstractPCATarget} <:
        DimensionReductionRegression
     me::T1
     ve::T2
     target::T3
 end
-function PCARegression(; me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
+function PCARegression(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                        ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                        target::AbstractPCATarget = PCATarget())
     return PCARegression{typeof(me), typeof(ve), typeof(target)}(me, ve, target)

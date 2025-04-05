@@ -10,22 +10,23 @@ function EmpiricalPriorModel(; X::AbstractMatrix, mu::AbstractVector, sigma::Abs
     issquare(sigma)
     return EmpiricalPriorModel{typeof(X), typeof(mu), typeof(sigma)}(X, mu, sigma)
 end
-struct EmpiricalPriorEstimator{T1 <: ExpectedReturnsEstimator,
+struct EmpiricalPriorEstimator{T1 <: AbstractExpectedReturnsEstimator,
                                T2 <: StatsBase.CovarianceEstimator,
                                T3 <: Union{Nothing, <:Real}} <: AbstractPriorEstimator_1_0
     me::T1
     ce::T2
     horizon::T3
 end
-function EmpiricalPriorEstimator(; me::ExpectedReturnsEstimator = SimpleExpectedReturns(),
+function EmpiricalPriorEstimator(;
+                                 me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                  ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                  horizon::Union{Nothing, <:Real} = nothing)
     return EmpiricalPriorEstimator{typeof(me), typeof(ce), typeof(horizon)}(me, ce, horizon)
 end
-function moment_factory_w(pe::EmpiricalPriorEstimator,
+function w_moment_factory(pe::EmpiricalPriorEstimator,
                           w::Union{Nothing, <:AbstractWeights} = nothing)
-    return EmpiricalPriorEstimator(; me = moment_factory_w(pe.me, w),
-                                   ce = moment_factory_w(pe.ce, w), horizon = pe.horizon)
+    return EmpiricalPriorEstimator(; me = w_moment_factory(pe.me, w),
+                                   ce = w_moment_factory(pe.ce, w), horizon = pe.horizon)
 end
 function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, Nothing}, X::AbstractMatrix,
                args...; dims::Int = 1, kwargs...)

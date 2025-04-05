@@ -39,8 +39,8 @@ function Base.getproperty(obj::FactorPriorModel, sym::Symbol)
         getfield(obj, sym)
     end
 end
-struct FactorPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1, T2 <: MatrixProcessing,
-                            T3 <: RegressionMethod,
+struct FactorPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
+                            T2 <: AbstractMatrixProcessingEstimator, T3 <: RegressionMethod,
                             T4 <: PortfolioOptimisersVarianceEstimator, T5 <: Bool} <:
        AbstractPriorEstimator_2_1
     pe::T1
@@ -51,17 +51,17 @@ struct FactorPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1, T2 <: MatrixPro
 end
 function FactorPriorEstimator(;
                               pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
-                              mp::MatrixProcessing = DefaultMatrixProcessing(),
+                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                               re::RegressionMethod = ForwardRegression(),
                               ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                               residuals::Bool = true)
     return FactorPriorEstimator{typeof(pe), typeof(mp), typeof(re), typeof(ve),
                                 typeof(residuals)}(pe, mp, re, ve, residuals)
 end
-function moment_factory_w(pe::FactorPriorEstimator,
+function w_moment_factory(pe::FactorPriorEstimator,
                           w::Union{Nothing, <:AbstractWeights} = nothing)
-    return FactorPriorEstimator(; pe = moment_factory_w(pe.pe, w), mp = pe.mp, re = pe.re,
-                                ve = moment_factory_w(pe.ve, w), residuals = pe.residuals)
+    return FactorPriorEstimator(; pe = w_moment_factory(pe.pe, w), mp = pe.mp, re = pe.re,
+                                ve = w_moment_factory(pe.ve, w), residuals = pe.residuals)
 end
 function Base.getproperty(obj::FactorPriorEstimator, sym::Symbol)
     return if sym == :me
@@ -86,7 +86,7 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
     posterior_X = F * transpose(M) .+ transpose(b)
     posterior_mu = M * f_mu .+ b
     posterior_sigma = M * f_sigma * transpose(M)
-    mtx_process!(pe.mp, posterior_sigma, posterior_X)
+    fit!(pe.mp, posterior_sigma, posterior_X)
     posterior_csigma = M * cholesky(f_sigma).L
     if pe.residuals
         err = X - posterior_X

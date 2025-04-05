@@ -29,7 +29,7 @@ function Base.getproperty(obj::BayesianBlackLittermanPriorModel, sym::Symbol)
     end
 end
 struct BayesianBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_2,
-                                            T2 <: MatrixProcessing,
+                                            T2 <: AbstractMatrixProcessingEstimator,
                                             T3 <: Union{<:BlackLittermanView,
                                                         <:AbstractVector{<:BlackLittermanView}},
                                             T4 <: DataFrame, T5 <: Real,
@@ -48,7 +48,7 @@ function BayesianBlackLittermanPriorEstimator(;
                                               pe::AbstractPriorEstimatorMap_2_2 = FactorPriorEstimator(;
                                                                                                        pe = EmpiricalPriorEstimator(;
                                                                                                                                     me = EquilibriumExpectedReturns())),
-                                              mp::MatrixProcessing = DefaultMatrixProcessing(),
+                                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                               views::Union{<:BlackLittermanView,
                                                            <:AbstractVector{<:BlackLittermanView}},
                                               sets::DataFrame = DataFrame(), rf::Real = 0.0,
@@ -76,9 +76,9 @@ function BayesianBlackLittermanPriorEstimator(;
                                                                                  views_conf,
                                                                                  tau)
 end
-function moment_factory_w(pe::BayesianBlackLittermanPriorEstimator,
+function w_moment_factory(pe::BayesianBlackLittermanPriorEstimator,
                           w::Union{Nothing, <:AbstractWeights} = nothing)
-    return BayesianBlackLittermanPriorEstimator(; pe = moment_factory_w(pe.pe, w),
+    return BayesianBlackLittermanPriorEstimator(; pe = w_moment_factory(pe.pe, w),
                                                 mp = pe.mp, views = pe.views,
                                                 sets = pe.sets, rf = pe.rf,
                                                 views_conf = pe.views_conf, tau = pe.tau)
@@ -125,7 +125,7 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     v2 = sigma_hat + transpose(M) * v1
     v3 = inv(prior_sigma)
     posterior_sigma = inv(v3 - v1 * (v2 \ transpose(M)) * v3)
-    mtx_process!(pe.mp, posterior_sigma, posterior_X)
+    fit!(pe.mp, posterior_sigma, posterior_X)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat) .+ pe.rf .+ b
     return BayesianBlackLittermanPriorModel(;
                                             pm = EmpiricalPriorModel(; X = posterior_X,

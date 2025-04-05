@@ -3,10 +3,10 @@ struct HighOrderPriorModel{T1 <: AbstractLowOrderPriorModel,
                            T3 <: Union{Nothing, <:AbstractMatrix},
                            T4 <: Union{Nothing, <:AbstractMatrix},
                            T5 <: Union{Nothing, <:AbstractMatrix},
-                           T6 <: Union{Nothing, <:MatrixProcessing},
+                           T6 <: Union{Nothing, <:AbstractMatrixProcessingEstimator},
                            T7 <: Union{Nothing, <:AbstractMatrix},
                            T8 <: Union{Nothing, <:AbstractMatrix},
-                           T9 <: Union{Nothing, <:MatrixProcessing}} <:
+                           T9 <: Union{Nothing, <:AbstractMatrixProcessingEstimator}} <:
        AbstractHighOrderPriorModel
     pm::T1
     kt::T2
@@ -22,11 +22,11 @@ function HighOrderPriorModel(; pm::AbstractLowOrderPriorModel,
                              kt::Union{Nothing, <:AbstractMatrix},
                              skt::Union{Nothing, <:AbstractMatrix},
                              sk::Union{Nothing, <:AbstractMatrix},
-                             skmp::Union{Nothing, <:MatrixProcessing},
+                             skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator},
                              V::Union{Nothing, <:AbstractMatrix},
                              ssk::Union{Nothing, <:AbstractMatrix},
                              SV::Union{Nothing, <:AbstractMatrix},
-                             sskmp::Union{Nothing, <:MatrixProcessing})
+                             sskmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
     if isa(kt, AbstractMatrix)
         @smart_assert(!isempty(kt))
         issquare(kt)
@@ -95,13 +95,13 @@ struct HighOrderPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
     ske::T4
     sske::T5
 end
-function moment_factory_w(pe::HighOrderPriorEstimator,
+function w_moment_factory(pe::HighOrderPriorEstimator,
                           w::Union{Nothing, <:AbstractWeights} = nothing)
-    return HighOrderPriorEstimator(; pe = moment_factory_w(pe.pe, w),
-                                   kte = moment_factory_w(pe.kte, w),
-                                   skte = moment_factory_w(pe.skte, w),
-                                   ske = moment_factory_w(pe.ske, w),
-                                   sske = moment_factory_w(pe.sske, w))
+    return HighOrderPriorEstimator(; pe = w_moment_factory(pe.pe, w),
+                                   kte = w_moment_factory(pe.kte, w),
+                                   skte = w_moment_factory(pe.skte, w),
+                                   ske = w_moment_factory(pe.ske, w),
+                                   sske = w_moment_factory(pe.sske, w))
 end
 function HighOrderPriorEstimator(;
                                  pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),

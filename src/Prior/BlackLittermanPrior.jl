@@ -20,7 +20,7 @@ function Base.getproperty(obj::BlackLittermanPriorModel, sym::Symbol)
     end
 end
 struct BlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
-                                    T2 <: MatrixProcessing,
+                                    T2 <: AbstractMatrixProcessingEstimator,
                                     T3 <: Union{<:BlackLittermanView,
                                                 <:AbstractVector{<:BlackLittermanView}},
                                     T4 <: DataFrame, T5 <: Real,
@@ -47,7 +47,7 @@ end
 function BlackLittermanPriorEstimator(;
                                       pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(;
                                                                                                       me = EquilibriumExpectedReturns()),
-                                      mp::MatrixProcessing = DefaultMatrixProcessing(),
+                                      mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                       views::Union{<:BlackLittermanView,
                                                    <:AbstractVector{<:BlackLittermanView}},
                                       sets::DataFrame = DataFrame(), rf::Real = 0.0,
@@ -75,9 +75,9 @@ function BlackLittermanPriorEstimator(;
                                                                                      views_conf,
                                                                                      tau)
 end
-function moment_factory_w(pe::BlackLittermanPriorEstimator,
+function w_moment_factory(pe::BlackLittermanPriorEstimator,
                           w::Union{Nothing, <:AbstractWeights} = nothing)
-    return BlackLittermanPriorEstimator(; pe = moment_factory_w(pe.pe, w), mp = pe.mp,
+    return BlackLittermanPriorEstimator(; pe = w_moment_factory(pe.pe, w), mp = pe.mp,
                                         views = pe.views, sets = pe.sets, rf = pe.rf,
                                         views_conf = pe.views_conf, tau = pe.tau)
 end
@@ -114,7 +114,7 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
     v3 = Q .- P * prior_mu
     posterior_mu = prior_mu + v1 * (v2 \ v3) .+ pe.rf
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
-    mtx_process!(pe.mp, posterior_sigma, posterior_X)
+    fit!(pe.mp, posterior_sigma, posterior_X)
     return BlackLittermanPriorModel(;
                                     pm = EmpiricalPriorModel(; X = posterior_X,
                                                              mu = posterior_mu,

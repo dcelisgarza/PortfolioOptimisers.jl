@@ -1,4 +1,4 @@
-function LoGo!(::Nothing, args...; kwargs...)
+function fit!(::Nothing, args...; kwargs...)
     return nothing
 end
 struct LoGo{T1 <: PortfolioOptimisersUnionDistanceMetric, T2 <: SimilarityMatrixEstimator}
@@ -17,8 +17,8 @@ end
 function LoGo_dist_assert(args...)
     return nothing
 end
-function LoGo!(je::LoGo, fnpdm::Union{Nothing, <:FixNonPositiveDefiniteMatrix},
-               sigma::AbstractMatrix, X::AbstractMatrix; dims::Int = 1)
+function fit!(je::LoGo, pdm::Union{Nothing, <:PosDefMatrixEstimator}, sigma::AbstractMatrix,
+              X::AbstractMatrix; dims::Int = 1)
     issquare(sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
@@ -33,8 +33,8 @@ function LoGo!(je::LoGo, fnpdm::Union{Nothing, <:FixNonPositiveDefiniteMatrix},
     S = dbht_similarity(je.sim, S, D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
     sigma .= J_LoGo(sigma, separators, cliques) \ I
-    fix_non_positive_definite_matrix!(fnpdm, sigma)
+    fit!(pdm, sigma)
     return nothing
 end
 
-export LoGo!, LoGo
+export fit!, LoGo

@@ -17,8 +17,8 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass, 
             sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
         end
     end
-    fix_non_positive_definite_matrix!(ue.pe.ce.mp.fnpdm, sigma_l)
-    fix_non_positive_definite_matrix!(ue.pe.ce.mp.fnpdm, sigma_u)
+    fit!(ue.pe.ce.mp.pdm, sigma_l)
+    fit!(ue.pe.ce.mp.pdm, sigma_u)
     mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma_mu)) * 2
     mu_l = range(; start = zero(eltype(sigma)), stop = zero(eltype(sigma)), length = N)
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
@@ -54,7 +54,7 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetC
             sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
         end
     end
-    fix_non_positive_definite_matrix!(ue.pe.ce.mp.fnpdm, sigma_l)
-    fix_non_positive_definite_matrix!(ue.pe.ce.mp.fnpdm, sigma_u)
+    fit!(ue.pe.ce.mp.pdm, sigma_l)
+    fit!(ue.pe.ce.mp.pdm, sigma_u)
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end

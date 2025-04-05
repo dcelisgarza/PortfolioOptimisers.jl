@@ -36,7 +36,8 @@ function Base.getproperty(obj::AugmentedBlackLittermanPriorModel, sym::Symbol)
 end
 struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
                                              T2 <: AbstractPriorEstimatorMap_2_1,
-                                             T3 <: MatrixProcessing, T4 <: RegressionMethod,
+                                             T3 <: AbstractMatrixProcessingEstimator,
+                                             T4 <: RegressionMethod,
                                              T5 <: PortfolioOptimisersVarianceEstimator,
                                              T6 <: Union{<:BlackLittermanView,
                                                          <:AbstractVector{<:BlackLittermanView}},
@@ -68,7 +69,7 @@ end
 function AugmentedBlackLittermanPriorEstimator(;
                                                a_pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                                                f_pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
-                                               mp::MatrixProcessing = DefaultMatrixProcessing(),
+                                               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                                re::RegressionMethod = ForwardRegression(),
                                                ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
                                                a_views::Union{<:BlackLittermanView,
@@ -136,12 +137,12 @@ function AugmentedBlackLittermanPriorEstimator(;
                                                                                     w, l,
                                                                                     tau)
 end
-function moment_factory_w(pe::AugmentedBlackLittermanPriorEstimator,
+function w_moment_factory(pe::AugmentedBlackLittermanPriorEstimator,
                           w::Union{Nothing, <:AbstractWeights} = nothing)
-    return AugmentedBlackLittermanPriorEstimator(; a_pe = moment_factory_w(pe.a_pe, w),
-                                                 f_pe = moment_factory_w(pe.f_pe, w),
+    return AugmentedBlackLittermanPriorEstimator(; a_pe = w_moment_factory(pe.a_pe, w),
+                                                 f_pe = w_moment_factory(pe.f_pe, w),
                                                  mp = pe.mp, re = pe.re,
-                                                 ve = moment_factory_w(pe.ve, w),
+                                                 ve = w_moment_factory(pe.ve, w),
                                                  a_views = pe.a_views, f_views = pe.f_views,
                                                  a_sets = pe.a_sets, f_sets = pe.f_sets,
                                                  rf = pe.rf, a_views_conf = pe.a_views_conf,
@@ -226,7 +227,7 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     aug_posterior_mu = aug_prior_mu + v1 * (v2 \ v3)
     aug_posterior_sigma = aug_prior_sigma + tau * aug_prior_sigma -
                           v1 * (v2 \ transpose(v1))
-    mtx_process!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
+    fit!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
     posterior_mu = aug_posterior_mu[1:size(X, 2)] .+ pe.rf .+ b
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
     return AugmentedBlackLittermanPriorModel(;

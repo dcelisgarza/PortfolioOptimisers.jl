@@ -1,4 +1,5 @@
-struct NegativeQuadraticSemiSkewness{T1 <: RiskMeasureSettings, T2 <: MatrixProcessing,
+struct NegativeQuadraticSemiSkewness{T1 <: RiskMeasureSettings,
+                                     T2 <: AbstractMatrixProcessingEstimator,
                                      T3 <: Union{Nothing, <:AbstractMatrix},
                                      T4 <: Union{Nothing, <:AbstractMatrix}} <:
        SkewRiskMeasure
@@ -9,7 +10,7 @@ struct NegativeQuadraticSemiSkewness{T1 <: RiskMeasureSettings, T2 <: MatrixProc
 end
 function NegativeQuadraticSemiSkewness(;
                                        settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                       mp::MatrixProcessing = NonPositiveDefiniteMatrixProcessing(),
+                                       mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
                                        sk::Union{Nothing, <:AbstractMatrix} = nothing,
                                        V::Union{Nothing, <:AbstractMatrix} = nothing)
     sk_flag = isnothing(sk)
