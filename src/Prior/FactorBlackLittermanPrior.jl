@@ -91,12 +91,12 @@ function FactorBlackLittermanPriorEstimator(;
                                                            sets, rf, residuals, views_conf,
                                                            w, l, tau)
 end
-function w_moment_factory(pe::FactorBlackLittermanPriorEstimator,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return FactorBlackLittermanPriorEstimator(; pe = w_moment_factory(pe.pe, w),
-                                              f_mp = pe.f_mp, mp = pe.mp, re = pe.re,
-                                              ve = w_moment_factory(pe.ve, w),
-                                              views = pe.views, sets = pe.sets, rf = pe.rf,
+function factory(pe::FactorBlackLittermanPriorEstimator,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return FactorBlackLittermanPriorEstimator(; pe = factory(pe.pe, w), f_mp = pe.f_mp,
+                                              mp = pe.mp, re = pe.re,
+                                              ve = factory(pe.ve, w), views = pe.views,
+                                              sets = pe.sets, rf = pe.rf,
                                               residuals = pe.residuals,
                                               views_conf = pe.views_conf, w = pe.w,
                                               l = pe.l, tau = pe.tau)

@@ -58,10 +58,9 @@ function FactorPriorEstimator(;
     return FactorPriorEstimator{typeof(pe), typeof(mp), typeof(re), typeof(ve),
                                 typeof(residuals)}(pe, mp, re, ve, residuals)
 end
-function w_moment_factory(pe::FactorPriorEstimator,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return FactorPriorEstimator(; pe = w_moment_factory(pe.pe, w), mp = pe.mp, re = pe.re,
-                                ve = w_moment_factory(pe.ve, w), residuals = pe.residuals)
+function factory(pe::FactorPriorEstimator, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return FactorPriorEstimator(; pe = factory(pe.pe, w), mp = pe.mp, re = pe.re,
+                                ve = factory(pe.ve, w), residuals = pe.residuals)
 end
 function Base.getproperty(obj::FactorPriorEstimator, sym::Symbol)
     return if sym == :me

@@ -24,10 +24,9 @@ function StatsBase.var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mea
         var(X, ve.w, dims; corrected = ve.corrected, mean = mu)
     end
 end
-function w_moment_factory(ve::SimpleVariance,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return SimpleVariance(; me = w_moment_factory(ve.me, w), corrected = ve.corrected,
-                          w = w)
+function factory(ve::SimpleVariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return SimpleVariance(; me = factory(ve.me, w), corrected = ve.corrected,
+                          w = isnothing(w) ? ve.w : w)
 end
 
 export SimpleVariance

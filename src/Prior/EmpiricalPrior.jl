@@ -23,10 +23,10 @@ function EmpiricalPriorEstimator(;
                                  horizon::Union{Nothing, <:Real} = nothing)
     return EmpiricalPriorEstimator{typeof(me), typeof(ce), typeof(horizon)}(me, ce, horizon)
 end
-function w_moment_factory(pe::EmpiricalPriorEstimator,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return EmpiricalPriorEstimator(; me = w_moment_factory(pe.me, w),
-                                   ce = w_moment_factory(pe.ce, w), horizon = pe.horizon)
+function factory(pe::EmpiricalPriorEstimator,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return EmpiricalPriorEstimator(; me = factory(pe.me, w), ce = factory(pe.ce, w),
+                                   horizon = pe.horizon)
 end
 function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, Nothing}, X::AbstractMatrix,
                args...; dims::Int = 1, kwargs...)

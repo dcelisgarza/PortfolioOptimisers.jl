@@ -9,8 +9,8 @@ function LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
     @smart_assert(zero(alpha) < alpha < one(alpha))
     return LTDCovariance{typeof(ve), typeof(alpha)}(ve, alpha)
 end
-function w_moment_factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return LTDCovariance(; ve = w_moment_factory(ce.ve, w), alpha = ce.alpha)
+function factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return LTDCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha)
 end
 function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05)
     T, N = size(X)

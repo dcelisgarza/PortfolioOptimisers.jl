@@ -137,12 +137,11 @@ function AugmentedBlackLittermanPriorEstimator(;
                                                                                     w, l,
                                                                                     tau)
 end
-function w_moment_factory(pe::AugmentedBlackLittermanPriorEstimator,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return AugmentedBlackLittermanPriorEstimator(; a_pe = w_moment_factory(pe.a_pe, w),
-                                                 f_pe = w_moment_factory(pe.f_pe, w),
-                                                 mp = pe.mp, re = pe.re,
-                                                 ve = w_moment_factory(pe.ve, w),
+function factory(pe::AugmentedBlackLittermanPriorEstimator,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return AugmentedBlackLittermanPriorEstimator(; a_pe = factory(pe.a_pe, w),
+                                                 f_pe = factory(pe.f_pe, w), mp = pe.mp,
+                                                 re = pe.re, ve = factory(pe.ve, w),
                                                  a_views = pe.a_views, f_views = pe.f_views,
                                                  a_sets = pe.a_sets, f_sets = pe.f_sets,
                                                  rf = pe.rf, a_views_conf = pe.a_views_conf,

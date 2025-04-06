@@ -90,9 +90,8 @@ function StatsBase.cov(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, k
     std_vec = std(ce.ve, X; dims = 1)
     return gerber(ce, X, std_vec) .* (std_vec ⊗ std_vec)
 end
-function w_moment_factory(ce::GerberCovariance,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return GerberCovariance(; alg = ce.alg, ve = w_moment_factory(ce.ve, w), pdm = ce.pdm,
+function factory(ce::GerberCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return GerberCovariance(; alg = ce.alg, ve = factory(ce.ve, w), pdm = ce.pdm,
                             threshold = ce.threshold)
 end
 struct NormalisedGerberCovariance{T1 <: GerberCovarianceAlgorithm,
@@ -114,10 +113,10 @@ function NormalisedGerberCovariance(; alg::GerberCovarianceAlgorithm = Gerber1()
     return NormalisedGerberCovariance{typeof(alg), typeof(me), typeof(ve), typeof(pdm),
                                       typeof(threshold)}(alg, me, ve, pdm, threshold)
 end
-function w_moment_factory(ce::NormalisedGerberCovariance,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return NormalisedGerberCovariance(; alg = ce.alg, me = w_moment_factory(ce.me, w),
-                                      ve = w_moment_factory(ce.ve, w), pdm = ce.pdm,
+function factory(ce::NormalisedGerberCovariance,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return NormalisedGerberCovariance(; alg = ce.alg, me = factory(ce.me, w),
+                                      ve = factory(ce.ve, w), pdm = ce.pdm,
                                       threshold = ce.threshold)
 end
 function gerber(ce::NormalisedGerberCovariance{<:Gerber0, <:Any, <:Any, <:Any, <:Any},

@@ -16,9 +16,8 @@ function cokurtosis(ke::SemiCokurtosis, X::AbstractMatrix; dims::Int = 1)
     X = min.(X .- mu, zero(eltype(X)))
     return _cokurosis(X, ke.mp)
 end
-function w_moment_factory(ce::SemiCokurtosis,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return SemiCokurtosis(; me = w_moment_factory(ce.me, w), mp = ce.mp)
+function factory(ce::SemiCokurtosis, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return SemiCokurtosis(; me = factory(ce.me, w), mp = ce.mp)
 end
 
 export SemiCokurtosis

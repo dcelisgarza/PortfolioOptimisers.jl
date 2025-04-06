@@ -20,9 +20,8 @@ function StatsBase.cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1, 
     std_vec = std(ce.ve, X; dims = 1)
     return corkendall(X) .* (std_vec ⊗ std_vec)
 end
-function w_moment_factory(ce::KendallCovariance,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return KendallCovariance(; ve = w_moment_factory(ce.ve, w))
+function factory(ce::KendallCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return KendallCovariance(; ve = factory(ce.ve, w))
 end
 struct SpearmanCovariance{T1 <: AbstractVarianceEstimator} <: RankCovarianceEstimator
     ve::T1
@@ -45,9 +44,8 @@ function StatsBase.cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1,
     std_vec = std(ce.ve, X; dims = 1)
     return corspearman(X) .* (std_vec ⊗ std_vec)
 end
-function w_moment_factory(ce::SpearmanCovariance,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return SpearmanCovariance(; ve = w_moment_factory(ce.ve, w))
+function factory(ce::SpearmanCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return SpearmanCovariance(; ve = factory(ce.ve, w))
 end
 
 export KendallCovariance, SpearmanCovariance

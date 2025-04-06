@@ -90,10 +90,9 @@ function StatsBase.mean(me::ShrunkExpectedReturns{<:BodnarOkhrinParolya, <:Any, 
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
 end
-function w_moment_factory(ce::ShrunkExpectedReturns,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return ShrunkExpectedReturns(; me = w_moment_factory(ce.me, w),
-                                 ce = w_moment_factory(ce.ce, w), target = ce.target)
+function factory(ce::ShrunkExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return ShrunkExpectedReturns(; me = factory(ce.me, w), ce = factory(ce.ce, w),
+                                 target = ce.target)
 end
 
 export GrandMean, VolatilityWeighted, MeanSquareError, JamesStein, BayesStein,

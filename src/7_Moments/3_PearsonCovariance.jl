@@ -30,9 +30,9 @@ function StatsBase.cor(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::I
         robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean)
     end
 end
-function w_moment_factory(ce::GeneralWeightedCovariance,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return GeneralWeightedCovariance(; ce = ce.ce, w = w)
+function factory(ce::GeneralWeightedCovariance,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return GeneralWeightedCovariance(; ce = ce.ce, w = isnothing(w) ? ce.w : w)
 end
 struct Covariance{T1 <: AbstractPearsonCovarianceAlgorithm,
                   T2 <: AbstractExpectedReturnsEstimator,
@@ -46,9 +46,8 @@ function Covariance(; alg::AbstractPearsonCovarianceAlgorithm = FullCovariance()
                     ce::GeneralWeightedCovariance = GeneralWeightedCovariance())
     return Covariance{typeof(alg), typeof(me), typeof(ce)}(alg, me, ce)
 end
-function w_moment_factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return Covariance(; alg = ce.alg, me = w_moment_factory(ce.me, w),
-                      ce = w_moment_factory(ce.ce, w))
+function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return Covariance(; alg = ce.alg, me = factory(ce.me, w), ce = factory(ce.ce, w))
 end
 function StatsBase.cov(ce::Covariance{<:FullCovariance, <:Any, <:Any}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)

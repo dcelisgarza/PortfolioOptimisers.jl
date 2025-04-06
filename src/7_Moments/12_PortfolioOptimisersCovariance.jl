@@ -8,9 +8,9 @@ function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covar
                                        mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
     return PortfolioOptimisersCovariance{typeof(ce), typeof(mp)}(ce, mp)
 end
-function w_moment_factory(ce::PortfolioOptimisersCovariance,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return PortfolioOptimisersCovariance(; ce = w_moment_factory(ce.ce, w), mp = ce.mp)
+function factory(ce::PortfolioOptimisersCovariance,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 function StatsBase.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
                        kwargs...)

@@ -14,9 +14,9 @@ function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                                                                                      kwargs,
                                                                                      w)
 end
-function w_moment_factory(ce::DistanceCovariance,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs, w = w)
+function factory(ce::DistanceCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs,
+                              w = isnothing(w) ? ce.w : w)
 end
 function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
     N = length(v1)

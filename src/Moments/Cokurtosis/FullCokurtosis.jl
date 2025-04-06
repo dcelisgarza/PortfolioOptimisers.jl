@@ -16,9 +16,8 @@ function cokurtosis(ke::FullCokurtosis, X::AbstractMatrix; dims::Int = 1)
     X = X .- mu
     return _cokurosis(X, ke.mp)
 end
-function w_moment_factory(ce::FullCokurtosis,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return FullCokurtosis(; me = w_moment_factory(ce.me, w), mp = ce.mp)
+function factory(ce::FullCokurtosis, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return FullCokurtosis(; me = factory(ce.me, w), mp = ce.mp)
 end
 
 export FullCokurtosis

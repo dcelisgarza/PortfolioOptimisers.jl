@@ -11,9 +11,8 @@ end
 function StatsBase.mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1)
     return mean(me.me, X; dims = dims) .- me.rf
 end
-function w_moment_factory(me::ExcessExpectedReturns,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return ExcessExpectedReturns(; me = w_moment_factory(me.me, w), rf = me.rf)
+function factory(me::ExcessExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
 
 export ExcessExpectedReturns

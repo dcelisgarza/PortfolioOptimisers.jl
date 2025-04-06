@@ -95,13 +95,11 @@ struct HighOrderPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
     ske::T4
     sske::T5
 end
-function w_moment_factory(pe::HighOrderPriorEstimator,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return HighOrderPriorEstimator(; pe = w_moment_factory(pe.pe, w),
-                                   kte = w_moment_factory(pe.kte, w),
-                                   skte = w_moment_factory(pe.skte, w),
-                                   ske = w_moment_factory(pe.ske, w),
-                                   sske = w_moment_factory(pe.sske, w))
+function factory(pe::HighOrderPriorEstimator,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
+                                   skte = factory(pe.skte, w), ske = factory(pe.ske, w),
+                                   sske = factory(pe.sske, w))
 end
 function HighOrderPriorEstimator(;
                                  pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),

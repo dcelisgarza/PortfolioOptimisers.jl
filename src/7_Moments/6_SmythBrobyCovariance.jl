@@ -57,10 +57,9 @@ function SmythBrobyCovariance(; alg::SmythBrobyCovarianceAlgorithm = SmythBrobyG
                                 typeof(threshold), typeof(c1), typeof(c2), typeof(c3),
                                 typeof(n)}(alg, me, ve, pdm, threshold, c1, c2, c3, n)
 end
-function w_moment_factory(ce::SmythBrobyCovariance,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return SmythBrobyCovariance(; alg = ce.alg, me = w_moment_factory(ce.me, w),
-                                ve = w_moment_factory(ce.ve, w), pdm = ce.pdm,
+function factory(ce::SmythBrobyCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return SmythBrobyCovariance(; alg = ce.alg, me = factory(ce.me, w),
+                                ve = factory(ce.ve, w), pdm = ce.pdm,
                                 threshold = ce.threshold, c1 = ce.c1, c2 = ce.c2,
                                 c3 = ce.c3, n = ce.n)
 end
@@ -378,10 +377,10 @@ function NormalisedSmythBrobyCovariance(;
                                           typeof(c3), typeof(n)}(alg, me, ve, pdm,
                                                                  threshold, c1, c2, c3, n)
 end
-function w_moment_factory(ce::NormalisedSmythBrobyCovariance,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return NormalisedSmythBrobyCovariance(; alg = ce.alg, me = w_moment_factory(ce.me, w),
-                                          ve = w_moment_factory(ce.ve, w), pdm = ce.pdm,
+function factory(ce::NormalisedSmythBrobyCovariance,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return NormalisedSmythBrobyCovariance(; alg = ce.alg, me = factory(ce.me, w),
+                                          ve = factory(ce.ve, w), pdm = ce.pdm,
                                           threshold = ce.threshold, c1 = ce.c1, c2 = ce.c2,
                                           c3 = ce.c3, n = ce.n)
 end
