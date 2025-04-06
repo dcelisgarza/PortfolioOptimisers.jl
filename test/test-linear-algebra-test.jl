@@ -38,8 +38,8 @@
         T, N = size(X)
         q = T / N
         sigma = cov(X)
-        des = [nothing, Denoise(; alg = Fixed()), Denoise(; alg = Shrunk()),
-               Denoise(; alg = Spectral())]
+        des = [nothing, Denoise(; alg = FixedDenoise()), Denoise(; alg = ShrunkDenoise()),
+               Denoise(; alg = SpectralDenoise())]
         denoise_t = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv"), DataFrame)
         for i ∈ 1:ncol(denoise_t)
             sigma1 = copy(sigma)

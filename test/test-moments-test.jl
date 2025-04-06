@@ -13,6 +13,60 @@
             end
         end
     end
+    @testset "Expected Returns" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 20)
+        ew = eweights(1:1000, 0.01; scale = true)
+        mes = [SimpleExpectedReturns(), SimpleExpectedReturns(; w = ew),
+               ShrunkExpectedReturns(; alg = JamesStein()),
+               ShrunkExpectedReturns(; alg = JamesStein(), target = VolatilityWeighted()),
+               ShrunkExpectedReturns(; alg = JamesStein(), target = MeanSquareError()),
+               ShrunkExpectedReturns(; alg = JamesStein(),
+                                     me = SimpleExpectedReturns(; w = ew)),
+               ShrunkExpectedReturns(; alg = JamesStein(),
+                                     me = SimpleExpectedReturns(; w = ew),
+                                     target = VolatilityWeighted()),
+               ShrunkExpectedReturns(; alg = JamesStein(),
+                                     me = SimpleExpectedReturns(; w = ew),
+                                     target = MeanSquareError()),
+               ShrunkExpectedReturns(; alg = BayesStein()),
+               ShrunkExpectedReturns(; alg = BayesStein(), target = VolatilityWeighted()),
+               ShrunkExpectedReturns(; alg = BayesStein(), target = MeanSquareError()),
+               ShrunkExpectedReturns(; alg = BayesStein(),
+                                     me = SimpleExpectedReturns(; w = ew)),
+               ShrunkExpectedReturns(; alg = BayesStein(),
+                                     me = SimpleExpectedReturns(; w = ew),
+                                     target = VolatilityWeighted()),
+               ShrunkExpectedReturns(; alg = BayesStein(),
+                                     me = SimpleExpectedReturns(; w = ew),
+                                     target = MeanSquareError()),
+               ShrunkExpectedReturns(; alg = BodnarOkhrinParolya()),
+               ShrunkExpectedReturns(; alg = BodnarOkhrinParolya(),
+                                     target = VolatilityWeighted()),
+               ShrunkExpectedReturns(; alg = BodnarOkhrinParolya(),
+                                     target = MeanSquareError()),
+               ShrunkExpectedReturns(; alg = BodnarOkhrinParolya(),
+                                     me = SimpleExpectedReturns(; w = ew)),
+               ShrunkExpectedReturns(; alg = BodnarOkhrinParolya(),
+                                     me = SimpleExpectedReturns(; w = ew),
+                                     target = VolatilityWeighted()),
+               ShrunkExpectedReturns(; alg = BodnarOkhrinParolya(),
+                                     me = SimpleExpectedReturns(; w = ew),
+                                     target = MeanSquareError()),
+               EquilibriumExpectedReturns(), EquilibriumExpectedReturns(; l = 2),
+               ExcessExpectedReturns(), ExcessExpectedReturns(; rf = 0.01)]
+        ert = CSV.read(joinpath(@__DIR__, "./assets/Expected-Returns.csv"), DataFrame)
+        for i ∈ eachindex(mes)
+            er = mean(mes[i], X)
+            res = isapprox(er, reshape(ert[!, i], size(er)))
+            if !res
+                println("Test $i fails on:\n$(me[i])\n$(res)\n")
+                find_tol(er, reshape(ert[!, i], size(er)); name1 = :er, name2 = :er_t)
+            end
+            @test res
+        end
+        @test_throws AssertionError EquilibriumExpectedReturns(w = [])
+    end
     @testset "Covariance and Correlation correctness" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
@@ -469,49 +523,7 @@
             @test res
         end
     end
-    @testset "Expected Returns" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 1000, 20)
-        ew = eweights(1:1000, 0.01; scale = true)
-        mes = [SimpleExpectedReturns(), SimpleExpectedReturns(; w = ew),
-               JamesSteinExpectedReturns(),
-               JamesSteinExpectedReturns(; target = VolatilityWeighted()),
-               JamesSteinExpectedReturns(; target = MeanSquareError()),
-               JamesSteinExpectedReturns(; me = SimpleExpectedReturns(; w = ew)),
-               JamesSteinExpectedReturns(; me = SimpleExpectedReturns(; w = ew),
-                                         target = VolatilityWeighted()),
-               JamesSteinExpectedReturns(; me = SimpleExpectedReturns(; w = ew),
-                                         target = MeanSquareError()),
-               BayesSteinExpectedReturns(),
-               BayesSteinExpectedReturns(; target = VolatilityWeighted()),
-               BayesSteinExpectedReturns(; target = MeanSquareError()),
-               BayesSteinExpectedReturns(; me = SimpleExpectedReturns(; w = ew)),
-               BayesSteinExpectedReturns(; me = SimpleExpectedReturns(; w = ew),
-                                         target = VolatilityWeighted()),
-               BayesSteinExpectedReturns(; me = SimpleExpectedReturns(; w = ew),
-                                         target = MeanSquareError()),
-               BodnarOkhrinParolyaExpectedReturns(),
-               BodnarOkhrinParolyaExpectedReturns(; target = VolatilityWeighted()),
-               BodnarOkhrinParolyaExpectedReturns(; target = MeanSquareError()),
-               BodnarOkhrinParolyaExpectedReturns(; me = SimpleExpectedReturns(; w = ew)),
-               BodnarOkhrinParolyaExpectedReturns(; me = SimpleExpectedReturns(; w = ew),
-                                                  target = VolatilityWeighted()),
-               BodnarOkhrinParolyaExpectedReturns(; me = SimpleExpectedReturns(; w = ew),
-                                                  target = MeanSquareError()),
-               EquilibriumExpectedReturns(), EquilibriumExpectedReturns(; l = 2),
-               ExcessExpectedReturns(), ExcessExpectedReturns(; rf = 0.01)]
-        ert = CSV.read(joinpath(@__DIR__, "./assets/Expected-Returns.csv"), DataFrame)
-        for i ∈ eachindex(mes)
-            er = mean(mes[i], X)
-            res = isapprox(er, reshape(ert[!, i], size(er)))
-            if !res
-                println("Test $i fails on:\n$(me[i])\n$(res)\n")
-                find_tol(er, reshape(ert[!, i], size(er)); name1 = :er, name2 = :er_t)
-            end
-            @test res
-        end
-        @test_throws AssertionError EquilibriumExpectedReturns(w = [])
-    end
+
     @testset "Absolute Distances" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)

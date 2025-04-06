@@ -33,6 +33,9 @@ include("./7_Moments/11_RankCovariance.jl")
 include("./7_Moments/12_Histogram.jl")
 include("./7_Moments/13_MutualInfoCovariance.jl")
 include("./7_Moments/14_PortfolioOptimisersCovariance.jl")
+include("./7_Moments/15_ShrunkExpectedReturns.jl")
+include("./7_Moments/16_EquilibriumExpectedReturns.jl")
+include("./7_Moments/17_ExcessExpectedReturns.jl")
 
 #=
 
@@ -103,7 +106,7 @@ include("./Moments/Covariance/LTDCovariance.jl")
 # Mutual Information Covariance
 include("./Moments/Covariance/MutualInfoCovariance.jl")
 
-# Shrunk Expected Returns
+# ShrunkDenoise Expected Returns
 include("./Moments/ExpectedReturns/ShrunkExpectedReturns/ShrunkExpectedReturns_Types.jl")
 include("./Moments/ExpectedReturns/ShrunkExpectedReturns/JamesSteinExpectedReturns.jl")
 include("./Moments/ExpectedReturns/ShrunkExpectedReturns/BayesSteinExpectedReturns.jl")

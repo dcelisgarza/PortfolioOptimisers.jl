@@ -1,12 +1,12 @@
 abstract type DenoiseAlgorithm <: AbstractAlgorithm end
-struct Spectral <: DenoiseAlgorithm end
-struct Fixed <: DenoiseAlgorithm end
-struct Shrunk{T1 <: Real} <: DenoiseAlgorithm
+struct SpectralDenoise <: DenoiseAlgorithm end
+struct FixedDenoise <: DenoiseAlgorithm end
+struct ShrunkDenoise{T1 <: Real} <: DenoiseAlgorithm
     alpha::T1
 end
-function Shrunk(; alpha::Real = 0.0)
+function ShrunkDenoise(; alpha::Real = 0.0)
     @smart_assert(zero(alpha) <= alpha <= one(alpha))
-    return Shrunk{typeof(alpha)}(alpha)
+    return ShrunkDenoise{typeof(alpha)}(alpha)
 end
 struct Denoise{T1 <: DenoiseAlgorithm, T2 <: Integer, T3 <: Integer, T4, T5 <: Tuple,
                T6 <: NamedTuple} <: AbstractEstimator
@@ -17,27 +17,27 @@ struct Denoise{T1 <: DenoiseAlgorithm, T2 <: Integer, T3 <: Integer, T4, T5 <: T
     args::T5
     kwargs::T6
 end
-function Denoise(; alg::DenoiseAlgorithm = Shrunk(), m::Integer = 10, n::Integer = 1000,
-                 kernel = AverageShiftedHistograms.Kernels.gaussian, args::Tuple = (),
-                 kwargs::NamedTuple = (;))
+function Denoise(; alg::DenoiseAlgorithm = ShrunkDenoise(), m::Integer = 10,
+                 n::Integer = 1000, kernel = AverageShiftedHistograms.Kernels.gaussian,
+                 args::Tuple = (), kwargs::NamedTuple = (;))
     return Denoise{typeof(alg), typeof(m), typeof(n), typeof(kernel), typeof(args),
                    typeof(kwargs)}(alg, m, n, kernel, args, kwargs)
 end
-function fit_estimator!(::Spectral, X::AbstractMatrix, vals::AbstractVector,
+function fit_estimator!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
                         vecs::AbstractMatrix, num_factors::Integer)
     _vals = copy(vals)
     _vals[1:num_factors] .= zero(eltype(X))
     X .= cov2cor(vecs * Diagonal(_vals) * transpose(vecs))
     return nothing
 end
-function fit_estimator!(::Fixed, X::AbstractMatrix, vals::AbstractVector,
+function fit_estimator!(::FixedDenoise, X::AbstractMatrix, vals::AbstractVector,
                         vecs::AbstractMatrix, num_factors::Integer)
     _vals = copy(vals)
     _vals[1:num_factors] .= sum(_vals[1:num_factors]) / num_factors
     X .= cov2cor(vecs * Diagonal(_vals) * transpose(vecs))
     return nothing
 end
-function fit_estimator!(de::Shrunk, X::AbstractMatrix, vals::AbstractVector,
+function fit_estimator!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
                         vecs::AbstractMatrix, num_factors::Integer)
     # Small
     vals_l = vals[1:num_factors]
@@ -100,4 +100,4 @@ function fit_estimator(de::Denoise, pdm::Union{Nothing, <:PosDefEstimator},
     return X
 end
 
-export Denoise, Spectral, Fixed, Shrunk
+export Denoise, SpectralDenoise, FixedDenoise, ShrunkDenoise
