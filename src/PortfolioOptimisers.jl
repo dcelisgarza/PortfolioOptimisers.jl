@@ -21,7 +21,7 @@ include("./6_MatrixProcessing.jl")
 
 include("./7_Moments/1_Base_Moments.jl")
 include("./7_Moments/2_SimpleExpectedReturns.jl")
-include("./7_Moments/3_PearsonCovariance.jl")
+include("./7_Moments/3_Covariance.jl")
 include("./7_Moments/4_SimpleVariance.jl")
 include("./7_Moments/5_GerberCovariances.jl")
 include("./7_Moments/6_SmythBrobyCovariance.jl")
@@ -34,6 +34,14 @@ include("./7_Moments/12_PortfolioOptimisersCovariance.jl")
 include("./7_Moments/13_ShrunkExpectedReturns.jl")
 include("./7_Moments/14_EquilibriumExpectedReturns.jl")
 include("./7_Moments/15_ExcessExpectedReturns.jl")
+include("./7_Moments/16_Coskewness.jl")
+include("./7_Moments/17_Cokurtosis.jl")
+
+include("./8_Distance/1_Base_Distance.jl")
+include("./8_Distance/2_Distance.jl")
+include("./8_Distance/3_DistanceDistance.jl")
+include("./8_Distance/4_GeneralDistance.jl")
+include("./8_Distance/5_GeneralDistanceDistance.jl")
 
 #=
 
@@ -83,8 +91,8 @@ include("./Moments/ExpectedReturns/SimpleExpectedReturns.jl")
 include("./Moments/Covariance/Covariance_AbstractTypes.jl")
 include("./Moments/Covariance/Covariance/PearsonCovariance_AbstractTypes.jl")
 include("./Moments/Covariance/Covariance/GeneralWeightedCovariance.jl")
-include("./Moments/Covariance/Covariance/FullCovariance.jl")
-include("./Moments/Covariance/Covariance/SemiCovariance.jl")
+include("./Moments/Covariance/Covariance/Full.jl")
+include("./Moments/Covariance/Covariance/Semi.jl")
 
 # Simple Variance
 include("./Moments/Covariance/VarianceStd/VarianceStd_AbstractTypes.jl")

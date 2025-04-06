@@ -1,11 +1,11 @@
 function fit_estimator!(::Nothing, args...; kwargs...)
     return nothing
 end
-struct LoGo{T1 <: PortfolioOptimisersUnionDistanceMetric, T2 <: SimilarityMatrixEstimator}
+struct LoGo{T1 <: DistanceEstimator, T2 <: SimilarityMatrixEstimator}
     dist::T1
     sim::T2
 end
-function LoGo(; dist::PortfolioOptimisersUnionDistanceMetric = CanonicalDistance(),
+function LoGo(; dist::DistanceEstimator = CanonicalDistance(),
               sim::SimilarityMatrixEstimator = DBHT_MaximumDistanceSimilarity())
     return LoGo{typeof(dist), typeof(sim)}(dist, sim)
 end

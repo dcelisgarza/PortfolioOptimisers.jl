@@ -20,7 +20,7 @@ function sb_delta(xi, xj, mui, muj, sigmai, sigmaj, c1, c2, c3, n)
     return kappa / (1 + gamma^n)
 end
 abstract type BaseSmythBrobyCovariance <: BaseGerberCovariance end
-abstract type SmythBrobyCovarianceAlgorithm <: AbstractCovarianceAlgorithm end
+abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
 
 struct SmythBroby0 <: SmythBrobyCovarianceAlgorithm end
 struct SmythBroby1 <: SmythBrobyCovarianceAlgorithm end

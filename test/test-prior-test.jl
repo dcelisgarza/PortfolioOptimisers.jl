@@ -91,7 +91,7 @@
                                                                                                                                                name = nothing,
                                                                                                                                                group = nothing))))
         @test isa(pe5.me, EquilibriumExpectedReturns)
-        @test isa(pe5.ce.ce, FullCovariance)
+        @test isa(pe5.ce.ce, Full)
         pe6 = BlackLittermanPriorEstimator(;
                                            views = BlackLittermanView(;
                                                                       A = A_LinearConstraint(;
@@ -163,7 +163,7 @@
                                                                                                                                 name = nothing,
                                                                                                                                 group = nothing))))
         @test isa(pe10.me, EquilibriumExpectedReturns)
-        @test isa(pe10.ce.ce, FullCovariance)
+        @test isa(pe10.ce.ce, Full)
         pe11 = FactorPriorEstimator(;
                                     pe = EmpiricalPriorEstimator(;
                                                                  me = BayesSteinExpectedReturns(),

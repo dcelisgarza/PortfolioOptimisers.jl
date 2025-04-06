@@ -103,8 +103,7 @@ function calc_mst(cent::PrimTree, g::AbstractGraph)
     return Graphs.prim_mst(g, cent.args...; cent.kwargs...)
 end
 abstract type AbstractNetworkEstimator <: PhilogenyEstimator end
-struct NetworkEstimator{T1 <: StatsBase.CovarianceEstimator,
-                        T2 <: PortfolioOptimisersUnionDistanceMetric,
+struct NetworkEstimator{T1 <: StatsBase.CovarianceEstimator, T2 <: DistanceEstimator,
                         T3 <: Union{<:SimilarityMatrixEstimator, <:TreeType},
                         T4 <: Integer} <: AbstractNetworkEstimator
     ce::T1
@@ -114,7 +113,7 @@ struct NetworkEstimator{T1 <: StatsBase.CovarianceEstimator,
 end
 function NetworkEstimator(;
                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                          de::PortfolioOptimisersUnionDistanceMetric = CanonicalDistance(),
+                          de::DistanceEstimator = CanonicalDistance(),
                           alg::Union{<:SimilarityMatrixEstimator, <:TreeType} = KruskalTree(),
                           n::Integer = 1)
     return NetworkEstimator{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)

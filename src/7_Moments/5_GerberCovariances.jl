@@ -1,5 +1,5 @@
 abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
-abstract type GerberCovarianceAlgorithm <: AbstractCovarianceAlgorithm end
+abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 struct Gerber0 <: GerberCovarianceAlgorithm end
 struct Gerber1 <: GerberCovarianceAlgorithm end
 struct Gerber2 <: GerberCovarianceAlgorithm end

@@ -1,5 +1,4 @@
-struct ClusteringEstimator{T1 <: StatsBase.CovarianceEstimator,
-                           T2 <: PortfolioOptimisersUnionDistanceMetric,
+struct ClusteringEstimator{T1 <: StatsBase.CovarianceEstimator, T2 <: DistanceEstimator,
                            T3 <: ClusteringAlgorithm,
                            T4 <: Union{<:Integer, NumberClustersHeuristic}} <:
        AbstractClusteringEstimator
@@ -10,7 +9,7 @@ struct ClusteringEstimator{T1 <: StatsBase.CovarianceEstimator,
 end
 function ClusteringEstimator(;
                              ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                             de::PortfolioOptimisersUnionDistanceMetric = CanonicalDistance(),
+                             de::DistanceEstimator = CanonicalDistance(),
                              alg::ClusteringAlgorithm = HierarchicalClustering(),
                              nch::Union{<:Integer, NumberClustersHeuristic} = SecondOrderDifference())
     return ClusteringEstimator{typeof(ce), typeof(de), typeof(alg), typeof(nch)}(ce, de,

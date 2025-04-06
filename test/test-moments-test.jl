@@ -1,7 +1,6 @@
 @safetestset "Moments" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
           CSV, DataFrames
-
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -72,29 +71,29 @@
         X = randn(rng, 1000, 20)
         fw = FrequencyWeights(rand(rng, 1000))
         ew = eweights(1:1000, 0.01; scale = true)
-        ces = [PortfolioOptimisersCovariance(), Covariance(; alg = FullCovariance()),
-               Covariance(; alg = FullCovariance(), me = SimpleExpectedReturns(; w = ew),
+        ces = [PortfolioOptimisersCovariance(), Covariance(; alg = Full()),
+               Covariance(; alg = Full(), me = SimpleExpectedReturns(; w = ew),
                           ce = GeneralWeightedCovariance(;
                                                          ce = SimpleCovariance(;
                                                                                corrected = false),
                                                          w = ew)),
-               Covariance(; alg = FullCovariance(),
+               Covariance(; alg = Full(),
                           ce = GeneralWeightedCovariance(;
                                                          ce = AnalyticalNonlinearShrinkage())),
-               Covariance(; alg = FullCovariance(), me = SimpleExpectedReturns(; w = fw),
+               Covariance(; alg = Full(), me = SimpleExpectedReturns(; w = fw),
                           ce = GeneralWeightedCovariance(;
                                                          ce = AnalyticalNonlinearShrinkage(),
                                                          w = fw)),
-               Covariance(; alg = SemiCovariance()),
-               Covariance(; alg = SemiCovariance(), me = SimpleExpectedReturns(; w = ew),
+               Covariance(; alg = Semi()),
+               Covariance(; alg = Semi(), me = SimpleExpectedReturns(; w = ew),
                           ce = GeneralWeightedCovariance(;
                                                          ce = SimpleCovariance(;
                                                                                corrected = false),
                                                          w = ew)),
-               Covariance(; alg = SemiCovariance(),
+               Covariance(; alg = Semi(),
                           ce = GeneralWeightedCovariance(;
                                                          ce = AnalyticalNonlinearShrinkage())),
-               Covariance(; alg = SemiCovariance(), me = SimpleExpectedReturns(; w = fw),
+               Covariance(; alg = Semi(), me = SimpleExpectedReturns(; w = fw),
                           ce = GeneralWeightedCovariance(;
                                                          ce = AnalyticalNonlinearShrinkage(),
                                                          w = fw)), SpearmanCovariance(),
@@ -268,16 +267,16 @@
                           ce = GeneralWeightedCovariance(;
                                                          ce = AnalyticalNonlinearShrinkage(),
                                                          w = fw)),
-               Covariance(; alg = SemiCovariance()),
-               Covariance(; alg = SemiCovariance(),
+               Covariance(; alg = Semi()),
+               Covariance(; alg = Semi(),
                           ce = GeneralWeightedCovariance(;
                                                          ce = SimpleCovariance(;
                                                                                corrected = false),
                                                          w = ew)),
-               Covariance(; alg = SemiCovariance(),
+               Covariance(; alg = Semi(),
                           ce = GeneralWeightedCovariance(;
                                                          ce = AnalyticalNonlinearShrinkage())),
-               Covariance(; alg = SemiCovariance(),
+               Covariance(; alg = Semi(),
                           ce = GeneralWeightedCovariance(;
                                                          ce = AnalyticalNonlinearShrinkage(),
                                                          w = fw)), SpearmanCovariance(),
@@ -484,11 +483,10 @@
     @testset "Misc tests" begin
         @test iszero(PortfolioOptimisers.intrinsic_mutual_info(rand(1, 1)))
     end
-    #=
     @testset "Coskewness" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
-        cses = [FullCoskewness(), SemiCoskewness()]
+        cses = [Coskewness(; alg = Full()), Coskewness(; alg = Semi())]
         sk_t = CSV.read(joinpath(@__DIR__, "./assets/CoskewnessEstimator.csv"), DataFrame)
         for i ∈ eachindex(cses)
             sk, v = coskewness(cses[i], transpose(X); dims = 2)
@@ -512,7 +510,7 @@
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
         df = DataFrame()
-        kes = [FullCokurtosis(), SemiCokurtosis()]
+        kes = [Cokurtosis(; alg = Full()), Cokurtosis(; alg = Semi())]
         kt_t = CSV.read(joinpath(@__DIR__, "./assets/CokurtosisEstimator.csv"), DataFrame)
         for i ∈ eachindex(kes)
             kt = cokurtosis(kes[i], transpose(X); dims = 2)
@@ -528,8 +526,9 @@
     @testset "Absolute Distances" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
-        des = [SimpleAbsoluteDistance(), SimpleAbsoluteDistanceDistance(), LogDistance(),
-               LogDistanceDistance()]
+        des = [Distance(; alg = SimpleAbsoluteDistance()),
+               DistanceDistance(; alg = SimpleAbsoluteDistance()),
+               Distance(; alg = LogDistance()), DistanceDistance(; alg = LogDistance())]
 
         dist_t = CSV.read(joinpath(@__DIR__, "./assets/Absolute-Distance.csv"), DataFrame)
 
@@ -553,8 +552,10 @@
             @test res2
         end
 
-        des = [GeneralAbsoluteDistance(), GeneralAbsoluteDistanceDistance(),
-               GeneralLogDistance(), GeneralLogDistanceDistance()]
+        des = [GeneralDistance(; alg = SimpleAbsoluteDistance()),
+               GeneralDistanceDistance(; alg = SimpleAbsoluteDistance()),
+               GeneralDistance(; alg = LogDistance()),
+               GeneralDistanceDistance(; alg = LogDistance())]
         for i ∈ 1:ncol(dist_t)
             dist1 = distance(des[i], ce, X)
             MN = size(dist1)
@@ -574,12 +575,14 @@
             @test res2
         end
     end
+    #=
+
     @testset "Canonical and General Canonical Distance" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
-        ces = [PortfolioOptimisersCovariance(), FullCovariance(), SemiCovariance(),
-               SpearmanCovariance(), KendallCovariance(), MutualInfoCovariance(),
-               MutualInfoCovariance(; bins = 5), DistanceCovariance(),
+        ces = [PortfolioOptimisersCovariance(), Covariance(; alg = Full()),
+               Covariance(; alg = Semi()), SpearmanCovariance(), KendallCovariance(),
+               MutualInfoCovariance(), MutualInfoCovariance(; bins = 5), DistanceCovariance(),
                LTDCovariance(; alpha = 0.15), Gerber0Covariance(),
                Gerber0NormalisedCovariance(), Gerber1Covariance(),
                Gerber1NormalisedCovariance(), Gerber2Covariance(),
@@ -592,7 +595,7 @@
                SmythBrobyGerber2NormalisedCovariance()]
         dist_t = CSV.read(joinpath(@__DIR__, "./assets/Canonical-Distance.csv"), DataFrame)
 
-        de = CanonicalDistance()
+        de = Distance(; alg = CanonicalDistance())
         for i ∈ 1:ncol(dist_t)
             dist1 = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist1)
@@ -605,8 +608,7 @@
 
             dist2 = if isa(ces[i], MutualInfoCovariance)
                 distance(VariationInfoDistance(; bins = ces[i].bins,
-                                               normalise = ces[i].normalise),
-                         cov(ces[i], X), X)
+                                               normalise = ces[i].normalise), cov(ces[i], X), X)
             elseif isa(ces[i], DistanceCovariance)
                 distance(CorrelationDistance(;), cov(ces[i], X), X)
             elseif isa(ces[i], LTDCovariance)
@@ -622,7 +624,7 @@
             @test res2
         end
 
-        de = GeneralCanonicalDistance()
+        de = GeneralDistance(; alg = CanonicalDistance())
         for i ∈ 1:ncol(dist_t)
             dist1 = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist1)
@@ -652,10 +654,11 @@
             @test res2
         end
     end
+
     @testset "Canonical and General Canonical Distance Distance" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
-        ces = [PortfolioOptimisersCovariance(), FullCovariance(), SemiCovariance(),
+        ces = [PortfolioOptimisersCovariance(), Full(), Semi(),
                SpearmanCovariance(), KendallCovariance(), MutualInfoCovariance(),
                MutualInfoCovariance(; bins = 5), DistanceCovariance(),
                LTDCovariance(; alpha = 0.15), Gerber0Covariance(),

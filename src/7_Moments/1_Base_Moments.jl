@@ -1,7 +1,9 @@
 abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
 abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
 abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
-abstract type AbstractCovarianceAlgorithm <: AbstractAlgorithm end
+abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
+struct Full <: AbstractMomentAlgorithm end
+struct Semi <: AbstractMomentAlgorithm end
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
@@ -33,4 +35,4 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix,
     end
 end
 
-export robust_cor
+export robust_cor, Full, Semi
