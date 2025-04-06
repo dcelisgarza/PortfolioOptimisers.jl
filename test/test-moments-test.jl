@@ -72,31 +72,32 @@
         X = randn(rng, 1000, 20)
         fw = FrequencyWeights(rand(rng, 1000))
         ew = eweights(1:1000, 0.01; scale = true)
-        ces = [PortfolioOptimisersCovariance(), FullCovariance(),
-               FullCovariance(; me = SimpleExpectedReturns(; w = ew),
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = SimpleCovariance(;
-                                                                                   corrected = false),
-                                                             w = ew)),
-               FullCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage())),
-               FullCovariance(; me = SimpleExpectedReturns(; w = fw),
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage(),
-                                                             w = fw)), SemiCovariance(),
-               SemiCovariance(; me = SimpleExpectedReturns(; w = ew),
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = SimpleCovariance(;
-                                                                                   corrected = false),
-                                                             w = ew)),
-               SemiCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage())),
-               SemiCovariance(; me = SimpleExpectedReturns(; w = fw),
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage(),
-                                                             w = fw)), SpearmanCovariance(),
+        ces = [PortfolioOptimisersCovariance(), Covariance(; alg = FullCovariance()),
+               Covariance(; alg = FullCovariance(), me = SimpleExpectedReturns(; w = ew),
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = SimpleCovariance(;
+                                                                               corrected = false),
+                                                         w = ew)),
+               Covariance(; alg = FullCovariance(),
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = AnalyticalNonlinearShrinkage())),
+               Covariance(; alg = FullCovariance(), me = SimpleExpectedReturns(; w = fw),
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = AnalyticalNonlinearShrinkage(),
+                                                         w = fw)),
+               Covariance(; alg = SemiCovariance()),
+               Covariance(; alg = SemiCovariance(), me = SimpleExpectedReturns(; w = ew),
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = SimpleCovariance(;
+                                                                               corrected = false),
+                                                         w = ew)),
+               Covariance(; alg = SemiCovariance(),
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = AnalyticalNonlinearShrinkage())),
+               Covariance(; alg = SemiCovariance(), me = SimpleExpectedReturns(; w = fw),
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = AnalyticalNonlinearShrinkage(),
+                                                         w = fw)), SpearmanCovariance(),
                KendallCovariance(), MutualInfoCovariance(),
                MutualInfoCovariance(; bins = Knuth()),
                MutualInfoCovariance(; bins = FreedmanDiaconis()),
@@ -254,31 +255,32 @@
         fw = FrequencyWeights(rand(rng, 100))
         ew = eweights(1:100, 0.3; scale = true)
 
-        ces = [PortfolioOptimisersCovariance(), FullCovariance(),
-               FullCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = SimpleCovariance(;
-                                                                                   corrected = false),
-                                                             w = ew)),
-               FullCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage())),
-               FullCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage(),
-                                                             w = fw)), SemiCovariance(),
-               SemiCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = SimpleCovariance(;
-                                                                                   corrected = false),
-                                                             w = ew)),
-               SemiCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage())),
-               SemiCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage(),
-                                                             w = fw)), SpearmanCovariance(),
+        ces = [PortfolioOptimisersCovariance(), Covariance(),
+               Covariance(;
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = SimpleCovariance(;
+                                                                               corrected = false),
+                                                         w = ew)),
+               Covariance(;
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = AnalyticalNonlinearShrinkage())),
+               Covariance(;
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = AnalyticalNonlinearShrinkage(),
+                                                         w = fw)),
+               Covariance(; alg = SemiCovariance()),
+               Covariance(; alg = SemiCovariance(),
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = SimpleCovariance(;
+                                                                               corrected = false),
+                                                         w = ew)),
+               Covariance(; alg = SemiCovariance(),
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = AnalyticalNonlinearShrinkage())),
+               Covariance(; alg = SemiCovariance(),
+                          ce = GeneralWeightedCovariance(;
+                                                         ce = AnalyticalNonlinearShrinkage(),
+                                                         w = fw)), SpearmanCovariance(),
                KendallCovariance(), MutualInfoCovariance(),
                MutualInfoCovariance(; bins = Knuth()),
                MutualInfoCovariance(; bins = FreedmanDiaconis()),
@@ -523,7 +525,6 @@
             @test res
         end
     end
-
     @testset "Absolute Distances" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
