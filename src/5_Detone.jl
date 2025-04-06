@@ -1,11 +1,11 @@
-struct DetoneEstimator{T1 <: Integer} <: AbstractEstimator
+struct Detone{T1 <: Integer} <: AbstractEstimator
     n::T1
 end
-function DetoneEstimator(; n::Integer = 1)
+function Detone(; n::Integer = 1)
     @smart_assert(n >= zero(n))
-    return DetoneEstimator{typeof(n)}(n)
+    return Detone{typeof(n)}(n)
 end
-function fit_estimator!(ce::DetoneEstimator, pdm::Union{Nothing, <:PosDefEstimator},
+function fit_estimator!(ce::Detone, pdm::Union{Nothing, <:PosDefEstimator},
                         X::AbstractMatrix)
     n = ce.n
     @smart_assert(one(size(X, 1)) <= n <= size(X, 1))
@@ -27,11 +27,11 @@ function fit_estimator!(ce::DetoneEstimator, pdm::Union{Nothing, <:PosDefEstimat
     end
     return nothing
 end
-function fit_estimator(ce::DetoneEstimator, pdm::Union{Nothing, <:PosDefEstimator},
+function fit_estimator(ce::Detone, pdm::Union{Nothing, <:PosDefEstimator},
                        X::AbstractMatrix)
     X = copy(X)
     fit_estimator!(ce, pdm, X)
     return X
 end
 
-export DetoneEstimator
+export Detone

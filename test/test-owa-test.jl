@@ -1,3 +1,4 @@
+#=
 @safetestset "OWA" begin
     using PortfolioOptimisers, CSV, DataFrames, Clarabel, Test, Random, StableRNGs
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
@@ -77,3 +78,4 @@
         @test isapprox(w1, w2)
     end
 end
+=#

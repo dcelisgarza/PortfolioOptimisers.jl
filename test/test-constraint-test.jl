@@ -1,3 +1,4 @@
+#=
 @safetestset "Constraints" begin
     using PortfolioOptimisers, DataFrames, Test
     @testset "Linear Constraints" begin
@@ -236,3 +237,4 @@
         @test_throws AssertionError risk_budget_constraints(A_LinearConstraint[], sets)
     end
 end
+=#

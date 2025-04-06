@@ -63,9 +63,9 @@ include("./OrderedWeightsArray/OWA.jl")
 include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/FNPDM_AbstractTypes.jl")
 include("./LinearAlgebra/FixNonPositiveDefiniteMatrices/PosDefEstimator.jl")
 
-# DetoneEstimator
-include("./LinearAlgebra/DetoneEstimator/Detone_AbstractTypes.jl")
-include("./LinearAlgebra/DetoneEstimator/DetoneEstimator.jl")
+# Detone
+include("./LinearAlgebra/Detone/Detone_AbstractTypes.jl")
+include("./LinearAlgebra/Detone/Detone.jl")
 
 # Histogram
 include("./LinearAlgebra/Histogram/Histogram_AbstractTypes.jl")

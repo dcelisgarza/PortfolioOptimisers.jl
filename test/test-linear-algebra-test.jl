@@ -38,7 +38,8 @@
         T, N = size(X)
         q = T / N
         sigma = cov(X)
-        des = [nothing, FixedDenoise(), ShrunkDenoise(), SpectralDenoise()]
+        des = [nothing, Denoise(; alg = Fixed()), Denoise(; alg = Shrunk()),
+               Denoise(; alg = Spectral())]
         denoise_t = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv"), DataFrame)
         for i ∈ 1:ncol(denoise_t)
             sigma1 = copy(sigma)
@@ -51,14 +52,14 @@
             @test res
         end
     end
-    @testset "DetoneEstimator" begin
+    @testset "Detone" begin
         rng = StableRNG(987654321)
         X = randn(rng, 1000, 20)
         T, N = size(X)
         q = T / N
         sigma = cov(X)
-        des = [nothing, DetoneEstimator(), DetoneEstimator(; n = 3)]
-        detone = CSV.read(joinpath(@__DIR__, "./assets/DetoneEstimator.csv"), DataFrame)
+        des = [nothing, Detone(), Detone(; n = 3)]
+        detone = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv"), DataFrame)
         for i ∈ 1:ncol(detone)
             sigma1 = copy(sigma)
             fit_estimator!(des[i], PosDefEstimator(), sigma1)

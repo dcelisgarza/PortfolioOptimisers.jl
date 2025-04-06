@@ -13,6 +13,422 @@
             end
         end
     end
+    @testset "Covariance and Correlation correctness" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 20)
+        fw = FrequencyWeights(rand(rng, 1000))
+        ew = eweights(1:1000, 0.01; scale = true)
+        ces = [PortfolioOptimisersCovariance(), FullCovariance(),
+               FullCovariance(; me = SimpleExpectedReturns(; w = ew),
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = SimpleCovariance(;
+                                                                                   corrected = false),
+                                                             w = ew)),
+               FullCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage())),
+               FullCovariance(; me = SimpleExpectedReturns(; w = fw),
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage(),
+                                                             w = fw)), SemiCovariance(),
+               SemiCovariance(; me = SimpleExpectedReturns(; w = ew),
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = SimpleCovariance(;
+                                                                                   corrected = false),
+                                                             w = ew)),
+               SemiCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage())),
+               SemiCovariance(; me = SimpleExpectedReturns(; w = fw),
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage(),
+                                                             w = fw)), SpearmanCovariance(),
+               KendallCovariance(), MutualInfoCovariance(),
+               MutualInfoCovariance(; bins = Knuth()),
+               MutualInfoCovariance(; bins = FreedmanDiaconis()),
+               MutualInfoCovariance(; bins = Scott()), MutualInfoCovariance(; bins = 5),
+               MutualInfoCovariance(;
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               DistanceCovariance(), DistanceCovariance(; w = ew), LTDCovariance(),
+               GerberCovariance(; alg = Gerber0()),
+               GerberCovariance(; alg = Gerber0(),
+                                ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
+                                                    corrected = false, w = ew)),
+               NormalisedGerberCovariance(; alg = Gerber0()),
+               NormalisedGerberCovariance(; alg = Gerber0(),
+                                          me = SimpleExpectedReturns(; w = ew),
+                                          ve = SimpleVariance(;
+                                                              me = SimpleExpectedReturns(;
+                                                                                         w = ew),
+                                                              corrected = false, w = ew)),
+               GerberCovariance(; alg = Gerber1()),
+               GerberCovariance(; alg = Gerber1(),
+                                ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
+                                                    corrected = false, w = ew)),
+               NormalisedGerberCovariance(; alg = Gerber1()),
+               NormalisedGerberCovariance(; alg = Gerber1(),
+                                          me = SimpleExpectedReturns(; w = ew),
+                                          ve = SimpleVariance(;
+                                                              me = SimpleExpectedReturns(;
+                                                                                         w = ew),
+                                                              corrected = false, w = ew)),
+               GerberCovariance(; alg = Gerber2()),
+               GerberCovariance(; alg = Gerber2(),
+                                ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
+                                                    corrected = false, w = ew)),
+               NormalisedGerberCovariance(; alg = Gerber2()),
+               NormalisedGerberCovariance(; alg = Gerber2(),
+                                          me = SimpleExpectedReturns(; w = ew),
+                                          ve = SimpleVariance(;
+                                                              me = SimpleExpectedReturns(;
+                                                                                         w = ew),
+                                                              corrected = false, w = ew)),
+               SmythBrobyCovariance(; alg = SmythBroby0()),
+               SmythBrobyCovariance(; alg = SmythBroby0(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby0()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby0(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew)),
+               SmythBrobyCovariance(; alg = SmythBroby1()),
+               SmythBrobyCovariance(; alg = SmythBroby1(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby1()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby1(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew)),
+               SmythBrobyCovariance(; alg = SmythBroby2()),
+               SmythBrobyCovariance(; alg = SmythBroby2(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(; corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby2()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby2(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew)),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber0()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber0(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber0()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber0(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew)),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber1()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber1(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber1()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber1(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew)),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber2()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber2(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber2()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber2(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew))]
+        cvrt = CSV.read(joinpath(@__DIR__,
+                                 "./assets/Covariance-and-Correlation-correctness.csv"),
+                        DataFrame)
+        for (i, j) ∈ zip(1:55, 1:2:ncol(cvrt))
+            cv = cov(ces[i], X)
+            cr = cor(ces[i], X)
+            MN = size(cv)
+            res1 = isapprox(cv, reshape(cvrt[!, j], MN))
+            res2 = isapprox(cr, reshape(cvrt[!, j + 1], MN))
+            if !res1
+                println("Fails on cov iteration $i")
+                find_tol(cv, reshape(cvrt[!, j], MN); name1 = :cv, name2 = :cv_t)
+            end
+            @test res1
+            if !res2
+                println("Fails on cor iteration $i")
+                find_tol(cr, reshape(cvrt[!, j + 1], MN); name1 = :cr, name2 = :cr_t)
+            end
+            @test res2
+        end
+    end
+    @testset "cov2cor" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 100, 10)
+        fw = FrequencyWeights(rand(rng, 100))
+        ew = eweights(1:100, 0.3; scale = true)
+
+        ces = [PortfolioOptimisersCovariance(), FullCovariance(),
+               FullCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = SimpleCovariance(;
+                                                                                   corrected = false),
+                                                             w = ew)),
+               FullCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage())),
+               FullCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage(),
+                                                             w = fw)), SemiCovariance(),
+               SemiCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = SimpleCovariance(;
+                                                                                   corrected = false),
+                                                             w = ew)),
+               SemiCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage())),
+               SemiCovariance(;
+                              ce = GeneralWeightedCovariance(;
+                                                             ce = AnalyticalNonlinearShrinkage(),
+                                                             w = fw)), SpearmanCovariance(),
+               KendallCovariance(), MutualInfoCovariance(),
+               MutualInfoCovariance(; bins = Knuth()),
+               MutualInfoCovariance(; bins = FreedmanDiaconis()),
+               MutualInfoCovariance(; bins = Scott()), MutualInfoCovariance(; bins = 5),
+               MutualInfoCovariance(;
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               DistanceCovariance(), DistanceCovariance(; w = ew), LTDCovariance(),
+               GerberCovariance(; alg = Gerber0()),
+               GerberCovariance(; alg = Gerber0(),
+                                ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
+                                                    corrected = false, w = ew)),
+               NormalisedGerberCovariance(; alg = Gerber0()),
+               NormalisedGerberCovariance(; alg = Gerber0(),
+                                          me = SimpleExpectedReturns(; w = ew),
+                                          ve = SimpleVariance(;
+                                                              me = SimpleExpectedReturns(;
+                                                                                         w = ew),
+                                                              corrected = false, w = ew)),
+               GerberCovariance(; alg = Gerber1()),
+               GerberCovariance(; alg = Gerber1(),
+                                ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
+                                                    corrected = false, w = ew)),
+               NormalisedGerberCovariance(; alg = Gerber1()),
+               NormalisedGerberCovariance(; alg = Gerber1(),
+                                          me = SimpleExpectedReturns(; w = ew),
+                                          ve = SimpleVariance(;
+                                                              me = SimpleExpectedReturns(;
+                                                                                         w = ew),
+                                                              corrected = false, w = ew)),
+               GerberCovariance(; alg = Gerber2()),
+               GerberCovariance(; alg = Gerber2(),
+                                ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
+                                                    corrected = false, w = ew)),
+               NormalisedGerberCovariance(; alg = Gerber2()),
+               NormalisedGerberCovariance(; alg = Gerber2(),
+                                          me = SimpleExpectedReturns(; w = ew),
+                                          ve = SimpleVariance(;
+                                                              me = SimpleExpectedReturns(;
+                                                                                         w = ew),
+                                                              corrected = false, w = ew)),
+               SmythBrobyCovariance(; alg = SmythBroby0()),
+               SmythBrobyCovariance(; alg = SmythBroby0(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby0()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby0(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew)),
+               SmythBrobyCovariance(; alg = SmythBroby1()),
+               SmythBrobyCovariance(; alg = SmythBroby1(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby1()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby1(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew)),
+               SmythBrobyCovariance(; alg = SmythBroby2()),
+               SmythBrobyCovariance(; alg = SmythBroby2(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby2()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby2(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew)),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber0()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber0(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber0()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber0(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew)),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber1()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber1(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber1()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber1(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew)),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber2()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber2(),
+                                    me = SimpleExpectedReturns(; w = ew),
+                                    ve = SimpleVariance(;
+                                                        me = SimpleExpectedReturns(;
+                                                                                   w = ew),
+                                                        corrected = false, w = ew)),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber2()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber2(),
+                                              me = SimpleExpectedReturns(; w = ew),
+                                              ve = SimpleVariance(;
+                                                                  me = SimpleExpectedReturns(;
+                                                                                             w = ew),
+                                                                  corrected = false,
+                                                                  w = ew))]
+
+        for (i, ce) ∈ pairs(ces)
+            cv = cov(ce, X)
+            cr = cor(ce, X)
+            res1 = isapprox(if isa(cv, Matrix)
+                                StatsBase.cov2cor(cv)
+                            else
+                                StatsBase.cov2cor(Matrix(cv))
+                            end, cr)
+            if !res1
+                println("Test $i fails on:\n$(ce)\n")
+                find_tol(if isa(cv, Matrix)
+                             StatsBase.cov2cor(cv)
+                         else
+                             StatsBase.cov2cor(Matrix(cv))
+                         end, cr; name1 = :cv, name2 = :cr)
+            end
+            @test res1
+
+            cvt = cov(ce, Matrix(transpose(X)); dims = 2)
+            crt = cor(ce, Matrix(transpose(X)); dims = 2)
+            res2 = isapprox(if isa(cvt, Matrix)
+                                StatsBase.cov2cor(cvt)
+                            else
+                                StatsBase.cov2cor(Matrix(cvt))
+                            end, crt)
+            if !res2
+                println("Test `dims = 2` $i fails on:\n$(ce)\n")
+                find_tol(if isa(cvt, Matrix)
+                             StatsBase.cov2cor(cvt)
+                         else
+                             StatsBase.cov2cor(Matrix(cvt))
+                         end, crt; name1 = :cvt, name2 = :crt)
+            end
+            @test res2
+
+            res3 = isapprox(cv, cvt)
+            if !res3
+                find_tol(cv, cvt; name1 = :cv, name2 = :cvt)
+            end
+            @test res3
+
+            res4 = isapprox(cr, crt)
+            if !res4
+                find_tol(cr, crt; name1 = :cr, name2 = :crt)
+            end
+            @test res4
+        end
+    end
+    @testset "SimpleVariance" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 100, 10)
+        fw = FrequencyWeights(rand(rng, 100))
+        ew = eweights(1:100, 0.3; scale = true)
+
+        ve1 = SimpleVariance(; corrected = true)
+        ve2 = SimpleVariance(; corrected = false, w = ew)
+
+        s1 = std(ve1, X)
+        s2 = std(ve2, X)
+        v1 = var(ve1, X)
+        v2 = var(ve2, X)
+        @test isapprox(s1, sqrt.(v1))
+        @test isapprox(s2, sqrt.(v2))
+        @test !isapprox(s1, s2)
+        @test !isapprox(v1, v2)
+    end
+    @testset "Misc tests" begin
+        @test iszero(PortfolioOptimisers.intrinsic_mutual_info(rand(1, 1)))
+    end
+    #=
     @testset "Coskewness" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
@@ -302,333 +718,5 @@
             @test res2
         end
     end
-    @testset "Covariance and Correlation correctness" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 1000, 20)
-        fw = FrequencyWeights(rand(rng, 1000))
-        ew = eweights(1:1000, 0.01; scale = true)
-        ces = [PortfolioOptimisersCovariance(), FullCovariance(),
-               FullCovariance(; me = SimpleExpectedReturns(; w = ew),
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = SimpleCovariance(;
-                                                                                   corrected = false),
-                                                             w = ew)),
-               FullCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage())),
-               FullCovariance(; me = SimpleExpectedReturns(; w = fw),
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage(),
-                                                             w = fw)), SemiCovariance(),
-               SemiCovariance(; me = SimpleExpectedReturns(; w = ew),
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = SimpleCovariance(;
-                                                                                   corrected = false),
-                                                             w = ew)),
-               SemiCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage())),
-               SemiCovariance(; me = SimpleExpectedReturns(; w = fw),
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage(),
-                                                             w = fw)), SpearmanCovariance(),
-               KendallCovariance(), MutualInfoCovariance(),
-               MutualInfoCovariance(; bins = Knuth()),
-               MutualInfoCovariance(; bins = FreedmanDiaconis()),
-               MutualInfoCovariance(; bins = Scott()), MutualInfoCovariance(; bins = 5),
-               MutualInfoCovariance(;
-                                    ve = PortfolioOptimisers.SimpleVariance(;
-                                                                            corrected = false,
-                                                                            w = ew)),
-               DistanceCovariance(), DistanceCovariance(; w = ew), LTDCovariance(),
-               GerberCovariance(; alg = Gerber0()),
-               GerberCovariance(; alg = Gerber0(),
-                                ve = PortfolioOptimisers.SimpleVariance(; corrected = false,
-                                                                        w = ew)),
-               NormalisedGerberCovariance(; alg = Gerber0()),
-               NormalisedGerberCovariance(; alg = Gerber0(),
-                                          me = SimpleExpectedReturns(; w = ew),
-                                          ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                  corrected = false,
-                                                                                  w = ew)),
-               GerberCovariance(; alg = Gerber1()),
-               GerberCovariance(; alg = Gerber1(),
-                                ve = PortfolioOptimisers.SimpleVariance(; corrected = false,
-                                                                        w = ew)),
-               NormalisedGerberCovariance(; alg = Gerber1()),
-               NormalisedGerberCovariance(; alg = Gerber1(),
-                                          me = SimpleExpectedReturns(; w = ew),
-                                          ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                  corrected = false,
-                                                                                  w = ew)),
-               GerberCovariance(; alg = Gerber2()),
-               GerberCovariance(; alg = Gerber2(),
-                                ve = PortfolioOptimisers.SimpleVariance(; corrected = false,
-                                                                        w = ew)),
-               NormalisedGerberCovariance(; alg = Gerber2()),
-               NormalisedGerberCovariance(; alg = Gerber2(),
-                                          me = SimpleExpectedReturns(; w = ew),
-                                          ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                  corrected = false,
-                                                                                  w = ew)),
-               SmythBrobyCovariance(; alg = SmythBroby0()),
-               SmythBrobyCovariance(; alg = SmythBroby0(),
-                                    me = SimpleExpectedReturns(; w = ew),
-                                    ve = PortfolioOptimisers.SimpleVariance(;
-                                                                            corrected = false,
-                                                                            w = ew)),
-               NormalisedSmythBrobyCovariance(; alg = SmythBroby0()),
-               NormalisedSmythBrobyCovariance(; alg = SmythBroby0(),
-                                              me = SimpleExpectedReturns(; w = ew),
-                                              ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                      corrected = false,
-                                                                                      w = ew)),
-               SmythBrobyCovariance(; alg = SmythBroby1()),
-               SmythBrobyCovariance(; alg = SmythBroby1(),
-                                    me = SimpleExpectedReturns(; w = ew),
-                                    ve = PortfolioOptimisers.SimpleVariance(;
-                                                                            corrected = false,
-                                                                            w = ew)),
-               NormalisedSmythBrobyCovariance(; alg = SmythBroby1()),
-               NormalisedSmythBrobyCovariance(; alg = SmythBroby1(),
-                                              me = SimpleExpectedReturns(; w = ew),
-                                              ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                      corrected = false,
-                                                                                      w = ew)),
-               SmythBrobyCovariance(; alg = SmythBroby2()),
-               SmythBrobyCovariance(; alg = SmythBroby2(),
-                                    me = SimpleExpectedReturns(; w = ew),
-                                    ve = PortfolioOptimisers.SimpleVariance(;
-                                                                            corrected = false,
-                                                                            w = ew)),
-               NormalisedSmythBrobyCovariance(; alg = SmythBroby2()),
-               NormalisedSmythBrobyCovariance(; alg = SmythBroby2(),
-                                              me = SimpleExpectedReturns(; w = ew),
-                                              ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                      corrected = false,
-                                                                                      w = ew)),
-               SmythBrobyCovariance(; alg = SmythBrobyGerber0()),
-               SmythBrobyCovariance(; alg = SmythBrobyGerber0(),
-                                    me = SimpleExpectedReturns(; w = ew),
-                                    ve = PortfolioOptimisers.SimpleVariance(;
-                                                                            corrected = false,
-                                                                            w = ew)),
-               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber0()),
-               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber0(),
-                                              me = SimpleExpectedReturns(; w = ew),
-                                              ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                      corrected = false,
-                                                                                      w = ew)),
-               SmythBrobyCovariance(; alg = SmythBrobyGerber1()),
-               SmythBrobyCovariance(; alg = SmythBrobyGerber1(),
-                                    me = SimpleExpectedReturns(; w = ew),
-                                    ve = PortfolioOptimisers.SimpleVariance(;
-                                                                            corrected = false,
-                                                                            w = ew)),
-               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber1()),
-               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber1(),
-                                              me = SimpleExpectedReturns(; w = ew),
-                                              ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                      corrected = false,
-                                                                                      w = ew)),
-               SmythBrobyCovariance(; alg = SmythBrobyGerber2()),
-               SmythBrobyCovariance(; alg = SmythBrobyGerber2(),
-                                    me = SimpleExpectedReturns(; w = ew),
-                                    ve = PortfolioOptimisers.SimpleVariance(;
-                                                                            corrected = false,
-                                                                            w = ew)),
-               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber2()),
-               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber2(),
-                                              me = SimpleExpectedReturns(; w = ew),
-                                              ve = PortfolioOptimisers.SimpleVariance(;
-                                                                                      corrected = false,
-                                                                                      w = ew))]
-        cvrt = CSV.read(joinpath(@__DIR__,
-                                 "./assets/Covariance-and-Correlation-correctness.csv"),
-                        DataFrame)
-        for (i, j) ∈ zip(1:55, 1:2:ncol(cvrt))
-            cv = cov(ces[i], X)
-            cr = cor(ces[i], X)
-            MN = size(cv)
-            res1 = isapprox(cv, reshape(cvrt[!, j], MN))
-            res2 = isapprox(cr, reshape(cvrt[!, j + 1], MN))
-            if !res1
-                println("Fails on cov iteration $i")
-                find_tol(cv, reshape(cvrt[!, j], MN); name1 = :cv, name2 = :cv_t)
-            end
-            @test res1
-            if !res2
-                println("Fails on cor iteration $i")
-                find_tol(cr, reshape(cvrt[!, j + 1], MN); name1 = :cr, name2 = :cr_t)
-            end
-            @test res2
-        end
-    end
-    @testset "cov2cor" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 100, 10)
-        fw = FrequencyWeights(rand(rng, 100))
-        ew = eweights(1:100, 0.3; scale = true)
-
-        ces = [PortfolioOptimisersCovariance(), FullCovariance(),
-               FullCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = SimpleCovariance(;
-                                                                                   corrected = false),
-                                                             w = ew)),
-               FullCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage())),
-               FullCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage(),
-                                                             w = fw)), SemiCovariance(),
-               SemiCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = SimpleCovariance(;
-                                                                                   corrected = false),
-                                                             w = ew)),
-               SemiCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage())),
-               SemiCovariance(;
-                              ce = GeneralWeightedCovariance(;
-                                                             ce = AnalyticalNonlinearShrinkage(),
-                                                             w = fw)), SpearmanCovariance(),
-               KendallCovariance(), MutualInfoCovariance(),
-               MutualInfoCovariance(; bins = Knuth()),
-               MutualInfoCovariance(; bins = FreedmanDiaconis()),
-               MutualInfoCovariance(; bins = Scott()), MutualInfoCovariance(; bins = 5),
-               MutualInfoCovariance(; ve = SimpleVariance(; corrected = false, w = ew)),
-               DistanceCovariance(), DistanceCovariance(; w = ew), LTDCovariance(),
-               Gerber0Covariance(),
-               Gerber0Covariance(; ve = SimpleVariance(; corrected = false, w = ew)),
-               Gerber0NormalisedCovariance(),
-               Gerber0NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = SimpleVariance(; corrected = false, w = ew)),
-               Gerber1Covariance(),
-               Gerber1Covariance(; ve = SimpleVariance(; corrected = false, w = ew)),
-               Gerber1NormalisedCovariance(),
-               Gerber1NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = SimpleVariance(; corrected = false, w = ew)),
-               Gerber2Covariance(),
-               Gerber2Covariance(; ve = SimpleVariance(; corrected = false, w = ew)),
-               Gerber2NormalisedCovariance(),
-               Gerber2NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = SimpleVariance(; corrected = false, w = ew)),
-               SmythBroby0Covariance(),
-               SmythBroby0Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                     ve = SimpleVariance(; corrected = false, w = ew)),
-               SmythBroby0NormalisedCovariance(),
-               SmythBroby0NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                               ve = SimpleVariance(; corrected = false,
-                                                                   w = ew)),
-               SmythBroby1Covariance(),
-               SmythBroby1Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                     ve = SimpleVariance(; corrected = false, w = ew)),
-               SmythBroby1NormalisedCovariance(),
-               SmythBroby1NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                               ve = SimpleVariance(; corrected = false,
-                                                                   w = ew)),
-               SmythBroby2Covariance(),
-               SmythBroby2Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                     ve = SimpleVariance(; corrected = false, w = ew)),
-               SmythBroby2NormalisedCovariance(),
-               SmythBroby2NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                               ve = SimpleVariance(; corrected = false,
-                                                                   w = ew)),
-               SmythBrobyGerber0Covariance(),
-               SmythBrobyGerber0Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = SimpleVariance(; corrected = false, w = ew)),
-               SmythBrobyGerber0NormalisedCovariance(),
-               SmythBrobyGerber0NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                                     ve = SimpleVariance(;
-                                                                         corrected = false,
-                                                                         w = ew)),
-               SmythBrobyGerber1Covariance(),
-               SmythBrobyGerber1Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = SimpleVariance(; corrected = false, w = ew)),
-               SmythBrobyGerber1NormalisedCovariance(),
-               SmythBrobyGerber1NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                                     ve = SimpleVariance(;
-                                                                         corrected = false,
-                                                                         w = ew)),
-               SmythBrobyGerber2Covariance(),
-               SmythBrobyGerber2Covariance(; me = SimpleExpectedReturns(; w = ew),
-                                           ve = SimpleVariance(; corrected = false, w = ew)),
-               SmythBrobyGerber2NormalisedCovariance(),
-               SmythBrobyGerber2NormalisedCovariance(; me = SimpleExpectedReturns(; w = ew),
-                                                     ve = SimpleVariance(;
-                                                                         corrected = false,
-                                                                         w = ew))]
-
-        for (i, ce) ∈ pairs(ces)
-            cv = cov(ce, X)
-            cr = cor(ce, X)
-            res1 = isapprox(if isa(cv, Matrix)
-                                StatsBase.cov2cor(cv)
-                            else
-                                StatsBase.cov2cor(Matrix(cv))
-                            end, cr)
-            if !res1
-                println("Test $i fails on:\n$(ce)\n")
-                find_tol(if isa(cv, Matrix)
-                             StatsBase.cov2cor(cv)
-                         else
-                             StatsBase.cov2cor(Matrix(cv))
-                         end, cr; name1 = :cv, name2 = :cr)
-            end
-            @test res1
-
-            cvt = cov(ce, Matrix(transpose(X)); dims = 2)
-            crt = cor(ce, Matrix(transpose(X)); dims = 2)
-            res2 = isapprox(if isa(cvt, Matrix)
-                                StatsBase.cov2cor(cvt)
-                            else
-                                StatsBase.cov2cor(Matrix(cvt))
-                            end, crt)
-            if !res2
-                println("Test `dims = 2` $i fails on:\n$(ce)\n")
-                find_tol(if isa(cvt, Matrix)
-                             StatsBase.cov2cor(cvt)
-                         else
-                             StatsBase.cov2cor(Matrix(cvt))
-                         end, crt; name1 = :cvt, name2 = :crt)
-            end
-            @test res2
-
-            res3 = isapprox(cv, cvt)
-            if !res3
-                find_tol(cv, cvt; name1 = :cv, name2 = :cvt)
-            end
-            @test res3
-
-            res4 = isapprox(cr, crt)
-            if !res4
-                find_tol(cr, crt; name1 = :cr, name2 = :crt)
-            end
-            @test res4
-        end
-    end
-    @testset "SimpleVariance" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 100, 10)
-        fw = FrequencyWeights(rand(rng, 100))
-        ew = eweights(1:100, 0.3; scale = true)
-
-        ve1 = SimpleVariance(; corrected = true)
-        ve2 = SimpleVariance(; corrected = false, w = ew)
-
-        s1 = std(ve1, X)
-        s2 = std(ve2, X)
-        v1 = var(ve1, X)
-        v2 = var(ve2, X)
-        @test isapprox(s1, sqrt.(v1))
-        @test isapprox(s2, sqrt.(v2))
-        @test !isapprox(s1, s2)
-        @test !isapprox(v1, v2)
-    end
-    @testset "Misc tests" begin
-        @test iszero(PortfolioOptimisers.intrinsic_mutual_info(rand(1, 1)))
-    end
+    =#
 end

@@ -1,8 +1,8 @@
 abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
 struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:PosDefEstimator},
-                               T2 <: Union{Nothing, <:DenoiseEstimator},
-                               T3 <: Union{Nothing, <:DetoneEstimator},
+                               T2 <: Union{Nothing, <:Denoise},
+                               T3 <: Union{Nothing, <:Detone},
                                T4 <: Union{Nothing, <:AbstractMatrixProcessingAlgorithm}} <:
        AbstractMatrixProcessingEstimator
     pdm::T1
@@ -12,8 +12,8 @@ struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:PosDefEstimator},
 end
 function DefaultMatrixProcessing(;
                                  pdm::Union{Nothing, <:PosDefEstimator} = PosDefEstimator(),
-                                 denoise::Union{Nothing, <:DenoiseEstimator} = nothing,
-                                 detone::Union{Nothing, <:DetoneEstimator} = nothing,
+                                 denoise::Union{Nothing, <:Denoise} = nothing,
+                                 detone::Union{Nothing, <:Detone} = nothing,
                                  alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
     return DefaultMatrixProcessing{typeof(pdm), typeof(denoise), typeof(detone),
                                    typeof(alg)}(pdm, denoise, detone, alg)
@@ -33,8 +33,8 @@ function fit_estimator(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
     fit_estimator!(mp, sigma, X, args...; kwargs...)
     return X
 end
-struct NonPositiveDefiniteMatrixProcessing{T1 <: Union{Nothing, <:DenoiseEstimator},
-                                           T2 <: Union{Nothing, <:DetoneEstimator},
+struct NonPositiveDefiniteMatrixProcessing{T1 <: Union{Nothing, <:Denoise},
+                                           T2 <: Union{Nothing, <:Detone},
                                            T3 <: Union{Nothing,
                                                        <:AbstractMatrixProcessingAlgorithm}} <:
        AbstractMatrixProcessingEstimator
@@ -42,9 +42,8 @@ struct NonPositiveDefiniteMatrixProcessing{T1 <: Union{Nothing, <:DenoiseEstimat
     detone::T2
     alg::T3
 end
-function NonPositiveDefiniteMatrixProcessing(;
-                                             denoise::Union{Nothing, <:DenoiseEstimator} = nothing,
-                                             detone::Union{Nothing, <:DetoneEstimator} = nothing,
+function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
+                                             detone::Union{Nothing, <:Detone} = nothing,
                                              alg::Union{Nothing,
                                                         <:AbstractMatrixProcessingAlgorithm} = nothing)
     return NonPositiveDefiniteMatrixProcessing{typeof(denoise), typeof(detone),

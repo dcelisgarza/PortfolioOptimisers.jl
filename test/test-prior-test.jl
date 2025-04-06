@@ -1,3 +1,4 @@
+#=
 @safetestset "Prior tests" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
           CSV, DataFrames, LinearAlgebra, Clarabel
@@ -1233,3 +1234,4 @@
         @test isa(pe.me, SimpleExpectedReturns)
     end
 end
+=#

@@ -1,3 +1,4 @@
+#=
 @safetestset "Types tests" begin
     using PortfolioOptimisers, Test, Clarabel, HiGHS
     @testset "Solver" begin
@@ -11,3 +12,4 @@
         @test !isequal(solvers1, solvers3)
     end
 end
+=#

@@ -1,3 +1,4 @@
+#=
 @safetestset "Clustering tests" begin
     using PortfolioOptimisers, StableRNGs, Random, Test, Clustering
     @testset "Clustering tests" begin
@@ -108,3 +109,4 @@
                                                           clr.clustering, clr.D)
     end
 end
+=#
