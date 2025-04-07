@@ -1223,7 +1223,7 @@ function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
     D = distance(cle.de, S, X; dims = dims)
     S = dbht_similarity(cle.alg.sim, S, D)
     clustering = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
-    k = optimal_number_clusters(cle.nch, clustering, D)
+    k = optimal_number_clusters(cle.onc, clustering, D)
     return DBHTClusteringResult(; clustering = clustering, S = S, D = D, k = k)
 end
 

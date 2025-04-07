@@ -1,11 +1,56 @@
 abstract type AbstractClusteringEstimator <: AbstractPhilogenyEstimator end
 abstract type AbstractClusteringAlgorithm <: AbstractPhilogenyAlgorithm end
-abstract type AbstractOptimalNumberClusters <: AbstractPhilogenyAlgorithm end
+abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
+abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
 abstract type AbstractClusteringResult <: AbstractPhilogenyResult end
-
-function clusterise end
+struct HierarchicalClusteringResult{T1 <: Clustering.Hclust, T2 <: AbstractMatrix,
+                                    T3 <: AbstractMatrix, T4 <: Integer} <:
+       AbstractClusteringResult
+    clustering::T1
+    S::T2
+    D::T3
+    k::T4
+end
+function HierarchicalClusteringResult(; clustering::Clustering.Hclust, S::AbstractMatrix,
+                                      D::AbstractMatrix, k::Integer)
+    @smart_assert(!isempty(S) && !isempty(D))
+    @smart_assert(size(S) == size(D))
+    @smart_assert(k >= one(k))
+    return HierarchicalClusteringResult{typeof(clustering), typeof(S), typeof(D),
+                                        typeof(k)}(clustering, S, D, k)
+end
 function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
     return cle
+end
+struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
+struct PredefinedNumberClusters{T1 <: Integer} <: AbstractOptimalNumberClustersAlgorithm
+    k::T1
+end
+function PredefinedNumberClusters(; k::Integer = 1)
+    @smart_assert(k >= one(k))
+    return PredefinedNumberClusters{typeof(k)}(k)
+end
+struct StandardisedSilhouetteScore{T1 <: Union{Nothing, <:Distances.SemiMetric}} <:
+       AbstractOptimalNumberClustersAlgorithm
+    metric::T1
+end
+function StandardisedSilhouetteScore(;
+                                     metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
+    return StandardisedSilhouetteScore{typeof(metric)}(metric)
+end
+struct OptimalNumberClusters{T1 <: AbstractOptimalNumberClustersAlgorithm,
+                             T2 <: Union{Nothing, <:Integer}} <:
+       AbstractOptimalNumberClustersEstimator
+    alg::T1
+    max_k::T2
+end
+function OptimalNumberClusters(;
+                               alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference(),
+                               max_k::Union{Nothing, <:Integer} = nothing)
+    if !isnothing(max_k)
+        @smart_assert(max_k >= one(max_k))
+    end
+    return OptimalNumberClusters{typeof(alg), typeof(max_k)}(alg, max_k)
 end
 struct HierarchicalClustering{T1 <: Symbol} <: AbstractClusteringAlgorithm
     linkage::T1
@@ -13,58 +58,27 @@ end
 function HierarchicalClustering(; linkage::Symbol = :ward)
     return HierarchicalClustering{typeof(linkage)}(linkage)
 end
-
-struct PredefinedNumberClusters{T1 <: Integer, T2 <: Union{Nothing, <:Integer}} <:
-       AbstractOptimalNumberClusters
-    k::T1
-    max_k::T2
-end
-function PredefinedNumberClusters(; k::Integer = 1,
-                                  max_k::Union{Nothing, <:Integer} = nothing)
-    @smart_assert(k >= one(k))
-    if !isnothing(max_k)
-        @smart_assert(max_k >= one(max_k))
-    end
-    return PredefinedNumberClusters{typeof(k), typeof(max_k)}(k, max_k)
-end
-struct SecondOrderDifference{T1 <: Union{Nothing, <:Integer}} <:
-       AbstractOptimalNumberClusters
-    max_k::T1
-end
-function SecondOrderDifference(; max_k::Union{Nothing, <:Integer} = nothing)
-    if !isnothing(max_k)
-        @smart_assert(max_k >= one(max_k))
-    end
-    return SecondOrderDifference{typeof(max_k)}(max_k)
-end
-struct StandardisedSilhouetteScore{T1 <: Union{Nothing, <:Integer},
-                                   T2 <: Union{Nothing, <:Distances.SemiMetric}} <:
-       AbstractOptimalNumberClusters
-    max_k::T1
-    metric::T2
-end
-function StandardisedSilhouetteScore(; max_k::Union{Nothing, <:Integer} = nothing,
-                                     metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
-    if !isnothing(max_k)
-        @smart_assert(max_k >= one(max_k))
-    end
-    return StandardisedSilhouetteScore{typeof(max_k), typeof(metric)}(max_k, metric)
-end
 struct ClusteringEstimator{T1 <: StatsBase.CovarianceEstimator,
                            T2 <: AbstractDistanceEstimator,
                            T3 <: AbstractClusteringAlgorithm,
-                           T4 <: Union{<:Integer, AbstractOptimalNumberClusters}} <:
+                           T4 <: Union{<:Integer, <:AbstractOptimalNumberClustersEstimator}} <:
        AbstractClusteringEstimator
     ce::T1
     de::T2
     alg::T3
-    nch::T4
+    onc::T4
 end
 function ClusteringEstimator(;
                              ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                             de::AbstractDistanceEstimator = CanonicalDistance(),
+                             de::AbstractDistanceEstimator = Distance(;
+                                                                      alg = CanonicalDistance()),
                              alg::AbstractClusteringAlgorithm = HierarchicalClustering(),
-                             nch::Union{<:Integer, AbstractOptimalNumberClusters} = SecondOrderDifference())
-    return ClusteringEstimator{typeof(ce), typeof(de), typeof(alg), typeof(nch)}(ce, de,
-                                                                                 alg, nch)
+                             onc::Union{<:Integer,
+                                        <:AbstractOptimalNumberClustersEstimator} = OptimalNumberClusters())
+    return ClusteringEstimator{typeof(ce), typeof(de), typeof(alg), typeof(onc)}(ce, de,
+                                                                                 alg, onc)
 end
+
+export clusterise, SecondOrderDifference, PredefinedNumberClusters,
+       StandardisedSilhouetteScore, OptimalNumberClusters, HierarchicalClustering,
+       ClusteringEstimator

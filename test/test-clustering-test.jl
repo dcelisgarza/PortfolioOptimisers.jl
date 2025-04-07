@@ -5,9 +5,11 @@
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
         clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
-                                             de = CanonicalDistance(),
+                                             de = Distance(; alg = CanonicalDistance()),
                                              alg = HierarchicalClustering(),
-                                             nch = SecondOrderDifference()), X)
+                                             onc = OptimalNumberClusters(;
+                                                                         alg = SecondOrderDifference())),
+                         X)
         clr_t = Clustering.Hclust{Float64}([-8 -18; -3 -2; -5 -15; -12 -10; -11 -4; 2 -19;
                                             -17 -14;
                                              -9 -6; 7 4; -16 -1; -20 -13; -7 8; 10 6; 5 3;
@@ -30,8 +32,11 @@
         @test clr.clustering.labels == clr_t.labels
         @test clr.clustering.linkage == clr_t.linkage
         clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
-                                             de = CanonicalDistance(), alg = DBHT(),
-                                             nch = SecondOrderDifference()), X)
+                                             de = Distance(; alg = CanonicalDistance()),
+                                             alg = DBHT(),
+                                             onc = OptimalNumberClusters(;
+                                                                         alg = SecondOrderDifference())),
+                         X)
         clr_t = Hclust{Float64}([-5 -13; -10 -12; -9 -6; 3 -17; -8 -18; -14 -7; -3 -1;
                                  -11 -4;
                                  -20 -2; 9 -19; -16 -15; 8 5; 2 6; 10 12; 11 1; 14 7; 15 4;
@@ -50,63 +55,79 @@
         @test isapprox(clr.clustering.heights, clr_t.heights)
         @test clr.clustering.labels == clr_t.labels
         @test clr.clustering.linkage == clr_t.linkage
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(SecondOrderDifference(;
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = SecondOrderDifference(),
                                                                                      max_k = nothing),
                                                                clr.clustering, clr.D)
-        @test 1 == PortfolioOptimisers.optimal_number_clusters(SecondOrderDifference(;
+        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = SecondOrderDifference(),
                                                                                      max_k = 1),
                                                                clr.clustering, clr.D)
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(SecondOrderDifference(;
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = SecondOrderDifference(),
                                                                                      max_k = 100),
                                                                clr.clustering, clr.D)
 
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(StandardisedSilhouetteScore(;
-                                                                                           max_k = nothing),
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = StandardisedSilhouetteScore(),
+                                                                                     max_k = nothing),
                                                                clr.clustering, clr.D)
-        @test 1 == PortfolioOptimisers.optimal_number_clusters(StandardisedSilhouetteScore(;
-                                                                                           max_k = 1),
+        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = StandardisedSilhouetteScore(),
+                                                                                     max_k = 1),
                                                                clr.clustering, clr.D)
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(StandardisedSilhouetteScore(;
-                                                                                           max_k = 100),
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = StandardisedSilhouetteScore(),
+                                                                                     max_k = 100),
                                                                clr.clustering, clr.D)
 
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(StandardisedSilhouetteScore(;
-                                                                                           max_k = nothing),
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = StandardisedSilhouetteScore(),
+                                                                                     max_k = nothing),
                                                                clr.clustering, clr.D)
-        @test 1 == PortfolioOptimisers.optimal_number_clusters(StandardisedSilhouetteScore(;
-                                                                                           max_k = 1),
+        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = StandardisedSilhouetteScore(),
+                                                                                     max_k = 1),
                                                                clr.clustering, clr.D)
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(StandardisedSilhouetteScore(;
-                                                                                           max_k = 100),
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = StandardisedSilhouetteScore(),
+                                                                                     max_k = 100),
                                                                clr.clustering, clr.D)
-        @test 5 ==
-              PortfolioOptimisers.optimal_number_clusters(PredefinedNumberClusters(; k = 10,
-                                                                                   max_k = nothing),
-                                                          clr.clustering, clr.D)
-        @test 1 ==
-              PortfolioOptimisers.optimal_number_clusters(PredefinedNumberClusters(; k = 1,
-                                                                                   max_k = 5),
-                                                          clr.clustering, clr.D)
-        @test 2 ==
-              PortfolioOptimisers.optimal_number_clusters(PredefinedNumberClusters(; k = 2,
-                                                                                   max_k = 5),
-                                                          clr.clustering, clr.D)
-        @test 3 ==
-              PortfolioOptimisers.optimal_number_clusters(PredefinedNumberClusters(; k = 3,
-                                                                                   max_k = 5),
-                                                          clr.clustering, clr.D)
-        @test 4 ==
-              PortfolioOptimisers.optimal_number_clusters(PredefinedNumberClusters(; k = 4,
-                                                                                   max_k = 5),
-                                                          clr.clustering, clr.D)
-        @test 5 ==
-              PortfolioOptimisers.optimal_number_clusters(PredefinedNumberClusters(; k = 5,
-                                                                                   max_k = 5),
-                                                          clr.clustering, clr.D)
-        @test 5 ==
-              PortfolioOptimisers.optimal_number_clusters(PredefinedNumberClusters(; k = 6,
-                                                                                   max_k = 10),
-                                                          clr.clustering, clr.D)
+        @test 5 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = PredefinedNumberClusters(;
+                                                                                                                    k = 10),
+                                                                                     max_k = nothing),
+                                                               clr.clustering, clr.D)
+        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = PredefinedNumberClusters(;
+                                                                                                                    k = 1),
+                                                                                     max_k = 5),
+                                                               clr.clustering, clr.D)
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = PredefinedNumberClusters(;
+                                                                                                                    k = 2),
+                                                                                     max_k = 5),
+                                                               clr.clustering, clr.D)
+        @test 3 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = PredefinedNumberClusters(;
+                                                                                                                    k = 3),
+                                                                                     max_k = 5),
+                                                               clr.clustering, clr.D)
+        @test 4 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = PredefinedNumberClusters(;
+                                                                                                                    k = 4),
+                                                                                     max_k = 5),
+                                                               clr.clustering, clr.D)
+        @test 5 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = PredefinedNumberClusters(;
+                                                                                                                    k = 5),
+                                                                                     max_k = 5),
+                                                               clr.clustering, clr.D)
+        @test 5 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
+                                                                                     alg = PredefinedNumberClusters(;
+                                                                                                                    k = 6),
+                                                                                     max_k = 10),
+                                                               clr.clustering, clr.D)
     end
 end
 =#

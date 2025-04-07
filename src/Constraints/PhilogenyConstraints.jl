@@ -34,8 +34,8 @@ function IntegerPhilogenyConstraint(; pe::PhilogenyEstimator = NetworkEstimator(
     @smart_assert(!isempty(pe))
     if isa(B, AbstractVector)
         @smart_assert(!isempty(B) && all(B .>= zero(B)))
-        if isa(pe, ClusteringEstimator) && !isnothing(pe.nch.max_k)
-            @smart_assert(length(B) <= pe.nch.max_k)
+        if isa(pe, ClusteringEstimator) && !isnothing(pe.onc.max_k)
+            @smart_assert(length(B) <= pe.onc.max_k)
         end
     else
         @smart_assert(B >= zero(B))

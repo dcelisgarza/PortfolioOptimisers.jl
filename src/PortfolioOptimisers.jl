@@ -53,6 +53,7 @@ include("./11_Regression/3_DimensionReductionRegression.jl")
 
 include("./12_Philogeny/1_Base_Philogeny.jl")
 include("./12_Philogeny/2_Clustering.jl")
+include("./12_Philogeny/3_Hierarchical.jl")
 
 #=
 
