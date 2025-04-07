@@ -1,4 +1,5 @@
-struct PosDefEstimator{T1} <: AbstractEstimator
+abstract type AbstractPosdefEstimator <: AbstractEstimator end
+struct PosDefEstimator{T1} <: AbstractPosdefEstimator
     alg::T1
 end
 function PosDefEstimator(; alg = NearestCorrelationMatrix.Newton())

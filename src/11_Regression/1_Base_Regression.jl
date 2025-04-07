@@ -1,5 +1,8 @@
-abstract type RegressionMethod end
-struct LoadingsMatrix{T1 <: Union{Nothing, <:AbstractVector}, T2 <: AbstractMatrix}
+abstract type AbstractRegressionEstimator <: AbstractEstimator end
+abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
+abstract type AbstractRegressionResult <: AbstractResult end
+struct LoadingsMatrix{T1 <: Union{Nothing, <:AbstractVector}, T2 <: AbstractMatrix} <:
+       AbstractRegressionResult
     b::T1
     M::T2
 end

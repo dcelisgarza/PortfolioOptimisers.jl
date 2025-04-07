@@ -1,4 +1,3 @@
-#=
 @safetestset "Regression tests" begin
     using PortfolioOptimisers, DataFrames, Test, CSV, Random, StableRNGs
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
@@ -16,13 +15,19 @@
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
         F = X[:, [3, 8, 14, 19, 10]]
-        res = [ForwardRegression(), ForwardRegression(AIC()), ForwardRegression(AICC()),
-               ForwardRegression(BIC()), ForwardRegression(RSquared()),
-               ForwardRegression(AdjustedRSquared()), BackwardRegression(),
-               BackwardRegression(AIC()), BackwardRegression(AICC()),
-               BackwardRegression(BIC()), BackwardRegression(RSquared()),
-               BackwardRegression(AdjustedRSquared()), PCARegression(),
-               PCARegression(; target = PPCATarget())]
+        res = [StepwiseRegression(; alg = Forward()),
+               StepwiseRegression(; alg = Forward(), criterion = AIC()),
+               StepwiseRegression(; alg = Forward(), criterion = AICC()),
+               StepwiseRegression(; alg = Forward(), criterion = BIC()),
+               StepwiseRegression(; alg = Forward(), criterion = RSquared()),
+               StepwiseRegression(; alg = Forward(), criterion = AdjustedRSquared()),
+               StepwiseRegression(; alg = Backward()),
+               StepwiseRegression(; alg = Backward(), criterion = AIC()),
+               StepwiseRegression(; alg = Backward(), criterion = AICC()),
+               StepwiseRegression(; alg = Backward(), criterion = BIC()),
+               StepwiseRegression(; alg = Backward(), criterion = RSquared()),
+               StepwiseRegression(; alg = Backward(), criterion = AdjustedRSquared()),
+               DimensionReductionRegression(), DimensionReductionRegression(; alg = PPCA())]
         res_t = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv"), DataFrame)
         for i ∈ eachindex(res)
             loadings = regression(res[i], X, F)
@@ -39,4 +44,3 @@
         end
     end
 end
-=#

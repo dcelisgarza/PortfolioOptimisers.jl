@@ -1,15 +1,16 @@
-abstract type DenoiseAlgorithm <: AbstractAlgorithm end
-struct SpectralDenoise <: DenoiseAlgorithm end
-struct FixedDenoise <: DenoiseAlgorithm end
-struct ShrunkDenoise{T1 <: Real} <: DenoiseAlgorithm
+abstract type AbstractDenoiseEstimator <: AbstractEstimator end
+abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
+struct SpectralDenoise <: AbstractDenoiseAlgorithm end
+struct FixedDenoise <: AbstractDenoiseAlgorithm end
+struct ShrunkDenoise{T1 <: Real} <: AbstractDenoiseAlgorithm
     alpha::T1
 end
 function ShrunkDenoise(; alpha::Real = 0.0)
     @smart_assert(zero(alpha) <= alpha <= one(alpha))
     return ShrunkDenoise{typeof(alpha)}(alpha)
 end
-struct Denoise{T1 <: DenoiseAlgorithm, T2 <: Integer, T3 <: Integer, T4, T5 <: Tuple,
-               T6 <: NamedTuple} <: AbstractEstimator
+struct Denoise{T1 <: AbstractDenoiseAlgorithm, T2 <: Integer, T3 <: Integer, T4,
+               T5 <: Tuple, T6 <: NamedTuple} <: AbstractDenoiseEstimator
     alg::T1
     m::T2
     n::T3
@@ -17,7 +18,7 @@ struct Denoise{T1 <: DenoiseAlgorithm, T2 <: Integer, T3 <: Integer, T4, T5 <: T
     args::T5
     kwargs::T6
 end
-function Denoise(; alg::DenoiseAlgorithm = ShrunkDenoise(), m::Integer = 10,
+function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), m::Integer = 10,
                  n::Integer = 1000, kernel = AverageShiftedHistograms.Kernels.gaussian,
                  args::Tuple = (), kwargs::NamedTuple = (;))
     return Denoise{typeof(alg), typeof(m), typeof(n), typeof(kernel), typeof(args),

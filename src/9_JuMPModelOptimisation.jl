@@ -1,3 +1,4 @@
+abstract type AbstractJuMPResult <: AbstractResult end
 struct Solver{T1 <: Union{Symbol, <:AbstractString}, T2, T3 <: NamedTuple,
               T4 <: Union{Nothing, <:AbstractDict}, T5 <: Bool}
     name::T1
@@ -24,7 +25,6 @@ function Base.isequal(A::Solver, B::Solver)
     return true
 end
 Base.iterate(S::Solver, state = 1) = state > 1 ? nothing : (S, state + 1)
-abstract type AbstractJuMPResult <: AbstractResult end
 struct JuMPResult{T1 <: AbstractDict, T2 <: Bool} <: AbstractJuMPResult
     trials::T1
     success::T2

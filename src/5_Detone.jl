@@ -1,4 +1,5 @@
-struct Detone{T1 <: Integer} <: AbstractEstimator
+abstract type AbstractDetoneEstimator <: AbstractEstimator end
+struct Detone{T1 <: Integer} <: AbstractDetoneEstimator
     n::T1
 end
 function Detone(; n::Integer = 1)

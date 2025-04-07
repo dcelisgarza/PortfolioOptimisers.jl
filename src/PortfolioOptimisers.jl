@@ -47,6 +47,10 @@ include("./9_JuMPModelOptimisation.jl")
 
 include("./10_OWA.jl")
 
+include("./11_Regression/1_Base_Regression.jl")
+include("./11_Regression/2_StepwiseRegression.jl")
+include("./11_Regression/3_DimensionReductionRegression.jl")
+
 #=
 
 # Linear Algebra
