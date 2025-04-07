@@ -5,7 +5,7 @@ struct ReturnsData{T1 <: Union{Nothing, <:AbstractVector},
                    T2 <: Union{Nothing, AbstractMatrix},
                    T3 <: Union{Nothing, <:AbstractVector},
                    T4 <: Union{Nothing, <:AbstractMatrix},
-                   T5 <: Union{Nothing, <:AbstractVector}}
+                   T5 <: Union{Nothing, <:AbstractVector}} <: AbstractResult
     nx::T1
     X::T2
     nf::T3

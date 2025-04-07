@@ -37,4 +37,4 @@ function fit_estimator!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator},
     return nothing
 end
 
-export fit_estimator!, LoGo
+export LoGo

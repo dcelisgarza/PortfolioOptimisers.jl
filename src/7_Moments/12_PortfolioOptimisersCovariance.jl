@@ -19,7 +19,7 @@ function StatsBase.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dim
         X = transpose(X)
     end
     sigma = cov(ce.ce, X; kwargs...)
-    fit_estimator!(ce.mp, sigma, X)
+    matrix_processing!(ce.mp, sigma, X)
     return sigma
 end
 function StatsBase.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
@@ -29,7 +29,7 @@ function StatsBase.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dim
         X = transpose(X)
     end
     rho = cor(ce.ce, X; kwargs...)
-    fit_estimator!(ce.mp, rho, X)
+    matrix_processing!(ce.mp, rho, X)
     return rho
 end
 

@@ -19,7 +19,7 @@ function _cokurosis(X, mp)
     o = transpose(range(; start = one(eltype(X)), stop = one(eltype(X)), length = N))
     z = kron(o, X) .* kron(X, o)
     ckurt = transpose(z) * z / T
-    fit_estimator!(mp, ckurt, X)
+    matrix_processing!(mp, ckurt, X)
     return ckurt
 end
 function cokurtosis(ke::Cokurtosis{<:Full, <:Any, <:Any}, X::AbstractMatrix; dims::Int = 1,

@@ -1,5 +1,13 @@
 abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
+function matrix_processing_algorithm!(::Union{Nothing, AbstractMatrixProcessingAlgorithm},
+                                      args...)
+    return nothing
+end
+function matrix_processing_algorithm(::Union{Nothing, AbstractMatrixProcessingAlgorithm},
+                                     args...)
+    return nothing
+end
 struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:PosDefEstimator},
                                T2 <: Union{Nothing, <:Denoise},
                                T3 <: Union{Nothing, <:Detone},
@@ -18,19 +26,19 @@ function DefaultMatrixProcessing(;
     return DefaultMatrixProcessing{typeof(pdm), typeof(denoise), typeof(detone),
                                    typeof(alg)}(pdm, denoise, detone, alg)
 end
-function fit_estimator!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
-                        X::AbstractMatrix, args...; kwargs...)
+function matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
+                            X::AbstractMatrix, args...; kwargs...)
     T, N = size(X)
-    fit_estimator!(mp.pdm, sigma)
-    fit_estimator!(mp.denoise, mp.pdm, sigma, T / N)
-    fit_estimator!(mp.detone, mp.pdm, sigma)
-    fit_estimator!(mp.alg, mp.pdm, sigma, X)
+    posdef!(mp.pdm, sigma)
+    denoise!(mp.denoise, mp.pdm, sigma, T / N)
+    detone!(mp.detone, mp.pdm, sigma)
+    matrix_processing_algorithm!(mp.alg, mp.pdm, sigma, X)
     return nothing
 end
-function fit_estimator(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
-                       X::AbstractMatrix, args...; kwargs...)
+function matrix_processing(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
+                           X::AbstractMatrix, args...; kwargs...)
     X = copy(X)
-    fit_estimator!(mp, sigma, X, args...; kwargs...)
+    matrix_processing!(mp, sigma, X, args...; kwargs...)
     return X
 end
 struct NonPositiveDefiniteMatrixProcessing{T1 <: Union{Nothing, <:Denoise},
@@ -49,20 +57,21 @@ function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise
     return NonPositiveDefiniteMatrixProcessing{typeof(denoise), typeof(detone),
                                                typeof(alg)}(denoise, detone, alg)
 end
-function fit_estimator!(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
-                        X::AbstractMatrix, args...; kwargs...)
+function matrix_processing!(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
+                            X::AbstractMatrix, args...; kwargs...)
     T, N = size(X)
-    fit_estimator!(nothing, sigma)
-    fit_estimator!(mp.denoise, nothing, sigma, T / N)
-    fit_estimator!(mp.detone, nothing, sigma)
-    fit_estimator!(mp.alg, nothing, sigma, X)
+    posdef!(nothing, sigma)
+    denoise!(mp.denoise, nothing, sigma, T / N)
+    detone!(mp.detone, nothing, sigma)
+    matrix_processing_algorithm!(mp.alg, nothing, sigma, X)
     return nothing
 end
-function fit_estimator(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
-                       X::AbstractMatrix, args...; kwargs...)
+function matrix_processing(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
+                           X::AbstractMatrix, args...; kwargs...)
     X = copy(X)
-    fit_estimator!(mp, sigma, X, args...; kwargs...)
+    matrix_processing!(mp, sigma, X, args...; kwargs...)
     return X
 end
 
-export DefaultMatrixProcessing, NonPositiveDefiniteMatrixProcessing
+export DefaultMatrixProcessing, NonPositiveDefiniteMatrixProcessing, matrix_processing,
+       matrix_processing!, matrix_processing_algorithm, matrix_processing_algorithm!

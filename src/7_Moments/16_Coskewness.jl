@@ -22,7 +22,7 @@ function __coskewness(cskew, X, mp)
         j = (i - 1) * N + 1
         k = i * N
         coskew_jk = view(cskew, :, j:k)
-        fit_estimator!(mp, coskew_jk, X)
+        matrix_processing!(mp, coskew_jk, X)
         vals, vecs = eigen(coskew_jk)
         vals .= clamp.(real.(vals), typemin(eltype(cskew)), zero(eltype(cskew))) +
                 clamp.(imag.(vals), typemin(eltype(cskew)), zero(eltype(cskew)))im

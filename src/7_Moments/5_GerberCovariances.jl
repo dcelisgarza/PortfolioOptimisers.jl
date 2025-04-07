@@ -35,7 +35,7 @@ function gerber(ce::GerberCovariance{<:Gerber0, <:Any, <:Any, <:Any}, X::Abstrac
     UmD = U - D
     UpD = U + D
     rho = (transpose(UmD) * UmD) ./ (transpose(UpD) * UpD)
-    fit_estimator!(ce.pdm, rho)
+    posdef!(ce.pdm, rho)
     return rho
 end
 function gerber(ce::GerberCovariance{<:Gerber1, <:Any, <:Any, <:Any}, X::AbstractMatrix,
@@ -53,7 +53,7 @@ function gerber(ce::GerberCovariance{<:Gerber1, <:Any, <:Any, <:Any}, X::Abstrac
     # H = nconc - ndisc
     UmD = U - D
     rho = transpose(UmD) * (UmD) ./ (T .- transpose(N) * N)
-    fit_estimator!(ce.pdm, rho)
+    posdef!(ce.pdm, rho)
     return rho
 end
 function gerber(ce::GerberCovariance{<:Gerber2, <:Any, <:Any, <:Any}, X::AbstractMatrix,
@@ -71,7 +71,7 @@ function gerber(ce::GerberCovariance{<:Gerber2, <:Any, <:Any, <:Any}, X::Abstrac
     H = transpose(UmD) * (UmD)
     h = sqrt.(diag(H))
     rho = H ./ (h * transpose(h))
-    fit_estimator!(ce.pdm, rho)
+    posdef!(ce.pdm, rho)
     return rho
 end
 function StatsBase.cor(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
@@ -132,7 +132,7 @@ function gerber(ce::NormalisedGerberCovariance{<:Gerber0, <:Any, <:Any, <:Any, <
     UmD = U - D
     UpD = U + D
     rho = (transpose(UmD) * UmD) ./ (transpose(UpD) * UpD)
-    fit_estimator!(ce.pdm, rho)
+    posdef!(ce.pdm, rho)
     return rho
 end
 function gerber(ce::NormalisedGerberCovariance{<:Gerber1, <:Any, <:Any, <:Any, <:Any},
@@ -149,7 +149,7 @@ function gerber(ce::NormalisedGerberCovariance{<:Gerber1, <:Any, <:Any, <:Any, <
     # H = nconc - ndisc
     UmD = U - D
     rho = transpose(UmD) * (UmD) ./ (T .- transpose(N) * N)
-    fit_estimator!(ce.pdm, rho)
+    posdef!(ce.pdm, rho)
     return rho
 end
 function gerber(ce::NormalisedGerberCovariance{<:Gerber2, <:Any, <:Any, <:Any, <:Any},
@@ -166,7 +166,7 @@ function gerber(ce::NormalisedGerberCovariance{<:Gerber2, <:Any, <:Any, <:Any, <
     H = transpose(UmD) * (UmD)
     h = sqrt.(diag(H))
     rho = H ./ (h * transpose(h))
-    fit_estimator!(ce.pdm, rho)
+    posdef!(ce.pdm, rho)
     return rho
 end
 function StatsBase.cor(ce::NormalisedGerberCovariance, X::AbstractMatrix; dims::Int = 1,

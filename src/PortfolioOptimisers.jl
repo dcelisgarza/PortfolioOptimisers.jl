@@ -12,8 +12,8 @@ using AverageShiftedHistograms, Clustering, Distances, Distributions, GLM, Imput
     read(path, String)
 end PortfolioOptimisers
 
-include("./1_Tools.jl")
-include("./2_Base.jl")
+include("./1_Base.jl")
+include("./2_Tools.jl")
 include("./3_PosDefMatrix.jl")
 include("./4_Denoise.jl")
 include("./5_Detone.jl")
