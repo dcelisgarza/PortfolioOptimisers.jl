@@ -534,7 +534,7 @@
 
         ce = PortfolioOptimisersCovariance()
         for i ∈ 1:ncol(dist_t)
-            dist1 = fit_estimator(des[i], ce, X)
+            dist1 = distance(des[i], ce, X)
             MN = size(dist1)
             res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
             if !res1
@@ -543,7 +543,7 @@
             end
             @test res1
 
-            dist2 = fit_estimator(des[i], cov(ce, X), X)
+            dist2 = distance(des[i], cov(ce, X), X)
             res2 = isapprox(dist1, dist2)
             if !res2
                 println("Fails on Absolute Distance method comparison iteration $i")
@@ -557,7 +557,7 @@
                GeneralDistance(; alg = LogDistance()),
                GeneralDistanceDistance(; alg = LogDistance())]
         for i ∈ 1:ncol(dist_t)
-            dist1 = fit_estimator(des[i], ce, X)
+            dist1 = distance(des[i], ce, X)
             MN = size(dist1)
             res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
             if !res1
@@ -566,7 +566,7 @@
             end
             @test res1
 
-            dist2 = fit_estimator(des[i], cov(ce, X), X)
+            dist2 = distance(des[i], cov(ce, X), X)
             res2 = isapprox(dist1, dist2)
             if !res2
                 println("Fails on General Absolute Distance Distance method comparison iteration $i")
@@ -604,7 +604,7 @@
 
         de = Distance(; alg = CanonicalDistance())
         for i ∈ 1:ncol(dist_t)
-            dist1 = fit_estimator(de, ces[i], transpose(X); dims = 2)
+            dist1 = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist1)
             res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
             if !res1
@@ -614,16 +614,16 @@
             @test res1
 
             dist2 = if isa(ces[i], MutualInfoCovariance)
-                fit_estimator(Distance(;
-                                       alg = VariationInfoDistance(; bins = ces[i].bins,
-                                                                   normalise = ces[i].normalise)),
-                              cov(ces[i], X), X)
+                distance(Distance(;
+                                  alg = VariationInfoDistance(; bins = ces[i].bins,
+                                                              normalise = ces[i].normalise)),
+                         cov(ces[i], X), X)
             elseif isa(ces[i], DistanceCovariance)
-                fit_estimator(Distance(; alg = CorrelationDistance(;)), cov(ces[i], X), X)
+                distance(Distance(; alg = CorrelationDistance(;)), cov(ces[i], X), X)
             elseif isa(ces[i], LTDCovariance)
-                fit_estimator(Distance(; alg = LogDistance()), cov(ces[i], X), X)
+                distance(Distance(; alg = LogDistance()), cov(ces[i], X), X)
             else
-                fit_estimator(de, cov(ces[i], X), X)
+                distance(de, cov(ces[i], X), X)
             end
             res2 = isapprox(dist1, dist2)
             if !res2
@@ -635,7 +635,7 @@
 
         de = GeneralDistance(; alg = CanonicalDistance())
         for i ∈ 1:ncol(dist_t)
-            dist1 = fit_estimator(de, ces[i], transpose(X); dims = 2)
+            dist1 = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist1)
             res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
             if !res1
@@ -645,18 +645,16 @@
             @test res1
 
             dist2 = if isa(ces[i], MutualInfoCovariance)
-                fit_estimator(GeneralDistance(;
-                                              alg = VariationInfoDistance(;
-                                                                          bins = ces[i].bins,
-                                                                          normalise = ces[i].normalise)),
-                              cov(ces[i], X), X)
+                distance(GeneralDistance(;
+                                         alg = VariationInfoDistance(; bins = ces[i].bins,
+                                                                     normalise = ces[i].normalise)),
+                         cov(ces[i], X), X)
             elseif isa(ces[i], DistanceCovariance)
-                fit_estimator(GeneralDistance(; alg = CorrelationDistance(;)),
-                              cov(ces[i], X), X)
+                distance(GeneralDistance(; alg = CorrelationDistance(;)), cov(ces[i], X), X)
             elseif isa(ces[i], LTDCovariance)
-                fit_estimator(GeneralDistance(; alg = LogDistance()), cov(ces[i], X), X)
+                distance(GeneralDistance(; alg = LogDistance()), cov(ces[i], X), X)
             else
-                fit_estimator(de, cov(ces[i], X), X)
+                distance(de, cov(ces[i], X), X)
             end
             res2 = isapprox(dist1, dist2)
             if !res2
@@ -697,7 +695,7 @@
 
         de = DistanceDistance(; alg = CanonicalDistance())
         for i ∈ 1:ncol(dist_t)
-            dist1 = fit_estimator(de, ces[i], transpose(X); dims = 2)
+            dist1 = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist1)
             res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
             if !res1
@@ -707,18 +705,16 @@
             @test res1
 
             dist2 = if isa(ces[i], MutualInfoCovariance)
-                fit_estimator(DistanceDistance(;
-                                               alg = VariationInfoDistance(;
-                                                                           bins = ces[i].bins,
-                                                                           normalise = ces[i].normalise)),
-                              cov(ces[i], X), X)
+                distance(DistanceDistance(;
+                                          alg = VariationInfoDistance(; bins = ces[i].bins,
+                                                                      normalise = ces[i].normalise)),
+                         cov(ces[i], X), X)
             elseif isa(ces[i], DistanceCovariance)
-                fit_estimator(DistanceDistance(; alg = CorrelationDistance()),
-                              cov(ces[i], X), X)
+                distance(DistanceDistance(; alg = CorrelationDistance()), cov(ces[i], X), X)
             elseif isa(ces[i], LTDCovariance)
-                fit_estimator(DistanceDistance(; alg = LogDistance()), cov(ces[i], X), X)
+                distance(DistanceDistance(; alg = LogDistance()), cov(ces[i], X), X)
             else
-                fit_estimator(de, cov(ces[i], X), X)
+                distance(de, cov(ces[i], X), X)
             end
             res2 = isapprox(dist1, dist2)
             if !res2
@@ -730,7 +726,7 @@
 
         de = GeneralDistanceDistance(; alg = CanonicalDistance())
         for i ∈ 1:ncol(dist_t)
-            dist1 = fit_estimator(de, ces[i], transpose(X); dims = 2)
+            dist1 = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist1)
             res1 = isapprox(dist1, reshape(dist_t[!, i], MN))
             if !res1
@@ -740,19 +736,18 @@
             @test res1
 
             dist2 = if isa(ces[i], MutualInfoCovariance)
-                fit_estimator(GeneralDistanceDistance(;
-                                                      alg = VariationInfoDistance(;
-                                                                                  bins = ces[i].bins,
-                                                                                  normalise = ces[i].normalise)),
-                              cov(ces[i], X), X)
+                distance(GeneralDistanceDistance(;
+                                                 alg = VariationInfoDistance(;
+                                                                             bins = ces[i].bins,
+                                                                             normalise = ces[i].normalise)),
+                         cov(ces[i], X), X)
             elseif isa(ces[i], DistanceCovariance)
-                fit_estimator(GeneralDistanceDistance(; alg = CorrelationDistance(;)),
-                              cov(ces[i], X), X)
+                distance(GeneralDistanceDistance(; alg = CorrelationDistance(;)),
+                         cov(ces[i], X), X)
             elseif isa(ces[i], LTDCovariance)
-                fit_estimator(GeneralDistanceDistance(; alg = LogDistance()),
-                              cov(ces[i], X), X)
+                distance(GeneralDistanceDistance(; alg = LogDistance()), cov(ces[i], X), X)
             else
-                fit_estimator(de, cov(ces[i], X), X)
+                distance(de, cov(ces[i], X), X)
             end
             res2 = isapprox(dist1, dist2)
             if !res2

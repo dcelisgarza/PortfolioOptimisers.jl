@@ -1,4 +1,4 @@
-function fit_estimator!(::Nothing, args...; kwargs...)
+function logo!(::Nothing, args...; kwargs...)
     return nothing
 end
 struct LoGo{T1 <: DistanceEstimator, T2 <: SimilarityMatrixEstimator}
@@ -17,8 +17,8 @@ end
 function LoGo_dist_assert(args...)
     return nothing
 end
-function fit_estimator!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator},
-                        sigma::AbstractMatrix, X::AbstractMatrix; dims::Int = 1)
+function logo!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator}, sigma::AbstractMatrix,
+               X::AbstractMatrix; dims::Int = 1)
     issquare(sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
@@ -29,11 +29,11 @@ function fit_estimator!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator},
     else
         sigma
     end
-    D = fit_estimator(je.dist, S, X; dims = dims)
+    D = logo(je.dist, S, X; dims = dims)
     S = dbht_similarity(je.sim, S, D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
     sigma .= J_LoGo(sigma, separators, cliques) \ I
-    fit_estimator!(pdm, sigma)
+    logo!(pdm, sigma)
     return nothing
 end
 

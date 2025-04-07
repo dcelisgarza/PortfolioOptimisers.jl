@@ -20,7 +20,7 @@
         ce = PortfolioOptimisersCovariance()
         de = SimpleDistance()
         rho = cor(ce, X)
-        dist = fit_estimator(de, rho, X)
+        dist = distance(de, rho, X)
 
         sim = DBHT_MaximumDistanceSimilarity()
         S = dbht_similarity(sim, rho, dist)
@@ -135,7 +135,7 @@
         ce = PortfolioOptimisersCovariance()
         de = SimpleDistance()
         rho = cor(ce, X)
-        dist = fit_estimator(de, rho, X)
+        dist = distance(de, rho, X)
 
         sim = DBHT_ExponentialSimilarity()
         S = dbht_similarity(sim, rho, dist)
@@ -277,7 +277,7 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            fit_estimator!(PortfolioOptimisers.LoGo(; dist = des[i]), PosDefEstimator(),
+            logo!(PortfolioOptimisers.LoGo(; dist = des[i]), PosDefEstimator(),
                            sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
@@ -297,7 +297,7 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            fit_estimator!(PortfolioOptimisers.LoGo(; dist = des[i]), PosDefEstimator(),
+            logo!(PortfolioOptimisers.LoGo(; dist = des[i]), PosDefEstimator(),
                            sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
@@ -319,7 +319,7 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            fit_estimator!(PortfolioOptimisers.LoGo(; dist = des[i],
+            logo!(PortfolioOptimisers.LoGo(; dist = des[i],
                                                     sim = DBHT_ExponentialSimilarity()),
                            PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
@@ -340,7 +340,7 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            fit_estimator!(PortfolioOptimisers.LoGo(; dist = des[i],
+            logo!(PortfolioOptimisers.LoGo(; dist = des[i],
                                                     sim = DBHT_ExponentialSimilarity()),
                            PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
