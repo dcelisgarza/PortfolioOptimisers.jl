@@ -1,7 +1,3 @@
-
-function HierarchicalClustering(; linkage::Symbol = :ward)
-    return HierarchicalClustering{typeof(linkage)}(linkage)
-end
 struct ClusterNode{tid, tl, tr, td, tcnt}
     id::tid
     left::tl
