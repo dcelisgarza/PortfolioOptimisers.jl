@@ -43,6 +43,10 @@ include("./8_Distance/3_DistanceDistance.jl")
 include("./8_Distance/4_GeneralDistance.jl")
 include("./8_Distance/5_GeneralDistanceDistance.jl")
 
+include("./9_JuMPModelOptimisation.jl")
+
+include("./10_OWA.jl")
+
 #=
 
 # Linear Algebra
@@ -61,7 +65,7 @@ include("./ModelOptimisation/OptimiseModel.jl")
 
 # Ordered Weight Arrays
 include("./OrderedWeightsArray/OrderedWeightsArray_AbstractTypes.jl")
-include("./OrderedWeightsArray/OWA_NCRRA.jl")
+include("./OrderedWeightsArray/NormalisedConstantRelativeRiskAversion.jl")
 include("./OrderedWeightsArray/JuMP_OrderedWeightsArray/JuMP_OWA_AbstractTypes.jl")
 include("./OrderedWeightsArray/JuMP_OrderedWeightsArray/OWA_MaximumEntropy.jl")
 include("./OrderedWeightsArray/JuMP_OrderedWeightsArray/OWA_MinimumSumSquares.jl")

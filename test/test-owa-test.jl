@@ -1,4 +1,3 @@
-#=
 @safetestset "OWA" begin
     using PortfolioOptimisers, CSV, DataFrames, Clarabel, Test, Random, StableRNGs
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
@@ -16,16 +15,20 @@
         slv = Solver(; solver = Clarabel.Optimizer,
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
         owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_l_moment_weights.csv"), DataFrame)
-        owas = [OWA_NCRRA(; g = 0.75), OWA_NCRRA(), OWA_NCRRA(; g = 0.25),
-                OWA_MaximumEntropy(; max_phi = 0.75, slv = slv),
-                OWA_MaximumEntropy(; slv = slv),
-                OWA_MaximumEntropy(; max_phi = 0.25, slv = slv),
-                OWA_MinimumSumSquares(; max_phi = 0.75, slv = slv),
-                OWA_MinimumSumSquares(; slv = slv),
-                OWA_MinimumSumSquares(; max_phi = 0.25, slv = slv),
-                OWA_MinimumSquareDistance(; max_phi = 0.75, slv = slv),
-                OWA_MinimumSquareDistance(; slv = slv),
-                OWA_MinimumSquareDistance(; max_phi = 0.25, slv = slv)]
+        owas = [NormalisedConstantRelativeRiskAversion(; g = 0.75),
+                NormalisedConstantRelativeRiskAversion(),
+                NormalisedConstantRelativeRiskAversion(; g = 0.25),
+                OWAJuMPEstimator(; alg = MaximumEntropy(), max_phi = 0.75, slv = slv),
+                OWAJuMPEstimator(; alg = MaximumEntropy(), slv = slv),
+                OWAJuMPEstimator(; alg = MaximumEntropy(), max_phi = 0.25, slv = slv),
+                OWAJuMPEstimator(; alg = MinimumSumSquares(), max_phi = 0.75, slv = slv),
+                OWAJuMPEstimator(; alg = MinimumSumSquares(), slv = slv),
+                OWAJuMPEstimator(; alg = MinimumSumSquares(), max_phi = 0.25, slv = slv),
+                OWAJuMPEstimator(; alg = MinimumSquareDistance(), max_phi = 0.75,
+                                 slv = slv),
+                OWAJuMPEstimator(; alg = MinimumSquareDistance(), slv = slv),
+                OWAJuMPEstimator(; alg = MinimumSquareDistance(), max_phi = 0.25,
+                                 slv = slv)]
         for i ∈ eachindex(owas)
             owa = owa_l_moment_crm(200; k = 5, method = owas[i])
             res = if i == 4
@@ -43,9 +46,7 @@
             end
             @test res
         end
-        @test_throws AssertionError OWA_MaximumEntropy(slv = Solver[])
-        @test_throws AssertionError OWA_MinimumSquareDistance(slv = Solver[])
-        @test_throws AssertionError OWA_MinimumSumSquares(slv = Solver[])
+        @test_throws AssertionError OWAJuMPEstimator(slv = Solver[])
     end
     @testset "OWA weight vectors" begin
         owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_weights.csv"), DataFrame)
@@ -78,4 +79,3 @@
         @test isapprox(w1, w2)
     end
 end
-=#

@@ -29,7 +29,7 @@ function fit_estimator!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator},
     else
         sigma
     end
-    D = distance(je.dist, S, X; dims = dims)
+    D = fit_estimator(je.dist, S, X; dims = dims)
     S = dbht_similarity(je.sim, S, D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
     sigma .= J_LoGo(sigma, separators, cliques) \ I

@@ -20,7 +20,7 @@
         ce = PortfolioOptimisersCovariance()
         de = SimpleDistance()
         rho = cor(ce, X)
-        dist = distance(de, rho, X)
+        dist = fit_estimator(de, rho, X)
 
         sim = DBHT_MaximumDistanceSimilarity()
         S = dbht_similarity(sim, rho, dist)
@@ -135,7 +135,7 @@
         ce = PortfolioOptimisersCovariance()
         de = SimpleDistance()
         rho = cor(ce, X)
-        dist = distance(de, rho, X)
+        dist = fit_estimator(de, rho, X)
 
         sim = DBHT_ExponentialSimilarity()
         S = dbht_similarity(sim, rho, dist)

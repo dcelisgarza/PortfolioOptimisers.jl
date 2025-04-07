@@ -14,14 +14,15 @@ function GeneralDistanceDistance(; alg::AbstractDistanceAlgorithm = SimpleDistan
     return GeneralDistanceDistance{typeof(alg), typeof(power), typeof(dist), typeof(args),
                                    typeof(kwargs)}(alg, power, dist, args, kwargs)
 end
-function distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1)
-    dist = distance(GeneralDistance(; alg = de.alg, power = de.power), ce, X; dims = dims)
+function fit_estimator(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator,
+                       X::AbstractMatrix; dims::Int = 1)
+    dist = fit_estimator(GeneralDistance(; alg = de.alg, power = de.power), ce, X;
+                         dims = dims)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
-function distance(de::GeneralDistanceDistance, rho::AbstractMatrix, args...; kwargs...)
-    dist = distance(GeneralDistance(; alg = de.alg, power = de.power), rho, args...;
-                    kwargs...)
+function fit_estimator(de::GeneralDistanceDistance, rho::AbstractMatrix, args...; kwargs...)
+    dist = fit_estimator(GeneralDistance(; alg = de.alg, power = de.power), rho, args...;
+                         kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 

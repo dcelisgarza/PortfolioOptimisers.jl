@@ -129,7 +129,7 @@ end
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:TreeType, <:Any},
                         X::AbstractMatrix; dims::Int = 1)
     S = cor(ne.ce, X; dims = dims)
-    D = distance(ne.de, S, X; dims = dims)
+    D = fit_estimator(ne.de, S, X; dims = dims)
     G = SimpleWeightedGraph(D)
     tree = calc_mst(ne.alg, G)
     return adjacency_matrix(SimpleGraph(G[tree]))
@@ -137,7 +137,7 @@ end
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:SimilarityMatrixEstimator,
                                              <:Any}, X::AbstractMatrix; dims::Int = 1)
     S = cor(ne.ce, X; dims = dims)
-    D = distance(ne.de, S, X; dims = dims)
+    D = fit_estimator(ne.de, S, X; dims = dims)
     S = dbht_similarity(ne.alg, S, D)
     Rpm = PMFG_T2s(S)[1]
     return adjacency_matrix(SimpleGraph(Rpm))

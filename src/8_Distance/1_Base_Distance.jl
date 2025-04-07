@@ -19,7 +19,5 @@ function VariationInfoDistance(;
     return VariationInfoDistance{typeof(bins), typeof(normalise)}(bins, normalise)
 end
 
-function distance end
-
-export distance, SimpleDistance, SimpleAbsoluteDistance, LogDistance, CorrelationDistance,
+export SimpleDistance, SimpleAbsoluteDistance, LogDistance, CorrelationDistance,
        CanonicalDistance, VariationInfoDistance

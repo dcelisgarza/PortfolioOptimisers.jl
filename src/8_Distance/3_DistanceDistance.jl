@@ -13,13 +13,13 @@ function DistanceDistance(; alg::AbstractDistanceAlgorithm = SimpleDistance(),
                                                                                      args,
                                                                                      kwargs)
 end
-function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1)
-    dist = distance(Distance(; alg = de.alg), ce, X; dims = dims)
+function fit_estimator(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
+                       X::AbstractMatrix; dims::Int = 1)
+    dist = fit_estimator(Distance(; alg = de.alg), ce, X; dims = dims)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
-function distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
-    dist = distance(Distance(; alg = de.alg), rho, args...; kwargs...)
+function fit_estimator(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
+    dist = fit_estimator(Distance(; alg = de.alg), rho, args...; kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 
