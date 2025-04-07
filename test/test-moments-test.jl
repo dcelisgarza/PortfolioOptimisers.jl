@@ -575,24 +575,31 @@
             @test res2
         end
     end
-    #=
-
     @testset "Canonical and General Canonical Distance" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
         ces = [PortfolioOptimisersCovariance(), Covariance(; alg = Full()),
                Covariance(; alg = Semi()), SpearmanCovariance(), KendallCovariance(),
-               MutualInfoCovariance(), MutualInfoCovariance(; bins = 5), DistanceCovariance(),
-               LTDCovariance(; alpha = 0.15), Gerber0Covariance(),
-               Gerber0NormalisedCovariance(), Gerber1Covariance(),
-               Gerber1NormalisedCovariance(), Gerber2Covariance(),
-               Gerber2NormalisedCovariance(), SmythBroby0Covariance(),
-               SmythBroby0NormalisedCovariance(), SmythBroby1Covariance(),
-               SmythBroby1NormalisedCovariance(), SmythBroby2Covariance(),
-               SmythBroby2NormalisedCovariance(), SmythBrobyGerber0Covariance(),
-               SmythBrobyGerber0NormalisedCovariance(), SmythBrobyGerber1Covariance(),
-               SmythBrobyGerber1NormalisedCovariance(), SmythBrobyGerber2Covariance(),
-               SmythBrobyGerber2NormalisedCovariance()]
+               MutualInfoCovariance(), MutualInfoCovariance(; bins = 5),
+               DistanceCovariance(), LTDCovariance(; alpha = 0.15),
+               GerberCovariance(; alg = Gerber0()),
+               NormalisedGerberCovariance(; alg = Gerber0()),
+               GerberCovariance(; alg = Gerber1()),
+               NormalisedGerberCovariance(; alg = Gerber1()),
+               GerberCovariance(; alg = Gerber2()),
+               NormalisedGerberCovariance(; alg = Gerber2()),
+               SmythBrobyCovariance(; alg = SmythBroby0()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby0()),
+               SmythBrobyCovariance(; alg = SmythBroby1()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby1()),
+               SmythBrobyCovariance(; alg = SmythBroby2()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby2()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber0()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber0()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber1()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber1()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber2()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber2())]
         dist_t = CSV.read(joinpath(@__DIR__, "./assets/Canonical-Distance.csv"), DataFrame)
 
         de = Distance(; alg = CanonicalDistance())
@@ -607,12 +614,14 @@
             @test res1
 
             dist2 = if isa(ces[i], MutualInfoCovariance)
-                distance(VariationInfoDistance(; bins = ces[i].bins,
-                                               normalise = ces[i].normalise), cov(ces[i], X), X)
+                distance(Distance(;
+                                  alg = VariationInfoDistance(; bins = ces[i].bins,
+                                                              normalise = ces[i].normalise)),
+                         cov(ces[i], X), X)
             elseif isa(ces[i], DistanceCovariance)
-                distance(CorrelationDistance(;), cov(ces[i], X), X)
+                distance(Distance(; alg = CorrelationDistance(;)), cov(ces[i], X), X)
             elseif isa(ces[i], LTDCovariance)
-                distance(LogDistance(), cov(ces[i], X), X)
+                distance(Distance(; alg = LogDistance()), cov(ces[i], X), X)
             else
                 distance(de, cov(ces[i], X), X)
             end
@@ -636,13 +645,14 @@
             @test res1
 
             dist2 = if isa(ces[i], MutualInfoCovariance)
-                distance(GeneralVariationInfoDistance(; bins = ces[i].bins,
-                                                      normalise = ces[i].normalise),
+                distance(GeneralDistance(;
+                                         alg = VariationInfoDistance(; bins = ces[i].bins,
+                                                                     normalise = ces[i].normalise)),
                          cov(ces[i], X), X)
             elseif isa(ces[i], DistanceCovariance)
-                distance(GeneralCorrelationDistance(;), cov(ces[i], X), X)
+                distance(GeneralDistance(; alg = CorrelationDistance(;)), cov(ces[i], X), X)
             elseif isa(ces[i], LTDCovariance)
-                distance(GeneralLogDistance(), cov(ces[i], X), X)
+                distance(GeneralDistance(; alg = LogDistance()), cov(ces[i], X), X)
             else
                 distance(de, cov(ces[i], X), X)
             end
@@ -658,23 +668,32 @@
     @testset "Canonical and General Canonical Distance Distance" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
-        ces = [PortfolioOptimisersCovariance(), Full(), Semi(),
-               SpearmanCovariance(), KendallCovariance(), MutualInfoCovariance(),
-               MutualInfoCovariance(; bins = 5), DistanceCovariance(),
-               LTDCovariance(; alpha = 0.15), Gerber0Covariance(),
-               Gerber0NormalisedCovariance(), Gerber1Covariance(),
-               Gerber1NormalisedCovariance(), Gerber2Covariance(),
-               Gerber2NormalisedCovariance(), SmythBroby0Covariance(),
-               SmythBroby0NormalisedCovariance(), SmythBroby1Covariance(),
-               SmythBroby1NormalisedCovariance(), SmythBroby2Covariance(),
-               SmythBroby2NormalisedCovariance(), SmythBrobyGerber0Covariance(),
-               SmythBrobyGerber0NormalisedCovariance(), SmythBrobyGerber1Covariance(),
-               SmythBrobyGerber1NormalisedCovariance(), SmythBrobyGerber2Covariance(),
-               SmythBrobyGerber2NormalisedCovariance()]
+        ces = [PortfolioOptimisersCovariance(), Covariance(; alg = Full()),
+               Covariance(; alg = Semi()), SpearmanCovariance(), KendallCovariance(),
+               MutualInfoCovariance(), MutualInfoCovariance(; bins = 5),
+               DistanceCovariance(), LTDCovariance(; alpha = 0.15),
+               GerberCovariance(; alg = Gerber0()),
+               NormalisedGerberCovariance(; alg = Gerber0()),
+               GerberCovariance(; alg = Gerber1()),
+               NormalisedGerberCovariance(; alg = Gerber1()),
+               GerberCovariance(; alg = Gerber2()),
+               NormalisedGerberCovariance(; alg = Gerber2()),
+               SmythBrobyCovariance(; alg = SmythBroby0()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby0()),
+               SmythBrobyCovariance(; alg = SmythBroby1()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby1()),
+               SmythBrobyCovariance(; alg = SmythBroby2()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBroby2()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber0()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber0()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber1()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber1()),
+               SmythBrobyCovariance(; alg = SmythBrobyGerber2()),
+               NormalisedSmythBrobyCovariance(; alg = SmythBrobyGerber2())]
         dist_t = CSV.read(joinpath(@__DIR__, "./assets/Canonical-Distance-Distance.csv"),
                           DataFrame)
 
-        de = CanonicalDistanceDistance()
+        de = DistanceDistance(; alg = CanonicalDistance())
         for i ∈ 1:ncol(dist_t)
             dist1 = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist1)
@@ -686,13 +705,14 @@
             @test res1
 
             dist2 = if isa(ces[i], MutualInfoCovariance)
-                distance(VariationInfoDistanceDistance(; bins = ces[i].bins,
-                                                       normalise = ces[i].normalise),
+                distance(DistanceDistance(;
+                                          alg = VariationInfoDistance(; bins = ces[i].bins,
+                                                                      normalise = ces[i].normalise)),
                          cov(ces[i], X), X)
             elseif isa(ces[i], DistanceCovariance)
-                distance(CorrelationDistanceDistance(;), cov(ces[i], X), X)
+                distance(DistanceDistance(; alg = CorrelationDistance()), cov(ces[i], X), X)
             elseif isa(ces[i], LTDCovariance)
-                distance(LogDistanceDistance(), cov(ces[i], X), X)
+                distance(DistanceDistance(; alg = LogDistance()), cov(ces[i], X), X)
             else
                 distance(de, cov(ces[i], X), X)
             end
@@ -704,7 +724,7 @@
             @test res2
         end
 
-        de = GeneralCanonicalDistanceDistance()
+        de = GeneralDistanceDistance(; alg = CanonicalDistance())
         for i ∈ 1:ncol(dist_t)
             dist1 = distance(de, ces[i], transpose(X); dims = 2)
             MN = size(dist1)
@@ -716,13 +736,16 @@
             @test res1
 
             dist2 = if isa(ces[i], MutualInfoCovariance)
-                distance(GeneralVariationInfoDistanceDistance(; bins = ces[i].bins,
-                                                              normalise = ces[i].normalise),
+                distance(GeneralDistanceDistance(;
+                                                 alg = VariationInfoDistance(;
+                                                                             bins = ces[i].bins,
+                                                                             normalise = ces[i].normalise)),
                          cov(ces[i], X), X)
             elseif isa(ces[i], DistanceCovariance)
-                distance(GeneralCorrelationDistanceDistance(;), cov(ces[i], X), X)
+                distance(GeneralDistanceDistance(; alg = CorrelationDistance(;)),
+                         cov(ces[i], X), X)
             elseif isa(ces[i], LTDCovariance)
-                distance(GeneralLogDistanceDistance(), cov(ces[i], X), X)
+                distance(GeneralDistanceDistance(; alg = LogDistance()), cov(ces[i], X), X)
             else
                 distance(de, cov(ces[i], X), X)
             end
@@ -734,5 +757,4 @@
             @test res2
         end
     end
-    =#
 end
