@@ -1,6 +1,6 @@
 function set_risk_budget!(rb::AbstractVector,
-                          plca::A_LinearConstraint{<:AbstractVector, <:AbstractVector,
-                                                   <:AbstractVector}, sets::DataFrame,
+                          plca::LinearConstraintSide{<:AbstractVector, <:AbstractVector,
+                                                     <:AbstractVector}, sets::DataFrame,
                           strict::Bool = false)
     group_names = names(sets)
     for (group, name, coef) ∈ zip(plca.group, plca.name, plca.coef)
@@ -24,7 +24,7 @@ function set_risk_budget!(rb::AbstractVector,
     return nothing
 end
 function set_risk_budget!(rb::AbstractVector,
-                          plca::A_LinearConstraint{<:Any, <:Any, <:Real}, sets::DataFrame,
+                          plca::LinearConstraintSide{<:Any, <:Any, <:Real}, sets::DataFrame,
                           strict::Bool = false)
     group_names = names(sets)
     (; group, name, coef) = plca
@@ -46,8 +46,8 @@ function set_risk_budget!(rb::AbstractVector,
     end
     return nothing
 end
-function risk_budget_constraints(plcas::Union{<:A_LinearConstraint,
-                                              <:AbstractVector{<:A_LinearConstraint}},
+function risk_budget_constraints(plcas::Union{<:LinearConstraintSide,
+                                              <:AbstractVector{<:LinearConstraintSide}},
                                  sets::DataFrame; datatype::Type = Float64,
                                  strict::Bool = false)
     if isa(plcas, AbstractVector)

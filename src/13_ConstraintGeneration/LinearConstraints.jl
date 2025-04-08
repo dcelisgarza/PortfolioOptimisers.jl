@@ -1,19 +1,19 @@
-struct LinearConstraint{T1 <: A_LinearConstraint, T2 <: Real, T3 <: ComparisonOperators}
+struct LinearConstraint{T1 <: LinearConstraintSide, T2 <: Real, T3 <: ComparisonOperators}
     A::T1
     B::T2
     comp::T3
 end
-function LinearConstraint(; A::A_LinearConstraint, B::Real = 0.0,
+function LinearConstraint(; A::LinearConstraintSide, B::Real = 0.0,
                           comp::ComparisonOperators = LEQ())
     return LinearConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
-struct CardinalityConstraint{T1 <: A_CardinalityConstraint, T2 <: Real,
+struct CardinalityConstraint{T1 <: CardinalityConstraint, T2 <: Real,
                              T3 <: ComparisonOperators}
     A::T1
     B::T2
     comp::T3
 end
-function CardinalityConstraint(; A::A_CardinalityConstraint, B::Real = 0.0,
+function CardinalityConstraint(; A::CardinalityConstraint, B::Real = 0.0,
                                comp::ComparisonOperators = LEQ())
     return CardinalityConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
@@ -54,7 +54,7 @@ function Base.getproperty(obj::LinearConstraintModel, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function get_A_constraint_data(A_lc::A_LinearConstraint{<:Any, <:Any, <:Any},
+function get_A_constraint_data(A_lc::LinearConstraintSide{<:Any, <:Any, <:Any},
                                sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     A = Vector{eltype(A_lc.coef)}(undef, 0)
@@ -70,9 +70,10 @@ function get_A_constraint_data(A_lc::A_LinearConstraint{<:Any, <:Any, <:Any},
     end
     return A
 end
-function get_A_constraint_data(A_lc::A_LinearConstraint{<:AbstractVector, <:AbstractVector,
-                                                        <:AbstractVector}, sets::DataFrame,
-                               strict::Bool = false)
+function get_A_constraint_data(A_lc::LinearConstraintSide{<:AbstractVector,
+                                                          <:AbstractVector,
+                                                          <:AbstractVector},
+                               sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     A = Vector{eltype(A_lc.coef)}(undef, 0)
     for (group, name, coef) ∈ zip(A_lc.group, A_lc.name, A_lc.coef)
@@ -144,7 +145,7 @@ function linear_constraints(::Nothing, args...; kwargs...)
     return nothing
 end
 
-function get_A_cardinality_constraint_data(A_lc::A_CardinalityConstraint{<:Any, <:Any},
+function get_A_cardinality_constraint_data(A_lc::CardinalityConstraint{<:Any, <:Any},
                                            sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     A = Vector{Int}(undef, 0)
@@ -159,8 +160,8 @@ function get_A_cardinality_constraint_data(A_lc::A_CardinalityConstraint{<:Any, 
     end
     return A
 end
-function get_A_cardinality_constraint_data(A_lc::A_CardinalityConstraint{<:AbstractVector,
-                                                                         <:AbstractVector},
+function get_A_cardinality_constraint_data(A_lc::CardinalityConstraint{<:AbstractVector,
+                                                                       <:AbstractVector},
                                            sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     A = Vector{Int}(undef, 0)

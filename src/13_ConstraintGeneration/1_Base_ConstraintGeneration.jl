@@ -14,16 +14,15 @@ end
 function comparison_sign_ineq_flag(::GEQ)
     return -1, true
 end
-abstract type ConstraintSide end
-abstract type A_Constraint <: ConstraintSide end
-struct A_LinearConstraint{T1, T2, T3 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
-       A_Constraint
+abstract type AbstractConstraintSide <: AbstractEstimator end
+struct LinearConstraintSide{T1, T2, T3 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
+       AbstractConstraintSide
     group::T1
     name::T2
     coef::T3
 end
-function A_LinearConstraint(; group, name,
-                            coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
+function LinearConstraintSide(; group, name,
+                              coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
@@ -32,13 +31,14 @@ function A_LinearConstraint(; group, name,
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
     end
-    return A_LinearConstraint{typeof(group), typeof(name), typeof(coef)}(group, name, coef)
+    return LinearConstraintSide{typeof(group), typeof(name), typeof(coef)}(group, name,
+                                                                           coef)
 end
-struct A_CardinalityConstraint{T1, T2} <: A_Constraint
+struct CardinalityConstraint{T1, T2} <: AbstractConstraintSide
     group::T1
     name::T2
 end
-function A_CardinalityConstraint(; group, name)
+function CardinalityConstraint(; group, name)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     if group_flag || name_flag
@@ -46,7 +46,7 @@ function A_CardinalityConstraint(; group, name)
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
     end
-    return A_CardinalityConstraint{typeof(group), typeof(name)}(group, name)
+    return CardinalityConstraint{typeof(group), typeof(name)}(group, name)
 end
 function split_equation(equation_str::AbstractString)
     # Remove whitespace for easier parsing
@@ -79,6 +79,113 @@ function split_equation(equation_str::AbstractString)
 
     return Dict("lhs" => lhs, "rhs" => rhs, "comparison" => comp_op)
 end
+# Function to tokenize and parse terms from a side of the equation
+function parse_side(side, strict::Bool = true)
+    # Add leading + if needed for consistent parsing
+    if !isempty(side) && !(startswith(side, "+") || startswith(side, "-"))
+        side = "+" * side
+    end
+
+    # Find term boundaries (looking for +/- not inside scientific notation)
+    terms = String[]
+    term_start = 1
+    i = 2
+    while i <= length(side)
+        if (side[i] == '+' || side[i] == '-') &&
+           !(i > 1 && side[i - 1] == 'e' && isdigit(side[i - 2]))
+            push!(terms, side[term_start:(i - 1)])
+            term_start = i
+        end
+        i += 1
+    end
+    # Add the last term
+    push!(terms, side[term_start:end])
+
+    # Process each term
+    variable_terms = Tuple{Float64, String}[]
+    constant_value = 0.0
+    pevious_factor = 1.0
+    for term ∈ terms
+        # Skip empty terms
+        if isempty(term)
+            continue
+        end
+
+        # Get the sign
+        if term == "-"
+            pevious_factor = -pevious_factor
+            continue
+        end
+        sign_factor = startswith(term, "-") ? -pevious_factor : pevious_factor
+        pevious_factor = 1.0 # Reset previous factor.
+        term = term[2:end]  # Remove sign
+
+        # Skip empty terms after sign removal
+        if isempty(term)
+            continue
+        end
+
+        # Check if it's a numeric constant
+        if occursin(r"^[0-9]+\.?[0-9]*$", term)
+            constant_value += sign_factor * parse(Float64, term)
+            continue
+        end
+
+        # Case 1: coefficient*variable[/denominator]
+        m = match(r"^(\d*\.?\d*)\*([a-zA-Z][a-zA-Z0-9_\.]*)(?:\/(\d+))?$", term)
+        if !isnothing(m)
+            coef = isnothing(m[1]) || isempty(m[1]) ? 1.0 : parse(Float64, m[1])
+            var = m[2]
+            denom = isnothing(m[3]) || isempty(m[3]) ? 1.0 : parse(Float64, m[3])
+            push!(variable_terms, (sign_factor * coef / denom, var))
+            continue
+        end
+
+        # Case 2: variable*coefficient[/denominator]
+        m = match(r"^([a-zA-Z][a-zA-Z0-9_\.]*)\*(\d*\.?\d+)(?:\/(\d+))?$", term)
+        if !isnothing(m)
+            var = m[1]
+            coef = parse(Float64, m[2])
+            denom = isnothing(m[3]) || isempty(m[3]) ? 1.0 : parse(Float64, m[3])
+            push!(variable_terms, (sign_factor * coef / denom, var))
+            continue
+        end
+
+        # Case 3: coefficient[/denominator]*variable
+        m = match(r"^(\d*\.?\d+)(?:\/(\d+))?\*([a-zA-Z][a-zA-Z0-9_\.]*)$", term)
+        if !isnothing(m)
+            coef = parse(Float64, m[1])
+            denom = isnothing(m[2]) || isempty(m[2]) ? 1.0 : parse(Float64, m[2])
+            var = m[3]
+            push!(variable_terms, (sign_factor * coef / denom, var))
+            continue
+        end
+
+        # Case 4: variable/denominator
+        m = match(r"^([a-zA-Z][a-zA-Z0-9_\.]*)\/(\d+)$", term)
+        if !isnothing(m)
+            var = m[1]
+            denom = parse(Float64, m[2])
+            push!(variable_terms, (sign_factor / denom, var))
+            continue
+        end
+
+        # Case 5: pure variable
+        m = match(r"^([a-zA-Z][a-zA-Z0-9_\.]*)$", term)
+        if !isnothing(m)
+            push!(variable_terms, (sign_factor, m[1]))
+            continue
+        end
+
+        if strict
+            throw(ArgumentError("Could not parse term: $term"))
+        else
+            @warn("Could not parse term: $term")
+        end
+    end
+
+    return variable_terms, constant_value
+end
 function parse_constraint_equation(equation_str::AbstractString, strict::Bool = true)
     # Split the equation using the existing function
     split_eq = split_equation(equation_str)
@@ -91,117 +198,9 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
         comp_op = "=="
     end
 
-    # Function to tokenize and parse terms from a side of the equation
-    function parse_side(side)
-        # Add leading + if needed for consistent parsing
-        if !isempty(side) && !(startswith(side, "+") || startswith(side, "-"))
-            side = "+" * side
-        end
-
-        # Find term boundaries (looking for +/- not inside scientific notation)
-        terms = String[]
-        term_start = 1
-        i = 2
-        while i <= length(side)
-            if (side[i] == '+' || side[i] == '-') &&
-               !(i > 1 && side[i - 1] == 'e' && isdigit(side[i - 2]))
-                push!(terms, side[term_start:(i - 1)])
-                term_start = i
-            end
-            i += 1
-        end
-        # Add the last term
-        push!(terms, side[term_start:end])
-
-        # Process each term
-        variable_terms = Tuple{Float64, String}[]
-        constant_value = 0.0
-        pevious_factor = 1.0
-        for term ∈ terms
-            # Skip empty terms
-            if isempty(term)
-                continue
-            end
-
-            # Get the sign
-            if term == "-"
-                pevious_factor = -pevious_factor
-                continue
-            end
-            sign_factor = startswith(term, "-") ? -pevious_factor : pevious_factor
-            pevious_factor = 1.0 # Reset previous factor.
-            term = term[2:end]  # Remove sign
-
-            # Skip empty terms after sign removal
-            if isempty(term)
-                continue
-            end
-
-            # Check if it's a numeric constant
-            if occursin(r"^[0-9]+\.?[0-9]*$", term)
-                constant_value += sign_factor * parse(Float64, term)
-                continue
-            end
-
-            # Case 1: coefficient*variable[/denominator]
-            m = match(r"^(\d*\.?\d*)\*([a-zA-Z][a-zA-Z0-9_]*)(?:\/(\d+))?$", term)
-            if !isnothing(m)
-                coef = isnothing(m[1]) || isempty(m[1]) ? 1.0 : parse(Float64, m[1])
-                var = m[2]
-                denom = isnothing(m[3]) || isempty(m[3]) ? 1.0 : parse(Float64, m[3])
-                push!(variable_terms, (sign_factor * coef / denom, var))
-                continue
-            end
-
-            # Case 2: variable*coefficient[/denominator]
-            m = match(r"^([a-zA-Z][a-zA-Z0-9_]*)\*(\d*\.?\d+)(?:\/(\d+))?$", term)
-            if !isnothing(m)
-                var = m[1]
-                coef = parse(Float64, m[2])
-                denom = isnothing(m[3]) || isempty(m[3]) ? 1.0 : parse(Float64, m[3])
-                push!(variable_terms, (sign_factor * coef / denom, var))
-                continue
-            end
-
-            # Case 3: variable*coefficient[/denominator]
-            m = match(r"^(\d*\.?\d+)(?:\/(\d+))?\*([a-zA-Z][a-zA-Z0-9_]*)$", term)
-            if !isnothing(m)
-                coef = parse(Float64, m[1])
-                denom = isnothing(m[2]) || isempty(m[2]) ? 1.0 : parse(Float64, m[2])
-                var = m[3]
-                push!(variable_terms, (sign_factor * coef / denom, var))
-                continue
-            end
-
-            # Case 4: variable/denominator
-            m = match(r"^([a-zA-Z][a-zA-Z0-9_]*)\/(\d+)$", term)
-            if !isnothing(m)
-                var = m[1]
-                denom = parse(Float64, m[2])
-                push!(variable_terms, (sign_factor / denom, var))
-                continue
-            end
-
-            # Case 5: pure variable
-            m = match(r"^([a-zA-Z][a-zA-Z0-9_]*)$", term)
-            if !isnothing(m)
-                push!(variable_terms, (sign_factor, m[1]))
-                continue
-            end
-
-            if strict
-                throw(ArgumentError("Could not parse term: $term"))
-            else
-                @warn("Could not parse term: $term")
-            end
-        end
-
-        return variable_terms, constant_value
-    end
-
     # Parse both sides
-    lhs_terms, lhs_const = parse_side(lhs)
-    rhs_terms, rhs_const = parse_side(rhs)
+    lhs_terms, lhs_const = parse_side(lhs, strict)
+    rhs_terms, rhs_const = parse_side(rhs, strict)
 
     # Combine like terms - put all variables on left side
     var_coeffs = Dict{String, Float64}()
@@ -269,5 +268,5 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
                 "comparison" => comp_op, "constant" => right_const)
 end
 
-export EQ, LEQ, GEQ, A_LinearConstraint, A_CardinalityConstraint, split_equation,
+export EQ, LEQ, GEQ, LinearConstraintSide, CardinalityConstraint, split_equation,
        parse_constraint_equation

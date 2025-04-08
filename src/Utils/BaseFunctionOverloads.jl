@@ -1,5 +1,5 @@
 for (op, name) ∈
-    zip((Solver, A_LinearConstraint, BlackLittermanView, LinearConstraint, MeanReturn,
+    zip((Solver, LinearConstraintSide, BlackLittermanView, LinearConstraint, MeanReturn,
          Skewness, ThirdCentralMoment, FourthLowerPartialMoment, SemiKurtosis, SemiSkewness,
          ThirdLowerPartialMoment, FourthCentralMoment, Kurtosis, ValueatRiskRange,
          ValueatRisk, DrawdownatRisk, RelativeAverageDrawdown,
@@ -22,7 +22,7 @@ for (op, name) ∈
          C2_LinearEntropyPoolingConstraint, C4_LinearEntropyPoolingConstraint,
          EntropyPoolingView, EmpiricalPriorResult, HighOrderPriorModel, EqualRiskMeasure,
          CentralityConstraint),
-        ("Solver", "A_LinearConstraint", "BlackLittermanView", "LinearConstraint",
+        ("Solver", "LinearConstraintSide", "BlackLittermanView", "LinearConstraint",
          "MeanReturn", "Skewness", "ThirdCentralMoment", "FourthLowerPartialMoment",
          "SemiKurtosis", "SemiSkewness", "ThirdLowerPartialMoment", "FourthCentralMoment",
          "Kurtosis", "ValueatRiskRange", "ValueatRisk", "DrawdownatRisk",
