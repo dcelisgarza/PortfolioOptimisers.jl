@@ -1,19 +1,19 @@
-abstract type CentralityType end
-struct BetweennessCentrality{T1 <: Tuple, T2 <: NamedTuple} <: CentralityType
+abstract type AbstractCentralityAlgorithm <: AbstractPhilogenyAlgorithm end
+struct BetweennessCentrality{T1 <: Tuple, T2 <: NamedTuple} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
 end
 function BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BetweennessCentrality{typeof(args), typeof(kwargs)}(args, kwargs)
 end
-struct ClosenessCentrality{T1 <: Tuple, T2 <: NamedTuple} <: CentralityType
+struct ClosenessCentrality{T1 <: Tuple, T2 <: NamedTuple} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
 end
 function ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return ClosenessCentrality{typeof(args), typeof(kwargs)}(args, kwargs)
 end
-struct DegreeCentrality{T1 <: Integer, T2 <: NamedTuple} <: CentralityType
+struct DegreeCentrality{T1 <: Integer, T2 <: NamedTuple} <: AbstractCentralityAlgorithm
     kind::T1
     kwargs::T2
 end
@@ -21,14 +21,14 @@ function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
     @smart_assert(kind ∈ 0:2)
     return DegreeCentrality{typeof(kind), typeof(kwargs)}(kind, kwargs)
 end
-struct EigenvectorCentrality <: CentralityType end
-struct KatzCentrality{T1 <: Real} <: CentralityType
+struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
+struct KatzCentrality{T1 <: Real} <: AbstractCentralityAlgorithm
     alpha::T1
 end
 function KatzCentrality(; alpha::Real = 0.3)
     return KatzCentrality{typeof(alpha)}(alpha)
 end
-struct Pagerank{T1 <: Real, T2 <: Integer, T3 <: Real} <: CentralityType
+struct Pagerank{T1 <: Real, T2 <: Integer, T3 <: Real} <: AbstractCentralityAlgorithm
     alpha::T1
     n::T2
     epsilon::T3
@@ -39,8 +39,8 @@ function Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
     @smart_assert(epsilon > zero(epsilon))
     return Pagerank{typeof(alpha), typeof(n), typeof(epsilon)}(alpha, n, epsilon)
 end
-struct RadialityCentrality <: CentralityType end
-struct StressCentrality{T1 <: Tuple, T2 <: NamedTuple} <: CentralityType
+struct RadialityCentrality <: AbstractCentralityAlgorithm end
+struct StressCentrality{T1 <: Tuple, T2 <: NamedTuple} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
 end
@@ -71,22 +71,22 @@ end
 function calc_centrality(cent::StressCentrality, g::AbstractGraph)
     return Graphs.stress_centrality(g, cent.args...; cent.kwargs...)
 end
-abstract type TreeType end
-struct KruskalTree{T1 <: Tuple, T2 <: NamedTuple} <: TreeType
+abstract type AbstractTreeType <: AbstractPhilogenyAlgorithm end
+struct KruskalTree{T1 <: Tuple, T2 <: NamedTuple} <: AbstractTreeType
     args::T1
     kwargs::T2
 end
 function KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return KruskalTree{typeof(args), typeof(kwargs)}(args, kwargs)
 end
-struct BoruvkaTree{T1 <: Tuple, T2 <: NamedTuple} <: TreeType
+struct BoruvkaTree{T1 <: Tuple, T2 <: NamedTuple} <: AbstractTreeType
     args::T1
     kwargs::T2
 end
 function BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BoruvkaTree{typeof(args), typeof(kwargs)}(args, kwargs)
 end
-struct PrimTree{T1 <: Tuple, T2 <: NamedTuple} <: TreeType
+struct PrimTree{T1 <: Tuple, T2 <: NamedTuple} <: AbstractTreeType
     args::T1
     kwargs::T2
 end
@@ -102,9 +102,11 @@ end
 function calc_mst(cent::PrimTree, g::AbstractGraph)
     return Graphs.prim_mst(g, cent.args...; cent.kwargs...)
 end
-abstract type AbstractNetworkEstimator <: PhilogenyEstimator end
-struct NetworkEstimator{T1 <: StatsBase.CovarianceEstimator, T2 <: DistanceEstimator,
-                        T3 <: Union{<:SimilarityMatrixEstimator, <:TreeType},
+abstract type AbstractNetworkEstimator <: AbstractPhilogenyEstimator end
+struct NetworkEstimator{T1 <: StatsBase.CovarianceEstimator,
+                        T2 <: AbstractDistanceEstimator,
+                        T3 <:
+                        Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType},
                         T4 <: Integer} <: AbstractNetworkEstimator
     ce::T1
     de::T2
@@ -113,20 +115,22 @@ struct NetworkEstimator{T1 <: StatsBase.CovarianceEstimator, T2 <: DistanceEstim
 end
 function NetworkEstimator(;
                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                          de::DistanceEstimator = CanonicalDistance(),
-                          alg::Union{<:SimilarityMatrixEstimator, <:TreeType} = KruskalTree(),
-                          n::Integer = 1)
+                          de::AbstractDistanceEstimator = Distance(;
+                                                                   alg = CanonicalDistance()),
+                          alg::Union{<:AbstractSimilarityMatrixAlgorithm,
+                                     <:AbstractTreeType} = KruskalTree(), n::Integer = 1)
     return NetworkEstimator{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
 end
-struct CentralityEstimator{T1 <: CentralityType, T2 <: AbstractNetworkEstimator}
+struct CentralityEstimator{T1 <: AbstractCentralityAlgorithm,
+                           T2 <: AbstractNetworkEstimator}
     ne::T1
     cent::T2
 end
 function CentralityEstimator(; ne::AbstractNetworkEstimator = NetworkEstimator(),
-                             cent::CentralityType = DegreeCentrality())
+                             cent::AbstractCentralityAlgorithm = DegreeCentrality())
     return CentralityEstimator{typeof(ne), typeof(cent)}(ne, cent)
 end
-function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:TreeType, <:Any},
+function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
                         X::AbstractMatrix; dims::Int = 1)
     S = cor(ne.ce, X; dims = dims)
     D = distance(ne.de, S, X; dims = dims)
@@ -134,8 +138,9 @@ function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:TreeType, <:Any},
     tree = calc_mst(ne.alg, G)
     return adjacency_matrix(SimpleGraph(G[tree]))
 end
-function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:SimilarityMatrixEstimator,
-                                             <:Any}, X::AbstractMatrix; dims::Int = 1)
+function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any,
+                                             <:AbstractSimilarityMatrixAlgorithm, <:Any},
+                        X::AbstractMatrix; dims::Int = 1)
     S = cor(ne.ce, X; dims = dims)
     D = distance(ne.de, S, X; dims = dims)
     S = dbht_similarity(ne.alg; S = S, D = D)
@@ -151,7 +156,7 @@ function philogeny_matrix(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1
     P .= clamp!(P, 0, 1) - I
     return P
 end
-function centrality_vector(cent::CentralityType, X::AbstractMatrix; kwargs...)
+function centrality_vector(cent::AbstractCentralityAlgorithm, X::AbstractMatrix; kwargs...)
     G = SimpleGraph(X)
     return calc_centrality(cent, G)
 end
@@ -159,8 +164,8 @@ function centrality_vector(cte::CentralityEstimator, X::AbstractMatrix; dims::In
     P = philogeny_matrix(cte.ne, X; dims = dims)
     return centrality_vector(cte.cent, P)
 end
-function average_centrality(ne::NetworkEstimator, cent::CentralityType, w::AbstractVector,
-                            X::AbstractMatrix; dims::Int = 1)
+function average_centrality(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
+                            w::AbstractVector, X::AbstractMatrix; dims::Int = 1)
     P = philogeny_matrix(ne, X; dims = dims)
     cv = centrality_vector(cent, P)
     return dot(cv, w)
@@ -200,4 +205,4 @@ end
 export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
        KatzCentrality, Pagerank, RadialityCentrality, StressCentrality, KruskalTree,
        BoruvkaTree, PrimTree, NetworkEstimator, philogeny_matrix, average_centrality,
-       asset_philogeny, CentralityType, CentralityEstimator, centrality_vector
+       asset_philogeny, AbstractCentralityAlgorithm, CentralityEstimator, centrality_vector
