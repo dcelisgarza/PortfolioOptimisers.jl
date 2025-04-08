@@ -1,35 +1,46 @@
 """
-    abstract type DBHT_RootMethod end
+    abstract type DBHTRootMethod end
 """
-abstract type DBHT_RootMethod end
+abstract type DBHTRootMethod <: AbstractAlgorithm end
 """
-    struct DBHT_UniqueRoot <: DBHT_RootMethod end
+    struct UniqueRoot <: DBHTRootMethod end
 """
-struct DBHT_UniqueRoot <: DBHT_RootMethod end
+struct UniqueRoot <: DBHTRootMethod end
 """
-    struct DBHT_EqualRoot <: DBHT_RootMethod end
+    struct EqualRoot <: DBHTRootMethod end
 """
-struct DBHT_EqualRoot <: DBHT_RootMethod end
-
-abstract type SimilarityMatrixEstimator end
-struct DBHT_ExponentialSimilarity <: SimilarityMatrixEstimator end
-struct DBHT_MaximumDistanceSimilarity <: SimilarityMatrixEstimator end
-
-export DBHT_ExponentialSimilarity, DBHT_MaximumDistanceSimilarity
-
-function dbht_similarity(::DBHT_ExponentialSimilarity, S, D)
-    return exp.(-D)
+struct EqualRoot <: DBHTRootMethod end
+abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
+struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
+struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
+struct GeneralExponentialSimilarity{T1 <: Real, T2 <: Real} <:
+       AbstractSimilarityMatrixAlgorithm
+    coef::T1
+    power::T2
 end
-function dbht_similarity(::DBHT_MaximumDistanceSimilarity, S, D)
+function GeneralExponentialSimilarity(; coef::Real = 1.0, power::Real = 1.0)
+    @smart_assert(coef >= zero(coef))
+    @smart_assert(power >= zero(power))
+    return GeneralExponentialSimilarity{typeof(coef), typeof(power)}(coef, power)
+end
+function dbht_similarity(::MaximumDistanceSimilarity; D::AbstractMatrix, kwargs...)
     return ceil(maximum(D)^2) .- D .^ 2
 end
-export dbht_similarity
-struct DBHT{T1 <: SimilarityMatrixEstimator, T2 <: DBHT_RootMethod} <: ClusteringAlgorithm
+function dbht_similarity(::ExponentialSimilarity; D::AbstractMatrix, kwargs...)
+    return exp.(-D)
+end
+function dbht_similarity(se::GeneralExponentialSimilarity; D::AbstractMatrix, kwargs...)
+    power = se.power
+    coef = se.coef
+    return exp.(-coef * D .^ power)
+end
+struct DBHT{T1 <: AbstractSimilarityMatrixAlgorithm, T2 <: DBHTRootMethod} <:
+       AbstractClusteringAlgorithm
     sim::T1
     root::T2
 end
-function DBHT(; sim::SimilarityMatrixEstimator = DBHT_MaximumDistanceSimilarity(),
-              root::DBHT_RootMethod = DBHT_UniqueRoot())
+function DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+              root::DBHTRootMethod = UniqueRoot())
     return DBHT{typeof(sim), typeof(root)}(sim, root)
 end
 
@@ -538,10 +549,10 @@ end
 
 """
 ```
-CliqueRoot(::DBHT_UniqueRoot, Root, Pred, Nc, args...)
+CliqueRoot(::UniqueRoot, Root, Pred, Nc, args...)
 ```
 """
-function CliqueRoot(::DBHT_UniqueRoot, Root, Pred, Nc, args...)
+function CliqueRoot(::UniqueRoot, Root, Pred, Nc, args...)
     if length(Root) > 1
         push!(Pred, 0)
         Pred[Root] .= length(Pred)
@@ -555,7 +566,7 @@ function CliqueRoot(::DBHT_UniqueRoot, Root, Pred, Nc, args...)
     end
     return H = H + transpose(H)
 end
-function CliqueRoot(::DBHT_EqualRoot, Root, Pred, Nc, A, CliqList)
+function CliqueRoot(::EqualRoot, Root, Pred, Nc, A, CliqList)
     if length(Root) > 1
         Adj = AdjCliq(A, CliqList, Root)
     end
@@ -586,10 +597,10 @@ Looks for 3-cliques of a Maximal Planar Graph (MPG), then construct a hierarchy 
 
   - `Apm`: `N×N` adjacency matrix of an MPG.
 
-  - `type`: type for finding the root of the graph [`DBHT_RootMethod`](@ref). Uses Voronoi tesselation between tiling triangles.
+  - `type`: type for finding the root of the graph [`DBHTRootMethod`](@ref). Uses Voronoi tesselation between tiling triangles.
 
-      + [`DBHT_UniqueRoot`](@ref): create a unique root.
-      + [`DBHT_EqualRoot`](@ref): the root is created from the candidate's adjacency tree.
+      + [`UniqueRoot`](@ref): create a unique root.
+      + [`EqualRoot`](@ref): the root is created from the candidate's adjacency tree.
 
 # Outputs
 
@@ -600,7 +611,7 @@ Looks for 3-cliques of a Maximal Planar Graph (MPG), then construct a hierarchy 
   - `Sb`: `Nc×1` vector. `Sb[n] = 1` indicates 3-clique `n` is separating.
 """
 function CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real},
-                             root::DBHT_RootMethod = DBHT_UniqueRoot())
+                             root::DBHTRootMethod = UniqueRoot())
     N = size(Apm, 1)
     A = Apm .!= 0
     K3, E, clique = clique3(A)
@@ -1085,7 +1096,7 @@ Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering a
 
     Where ``\\mathbf{C}`` is the correlation matrix, ``\\mathbf{D}`` the dissimilarity matrix `D`, and ``\\odot`` the Hadamard (elementwise) operator.
   - `branchorder`: parameter for ordering the final dendrogram's branches accepted by [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
-  - `type`: type for finding the root of a Direct Bubble Hierarchical Clustering Tree in case there is more than one candidate [`DBHT_RootMethod`](@ref).
+  - `type`: type for finding the root of a Direct Bubble Hierarchical Clustering Tree in case there is more than one candidate [`DBHTRootMethod`](@ref).
 
       + `:Unique`: create a unique root.
       + `:Equal`: the root is created from the candidate's adjacency tree.
@@ -1101,7 +1112,7 @@ Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering a
   - `Z_hclust`: Z matrix in [Clustering.Hclust](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format.
 """
 function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
-               branchorder::Symbol = :optimal, root::DBHT_RootMethod = DBHT_UniqueRoot())
+               branchorder::Symbol = :optimal, root::DBHTRootMethod = UniqueRoot())
     @assert(issymmetric(D), "Distance matrix should be symmetric.")
     @assert(issymmetric(S), "Similarity matrix should be symmetric.")
 
@@ -1200,8 +1211,7 @@ function J_LoGo(sigma, separators, cliques)
     return jlogo
 end
 struct DBHTClusteringResult{T1 <: Clustering.Hclust, T2 <: AbstractMatrix,
-                            T3 <: AbstractMatrix, T4 <: Integer} <:
-       AbstractPortfolioOptimisersClusteringResult
+                            T3 <: AbstractMatrix, T4 <: Integer} <: AbstractClusteringResult
     clustering::T1
     S::T2
     D::T3
@@ -1221,10 +1231,56 @@ function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
                     dims::Int = 1)
     S = cor(cle.ce, X; dims = dims)
     D = distance(cle.de, S, X; dims = dims)
-    S = dbht_similarity(cle.alg.sim, S, D)
+    S = dbht_similarity(cle.alg.sim; S = S, D = D)
     clustering = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
     k = optimal_number_clusters(cle.onc, clustering, D)
     return DBHTClusteringResult(; clustering = clustering, S = S, D = D, k = k)
 end
+function logo!(::Nothing, args...; kwargs...)
+    return nothing
+end
+abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
+struct LoGo{T1 <: AbstractDistanceEstimator, T2 <: AbstractSimilarityMatrixAlgorithm} <:
+       InverseMatrixSparsificationAlgorithm
+    dist::T1
+    sim::T2
+end
+function LoGo(; dist::AbstractDistanceEstimator = CanonicalDistance(),
+              sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
+    return LoGo{typeof(dist), typeof(sim)}(dist, sim)
+end
+function LoGo_dist_assert(::Union{Distance{<:VariationInfoDistance},
+                                  GeneralDistance{<:VariationInfoDistance, <:Any},
+                                  DistanceDistance{<:VariationInfoDistance, <:Any, <:Any,
+                                                   <:Any},
+                                  GeneralDistanceDistance{<:VariationInfoDistance, <:Any,
+                                                          <:Any, <:Any, <:Any}},
+                          sigma::AbstractMatrix, X::AbstractMatrix)
+    @smart_assert(size(sigma, 1) == size(X, 2))
+    return nothing
+end
+function LoGo_dist_assert(args...)
+    return nothing
+end
+function logo!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator}, sigma::AbstractMatrix,
+               X::AbstractMatrix; dims::Int = 1)
+    issquare(sigma)
+    LoGo_dist_assert(je.dist, sigma, X)
+    s = diag(sigma)
+    iscov = any(.!isone.(s))
+    S = if iscov
+        s .= sqrt.(s)
+        StatsBase.cov2cor(sigma, s)
+    else
+        sigma
+    end
+    D = distance(je.dist, S, X; dims = dims)
+    S = dbht_similarity(je.sim; S = S, D = D)
+    separators, cliques = PMFG_T2s(S, 4)[3:4]
+    sigma .= J_LoGo(sigma, separators, cliques) \ I
+    logo!(pdm, sigma)
+    return nothing
+end
 
-export PMFG_T2s, DBHTs, J_LoGo, DBHT_UniqueRoot, DBHT_EqualRoot, DBHTClusteringResult, DBHT
+export ExponentialSimilarity, MaximumDistanceSimilarity, dbht_similarity, PMFG_T2s, DBHTs,
+       J_LoGo, UniqueRoot, EqualRoot, DBHTClusteringResult, DBHT, LoGo

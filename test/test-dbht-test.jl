@@ -22,10 +22,10 @@
         rho = cor(ce, X)
         dist = distance(de, rho, X)
 
-        sim = DBHT_MaximumDistanceSimilarity()
-        S = dbht_similarity(sim, rho, dist)
+        sim = MaximumDistanceSimilarity()
+        S = dbht_similarity(sim, S=rho, D=dist)
 
-        root = DBHT_UniqueRoot()
+        root = UniqueRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z1, dbht = DBHTs(dist, S; branchorder = :default,
                                                  root = root)
         m1 = Z1[:, 1] .< 0
@@ -137,10 +137,10 @@
         rho = cor(ce, X)
         dist = distance(de, rho, X)
 
-        sim = DBHT_ExponentialSimilarity()
-        S = dbht_similarity(sim, rho, dist)
+        sim = ExponentialSimilarity()
+        S = dbht_similarity(sim, S=rho, D=dist)
 
-        root = DBHT_EqualRoot()
+        root = EqualRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z2, dbht = DBHTs(dist, S; branchorder = :optimal,
                                                  root = root)
         m1 = Z2[:, 1] .< 0
@@ -320,7 +320,7 @@
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             logo!(PortfolioOptimisers.LoGo(; dist = des[i],
-                                                    sim = DBHT_ExponentialSimilarity()),
+                                                    sim = ExponentialSimilarity()),
                            PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
@@ -341,7 +341,7 @@
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             logo!(PortfolioOptimisers.LoGo(; dist = des[i],
-                                                    sim = DBHT_ExponentialSimilarity()),
+                                                    sim = ExponentialSimilarity()),
                            PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))

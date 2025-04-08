@@ -21,7 +21,7 @@
             A = philogeny_matrix(NetworkEstimator(; n = i), X)
             res = isapprox(vec(A), df[!, i])
             if !res
-                println("Iteration $i failed on DBHT_MaximumDistanceSimilarity.")
+                println("Iteration $i failed on MaximumDistanceSimilarity.")
                 find_tol(vec(A), df[!, i]; name1 = :A, name2 = :df)
             end
         end
@@ -29,11 +29,11 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/Philogeny_Matrix_2.csv"), DataFrame)
         for i ∈ 1:ncol(df)
             A = philogeny_matrix(NetworkEstimator(; n = i,
-                                                  alg = DBHT_MaximumDistanceSimilarity()),
+                                                  alg = MaximumDistanceSimilarity()),
                                  X)
             res = isapprox(vec(A), df[!, i])
             if !res
-                println("Iteration $i failed on DBHT_MaximumDistanceSimilarity.")
+                println("Iteration $i failed on MaximumDistanceSimilarity.")
                 find_tol(vec(A), df[!, i]; name1 = :A, name2 = :df)
             end
         end

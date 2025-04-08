@@ -138,7 +138,7 @@ function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:SimilarityMatrixEst
                                              <:Any}, X::AbstractMatrix; dims::Int = 1)
     S = cor(ne.ce, X; dims = dims)
     D = distance(ne.de, S, X; dims = dims)
-    S = dbht_similarity(ne.alg, S, D)
+    S = dbht_similarity(ne.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
     return adjacency_matrix(SimpleGraph(Rpm))
 end
