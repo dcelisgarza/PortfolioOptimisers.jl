@@ -75,16 +75,16 @@ function Base.getproperty(obj::EntropyPoolingPriorEstimator, sym::Symbol)
     end
 end
 struct EntropyPoolingModel{T1 <: AbstractPriorResult,
-                           T2 <: Union{<:LinearConstraintModel,
-                                       <:AbstractVector{<:LinearConstraintModel}},
+                           T2 <: Union{<:LinearConstraintResult,
+                                       <:AbstractVector{<:LinearConstraintResult}},
                            T3 <: AbstractWeights} <: AbstractEntropyPoolingPriorResult
     pm::T1
     views::T2
     w::T3
 end
 function EntropyPoolingModel(; pm::AbstractPriorResult,
-                             views::Union{<:LinearConstraintModel,
-                                          <:AbstractVector{<:LinearConstraintModel}},
+                             views::Union{<:LinearConstraintResult,
+                                          <:AbstractVector{<:LinearConstraintResult}},
                              w::AbstractWeights)
     @smart_assert(!isempty(w))
     @smart_assert(size(pm.X, 1) == length(w))
@@ -197,7 +197,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
     end
     return EntropyPoolingModel(; pm = pm, views = V_i, w = wi)
 end
-function entropy_pooling(w::AbstractVector, epcs::LinearConstraintModel,
+function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
                          optim::OptimEntropyPooling)
     (; A_eq, B_eq, A_ineq, B_ineq) = epcs
     lhs, rhs, lb, ub = if !isnothing(A_eq) && !isnothing(B_eq)
@@ -250,7 +250,7 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintModel,
     x = Optim.minimizer(result)
     return pweights(exp.(log_p .- one(eltype(log_p)) .- lhs' * x))
 end
-function entropy_pooling(w::AbstractVector, epcs::LinearConstraintModel,
+function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
                          optim::JuMPEntropyPooling)
     model = Model()
     S = length(w)

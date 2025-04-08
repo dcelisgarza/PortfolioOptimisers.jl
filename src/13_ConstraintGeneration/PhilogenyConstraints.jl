@@ -130,12 +130,12 @@ function centrality_constraints(ccs::Union{<:CentralityConstraint,
         A_eq = nothing
         B_eq = nothing
     end
-    return LinearConstraintModel(;
-                                 ineq = PartialLinearConstraintModel(; A = A_ineq,
-                                                                     B = B_ineq),
-                                 eq = PartialLinearConstraintModel(; A = A_eq, B = B_eq))
+    return LinearConstraintResult(;
+                                  ineq = PartialLinearConstraintResult(; A = A_ineq,
+                                                                       B = B_ineq),
+                                  eq = PartialLinearConstraintResult(; A = A_eq, B = B_eq))
 end
-function centrality_constraints(ccs::LinearConstraintModel, args...; kwargs...)
+function centrality_constraints(ccs::LinearConstraintResult, args...; kwargs...)
     return ccs
 end
 function centrality_constraints(::Nothing, args...; kwargs...)

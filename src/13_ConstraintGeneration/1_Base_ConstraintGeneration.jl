@@ -1,10 +1,12 @@
+abstract type AbstractConstraintSide <: AbstractEstimator end
+abstract type AbstractConstraint <: AbstractEstimator end
+abstract type AbstractConstraintResult <: AbstractResult end
 abstract type ComparisonOperators end
 abstract type EqualityComparisonOperators <: ComparisonOperators end
 abstract type InequalityComparisonOperators <: ComparisonOperators end
 struct EQ <: EqualityComparisonOperators end
 struct LEQ <: InequalityComparisonOperators end
 struct GEQ <: InequalityComparisonOperators end
-abstract type AbstractConstraintResult <: AbstractResult end
 function comparison_sign_ineq_flag(::EQ)
     return 1, false
 end
@@ -13,40 +15,6 @@ function comparison_sign_ineq_flag(::LEQ)
 end
 function comparison_sign_ineq_flag(::GEQ)
     return -1, true
-end
-abstract type AbstractConstraintSide <: AbstractEstimator end
-struct LinearConstraintSide{T1, T2, T3 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
-       AbstractConstraintSide
-    group::T1
-    name::T2
-    coef::T3
-end
-function LinearConstraintSide(; group, name,
-                              coef::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
-    group_flag = isa(group, AbstractVector)
-    name_flag = isa(name, AbstractVector)
-    coef_flag = isa(coef, AbstractVector)
-    if group_flag || name_flag || coef_flag
-        @smart_assert(group_flag && name_flag && coef_flag)
-        @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
-        @smart_assert(length(group) == length(name) == length(coef))
-    end
-    return LinearConstraintSide{typeof(group), typeof(name), typeof(coef)}(group, name,
-                                                                           coef)
-end
-struct CardinalityConstraint{T1, T2} <: AbstractConstraintSide
-    group::T1
-    name::T2
-end
-function CardinalityConstraint(; group, name)
-    group_flag = isa(group, AbstractVector)
-    name_flag = isa(name, AbstractVector)
-    if group_flag || name_flag
-        @smart_assert(group_flag && name_flag)
-        @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
-        @smart_assert(length(group) == length(name) == length(coef))
-    end
-    return CardinalityConstraint{typeof(group), typeof(name)}(group, name)
 end
 function split_equation(equation_str::AbstractString)
     # Remove whitespace for easier parsing
@@ -267,6 +235,11 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
     return Dict("equation" => equation, "variables" => vars, "coefficients" => coefs,
                 "comparison" => comp_op, "constant" => right_const)
 end
+function generate_constraints(cr::AbstractConstraintResult, args...; kwargs...)
+    return cr
+end
+function generate_constraints(::Nothing, args...; kwargs...)
+    return nothing
+end
 
-export EQ, LEQ, GEQ, LinearConstraintSide, CardinalityConstraint, split_equation,
-       parse_constraint_equation
+export EQ, LEQ, GEQ, split_equation, parse_constraint_equation, generate_constraints

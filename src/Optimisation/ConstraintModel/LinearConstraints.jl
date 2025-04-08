@@ -1,13 +1,13 @@
 function set_linear_weight_constraints!(::JuMP.Model,
                                         ::Union{Nothing,
-                                                <:LinearConstraintModel{<:PartialLinearConstraintModel{Nothing,
-                                                                                                       Nothing},
-                                                                        <:PartialLinearConstraintModel{Nothing,
-                                                                                                       Nothing}}},
+                                                <:LinearConstraintResult{<:PartialLinearConstraintResult{Nothing,
+                                                                                                         Nothing},
+                                                                         <:PartialLinearConstraintResult{Nothing,
+                                                                                                         Nothing}}},
                                         ::Symbol, ::Symbol)
     return nothing
 end
-function set_linear_weight_constraints!(model::JuMP.Model, lcm::LinearConstraintModel,
+function set_linear_weight_constraints!(model::JuMP.Model, lcm::LinearConstraintResult,
                                         key_ineq::Symbol, key_eq::Symbol)
     w, k, sc = get_w_k_sc(model)
     if !isnothing(lcm.A_ineq)

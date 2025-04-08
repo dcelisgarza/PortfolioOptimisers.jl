@@ -58,6 +58,8 @@ include("./12_Philogeny/4_DBHT.jl")
 include("./12_Philogeny/5_Network.jl")
 
 include("./13_ConstraintGeneration/1_Base_ConstraintGeneration.jl")
+include("./13_ConstraintGeneration/2_LinearConstraintGeneration.jl")
+include("./13_ConstraintGeneration/3_CardinalityConstraintGeneration.jl")
 
 include("./14_Prior/1_Base_Prior.jl")
 include("./14_Prior/2_EmpiricalPrior.jl")

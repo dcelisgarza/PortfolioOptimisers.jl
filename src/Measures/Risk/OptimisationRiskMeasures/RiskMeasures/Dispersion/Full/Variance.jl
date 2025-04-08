@@ -6,7 +6,7 @@ struct Variance{T1 <: RiskMeasureSettings, T2 <: VarianceFormulation,
                 T3 <: Union{Nothing, <:AbstractMatrix},
                 T4 <:
                 Union{Nothing, <:LinearConstraint, <:AbstractVector{<:LinearConstraint},
-                      <:LinearConstraintModel}} <: RiskContributionSigmaRiskMeasure
+                      <:LinearConstraintResult}} <: RiskContributionSigmaRiskMeasure
     settings::T1
     formulation::T2
     sigma::T3
@@ -16,7 +16,7 @@ function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   formulation::VarianceFormulation = SOC(),
                   sigma::Union{Nothing, <:AbstractMatrix} = nothing,
                   rc::Union{Nothing, <:LinearConstraint,
-                            <:AbstractVector{<:LinearConstraint}, <:LinearConstraintModel} = nothing)
+                            <:AbstractVector{<:LinearConstraint}, <:LinearConstraintResult} = nothing)
     if isa(sigma, AbstractMatrix)
         @smart_assert(!isempty(sigma))
         issquare(sigma)

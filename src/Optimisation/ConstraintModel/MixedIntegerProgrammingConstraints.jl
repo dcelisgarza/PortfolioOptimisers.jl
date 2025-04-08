@@ -151,7 +151,7 @@ function _mip_constraints(model::JuMP.Model, wb::WeightBounds,
     return ib
 end
 function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThreshold},
-                              card::Union{Nothing, <:LinearConstraintModel},
+                              card::Union{Nothing, <:LinearConstraintResult},
                               fees::Union{Nothing, <:Fees},
                               nplg::Union{Nothing, <:PhilogenyConstraintModel},
                               cplg::Union{Nothing, <:PhilogenyConstraintModel},
@@ -163,10 +163,10 @@ function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThre
     end
     card_flag = !isa(card,
                      Union{Nothing,
-                           <:LinearConstraintModel{<:PartialLinearConstraintModel{Nothing,
-                                                                                  Nothing},
-                                                   <:PartialLinearConstraintModel{Nothing,
-                                                                                  Nothing}}})
+                           <:LinearConstraintResult{<:PartialLinearConstraintResult{Nothing,
+                                                                                    Nothing},
+                                                    <:PartialLinearConstraintResult{Nothing,
+                                                                                    Nothing}}})
     ffl_flag, ffs_flag = if !isnothing(fees)
         non_zero_real_or_vec(fees.fixed_long)
         non_zero_real_or_vec(fees.fixed_short)

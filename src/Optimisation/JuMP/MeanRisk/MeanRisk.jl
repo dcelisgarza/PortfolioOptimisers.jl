@@ -15,9 +15,9 @@ function cleanup_weights(model::JuMP.Model, ::MeanRiskEstimator)
     return value.(model[:w]) / value(model[:k])
 end
 struct MeanRiskModel{T1 <: AbstractPriorResult, T2 <: Union{Nothing, <:WeightBounds},
-                     T3 <: Union{Nothing, <:LinearConstraintModel},
-                     T4 <: Union{Nothing, <:LinearConstraintModel},
-                     T5 <: Union{Nothing, <:LinearConstraintModel},
+                     T3 <: Union{Nothing, <:LinearConstraintResult},
+                     T4 <: Union{Nothing, <:LinearConstraintResult},
+                     T5 <: Union{Nothing, <:LinearConstraintResult},
                      T6 <: Union{Nothing, <:PhilogenyConstraintModel},
                      T7 <: Union{Nothing, <:PhilogenyConstraintModel},
                      T8 <: JuMPPortfolioSolution} <: PortfolioModel

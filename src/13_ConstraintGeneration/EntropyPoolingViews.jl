@@ -933,10 +933,10 @@ function entropy_pooling_views(pm::AbstractPriorResult,
         B_eq = nothing
     end
 
-    return LinearConstraintModel(;
-                                 ineq = PartialLinearConstraintModel(; A = A_ineq,
-                                                                     B = B_ineq),
-                                 eq = PartialLinearConstraintModel(; A = A_eq, B = B_eq))
+    return LinearConstraintResult(;
+                                  ineq = PartialLinearConstraintResult(; A = A_ineq,
+                                                                       B = B_ineq),
+                                  eq = PartialLinearConstraintResult(; A = A_eq, B = B_eq))
 end
 
 export entropy_pooling_views, ConstantEntropyPoolingConstraint,

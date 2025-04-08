@@ -65,14 +65,14 @@ function _set_risk_constraints!(model::JuMP.Model, r::StandardDeviation,
 end
 function sdp_rc_variance_flag!(::JuMP.Model, ::MeanRiskEstimator,
                                ::Union{Nothing,
-                                       LinearConstraintModel{<:PartialLinearConstraintModel{Nothing,
-                                                                                            Nothing},
-                                                             <:PartialLinearConstraintModel{Nothing,
-                                                                                            Nothing}}})
+                                       LinearConstraintResult{<:PartialLinearConstraintResult{Nothing,
+                                                                                              Nothing},
+                                                              <:PartialLinearConstraintResult{Nothing,
+                                                                                              Nothing}}})
     return false
 end
 function sdp_rc_variance_flag!(model::JuMP.Model, ::MeanRiskEstimator,
-                               ::LinearConstraintModel)
+                               ::LinearConstraintResult)
     set_sdp_constraints!(model)
     return true
 end
@@ -177,7 +177,7 @@ end
 function rc_variance_constraints!(args...)
     return nothing
 end
-function rc_variance_constraints!(model::JuMP.Model, i::Integer, rc::LinearConstraintModel,
+function rc_variance_constraints!(model::JuMP.Model, i::Integer, rc::LinearConstraintResult,
                                   variance_risk::AbstractJuMPScalar)
     sigma_W = model[Symbol(ShortString("sigma_W_$(i)"))]
     sc = model[:sc]
