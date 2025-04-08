@@ -52,9 +52,9 @@ function split_equation(equation_str::AbstractString)
     # Remove whitespace for easier parsing
     eq_clean = replace(equation_str, r"\s+" => "")
 
-    invalid = match(r"(-=|=>|=<)", eq_clean)
-    if !isnothing(invalid)
-        throw(ArgumentError("Invalid comparison operators found in equation: $(invalid.captures[1])"))
+    invalid = collect(eachmatch(r"(=>|=<)", eq_clean))
+    if !isempty(invalid)
+        throw(ArgumentError("Invalid comparison operators found in equation: $invalid"))
     end
 
     # Find the comparison operator
@@ -62,14 +62,14 @@ function split_equation(equation_str::AbstractString)
 
     # Check for multiple comparison operators
     if length(comp_match) > 1
-        throw(ArgumentError("Multiple comparison operators found in equation: $(getindex.(getproperty.(comp_match, :captures),1))"))
+        throw(ArgumentError("Multiple comparison operators found in equation: $comp_match"))
     end
 
-    comp_match = comp_match[1]
-    if isnothing(comp_match)
+    if isempty(comp_match)
         throw(ArgumentError("No valid comparison operator found in equation: $eq_clean"))
     end
 
+    comp_match = comp_match[1]
     comp_op = comp_match.captures[1]
     comp_pos = comp_match.offset
 
@@ -163,7 +163,17 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
                 continue
             end
 
-            # Case 3: variable/denominator
+            # Case 3: variable*coefficient[/denominator]
+            m = match(r"^(\d*\.?\d+)(?:\/(\d+))?\*([a-zA-Z][a-zA-Z0-9_]*)$", term)
+            if !isnothing(m)
+                coef = parse(Float64, m[1])
+                denom = isnothing(m[2]) || isempty(m[2]) ? 1.0 : parse(Float64, m[2])
+                var = m[3]
+                push!(variable_terms, (sign_factor * coef / denom, var))
+                continue
+            end
+
+            # Case 4: variable/denominator
             m = match(r"^([a-zA-Z][a-zA-Z0-9_]*)\/(\d+)$", term)
             if !isnothing(m)
                 var = m[1]
@@ -172,7 +182,7 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
                 continue
             end
 
-            # Case 4: pure variable
+            # Case 5: pure variable
             m = match(r"^([a-zA-Z][a-zA-Z0-9_]*)$", term)
             if !isnothing(m)
                 push!(variable_terms, (sign_factor, m[1]))
