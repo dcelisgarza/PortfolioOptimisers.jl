@@ -1,14 +1,15 @@
-struct EmpiricalPriorModel{T1 <: AbstractMatrix, T2 <: AbstractVector,
-                           T3 <: AbstractMatrix} <: AbstractPriorModel_A
+struct EmpiricalPriorResult{T1 <: AbstractMatrix, T2 <: AbstractVector,
+                            T3 <: AbstractMatrix} <: AbstractPriorResult_A
     X::T1
     mu::T2
     sigma::T3
 end
-function EmpiricalPriorModel(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix)
+function EmpiricalPriorResult(; X::AbstractMatrix, mu::AbstractVector,
+                              sigma::AbstractMatrix)
     @smart_assert(!isempty(X) && !isempty(mu) && !isempty(sigma))
     @smart_assert(size(X, 2) == length(mu))
     issquare(sigma)
-    return EmpiricalPriorModel{typeof(X), typeof(mu), typeof(sigma)}(X, mu, sigma)
+    return EmpiricalPriorResult{typeof(X), typeof(mu), typeof(sigma)}(X, mu, sigma)
 end
 struct EmpiricalPriorEstimator{T1 <: AbstractExpectedReturnsEstimator,
                                T2 <: StatsBase.CovarianceEstimator,
@@ -36,7 +37,7 @@ function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, Nothing}, X::AbstractMa
     end
     mu = vec(mean(pe.me, X))
     sigma = cov(pe.ce, X)
-    return EmpiricalPriorModel(; X = X, mu = mu, sigma = sigma)
+    return EmpiricalPriorResult(; X = X, mu = mu, sigma = sigma)
 end
 function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMatrix,
                args...; dims::Int = 1, kwargs...)
@@ -51,7 +52,7 @@ function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMat
     sigma .*= pe.horizon
     mu .= exp.(mu + 0.5 * diag(sigma))
     sigma .= (mu ⊗ mu) .* (exp.(sigma) .- one(eltype(sigma)))
-    return EmpiricalPriorModel(; X = X, mu = mu, sigma = sigma)
+    return EmpiricalPriorResult(; X = X, mu = mu, sigma = sigma)
 end
 
-export EmpiricalPriorEstimator, EmpiricalPriorModel
+export EmpiricalPriorEstimator, EmpiricalPriorResult

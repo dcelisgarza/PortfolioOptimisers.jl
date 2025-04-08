@@ -2,7 +2,8 @@ struct MaximumReturn <: ObjectiveFunction end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn,
                                            pret::PortfolioReturnType,
                                            cobj::Union{Nothing, <:CustomObjective},
-                                           mr::JuMPOptimisationType, pm::AbstractPriorModel)
+                                           mr::JuMPOptimisationType,
+                                           pm::AbstractPriorResult)
     so = model[:so]
     ret = model[:ret]
     op = model[:op]

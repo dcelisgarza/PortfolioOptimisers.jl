@@ -1,4 +1,4 @@
-struct Skewness{T1 <: PortfolioOptimisersVarianceEstimator,
+struct Skewness{T1 <: AbstractVarianceEstimator,
                 T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                 T3 <: Union{Nothing, <:AbstractWeights},
                 T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
@@ -8,7 +8,7 @@ struct Skewness{T1 <: PortfolioOptimisersVarianceEstimator,
     w::T3
     mu::T4
 end
-function Skewness(; ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
+function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                   w::Union{Nothing, <:AbstractWeights} = nothing,
                   mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)

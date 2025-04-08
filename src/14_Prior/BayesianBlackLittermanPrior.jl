@@ -1,11 +1,13 @@
-struct BayesianBlackLittermanPriorModel{T1 <: EmpiricalPriorModel, T2 <: PartialFactorModel,
+struct BayesianBlackLittermanPriorModel{T1 <: EmpiricalPriorResult,
+                                        T2 <: PartialFactorPriorResult,
                                         T3 <: BlackLittermanViewsModel} <:
-       AbstractPriorModel_AFV
+       AbstractPriorResult_AFV
     pm::T1
     fm::T2
     f_views::T3
 end
-function BayesianBlackLittermanPriorModel(; pm::EmpiricalPriorModel, fm::PartialFactorModel,
+function BayesianBlackLittermanPriorModel(; pm::EmpiricalPriorResult,
+                                          fm::PartialFactorPriorResult,
                                           f_views::BlackLittermanViewsModel)
     @smart_assert(length(fm.mu) == size(f_views.P, 2))
     return BayesianBlackLittermanPriorModel{typeof(pm), typeof(fm), typeof(f_views)}(pm, fm,
@@ -128,12 +130,12 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat) .+ pe.rf .+ b
     return BayesianBlackLittermanPriorModel(;
-                                            pm = EmpiricalPriorModel(; X = posterior_X,
-                                                                     mu = posterior_mu,
-                                                                     sigma = posterior_sigma),
-                                            fm = PartialFactorModel(; mu = f_mu,
-                                                                    sigma = f_sigma,
-                                                                    loadings = loadings),
+                                            pm = EmpiricalPriorResult(; X = posterior_X,
+                                                                      mu = posterior_mu,
+                                                                      sigma = posterior_sigma),
+                                            fm = PartialFactorPriorResult(; mu = f_mu,
+                                                                          sigma = f_sigma,
+                                                                          loadings = loadings),
                                             f_views = f_views)
 end
 

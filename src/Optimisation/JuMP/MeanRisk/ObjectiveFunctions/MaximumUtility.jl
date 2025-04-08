@@ -8,7 +8,8 @@ end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtility,
                                            pret::PortfolioReturnType,
                                            cobj::Union{Nothing, <:CustomObjective},
-                                           mr::JuMPOptimisationType, pm::AbstractPriorModel)
+                                           mr::JuMPOptimisationType,
+                                           pm::AbstractPriorResult)
     so = model[:so]
     ret = model[:ret]
     risk = model[:risk]

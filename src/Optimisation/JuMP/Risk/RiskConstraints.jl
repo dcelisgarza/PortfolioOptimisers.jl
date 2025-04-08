@@ -1,4 +1,4 @@
-function get_chol_or_sigma_pm(model::JuMP.Model, pm::AbstractPriorModel)
+function get_chol_or_sigma_pm(model::JuMP.Model, pm::AbstractPriorResult)
     if !haskey(model, :G)
         G = cholesky(pm.sigma).U
         # G = sqrt(pm.sigma)
@@ -7,7 +7,7 @@ function get_chol_or_sigma_pm(model::JuMP.Model, pm::AbstractPriorModel)
     return model[:G]
 end
 function get_chol_or_sigma_pm(model::JuMP.Model,
-                              pm::Union{<:FactorPriorModel,
+                              pm::Union{<:FactorPriorResult,
                                         <:FactorBlackLittermanPriorModel})
     if !haskey(model, :G)
         G = pm.chol
@@ -50,7 +50,7 @@ function set_risk_bounds_and_expression!(opt::MeanRiskEstimator, model::JuMP.Mod
     return nothing
 end
 function _set_risk_constraints!(model::JuMP.Model, r::StandardDeviation,
-                                opt::MeanRiskEstimator, pm::AbstractPriorModel, i::Integer,
+                                opt::MeanRiskEstimator, pm::AbstractPriorResult, i::Integer,
                                 args...)
     sc = model[:sc]
     w = model[:w]
@@ -90,7 +90,7 @@ function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
         false
     end
 end
-function set_variance_risk!(model::JuMP.Model, flag::Bool, pm::AbstractPriorModel,
+function set_variance_risk!(model::JuMP.Model, flag::Bool, pm::AbstractPriorResult,
                             i::Integer, r::Variance, key::Symbol)
     if flag
         set_sdp_variance_risk!(model, pm, i, r, key)
@@ -99,7 +99,7 @@ function set_variance_risk!(model::JuMP.Model, flag::Bool, pm::AbstractPriorMode
     end
     return nothing
 end
-function set_sdp_variance_risk!(model::JuMP.Model, pm::AbstractPriorModel, i::Integer,
+function set_sdp_variance_risk!(model::JuMP.Model, pm::AbstractPriorResult, i::Integer,
                                 r::Variance, key::Symbol)
     W = model[:W]
     sigma = isnothing(r.sigma) ? pm.sigma : r.sigma
@@ -107,7 +107,7 @@ function set_sdp_variance_risk!(model::JuMP.Model, pm::AbstractPriorModel, i::In
     model[key] = @expression(model, tr(sigma_W))
     return nothing
 end
-function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorModel, i::Integer,
+function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorResult, i::Integer,
                             r::Variance{<:Any, <:SOC, <:Any, <:Any}, key::Symbol)
     sc = model[:sc]
     w = model[:w]
@@ -120,7 +120,7 @@ function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorModel, i::Intege
                                                                SecondOrderCone())
     return nothing
 end
-function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorModel, i::Integer,
+function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorResult, i::Integer,
                             r::Variance{<:Any, <:Quad, <:Any, <:Any}, key::Symbol)
     sc = model[:sc]
     w = model[:w]
@@ -134,7 +134,7 @@ function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorModel, i::Intege
                                                                SecondOrderCone())
     return nothing
 end
-function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorModel, i::Integer,
+function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorResult, i::Integer,
                             r::Variance{<:Any, <:RSOC, <:Any, <:Any}, key::Symbol)
     sc = model[:sc]
     w = model[:w]
@@ -203,7 +203,7 @@ function rc_variance_constraints!(model::JuMP.Model, i::Integer, rc::LinearConst
     return nothing
 end
 function _set_risk_constraints!(model::JuMP.Model, r::Variance, opt::MeanRiskEstimator,
-                                pm::AbstractPriorModel, i::Integer,
+                                pm::AbstractPriorResult, i::Integer,
                                 cplg::Union{Nothing, <:SemiDefinitePhilogenyModel,
                                             <:IntegerPhilogenyModel},
                                 nplg::Union{Nothing, <:SemiDefinitePhilogenyModel,

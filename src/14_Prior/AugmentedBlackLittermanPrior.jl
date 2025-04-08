@@ -1,15 +1,15 @@
-struct AugmentedBlackLittermanPriorModel{T1 <: EmpiricalPriorModel,
-                                         T2 <: PartialFactorModel,
+struct AugmentedBlackLittermanPriorModel{T1 <: EmpiricalPriorResult,
+                                         T2 <: PartialFactorPriorResult,
                                          T3 <: BlackLittermanViewsModel,
                                          T4 <: BlackLittermanViewsModel} <:
-       AbstractPriorModel_AVFV
+       AbstractPriorResult_AVFV
     pm::T1
     fm::T2
     a_views::T3
     f_views::T4
 end
-function AugmentedBlackLittermanPriorModel(; pm::EmpiricalPriorModel,
-                                           fm::PartialFactorModel,
+function AugmentedBlackLittermanPriorModel(; pm::EmpiricalPriorResult,
+                                           fm::PartialFactorPriorResult,
                                            a_views::BlackLittermanViewsModel,
                                            f_views::BlackLittermanViewsModel)
     @smart_assert(size(pm.X, 2) == size(a_views.P, 2))
@@ -37,8 +37,8 @@ end
 struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
                                              T2 <: AbstractPriorEstimatorMap_2_1,
                                              T3 <: AbstractMatrixProcessingEstimator,
-                                             T4 <: RegressionMethod,
-                                             T5 <: PortfolioOptimisersVarianceEstimator,
+                                             T4 <: AbstractRegressionEstimator,
+                                             T5 <: AbstractVarianceEstimator,
                                              T6 <: Union{<:BlackLittermanView,
                                                          <:AbstractVector{<:BlackLittermanView}},
                                              T7 <: Union{<:BlackLittermanView,
@@ -70,8 +70,8 @@ function AugmentedBlackLittermanPriorEstimator(;
                                                a_pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                                                f_pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                                                mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                               re::RegressionMethod = ForwardRegression(),
-                                               ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
+                                               re::AbstractRegressionEstimator = ForwardRegression(),
+                                               ve::AbstractVarianceEstimator = SimpleVariance(),
                                                a_views::Union{<:BlackLittermanView,
                                                               <:AbstractVector{<:BlackLittermanView}},
                                                f_views::Union{<:BlackLittermanView,
@@ -230,12 +230,13 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_mu = aug_posterior_mu[1:size(X, 2)] .+ pe.rf .+ b
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
     return AugmentedBlackLittermanPriorModel(;
-                                             pm = EmpiricalPriorModel(; X = posterior_X,
-                                                                      mu = posterior_mu,
-                                                                      sigma = posterior_sigma),
-                                             fm = PartialFactorModel(; mu = f_prior_mu,
-                                                                     sigma = f_prior_sigma,
-                                                                     loadings = loadings),
+                                             pm = EmpiricalPriorResult(; X = posterior_X,
+                                                                       mu = posterior_mu,
+                                                                       sigma = posterior_sigma),
+                                             fm = PartialFactorPriorResult(;
+                                                                           mu = f_prior_mu,
+                                                                           sigma = f_prior_sigma,
+                                                                           loadings = loadings),
                                              a_views = a_views, f_views = f_views)
 end
 

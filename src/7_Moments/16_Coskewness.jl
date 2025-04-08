@@ -1,6 +1,7 @@
 abstract type CoskewnessEstimator end
-function coskewness end
-
+function coskewness(::Nothing, args...; kwargs...)
+    return nothing, nothing
+end
 struct Coskewness{T1 <: AbstractMomentAlgorithm, T2 <: AbstractExpectedReturnsEstimator,
                   T3 <: AbstractMatrixProcessingEstimator} <: CoskewnessEstimator
     alg::T1

@@ -61,7 +61,7 @@ function regression(method::DimensionReductionRegression, X::AbstractMatrix,
     for i ∈ axes(loadings, 1)
         loadings[i, :] .= regression(view(X, :, i), mu, sigma, f1, Vp)
     end
-    return LoadingsMatrix(; b = view(loadings, :, 1), M = view(loadings, :, 2:cols))
+    return RegressionResult(; b = view(loadings, :, 1), M = view(loadings, :, 2:cols))
 end
 
 export PCA, PPCA, DimensionReductionRegression

@@ -1,7 +1,8 @@
 struct NormalUncertaintySetEstimator{T1 <: AbstractPriorEstimator,
-                                     T2 <: UncertaintySetClass, T3 <: Integer, T4 <: Real,
-                                     T5 <: AbstractRNG, T6 <: Union{Nothing, <:Integer}} <:
-       UncertaintySetEstimator
+                                     T2 <: AbstractUncertaintySetAlgorithm, T3 <: Integer,
+                                     T4 <: Real, T5 <: AbstractRNG,
+                                     T6 <: Union{Nothing, <:Integer}} <:
+       AbstractUncertaintySetEstimator
     pe::T1
     class::T2
     n_sim::T3
@@ -11,7 +12,7 @@ struct NormalUncertaintySetEstimator{T1 <: AbstractPriorEstimator,
 end
 function NormalUncertaintySetEstimator(;
                                        pe::AbstractPriorEstimator = EmpiricalPriorEstimator(),
-                                       class::UncertaintySetClass = BoxUncertaintySetClass(),
+                                       class::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                                        n_sim::Integer = 3_000, q::Real = 0.05,
                                        rng::AbstractRNG = Random.default_rng(),
                                        seed::Union{<:Integer, Nothing} = nothing)

@@ -74,15 +74,15 @@ function Base.getproperty(obj::EntropyPoolingPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
-struct EntropyPoolingModel{T1 <: AbstractPriorModel,
+struct EntropyPoolingModel{T1 <: AbstractPriorResult,
                            T2 <: Union{<:LinearConstraintModel,
                                        <:AbstractVector{<:LinearConstraintModel}},
-                           T3 <: AbstractWeights} <: AbstractEntropyPoolingPriorModel
+                           T3 <: AbstractWeights} <: AbstractEntropyPoolingPriorResult
     pm::T1
     views::T2
     w::T3
 end
-function EntropyPoolingModel(; pm::AbstractPriorModel,
+function EntropyPoolingModel(; pm::AbstractPriorResult,
                              views::Union{<:LinearConstraintModel,
                                           <:AbstractVector{<:LinearConstraintModel}},
                              w::AbstractWeights)

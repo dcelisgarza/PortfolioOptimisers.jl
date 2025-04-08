@@ -1,4 +1,4 @@
-struct HighOrderPriorModel{T1 <: AbstractLowOrderPriorModel,
+struct HighOrderPriorModel{T1 <: AbstractLowOrderPriorResult,
                            T2 <: Union{Nothing, <:AbstractMatrix},
                            T3 <: Union{Nothing, <:AbstractMatrix},
                            T4 <: Union{Nothing, <:AbstractMatrix},
@@ -7,7 +7,7 @@ struct HighOrderPriorModel{T1 <: AbstractLowOrderPriorModel,
                            T7 <: Union{Nothing, <:AbstractMatrix},
                            T8 <: Union{Nothing, <:AbstractMatrix},
                            T9 <: Union{Nothing, <:AbstractMatrixProcessingEstimator}} <:
-       AbstractHighOrderPriorModel
+       AbstractHighOrderPriorResult
     pm::T1
     kt::T2
     skt::T3
@@ -18,7 +18,7 @@ struct HighOrderPriorModel{T1 <: AbstractLowOrderPriorModel,
     SV::T8
     sskmp::T9
 end
-function HighOrderPriorModel(; pm::AbstractLowOrderPriorModel,
+function HighOrderPriorModel(; pm::AbstractLowOrderPriorResult,
                              kt::Union{Nothing, <:AbstractMatrix},
                              skt::Union{Nothing, <:AbstractMatrix},
                              sk::Union{Nothing, <:AbstractMatrix},
@@ -103,10 +103,14 @@ function factory(pe::HighOrderPriorEstimator,
 end
 function HighOrderPriorEstimator(;
                                  pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
-                                 kte::CokurtosisEstimator = FullCokurtosis(),
-                                 skte::CokurtosisEstimator = SemiCokurtosis(),
-                                 ske::CoskewnessEstimator = FullCoskewness(),
-                                 sske::CoskewnessEstimator = SemiCoskewness())
+                                 kte::Union{Nothing, CokurtosisEstimator} = Cokurtosis(;
+                                                                                       alg = Full()),
+                                 skte::Union{Nothing, CokurtosisEstimator} = Cokurtosis(;
+                                                                                        alg = Semi()),
+                                 ske::Union{Nothing, CoskewnessEstimator} = Coskewness(;
+                                                                                       alg = Full()),
+                                 sske::Union{Nothing, CoskewnessEstimator} = Coskewness(;
+                                                                                        alg = Semi()))
     return HighOrderPriorEstimator{typeof(pe), typeof(kte), typeof(skte), typeof(ske),
                                    typeof(sske)}(pe, kte, skte, ske, sske)
 end
@@ -120,9 +124,7 @@ function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
     end
 end
 function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
-               kurt::Bool = true, skurt::Bool = true, skew::Bool = true, sskew::Bool = true,
-               kwargs...)
+               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
@@ -130,12 +132,11 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
             F = transpose(F)
         end
     end
-    pm = prior(pe.pe, X, F; kurt = kurt, skurt = skurt, skew = skew, sskew = sskew,
-               kwargs...)
-    kt = kurt ? cokurtosis(pe.kte, pm.X) : nothing
-    skt = skurt ? cokurtosis(pe.skte, pm.X) : nothing
-    sk, V = skew ? coskewness(pe.ske, pm.X) : (nothing, nothing)
-    ssk, SV = sskew ? coskewness(pe.sske, pm.X) : (nothing, nothing)
+    pm = prior(pe.pe, X, F)
+    kt = cokurtosis(pe.kte, pm.X)
+    skt = cokurtosis(pe.skte, pm.X)
+    sk, V = coskewness(pe.ske, pm.X)
+    ssk, SV = coskewness(pe.sske, pm.X)
     return HighOrderPriorModel(; pm = pm, kt = kt, skt = skt, sk = sk, V = V,
                                skmp = isnothing(sk) ? nothing : pe.ske.mp, ssk = ssk,
                                SV = SV, sskmp = isnothing(ssk) ? nothing : pe.sske.mp)

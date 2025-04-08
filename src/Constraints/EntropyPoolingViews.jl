@@ -140,7 +140,7 @@ end
 function to_be_frozen(epv::EntropyPoolingView)
     return isequal(epv.A, epv.B)
 end
-function constant_entropy_pooling_constraint!(pm::AbstractPriorModel, cache::AbstractSet,
+function constant_entropy_pooling_constraint!(pm::AbstractPriorResult, cache::AbstractSet,
                                               idx::AbstractVector,
                                               epvs::Union{<:EntropyPoolingView,
                                                           <:AbstractVector{<:EntropyPoolingView}},
@@ -206,12 +206,12 @@ function freeze_A_view(A::C4_LinearEntropyPoolingConstraint{<:AbstractVector,
                                              name1 = A.name1, name2 = A.name2,
                                              coef = sign.(A.coef))
 end
-function _freeze_view(epc::C0_LinearEntropyPoolingConstraint, pm::AbstractPriorModel,
+function _freeze_view(epc::C0_LinearEntropyPoolingConstraint, pm::AbstractPriorResult,
                       idx::AbstractVector, coef::Real; kwargs...)
     mu = view(pm.mu, idx)
     return sign(coef) * sum(mu)
 end
-function _freeze_view(epc::C1_LinearEntropyPoolingConstraint, pm::AbstractPriorModel,
+function _freeze_view(epc::C1_LinearEntropyPoolingConstraint, pm::AbstractPriorResult,
                       idx::AbstractVector, coef::Real; kwargs...)
     sigma = pm.sigma
     dsigma = view(diag(sigma), idx)
@@ -228,7 +228,7 @@ function _freeze_view(epc::C1_LinearEntropyPoolingConstraint, pm::AbstractPriorM
 end
 function _freeze_view(epc::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any,
                                                              <:SkewnessEntropyPoolingView},
-                      pm::AbstractPriorModel, idx::AbstractVector, coef::Real;
+                      pm::AbstractPriorResult, idx::AbstractVector, coef::Real;
                       w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                           length = size(pm.X, 1))),
                       kwargs...)
@@ -237,14 +237,14 @@ function _freeze_view(epc::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any
 end
 function _freeze_view(epc::C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any,
                                                              <:KurtosisEntropyPoolingView},
-                      pm::AbstractPriorModel, idx::AbstractVector, coef::Real;
+                      pm::AbstractPriorResult, idx::AbstractVector, coef::Real;
                       w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                           length = size(pm.X, 1))),
                       kwargs...)
     X = view(pm.X, :, idx)
     return sign(coef) * sum([kurtosis(X[:, i], w) + 3 for i ∈ axes(X, 2)])
 end
-function _freeze_view(epc::C4_LinearEntropyPoolingConstraint, pm::AbstractPriorModel,
+function _freeze_view(epc::C4_LinearEntropyPoolingConstraint, pm::AbstractPriorResult,
                       idx1::AbstractVector, idx2::AbstractVector, coef::Real; kwargs...)
     sigma = pm.sigma
     dsigma = diag(sigma)
@@ -252,11 +252,11 @@ function _freeze_view(epc::C4_LinearEntropyPoolingConstraint, pm::AbstractPriorM
     dsigma2 = sqrt.(view(dsigma, idx2))
     return sign(coef) * sum(dsigma1 .* dsigma2)
 end
-function freeze_B_view(::AbstractPriorModel, epv::ConstantEntropyPoolingConstraint,
+function freeze_B_view(::AbstractPriorResult, epv::ConstantEntropyPoolingConstraint,
                        ::DataFrame, ::Bool, args...; kwargs...)
     return epv
 end
-function freeze_B_view(pm::AbstractPriorModel,
+function freeze_B_view(pm::AbstractPriorResult,
                        epv::Union{<:C0_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Real},
                                   <:C1_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Real},
                                   <:C2_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Real,
@@ -289,7 +289,7 @@ function freeze_B_view(pm::AbstractPriorModel,
                                                 zero(eltype(pm.X))
                                             end)
 end
-function freeze_B_view(pm::AbstractPriorModel,
+function freeze_B_view(pm::AbstractPriorResult,
                        epv::Union{<:C0_LinearEntropyPoolingConstraint{<:AbstractVector,
                                                                       <:AbstractVector,
                                                                       <:AbstractVector},
@@ -331,7 +331,7 @@ function freeze_B_view(pm::AbstractPriorModel,
                                                 zero(eltype(pm.X))
                                             end)
 end
-function freeze_B_view(pm::AbstractPriorModel,
+function freeze_B_view(pm::AbstractPriorResult,
                        epv::C4_LinearEntropyPoolingConstraint{<:Any, <:Any, <:Any, <:Any,
                                                               <:Real}, sets::DataFrame,
                        strict::Bool = false;
@@ -365,7 +365,7 @@ function freeze_B_view(pm::AbstractPriorModel,
                                                 @warn("$(string(group1)) or $(string(group1)) are not in $(group_names).\n$(epv).")
                                             end)
 end
-function freeze_B_view(pm::AbstractPriorModel,
+function freeze_B_view(pm::AbstractPriorResult,
                        epv::C4_LinearEntropyPoolingConstraint{<:AbstractVector,
                                                               <:AbstractVector,
                                                               <:AbstractVector,
@@ -426,19 +426,19 @@ end
 function Base.isless(a::EntropyPoolingView, b::EntropyPoolingView)
     return Base.isless(get_view_level(a), get_view_level(b))
 end
-function get_B_entropy_pooling_view_data(::AbstractPriorModel,
+function get_B_entropy_pooling_view_data(::AbstractPriorResult,
                                          epv::ConstantEntropyPoolingConstraint, ::DataFrame,
                                          ::Bool, args...; kwargs...)
     return epv.coef
 end
 function _get_B_entropy_pooling_view_data(::C0_LinearEntropyPoolingConstraint,
-                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          pm::AbstractPriorResult, idx::AbstractVector,
                                           coef::Real, args...; kwargs...)
     mu = view(pm.mu, idx)
     return coef * sum(mu)
 end
 function _get_B_entropy_pooling_view_data(epc::C1_LinearEntropyPoolingConstraint,
-                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          pm::AbstractPriorResult, idx::AbstractVector,
                                           coef::Real, args...; kwargs...)
     sigma = pm.sigma
     dsigma = view(diag(sigma), idx)
@@ -456,7 +456,7 @@ end
 function _get_B_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
                                                                               <:Any,
                                                                               <:SkewnessEntropyPoolingView},
-                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          pm::AbstractPriorResult, idx::AbstractVector,
                                           coef::Real;
                                           w::AbstractWeights = pweights(range(; start = 1,
                                                                               stop = 1,
@@ -469,7 +469,7 @@ end
 function _get_B_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
                                                                               <:Any,
                                                                               <:KurtosisEntropyPoolingView},
-                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          pm::AbstractPriorResult, idx::AbstractVector,
                                           coef::Real;
                                           w::AbstractWeights = pweights(range(; start = 1,
                                                                               stop = 1,
@@ -480,7 +480,7 @@ function _get_B_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:
     return coef * sum([kurtosis(X[:, i], w) + 3] for i ∈ axes(X, 2))
 end
 function _get_B_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraint,
-                                          pm::AbstractPriorModel, idx1::AbstractVector,
+                                          pm::AbstractPriorResult, idx1::AbstractVector,
                                           idx2::AbstractVector, coef::Real, args...;
                                           kwargs...)
     sigma = pm.sigma
@@ -489,7 +489,7 @@ function _get_B_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraint,
     dsigma2 = sqrt.(view(dsigma, idx2))
     return coef * sum(dsigma1 .* dsigma2)
 end
-function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
+function get_B_entropy_pooling_view_data(pm::AbstractPriorResult,
                                          epvbs::AbstractVector{<:EntropyPoolingConstraint},
                                          sets::DataFrame, strict::Bool = false, args...;
                                          w::AbstractWeights = pweights(range(; start = 1,
@@ -502,7 +502,7 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
     end
     return B
 end
-function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
+function get_B_entropy_pooling_view_data(pm::AbstractPriorResult,
                                          epv::C4_LinearEntropyPoolingConstraint{<:Any,
                                                                                 <:Any,
                                                                                 <:Any,
@@ -540,7 +540,7 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
     end
     return B
 end
-function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
+function get_B_entropy_pooling_view_data(pm::AbstractPriorResult,
                                          epv::C4_LinearEntropyPoolingConstraint{<:AbstractVector,
                                                                                 <:AbstractVector,
                                                                                 <:AbstractVector,
@@ -579,7 +579,7 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
     end
     return B
 end
-function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
+function get_B_entropy_pooling_view_data(pm::AbstractPriorResult,
                                          epv::Union{<:C0_LinearEntropyPoolingConstraint{<:Any,
                                                                                         <:Any,
                                                                                         <:Real},
@@ -659,7 +659,7 @@ function get_view_index(epv::Union{<:C0_LinearEntropyPoolingConstraint{<:Any, <:
         @warn("$(string(group)) is not in $(group_names).\n$(epv)")
     end
 end
-function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
+function get_B_entropy_pooling_view_data(pm::AbstractPriorResult,
                                          epv::Union{<:C0_LinearEntropyPoolingConstraint{<:AbstractVector,
                                                                                         <:AbstractVector,
                                                                                         <:AbstractVector},
@@ -699,13 +699,13 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorModel,
     return B
 end
 function _get_A_entropy_pooling_view_data(::C0_LinearEntropyPoolingConstraint,
-                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          pm::AbstractPriorResult, idx::AbstractVector,
                                           coef::Real)
     X = view(pm.X, :, idx)
     return coef * X
 end
 function _get_A_entropy_pooling_view_data(::C1_LinearEntropyPoolingConstraint,
-                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          pm::AbstractPriorResult, idx::AbstractVector,
                                           coef::Real)
     X = view(pm.X, :, idx)
     mu = view(pm.mu, idx)
@@ -714,7 +714,7 @@ end
 function _get_A_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
                                                                               <:Any,
                                                                               <:SkewnessEntropyPoolingView},
-                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          pm::AbstractPriorResult, idx::AbstractVector,
                                           coef::Real)
     X = view(pm.X, :, idx)
     mu = view(pm.mu, idx)
@@ -724,7 +724,7 @@ end
 function _get_A_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:Any, <:Any,
                                                                               <:Any,
                                                                               <:KurtosisEntropyPoolingView},
-                                          pm::AbstractPriorModel, idx::AbstractVector,
+                                          pm::AbstractPriorResult, idx::AbstractVector,
                                           coef::Real)
     X = view(pm.X, :, idx)
     mu = view(pm.mu, idx)
@@ -732,7 +732,7 @@ function _get_A_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraint{<:
     return coef * ((X .- transpose(mu)) .^ 4) ./ (dsigma .^ 2)
 end
 function _get_A_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraint,
-                                          pm::AbstractPriorModel, idx1::AbstractVector,
+                                          pm::AbstractPriorResult, idx1::AbstractVector,
                                           idx2::AbstractVector, coef::Real)
     X1 = view(pm.X, :, idx1)
     X2 = view(pm.X, :, idx2)
@@ -740,7 +740,7 @@ function _get_A_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraint,
     mu2 = view(pm.mu, idx2)
     return coef * vec((X1 .- transpose(mu1)) .* (X2 .- transpose(mu2)))
 end
-function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
+function get_A_entropy_pooling_view_data(pm::AbstractPriorResult,
                                          epv::C4_LinearEntropyPoolingConstraint{<:Any,
                                                                                 <:Any,
                                                                                 <:Any,
@@ -773,7 +773,7 @@ function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
     end
     return A
 end
-function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
+function get_A_entropy_pooling_view_data(pm::AbstractPriorResult,
                                          epv::C4_LinearEntropyPoolingConstraint{<:AbstractVector,
                                                                                 <:AbstractVector,
                                                                                 <:AbstractVector,
@@ -812,7 +812,7 @@ function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
     end
     return A
 end
-function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
+function get_A_entropy_pooling_view_data(pm::AbstractPriorResult,
                                          epv::Union{<:C0_LinearEntropyPoolingConstraint{<:Any,
                                                                                         <:Any,
                                                                                         <:Real},
@@ -847,7 +847,7 @@ function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
     end
     return A
 end
-function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
+function get_A_entropy_pooling_view_data(pm::AbstractPriorResult,
                                          epv::Union{<:C0_LinearEntropyPoolingConstraint{<:AbstractVector,
                                                                                         <:AbstractVector,
                                                                                         <:AbstractVector},
@@ -885,7 +885,7 @@ function get_A_entropy_pooling_view_data(pm::AbstractPriorModel,
     end
     return A
 end
-function entropy_pooling_views(pm::AbstractPriorModel,
+function entropy_pooling_views(pm::AbstractPriorResult,
                                epvs::Union{<:EntropyPoolingView,
                                            <:AbstractVector{<:EntropyPoolingView}},
                                sets::DataFrame; strict::Bool = false,

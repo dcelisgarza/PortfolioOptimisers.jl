@@ -1,4 +1,4 @@
-struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel},
+struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                      T2 <: Union{Nothing, <:AbstractVector{<:Real}},
                      T3 <: Union{Nothing, <:WeightBounds, <:WeightBoundsConstraints},
                      T4 <: Union{Nothing, <:Real, <:BudgetConstraint},
@@ -56,7 +56,7 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel}
     strict::T29
 end
 function JuMPOptimiser(;
-                       pe::Union{<:AbstractPriorEstimator, <:AbstractPriorModel} = EmpiricalPriorEstimator(),
+                       pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                        wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                        wb::Union{Nothing, <:WeightBounds, <:WeightBoundsConstraints} = WeightBounds(),
                        bgt::Union{Nothing, <:Real, <:BudgetConstraint} = 1.0,

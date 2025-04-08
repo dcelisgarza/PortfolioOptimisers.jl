@@ -1,4 +1,4 @@
-struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorModel},
+struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                              T2 <: Union{<:ClusteringEstimator,
                                          <:AbstractPortfolioOptimisersClusteringResult},
                              T3 <: Union{Nothing, Fees},
@@ -18,7 +18,7 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
     strict::T9
 end
 function HierarchicalOptimiser(;
-                               pe::Union{<:AbstractPriorEstimator, <:AbstractPriorModel} = EmpiricalPriorEstimator(),
+                               pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                                cle::Union{<:ClusteringEstimator,
                                           <:AbstractPortfolioOptimisersClusteringResult} = ClusteringEstimator(),
                                fees::Union{Nothing, <:Fees} = nothing,

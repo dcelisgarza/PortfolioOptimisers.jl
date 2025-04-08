@@ -20,7 +20,7 @@ for (op, name) ∈
          C0_LinearEntropyPoolingConstraint, C1_LinearEntropyPoolingConstraint,
          SkewnessEntropyPoolingView, KurtosisEntropyPoolingView,
          C2_LinearEntropyPoolingConstraint, C4_LinearEntropyPoolingConstraint,
-         EntropyPoolingView, EmpiricalPriorModel, HighOrderPriorModel, EqualRiskMeasure,
+         EntropyPoolingView, EmpiricalPriorResult, HighOrderPriorModel, EqualRiskMeasure,
          CentralityConstraint),
         ("Solver", "A_LinearConstraint", "BlackLittermanView", "LinearConstraint",
          "MeanReturn", "Skewness", "ThirdCentralMoment", "FourthLowerPartialMoment",
@@ -44,7 +44,7 @@ for (op, name) ∈
          "C0_LinearEntropyPoolingConstraint", "C1_LinearEntropyPoolingConstraint",
          "SkewnessEntropyPoolingView", "KurtosisEntropyPoolingView",
          "C2_LinearEntropyPoolingConstraint", "C4_LinearEntropyPoolingConstraint",
-         "EntropyPoolingView", "EmpiricalPriorModel", "HighOrderPriorModel",
+         "EntropyPoolingView", "EmpiricalPriorResult", "HighOrderPriorModel",
          "EqualRiskMeasure", "CentralityConstraint"))
     eval(quote
              Base.iterate(S::$op, state = 1) = state > 1 ? nothing : (S, state + 1)

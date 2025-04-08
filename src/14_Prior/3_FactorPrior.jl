@@ -1,28 +1,29 @@
-struct PartialFactorModel{T1 <: AbstractVector, T2 <: AbstractMatrix, T3 <: LoadingsMatrix}
+struct PartialFactorPriorResult{T1 <: AbstractVector, T2 <: AbstractMatrix,
+                                T3 <: RegressionResult}
     mu::T1
     sigma::T2
     loadings::T3
 end
-function PartialFactorModel(; mu::AbstractVector, sigma::AbstractMatrix,
-                            loadings::LoadingsMatrix)
+function PartialFactorPriorResult(; mu::AbstractVector, sigma::AbstractMatrix,
+                                  loadings::RegressionResult)
     @smart_assert(!isempty(mu) && !isempty(sigma))
     @smart_assert(length(mu) == size(sigma, 1) == size(sigma, 2) == size(loadings.M, 2))
-    return PartialFactorModel{typeof(mu), typeof(sigma), typeof(loadings)}(mu, sigma,
-                                                                           loadings)
+    return PartialFactorPriorResult{typeof(mu), typeof(sigma), typeof(loadings)}(mu, sigma,
+                                                                                 loadings)
 end
-struct FactorPriorModel{T1 <: EmpiricalPriorModel, T2 <: PartialFactorModel,
-                        T3 <: AbstractMatrix} <: AbstractPriorModel_AFC
+struct FactorPriorResult{T1 <: EmpiricalPriorResult, T2 <: PartialFactorPriorResult,
+                         T3 <: AbstractMatrix} <: AbstractPriorResult_AFC
     pm::T1
     fm::T2
     chol::T3
 end
-function FactorPriorModel(; pm::EmpiricalPriorModel, fm::PartialFactorModel,
-                          chol::AbstractMatrix)
+function FactorPriorResult(; pm::EmpiricalPriorResult, fm::PartialFactorPriorResult,
+                           chol::AbstractMatrix)
     @smart_assert(!isempty(chol))
     @smart_assert(size(pm.X, 2) == size(chol, 2) == size(fm.loadings.M, 1))
-    return FactorPriorModel{typeof(pm), typeof(fm), typeof(chol)}(pm, fm, chol)
+    return FactorPriorResult{typeof(pm), typeof(fm), typeof(chol)}(pm, fm, chol)
 end
-function Base.getproperty(obj::FactorPriorModel, sym::Symbol)
+function Base.getproperty(obj::FactorPriorResult, sym::Symbol)
     return if sym == :X
         obj.pm.X
     elseif sym == :mu
@@ -40,8 +41,9 @@ function Base.getproperty(obj::FactorPriorModel, sym::Symbol)
     end
 end
 struct FactorPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
-                            T2 <: AbstractMatrixProcessingEstimator, T3 <: RegressionMethod,
-                            T4 <: PortfolioOptimisersVarianceEstimator, T5 <: Bool} <:
+                            T2 <: AbstractMatrixProcessingEstimator,
+                            T3 <: AbstractRegressionEstimator,
+                            T4 <: AbstractVarianceEstimator, T5 <: Bool} <:
        AbstractPriorEstimator_2_1
     pe::T1
     mp::T2
@@ -52,8 +54,8 @@ end
 function FactorPriorEstimator(;
                               pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                              re::RegressionMethod = ForwardRegression(),
-                              ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
+                              re::AbstractRegressionEstimator = StepwiseRegression(),
+                              ve::AbstractVarianceEstimator = SimpleVariance(),
                               residuals::Bool = true)
     return FactorPriorEstimator{typeof(pe), typeof(mp), typeof(re), typeof(ve),
                                 typeof(residuals)}(pe, mp, re, ve, residuals)
@@ -93,13 +95,13 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    return FactorPriorModel(;
-                            pm = EmpiricalPriorModel(; X = posterior_X, mu = posterior_mu,
-                                                     sigma = posterior_sigma),
-                            fm = PartialFactorModel(; mu = f_mu, sigma = f_sigma,
-                                                    loadings = loadings),
-                            chol = transpose(reshape(posterior_csigma, length(posterior_mu),
-                                                     :)))
+    return FactorPriorResult(;
+                             pm = EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,
+                                                       sigma = posterior_sigma),
+                             fm = PartialFactorPriorResult(; mu = f_mu, sigma = f_sigma,
+                                                           loadings = loadings),
+                             chol = transpose(reshape(posterior_csigma,
+                                                      length(posterior_mu), :)))
 end
 
-export FactorPriorModel, FactorPriorEstimator
+export FactorPriorResult, FactorPriorEstimator

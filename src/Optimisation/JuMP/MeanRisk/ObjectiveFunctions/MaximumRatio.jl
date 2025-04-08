@@ -10,7 +10,8 @@ end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::ExactKellyReturn,
                                            cobj::Union{Nothing, <:CustomObjective},
-                                           mr::JuMPOptimisationType, pm::AbstractPriorModel)
+                                           mr::JuMPOptimisationType,
+                                           pm::AbstractPriorResult)
     so = model[:so]
     ret = model[:ret]
     op = model[:op]
@@ -23,7 +24,8 @@ end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::PortfolioReturnType,
                                            cobj::Union{Nothing, <:CustomObjective},
-                                           mr::JuMPOptimisationType, pm::AbstractPriorModel)
+                                           mr::JuMPOptimisationType,
+                                           pm::AbstractPriorResult)
     so = model[:so]
     op = model[:op]
     if haskey(model, :sr_risk)

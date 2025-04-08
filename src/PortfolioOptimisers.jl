@@ -57,6 +57,13 @@ include("./12_Philogeny/3_Hierarchical.jl")
 include("./12_Philogeny/4_DBHT.jl")
 include("./12_Philogeny/5_Network.jl")
 
+include("./14_Prior/1_Base_Prior.jl")
+include("./14_Prior/2_EmpiricalPrior.jl")
+include("./14_Prior/3_FactorPrior.jl")
+include("./14_Prior/4_HighOrderPrior.jl")
+
+include("./15_UncertaintySets/1_Base_UncertaintySets.jl")
+
 #=
 
 # Linear Algebra
@@ -254,7 +261,7 @@ include("./Regression/DimensionReductionRegression/PCARegression/PPCATarget.jl")
 include("./Regression/DimensionReductionRegression/PCARegression/PCARegression.jl")
 
 # Prior
-include("./Measures/Returns/ReturnsData.jl")
+include("./Measures/Returns/ReturnsResult.jl")
 include("./Prior/Prior_AbstractTypes.jl")
 include("./Prior/EmpiricalPrior.jl")
 include("./Prior/BlackLittermanPrior.jl")
@@ -268,8 +275,8 @@ include("./Prior/EntropyPoolingPrior.jl")
 
 # Uncertainty sets
 include("./UncertaintySets/UncertaintySets_AbstractTypes.jl")
-include("./UncertaintySets/EllipseUncertaintySetClass.jl")
-include("./UncertaintySets/BoxUncertaintySetClass.jl")
+include("./UncertaintySets/EllipseUncertaintySetAlgorithm.jl")
+include("./UncertaintySets/BoxUncertaintySetAlgorithm.jl")
 include("./UncertaintySets/DeltaUncertaintySet.jl")
 include("./UncertaintySets/BootstrapUncertaintySets/BootstrapUncertaintySets_AbstractTypes.jl")
 include("./UncertaintySets/BootstrapUncertaintySets/ARCHUncertaintySets/ARCHUncertaintySets.jl")

@@ -197,7 +197,7 @@ function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::AbstractVector,
 end
 function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                          <:OptimisationRiskMeasure},
-                   pm::AbstractPriorModel, cls::AbstractVector)
+                   pm::AbstractPriorResult, cls::AbstractVector)
     ri = risk_measure_factory(hc.ri, pm, hc.opt.slv)
     riku = unitary_expected_risks(ri, pm.X, hc.opt.fees)
     if hc.ri === hc.ro
@@ -223,7 +223,7 @@ end
 function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any,
                                                          <:AbstractVector{<:OptimisationRiskMeasure},
                                                          <:AbstractVector{<:OptimisationRiskMeasure}},
-                   pm::AbstractPriorModel, cls::AbstractVector)
+                   pm::AbstractPriorResult, cls::AbstractVector)
     ri = risk_measure_factory(hc.ri, pm, hc.opt.slv)
     if hc.ri === hc.ro
         ro = ri
@@ -246,7 +246,7 @@ function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any,
 end
 function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                          <:AbstractVector{<:OptimisationRiskMeasure}},
-                   pm::AbstractPriorModel, cls::AbstractVector)
+                   pm::AbstractPriorResult, cls::AbstractVector)
     ri = risk_measure_factory(hc.ri, pm, hc.opt.slv)
     riku = unitary_expected_risks(ri, pm.X, hc.opt.fees)
     ro = risk_measure_factory(hc.ro, pm, hc.opt.slv)
@@ -267,7 +267,7 @@ end
 function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any,
                                                          <:AbstractVector{<:OptimisationRiskMeasure},
                                                          <:OptimisationRiskMeasure},
-                   pm::AbstractPriorModel, cls::AbstractVector)
+                   pm::AbstractPriorResult, cls::AbstractVector)
     ri = risk_measure_factory(hc.ri, pm, hc.opt.slv)
     riku = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
     ro = risk_measure_factory(hc.ro, pm, hc.opt.slv)
@@ -285,7 +285,8 @@ function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any,
     end
     return w, rkcl
 end
-function optimise!(hc::HierarchicalEqualRiskContribution, rd::ReturnsData = ReturnsData())
+function optimise!(hc::HierarchicalEqualRiskContribution,
+                   rd::ReturnsResult = ReturnsResult())
     pm = prior(hc.opt.pe, rd.X, rd.F)
     clm = clusterise(hc.opt.cle, pm.X)
     idx = cutree(clm.clustering; k = clm.k)

@@ -16,7 +16,7 @@
     @testset "Hierarchical Risk Parity" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 15)
-        rd = ReturnsData(; nx = 1:size(X, 2), X = X)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
 
         pm = prior(HighOrderPriorEstimator(), rd)
         clm = clusterise(ClusteringEstimator(), pm.X)
@@ -133,7 +133,7 @@
     @testset "Hierarchical Equal Risk Contribution" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 15)
-        rd = ReturnsData(; nx = 1:size(X, 2), X = X)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
 
         pm = prior(HighOrderPriorEstimator(), rd)
         clm = clusterise(ClusteringEstimator(), pm.X)

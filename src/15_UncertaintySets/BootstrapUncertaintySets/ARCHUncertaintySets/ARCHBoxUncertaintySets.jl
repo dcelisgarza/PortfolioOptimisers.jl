@@ -1,5 +1,5 @@
-function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass, <:Any, <:Any,
-                                             <:Any, <:Any, <:Any}, X::AbstractMatrix,
+function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm, <:Any,
+                                             <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
              args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     N = size(pm.X, 2)
@@ -22,7 +22,7 @@ function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass, <:
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
-function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass, <:Any,
+function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm, <:Any,
                                                 <:Any, <:Any, <:Any, <:Any},
                 X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
@@ -38,8 +38,8 @@ function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass,
     end
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
-function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetClass, <:Any,
-                                                   <:Any, <:Any, <:Any, <:Any},
+function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm,
+                                                   <:Any, <:Any, <:Any, <:Any, <:Any},
                    X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     N = size(pm.X, 2)

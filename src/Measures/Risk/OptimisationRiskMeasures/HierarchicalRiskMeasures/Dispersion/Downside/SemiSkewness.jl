@@ -1,4 +1,4 @@
-struct SemiSkewness{T1 <: RiskMeasureSettings, T2 <: PortfolioOptimisersVarianceEstimator,
+struct SemiSkewness{T1 <: RiskMeasureSettings, T2 <: AbstractVarianceEstimator,
                     T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                     T4 <: Union{Nothing, <:AbstractWeights},
                     T5 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
@@ -10,7 +10,7 @@ struct SemiSkewness{T1 <: RiskMeasureSettings, T2 <: PortfolioOptimisersVariance
     mu::T5
 end
 function SemiSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                      ve::PortfolioOptimisersVarianceEstimator = SimpleVariance(),
+                      ve::AbstractVarianceEstimator = SimpleVariance(),
                       target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                       w::Union{Nothing, <:AbstractWeights} = nothing,
                       mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)

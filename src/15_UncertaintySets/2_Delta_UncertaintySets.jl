@@ -1,5 +1,5 @@
 struct DeltaUncertaintySetEstimator{T1 <: AbstractPriorEstimator, T2 <: Real, T3 <: Real} <:
-       UncertaintySetEstimator
+       AbstractUncertaintySetEstimator
     pe::T1
     delta_mu::T2
     delta_sigma::T3

@@ -1,6 +1,6 @@
 function ucs(ue::NormalUncertaintySetEstimator{<:Any,
-                                               <:EllipseUncertaintySetClass{<:Any,
-                                                                            <:NormalKUncertaintyMethod},
+                                               <:EllipseUncertaintySetAlgorithm{<:Any,
+                                                                                <:NormalKUncertaintyMethod},
                                                <:Any, <:Any, <:Any}, X::AbstractMatrix,
              args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
@@ -29,8 +29,8 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
            EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma)
 end
 function ucs(ue::NormalUncertaintySetEstimator{<:Any,
-                                               <:EllipseUncertaintySetClass{<:Any,
-                                                                            <:ChiSqKUncertaintyMethod},
+                                               <:EllipseUncertaintySetAlgorithm{<:Any,
+                                                                                <:ChiSqKUncertaintyMethod},
                                                <:Any, <:Any, <:Any}, X::AbstractMatrix,
              args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
@@ -51,7 +51,8 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
            EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma)
 end
 function ucs(ue::NormalUncertaintySetEstimator{<:Any,
-                                               <:EllipseUncertaintySetClass{<:Any, <:Any},
+                                               <:EllipseUncertaintySetAlgorithm{<:Any,
+                                                                                <:Any},
                                                <:Any, <:Any, <:Any}, X::AbstractMatrix,
              args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
@@ -72,8 +73,8 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
            EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma)
 end
 function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
-                                                  <:EllipseUncertaintySetClass{<:Any,
-                                                                               <:NormalKUncertaintyMethod},
+                                                  <:EllipseUncertaintySetAlgorithm{<:Any,
+                                                                                   <:NormalKUncertaintyMethod},
                                                   <:Any, <:Any, <:Any}, X::AbstractMatrix,
                 args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
@@ -90,8 +91,8 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu)
 end
 function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
-                                                  <:EllipseUncertaintySetClass{<:Any,
-                                                                               <:ChiSqKUncertaintyMethod},
+                                                  <:EllipseUncertaintySetAlgorithm{<:Any,
+                                                                                   <:ChiSqKUncertaintyMethod},
                                                   <:Any, <:Any, <:Any}, X::AbstractMatrix,
                 args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
@@ -106,8 +107,8 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu)
 end
 function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
-                                                  <:EllipseUncertaintySetClass{<:Any,
-                                                                               <:Any},
+                                                  <:EllipseUncertaintySetAlgorithm{<:Any,
+                                                                                   <:Any},
                                                   <:Any, <:Any, <:Any}, X::AbstractMatrix,
                 args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
@@ -122,8 +123,8 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu)
 end
 function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
-                                                     <:EllipseUncertaintySetClass{<:Any,
-                                                                                  <:NormalKUncertaintyMethod},
+                                                     <:EllipseUncertaintySetAlgorithm{<:Any,
+                                                                                      <:NormalKUncertaintyMethod},
                                                      <:Any, <:Any, <:Any},
                    X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
@@ -148,8 +149,8 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma)
 end
 function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
-                                                     <:EllipseUncertaintySetClass{<:Any,
-                                                                                  <:ChiSqKUncertaintyMethod},
+                                                     <:EllipseUncertaintySetAlgorithm{<:Any,
+                                                                                      <:ChiSqKUncertaintyMethod},
                                                      <:Any, <:Any, <:Any},
                    X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
@@ -167,8 +168,8 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma)
 end
 function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
-                                                     <:EllipseUncertaintySetClass{<:Any,
-                                                                                  <:Any},
+                                                     <:EllipseUncertaintySetAlgorithm{<:Any,
+                                                                                      <:Any},
                                                      <:Any, <:Any, <:Any},
                    X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)

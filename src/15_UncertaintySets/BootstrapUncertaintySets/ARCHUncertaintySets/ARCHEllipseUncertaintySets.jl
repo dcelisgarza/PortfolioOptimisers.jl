@@ -1,4 +1,4 @@
-function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetClass, <:Any,
+function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
                                              <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
              args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
@@ -22,8 +22,8 @@ function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetClass
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu),
            EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma)
 end
-function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetClass, <:Any,
-                                                <:Any, <:Any, <:Any, <:Any},
+function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgorithm,
+                                                <:Any, <:Any, <:Any, <:Any, <:Any},
                 X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)
     N = size(pm.X, 2)
@@ -41,7 +41,7 @@ function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetCl
     k_mu = k_ucs(ue.class.method, ue.q, X_mu, sigma_mu)
     return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu)
 end
-function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetClass,
+function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgorithm,
                                                    <:Any, <:Any, <:Any, <:Any, <:Any},
                    X::AbstractMatrix, args...; dims::Int = 1)
     pm = prior(ue.pe, X, args...; dims = dims)

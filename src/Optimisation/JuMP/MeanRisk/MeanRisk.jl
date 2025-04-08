@@ -14,7 +14,7 @@ end
 function cleanup_weights(model::JuMP.Model, ::MeanRiskEstimator)
     return value.(model[:w]) / value(model[:k])
 end
-struct MeanRiskModel{T1 <: AbstractPriorModel, T2 <: Union{Nothing, <:WeightBounds},
+struct MeanRiskModel{T1 <: AbstractPriorResult, T2 <: Union{Nothing, <:WeightBounds},
                      T3 <: Union{Nothing, <:LinearConstraintModel},
                      T4 <: Union{Nothing, <:LinearConstraintModel},
                      T5 <: Union{Nothing, <:LinearConstraintModel},
@@ -30,7 +30,7 @@ struct MeanRiskModel{T1 <: AbstractPriorModel, T2 <: Union{Nothing, <:WeightBoun
     cplg::T7
     sol::T8
 end
-function optimise!(mr::MeanRiskEstimator, rd::ReturnsData = ReturnsData())
+function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     model = JuMP.Model()
     set_string_names_on_creation(model, mr.opt.str_names)
     set_objective_penalty!(model)

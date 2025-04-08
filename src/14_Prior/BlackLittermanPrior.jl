@@ -1,9 +1,9 @@
-struct BlackLittermanPriorModel{T1 <: EmpiricalPriorModel,
-                                T2 <: BlackLittermanViewsModel} <: AbstractPriorModel_AV
+struct BlackLittermanPriorModel{T1 <: EmpiricalPriorResult,
+                                T2 <: BlackLittermanViewsModel} <: AbstractPriorResult_AV
     pm::T1
     views::T2
 end
-function BlackLittermanPriorModel(; pm::EmpiricalPriorModel,
+function BlackLittermanPriorModel(; pm::EmpiricalPriorResult,
                                   views::BlackLittermanViewsModel)
     @smart_assert(size(pm.X, 2) == size(views.P, 2))
     return BlackLittermanPriorModel{typeof(pm), typeof(views)}(pm, views)
@@ -116,9 +116,9 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
     return BlackLittermanPriorModel(;
-                                    pm = EmpiricalPriorModel(; X = posterior_X,
-                                                             mu = posterior_mu,
-                                                             sigma = posterior_sigma),
+                                    pm = EmpiricalPriorResult(; X = posterior_X,
+                                                              mu = posterior_mu,
+                                                              sigma = posterior_sigma),
                                     views = views)
 end
 

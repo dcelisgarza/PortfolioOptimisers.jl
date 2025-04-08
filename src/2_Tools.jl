@@ -39,22 +39,22 @@ function drop_incomplete(X::AbstractMatrix, any_missing::Bool = true)
     end
 end
 function select_kextremes(X::AbstractMatrix) end
-struct ReturnsData{T1 <: Union{Nothing, <:AbstractVector},
-                   T2 <: Union{Nothing, AbstractMatrix},
-                   T3 <: Union{Nothing, <:AbstractVector},
-                   T4 <: Union{Nothing, <:AbstractMatrix},
-                   T5 <: Union{Nothing, <:AbstractVector}} <: AbstractReturnsResult
+struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
+                     T2 <: Union{Nothing, AbstractMatrix},
+                     T3 <: Union{Nothing, <:AbstractVector},
+                     T4 <: Union{Nothing, <:AbstractMatrix},
+                     T5 <: Union{Nothing, <:AbstractVector}} <: AbstractReturnsResult
     nx::T1
     X::T2
     nf::T3
     F::T4
     ts::T5
 end
-function ReturnsData(; nx::Union{Nothing, <:AbstractVector} = nothing,
-                     X::Union{Nothing, AbstractMatrix} = nothing,
-                     nf::Union{Nothing, AbstractVector} = nothing,
-                     F::Union{Nothing, AbstractMatrix} = nothing,
-                     ts::Union{Nothing, AbstractVector} = nothing)
+function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
+                       X::Union{Nothing, AbstractMatrix} = nothing,
+                       nf::Union{Nothing, AbstractVector} = nothing,
+                       F::Union{Nothing, AbstractMatrix} = nothing,
+                       ts::Union{Nothing, AbstractVector} = nothing)
     nxs_flag = !isnothing(nx)
     X_flag = !isnothing(X)
     if nxs_flag || X_flag
@@ -74,8 +74,9 @@ function ReturnsData(; nx::Union{Nothing, <:AbstractVector} = nothing,
         @smart_assert(!isempty(ts))
         @smart_assert(length(ts) == size(X, 1))
     end
-    return ReturnsData{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts)}(nx, X, nf,
-                                                                                 F, ts)
+    return ReturnsResult{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts)}(nx, X,
+                                                                                   nf, F,
+                                                                                   ts)
 end
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                            ret_method::Symbol = :simple, padding::Bool = false,
@@ -150,9 +151,9 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     else
         X = Matrix(X[!, ac])
     end
-    return ReturnsData(; ts = ts, nx = ac, X = X, nf = fc, F = F)
+    return ReturnsResult(; ts = ts, nx = ac, X = X, nf = fc, F = F)
 end
 ⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
 outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
 
-export drop_correlated, drop_incomplete, ReturnsData, prices_to_returns
+export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns

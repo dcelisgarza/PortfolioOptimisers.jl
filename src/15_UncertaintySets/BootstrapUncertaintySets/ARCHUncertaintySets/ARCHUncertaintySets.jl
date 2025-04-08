@@ -11,7 +11,8 @@ end
 function bootstrap_func(::MovingBootstrap, block_size, X, seed)
     return pyimport("arch.bootstrap").MovingBlockBootstrap(block_size, X; seed = seed)
 end
-struct ARCHUncertaintySetEstimator{T1 <: AbstractPriorEstimator, T2 <: UncertaintySetClass,
+struct ARCHUncertaintySetEstimator{T1 <: AbstractPriorEstimator,
+                                   T2 <: AbstractUncertaintySetAlgorithm,
                                    T3 <: ARCHBootstrapSet, T4 <: Integer, T5 <: Integer,
                                    T6 <: Real, T7 <: Union{Nothing, <:Integer}} <:
        BootsrapUncertaintySetEstimator
@@ -25,7 +26,7 @@ struct ARCHUncertaintySetEstimator{T1 <: AbstractPriorEstimator, T2 <: Uncertain
 end
 function ARCHUncertaintySetEstimator(;
                                      pe::AbstractPriorEstimator = EmpiricalPriorEstimator(),
-                                     class::UncertaintySetClass = BoxUncertaintySetClass(),
+                                     class::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                                      bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
                                      n_sim::Integer = 3_000, block_size::Integer = 3,
                                      q::Real = 0.05,

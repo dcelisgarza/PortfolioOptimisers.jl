@@ -1,5 +1,7 @@
 abstract type CokurtosisEstimator end
-function cokurtosis end
+function cokurtosis(::Nothing, args...; kwargs...)
+    return nothing
+end
 struct Cokurtosis{T1 <: AbstractMomentAlgorithm, T2 <: AbstractExpectedReturnsEstimator,
                   T3 <: AbstractMatrixProcessingEstimator} <: CokurtosisEstimator
     alg::T1

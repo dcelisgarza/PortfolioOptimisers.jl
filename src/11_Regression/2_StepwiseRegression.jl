@@ -254,7 +254,7 @@ function regression(method::StepwiseRegression, X::AbstractMatrix, F::AbstractMa
         idx = [findfirst(x -> x == i, features) + 1 for i ∈ included]
         loadings[i, idx] .= params[2:end]
     end
-    return LoadingsMatrix(; b = view(loadings, :, 1), M = view(loadings, :, 2:cols))
+    return RegressionResult(; b = view(loadings, :, 1), M = view(loadings, :, 2:cols))
 end
 
 export AIC, AICC, BIC, RSquared, AdjustedRSquared, PValue, Forward, Backward,

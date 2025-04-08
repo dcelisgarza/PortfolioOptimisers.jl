@@ -30,12 +30,13 @@ function fourth_moment_cluster_index_factory(N::Integer, cluster::AbstractVector
 end
 
 function ucs_cluster_factory(::Nothing,
-                             prior_ucs::Union{<:UncertaintySet, <:UncertaintySetEstimator},
-                             ::Any)
+                             prior_ucs::Union{<:AbstractUncertaintySet,
+                                              <:AbstractUncertaintySetEstimator}, ::Any)
     return prior_ucs
 end
-function ucs_cluster_factory(risk_ucs::Union{<:UncertaintySet, <:UncertaintySetEstimator},
-                             ::Any, ::Any)
+function ucs_cluster_factory(risk_ucs::Union{<:AbstractUncertaintySet,
+                                             <:AbstractUncertaintySetEstimator}, ::Any,
+                             ::Any)
     return risk_ucs
 end
 function ucs_cluster_factory(::Nothing, ::Nothing, ::Any)

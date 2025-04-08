@@ -28,7 +28,7 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     return nothing
 end
 function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{<:Any, Nothing},
-                                 obj::ObjectiveFunction, pm::AbstractPriorModel)
+                                 obj::ObjectiveFunction, pm::AbstractPriorResult)
     w = model[:w]
     fees = model[:fees]
     lb = pret.lb
@@ -65,9 +65,9 @@ function set_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySet,
 end
 function set_return_constraints!(model::JuMP.Model,
                                  pret::ArithmeticReturn{<:Any,
-                                                        Union{<:UncertaintySet,
-                                                              <:UncertaintySetEstimator}},
-                                 obj::ObjectiveFunction, pm::AbstractPriorModel)
+                                                        Union{<:AbstractUncertaintySet,
+                                                              <:AbstractUncertaintySetEstimator}},
+                                 obj::ObjectiveFunction, pm::AbstractPriorResult)
     lb = pret.lb
     ucs = pret.ucs
     X = pm.X
@@ -85,7 +85,7 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     @constraint(model, sr_ekelly_risk, sc * risk <= sc * ohf)
 end
 function set_return_constraints!(model::JuMP.Model, pret::ExactKellyReturn,
-                                 obj::ObjectiveFunction, pm::AbstractPriorModel)
+                                 obj::ObjectiveFunction, pm::AbstractPriorResult)
     k = model[:k]
     sc = model[:sc]
     lb = pret.lb

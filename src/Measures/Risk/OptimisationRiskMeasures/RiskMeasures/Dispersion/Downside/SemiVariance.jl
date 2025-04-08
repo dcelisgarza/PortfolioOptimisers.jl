@@ -23,7 +23,7 @@ function (r::SemiVariance)(w::AbstractVector, X::AbstractMatrix,
     val = val[val .<= zero(eltype(val))]
     return dot(val, val) / (length(x) - 1)
 end
-function risk_measure_factory(r::SemiVariance, prior::AbstractPriorModel, args...;
+function risk_measure_factory(r::SemiVariance, prior::AbstractPriorResult, args...;
                               kwargs...)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
     return SemiVariance(; settings = r.settings, formulation = r.formulation,
@@ -45,7 +45,7 @@ function risk_measure_factory(r::SemiVariance,
     return SemiVariance(; settings = r.settings, formulation = r.formulation,
                         target = r.target, w = w, mu = mu)
 end
-function cluster_risk_measure_factory(r::SemiVariance, prior::AbstractPriorModel,
+function cluster_risk_measure_factory(r::SemiVariance, prior::AbstractPriorResult,
                                       cluster::AbstractVector, args...; kwargs...)
     target = risk_measure_nothing_real_vec_factory(r.target, cluster)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
