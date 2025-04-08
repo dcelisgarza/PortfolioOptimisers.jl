@@ -19,7 +19,7 @@ function CardinalityConstraint(; A::A_CardinalityConstraint, B::Real = 0.0,
 end
 struct PartialLinearConstraintModel{T1 <: Union{Nothing, <:AbstractMatrix},
                                     T2 <: Union{Nothing, <:AbstractVector}} <:
-       AbstractConstraintModel
+       AbstractConstraintResult
     A::T1
     B::T2
 end
@@ -33,7 +33,7 @@ function PartialLinearConstraintModel(; A::Union{Nothing, <:AbstractMatrix},
     return PartialLinearConstraintModel{typeof(A), typeof(B)}(A, B)
 end
 struct LinearConstraintModel{T1 <: PartialLinearConstraintModel,
-                             T2 <: PartialLinearConstraintModel} <: AbstractConstraintModel
+                             T2 <: PartialLinearConstraintModel} <: AbstractConstraintResult
     ineq::T1
     eq::T2
 end

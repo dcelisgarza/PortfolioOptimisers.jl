@@ -1,4 +1,4 @@
-abstract type BudgetConstraint <: AbstractConstraintModel end
+abstract type BudgetConstraint <: AbstractConstraintResult end
 function set_budget_constraints!(::JuMP.Model, ::Nothing, args...)
     return nothing
 end
