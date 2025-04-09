@@ -323,7 +323,6 @@
         @test lb == range(; start = 0.5, stop = 0.5, length = 5)
         @test ub == range(; start = 0.7, stop = 0.7, length = 5)
     end
-    #=
     @testset "Risk budget constraints" begin
         assets = 1:10
         sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
@@ -331,7 +330,8 @@
         c2 = LinearConstraintSide(; group = [:Assets, :Assets], name = [1, 3],
                                   coef = [0.6, 0.3])
         c3 = LinearConstraintSide(; group = :Clusters, name = 3, coef = 0.25)
-        c4 = LinearConstraintSide(; group = [:Clusters, :Clusters, :Clusters], name = [1, 2, 3],
+        c4 = LinearConstraintSide(; group = [:Clusters, :Clusters, :Clusters],
+                                  name = [1, 2, 3],
                                   coef = [inv(length(sets[!, :Clusters][sets[!, :Clusters] .== i]))
                                           for i ∈ 1:3])
 
@@ -382,5 +382,4 @@
                                                                sets)
         @test_throws AssertionError risk_budget_constraints(LinearConstraintSide[], sets)
     end
-    =#
 end

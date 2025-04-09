@@ -61,6 +61,7 @@ include("./13_ConstraintGeneration/1_Base_ConstraintGeneration.jl")
 include("./13_ConstraintGeneration/2_LinearConstraintGeneration.jl")
 include("./13_ConstraintGeneration/3_CardinalityConstraintGeneration.jl")
 include("./13_ConstraintGeneration/4_WeightBoundsConstraintGeneration.jl")
+include("./13_ConstraintGeneration/5_RiskBudgetConstraintGeneration.jl")
 
 include("./14_Prior/1_Base_Prior.jl")
 include("./14_Prior/2_EmpiricalPrior.jl")
