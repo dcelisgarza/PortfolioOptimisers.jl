@@ -1,5 +1,6 @@
-struct WeightBounds{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                    T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}}
+struct WeightBoundsResult{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                          T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
+       AbstractResult
     lb::T1
     ub::T2
 end
@@ -33,15 +34,16 @@ end
 function validate_bounds(args...)
     return nothing
 end
-function WeightBounds(; lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
-                      ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
+function WeightBoundsResult(; lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
+                            ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
     @smart_assert(isnothing(lb) ⊼ isnothing(ub))
     validate_bounds(lb, ub)
-    return WeightBounds{typeof(lb), typeof(ub)}(lb, ub)
+    return WeightBoundsResult{typeof(lb), typeof(ub)}(lb, ub)
 end
 struct WeightBoundsConstraints{T1, T2,
                                T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                               T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}}
+                               T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
+       AbstractEstimator
     group::T1
     name::T2
     lb::T3
@@ -90,7 +92,7 @@ function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:Any, <:Any,
     else
         @warn("$(string(group)) is not in $(group_names).\n$(hcc)")
     end
-    return WeightBounds(; lb = LB, ub = UB)
+    return WeightBoundsResult(; lb = LB, ub = UB)
 end
 function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:AbstractVector,
                                                                 <:AbstractVector,
@@ -113,11 +115,11 @@ function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:AbstractVector
             @warn("$(string(group)) is not in $(group_names).\n$(hcc)")
         end
     end
-    return WeightBounds(; lb = LB, ub = UB)
+    return WeightBoundsResult(; lb = LB, ub = UB)
 end
-function weight_bounds_constraints(wb::WeightBounds, args...; scalar::Bool = false,
-                                   N::Integer, kwargs...)
-    if scalar
+function weight_bounds_constraints(wb::WeightBoundsResult{<:Any, <:Any}, args...;
+                                   scalar::Bool = false, N::Integer = 0, kwargs...)
+    if scalar || iszero(N)
         return wb
     end
     lb = wb.lb
@@ -132,15 +134,20 @@ function weight_bounds_constraints(wb::WeightBounds, args...; scalar::Bool = fal
     elseif isa(ub, Real)
         ub = range(; start = ub, stop = ub, length = N)
     end
-    return WeightBounds(; lb = lb, ub = ub)
+    return WeightBoundsResult(; lb = lb, ub = ub)
 end
-function weight_bounds_constraints(wb::WeightBounds{<:AbstractVector, <:AbstractVector},
-                                   args...; kwargs...)
+function weight_bounds_constraints(wb::WeightBoundsResult{<:AbstractVector,
+                                                          <:AbstractVector}, args...;
+                                   kwargs...)
     return wb
 end
-function weight_bounds_constraints(wb::Nothing, args...; N::Integer, kwargs...)
-    return WeightBounds(; lb = range(; start = 0, stop = 0, length = N),
-                        ub = range(; start = 1, stop = 1, length = N))
+function weight_bounds_constraints(wb::Nothing, args...; scalar::Bool = false,
+                                   N::Integer = 0, kwargs...)
+    if scalar || iszero(N)
+        return WeightBoundsResult(; lb = 0, ub = 1)
+    end
+    return WeightBoundsResult(; lb = range(; start = 0, stop = 0, length = N),
+                              ub = range(; start = 1, stop = 1, length = N))
 end
 
-export WeightBoundsConstraints, weight_bounds_constraints
+export WeightBoundsConstraints, WeightBoundsResult, weight_bounds_constraints

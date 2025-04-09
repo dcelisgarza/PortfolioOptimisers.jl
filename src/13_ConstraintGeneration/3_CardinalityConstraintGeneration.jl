@@ -61,6 +61,12 @@ function get_cardinality_constraint_data(lc::CardinalityConstraintSide{<:Abstrac
     end
     return A
 end
+function cardinality_constraints(lcs::LinearConstraintResult, args...; kwargs...)
+    return lcs
+end
+function cardinality_constraints(::Nothing, args...; kwargs...)
+    return nothing
+end
 function cardinality_constraints(lcs::Union{<:CardinalityConstraint,
                                             <:AbstractVector{<:CardinalityConstraint}},
                                  sets::DataFrame; datatype::Type = Float64,
@@ -110,12 +116,6 @@ function cardinality_constraints(lcs::Union{<:CardinalityConstraint,
                                   else
                                       nothing
                                   end)
-end
-function cardinality_constraints(lcs::LinearConstraintResult, args...; kwargs...)
-    return lcs
-end
-function cardinality_constraints(::Nothing, args...; kwargs...)
-    return nothing
 end
 
 export CardinalityConstraintSide, CardinalityConstraint, cardinality_constraints

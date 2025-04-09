@@ -282,8 +282,9 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            matrix_processing_algorithm!(PortfolioOptimisers.LoGo(; dist = des[i]),
-                                         PosDefEstimator(), sigma1, X)
+            PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
+                                                                                      dist = des[i]),
+                                                             PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -308,8 +309,9 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            matrix_processing_algorithm!(PortfolioOptimisers.LoGo(; dist = des[i]),
-                                         PosDefEstimator(), sigma1, X)
+            PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
+                                                                                      dist = des[i]),
+                                                             PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -336,9 +338,10 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            matrix_processing_algorithm!(PortfolioOptimisers.LoGo(; dist = des[i],
-                                                                  sim = ExponentialSimilarity()),
-                                         PosDefEstimator(), sigma1, X)
+            PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
+                                                                                      dist = des[i],
+                                                                                      sim = ExponentialSimilarity()),
+                                                             PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -363,9 +366,10 @@
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            matrix_processing_algorithm!(PortfolioOptimisers.LoGo(; dist = des[i],
-                                                                  sim = ExponentialSimilarity()),
-                                         PosDefEstimator(), sigma1, X)
+            PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
+                                                                                      dist = des[i],
+                                                                                      sim = ExponentialSimilarity()),
+                                                             PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1

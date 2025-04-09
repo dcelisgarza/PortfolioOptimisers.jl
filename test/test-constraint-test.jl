@@ -66,8 +66,10 @@
                                    A = LinearConstraintSide(; group = [:Clusters, :Assets],
                                                             name = [2, 7], coef = [-1, -1]),
                                    B = 8, comp = EQ())]
-
-        (; ineq, eq) = linear_constraints(constr, sets)
+        constr_result = linear_constraints(constr, sets)
+        constr_result2 = linear_constraints(constr_result, sets)
+        @test constr_result === constr_result2
+        (; ineq, eq) = constr_result
         A_ineq, B_ineq = ineq.A, ineq.B
         A_eq, B_eq = eq.A, eq.B
         A_ineq_t = reshape([1.0, -0.0, -1.0, 2.0, 0.0, -0.0, -1.0, 0.0, -0.0, -1.0, 0.0,
@@ -119,6 +121,7 @@
                                      coef = [1, -1])
         constr = LinearConstraint(; A = lhs_1, B = 0.35, comp = EQ())
         @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
+        @test isnothing(linear_constraints(nothing))
     end
     @testset "Cardinality Constraints" begin
         assets = 1:10
@@ -194,7 +197,10 @@
                                                                       name = [2, 7]), B = 9,
                                         comp = EQ())]
 
-        (; ineq, eq) = cardinality_constraints(constr, sets)
+        constr_result = cardinality_constraints(constr, sets)
+        constr_result2 = cardinality_constraints(constr_result, sets)
+        @test constr_result === constr_result2
+        (; ineq, eq) = constr_result
         A_ineq, B_ineq = ineq.A, ineq.B
         A_eq, B_eq = eq.A, eq.B
         A_ineq_t = reshape([2.0, 0.0, 1.0, 2.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0,
@@ -243,8 +249,8 @@
         lhs_1 = CardinalityConstraintSide(; group = [:Asset, :Foo], name = [1, :Bar])
         constr = CardinalityConstraint(; A = lhs_1, B = 9, comp = EQ())
         @test_throws ArgumentError cardinality_constraints(constr, sets, strict = true)
+        @test isnothing(cardinality_constraints(nothing))
     end
-    #=
     @testset "Weight Bounds constraints" begin
         assets = 1:10
         sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
@@ -252,7 +258,10 @@
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
 
         hcc_1 = WeightBoundsConstraints(; group = :Assets, name = 1, lb = 0.7, ub = 0.8)
-        (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
+        wb_result = weight_bounds_constraints(hcc_1, sets)
+        wb_result2 = weight_bounds_constraints(wb_result, sets)
+        @test wb_result === wb_result2
+        (; lb, ub) = wb_result
         @test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         @test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
@@ -272,16 +281,18 @@
         @test isnothing(hcc.group)
         @test isnothing(hcc.name)
 
-        @test_throws UndefKeywordError WeightBoundsConstraints(; group = [nothing], ub = [2],
-                                                               lb = [1])
-        lcs = WeightBoundsConstraints(; group = [nothing], name = [nothing], ub = [5], lb = [3])
+        @test_throws UndefKeywordError WeightBoundsConstraints(; group = [nothing],
+                                                               ub = [2], lb = [1])
+        lcs = WeightBoundsConstraints(; group = [nothing], name = [nothing], ub = [5],
+                                      lb = [3])
         @test isnothing(lcs.group[1])
         @test isnothing(lcs.name[1])
 
         hcc_1 = WeightBoundsConstraints(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
         @test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
 
-        hcc_1 = WeightBoundsConstraints(; group = [:Foo], name = [:Bar], lb = [0.7], ub = [0.8])
+        hcc_1 = WeightBoundsConstraints(; group = [:Foo], name = [:Bar], lb = [0.7],
+                                        ub = [0.8])
         @test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
 
         (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
@@ -292,7 +303,27 @@
         (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
         @test all(iszero.(lb))
         @test all(isone.(ub))
+
+        (; lb, ub) = weight_bounds_constraints(nothing; N = 5)
+        @test lb == range(; start = 0, stop = 0, length = 5)
+        @test ub == range(; start = 1, stop = 1, length = 5)
+
+        wb = weight_bounds_constraints(nothing)
+        @test WeightBoundsResult(0, 1) == wb
+
+        wb = WeightBoundsResult(; lb = 0.5, ub = 0.7)
+        (; lb, ub) = wb
+        @test lb == 0.5
+        @test ub == 0.7
+
+        wb2 = weight_bounds_constraints(wb)
+        @test wb === wb2
+
+        (; lb, ub) = weight_bounds_constraints(wb; N = 5)
+        @test lb == range(; start = 0.5, stop = 0.5, length = 5)
+        @test ub == range(; start = 0.7, stop = 0.7, length = 5)
     end
+    #=
     @testset "Risk budget constraints" begin
         assets = 1:10
         sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
