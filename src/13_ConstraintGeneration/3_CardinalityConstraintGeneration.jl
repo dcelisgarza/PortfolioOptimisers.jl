@@ -22,8 +22,8 @@ function CardinalityConstraint(; A::CardinalityConstraintSide, B::Real = 0.0,
                                comp::ComparisonOperators = LEQ())
     return CardinalityConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
-function get_A_cardinality_constraint_data(A_lc::CardinalityConstraintSide{<:Any, <:Any},
-                                           sets::DataFrame, strict::Bool = false)
+function get_cardinality_constraint_data(A_lc::CardinalityConstraintSide{<:Any, <:Any},
+                                         sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     A = Vector{Int}(undef, 0)
     (; group, name) = A_lc
@@ -37,9 +37,9 @@ function get_A_cardinality_constraint_data(A_lc::CardinalityConstraintSide{<:Any
     end
     return A
 end
-function get_A_cardinality_constraint_data(A_lc::CardinalityConstraintSide{<:AbstractVector,
-                                                                           <:AbstractVector},
-                                           sets::DataFrame, strict::Bool = false)
+function get_cardinality_constraint_data(A_lc::CardinalityConstraintSide{<:AbstractVector,
+                                                                         <:AbstractVector},
+                                         sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     A = Vector{Int}(undef, 0)
     for (group, name) ∈ zip(A_lc.group, A_lc.name)
@@ -70,7 +70,7 @@ function cardinality_constraints(lcs::Union{<:CardinalityConstraint,
     A_eq = Vector{datatype}(undef, 0)
     B_eq = Vector{datatype}(undef, 0)
     for lc ∈ lcs
-        A = get_A_cardinality_constraint_data(lc.A, sets, strict)
+        A = get_cardinality_constraint_data(lc.A, sets, strict)
         B = lc.B
         lhs_flag = isempty(A) || all(iszero.(A))
         if lhs_flag

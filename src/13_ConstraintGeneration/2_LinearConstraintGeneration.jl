@@ -65,11 +65,10 @@ function Base.getproperty(obj::LinearConstraintResult, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function linear_constraints(lcs::LinearConstraintResult, args...; kwargs...)
-    return lcs
-end
-function linear_constraints(::Nothing, args...; kwargs...)
-    return nothing
+function Base.iterate(S::Union{<:LinearConstraintSide, <:LinearConstraint,
+                               <:PartialLinearConstraintResult, <:LinearConstraintResult},
+                      state = 1)
+    return state > 1 ? nothing : (S, state + 1)
 end
 function get_constraint_data(A_lc::LinearConstraintSide{<:Any, <:Any, <:Any},
                              sets::DataFrame, strict::Bool = false)
@@ -108,6 +107,12 @@ function get_constraint_data(A_lc::LinearConstraintSide{<:AbstractVector, <:Abst
     end
     return A
 end
+function linear_constraints(lcs::LinearConstraintResult, args...; kwargs...)
+    return lcs
+end
+function linear_constraints(::Nothing, args...; kwargs...)
+    return nothing
+end
 function linear_constraints(lcs::Union{<:LinearConstraint,
                                        <:AbstractVector{<:LinearConstraint}},
                             sets::DataFrame; datatype::Type = Float64, strict::Bool = false)
@@ -121,7 +126,6 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
     B_eq = Vector{datatype}(undef, 0)
     for lc ∈ lcs
         A = get_constraint_data(lc.A, sets, strict)
-        B = lc.B
         lhs_flag = isempty(A) || all(iszero.(A))
         if lhs_flag
             continue
@@ -154,3 +158,6 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
                                                                        B = B_ineq),
                                   eq = PartialLinearConstraintResult(; A = A_eq, B = B_eq))
 end
+
+export LinearConstraintSide, LinearConstraint, PartialLinearConstraintResult,
+       LinearConstraintResult, linear_constraints

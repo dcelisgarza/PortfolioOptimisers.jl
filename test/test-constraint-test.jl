@@ -1,4 +1,3 @@
-#=
 @safetestset "Constraints" begin
     using PortfolioOptimisers, DataFrames, Test
     @testset "Linear Constraints" begin
@@ -10,60 +9,62 @@
                                    B = 0.35, comp = EQ()),
                   LinearConstraint(;
                                    A = LinearConstraintSide(;
-                                                          group = [:Assets, :Assets,
-                                                                   :Assets],
-                                                          name = [1, 1, 3],
-                                                          coef = [1, -0, -0.3]), B = 0.25,
+                                                            group = [:Assets, :Assets,
+                                                                     :Assets],
+                                                            name = [1, 1, 3],
+                                                            coef = [1, -0, -0.3]), B = 0.25,
                                    comp = LEQ()),
                   LinearConstraint(; A = LinearConstraintSide(; group = :Assets, name = 5),
                                    B = 0.5, comp = EQ()),
                   LinearConstraint(;
-                                   A = LinearConstraintSide(; group = [:Clusters, :Clusters],
-                                                          name = [3, 2], coef = [2, -3]),
+                                   A = LinearConstraintSide(;
+                                                            group = [:Clusters, :Clusters],
+                                                            name = [3, 2], coef = [2, -3]),
                                    comp = GEQ()),
                   LinearConstraint(;
                                    A = LinearConstraintSide(;
-                                                          group = [:Clusters, :Clusters,
-                                                                   :Clusters],
-                                                          name = [1, 3, 2],
-                                                          coef = [-1, 2, -3]), B = -0.1,
+                                                            group = [:Clusters, :Clusters,
+                                                                     :Clusters],
+                                                            name = [1, 3, 2],
+                                                            coef = [-1, 2, -3]), B = -0.1,
                                    comp = LEQ()),
                   LinearConstraint(;
                                    A = LinearConstraintSide(; group = fill(:Assets, 20),
-                                                          name = [assets; assets],
-                                                          coef = [-loadings.MTUM;
-                                                                  loadings.QUAL]), B = 0.9,
-                                   comp = GEQ()),
+                                                            name = [assets; assets],
+                                                            coef = [-loadings.MTUM;
+                                                                    loadings.QUAL]),
+                                   B = 0.9, comp = GEQ()),
                   LinearConstraint(;
                                    A = LinearConstraintSide(; group = [:Clusters, :Assets],
-                                                          name = [2, 7], coef = -[1, 1]),
+                                                            name = [2, 7], coef = -[1, 1]),
                                    B = 0.7, comp = EQ()),
                   LinearConstraint(;
                                    A = LinearConstraintSide(; group = :Assets, name = 1,
-                                                          coef = 1), B = 4, comp = EQ()),
+                                                            coef = 1), B = 4, comp = EQ()),
                   LinearConstraint(;
                                    A = LinearConstraintSide(;
-                                                          group = [:Assets, :Assets,
-                                                                   :Assets],
-                                                          name = [1, 1, 3],
-                                                          coef = [1, -1, 1]), B = 5,
+                                                            group = [:Assets, :Assets,
+                                                                     :Assets],
+                                                            name = [1, 1, 3],
+                                                            coef = [1, -1, 1]), B = 5,
                                    comp = LEQ()),
                   LinearConstraint(; A = LinearConstraintSide(; group = :Assets, name = 5),
                                    B = 7, comp = EQ()),
                   LinearConstraint(;
-                                   A = LinearConstraintSide(; group = [:Clusters, :Clusters],
-                                                          name = [3, 2], coef = [1, -1]),
+                                   A = LinearConstraintSide(;
+                                                            group = [:Clusters, :Clusters],
+                                                            name = [3, 2], coef = [1, -1]),
                                    B = 3, comp = GEQ()),
                   LinearConstraint(;
                                    A = LinearConstraintSide(;
-                                                          group = [:Clusters, :Clusters,
-                                                                   :Clusters],
-                                                          name = [1, 3, 2],
-                                                          coef = -[1, 1, -1]), B = 7,
+                                                            group = [:Clusters, :Clusters,
+                                                                     :Clusters],
+                                                            name = [1, 3, 2],
+                                                            coef = -[1, 1, -1]), B = 7,
                                    comp = LEQ()),
                   LinearConstraint(;
                                    A = LinearConstraintSide(; group = [:Clusters, :Assets],
-                                                          name = [2, 7], coef = [-1, -1]),
+                                                            name = [2, 7], coef = [-1, -1]),
                                    B = 8, comp = EQ())]
 
         (; ineq, eq) = linear_constraints(constr, sets)
@@ -90,8 +91,8 @@
 
         (; ineq, eq) = linear_constraints(LinearConstraint(;
                                                            A = LinearConstraintSide(;
-                                                                                  group = nothing,
-                                                                                  name = nothing)),
+                                                                                    group = nothing,
+                                                                                    name = nothing)),
                                           sets)
         A_ineq, B_ineq = ineq.A, ineq.B
         A_eq, B_eq = eq.A, eq.B
@@ -102,9 +103,9 @@
 
         (; ineq, eq) = linear_constraints(LinearConstraint(;
                                                            A = LinearConstraintSide(;
-                                                                                  group = [:Foo],
-                                                                                  name = [20],
-                                                                                  coef = [5]),
+                                                                                    group = [:Foo],
+                                                                                    name = [20],
+                                                                                    coef = [5]),
                                                            B = 0.35), sets)
         A_ineq, B_ineq = ineq.A, ineq.B
         A_eq, B_eq = eq.A, eq.B
@@ -123,10 +124,11 @@
         @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
 
         lhs_1 = LinearConstraintSide(; group = [:Asset, :Foo], name = [1, :Bar],
-                                   coef = [1, -1])
+                                     coef = [1, -1])
         constr = LinearConstraint(; A = lhs_1, B = 0.35, comp = EQ())
         @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
     end
+    #=
     @testset "Weight Bounds constraints" begin
         assets = 1:10
         sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
@@ -154,18 +156,16 @@
         @test isnothing(hcc.group)
         @test isnothing(hcc.name)
 
-        @test_throws UndefKeywordError WeightBoundsConstraints(; group = [nothing],
-                                                               ub = [2], lb = [1])
-        lcs = WeightBoundsConstraints(; group = [nothing], name = [nothing], ub = [5],
-                                      lb = [3])
+        @test_throws UndefKeywordError WeightBoundsConstraints(; group = [nothing], ub = [2],
+                                                               lb = [1])
+        lcs = WeightBoundsConstraints(; group = [nothing], name = [nothing], ub = [5], lb = [3])
         @test isnothing(lcs.group[1])
         @test isnothing(lcs.name[1])
 
         hcc_1 = WeightBoundsConstraints(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
         @test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
 
-        hcc_1 = WeightBoundsConstraints(; group = [:Foo], name = [:Bar], lb = [0.7],
-                                        ub = [0.8])
+        hcc_1 = WeightBoundsConstraints(; group = [:Foo], name = [:Bar], lb = [0.7], ub = [0.8])
         @test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
 
         (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
@@ -182,12 +182,11 @@
         sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         c1 = LinearConstraintSide(; group = :Assets, name = 1)
         c2 = LinearConstraintSide(; group = [:Assets, :Assets], name = [1, 3],
-                                coef = [0.6, 0.3])
+                                  coef = [0.6, 0.3])
         c3 = LinearConstraintSide(; group = :Clusters, name = 3, coef = 0.25)
-        c4 = LinearConstraintSide(; group = [:Clusters, :Clusters, :Clusters],
-                                name = [1, 2, 3],
-                                coef = [inv(length(sets[!, :Clusters][sets[!, :Clusters] .== i]))
-                                        for i ∈ 1:3])
+        c4 = LinearConstraintSide(; group = [:Clusters, :Clusters, :Clusters], name = [1, 2, 3],
+                                  coef = [inv(length(sets[!, :Clusters][sets[!, :Clusters] .== i]))
+                                          for i ∈ 1:3])
 
         rb = risk_budget_constraints(c1, sets)
         @test isapprox(rb[1] / rb[2], 10)
@@ -231,10 +230,10 @@
 
         rb = risk_budget_constraints(c1, sets; strict = false)
         @test_throws UndefKeywordError risk_budget_constraints([LinearConstraintSide(;
-                                                                                   group = [nothing],
-                                                                                   coef = [2])],
+                                                                                     group = [nothing],
+                                                                                     coef = [2])],
                                                                sets)
         @test_throws AssertionError risk_budget_constraints(LinearConstraintSide[], sets)
     end
+    =#
 end
-=#
