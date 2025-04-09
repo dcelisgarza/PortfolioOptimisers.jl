@@ -7,8 +7,8 @@ function CardinalityConstraintSide(; group, name)
     name_flag = isa(name, AbstractVector)
     if group_flag || name_flag
         @smart_assert(group_flag && name_flag)
-        @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
-        @smart_assert(length(group) == length(name) == length(coef))
+        @smart_assert(!isempty(group) && !isempty(name))
+        @smart_assert(length(group) == length(name))
     end
     return CardinalityConstraintSide{typeof(group), typeof(name)}(group, name)
 end
@@ -21,6 +21,10 @@ end
 function CardinalityConstraint(; A::CardinalityConstraintSide, B::Integer = 1,
                                comp::ComparisonOperators = LEQ())
     return CardinalityConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
+end
+function Base.iterate(S::Union{<:CardinalityConstraintSide, <:CardinalityConstraint},
+                      state = 1)
+    return state > 1 ? nothing : (S, state + 1)
 end
 function get_cardinality_constraint_data(lc::CardinalityConstraintSide{<:Any, <:Any},
                                          sets::DataFrame, strict::Bool = false)
@@ -76,7 +80,7 @@ function cardinality_constraints(lcs::Union{<:CardinalityConstraint,
             continue
         end
         d, flag_ineq = comparison_sign_ineq_flag(lc.comp)
-        A = d * A
+        A .*= d
         B = d * lc.B
         if flag_ineq
             append!(A_ineq, A)
@@ -86,22 +90,26 @@ function cardinality_constraints(lcs::Union{<:CardinalityConstraint,
             append!(B_eq, B)
         end
     end
-    if !isempty(A_ineq)
+    ineq_flag = !isempty(A_ineq)
+    eq_flag = !isempty(A_eq)
+    if ineq_flag
         A_ineq = transpose(reshape(A_ineq, nrow(sets), :))
-    else
-        A_ineq = nothing
-        B_ineq = nothing
     end
-    if !isempty(A_eq)
+    if eq_flag
         A_eq = transpose(reshape(A_eq, nrow(sets), :))
-    else
-        A_eq = nothing
-        B_eq = nothing
     end
     return LinearConstraintResult(;
-                                  ineq = PartialLinearConstraintResult(; A = A_ineq,
-                                                                       B = B_ineq),
-                                  eq = PartialLinearConstraintResult(; A = A_eq, B = B_eq))
+                                  ineq = if ineq_flag
+                                      PartialLinearConstraintResult(; A = A_ineq,
+                                                                    B = B_ineq)
+                                  else
+                                      nothing
+                                  end,
+                                  eq = if eq_flag
+                                      PartialLinearConstraintResult(; A = A_eq, B = B_eq)
+                                  else
+                                      nothing
+                                  end)
 end
 function cardinality_constraints(lcs::LinearConstraintResult, args...; kwargs...)
     return lcs
@@ -109,3 +117,5 @@ end
 function cardinality_constraints(::Nothing, args...; kwargs...)
     return nothing
 end
+
+export CardinalityConstraintSide, CardinalityConstraint, cardinality_constraints

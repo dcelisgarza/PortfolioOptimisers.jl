@@ -200,18 +200,26 @@ function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThre
         @constraint(model, card, sc * sum(ib) <= sc * card)
     end
     if gcard_flag
-        if !isnothing(gcard.A_ineq)
-            @constraint(model, gcard_ineq, sc * gcard.A_ineq * ib <= sc * gcard.B_ineq)
+        if !isnothing(gcard.ineq)
+            A = gcard.ineq.A
+            B = gcard.ineq.B
+            @constraint(model, gcard_ineq, sc * A * ib <= sc * B)
         end
-        if !isnothing(gcard.A_eq)
-            @constraint(model, gcard_eq, sc * gcard.A_eq * ib == sc * gcard.B_eq)
+        if !isnothing(gcard.eq)
+            A = gcard.eq.A
+            B = gcard.eq.B
+            @constraint(model, gcard_eq, sc * A * ib == sc * B)
         end
     end
     if n_flag
-        @constraint(model, card_nplg, sc * nplg.A * ib <= sc * nplg.B)
+        A = nplg.A
+        B = nplg.B
+        @constraint(model, card_nplg, sc * A * ib <= sc * B)
     end
     if c_flag
-        @constraint(model, card_cplg, sc * cplg.A * ib <= sc * cplg.B)
+        A = cplg.A
+        B = cplg.B
+        @constraint(model, card_cplg, sc * A * ib <= sc * B)
     end
     return nothing
 end

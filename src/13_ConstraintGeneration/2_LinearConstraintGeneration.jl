@@ -27,40 +27,34 @@ function LinearConstraint(; A::LinearConstraintSide, B::Real = 0.0,
                           comp::ComparisonOperators = LEQ())
     return LinearConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
-struct PartialLinearConstraintResult{T1 <: Union{Nothing, <:AbstractMatrix},
-                                     T2 <: Union{Nothing, <:AbstractVector}} <:
+struct PartialLinearConstraintResult{T1 <: AbstractMatrix, T2 <: AbstractVector} <:
        AbstractConstraintResult
     A::T1
     B::T2
 end
-function PartialLinearConstraintResult(; A::Union{Nothing, <:AbstractMatrix},
-                                       B::Union{Nothing, <:AbstractVector})
-    if isnothing(A) || isnothing(B)
-        @smart_assert(isnothing(A) && isnothing(B))
-    else
-        @smart_assert(!isempty(A) && !isempty(B))
-    end
+function PartialLinearConstraintResult(; A::AbstractMatrix, B::AbstractVector)
+    @smart_assert(!isempty(A) && !isempty(B))
     return PartialLinearConstraintResult{typeof(A), typeof(B)}(A, B)
 end
-struct LinearConstraintResult{T1 <: PartialLinearConstraintResult,
-                              T2 <: PartialLinearConstraintResult} <:
+struct LinearConstraintResult{T1 <: Union{Nothing, PartialLinearConstraintResult},
+                              T2 <: Union{Nothing, PartialLinearConstraintResult}} <:
        AbstractConstraintResult
     ineq::T1
     eq::T2
 end
-function LinearConstraintResult(; ineq::PartialLinearConstraintResult,
-                                eq::PartialLinearConstraintResult)
+function LinearConstraintResult(; ineq::Union{Nothing, PartialLinearConstraintResult},
+                                eq::Union{Nothing, PartialLinearConstraintResult})
     return LinearConstraintResult{typeof(ineq), typeof(eq)}(ineq, eq)
 end
 function Base.getproperty(obj::LinearConstraintResult, sym::Symbol)
     return if sym == :A_ineq
-        obj.ineq.A
+        isnothing(obj.ineq) ? nothing : obj.ineq.A
     elseif sym == :B_ineq
-        obj.ineq.B
+        isnothing(obj.ineq) ? nothing : obj.ineq.B
     elseif sym == :A_eq
-        obj.eq.A
+        isnothing(obj.eq) ? nothing : obj.eq.A
     elseif sym == :B_eq
-        obj.eq.B
+        isnothing(obj.eq) ? nothing : obj.eq.B
     else
         getfield(obj, sym)
     end
@@ -131,7 +125,7 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
             continue
         end
         d, flag_ineq = comparison_sign_ineq_flag(lc.comp)
-        A = d * A
+        A .*= d
         B = d * lc.B
         if flag_ineq
             append!(A_ineq, A)
@@ -141,22 +135,26 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
             append!(B_eq, B)
         end
     end
-    if !isempty(A_ineq)
+    ineq_flag = !isempty(A_ineq)
+    eq_flag = !isempty(A_eq)
+    if ineq_flag
         A_ineq = transpose(reshape(A_ineq, nrow(sets), :))
-    else
-        A_ineq = nothing
-        B_ineq = nothing
     end
-    if !isempty(A_eq)
+    if eq_flag
         A_eq = transpose(reshape(A_eq, nrow(sets), :))
-    else
-        A_eq = nothing
-        B_eq = nothing
     end
     return LinearConstraintResult(;
-                                  ineq = PartialLinearConstraintResult(; A = A_ineq,
-                                                                       B = B_ineq),
-                                  eq = PartialLinearConstraintResult(; A = A_eq, B = B_eq))
+                                  ineq = if ineq_flag
+                                      PartialLinearConstraintResult(; A = A_ineq,
+                                                                    B = B_ineq)
+                                  else
+                                      nothing
+                                  end,
+                                  eq = if eq_flag
+                                      PartialLinearConstraintResult(; A = A_eq, B = B_eq)
+                                  else
+                                      nothing
+                                  end)
 end
 
 export LinearConstraintSide, LinearConstraint, PartialLinearConstraintResult,
