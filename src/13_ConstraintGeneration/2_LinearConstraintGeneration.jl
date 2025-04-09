@@ -70,36 +70,36 @@ function Base.iterate(S::Union{<:LinearConstraintSide, <:LinearConstraint,
                       state = 1)
     return state > 1 ? nothing : (S, state + 1)
 end
-function get_constraint_data(A_lc::LinearConstraintSide{<:Any, <:Any, <:Any},
-                             sets::DataFrame, strict::Bool = false)
+function get_constraint_data(lc::LinearConstraintSide{<:Any, <:Any, <:Any}, sets::DataFrame,
+                             strict::Bool = false)
     group_names = names(sets)
-    A = Vector{eltype(A_lc.coef)}(undef, 0)
-    (; group, name, coef) = A_lc
+    A = Vector{eltype(lc.coef)}(undef, 0)
+    (; group, name, coef) = lc
     if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
         idx = coef * idx
         append!(A, idx)
     elseif strict
-        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(A_lc)"))
+        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lc)"))
     else
-        @warn("$(string(group)) is not in $(group_names).\n$(A_lc)")
+        @warn("$(string(group)) is not in $(group_names).\n$(lc)")
     end
     return A
 end
-function get_constraint_data(A_lc::LinearConstraintSide{<:AbstractVector, <:AbstractVector,
-                                                        <:AbstractVector}, sets::DataFrame,
+function get_constraint_data(lc::LinearConstraintSide{<:AbstractVector, <:AbstractVector,
+                                                      <:AbstractVector}, sets::DataFrame,
                              strict::Bool = false)
     group_names = names(sets)
-    A = Vector{eltype(A_lc.coef)}(undef, 0)
-    for (group, name, coef) ∈ zip(A_lc.group, A_lc.name, A_lc.coef)
+    A = Vector{eltype(lc.coef)}(undef, 0)
+    for (group, name, coef) ∈ zip(lc.group, lc.name, lc.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
             idx = coef * idx
             append!(A, idx)
         elseif strict
-            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(A_lc)."))
+            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lc)."))
         else
-            @warn("$(string(group)) is not in $(group_names).\n$(A_lc).")
+            @warn("$(string(group)) is not in $(group_names).\n$(lc).")
         end
     end
     if !isempty(A)

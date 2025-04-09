@@ -12,44 +12,44 @@ function CardinalityConstraintSide(; group, name)
     end
     return CardinalityConstraintSide{typeof(group), typeof(name)}(group, name)
 end
-struct CardinalityConstraint{T1 <: CardinalityConstraintSide, T2 <: Real,
+struct CardinalityConstraint{T1 <: CardinalityConstraintSide, T2 <: Integer,
                              T3 <: ComparisonOperators}
     A::T1
     B::T2
     comp::T3
 end
-function CardinalityConstraint(; A::CardinalityConstraintSide, B::Real = 0.0,
+function CardinalityConstraint(; A::CardinalityConstraintSide, B::Integer = 1,
                                comp::ComparisonOperators = LEQ())
     return CardinalityConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
-function get_cardinality_constraint_data(A_lc::CardinalityConstraintSide{<:Any, <:Any},
+function get_cardinality_constraint_data(lc::CardinalityConstraintSide{<:Any, <:Any},
                                          sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     A = Vector{Int}(undef, 0)
-    (; group, name) = A_lc
+    (; group, name) = lc
     if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
         append!(A, idx)
     elseif strict
-        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(A_lc)"))
+        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lc)"))
     else
-        @warn("$(string(group)) is not in $(group_names).\n$(A_lc)")
+        @warn("$(string(group)) is not in $(group_names).\n$(lc)")
     end
     return A
 end
-function get_cardinality_constraint_data(A_lc::CardinalityConstraintSide{<:AbstractVector,
-                                                                         <:AbstractVector},
+function get_cardinality_constraint_data(lc::CardinalityConstraintSide{<:AbstractVector,
+                                                                       <:AbstractVector},
                                          sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     A = Vector{Int}(undef, 0)
-    for (group, name) ∈ zip(A_lc.group, A_lc.name)
+    for (group, name) ∈ zip(lc.group, lc.name)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
             append!(A, idx)
         elseif strict
-            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(A_lc)."))
+            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lc)."))
         else
-            @warn("$(string(group)) is not in $(group_names).\n$(A_lc).")
+            @warn("$(string(group)) is not in $(group_names).\n$(lc).")
         end
     end
     if !isempty(A)
@@ -71,7 +71,6 @@ function cardinality_constraints(lcs::Union{<:CardinalityConstraint,
     B_eq = Vector{datatype}(undef, 0)
     for lc ∈ lcs
         A = get_cardinality_constraint_data(lc.A, sets, strict)
-        B = lc.B
         lhs_flag = isempty(A) || all(iszero.(A))
         if lhs_flag
             continue

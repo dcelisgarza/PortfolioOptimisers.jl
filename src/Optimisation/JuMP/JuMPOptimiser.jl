@@ -8,24 +8,24 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T7 <: Union{Nothing, <:LinearConstraintResult},
                      T8 <: Union{Nothing, <:CentralityConstraint,
                                  <:AbstractVector{<:CentralityConstraint},
-                                 <:LinearConstraintResult},
-                     T9 <: Union{Nothing, <:CardinalityConstraint,
-                                 <:AbstractVector{<:CardinalityConstraint},
-                                 <:LinearConstraintResult},
-                     T10 <: Union{Nothing, DataFrame},
-                     T11 <:
-                     Union{Nothing, <:PhilogenyConstraint, <:PhilogenyConstraintModel},
+                                 <:LinearConstraintResult}, T9::Union{Nothing, <:Integer},
+                     T10 <: Union{Nothing, <:CardinalityConstraint,
+                                  <:AbstractVector{<:CardinalityConstraint},
+                                  <:LinearConstraintResult},
+                     T11 <: Union{Nothing, DataFrame},
                      T12 <:
                      Union{Nothing, <:PhilogenyConstraint, <:PhilogenyConstraintModel},
-                     T13 <: Union{Nothing, <:BuyInThreshold},
-                     T14 <: Union{Nothing, <:Turnover},
-                     T15 <: Union{Nothing, <:TrackingError}, T16 <: Union{Nothing, <:Real},
-                     T17 <: Union{Nothing, <:Real}, T18 <: Union{Nothing, Fees},
-                     T19 <: Scalariser, T20 <: PortfolioReturnType,
-                     T21 <: Union{Nothing, <:CustomConstraint},
-                     T22 <: Union{Nothing, <:CustomObjective}, T23 <: Real, T24 <: Real,
-                     T25 <: Real, T26 <: Union{<:Solver, <:AbstractVector{<:Solver}},
-                     T27 <: Bool, T28 <: Bool, T29 <: Bool} <: JuMPOptimisationType
+                     T13 <:
+                     Union{Nothing, <:PhilogenyConstraint, <:PhilogenyConstraintModel},
+                     T14 <: Union{Nothing, <:BuyInThreshold},
+                     T15 <: Union{Nothing, <:Turnover},
+                     T16 <: Union{Nothing, <:TrackingError}, T17 <: Union{Nothing, <:Real},
+                     T18 <: Union{Nothing, <:Real}, T19 <: Union{Nothing, Fees},
+                     T20 <: Scalariser, T21 <: PortfolioReturnType,
+                     T22 <: Union{Nothing, <:CustomConstraint},
+                     T23 <: Union{Nothing, <:CustomObjective}, T24 <: Real, T25 <: Real,
+                     T26 <: Real, T27 <: Union{<:Solver, <:AbstractVector{<:Solver}},
+                     T28 <: Bool, T29 <: Bool, T30 <: Bool} <: JuMPOptimisationType
     pe::T1 # PriorEstimator
     wi::T2
     wb::T3 # WeightBounds
@@ -35,26 +35,27 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
     lcm::T7
     cent::T8
     card::T9
-    sets::T10
-    nplg::T11
-    cplg::T12
-    bit::T13 # BuyInThreshold
-    tn::T14 # Turnover
-    te::T15 # TrackingError
-    l1::T16
-    l2::T17
-    fees::T18
-    sce::T19
-    ret::T20
-    ccnt::T21
-    cobj::T22
-    sc::T23
-    so::T24
-    ss::T25
-    slv::T26
-    str_names::T27
-    save::T28
-    strict::T29
+    gcard::T10
+    sets::T11
+    nplg::T12
+    cplg::T13
+    bit::T14 # BuyInThreshold
+    tn::T15 # Turnover
+    te::T16 # TrackingError
+    l1::T17
+    l2::T18
+    fees::T19
+    sce::T20
+    ret::T21
+    ccnt::T22
+    cobj::T23
+    sc::T24
+    so::T25
+    ss::T26
+    slv::T27
+    str_names::T28
+    save::T29
+    strict::T30
 end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
@@ -69,9 +70,10 @@ function JuMPOptimiser(;
                        cent::Union{Nothing, <:CentralityConstraint,
                                    <:AbstractVector{<:CentralityConstraint},
                                    <:LinearConstraintResult} = nothing,
-                       card::Union{Nothing, <:CardinalityConstraint,
-                                   <:AbstractVector{<:CardinalityConstraint},
-                                   <:LinearConstraintResult} = nothing,
+                       card::Union{Nothing, <:Integer} = nothing,
+                       gcard::Union{Nothing, <:CardinalityConstraint,
+                                    <:AbstractVector{<:CardinalityConstraint},
+                                    <:LinearConstraintResult} = nothing,
                        sets::Union{Nothing, DataFrame} = nothing,
                        nplg::Union{Nothing, <:PhilogenyEstimator,
                                    <:PhilogenyConstraintModel} = nothing,
@@ -102,54 +104,34 @@ function JuMPOptimiser(;
     if isa(cent, AbstractVector)
         @smart_assert(!isempty(cent))
     end
-    if isa(card, AbstractVector)
-        @smart_assert(!isempty(card))
+    if !isnothing(card)
+        @smart_assert(isfinite(card) && card > 0)
+    end
+    if isa(gcard, AbstractVector)
+        @smart_assert(!isempty(gcard))
     end
     if isa(lcs, LinearConstraint) ||
        isa(lcs, AbstractVector{<:LinearConstraint}) ||
        isa(cent, CentralityConstraint) ||
        isa(cent, AbstractVector{<:CentralityConstraint}) ||
-       isa(card, CardinalityConstraint) ||
-       isa(card, AbstractVector{<:CardinalityConstraint})
+       isa(gcard, CardinalityConstraint) ||
+       isa(gcard, AbstractVector{<:CardinalityConstraint})
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
     return JuMPOptimiser{typeof(pe), typeof(wi), typeof(wb), typeof(bgt), typeof(sbgt),
-                         typeof(lcs), typeof(lcm), typeof(cent), typeof(card), typeof(sets),
-                         typeof(nplg), typeof(cplg), typeof(bit), typeof(tn), typeof(te),
-                         typeof(l1), typeof(l2), typeof(fees), typeof(sce), typeof(ret),
-                         typeof(ccnt), typeof(cobj), typeof(sc), typeof(so), typeof(ss),
-                         typeof(slv), typeof(str_names), typeof(save), typeof(strict)}(pe,
-                                                                                       wi,
-                                                                                       wb,
-                                                                                       bgt,
-                                                                                       sbgt,
-                                                                                       lcs,
-                                                                                       lcm,
-                                                                                       cent,
-                                                                                       card,
-                                                                                       sets,
-                                                                                       nplg,
-                                                                                       cplg,
-                                                                                       bit,
-                                                                                       tn,
-                                                                                       te,
-                                                                                       l1,
-                                                                                       l2,
-                                                                                       fees,
-                                                                                       sce,
-                                                                                       ret,
-                                                                                       ccnt,
-                                                                                       cobj,
-                                                                                       sc,
-                                                                                       so,
-                                                                                       ss,
-                                                                                       slv,
-                                                                                       str_names,
-                                                                                       save,
-                                                                                       strict)
+                         typeof(lcs), typeof(lcm), typeof(cent), typeof(card),
+                         typeof(gcard), typeof(sets), typeof(nplg), typeof(cplg),
+                         typeof(bit), typeof(tn), typeof(te), typeof(l1), typeof(l2),
+                         typeof(fees), typeof(sce), typeof(ret), typeof(ccnt), typeof(cobj),
+                         typeof(sc), typeof(so), typeof(ss), typeof(slv), typeof(str_names),
+                         typeof(save), typeof(strict)}(pe, wi, wb, bgt, sbgt, lcs, lcm,
+                                                       cent, card, gcard, sets, nplg, cplg,
+                                                       bit, tn, te, l1, l2, fees, sce, ret,
+                                                       ccnt, cobj, sc, so, ss, slv,
+                                                       str_names, save, strict)
 end
 
 export JuMPOptimiser
