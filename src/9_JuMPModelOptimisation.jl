@@ -14,16 +14,16 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
     return Solver{typeof(name), typeof(solver), typeof(check_sol), typeof(settings),
                   typeof(add_bridges)}(name, solver, check_sol, settings, add_bridges)
 end
-function Base.isequal(A::Solver, B::Solver)
-    for property ∈ propertynames(A)
-        prop_A = getproperty(A, property)
-        prop_B = getproperty(B, property)
-        if !isequal(prop_A, prop_B)
-            return false
-        end
-    end
-    return true
-end
+# function Base.isequal(A::Solver, B::Solver)
+#     for property ∈ propertynames(A)
+#         prop_A = getproperty(A, property)
+#         prop_B = getproperty(B, property)
+#         if !isequal(prop_A, prop_B)
+#             return false
+#         end
+#     end
+#     return true
+# end
 Base.iterate(S::Solver, state = 1) = state > 1 ? nothing : (S, state + 1)
 struct JuMPResult{T1 <: AbstractDict, T2 <: Bool} <: AbstractJuMPResult
     trials::T1

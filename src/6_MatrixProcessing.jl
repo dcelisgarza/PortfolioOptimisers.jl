@@ -6,6 +6,12 @@ end
 function matrix_processing_algorithm(::Nothing, args...; kwargs...)
     return nothing
 end
+function matrix_processing!(::Nothing, args...; kwargs...)
+    return nothing
+end
+function matrix_processing(::Nothing, args...; kwargs...)
+    return nothing
+end
 struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:PosDefEstimator},
                                T2 <: Union{Nothing, <:Denoise},
                                T3 <: Union{Nothing, <:Detone},
@@ -35,9 +41,9 @@ function matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
 end
 function matrix_processing(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
                            X::AbstractMatrix, args...; kwargs...)
-    X = copy(X)
+    sigma = copy(sigma)
     matrix_processing!(mp, sigma, X, args...; kwargs...)
-    return X
+    return sigma
 end
 struct NonPositiveDefiniteMatrixProcessing{T1 <: Union{Nothing, <:Denoise},
                                            T2 <: Union{Nothing, <:Detone},
@@ -66,10 +72,10 @@ function matrix_processing!(mp::NonPositiveDefiniteMatrixProcessing, sigma::Abst
 end
 function matrix_processing(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
                            X::AbstractMatrix, args...; kwargs...)
-    X = copy(X)
+    sigma = copy(sigma)
     matrix_processing!(mp, sigma, X, args...; kwargs...)
-    return X
+    return sigma
 end
 
 export DefaultMatrixProcessing, NonPositiveDefiniteMatrixProcessing, matrix_processing,
-       matrix_processing!, matrix_processing_algorithm, matrix_processing_algorithm!
+       matrix_processing!

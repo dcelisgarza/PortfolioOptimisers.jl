@@ -77,9 +77,17 @@
 
         X7 = copy(sigma)
         X8 = matrix_processing(DefaultMatrixProcessing(), X7, X)
-        matrix_processing!(DefaultMatrixProcessing(), X8, X)
+        matrix_processing!(DefaultMatrixProcessing(), X7, X)
         @test isapprox(X7, X8)
         @test !isapprox(X7, sigma; rtol = 1e-8)
         @test isnothing(matrix_processing(nothing))
+
+        X9 = copy(sigma)
+        X10 = matrix_processing(NonPositiveDefiniteMatrixProcessing(), X9, X)
+        matrix_processing!(NonPositiveDefiniteMatrixProcessing(), X9, X)
+        @test isapprox(X9, X10)
+        @test isapprox(X9, sigma)
+
+        @test isnothing(PortfolioOptimisers.matrix_processing_algorithm(nothing))
     end
 end
