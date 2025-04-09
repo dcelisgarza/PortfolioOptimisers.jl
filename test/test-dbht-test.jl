@@ -1,4 +1,3 @@
-#=
 @safetestset "DBHT" begin
     using PortfolioOptimisers, DataFrames, CSV, Random, StableRNGs, Test, StatsBase,
           Statistics, SparseArrays
@@ -18,12 +17,12 @@
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
         ce = PortfolioOptimisersCovariance()
-        de = SimpleDistance()
+        de = Distance(; alg = SimpleDistance())
         rho = cor(ce, X)
         dist = distance(de, rho, X)
 
         sim = MaximumDistanceSimilarity()
-        S = dbht_similarity(sim, S=rho, D=dist)
+        S = dbht_similarity(sim; S = rho, D = dist)
 
         root = UniqueRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z1, dbht = DBHTs(dist, S; branchorder = :default,
@@ -133,12 +132,12 @@
         rng = StableRNG(1357268)
         X = randn(rng, 1000, 20)
         ce = PortfolioOptimisersCovariance()
-        de = SimpleDistance()
+        de = Distance(; alg = SimpleDistance())
         rho = cor(ce, X)
         dist = distance(de, rho, X)
 
         sim = ExponentialSimilarity()
-        S = dbht_similarity(sim, S=rho, D=dist)
+        S = dbht_similarity(sim; S = rho, D = dist)
 
         root = EqualRoot()
         T8, Rpm, Adjv, Dpm, Mv, Z2, dbht = DBHTs(dist, S; branchorder = :optimal,
@@ -269,16 +268,22 @@
         logo_t = CSV.read(joinpath(@__DIR__, "./assets/LoGo-MaximumDistanceSimilarity.csv"),
                           DataFrame)
 
-        des = [CanonicalDistance(), CanonicalDistanceDistance(), SimpleDistance(),
-               SimpleDistanceDistance(), SimpleAbsoluteDistance(),
-               SimpleAbsoluteDistanceDistance(), CorrelationDistance(),
-               CorrelationDistanceDistance(), LogDistance(), LogDistanceDistance(),
-               VariationInfoDistance(), VariationInfoDistanceDistance()]
+        des = [Distance(; alg = CanonicalDistance()),
+               DistanceDistance(; alg = CanonicalDistance()),
+               Distance(; alg = SimpleDistance()),
+               DistanceDistance(; alg = SimpleDistance()),
+               Distance(; alg = SimpleAbsoluteDistance()),
+               DistanceDistance(; alg = SimpleAbsoluteDistance()),
+               Distance(; alg = CorrelationDistance()),
+               DistanceDistance(; alg = CorrelationDistance()),
+               Distance(; alg = LogDistance()), DistanceDistance(; alg = LogDistance()),
+               Distance(; alg = VariationInfoDistance()),
+               DistanceDistance(; alg = VariationInfoDistance())]
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            logo!(PortfolioOptimisers.LoGo(; dist = des[i]), PosDefEstimator(),
-                           sigma1, X)
+            matrix_processing_algorithm!(PortfolioOptimisers.LoGo(; dist = des[i]),
+                                         PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -288,17 +293,23 @@
             @test res1
         end
 
-        des = [GeneralCanonicalDistance(), GeneralCanonicalDistanceDistance(),
-               GeneralDistance(), GeneralDistanceDistance(), GeneralAbsoluteDistance(),
-               GeneralAbsoluteDistanceDistance(), GeneralCorrelationDistance(),
-               GeneralCorrelationDistanceDistance(), GeneralLogDistance(),
-               GeneralLogDistanceDistance(), GeneralVariationInfoDistance(),
-               GeneralVariationInfoDistanceDistance()]
+        des = [GeneralDistance(; alg = CanonicalDistance()),
+               GeneralDistanceDistance(; alg = CanonicalDistance()),
+               GeneralDistance(; alg = SimpleDistance()),
+               GeneralDistanceDistance(; alg = SimpleDistance()),
+               GeneralDistance(; alg = SimpleAbsoluteDistance()),
+               GeneralDistanceDistance(; alg = SimpleAbsoluteDistance()),
+               GeneralDistance(; alg = CorrelationDistance()),
+               GeneralDistanceDistance(; alg = CorrelationDistance()),
+               GeneralDistance(; alg = LogDistance()),
+               GeneralDistanceDistance(; alg = LogDistance()),
+               GeneralDistance(; alg = VariationInfoDistance()),
+               GeneralDistanceDistance(; alg = VariationInfoDistance())]
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            logo!(PortfolioOptimisers.LoGo(; dist = des[i]), PosDefEstimator(),
-                           sigma1, X)
+            matrix_processing_algorithm!(PortfolioOptimisers.LoGo(; dist = des[i]),
+                                         PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -311,17 +322,23 @@
         logo_t = CSV.read(joinpath(@__DIR__, "./assets/LoGo-ExponentialSimilarity.csv"),
                           DataFrame)
 
-        des = [CanonicalDistance(), CanonicalDistanceDistance(), SimpleDistance(),
-               SimpleDistanceDistance(), SimpleAbsoluteDistance(),
-               SimpleAbsoluteDistanceDistance(), CorrelationDistance(),
-               CorrelationDistanceDistance(), LogDistance(), LogDistanceDistance(),
-               VariationInfoDistance(), VariationInfoDistanceDistance()]
+        des = [Distance(; alg = CanonicalDistance()),
+               DistanceDistance(; alg = CanonicalDistance()),
+               Distance(; alg = SimpleDistance()),
+               DistanceDistance(; alg = SimpleDistance()),
+               Distance(; alg = SimpleAbsoluteDistance()),
+               DistanceDistance(; alg = SimpleAbsoluteDistance()),
+               Distance(; alg = CorrelationDistance()),
+               DistanceDistance(; alg = CorrelationDistance()),
+               Distance(; alg = LogDistance()), DistanceDistance(; alg = LogDistance()),
+               Distance(; alg = VariationInfoDistance()),
+               DistanceDistance(; alg = VariationInfoDistance())]
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            logo!(PortfolioOptimisers.LoGo(; dist = des[i],
-                                                    sim = ExponentialSimilarity()),
-                           PosDefEstimator(), sigma1, X)
+            matrix_processing_algorithm!(PortfolioOptimisers.LoGo(; dist = des[i],
+                                                                  sim = ExponentialSimilarity()),
+                                         PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -331,18 +348,24 @@
             @test res1
         end
 
-        des = [GeneralCanonicalDistance(), GeneralCanonicalDistanceDistance(),
-               GeneralDistance(), GeneralDistanceDistance(), GeneralAbsoluteDistance(),
-               GeneralAbsoluteDistanceDistance(), GeneralCorrelationDistance(),
-               GeneralCorrelationDistanceDistance(), GeneralLogDistance(),
-               GeneralLogDistanceDistance(), GeneralVariationInfoDistance(),
-               GeneralVariationInfoDistanceDistance()]
+        des = [GeneralDistance(; alg = CanonicalDistance()),
+               GeneralDistanceDistance(; alg = CanonicalDistance()),
+               GeneralDistance(; alg = SimpleDistance()),
+               GeneralDistanceDistance(; alg = SimpleDistance()),
+               GeneralDistance(; alg = SimpleAbsoluteDistance()),
+               GeneralDistanceDistance(; alg = SimpleAbsoluteDistance()),
+               GeneralDistance(; alg = CorrelationDistance()),
+               GeneralDistanceDistance(; alg = CorrelationDistance()),
+               GeneralDistance(; alg = LogDistance()),
+               GeneralDistanceDistance(; alg = LogDistance()),
+               GeneralDistance(; alg = VariationInfoDistance()),
+               GeneralDistanceDistance(; alg = VariationInfoDistance())]
 
         for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
-            logo!(PortfolioOptimisers.LoGo(; dist = des[i],
-                                                    sim = ExponentialSimilarity()),
-                           PosDefEstimator(), sigma1, X)
+            matrix_processing_algorithm!(PortfolioOptimisers.LoGo(; dist = des[i],
+                                                                  sim = ExponentialSimilarity()),
+                                         PosDefEstimator(), sigma1, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -353,4 +376,3 @@
         end
     end
 end
-=#

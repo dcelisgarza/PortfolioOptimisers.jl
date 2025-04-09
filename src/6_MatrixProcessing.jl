@@ -1,11 +1,9 @@
 abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
-function matrix_processing_algorithm!(::Union{Nothing, AbstractMatrixProcessingAlgorithm},
-                                      args...)
+function matrix_processing_algorithm!(::Nothing, args...; kwargs...)
     return nothing
 end
-function matrix_processing_algorithm(::Union{Nothing, AbstractMatrixProcessingAlgorithm},
-                                     args...)
+function matrix_processing_algorithm(::Nothing, args...; kwargs...)
     return nothing
 end
 struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:PosDefEstimator},

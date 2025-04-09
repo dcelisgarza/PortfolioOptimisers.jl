@@ -1278,8 +1278,13 @@ function logo!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator}, sigma::Abstract
     S = dbht_similarity(je.sim; S = S, D = D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
     sigma .= J_LoGo(sigma, separators, cliques) \ I
-    logo!(pdm, sigma)
+    posdef!(pdm, sigma)
     return nothing
+end
+function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator},
+                                      sigma::AbstractMatrix, X::AbstractMatrix;
+                                      dims::Int = 1)
+    return logo!(je, pdm, sigma, X; dims = dims)
 end
 
 export ExponentialSimilarity, MaximumDistanceSimilarity, dbht_similarity, PMFG_T2s, DBHTs,
