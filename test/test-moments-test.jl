@@ -72,7 +72,6 @@
         X = randn(rng, 1000, 20)
         fw = FrequencyWeights(rand(rng, 1000))
         ew = eweights(1:1000, 0.01; scale = true)
-        fw = fweights(rand(rng, 1000))
         ces = [PortfolioOptimisersCovariance(), Covariance(; alg = Full()),
                Covariance(; alg = Full(), me = SimpleExpectedReturns(; w = ew),
                           ce = GeneralWeightedCovariance(;
@@ -255,7 +254,6 @@
         X = randn(rng, 100, 10)
         fw = FrequencyWeights(rand(rng, 100))
         ew = eweights(1:100, 0.3; scale = true)
-
         ces = [PortfolioOptimisersCovariance(), Covariance(),
                Covariance(;
                           ce = GeneralWeightedCovariance(;
@@ -467,7 +465,6 @@
     @testset "SimpleVariance" begin
         rng = StableRNG(123456789)
         X = randn(rng, 100, 10)
-        fw = FrequencyWeights(rand(rng, 100))
         ew = eweights(1:100, 0.3; scale = true)
 
         ve1 = SimpleVariance(; corrected = true)
