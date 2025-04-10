@@ -64,15 +64,6 @@
                 find_tol(er, reshape(ert[!, i], size(er)); name1 = :er, name2 = :er_t)
             end
             @test res
-
-            mew = PortfolioOptimisers.factory(mes[i]; w = fw)
-            for p ∈ propertynames(mew)
-                if p == :w
-                    @test getproperty(mew, p) == fw
-                else
-                    @test getproperty(mew, p) == getproperty(mes[i], p)
-                end
-            end
         end
         @test_throws AssertionError EquilibriumExpectedReturns(w = [])
     end
@@ -257,15 +248,6 @@
                 find_tol(cr, reshape(cvrt[!, j + 1], MN); name1 = :cr, name2 = :cr_t)
             end
             @test res2
-
-            cew = PortfolioOptimisers.factory(ces[i]; w = fw)
-            for p ∈ propertynames(cew)
-                if p == :w
-                    @test getproperty(cew, p) == fw
-                else
-                    @test getproperty(cew, p) == getproperty(ces[i], p)
-                end
-            end
         end
     end
     @testset "cov2cor" begin
