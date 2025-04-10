@@ -1,4 +1,3 @@
-
 struct LTDCovariance{T1 <: AbstractVarianceEstimator, T2 <: Real} <:
        AbstractCovarianceEstimator
     ve::T1

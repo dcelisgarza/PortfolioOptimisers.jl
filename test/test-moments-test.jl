@@ -663,7 +663,6 @@
             @test res2
         end
     end
-
     @testset "Canonical and General Canonical Distance Distance" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
@@ -755,5 +754,78 @@
             end
             @test res2
         end
+    end
+    @testset "Factories" begin
+        rng = StableRNG(123456789)
+        ew = eweights(1:10, 0.3; scale = true)
+        fw = fweights(rand(rng, 10))
+
+        me1 = ShrunkExpectedReturns(;
+                                    me = ExcessExpectedReturns(;
+                                                               me = EquilibriumExpectedReturns()))
+        me2 = PortfolioOptimisers.factory(me1, fw)
+        @test isnothing(me2.me.me.w)
+        @test me2.ce.ce.ce.w === fw
+
+        me1 = ShrunkExpectedReturns(;
+                                    me = ExcessExpectedReturns(;
+                                                               me = SimpleExpectedReturns()))
+        me2 = PortfolioOptimisers.factory(me1, fw)
+        @test me2.me.me.w === fw
+        @test me2.ce.ce.ce.w === fw
+
+        ce1 = PortfolioOptimisersCovariance(;
+                                            ce = Covariance(;
+                                                            ce = GeneralWeightedCovariance()))
+        ce2 = PortfolioOptimisers.factory(ce1, fw)
+        @test ce2.ce.ce.w === fw
+        @test ce2.ce.me.w == fw
+
+        ce1 = GerberCovariance()
+        ce2 = PortfolioOptimisers.factory(ce1, fw)
+        @test ce2.ve.w == fw
+
+        ce1 = NormalisedGerberCovariance()
+        ce2 = PortfolioOptimisers.factory(ce1, fw)
+        @test ce2.me.w == fw
+        @test ce2.ve.w == fw
+
+        ce1 = SmythBrobyCovariance()
+        ce2 = PortfolioOptimisers.factory(ce1, fw)
+        @test ce2.me.w == fw
+        @test ce2.ve.w == fw
+
+        ce1 = NormalisedSmythBrobyCovariance()
+        ce2 = PortfolioOptimisers.factory(ce1, fw)
+        @test ce2.me.w == fw
+        @test ce2.ve.w == fw
+
+        ce1 = DistanceCovariance()
+        ce2 = PortfolioOptimisers.factory(ce1, fw)
+        @test ce2.w == fw
+
+        ce1 = LTDCovariance()
+        ce2 = PortfolioOptimisers.factory(ce1, fw)
+        @test ce2.ve.w == fw
+
+        ce1 = KendallCovariance()
+        ce2 = PortfolioOptimisers.factory(ce1, fw)
+        @test ce2.ve.w == fw
+
+        ce1 = SpearmanCovariance()
+        ce2 = PortfolioOptimisers.factory(ce1, fw)
+        @test ce2.ve.w == fw
+
+        ce1 = MutualInfoCovariance()
+        ce2 = PortfolioOptimisers.factory(ce1, fw)
+        @test ce2.ve.w == fw
+
+        ske1 = Coskewness()
+        ske2 = PortfolioOptimisers.factory(ske1, fw)
+        @test ske2.me.w == fw
+
+        kte1 = Cokurtosis()
+        kte2 = PortfolioOptimisers.factory(ske1, fw)
+        @test kte2.me.w == fw
     end
 end

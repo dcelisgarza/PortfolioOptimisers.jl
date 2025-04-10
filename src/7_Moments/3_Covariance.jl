@@ -31,14 +31,14 @@ function factory(ce::GeneralWeightedCovariance,
     return GeneralWeightedCovariance(; ce = ce.ce, w = isnothing(w) ? ce.w : w)
 end
 struct Covariance{T1 <: AbstractMomentAlgorithm, T2 <: AbstractExpectedReturnsEstimator,
-                  T3 <: GeneralWeightedCovariance} <: AbstractCovarianceEstimator
+                  T3 <: StatsBase.CovarianceEstimator} <: AbstractCovarianceEstimator
     alg::T1
     me::T2
     ce::T3
 end
 function Covariance(; alg::AbstractMomentAlgorithm = Full(),
                     me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                    ce::GeneralWeightedCovariance = GeneralWeightedCovariance())
+                    ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance())
     return Covariance{typeof(alg), typeof(me), typeof(ce)}(alg, me, ce)
 end
 function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
