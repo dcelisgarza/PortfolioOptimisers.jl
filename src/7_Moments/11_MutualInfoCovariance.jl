@@ -14,9 +14,8 @@ function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance()
     return MutualInfoCovariance{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins,
                                                                              normalise)
 end
-function moment_factory_w(ce::MutualInfoCovariance,
-                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return MutualInfoCovariance(; ve = moment_factory_w(ce.ve, w), bins = ce.bins,
+function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,
                                 normalise = ce.normalise)
 end
 function StatsBase.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,

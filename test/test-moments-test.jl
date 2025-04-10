@@ -16,6 +16,7 @@
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
         ew = eweights(1:1000, 0.01; scale = true)
+        fw = fweights(rand(rng, 1000))
         mes = [SimpleExpectedReturns(), SimpleExpectedReturns(; w = ew),
                ShrunkExpectedReturns(; alg = JamesStein()),
                ShrunkExpectedReturns(; alg = JamesStein(), target = VolatilityWeighted()),
@@ -63,6 +64,15 @@
                 find_tol(er, reshape(ert[!, i], size(er)); name1 = :er, name2 = :er_t)
             end
             @test res
+
+            mew = PortfolioOptimisers.factory(mes[i]; w = fw)
+            for p ∈ propertynames(mew)
+                if p == :w
+                    @test getproperty(mew, p) == fw
+                else
+                    @test getproperty(mew, p) == getproperty(mes[i], p)
+                end
+            end
         end
         @test_throws AssertionError EquilibriumExpectedReturns(w = [])
     end
@@ -71,6 +81,7 @@
         X = randn(rng, 1000, 20)
         fw = FrequencyWeights(rand(rng, 1000))
         ew = eweights(1:1000, 0.01; scale = true)
+        fw = fweights(rand(rng, 1000))
         ces = [PortfolioOptimisersCovariance(), Covariance(; alg = Full()),
                Covariance(; alg = Full(), me = SimpleExpectedReturns(; w = ew),
                           ce = GeneralWeightedCovariance(;
@@ -246,6 +257,15 @@
                 find_tol(cr, reshape(cvrt[!, j + 1], MN); name1 = :cr, name2 = :cr_t)
             end
             @test res2
+
+            cew = PortfolioOptimisers.factory(ces[i]; w = fw)
+            for p ∈ propertynames(cew)
+                if p == :w
+                    @test getproperty(cew, p) == fw
+                else
+                    @test getproperty(cew, p) == getproperty(ces[i], p)
+                end
+            end
         end
     end
     @testset "cov2cor" begin
