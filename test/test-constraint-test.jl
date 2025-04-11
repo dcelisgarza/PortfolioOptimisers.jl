@@ -72,6 +72,10 @@
         (; ineq, eq) = constr_result
         A_ineq, B_ineq = ineq.A, ineq.B
         A_eq, B_eq = eq.A, eq.B
+        @test A_ineq === constr_result.A_ineq
+        @test B_ineq === constr_result.B_ineq
+        @test A_eq === constr_result.A_eq
+        @test B_eq === constr_result.B_eq
         A_ineq_t = reshape([1.0, -0.0, -1.0, 2.0, 0.0, -0.0, -1.0, 0.0, -0.0, -1.0, 0.0,
                             0.0, -0.0, -1.0, -0.3, -2.0, 2.0, -2.0, 1.0, -1.0, -1.0, 0.0,
                             3.0, -3.0, 1.0, 0.0, 1.0, 1.0, 0.0, -2.0, 2.0, 1.0, 0.0, -1.0,
@@ -276,6 +280,12 @@
         @test isapprox(lb, [0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2, 0.2])
         @test isapprox(ub, [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5])
 
+        hcc_4 = WeightBoundsConstraints(; group = :Assets, name = 1, lb = nothing,
+                                        ub = nothing)
+        (; lb, ub) = weight_bounds_constraints(hcc_4, sets; strict = true)
+        @test isapprox(lb, [-Inf, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        @test isapprox(ub, [Inf, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+
         @test_throws UndefKeywordError WeightBoundsConstraints(group = :Asset)
         hcc = WeightBoundsConstraints(; group = nothing, name = nothing)
         @test isnothing(hcc.group)
@@ -305,11 +315,11 @@
         @test all(isone.(ub))
 
         (; lb, ub) = weight_bounds_constraints(nothing; N = 5)
-        @test lb == range(; start = 0, stop = 0, length = 5)
-        @test ub == range(; start = 1, stop = 1, length = 5)
+        @test lb == fill(-Inf, 5)
+        @test ub == fill(Inf, 5)
 
         wb = weight_bounds_constraints(nothing)
-        @test WeightBoundsResult(0, 1) == wb
+        @test WeightBoundsResult(-Inf, Inf) == wb
 
         wb = WeightBoundsResult(; lb = 0.5, ub = 0.7)
         (; lb, ub) = wb
@@ -322,6 +332,42 @@
         (; lb, ub) = weight_bounds_constraints(wb; N = 5)
         @test lb == range(; start = 0.5, stop = 0.5, length = 5)
         @test ub == range(; start = 0.7, stop = 0.7, length = 5)
+
+        wb = WeightBoundsResult(; lb = 0.5, ub = [0.7])
+        @test wb.lb == 0.5
+        @test wb.ub == [0.7]
+
+        wb = WeightBoundsResult(; lb = [0.5], ub = 0.7)
+        @test wb.lb == [0.5]
+        @test wb.ub == 0.7
+
+        wb = WeightBoundsResult(; lb = nothing, ub = [0.7])
+        @test isnothing(wb.lb)
+        @test wb.ub == [0.7]
+        wb = weight_bounds_constraints(wb; N = 1)
+        @test all(wb.lb .== 0)
+
+        wb = WeightBoundsResult(; lb = [0.5], ub = nothing)
+        @test wb.lb == [0.5]
+        @test isnothing(wb.ub)
+        wb = weight_bounds_constraints(wb; N = 1)
+        @test all(wb.ub .== 1)
+
+        wb = WeightBoundsResult(; lb = nothing, ub = [0.7])
+        @test isnothing(wb.lb)
+        @test wb.ub == [0.7]
+
+        wb = WeightBoundsResult(; lb = nothing, ub = 0.7)
+        @test isnothing(wb.lb)
+        @test wb.ub == 0.7
+
+        wb = WeightBoundsResult(; lb = [0.5], ub = nothing)
+        @test wb.lb == [0.5]
+        @test isnothing(wb.ub)
+
+        wb = WeightBoundsResult(; lb = 0.5, ub = nothing)
+        @test wb.lb == 0.5
+        @test isnothing(wb.ub)
     end
     @testset "Risk budget constraints" begin
         assets = 1:10

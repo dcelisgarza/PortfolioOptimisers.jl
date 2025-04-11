@@ -74,8 +74,10 @@ function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:Any, <:Any,
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     N = nrow(sets)
-    LB = zeros(promote_type(eltype(hcc.lb), eltype(hcc.ub)), N)
-    UB = ones(promote_type(eltype(hcc.lb), eltype(hcc.ub)), N)
+    lbtype = !isnothing(hcc.lb) ? eltype(hcc.lb) : Float64
+    ubtype = !isnothing(hcc.ub) ? eltype(hcc.ub) : Float64
+    LB = zeros(promote_type(lbtype, ubtype), N)
+    UB = ones(promote_type(lbtype, ubtype), N)
     (; group, name, lb, ub) = hcc
     if isnothing(lb)
         lb = -Inf
@@ -125,12 +127,12 @@ function weight_bounds_constraints(wb::WeightBoundsResult{<:Any, <:Any}, args...
     lb = wb.lb
     ub = wb.ub
     if isnothing(lb)
-        lb = range(; start = -Inf, stop = -Inf, length = N)
+        lb = fill(-Inf, N)
     elseif isa(lb, Real)
         lb = range(; start = lb, stop = lb, length = N)
     end
     if isnothing(ub)
-        ub = range(; start = Inf, stop = Inf, length = N)
+        ub = fill(Inf, N)
     elseif isa(ub, Real)
         ub = range(; start = ub, stop = ub, length = N)
     end
@@ -144,10 +146,9 @@ end
 function weight_bounds_constraints(wb::Nothing, args...; scalar::Bool = false,
                                    N::Integer = 0, kwargs...)
     if scalar || iszero(N)
-        return WeightBoundsResult(; lb = 0, ub = 1)
+        return WeightBoundsResult(; lb = -Inf, ub = Inf)
     end
-    return WeightBoundsResult(; lb = range(; start = 0, stop = 0, length = N),
-                              ub = range(; start = 1, stop = 1, length = N))
+    return WeightBoundsResult(; lb = fill(-Inf, N), ub = fill(Inf, N))
 end
 
 export WeightBoundsConstraints, WeightBoundsResult, weight_bounds_constraints
