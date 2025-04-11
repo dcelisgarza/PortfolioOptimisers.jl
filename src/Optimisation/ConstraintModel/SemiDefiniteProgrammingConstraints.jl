@@ -26,7 +26,7 @@ end
 function set_sdp_philogeny_constraints!(::JuMP.Model, args...)
     return nothing
 end
-function set_sdp_philogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhilogenyModel,
+function set_sdp_philogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhilogenyResult,
                                         key::Symbol)
     sc = model[:sc]
     set_sdp_constraints!(model)
@@ -41,7 +41,7 @@ function set_sdp_frc_philogeny_constraints!(::JuMP.Model, args...)
     return nothing
 end
 function set_sdp_frc_philogeny_constraints!(model::JuMP.Model,
-                                            adj::SemiDefinitePhilogenyModel, key::Symbol)
+                                            adj::SemiDefinitePhilogenyResult, key::Symbol)
     sc = model[:sc]
     set_sdp_frc_constraints!(model)
     W1 = model[:W1]

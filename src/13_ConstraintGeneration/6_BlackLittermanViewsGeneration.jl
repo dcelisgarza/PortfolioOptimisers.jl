@@ -44,7 +44,6 @@ function get_black_litterman_views_data(blve::LinearConstraintSide{<:AbstractVec
             else
                 idx = coef * idx
             end
-            println(idx)
             append!(A, idx)
         elseif strict
             throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(blve)."))

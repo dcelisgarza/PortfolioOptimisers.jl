@@ -18,8 +18,8 @@ struct MeanRiskModel{T1 <: AbstractPriorResult, T2 <: Union{Nothing, <:WeightBou
                      T3 <: Union{Nothing, <:LinearConstraintResult},
                      T4 <: Union{Nothing, <:LinearConstraintResult},
                      T5 <: Union{Nothing, <:LinearConstraintResult},
-                     T6 <: Union{Nothing, <:PhilogenyConstraintModel},
-                     T7 <: Union{Nothing, <:PhilogenyConstraintModel},
+                     T6 <: Union{Nothing, <:PhilogenyConstraintResult},
+                     T7 <: Union{Nothing, <:PhilogenyConstraintResult},
                      T8 <: JuMPPortfolioSolution} <: PortfolioModel
     pm::T1
     wb::T2

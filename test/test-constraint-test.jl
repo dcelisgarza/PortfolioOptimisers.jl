@@ -427,7 +427,7 @@
                                                                                      coef = [2])],
                                                                sets)
         @test_throws AssertionError risk_budget_constraints(LinearConstraintSide[], sets)
-        w = rand(rng, 10)
+        w = rand(10)
         rb = risk_budget_constraints(w)
         @test rb === w
     end

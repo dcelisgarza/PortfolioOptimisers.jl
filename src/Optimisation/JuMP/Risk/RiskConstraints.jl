@@ -77,14 +77,14 @@ function sdp_rc_variance_flag!(model::JuMP.Model, ::MeanRiskEstimator,
     return true
 end
 function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
-                            cplg::Union{Nothing, <:SemiDefinitePhilogenyModel,
-                                        <:IntegerPhilogenyModel},
-                            nplg::Union{Nothing, <:SemiDefinitePhilogenyModel,
-                                        <:IntegerPhilogenyModel})
+                            cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
+                                        <:IntegerPhilogenyResult},
+                            nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
+                                        <:IntegerPhilogenyResult})
     return if rc_flag ||
               haskey(model, :rc_variance) ||
-              isa(cplg, SemiDefinitePhilogenyModel) ||
-              isa(nplg, SemiDefinitePhilogenyModel)
+              isa(cplg, SemiDefinitePhilogenyResult) ||
+              isa(nplg, SemiDefinitePhilogenyResult)
         true
     else
         false
@@ -204,10 +204,10 @@ function rc_variance_constraints!(model::JuMP.Model, i::Integer, rc::LinearConst
 end
 function _set_risk_constraints!(model::JuMP.Model, r::Variance, opt::MeanRiskEstimator,
                                 pm::AbstractPriorResult, i::Integer,
-                                cplg::Union{Nothing, <:SemiDefinitePhilogenyModel,
-                                            <:IntegerPhilogenyModel},
-                                nplg::Union{Nothing, <:SemiDefinitePhilogenyModel,
-                                            <:IntegerPhilogenyModel})
+                                cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
+                                            <:IntegerPhilogenyResult},
+                                nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
+                                            <:IntegerPhilogenyResult})
     if !haskey(model, :variance_flag) && r.settings.rke
         @expression(model, variance_flag, true)
     end

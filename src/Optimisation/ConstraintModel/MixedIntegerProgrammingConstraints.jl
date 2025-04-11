@@ -154,8 +154,8 @@ function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThre
                               card::Union{Nothing, <:Integer},
                               gcard::Union{Nothing, <:LinearConstraintResult},
                               fees::Union{Nothing, <:Fees},
-                              nplg::Union{Nothing, <:PhilogenyConstraintModel},
-                              cplg::Union{Nothing, <:PhilogenyConstraintModel},
+                              nplg::Union{Nothing, <:PhilogenyConstraintResult},
+                              cplg::Union{Nothing, <:PhilogenyConstraintResult},
                               wb::WeightBounds)
     lbi_flag, sbi_flag = if !isnothing(bit)
         non_zero_real_or_vec(bit.lbi), non_zero_real_or_vec(bit.sbi)
@@ -175,8 +175,8 @@ function set_mip_constraints!(model::JuMP.Model, bit::Union{Nothing, <:BuyInThre
     else
         false, false
     end
-    n_flag = isa(nplg, IntegerPhilogenyModel)
-    c_flag = isa(cplg, IntegerPhilogenyModel)
+    n_flag = isa(nplg, IntegerPhilogenyResult)
+    c_flag = isa(cplg, IntegerPhilogenyResult)
     if !(lbi_flag ||
          sbi_flag ||
          card_flag ||
