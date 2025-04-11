@@ -1,5 +1,16 @@
 @safetestset "Constraints" begin
-    using PortfolioOptimisers, DataFrames, Test
+    using PortfolioOptimisers, DataFrames, Test, Random, StableRNGs, LinearAlgebra
+    function find_tol(a1, a2; name1 = :a1, name2 = :a2)
+        for rtol ∈
+            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
+             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
+             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
+            if isapprox(a1, a2; rtol = rtol)
+                println("isapprox($name1, $name2, rtol = $(rtol))")
+                break
+            end
+        end
+    end
     @testset "Linear Constraints" begin
         assets = 1:10
         sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
@@ -481,5 +492,118 @@
                                                                                                 group = nothing,
                                                                                                 name = nothing)),
                                           sets))
+    end
+    @testset "Philogeny constraints" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 20)
+
+        plc = SemiDefinitePhilogenyConstraintEstimator(; pe = NetworkEstimator(), p = 0.1)
+        res = philogeny_constraints(plc, X)
+        @test res === philogeny_constraints(res)
+        @test isapprox(res.A, philogeny_matrix(NetworkEstimator(), X))
+        @test res.p == 0.1
+
+        plc = SemiDefinitePhilogenyConstraintEstimator(; pe = ClusteringEstimator(),
+                                                       p = 0.15)
+        res = philogeny_constraints(plc, X)
+        @test res === philogeny_constraints(res)
+        @test isapprox(res.A, philogeny_matrix(ClusteringEstimator(), X))
+        @test res.p == 0.15
+
+        plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = 2)
+        res = philogeny_constraints(plc, X)
+        @test res === philogeny_constraints(res)
+        @test isapprox(res.A, philogeny_matrix(NetworkEstimator(), X) + I)
+        @test res.B == 2
+        @test isapprox(res.scale, 1e5)
+
+        plc = IntegerPhilogenyConstraintEstimator(; pe = ClusteringEstimator(), scale = 1e3)
+        res = philogeny_constraints(plc, X)
+        @test res === philogeny_constraints(res)
+        @test isapprox(res.A,
+                       unique(philogeny_matrix(ClusteringEstimator(), X) + I; dims = 1))
+        @test res.B == 1
+        @test res.scale == 1e3
+
+        plc = IntegerPhilogenyConstraintEstimator(;
+                                                  pe = ClusteringEstimator(;
+                                                                           onc = OptimalNumberClusters(;
+                                                                                                       max_k = 2)),
+                                                  B = [3, 5])
+        res = philogeny_constraints(plc, X)
+        @test res === philogeny_constraints(res)
+        @test isapprox(res.A,
+                       unique(philogeny_matrix(ClusteringEstimator(), X) + I; dims = 1))
+        @test res.B == [3, 5]
+
+        pe = ClusteringEstimator(;
+                                 onc = OptimalNumberClusters(;
+                                                             alg = PredefinedNumberClusters(;
+                                                                                            k = 3),
+                                                             max_k = 4))
+        plc = IntegerPhilogenyConstraintEstimator(; pe = pe, B = [3, 5, 4])
+        res = philogeny_constraints(plc, X)
+        @test res === philogeny_constraints(res)
+        @test isapprox(res.A, unique(philogeny_matrix(pe, X) + I; dims = 1))
+        @test res.B == [3, 5, 4]
+
+        @test isnothing(philogeny_constraints(nothing))
+    end
+    @testset "Centrality constraints" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 20)
+        ces = [CentralityEstimator(), CentralityEstimator(; cent = EigenvectorCentrality()),
+               CentralityEstimator(; cent = ClosenessCentrality()),
+               CentralityEstimator(; cent = StressCentrality()),
+               CentralityEstimator(; cent = RadialityCentrality())]
+
+        ce1 = CentralityConstraintEstimator(; A = ces[1], B = MinValue(), comp = GEQ())
+        ce2 = CentralityConstraintEstimator(; A = ces[2], B = MeanValue(), comp = LEQ())
+        ce3 = CentralityConstraintEstimator(; A = ces[3], B = MedianValue(), comp = EQ())
+        ce4 = CentralityConstraintEstimator(; A = ces[4], B = 50, comp = EQ())
+        ce5 = CentralityConstraintEstimator(; A = ces[5], B = MaxValue(), comp = LEQ())
+        ccs = [ce1, ce2, ce3, ce4, ce5]
+        lcs = centrality_constraints(ccs, X)
+        lcs2 = centrality_constraints(lcs, X)
+        @test lcs === lcs2
+
+        eq = 1
+        ineq = 1
+        for (i, ce) ∈ enumerate(ccs)
+            d, flag_ineq = PortfolioOptimisers.comparison_sign_ineq_flag(ce.comp)
+            A = d * centrality_vector(ce.A, X)
+            B = d * PortfolioOptimisers.vec_to_real_measure(ce.B, A)
+            if flag_ineq
+                res = isapprox(lcs.A_ineq[ineq, :], A)
+                if !res
+                    println("A_ineq fails on index $ineq")
+                    find_tol(lcs.A_ineq[ineq, :], A; name1 = :A_ineq, name2 = :A)
+                end
+                @test res
+                res = isapprox(lcs.B_ineq[ineq], B)
+                if !res
+                    println("B_ineq fails on index $ineq")
+                    find_tol(lcs.B_ineq[ineq], B; name1 = :B_ineq, name2 = :B)
+                end
+                @test res
+                ineq += 1
+            else
+                res = isapprox(lcs.A_eq[eq, :], A)
+                if !res
+                    println("A_eq fails on index $eq")
+                    find_tol(lcs.A_eq[eq, :], A; name1 = :A_eq, name2 = :A)
+                end
+                @test res
+                res = isapprox(lcs.B_eq[eq], B)
+                if !res
+                    println("B_eq fails on index $eq")
+                    find_tol(lcs.B_eq[eq], B; name1 = :B_eq, name2 = :B)
+                end
+                @test res
+                eq += 1
+            end
+        end
+
+        @test isnothing(centrality_constraints(nothing))
     end
 end

@@ -55,7 +55,7 @@ include("./12_Philogeny/1_Base_Philogeny.jl")
 include("./12_Philogeny/2_Clustering.jl")
 include("./12_Philogeny/3_Hierarchical.jl")
 include("./12_Philogeny/4_DBHT.jl")
-include("./12_Philogeny/5_Network.jl")
+include("./12_Philogeny/5_Philogeny.jl")
 
 include("./13_ConstraintGeneration/1_Base_ConstraintGeneration.jl")
 include("./13_ConstraintGeneration/2_LinearConstraintGeneration.jl")

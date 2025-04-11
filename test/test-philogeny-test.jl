@@ -198,7 +198,6 @@
     @testset "Philogeny matrix" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
-
         df = CSV.read(joinpath(@__DIR__, "./assets/Philogeny_Matrix_1.csv"), DataFrame)
         for i ∈ 1:ncol(df)
             A = philogeny_matrix(NetworkEstimator(; n = i), X)
