@@ -1,6 +1,6 @@
 struct BayesianBlackLittermanPriorModel{T1 <: EmpiricalPriorResult,
                                         T2 <: PartialFactorPriorResult,
-                                        T3 <: BlackLittermanViewsModel} <:
+                                        T3 <: BlackLittermanViewsResult} <:
        AbstractPriorResult_AFV
     pm::T1
     fm::T2
@@ -8,7 +8,7 @@ struct BayesianBlackLittermanPriorModel{T1 <: EmpiricalPriorResult,
 end
 function BayesianBlackLittermanPriorModel(; pm::EmpiricalPriorResult,
                                           fm::PartialFactorPriorResult,
-                                          f_views::BlackLittermanViewsModel)
+                                          f_views::BlackLittermanViewsResult)
     @smart_assert(length(fm.mu) == size(f_views.P, 2))
     return BayesianBlackLittermanPriorModel{typeof(pm), typeof(fm), typeof(f_views)}(pm, fm,
                                                                                      f_views)
@@ -32,8 +32,8 @@ function Base.getproperty(obj::BayesianBlackLittermanPriorModel, sym::Symbol)
 end
 struct BayesianBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_2,
                                             T2 <: AbstractMatrixProcessingEstimator,
-                                            T3 <: Union{<:BlackLittermanView,
-                                                        <:AbstractVector{<:BlackLittermanView}},
+                                            T3 <: Union{<:BlackLittermanViewsEstimator,
+                                                        <:AbstractVector{<:BlackLittermanViewsEstimator}},
                                             T4 <: DataFrame, T5 <: Real,
                                             T6 <: Union{Nothing, <:AbstractVector},
                                             T7 <: Union{Nothing, <:Real}} <:
@@ -51,8 +51,8 @@ function BayesianBlackLittermanPriorEstimator(;
                                                                                                        pe = EmpiricalPriorEstimator(;
                                                                                                                                     me = EquilibriumExpectedReturns())),
                                               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                              views::Union{<:BlackLittermanView,
-                                                           <:AbstractVector{<:BlackLittermanView}},
+                                              views::Union{<:BlackLittermanViewsEstimator,
+                                                           <:AbstractVector{<:BlackLittermanViewsEstimator}},
                                               sets::DataFrame = DataFrame(), rf::Real = 0.0,
                                               views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                               tau::Union{Nothing, <:Real} = nothing)

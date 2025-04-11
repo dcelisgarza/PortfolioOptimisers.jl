@@ -1,11 +1,11 @@
 struct FactorBlackLittermanPriorModel{T1 <: FactorPriorResult,
-                                      T2 <: BlackLittermanViewsModel} <:
+                                      T2 <: BlackLittermanViewsResult} <:
        AbstractPriorResult_AFVC
     pm::T1
     f_views::T2
 end
 function FactorBlackLittermanPriorModel(; pm::FactorPriorResult,
-                                        f_views::BlackLittermanViewsModel)
+                                        f_views::BlackLittermanViewsResult)
     @smart_assert(length(pm.f_mu) == size(f_views.P, 2))
     return FactorBlackLittermanPriorModel{typeof(pm), typeof(f_views)}(pm, f_views)
 end
@@ -33,8 +33,8 @@ struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
                                           T3 <: AbstractMatrixProcessingEstimator,
                                           T4 <: AbstractRegressionEstimator,
                                           T5 <: AbstractVarianceEstimator,
-                                          T6 <: Union{<:BlackLittermanView,
-                                                      <:AbstractVector{<:BlackLittermanView}},
+                                          T6 <: Union{<:BlackLittermanViewsEstimator,
+                                                      <:AbstractVector{<:BlackLittermanViewsEstimator}},
                                           T7 <: DataFrame, T8 <: Real, T9 <: Bool,
                                           T10 <: Union{Nothing, <:AbstractVector},
                                           T11 <: Union{Nothing, <:AbstractVector},
@@ -61,8 +61,8 @@ function FactorBlackLittermanPriorEstimator(;
                                             mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                             re::AbstractRegressionEstimator = ForwardRegression(),
                                             ve::AbstractVarianceEstimator = SimpleVariance(),
-                                            views::Union{<:BlackLittermanView,
-                                                         <:AbstractVector{<:BlackLittermanView}},
+                                            views::Union{<:BlackLittermanViewsEstimator,
+                                                         <:AbstractVector{<:BlackLittermanViewsEstimator}},
                                             sets::DataFrame = DataFrame(), rf::Real = 0.0,
                                             residuals::Bool = true,
                                             views_conf::Union{Nothing, <:AbstractVector} = nothing,

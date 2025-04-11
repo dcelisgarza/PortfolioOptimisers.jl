@@ -16,7 +16,7 @@
     end
     @testset "Type tests" begin
         pe1 = BayesianBlackLittermanPriorEstimator(; tau = 1,
-                                                   views = BlackLittermanView(;
+                                                   views = BlackLittermanViewsEstimator(;
                                                                               A = LinearConstraintSide(;
                                                                                                      name = nothing,
                                                                                                      group = nothing)),
@@ -29,12 +29,12 @@
         @test isa(pe1.me, JamesSteinExpectedReturns)
         @test isa(pe1.ce.ce, Gerber0Covariance)
         pe2 = BayesianBlackLittermanPriorEstimator(;
-                                                   views = BlackLittermanView(;
+                                                   views = BlackLittermanViewsEstimator(;
                                                                               A = LinearConstraintSide(;
                                                                                                      name = nothing,
                                                                                                      group = nothing)),
                                                    pe = FactorBlackLittermanPriorEstimator(;
-                                                                                           views = BlackLittermanView(;
+                                                                                           views = BlackLittermanViewsEstimator(;
                                                                                                                       A = LinearConstraintSide(;
                                                                                                                                              name = nothing,
                                                                                                                                              group = nothing)),
@@ -45,16 +45,16 @@
         @test isa(pe2.me, BodnarOkhrinParolyaExpectedReturns)
         @test isa(pe2.ce.ce, Gerber2Covariance)
         pe3 = BayesianBlackLittermanPriorEstimator(;
-                                                   views = BlackLittermanView(;
+                                                   views = BlackLittermanViewsEstimator(;
                                                                               A = LinearConstraintSide(;
                                                                                                      name = nothing,
                                                                                                      group = nothing)),
                                                    pe = AugmentedBlackLittermanPriorEstimator(;
-                                                                                              a_views = BlackLittermanView(;
+                                                                                              a_views = BlackLittermanViewsEstimator(;
                                                                                                                            A = LinearConstraintSide(;
                                                                                                                                                   name = nothing,
                                                                                                                                                   group = nothing)),
-                                                                                              f_views = BlackLittermanView(;
+                                                                                              f_views = BlackLittermanViewsEstimator(;
                                                                                                                            A = LinearConstraintSide(;
                                                                                                                                                   name = nothing,
                                                                                                                                                   group = nothing)),
@@ -65,12 +65,12 @@
         @test isa(pe3.me, ExcessExpectedReturns)
         @test isa(pe3.ce.ce, Gerber1Covariance)
         pe4 = BayesianBlackLittermanPriorEstimator(;
-                                                   views = BlackLittermanView(;
+                                                   views = BlackLittermanViewsEstimator(;
                                                                               A = LinearConstraintSide(;
                                                                                                      name = nothing,
                                                                                                      group = nothing)),
                                                    pe = BlackLittermanPriorEstimator(;
-                                                                                     views = BlackLittermanView(;
+                                                                                     views = BlackLittermanViewsEstimator(;
                                                                                                                 A = LinearConstraintSide(;
                                                                                                                                        name = nothing,
                                                                                                                                        group = nothing)),
@@ -81,19 +81,19 @@
         @test isa(pe4.me, EquilibriumExpectedReturns)
         @test isa(pe4.ce.ce, SmythBroby0Covariance)
         pe5 = BayesianBlackLittermanPriorEstimator(;
-                                                   views = BlackLittermanView(;
+                                                   views = BlackLittermanViewsEstimator(;
                                                                               A = LinearConstraintSide(;
                                                                                                      name = nothing,
                                                                                                      group = nothing)),
                                                    pe = BayesianBlackLittermanPriorEstimator(;
-                                                                                             views = BlackLittermanView(;
+                                                                                             views = BlackLittermanViewsEstimator(;
                                                                                                                         A = LinearConstraintSide(;
                                                                                                                                                name = nothing,
                                                                                                                                                group = nothing))))
         @test isa(pe5.me, EquilibriumExpectedReturns)
         @test isa(pe5.ce.ce, Full)
         pe6 = BlackLittermanPriorEstimator(;
-                                           views = BlackLittermanView(;
+                                           views = BlackLittermanViewsEstimator(;
                                                                       A = LinearConstraintSide(;
                                                                                              name = nothing,
                                                                                              group = nothing)),
@@ -104,7 +104,7 @@
         @test isa(pe6.me, BayesSteinExpectedReturns)
         @test isa(pe6.ce.ce, SmythBroby0NormalisedCovariance)
         pe7 = BlackLittermanPriorEstimator(; tau = 0.5,
-                                           views = BlackLittermanView(;
+                                           views = BlackLittermanViewsEstimator(;
                                                                       A = LinearConstraintSide(;
                                                                                              name = nothing,
                                                                                              group = nothing)),
@@ -117,12 +117,12 @@
         @test isa(pe7.me, JamesSteinExpectedReturns)
         @test isa(pe7.ce.ce, Gerber0NormalisedCovariance)
         pe8 = BlackLittermanPriorEstimator(;
-                                           views = BlackLittermanView(;
+                                           views = BlackLittermanViewsEstimator(;
                                                                       A = LinearConstraintSide(;
                                                                                              name = nothing,
                                                                                              group = nothing)),
                                            pe = FactorBlackLittermanPriorEstimator(;
-                                                                                   views = BlackLittermanView(;
+                                                                                   views = BlackLittermanViewsEstimator(;
                                                                                                               A = LinearConstraintSide(;
                                                                                                                                      name = nothing,
                                                                                                                                      group = nothing)),
@@ -133,16 +133,16 @@
         @test isa(pe8.me, BodnarOkhrinParolyaExpectedReturns)
         @test isa(pe8.ce.ce, Gerber2NormalisedCovariance)
         pe9 = BlackLittermanPriorEstimator(;
-                                           views = BlackLittermanView(;
+                                           views = BlackLittermanViewsEstimator(;
                                                                       A = LinearConstraintSide(;
                                                                                              name = nothing,
                                                                                              group = nothing)),
                                            pe = AugmentedBlackLittermanPriorEstimator(;
-                                                                                      a_views = BlackLittermanView(;
+                                                                                      a_views = BlackLittermanViewsEstimator(;
                                                                                                                    A = LinearConstraintSide(;
                                                                                                                                           name = nothing,
                                                                                                                                           group = nothing)),
-                                                                                      f_views = BlackLittermanView(;
+                                                                                      f_views = BlackLittermanViewsEstimator(;
                                                                                                                    A = LinearConstraintSide(;
                                                                                                                                           name = nothing,
                                                                                                                                           group = nothing)),
@@ -153,12 +153,12 @@
         @test isa(pe9.me, ExcessExpectedReturns)
         @test isa(pe9.ce.ce, Gerber1NormalisedCovariance)
         pe10 = BlackLittermanPriorEstimator(;
-                                            views = BlackLittermanView(;
+                                            views = BlackLittermanViewsEstimator(;
                                                                        A = LinearConstraintSide(;
                                                                                               name = nothing,
                                                                                               group = nothing)),
                                             pe = BlackLittermanPriorEstimator(;
-                                                                              views = BlackLittermanView(;
+                                                                              views = BlackLittermanViewsEstimator(;
                                                                                                          A = LinearConstraintSide(;
                                                                                                                                 name = nothing,
                                                                                                                                 group = nothing))))
@@ -174,7 +174,7 @@
 
         pe12 = FactorPriorEstimator(;
                                     pe = BlackLittermanPriorEstimator(;
-                                                                      views = BlackLittermanView(;
+                                                                      views = BlackLittermanViewsEstimator(;
                                                                                                  A = LinearConstraintSide(;
                                                                                                                         name = nothing,
                                                                                                                         group = nothing)),
@@ -185,7 +185,7 @@
         @test isa(pe12.me, JamesSteinExpectedReturns)
         @test isa(pe12.ce.ce, Gerber2NormalisedCovariance)
         pe13 = FactorBlackLittermanPriorEstimator(; tau = 0.3,
-                                                  views = BlackLittermanView(;
+                                                  views = BlackLittermanViewsEstimator(;
                                                                              A = LinearConstraintSide(;
                                                                                                     name = nothing,
                                                                                                     group = nothing)),
@@ -197,12 +197,12 @@
         @test isa(pe13.me, BayesSteinExpectedReturns)
         @test isa(pe13.ce.ce, SmythBroby0NormalisedCovariance)
         pe14 = FactorBlackLittermanPriorEstimator(;
-                                                  views = BlackLittermanView(;
+                                                  views = BlackLittermanViewsEstimator(;
                                                                              A = LinearConstraintSide(;
                                                                                                     name = nothing,
                                                                                                     group = nothing)),
                                                   pe = BlackLittermanPriorEstimator(;
-                                                                                    views = BlackLittermanView(;
+                                                                                    views = BlackLittermanViewsEstimator(;
                                                                                                                A = LinearConstraintSide(;
                                                                                                                                       name = nothing,
                                                                                                                                       group = nothing)),
@@ -213,11 +213,11 @@
         @test isa(pe14.me, JamesSteinExpectedReturns)
         @test isa(pe14.ce.ce, Gerber2NormalisedCovariance)
         pe15 = AugmentedBlackLittermanPriorEstimator(; tau = 0.2,
-                                                     a_views = BlackLittermanView(;
+                                                     a_views = BlackLittermanViewsEstimator(;
                                                                                   A = LinearConstraintSide(;
                                                                                                          name = nothing,
                                                                                                          group = nothing)),
-                                                     f_views = BlackLittermanView(;
+                                                     f_views = BlackLittermanViewsEstimator(;
                                                                                   A = LinearConstraintSide(;
                                                                                                          name = nothing,
                                                                                                          group = nothing)),
@@ -229,16 +229,16 @@
         @test isa(pe15.me, BayesSteinExpectedReturns)
         @test isa(pe15.ce.ce, SmythBroby0NormalisedCovariance)
         pe16 = AugmentedBlackLittermanPriorEstimator(;
-                                                     a_views = BlackLittermanView(;
+                                                     a_views = BlackLittermanViewsEstimator(;
                                                                                   A = LinearConstraintSide(;
                                                                                                          name = nothing,
                                                                                                          group = nothing)),
-                                                     f_views = BlackLittermanView(;
+                                                     f_views = BlackLittermanViewsEstimator(;
                                                                                   A = LinearConstraintSide(;
                                                                                                          name = nothing,
                                                                                                          group = nothing)),
                                                      a_pe = BlackLittermanPriorEstimator(;
-                                                                                         views = BlackLittermanView(;
+                                                                                         views = BlackLittermanViewsEstimator(;
                                                                                                                     A = LinearConstraintSide(;
                                                                                                                                            name = nothing,
                                                                                                                                            group = nothing)),
@@ -281,22 +281,22 @@
         assets = 1:10
         sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
 
-        vc_1 = BlackLittermanView(;
+        vc_1 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = :Asset, name = 2,
                                                          coef = 1.0), B = 0.003)
-        vc_2 = BlackLittermanView(;
+        vc_2 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Asset, :Asset],
                                                          name = [3, 8], coef = [1.0, -1]),
                                   B = -0.001)
-        vc_3 = BlackLittermanView(;
+        vc_3 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Clusters, :Asset],
                                                          name = [3, 9], coef = [1.0, -1]),
                                   B = 0.002)
-        vc_4 = BlackLittermanView(;
+        vc_4 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Asset, :Clusters],
                                                          name = [5, 1], coef = [1.0, -1]),
                                   B = 0.007)
-        vc_5 = BlackLittermanView(;
+        vc_5 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = :Clusters, name = 2,
                                                          coef = 1.0), B = 0.001)
         views = [vc_1, vc_2, vc_3, vc_4, vc_5]
@@ -335,14 +335,14 @@
             @test size(pm.X) == size(X)
         end
 
-        @test_throws TypeError views_constraints(BlackLittermanView(;
+        @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
                                                                     A = LinearConstraintSide(;
                                                                                            group = :Foo,
                                                                                            name = 2,
                                                                                            coef = 1),
                                                                     B = 0.003), sets)
 
-        @test_throws ArgumentError views_constraints(BlackLittermanView(;
+        @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
                                                                         A = LinearConstraintSide(;
                                                                                                group = :Foo,
                                                                                                name = 2,
@@ -350,14 +350,14 @@
                                                                         B = 0.003), sets;
                                                      strict = true)
 
-        @test_throws TypeError views_constraints(BlackLittermanView(;
+        @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
                                                                     A = LinearConstraintSide(;
                                                                                            group = [:Foo],
                                                                                            name = [2],
                                                                                            coef = [1]),
                                                                     B = 0.003), sets)
 
-        @test_throws ArgumentError views_constraints(BlackLittermanView(;
+        @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
                                                                         A = LinearConstraintSide(;
                                                                                                group = [:Foo],
                                                                                                name = [2],
@@ -365,14 +365,14 @@
                                                                         B = 0.003), sets;
                                                      strict = true)
 
-        @test_throws TypeError views_constraints(BlackLittermanView(;
+        @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
                                                                     A = LinearConstraintSide(;
                                                                                            group = :Asset,
                                                                                            name = 11,
                                                                                            coef = 1),
                                                                     B = 0.003), sets)
 
-        @test_throws ArgumentError views_constraints(BlackLittermanView(;
+        @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
                                                                         A = LinearConstraintSide(;
                                                                                                group = :Asset,
                                                                                                name = 11,
@@ -380,14 +380,14 @@
                                                                         B = 0.003), sets,
                                                      strict = true)
 
-        @test_throws TypeError views_constraints(BlackLittermanView(;
+        @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
                                                                     A = LinearConstraintSide(;
                                                                                            group = [:Asset],
                                                                                            name = [11],
                                                                                            coef = [1]),
                                                                     B = 0.003), sets)
 
-        @test_throws ArgumentError views_constraints(BlackLittermanView(;
+        @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
                                                                         A = LinearConstraintSide(;
                                                                                                group = [:Asset],
                                                                                                name = [11],
@@ -434,14 +434,14 @@
         F = X[:, [3, 8, 5, 10]]
         assets = 1:10
         sets = DataFrame(:Factor => [1, 2, 3, 4])
-        vc_1 = BlackLittermanView(;
+        vc_1 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = :Factor, name = 2,
                                                          coef = 1), B = 0.003)
-        vc_2 = BlackLittermanView(;
+        vc_2 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Factor, :Factor],
                                                          name = [4, 1], coef = [1, -1.0]),
                                   B = -0.001)
-        vc_3 = BlackLittermanView(;
+        vc_3 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Factor, :Factor],
                                                          name = [2, 3], coef = [1, -1.0]),
                                   B = 0.002)
@@ -506,14 +506,14 @@
         X = randn(rng, 100, 10) * 0.001
         F = X[:, [3, 8, 5, 10]]
 
-        vc_1 = BlackLittermanView(;
+        vc_1 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = :Factor, name = 2,
                                                          coef = 1), B = 0.003)
-        vc_2 = BlackLittermanView(;
+        vc_2 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Factor, :Factor],
                                                          name = [4, 1], coef = [1, -1.0]),
                                   B = -0.001)
-        vc_3 = BlackLittermanView(;
+        vc_3 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Factor, :Factor],
                                                          name = [2, 3], coef = [1, -1.0]),
                                   B = 0.002)
@@ -686,35 +686,35 @@
 
         assets = 1:10
         a_sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-        vc_1 = BlackLittermanView(;
+        vc_1 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = :Asset, name = 2,
                                                          coef = 1.0), B = 0.003)
-        vc_2 = BlackLittermanView(;
+        vc_2 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Asset, :Asset],
                                                          name = [3, 8], coef = [1, -1.0]),
                                   B = -0.001)
-        vc_3 = BlackLittermanView(;
+        vc_3 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Clusters, :Asset],
                                                          name = [3, 9], coef = [1, -1.0]),
                                   B = 0.002)
-        vc_4 = BlackLittermanView(;
+        vc_4 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Asset, :Clusters],
                                                          name = [5, 1], coef = [1, -1.0]),
                                   B = 0.007)
-        vc_5 = BlackLittermanView(;
+        vc_5 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = :Clusters, name = 2,
                                                          coef = 1.0), B = 0.001)
         a_views = [vc_1, vc_2, vc_3, vc_4, vc_5]
 
         f_sets = DataFrame(:Factor => [1, 2, 3, 4])
-        vc_1 = BlackLittermanView(;
+        vc_1 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = :Factor, name = 2,
                                                          coef = 1.0), B = 0.003)
-        vc_2 = BlackLittermanView(;
+        vc_2 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Factor, :Factor],
                                                          name = [4, 1], coef = [1, -1.0]),
                                   B = -0.001)
-        vc_3 = BlackLittermanView(;
+        vc_3 = BlackLittermanViewsEstimator(;
                                   A = LinearConstraintSide(; group = [:Factor, :Factor],
                                                          name = [2, 3], coef = [1, -1.0]),
                                   B = 0.002)

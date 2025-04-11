@@ -1,7 +1,7 @@
 struct AugmentedBlackLittermanPriorModel{T1 <: EmpiricalPriorResult,
                                          T2 <: PartialFactorPriorResult,
-                                         T3 <: BlackLittermanViewsModel,
-                                         T4 <: BlackLittermanViewsModel} <:
+                                         T3 <: BlackLittermanViewsResult,
+                                         T4 <: BlackLittermanViewsResult} <:
        AbstractPriorResult_AVFV
     pm::T1
     fm::T2
@@ -10,8 +10,8 @@ struct AugmentedBlackLittermanPriorModel{T1 <: EmpiricalPriorResult,
 end
 function AugmentedBlackLittermanPriorModel(; pm::EmpiricalPriorResult,
                                            fm::PartialFactorPriorResult,
-                                           a_views::BlackLittermanViewsModel,
-                                           f_views::BlackLittermanViewsModel)
+                                           a_views::BlackLittermanViewsResult,
+                                           f_views::BlackLittermanViewsResult)
     @smart_assert(size(pm.X, 2) == size(a_views.P, 2))
     @smart_assert(length(fm.mu) == size(f_views.P, 2))
     return AugmentedBlackLittermanPriorModel{typeof(pm), typeof(fm), typeof(a_views),
@@ -39,10 +39,10 @@ struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1
                                              T3 <: AbstractMatrixProcessingEstimator,
                                              T4 <: AbstractRegressionEstimator,
                                              T5 <: AbstractVarianceEstimator,
-                                             T6 <: Union{<:BlackLittermanView,
-                                                         <:AbstractVector{<:BlackLittermanView}},
-                                             T7 <: Union{<:BlackLittermanView,
-                                                         <:AbstractVector{<:BlackLittermanView}},
+                                             T6 <: Union{<:BlackLittermanViewsEstimator,
+                                                         <:AbstractVector{<:BlackLittermanViewsEstimator}},
+                                             T7 <: Union{<:BlackLittermanViewsEstimator,
+                                                         <:AbstractVector{<:BlackLittermanViewsEstimator}},
                                              T8 <: DataFrame, T9 <: DataFrame, T10 <: Real,
                                              T11 <: Union{Nothing, <:AbstractVector},
                                              T12 <: Union{Nothing, <:AbstractVector},
@@ -72,10 +72,10 @@ function AugmentedBlackLittermanPriorEstimator(;
                                                mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                                re::AbstractRegressionEstimator = ForwardRegression(),
                                                ve::AbstractVarianceEstimator = SimpleVariance(),
-                                               a_views::Union{<:BlackLittermanView,
-                                                              <:AbstractVector{<:BlackLittermanView}},
-                                               f_views::Union{<:BlackLittermanView,
-                                                              <:AbstractVector{<:BlackLittermanView}},
+                                               a_views::Union{<:BlackLittermanViewsEstimator,
+                                                              <:AbstractVector{<:BlackLittermanViewsEstimator}},
+                                               f_views::Union{<:BlackLittermanViewsEstimator,
+                                                              <:AbstractVector{<:BlackLittermanViewsEstimator}},
                                                a_sets::DataFrame = DataFrame(),
                                                f_sets::DataFrame = DataFrame(),
                                                rf::Real = 0.0,
