@@ -1287,5 +1287,6 @@ function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:PosDefEsti
     return logo!(je, pdm, sigma, X; dims = dims)
 end
 
-export ExponentialSimilarity, MaximumDistanceSimilarity, dbht_similarity, PMFG_T2s, DBHTs,
-       J_LoGo, UniqueRoot, EqualRoot, DBHTClusteringResult, DBHT, LoGo
+export ExponentialSimilarity, GeneralExponentialSimilarity, MaximumDistanceSimilarity,
+       dbht_similarity, PMFG_T2s, DBHTs, J_LoGo, UniqueRoot, EqualRoot,
+       DBHTClusteringResult, DBHT, LoGo

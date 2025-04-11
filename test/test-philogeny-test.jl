@@ -229,5 +229,12 @@
         w = fill(inv(20), 20)
         @test isapprox(asset_philogeny(NetworkEstimator(), w, X), 0.09500000000000004)
         @test isapprox(asset_philogeny(ClusteringEstimator(), w, X), 0.45000000000000023)
+
+        A1 = PortfolioOptimisers.calc_adjacency(NetworkEstimator(; alg = KruskalTree()), X)
+        A2 = PortfolioOptimisers.calc_adjacency(NetworkEstimator(; alg = BoruvkaTree()), X)
+        A3 = PortfolioOptimisers.calc_adjacency(NetworkEstimator(; alg = PrimTree()), X)
+
+        @test A1 == A2
+        @test A1 == A3
     end
 end

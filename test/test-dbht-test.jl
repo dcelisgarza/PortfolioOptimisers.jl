@@ -21,6 +21,9 @@
         rho = cor(ce, X)
         dist = distance(de, rho, X)
 
+        @test isapprox(dbht_similarity(GeneralExponentialSimilarity(); D = rho),
+                       dbht_similarity(ExponentialSimilarity(); D = rho))
+
         sim = MaximumDistanceSimilarity()
         S = dbht_similarity(sim; S = rho, D = dist)
 
