@@ -378,5 +378,7 @@
             end
             @test res1
         end
+
+        @test isnothing(PortfolioOptimisers.logo!(nothing))
     end
 end

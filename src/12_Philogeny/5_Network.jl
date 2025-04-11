@@ -121,8 +121,8 @@ function NetworkEstimator(;
                                      <:AbstractTreeType} = KruskalTree(), n::Integer = 1)
     return NetworkEstimator{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
 end
-struct CentralityEstimator{T1 <: AbstractCentralityAlgorithm,
-                           T2 <: AbstractNetworkEstimator}
+struct CentralityEstimator{T1 <: AbstractNetworkEstimator,
+                           T2 <: AbstractCentralityAlgorithm}
     ne::T1
     cent::T2
 end
