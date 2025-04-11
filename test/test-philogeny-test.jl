@@ -168,6 +168,33 @@
                          X)
         @test clr.k == 4
     end
+    @testset "Centrality tests" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 20)
+        ces = [BetweennessCentrality(), ClosenessCentrality(), DegreeCentrality(),
+               EigenvectorCentrality(), KatzCentrality(), Pagerank(), RadialityCentrality(),
+               StressCentrality()]
+        df1 = CSV.read(joinpath(@__DIR__, "./assets/Centrality.csv"), DataFrame)
+        df2 = CSV.read(joinpath(@__DIR__, "./assets/Average_Centrality.csv"), DataFrame)
+        w = fill(inv(20), 20)
+        for i ∈ 1:ncol(df1)
+            v1 = centrality_vector(CentralityEstimator(; cent = ces[i]), X)
+            res = isapprox(v1, df1[!, i])
+            if !res
+                println("Iteration $i failed on default centrality algorithm.")
+                find_tol(v1, df1[!, i]; name1 = :v1, name2 = :df1)
+            end
+            @test res
+
+            c = average_centrality(CentralityEstimator(; cent = ces[i]), w, X)
+            res = isapprox(c, df2[i, 1])
+            if !res
+                println("Iteration $i failed on default average centrality algorithm.")
+                find_tol(c, df2[i, 1]; name1 = :c, name2 = :df2)
+            end
+            @test res
+        end
+    end
     @testset "Philogeny matrix" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
@@ -177,7 +204,7 @@
             A = philogeny_matrix(NetworkEstimator(; n = i), X)
             res = isapprox(vec(A), df[!, i])
             if !res
-                println("Iteration $i failed on MaximumDistanceSimilarity.")
+                println("Iteration $i failed on detault network estimator.")
                 find_tol(vec(A), df[!, i]; name1 = :A, name2 = :df)
             end
             @test res

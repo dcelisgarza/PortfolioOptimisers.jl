@@ -156,25 +156,6 @@ function philogeny_matrix(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1
     P .= clamp!(P, 0, 1) - I
     return P
 end
-function centrality_vector(cent::AbstractCentralityAlgorithm, X::AbstractMatrix; kwargs...)
-    G = SimpleGraph(X)
-    return calc_centrality(cent, G)
-end
-function centrality_vector(cte::CentralityEstimator, X::AbstractMatrix; dims::Int = 1)
-    P = philogeny_matrix(cte.ne, X; dims = dims)
-    return centrality_vector(cte.cent, P)
-end
-function average_centrality(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
-                            w::AbstractVector, X::AbstractMatrix; dims::Int = 1)
-    P = philogeny_matrix(ne, X; dims = dims)
-    cv = centrality_vector(cent, P)
-    return dot(cv, w)
-end
-function average_centrality(cte::CentralityEstimator, w::AbstractVector, X::AbstractMatrix;
-                            dims::Int = 1)
-    cv = centrality_vector(cte, X; dims = dims)
-    return dot(cv, w)
-end
 function philogeny_matrix(cle::ClusteringEstimator, X::AbstractMatrix;
                           branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims)
@@ -186,20 +167,33 @@ function philogeny_matrix(cle::ClusteringEstimator, X::AbstractMatrix;
     end
     return P * transpose(P) - I
 end
+function centrality_vector(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
+                           X::AbstractMatrix; dims::Int = 1, kwargs...)
+    P = philogeny_matrix(ne, X; dims = dims, kwargs...)
+    G = SimpleGraph(P)
+    return calc_centrality(cent, G)
+end
+function centrality_vector(cte::CentralityEstimator, X::AbstractMatrix; dims::Int = 1,
+                           kwargs...)
+    return centrality_vector(cte.ne, cte.cent, X; dims = dims, kwargs...)
+end
+function average_centrality(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
+                            w::AbstractVector, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...), w)
+end
+function average_centrality(cte::CentralityEstimator, w::AbstractVector, X::AbstractMatrix;
+                            dims::Int = 1, kwargs...)
+    return average_centrality(cte.ne, cte.cent, w, X; dims = dims, kwargs...)
+end
 function asset_philogeny(w::AbstractVector, X::AbstractMatrix)
     aw = abs.(w * transpose(w))
     c = sum(X .* aw)
     c /= sum(aw)
     return c
 end
-function asset_philogeny(cle::ClusteringEstimator, w::AbstractVector, X::AbstractMatrix;
-                         branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
-    return asset_philogeny(w,
-                           philogeny_matrix(cle, X; branchorder = branchorder, dims = dims))
-end
-function asset_philogeny(ne::NetworkEstimator, w::AbstractVector, X::AbstractMatrix;
-                         dims::Int = 1, kwargs...)
-    return asset_philogeny(w, philogeny_matrix(ne, X; dims = dims))
+function asset_philogeny(cle::Union{NetworkEstimator, ClusteringEstimator},
+                         w::AbstractVector, X::AbstractMatrix; dims::Int = 1, kwargs...)
+    return asset_philogeny(w, philogeny_matrix(cle, X; dims = dims, kwargs...))
 end
 
 export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
