@@ -345,13 +345,13 @@
         @test isnothing(wb.lb)
         @test wb.ub == [0.7]
         wb = weight_bounds_constraints(wb; N = 1)
-        @test all(wb.lb .== 0)
+        @test all(wb.lb .== -Inf)
 
         wb = WeightBoundsResult(; lb = [0.5], ub = nothing)
         @test wb.lb == [0.5]
         @test isnothing(wb.ub)
         wb = weight_bounds_constraints(wb; N = 1)
-        @test all(wb.ub .== 1)
+        @test all(wb.ub .== Inf)
 
         wb = WeightBoundsResult(; lb = nothing, ub = [0.7])
         @test isnothing(wb.lb)
