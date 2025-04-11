@@ -503,6 +503,10 @@
                 find_tol(v, reshape(v_t[1:prod(MN1), i], MN1); name1 = :v, name2 = :v_t)
             end
             @test res2
+
+            a, b = coskewness(nothing)
+            @test isnothing(a)
+            @test isnothing(b)
         end
     end
     @testset "Cokurtosis" begin
@@ -521,6 +525,8 @@
             end
             @test res
         end
+
+        @test isnothing(cokurtosis(nothing))
     end
     @testset "Absolute Distances" begin
         rng = StableRNG(123456789)
@@ -825,7 +831,7 @@
         @test ske2.me.w == fw
 
         kte1 = Cokurtosis()
-        kte2 = PortfolioOptimisers.factory(ske1, fw)
+        kte2 = PortfolioOptimisers.factory(kte1, fw)
         @test kte2.me.w == fw
     end
 end

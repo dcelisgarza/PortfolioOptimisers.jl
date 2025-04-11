@@ -9,6 +9,8 @@
                                              onc = OptimalNumberClusters(;
                                                                          alg = SecondOrderDifference())),
                          X)
+        clr2 = clusterise(clr)
+        @test clr === clr2
         clr_t = Clustering.Hclust{Float64}([-8 -18; -3 -2; -5 -15; -12 -10; -11 -4; 2 -19;
                                             -17 -14;
                                              -9 -6; 7 4; -16 -1; -20 -13; -7 8; 10 6; 5 3;
@@ -127,5 +129,32 @@
                                                                                                                     k = 6),
                                                                                      max_k = 10),
                                                                clr.clustering, clr.D)
+
+        rng = StableRNG(1)
+        X = randn(rng, 10, 1)
+        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
+                                             de = DistanceDistance(;
+                                                                   alg = CanonicalDistance()),
+                                             alg = HierarchicalClustering(),
+                                             onc = OptimalNumberClusters(;
+                                                                         #  alg = PredefinedNumberClusters(;
+                                                                         #                                 k = 9)
+
+                                                                         alg = StandardisedSilhouetteScore())),
+                         X)
+        @test clr.k == 1
+
+        rng = StableRNG(3)
+        X = randn(rng, 1000, 20)
+        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
+                                             de = DistanceDistance(;
+                                                                   alg = CanonicalDistance()),
+                                             alg = DBHT(; sim = MaximumDistanceSimilarity(),
+                                                        root = UniqueRoot()),
+                                             onc = OptimalNumberClusters(;
+                                                                         alg = PredefinedNumberClusters(;
+                                                                                                        k = 5))),
+                         X)
+        @test clr.k == 4
     end
 end

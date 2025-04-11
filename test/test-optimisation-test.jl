@@ -9,5 +9,7 @@
                                                               settings = Dict("verbose" => false)))
         @test !res.success
         @test haskey(res.trials[:Clarabel], :jump_error)
+        @test_throws AssertionError PortfolioOptimisers.optimise_JuMP_model!(JuMP.Model(),
+                                                                             Solver[])
     end
 end

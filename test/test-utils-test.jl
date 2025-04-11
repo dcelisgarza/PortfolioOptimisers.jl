@@ -87,6 +87,7 @@
         matrix_processing!(NonPositiveDefiniteMatrixProcessing(), X9, X)
         @test isapprox(X9, X10)
         @test isapprox(X9, sigma)
+        @test isnothing(matrix_processing!(nothing))
 
         @test isnothing(PortfolioOptimisers.matrix_processing_algorithm(nothing))
     end
