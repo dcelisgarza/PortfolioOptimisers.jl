@@ -492,6 +492,33 @@
                                                                                                 group = nothing,
                                                                                                 name = nothing)),
                                           sets))
+        vc = BlackLittermanViewsEstimator(;
+                                          A = LinearConstraintSide(; group = :Asset,
+                                                                   name = -1, coef = 1.0),
+                                          B = 0.003)
+        @test isnothing(views_constraints(vc, sets))
+        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
+
+        vc = BlackLittermanViewsEstimator(;
+                                          A = LinearConstraintSide(; group = [:Asset],
+                                                                   name = [-1],
+                                                                   coef = [1.0]), B = 0.003)
+        @test isnothing(views_constraints(vc, sets))
+        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
+
+        vc = BlackLittermanViewsEstimator(;
+                                          A = LinearConstraintSide(; group = :Foo,
+                                                                   name = -1, coef = 1.0),
+                                          B = 0.003)
+        @test isnothing(views_constraints(vc, sets))
+        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
+
+        vc = BlackLittermanViewsEstimator(;
+                                          A = LinearConstraintSide(; group = [:Foo],
+                                                                   name = [-1],
+                                                                   coef = [1.0]), B = 0.003)
+        @test isnothing(views_constraints(vc, sets))
+        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
     end
     @testset "Philogeny constraints" begin
         rng = StableRNG(123456789)
@@ -516,6 +543,13 @@
         @test isapprox(res.A, philogeny_matrix(NetworkEstimator(), X) + I)
         @test res.B == 2
         @test isapprox(res.scale, 1e5)
+
+        B = fill(1, 20)
+        plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = B)
+        res = philogeny_constraints(plc, X)
+        @test res === philogeny_constraints(res)
+        @test isapprox(res.A, philogeny_matrix(NetworkEstimator(), X) + I)
+        @test res.B === B
 
         plc = IntegerPhilogenyConstraintEstimator(; pe = ClusteringEstimator(), scale = 1e3)
         res = philogeny_constraints(plc, X)
