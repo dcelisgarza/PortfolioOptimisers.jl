@@ -37,6 +37,11 @@
             @test res2
             @test pm === prior(pm)
         end
+        pm1 = prior(EmpiricalPriorEstimator(), ReturnsResult(; nx = 1:10, X = X))
+        pm2 = prior(EmpiricalPriorEstimator(), X)
+        @test pm1.X == pm2.X
+        @test pm1.mu == pm2.mu
+        @test pm1.sigma == pm2.sigma
     end
     @testset "Factor Prior" begin
         rng = StableRNG(123456789)
@@ -51,7 +56,6 @@
         mu_t = view(pm1_t, 1001:1010, 1)
         sigma_t = reshape(view(pm1_t, 1011:1110, 1), 10, 10)
         chol_t = reshape(view(pm1_t, 1111:nrow(pm1_t), 1), :, 10)
-
         @test isapprox(pm1.X, X_t)
         @test isapprox(pm1.mu, mu_t)
         @test isapprox(pm1.sigma, sigma_t)
@@ -66,11 +70,23 @@
         mu_t = view(pm2_t, 1001:1010, 1)
         sigma_t = reshape(view(pm2_t, 1011:1110, 1), 10, 10)
         chol_t = reshape(view(pm2_t, 1111:nrow(pm2_t), 1), :, 10)
-
         @test isapprox(pm2.X, X_t)
         @test isapprox(pm2.mu, mu_t)
         @test isapprox(pm2.sigma, sigma_t)
         @test isapprox(pm2.chol, chol_t)
+
+        pm1 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())),
+                    ReturnsResult(; nx = 1:10, X = X, nf = 1:2, F = F))
+        pm2 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())), X,
+                    F)
+        @test pm1.X == pm2.X
+        @test pm1.mu == pm2.mu
+        @test pm1.sigma == pm2.sigma
+        @test pm1.chol == pm2.chol
+        @test pm1.fm.mu == pm2.fm.mu
+        @test pm1.fm.sigma == pm2.fm.sigma
+        @test pm1.fm.loadings.b == pm2.fm.loadings.b
+        @test pm1.fm.loadings.M == pm2.fm.loadings.M
     end
     @testset "High Order Prior" begin
         rng = StableRNG(123456789)
@@ -84,6 +100,18 @@
         @test isapprox(pm.skt, cokurtosis(Cokurtosis(; alg = Semi()), X))
         @test all(isapprox.((pm.sk, pm.V), coskewness(Coskewness(; alg = Full()), X)))
         @test all(isapprox.((pm.ssk, pm.SV), coskewness(Coskewness(; alg = Semi()), X)))
+
+        pm1 = prior(pe, ReturnsResult(; nx = 1:10, X = X))
+        @test isapprox(pm.X, pm1.X)
+        @test isapprox(pm.mu, pm1.mu)
+        @test isapprox(pm.sigma, pm1.sigma)
+        @test isapprox(pm.kt, pm1.kt)
+        @test isapprox(pm.skt, pm1.skt)
+        @test isapprox(pm.sk, pm1.sk)
+        @test isapprox(pm.ssk, pm1.ssk)
+        @test isapprox(pm.V, pm1.V)
+        @test isapprox(pm.SV, pm1.SV)
+
         pm = prior(HighOrderPriorEstimator(; kte = nothing, skte = nothing, ske = nothing,
                                            sske = nothing), transpose(X); dims = 2)
         @test isnothing(pm.kt)
@@ -521,6 +549,11 @@
             @test size(pm.X) == size(X)
             @test pm === prior(pm)
         end
+        pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X))
+        pm2 = prior(pes[1], X)
+        @test pm1.X == pm2.X
+        @test pm1.mu == pm2.mu
+        @test pm1.sigma == pm2.sigma
         @test_throws ArgumentError black_littterman_views(BlackLittermanViewsEstimator(;
                                                                                        A = LinearConstraintSide(;
                                                                                                                 group = :Foo,
@@ -630,6 +663,15 @@
             @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
             @test pm === prior(pm)
         end
+        pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
+        pm2 = prior(pes[1], X, F)
+        @test pm1.X == pm2.X
+        @test pm1.mu == pm2.mu
+        @test pm1.sigma == pm2.sigma
+        @test pm1.fm.mu == pm2.fm.mu
+        @test pm1.fm.sigma == pm2.fm.sigma
+        @test pm1.fm.loadings.b == pm2.fm.loadings.b
+        @test pm1.fm.loadings.M == pm2.fm.loadings.M
     end
     @testset "Factor Black Litterman Prior" begin
         rng = StableRNG(123456789)
@@ -700,7 +742,6 @@
         pm1_t = CSV.read(joinpath(@__DIR__,
                                   "./assets/Factor-Black-Litterman-Prior-No-Residuals.csv"),
                          DataFrame)
-
         for (i, pe) ∈ enumerate(pes)
             pm = prior(pe, transpose(X), transpose(F); dims = 2)
             X_t = reshape(view(pm1_t[!, i], 1:1000, 1), 100, 10)
@@ -737,7 +778,19 @@
                   size(pm.f_sigma, 2) ==
                   size(pm.loadings.M, 2)
             @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
+            @test pm === prior(pm)
         end
+
+        pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
+        pm2 = prior(pes[1], X, F)
+        @test pm1.X == pm2.X
+        @test pm1.mu == pm2.mu
+        @test pm1.sigma == pm2.sigma
+        @test pm1.chol == pm2.chol
+        @test pm1.f_mu == pm2.pm.f_mu
+        @test pm1.f_sigma == pm2.f_sigma
+        @test pm1.loadings.b == pm2.loadings.b
+        @test pm1.loadings.M == pm2.loadings.M
 
         pes = [FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
                                                   residuals = true),
@@ -974,7 +1027,17 @@
                   size(pm.f_sigma, 2) ==
                   size(pm.loadings.M, 2)
             @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
+            @test pm === prior(pm)
         end
+        pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
+        pm2 = prior(pes[1], X, F)
+        @test pm1.X == pm2.X
+        @test pm1.mu == pm2.mu
+        @test pm1.sigma == pm2.sigma
+        @test pm1.fm.mu == pm2.fm.mu
+        @test pm1.fm.sigma == pm2.fm.sigma
+        @test pm1.fm.loadings.b == pm2.fm.loadings.b
+        @test pm1.fm.loadings.M == pm2.fm.loadings.M
     end
     @testset "Entropy Pooling" begin
         rng = StableRNG(123456789)
@@ -1137,7 +1200,13 @@
                 find_tol(ens, ens_t; name1 = :ens, name2 = :ens_t)
             end
             @test ens == exp(-re)
+            @test pm === prior(pm)
         end
+        pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X))
+        pm2 = prior(pes[1], X)
+        @test pm1.X == pm2.X
+        @test pm1.mu == pm2.mu
+        @test pm1.sigma == pm2.sigma
 
         views = [EntropyPoolingViewEstimator(;
                                              A = C0_LinearEntropyPoolingConstraintEstimator(;

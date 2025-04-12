@@ -135,23 +135,23 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     X = DataFrame(percentchange(TimeArray(X; timestamp = :timestamp), ret_method;
                                 padding = padding))
     col_names = names(X)
-    ac = intersect(col_names, asset_names)
-    fc = intersect(col_names, factor_names)
-    oc = setdiff(col_names, union(ac, fc))
+    nx = intersect(col_names, asset_names)
+    nf = intersect(col_names, factor_names)
+    oc = setdiff(col_names, union(nx, nf))
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
-    if isempty(fc)
-        fc = nothing
+    if isempty(nf)
+        nf = nothing
         F = nothing
     else
-        F = Matrix(X[!, fc])
+        F = Matrix(X[!, nf])
     end
-    if isempty(ac)
-        ac = nothing
+    if isempty(nx)
+        nx = nothing
         X = nothing
     else
-        X = Matrix(X[!, ac])
+        X = Matrix(X[!, nx])
     end
-    return ReturnsResult(; ts = ts, nx = ac, X = X, nf = fc, F = F)
+    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F)
 end
 ⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
 outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
