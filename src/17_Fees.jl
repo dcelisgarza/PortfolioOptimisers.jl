@@ -2,7 +2,7 @@ struct Fees{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
             T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
             T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
             T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-            T5 <: Union{Nothing, <:Turnover}, T6 <: NamedTuple}
+            T5 <: Union{Nothing, <:Turnover}, T6 <: NamedTuple} <: AbstractEstimator
     long::T1
     short::T2
     fixed_long::T3
@@ -48,8 +48,8 @@ function cluster_fees_factory(::Nothing, cluster::AbstractVector; kwargs...)
     return nothing
 end
 function cluster_fees_factory(fees::Fees, cluster::AbstractVector; kwargs...)
-    long = cluster_real_or_vector_factory(fees.long, cluster)
-    fixed_long = cluster_real_or_vector_factory(fees.fixed_long, cluster)
+    long = scalar_array_view(fees.long, cluster)
+    fixed_long = scalar_array_view(fees.fixed_long, cluster)
     turnover = cluster_turnover_factory(fees.turnover, cluster)
     return Fees(; long = long, fixed_long = fixed_long, turnover = turnover,
                 tol_kwargs = fees.tol_kwargs)

@@ -1,4 +1,3 @@
-#=
 @safetestset "Fees" begin
     using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
@@ -70,4 +69,3 @@
         end
     end
 end
-=#

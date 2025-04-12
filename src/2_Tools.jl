@@ -155,5 +155,31 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
 end
 ⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
 outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
+function scalar_array_view(x::Real, ::Any)
+    return x
+end
+function scalar_array_view(x::AbstractVector, i)
+    return view(x, i)
+end
+function scalar_array_view(x::AbstractArray, i)
+    return view(x, i, i)
+end
+function scalar_array_getindex(x::Real, ::Any)
+    return x
+end
+function scalar_array_getindex(x::AbstractVector, i)
+    return x[i]
+end
+function scalar_array_getindex(x::AbstractMatrix, i)
+    return x[i, i]
+end
+function fourth_moment_index_factory(N::Integer, cluster::AbstractVector)
+    idx = Vector{Int}(undef, 0)
+    sizehint!(idx, length(cluster)^2)
+    for c ∈ cluster
+        append!(idx, (((c - 1) * N + 1):(c * N))[cluster])
+    end
+    return idx
+end
 
 export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns

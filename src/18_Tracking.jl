@@ -1,4 +1,4 @@
-abstract type AbstractTracking end
+abstract type AbstractTracking <: AbstractEstimator end
 struct WeightsTracking{T1 <: AbstractVector{<:Real}, T2 <: Union{Nothing, <:Fees}} <:
        AbstractTracking
     w::T1

@@ -284,7 +284,7 @@ for r ∈ risks
                                                    prior::AbstractPriorResult,
                                                    cluster::AbstractVector, args...;
                                                    kwargs...)
-                 idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
+                 idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
                  sk = view(skew_rm.sk, cluster, idx)
                  V = __coskewness(sk, prior.X, skew_rm.mp)
                  if all(iszero.(diag(V)))
@@ -301,7 +301,7 @@ for r ∈ risks
                                                                                <:AbstractMatrixProcessingEstimator},
                                                    cluster::AbstractVector, args...;
                                                    kwargs...)
-                 idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
+                 idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
                  sk = view(_get_sk(r, prior), cluster, idx)
                  V = __coskewness(sk, prior.X, _get_smp(r, prior))
                  if all(iszero.(diag(V)))
@@ -362,7 +362,7 @@ for r ∈ risks
                                                    cluster::AbstractVector, args...;
                                                    kwargs...)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-                 idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
+                 idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
                  kt = risk_measure_nothing_matrix_factory(r.kt, nothing, idx)
                  return $(r)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
              end
@@ -373,7 +373,7 @@ for r ∈ risks
                                                    kwargs...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-                 idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
+                 idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
                  kt = risk_measure_nothing_matrix_factory(r.kt, nothing, idx)
                  return $(r)(; settings = r.settings, w = w, mu = mu, kt = kt)
              end
@@ -381,7 +381,7 @@ for r ∈ risks
                                                    cluster::AbstractVector, args...;
                                                    kwargs...)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-                 idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
+                 idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
                  kt = risk_measure_nothing_matrix_factory(r.kt, _get_kt(r, prior), idx)
                  return $(r)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
              end
@@ -394,7 +394,7 @@ for r ∈ risks
                                                    kwargs...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-                 idx = fourth_moment_cluster_index_factory(size(prior.X, 2), cluster)
+                 idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
                  kt = risk_measure_nothing_matrix_factory(r.kt, _get_kt(r, prior), idx)
                  return $(r)(; settings = r.settings, w = w, mu = mu, kt = kt)
              end

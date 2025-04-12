@@ -1,4 +1,5 @@
-struct Turnover{T1 <: Union{<:Real, <:AbstractVector{<:Real}}, T2 <: AbstractVector{<:Real}}
+struct Turnover{T1 <: Union{<:Real, <:AbstractVector{<:Real}},
+                T2 <: AbstractVector{<:Real}} <: AbstractEstimator
     val::T1
     w::T2
 end
@@ -18,7 +19,7 @@ function cluster_turnover_factory(::Nothing, ::AbstractVector)
     return nothing
 end
 function cluster_turnover_factory(turnover::Turnover, cluster::AbstractVector)
-    val = cluster_real_or_vector_factory(turnover.val, cluster)
+    val = scalar_array_view(turnover.val, cluster)
     w = view(turnover.w, cluster)
     return Turnover(; val = val, w = w)
 end

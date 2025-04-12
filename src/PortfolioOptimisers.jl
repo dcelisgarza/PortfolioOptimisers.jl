@@ -81,6 +81,10 @@ include("./15_UncertaintySets/2_DeltaUncertaintySets.jl")
 include("./15_UncertaintySets/3_NormalUncertaintySets.jl")
 include("./15_UncertaintySets/4_BootstrapUncertaintySets.jl")
 
+include("./16_Turnover.jl")
+include("./17_Fees.jl")
+include("./18_Tracking.jl")
+
 #=
 
 # Linear Algebra
