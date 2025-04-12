@@ -29,7 +29,7 @@ function risk_measure_factory(r::SemiVariance, prior::AbstractPriorResult, args.
     return SemiVariance(; settings = r.settings, formulation = r.formulation,
                         target = r.target, w = r.w, mu = mu)
 end
-function risk_measure_factory(r::SemiVariance, prior::EntropyPoolingModel, args...;
+function risk_measure_factory(r::SemiVariance, prior::EntropyPoolingResult, args...;
                               kwargs...)
     w = risk_measure_nothing_vec_factory(r.w, prior.w)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
@@ -37,7 +37,7 @@ function risk_measure_factory(r::SemiVariance, prior::EntropyPoolingModel, args.
                         target = r.target, w = w, mu = mu)
 end
 function risk_measure_factory(r::SemiVariance,
-                              prior::HighOrderPriorResult{<:EntropyPoolingModel, <:Any,
+                              prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any,
                                                           <:Any, <:Any, <:Any}, args...;
                               kwargs...)
     w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
@@ -52,7 +52,7 @@ function cluster_risk_measure_factory(r::SemiVariance, prior::AbstractPriorResul
     return SemiVariance(; settings = r.settings, formulation = r.formulation,
                         target = target, w = r.w, mu = mu)
 end
-function cluster_risk_measure_factory(r::SemiVariance, prior::EntropyPoolingModel,
+function cluster_risk_measure_factory(r::SemiVariance, prior::EntropyPoolingResult,
                                       cluster::AbstractVector, args...; kwargs...)
     target = risk_measure_nothing_real_vec_factory(r.target, cluster)
     w = risk_measure_nothing_vec_factory(r.w, prior.w)
@@ -61,7 +61,7 @@ function cluster_risk_measure_factory(r::SemiVariance, prior::EntropyPoolingMode
                         target = target, w = w, mu = mu)
 end
 function cluster_risk_measure_factory(r::SemiVariance,
-                                      prior::HighOrderPriorResult{<:EntropyPoolingModel,
+                                      prior::HighOrderPriorResult{<:EntropyPoolingResult,
                                                                   <:Any, <:Any, <:Any,
                                                                   <:Any},
                                       cluster::AbstractVector, args...; kwargs...)

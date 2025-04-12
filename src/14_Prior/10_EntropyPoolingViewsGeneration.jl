@@ -962,21 +962,26 @@ function entropy_pooling_views(pm::AbstractPriorResult,
     eq_flag = !isempty(A_eq)
     if ineq_flag
         A_ineq = transpose(reshape(A_ineq, size(pm.X, 1), :))
-    else
-        A_ineq = nothing
-        B_ineq = nothing
     end
     if eq_flag
         A_eq = transpose(reshape(A_eq, size(pm.X, 1), :))
-    else
-        A_eq = nothing
-        B_eq = nothing
     end
-
     return LinearConstraintResult(;
-                                  ineq = PartialLinearConstraintResult(; A = A_ineq,
-                                                                       B = B_ineq),
-                                  eq = PartialLinearConstraintResult(; A = A_eq, B = B_eq))
+                                  ineq = if ineq_flag
+                                      PartialLinearConstraintResult(; A = A_ineq,
+                                                                    B = B_ineq)
+                                  else
+                                      nothing
+                                  end,
+                                  eq = if eq_flag
+                                      PartialLinearConstraintResult(; A = A_eq, B = B_eq)
+                                  else
+                                      nothing
+                                  end)
+end
+function entropy_pooling_views(pm::AbstractPriorResult, epvs::LinearConstraintResult,
+                               args...; kwargs...)
+    return lcm
 end
 
 export entropy_pooling_views, ConstantEntropyPoolingConstraintEstimator,

@@ -1,7 +1,6 @@
 @safetestset "Prior tests" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
           CSV, DataFrames, LinearAlgebra, Clarabel
-
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -128,7 +127,7 @@
                                                                      name = 2, coef = 1.0),
                                             B = 0.001)
         views = [vc_1, vc_2, vc_3, vc_4, vc_5]
-        blvr = views_constraints(views, sets)
+        blvr = black_littterman_views(views, sets)
         @test isapprox(blvr.P,
                        reshape([0.0, 0.0, 0.0, -0.3333333333333333, 0.0, 1.0, 0.0, 0.0,
                                 -0.3333333333333333, 0.0, 0.0, 1.0, 0.25, 0.0, 0.0, 0.0,
@@ -138,40 +137,40 @@
                                 0.0, 0.0, 0.0, -0.75, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0],
                                :, 10))
         @test isapprox(blvr.Q, [0.003, -0.001, 0.002, 0.007, 0.001])
-        @test blvr === views_constraints(blvr)
-        @test isnothing(views_constraints(nothing))
-        @test isnothing(views_constraints(BlackLittermanViewsEstimator(;
-                                                                       A = LinearConstraintSide(;
-                                                                                                group = nothing,
-                                                                                                name = nothing)),
-                                          sets))
+        @test blvr === black_littterman_views(blvr)
+        @test isnothing(black_littterman_views(nothing))
+        @test isnothing(black_littterman_views(BlackLittermanViewsEstimator(;
+                                                                            A = LinearConstraintSide(;
+                                                                                                     group = nothing,
+                                                                                                     name = nothing)),
+                                               sets))
         vc = BlackLittermanViewsEstimator(;
                                           A = LinearConstraintSide(; group = :Asset,
                                                                    name = -1, coef = 1.0),
                                           B = 0.003)
-        @test isnothing(views_constraints(vc, sets))
-        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
+        @test isnothing(black_littterman_views(vc, sets))
+        @test_throws ArgumentError black_littterman_views(vc, sets, strict = true)
 
         vc = BlackLittermanViewsEstimator(;
                                           A = LinearConstraintSide(; group = [:Asset],
                                                                    name = [-1],
                                                                    coef = [1.0]), B = 0.003)
-        @test isnothing(views_constraints(vc, sets))
-        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
+        @test isnothing(black_littterman_views(vc, sets))
+        @test_throws ArgumentError black_littterman_views(vc, sets, strict = true)
 
         vc = BlackLittermanViewsEstimator(;
                                           A = LinearConstraintSide(; group = :Foo,
                                                                    name = -1, coef = 1.0),
                                           B = 0.003)
-        @test isnothing(views_constraints(vc, sets))
-        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
+        @test isnothing(black_littterman_views(vc, sets))
+        @test_throws ArgumentError black_littterman_views(vc, sets, strict = true)
 
         vc = BlackLittermanViewsEstimator(;
                                           A = LinearConstraintSide(; group = [:Foo],
                                                                    name = [-1],
                                                                    coef = [1.0]), B = 0.003)
-        @test isnothing(views_constraints(vc, sets))
-        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
+        @test isnothing(black_littterman_views(vc, sets))
+        @test_throws ArgumentError black_littterman_views(vc, sets, strict = true)
     end
     @testset "Black Litteman type tests" begin
         pe1 = BayesianBlackLittermanPriorEstimator(; tau = 1,
@@ -522,34 +521,34 @@
             @test size(pm.X) == size(X)
             @test pm === prior(pm)
         end
-        @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
-                                                                                  A = LinearConstraintSide(;
-                                                                                                           group = :Foo,
-                                                                                                           name = 2,
-                                                                                                           coef = 1),
-                                                                                  B = 0.003),
-                                                     sets; strict = true)
-        @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
-                                                                                  A = LinearConstraintSide(;
-                                                                                                           group = [:Foo],
-                                                                                                           name = [2],
-                                                                                                           coef = [1]),
-                                                                                  B = 0.003),
-                                                     sets; strict = true)
-        @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
-                                                                                  A = LinearConstraintSide(;
-                                                                                                           group = :Asset,
-                                                                                                           name = 11,
-                                                                                                           coef = 1),
-                                                                                  B = 0.003),
-                                                     sets, strict = true)
-        @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
-                                                                                  A = LinearConstraintSide(;
-                                                                                                           group = [:Asset],
-                                                                                                           name = [11],
-                                                                                                           coef = [1]),
-                                                                                  B = 0.003),
-                                                     sets, strict = true)
+        @test_throws ArgumentError black_littterman_views(BlackLittermanViewsEstimator(;
+                                                                                       A = LinearConstraintSide(;
+                                                                                                                group = :Foo,
+                                                                                                                name = 2,
+                                                                                                                coef = 1),
+                                                                                       B = 0.003),
+                                                          sets; strict = true)
+        @test_throws ArgumentError black_littterman_views(BlackLittermanViewsEstimator(;
+                                                                                       A = LinearConstraintSide(;
+                                                                                                                group = [:Foo],
+                                                                                                                name = [2],
+                                                                                                                coef = [1]),
+                                                                                       B = 0.003),
+                                                          sets; strict = true)
+        @test_throws ArgumentError black_littterman_views(BlackLittermanViewsEstimator(;
+                                                                                       A = LinearConstraintSide(;
+                                                                                                                group = :Asset,
+                                                                                                                name = 11,
+                                                                                                                coef = 1),
+                                                                                       B = 0.003),
+                                                          sets, strict = true)
+        @test_throws ArgumentError black_littterman_views(BlackLittermanViewsEstimator(;
+                                                                                       A = LinearConstraintSide(;
+                                                                                                                group = [:Asset],
+                                                                                                                name = [11],
+                                                                                                                coef = [1]),
+                                                                                       B = 0.003),
+                                                          sets, strict = true)
     end
     @testset "Bayesian Black Litterman Prior" begin
         rng = StableRNG(123456789)
@@ -977,7 +976,6 @@
             @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
         end
     end
-    #=
     @testset "Entropy Pooling" begin
         rng = StableRNG(123456789)
         X = randn(rng, 100, 10)
@@ -1066,22 +1064,22 @@
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H2_EntropyPooling()),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
-                                            opt = JuMPEntropyPooling(;
-                                                                     slv = Solver(;
-                                                                                  solver = Clarabel.Optimizer,
-                                                                                  settings = Dict("verbose" => false)))),
+                                            opt = JuMPEntropyPoolingEstimator(;
+                                                                              slv = Solver(;
+                                                                                           solver = Clarabel.Optimizer,
+                                                                                           settings = Dict("verbose" => false)))),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H1_EntropyPooling(),
-                                            opt = JuMPEntropyPooling(;
-                                                                     slv = Solver(;
-                                                                                  solver = Clarabel.Optimizer,
-                                                                                  settings = Dict("verbose" => false)))),
+                                            opt = JuMPEntropyPoolingEstimator(;
+                                                                              slv = Solver(;
+                                                                                           solver = Clarabel.Optimizer,
+                                                                                           settings = Dict("verbose" => false)))),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H2_EntropyPooling(),
-                                            opt = JuMPEntropyPooling(;
-                                                                     slv = Solver(;
-                                                                                  solver = Clarabel.Optimizer,
-                                                                                  settings = Dict("verbose" => false))))]
+                                            opt = JuMPEntropyPoolingEstimator(;
+                                                                              slv = Solver(;
+                                                                                           solver = Clarabel.Optimizer,
+                                                                                           settings = Dict("verbose" => false))))]
 
         ress = (0.03270155949442489, 0.030586876690884276, 0.03058687450109127,
                 0.032701560391104334, 0.03058687741491548, 0.030586877801521424)
@@ -1389,7 +1387,7 @@
         @test sort(c) == c
         @test sort!(c) == c
 
-        @test_throws AssertionError JuMPEntropyPooling(; slv = Solver[])
+        @test_throws AssertionError JuMPEntropyPoolingEstimator(; slv = Solver[])
         pe = EntropyPoolingPriorEstimator(;
                                           views = EntropyPoolingViewEstimator(;
                                                                               A = C1_LinearEntropyPoolingConstraintEstimator(;
@@ -1403,5 +1401,4 @@
         @test isa(pe.ce, PortfolioOptimisersCovariance)
         @test isa(pe.me, SimpleExpectedReturns)
     end
-    =#
 end

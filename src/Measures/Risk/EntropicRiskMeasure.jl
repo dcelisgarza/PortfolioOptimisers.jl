@@ -17,11 +17,11 @@ function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:
                  end)
     @expression(model, risk, t - z * log(alpha * T))
     @objective(model, Min, risk)
-    success, solvers_tried = optimise_JuMP_model!(model, slv)
+    (; trials, success) = optimise_JuMP_model!(model, slv)
     return if success
         objective_value(model)
     else
-        @warn("model could not be optimised satisfactorily.\nSolvers: $solvers_tried.")
+        @warn("model could not be optimised satisfactorily.\nSolvers: $trials.")
         NaN
     end
 end

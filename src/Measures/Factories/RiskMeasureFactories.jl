@@ -55,14 +55,14 @@ for r ∈ risks
                  return $(r)(; settings = r.settings, ve = r.ve, target = target, w = r.w,
                              mu = mu)
              end
-             function risk_measure_factory(r::$(r), prior::EntropyPoolingModel, args...;
+             function risk_measure_factory(r::$(r), prior::EntropyPoolingResult, args...;
                                            kwargs...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
                  return $(r)(; settings = r.settings, ve = r.ve, target = r.target, w = w,
                              mu = mu)
              end
-             function cluster_risk_measure_factory(r::$(r), prior::EntropyPoolingModel,
+             function cluster_risk_measure_factory(r::$(r), prior::EntropyPoolingResult,
                                                    cluster::AbstractVector, args...;
                                                    kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, cluster)
@@ -72,7 +72,7 @@ for r ∈ risks
                              mu = mu)
              end
              function risk_measure_factory(r::$(r),
-                                           prior::HighOrderPriorResult{<:EntropyPoolingModel,
+                                           prior::HighOrderPriorResult{<:EntropyPoolingResult,
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any}, args...;
                                            kwargs...)
@@ -82,7 +82,7 @@ for r ∈ risks
                              mu = mu)
              end
              function cluster_risk_measure_factory(r::$(r),
-                                                   prior::HighOrderPriorResult{<:EntropyPoolingModel,
+                                                   prior::HighOrderPriorResult{<:EntropyPoolingResult,
                                                                                <:Any, <:Any,
                                                                                <:Any,
                                                                                <:Any},
@@ -113,13 +113,13 @@ for r ∈ risks
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
                  return $(r)(; settings = r.settings, target = target, w = r.w, mu = mu)
              end
-             function risk_measure_factory(r::$(r), prior::EntropyPoolingModel, args...;
+             function risk_measure_factory(r::$(r), prior::EntropyPoolingResult, args...;
                                            kwargs...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
                  return $(r)(; settings = r.settings, target = r.target, w = w, mu = mu)
              end
-             function cluster_risk_measure_factory(r::$(r), prior::EntropyPoolingModel,
+             function cluster_risk_measure_factory(r::$(r), prior::EntropyPoolingResult,
                                                    cluster::AbstractVector, args...;
                                                    kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, cluster)
@@ -128,7 +128,7 @@ for r ∈ risks
                  return $(r)(; settings = r.settings, target = target, w = w, mu = mu)
              end
              function risk_measure_factory(r::$(r),
-                                           prior::HighOrderPriorResult{<:EntropyPoolingModel,
+                                           prior::HighOrderPriorResult{<:EntropyPoolingResult,
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any}, args...;
                                            kwargs...)
@@ -137,7 +137,7 @@ for r ∈ risks
                  return $(r)(; settings = r.settings, target = r.target, w = w, mu = mu)
              end
              function cluster_risk_measure_factory(r::$(r),
-                                                   prior::HighOrderPriorResult{<:EntropyPoolingModel,
+                                                   prior::HighOrderPriorResult{<:EntropyPoolingResult,
                                                                                <:Any, <:Any,
                                                                                <:Any,
                                                                                <:Any},
@@ -174,13 +174,13 @@ for r ∈ risks
              function risk_measure_factory(r::$(r), args...; kwargs...)
                  return $(r)(; settings = r.settings, w = r.w)
              end
-             function risk_measure_factory(r::$(r), prior::EntropyPoolingModel, args...;
+             function risk_measure_factory(r::$(r), prior::EntropyPoolingResult, args...;
                                            kwargs...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.w)
                  return $(r)(; settings = r.settings, w = w)
              end
              function risk_measure_factory(r::$(r),
-                                           prior::HighOrderPriorResult{<:EntropyPoolingModel,
+                                           prior::HighOrderPriorResult{<:EntropyPoolingResult,
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any}, args...;
                                            kwargs...)
@@ -328,7 +328,7 @@ for r ∈ risks
                  return $(r)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
              end
              function risk_measure_factory(r::$(r),
-                                           prior::HighOrderPriorResult{<:EntropyPoolingModel,
+                                           prior::HighOrderPriorResult{<:EntropyPoolingResult,
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any}, args...;
                                            kwargs...)
@@ -343,7 +343,7 @@ for r ∈ risks
                  kt = risk_measure_nothing_matrix_factory(r.kt, nothing)
                  return $(r)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
              end
-             function risk_measure_factory(r::$(r), prior::EntropyPoolingModel, args...;
+             function risk_measure_factory(r::$(r), prior::EntropyPoolingResult, args...;
                                            kwargs...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
@@ -368,7 +368,7 @@ for r ∈ risks
              end
              function cluster_risk_measure_factory(r::$(r){<:Any, <:Any, <:Any,
                                                            <:AbstractMatrix},
-                                                   prior::EntropyPoolingModel,
+                                                   prior::EntropyPoolingResult,
                                                    cluster::AbstractVector, args...;
                                                    kwargs...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
@@ -386,7 +386,7 @@ for r ∈ risks
                  return $(r)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
              end
              function cluster_risk_measure_factory(r::$(r),
-                                                   prior::HighOrderPriorResult{<:EntropyPoolingModel,
+                                                   prior::HighOrderPriorResult{<:EntropyPoolingResult,
                                                                                <:Any, <:Any,
                                                                                <:Any,
                                                                                <:Any},

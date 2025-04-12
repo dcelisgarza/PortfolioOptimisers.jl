@@ -95,11 +95,11 @@ function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wb::WeightBounds
         @constraint(model, sc * w <= sc * ub)
     end
     set_clustering_weight_finaliser_version!(model, cwf.v, wi)
-    success, solvers_tried = optimise_JuMP_model!(model, cwf.slv)
+    (; trials, success) = optimise_JuMP_model!(model, cwf.slv)
     return if success
         value.(model[:w])
     else
-        @warn("Model could not be optimised satisfactorily.\nVersion: $(cwf.v)\nSolvers: $solvers_tried.\nReverting to Heuristic type.")
+        @warn("Model could not be optimised satisfactorily.\nVersion: $(cwf.v)\nSolvers: $trials.\nReverting to Heuristic type.")
         opt_weight_bounds(HeuristicClusteringWeightFiniliser(), wb, wi)
     end
 end

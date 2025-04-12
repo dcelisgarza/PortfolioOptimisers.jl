@@ -1,42 +1,139 @@
-abstract type EntropyPoolingOptimisation end
-abstract type EntropyPoolingAlgorithm end
-struct H0_EntropyPooling <: EntropyPoolingAlgorithm end
-struct H1_EntropyPooling <: EntropyPoolingAlgorithm end
-struct H2_EntropyPooling <: EntropyPoolingAlgorithm end
-struct OptimEntropyPooling{T1 <: Real, T2 <: Tuple, T3 <: NamedTuple} <:
-       EntropyPoolingOptimisation
+abstract type AbstractEntropyPoolingEstimator <: AbstractEstimator end
+abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
+struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+struct OptimEntropyPoolingEstimator{T1 <: Real, T2 <: Tuple, T3 <: NamedTuple} <:
+       AbstractEntropyPoolingEstimator
     scale::T1
     args::T2
     kwargs::T3
 end
-function OptimEntropyPooling(; scale::Real = 1, args::Tuple = (), kwargs::NamedTuple = (;))
+function OptimEntropyPoolingEstimator(; scale::Real = 1, args::Tuple = (),
+                                      kwargs::NamedTuple = (;))
     @smart_assert(scale >= zero(scale))
-    return OptimEntropyPooling{typeof(scale), typeof(args), typeof(kwargs)}(scale, args,
-                                                                            kwargs)
+    return OptimEntropyPoolingEstimator{typeof(scale), typeof(args), typeof(kwargs)}(scale,
+                                                                                     args,
+                                                                                     kwargs)
 end
-struct JuMPEntropyPooling{T1 <: Real, T2 <: Real,
-                          T3 <: Union{<:Solver, <:AbstractVector{<:Solver}}} <:
-       EntropyPoolingOptimisation
-    constr_scale::T1
-    obj_scale::T2
+struct JuMPEntropyPoolingEstimator{T1 <: Real, T2 <: Real,
+                                   T3 <: Union{<:Solver, <:AbstractVector{<:Solver}}} <:
+       AbstractEntropyPoolingEstimator
+    sc::T1
+    so::T2
     slv::T3
 end
-function JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                            constr_scale::Real = 1, obj_scale::Real = 1)
-    @smart_assert(constr_scale >= zero(constr_scale))
-    @smart_assert(obj_scale >= zero(obj_scale))
+function JuMPEntropyPoolingEstimator(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
+                                     sc::Real = 1, so::Real = 1)
+    @smart_assert(sc >= zero(sc))
+    @smart_assert(so >= zero(so))
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
-    return JuMPEntropyPooling{typeof(constr_scale), typeof(obj_scale), typeof(slv)}(constr_scale,
-                                                                                    obj_scale,
-                                                                                    slv)
+    return JuMPEntropyPoolingEstimator{typeof(sc), typeof(so), typeof(slv)}(sc, so, slv)
+end
+function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
+                         optim::OptimEntropyPoolingEstimator)
+    (; A_eq, B_eq, A_ineq, B_ineq) = epcs
+    lhs, rhs, lb, ub = if !isnothing(A_eq) && !isnothing(B_eq)
+        A_eq = vcat(ones(eltype(A_eq), 1, size(A_eq, 2)), A_eq)
+        B_eq = vcat(eltype(B_eq)[1], B_eq)
+        A_eq, B_eq, fill(typemin(eltype(B_eq)), length(B_eq)),
+        fill(typemax(eltype(B_eq)), length(B_eq))
+    else
+        ones(eltype(w), 1, length(w)), eltype(w)[1], [typemin(eltype(w))],
+        [typemax(eltype(w))]
+    end
+    lhs_ineq, rhs_ineq, lb_ineq, ub_ineq = if !isnothing(A_ineq) && !isnothing(B_ineq)
+        A_ineq, B_ineq, fill(zero(eltype(B_ineq)), length(B_ineq)),
+        fill(typemax(eltype(B_ineq)), length(B_ineq))
+    else
+        nothing, nothing, nothing, nothing
+    end
+    if !isnothing(lhs_ineq)
+        lhs = vcat(lhs, lhs_ineq)
+        rhs = vcat(rhs, rhs_ineq)
+        lb = vcat(lb, lb_ineq)
+        ub = vcat(ub, ub_ineq)
+    end
+    log_p = log.(w)
+    x0 = fill(inv(length(w)), size(lhs, 1))
+    G = similar(x0)
+    last_x = similar(x0)
+    grad = similar(G)
+    log_x = similar(log_p)
+    y = similar(log_p)
+    function common_op(x)
+        if x != last_x
+            copy!(last_x, x)
+            log_x .= log_p .- one(eltype(log_p)) .- lhs' * x
+            y .= exp.(log_x)
+            grad .= rhs - lhs * y
+        end
+    end
+    function f(x)
+        common_op(x)
+        return optim.scale * (dot(x, grad) - dot(y, log_x - log_p))
+    end
+    function g!(G, x)
+        common_op(x)
+        G .= grad
+        return optim.scale * G
+    end
+    result = Optim.optimize(f, g!, lb, ub, x0, optim.args...; optim.kwargs...)
+    # Compute posterior probabilities
+    x = Optim.minimizer(result)
+    return pweights(exp.(log_p .- one(eltype(log_p)) .- lhs' * x))
+end
+function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
+                         optim::JuMPEntropyPoolingEstimator)
+    model = Model()
+    S = length(w)
+    log_p = log.(w)
+    # Decision variables (posterior probabilities)
+    @variables(model, begin
+                   q[1:S]
+                   t
+               end)
+    (; A_eq, B_eq, A_ineq, B_ineq) = epcs
+    (; sc, so, slv) = optim
+    # Equality constraints from A_ineq and B_ineq if provided
+    if !isnothing(A_eq) && !isnothing(B_eq)
+        @constraint(model, constr_eq, sc * A_eq * q == sc * B_eq)
+    end
+    # Inequality constraints from A_ineq and B_ineq if provided
+    if !isnothing(A_ineq) && !isnothing(B_ineq)
+        @constraint(model, constr_ineq, sc * A_ineq * q <= sc * B_ineq)
+    end
+    # Equality constraints from A_eq and B_eq and probabilities equal to 1
+    @constraints(model, begin
+                     sum(q) == 1
+                     sc * [t; ones(S); q] in MOI.RelativeEntropyCone(2 * S + 1)
+                 end)
+    @objective(model, Min, so * (t - dot(q, log_p)))
+    # Solve the optimization problem
+    (; trials, success) = optimise_JuMP_model!(model, slv)
+    return if success
+        pweights(value.(q))
+    else
+        @warn("model could not be optimised satisfactorily.\nSolvers: $trials.")
+        pweights(fill(NaN, length(q)))
+    end
+end
+function relative_entropy(x::AbstractVector, y::AbstractVector)
+    @smart_assert(all(x .>= 0))
+    @smart_assert(all(y .>= 0))
+    @smart_assert(length(x) == length(y))
+    return dot(x, log.(x) - log.(y))
+end
+function effective_number_scenarios(x::AbstractVector, y::AbstractVector)
+    return exp(-relative_entropy(x, y))
 end
 struct EntropyPoolingPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
                                     T2 <: Union{<:EntropyPoolingViewEstimator,
                                                 <:AbstractVector{<:EntropyPoolingViewEstimator}},
-                                    T3 <: DataFrame, T4 <: EntropyPoolingAlgorithm,
-                                    T5 <: EntropyPoolingOptimisation,
+                                    T3 <: DataFrame, T4 <: AbstractEntropyPoolingAlgorithm,
+                                    T5 <: AbstractEntropyPoolingEstimator,
                                     T6 <: Union{Nothing, <:AbstractVector}} <:
        AbstractPriorEstimator_1o2_1o2
     pe::T1
@@ -51,8 +148,8 @@ function EntropyPoolingPriorEstimator(;
                                       views::Union{<:EntropyPoolingViewEstimator,
                                                    <:AbstractVector{<:EntropyPoolingViewEstimator}},
                                       sets::DataFrame = DataFrame(),
-                                      alg::EntropyPoolingAlgorithm = H0_EntropyPooling(),
-                                      opt::EntropyPoolingOptimisation = OptimEntropyPooling(),
+                                      alg::AbstractEntropyPoolingAlgorithm = H0_EntropyPooling(),
+                                      opt::AbstractEntropyPoolingEstimator = OptimEntropyPoolingEstimator(),
                                       w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(views, AbstractVector)
         @smart_assert(!isempty(views))
@@ -74,21 +171,21 @@ function Base.getproperty(obj::EntropyPoolingPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
-struct EntropyPoolingModel{T1 <: AbstractPriorResult,
-                           T2 <: Union{<:LinearConstraintResult,
-                                       <:AbstractVector{<:LinearConstraintResult}},
-                           T3 <: AbstractWeights} <: AbstractEntropyPoolingPriorResult
+struct EntropyPoolingResult{T1 <: AbstractPriorResult,
+                            T2 <: Union{<:LinearConstraintResult,
+                                        <:AbstractVector{<:LinearConstraintResult}},
+                            T3 <: AbstractWeights} <: AbstractEntropyPoolingPriorResult
     pm::T1
     views::T2
     w::T3
 end
-function EntropyPoolingModel(; pm::AbstractPriorResult,
-                             views::Union{<:LinearConstraintResult,
-                                          <:AbstractVector{<:LinearConstraintResult}},
-                             w::AbstractWeights)
+function EntropyPoolingResult(; pm::AbstractPriorResult,
+                              views::Union{<:LinearConstraintResult,
+                                           <:AbstractVector{<:LinearConstraintResult}},
+                              w::AbstractWeights)
     @smart_assert(!isempty(w))
     @smart_assert(size(pm.X, 1) == length(w))
-    return EntropyPoolingModel{typeof(pm), typeof(views), typeof(w)}(pm, views, w)
+    return EntropyPoolingResult{typeof(pm), typeof(views), typeof(w)}(pm, views, w)
 end
 function factory(pe::EntropyPoolingPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
@@ -96,7 +193,7 @@ function factory(pe::EntropyPoolingPriorEstimator,
                                         sets = pe.sets, alg = pe.alg, opt = pe.opt,
                                         w = isnothing(w) ? pe.w : w)
 end
-function Base.getproperty(obj::EntropyPoolingModel, sym::Symbol)
+function Base.getproperty(obj::EntropyPoolingResult, sym::Symbol)
     return if sym == :X
         obj.pm.X
     elseif sym == :mu
@@ -131,8 +228,8 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_Entrop
     views = entropy_pooling_views(pm, pe.views, pe.sets; strict = strict)
     w = entropy_pooling(w, views, pe.opt)
     pe = factory(pe, w)
-    return EntropyPoolingModel(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
-                               views = views, w = w)
+    return EntropyPoolingResult(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
+                                views = views, w = w)
 end
 function _get_epw(::H1_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return w0
@@ -195,107 +292,9 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
         pe = factory(pe, wi)
         pm = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
-    return EntropyPoolingModel(; pm = pm, views = V_i, w = wi)
-end
-function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
-                         optim::OptimEntropyPooling)
-    (; A_eq, B_eq, A_ineq, B_ineq) = epcs
-    lhs, rhs, lb, ub = if !isnothing(A_eq) && !isnothing(B_eq)
-        A_eq = vcat(ones(eltype(A_eq), 1, size(A_eq, 2)), A_eq)
-        B_eq = vcat(eltype(B_eq)[1], B_eq)
-        A_eq, B_eq, fill(typemin(eltype(B_eq)), length(B_eq)),
-        fill(typemax(eltype(B_eq)), length(B_eq))
-    else
-        ones(eltype(w), 1, length(w)), eltype(w)[1], [typemin(eltype(w))],
-        [typemax(eltype(w))]
-    end
-    lhs_ineq, rhs_ineq, lb_ineq, ub_ineq = if !isnothing(A_ineq) && !isnothing(B_ineq)
-        A_ineq, B_ineq, fill(zero(eltype(B_ineq)), length(B_ineq)),
-        fill(typemax(eltype(B_ineq)), length(B_ineq))
-    else
-        nothing, nothing, nothing, nothing
-    end
-    if !isnothing(lhs_ineq)
-        lhs = vcat(lhs, lhs_ineq)
-        rhs = vcat(rhs, rhs_ineq)
-        lb = vcat(lb, lb_ineq)
-        ub = vcat(ub, ub_ineq)
-    end
-    log_p = log.(w)
-    x0 = fill(inv(length(w)), size(lhs, 1))
-    G = similar(x0)
-    last_x = similar(x0)
-    grad = similar(G)
-    log_x = similar(log_p)
-    y = similar(log_p)
-    function common_op(x)
-        if x != last_x
-            copy!(last_x, x)
-            log_x .= log_p .- one(eltype(log_p)) .- lhs' * x
-            y .= exp.(log_x)
-            grad .= rhs - lhs * y
-        end
-    end
-    function f(x)
-        common_op(x)
-        return optim.scale * (dot(x, grad) - dot(y, log_x - log_p))
-    end
-    function g!(G, x)
-        common_op(x)
-        G .= grad
-        return optim.scale * G
-    end
-    result = Optim.optimize(f, g!, lb, ub, x0, optim.args...; optim.kwargs...)
-    # Compute posterior probabilities
-    x = Optim.minimizer(result)
-    return pweights(exp.(log_p .- one(eltype(log_p)) .- lhs' * x))
-end
-function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
-                         optim::JuMPEntropyPooling)
-    model = Model()
-    S = length(w)
-    log_p = log.(w)
-    # Decision variables (posterior probabilities)
-    @variables(model, begin
-                   q[1:S]
-                   t
-               end)
-    (; A_eq, B_eq, A_ineq, B_ineq) = epcs
-    (; constr_scale, obj_scale, slv) = optim
-    # Equality constraints from A_ineq and B_ineq if provided
-    if !isnothing(A_eq) && !isnothing(B_eq)
-        @constraint(model, constr_eq, constr_scale * A_eq * q == constr_scale * B_eq)
-    end
-    # Inequality constraints from A_ineq and B_ineq if provided
-    if !isnothing(A_ineq) && !isnothing(B_ineq)
-        @constraint(model, constr_ineq, constr_scale * A_ineq * q <= constr_scale * B_ineq)
-    end
-    # Equality constraints from A_eq and B_eq and probabilities equal to 1
-    @constraints(model,
-                 begin
-                     sum(q) == 1
-                     constr_scale * [t; ones(S); q] in MOI.RelativeEntropyCone(2 * S + 1)
-                 end)
-    @objective(model, Min, obj_scale * (t - dot(q, log_p)))
-    # Solve the optimization problem
-    success, solvers_tried = optimise_JuMP_model!(model, slv)
-    return if success
-        pweights(value.(q))
-    else
-        @warn("model could not be optimised satisfactorily.\nSolvers: $solvers_tried.")
-        pweights(fill(NaN, length(q)))
-    end
-end
-function relative_entropy(x::AbstractVector, y::AbstractVector)
-    @smart_assert(all(x .>= 0))
-    @smart_assert(all(y .>= 0))
-    @smart_assert(length(x) == length(y))
-    return dot(x, log.(x) - log.(y))
-end
-function effective_number_scenarios(x::AbstractVector, y::AbstractVector)
-    return exp(-relative_entropy(x, y))
+    return EntropyPoolingResult(; pm = pm, views = V_i, w = wi)
 end
 
-export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling, OptimEntropyPooling,
-       JuMPEntropyPooling, entropy_pooling, EntropyPoolingPriorEstimator, relative_entropy,
-       effective_number_scenarios
+export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling,
+       OptimEntropyPoolingEstimator, JuMPEntropyPoolingEstimator, entropy_pooling,
+       EntropyPoolingPriorEstimator, relative_entropy, effective_number_scenarios

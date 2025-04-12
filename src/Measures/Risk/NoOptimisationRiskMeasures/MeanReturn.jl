@@ -10,7 +10,7 @@ end
 function risk_measure_factory(r::MeanReturn, args...)
     return r(; w = r.w)
 end
-function risk_measure_factory(r::MeanReturn, prior::EntropyPoolingModel, args...)
+function risk_measure_factory(r::MeanReturn, prior::EntropyPoolingResult, args...)
     w = risk_measure_nothing_vec_factory(r.w, prior.w)
     return r(; w = w)
 end

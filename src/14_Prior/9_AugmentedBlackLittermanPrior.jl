@@ -184,10 +184,11 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     loadings = regression(pe.re, X, F)
     (; b, M) = loadings
     posterior_X = F * transpose(M) .+ transpose(b)
-    (; P, Q) = a_views = views_constraints(pe.a_views, pe.a_sets;
-                                           datatype = eltype(posterior_X), strict = strict)
-    f_views = views_constraints(pe.f_views, pe.f_sets; datatype = eltype(posterior_X),
-                                strict = strict)
+    (; P, Q) = a_views = black_littterman_views(pe.a_views, pe.a_sets;
+                                                datatype = eltype(posterior_X),
+                                                strict = strict)
+    f_views = black_littterman_views(pe.f_views, pe.f_sets; datatype = eltype(posterior_X),
+                                     strict = strict)
     f_P, f_Q = f_views.P, f_views.Q
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
     a_views_conf = pe.a_views_conf
