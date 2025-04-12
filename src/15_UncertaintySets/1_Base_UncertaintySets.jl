@@ -11,7 +11,8 @@ end
 function sigma_ucs(::Nothing, args...; kwargs...)
     return nothing
 end
-function ucs(uc::AbstractUncertaintySetResult, args...; kwargs...)
+function ucs(uc::Tuple{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetResult},
+             args...; kwargs...)
     return uc
 end
 function mu_ucs(uc::AbstractUncertaintySetResult, args...; kwargs...)

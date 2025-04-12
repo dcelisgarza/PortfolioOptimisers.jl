@@ -19,7 +19,6 @@
     @testset "Box Uncertainty sets" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
-
         ues = [DeltaUncertaintySetEstimator(;),
                NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
                                              alg = BoxUncertaintySetAlgorithm(),
@@ -64,7 +63,33 @@
                 find_tol([mu1; sigma1], ues_t[!, i]; name1 = :sigma1, name2 = :sigma2)
             end
             @test res3
+
+            mu_set3, sigma_set3 = ucs((mu_set1, sigma_set1))
+            @test mu_set1 === mu_set3
+            @test sigma_set1 === sigma_set3
+
+            mu_set4 = mu_ucs(mu_set1)
+            @test mu_set1 === mu_set4
+
+            sigma_set4 = sigma_ucs(sigma_set1)
+            @test sigma_set1 === sigma_set4
         end
+        ucrm1, ucrs1 = ucs(ues[1], X)
+        ucrm2, ucrs2 = ucs(ues[1], ReturnsResult(; nx = 1:20, X = X))
+        @test ucrm1.lb == ucrm2.lb
+        @test ucrm1.ub == ucrm2.ub
+        @test ucrs1.lb == ucrs2.lb
+        @test ucrs1.ub == ucrs2.ub
+
+        ucrm1 = mu_ucs(ues[1], X)
+        ucrm2 = mu_ucs(ues[1], ReturnsResult(; nx = 1:20, X = X))
+        @test ucrm1.lb == ucrm2.lb
+        @test ucrm1.ub == ucrm2.ub
+
+        ucrs1 = sigma_ucs(ues[1], X)
+        ucrs2 = sigma_ucs(ues[1], ReturnsResult(; nx = 1:20, X = X))
+        @test ucrs1.lb == ucrs2.lb
+        @test ucrs1.ub == ucrs2.ub
     end
     @testset "Ellipse Uncertainty sets" begin
         rng = StableRNG(123456789)
@@ -198,6 +223,33 @@
                 find_tol([mu1; sigma1], ues_t[!, i]; name1 = :sigma1, name2 = :sigma2)
             end
             @test res3
+
+            mu_set3, sigma_set3 = ucs((mu_set1, sigma_set1))
+            @test mu_set1 === mu_set3
+            @test sigma_set1 === sigma_set3
+
+            mu_set4 = mu_ucs(mu_set1)
+            @test mu_set1 === mu_set4
+
+            sigma_set4 = sigma_ucs(sigma_set1)
+            @test sigma_set1 === sigma_set4
         end
+
+        ucrm1, ucrs1 = ucs(ues[1], X)
+        ucrm2, ucrs2 = ucs(ues[1], ReturnsResult(; nx = 1:5, X = X))
+        @test ucrm1.sigma == ucrm2.sigma
+        @test ucrm1.k == ucrm2.k
+        @test ucrs1.sigma == ucrs2.sigma
+        @test ucrs1.k == ucrs2.k
+
+        ucrm1 = mu_ucs(ues[1], X)
+        ucrm2 = mu_ucs(ues[1], ReturnsResult(; nx = 1:5, X = X))
+        @test ucrm1.sigma == ucrm2.sigma
+        @test ucrm1.k == ucrm2.k
+
+        ucrs1 = sigma_ucs(ues[1], X)
+        ucrs2 = sigma_ucs(ues[1], ReturnsResult(; nx = 1:5, X = X))
+        @test ucrs1.sigma == ucrs2.sigma
+        @test ucrs1.k == ucrs2.k
     end
 end
