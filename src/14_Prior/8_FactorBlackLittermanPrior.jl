@@ -1,15 +1,15 @@
-struct FactorBlackLittermanPriorModel{T1 <: FactorPriorResult,
-                                      T2 <: BlackLittermanViewsResult} <:
+struct FactorBlackLittermanPriorResult{T1 <: FactorPriorResult,
+                                       T2 <: BlackLittermanViewsResult} <:
        AbstractPriorResult_AFVC
     pm::T1
     f_views::T2
 end
-function FactorBlackLittermanPriorModel(; pm::FactorPriorResult,
-                                        f_views::BlackLittermanViewsResult)
+function FactorBlackLittermanPriorResult(; pm::FactorPriorResult,
+                                         f_views::BlackLittermanViewsResult)
     @smart_assert(length(pm.f_mu) == size(f_views.P, 2))
-    return FactorBlackLittermanPriorModel{typeof(pm), typeof(f_views)}(pm, f_views)
+    return FactorBlackLittermanPriorResult{typeof(pm), typeof(f_views)}(pm, f_views)
 end
-function Base.getproperty(obj::FactorBlackLittermanPriorModel, sym::Symbol)
+function Base.getproperty(obj::FactorBlackLittermanPriorResult, sym::Symbol)
     return if sym == :X
         obj.pm.X
     elseif sym == :mu
@@ -59,7 +59,7 @@ function FactorBlackLittermanPriorEstimator(;
                                             pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                                             f_mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                             mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                            re::AbstractRegressionEstimator = ForwardRegression(),
+                                            re::AbstractRegressionEstimator = StepwiseRegression(),
                                             ve::AbstractVarianceEstimator = SimpleVariance(),
                                             views::Union{<:BlackLittermanViewsEstimator,
                                                          <:AbstractVector{<:BlackLittermanViewsEstimator}},
@@ -165,20 +165,20 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    return FactorBlackLittermanPriorModel(;
-                                          pm = FactorPriorResult(;
-                                                                 pm = EmpiricalPriorResult(;
-                                                                                           X = posterior_X,
-                                                                                           mu = posterior_mu,
-                                                                                           sigma = posterior_sigma),
-                                                                 fm = PartialFactorPriorResult(;
-                                                                                               mu = f_posterior_mu,
-                                                                                               sigma = f_posterior_sigma,
-                                                                                               loadings = loadings),
-                                                                 chol = transpose(reshape(posterior_csigma,
-                                                                                          length(posterior_mu),
-                                                                                          :))),
-                                          f_views = f_views)
+    return FactorBlackLittermanPriorResult(;
+                                           pm = FactorPriorResult(;
+                                                                  pm = EmpiricalPriorResult(;
+                                                                                            X = posterior_X,
+                                                                                            mu = posterior_mu,
+                                                                                            sigma = posterior_sigma),
+                                                                  fm = PartialFactorPriorResult(;
+                                                                                                mu = f_posterior_mu,
+                                                                                                sigma = f_posterior_sigma,
+                                                                                                loadings = loadings),
+                                                                  chol = transpose(reshape(posterior_csigma,
+                                                                                           length(posterior_mu),
+                                                                                           :))),
+                                           f_views = f_views)
 end
 
-export FactorBlackLittermanPriorModel, FactorBlackLittermanPriorEstimator
+export FactorBlackLittermanPriorResult, FactorBlackLittermanPriorEstimator

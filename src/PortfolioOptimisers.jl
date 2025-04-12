@@ -70,6 +70,9 @@ include("./14_Prior/3_FactorPrior.jl")
 include("./14_Prior/4_HighOrderPrior.jl")
 include("./14_Prior/5_BlackLittermanViewsGeneration.jl")
 include("./14_Prior/6_BlackLittermanPrior.jl")
+include("./14_Prior/7_BayesianBlackLittermanPrior.jl")
+include("./14_Prior/8_FactorBlackLittermanPrior.jl")
+include("./14_Prior/9_AugmentedBlackLittermanPrior.jl")
 
 include("./15_UncertaintySets/1_Base_UncertaintySets.jl")
 

@@ -1,14 +1,14 @@
-struct BlackLittermanPriorModel{T1 <: EmpiricalPriorResult,
-                                T2 <: BlackLittermanViewsResult} <: AbstractPriorResult_AV
+struct BlackLittermanPriorResult{T1 <: EmpiricalPriorResult,
+                                 T2 <: BlackLittermanViewsResult} <: AbstractPriorResult_AV
     pm::T1
     views::T2
 end
-function BlackLittermanPriorModel(; pm::EmpiricalPriorResult,
-                                  views::BlackLittermanViewsResult)
+function BlackLittermanPriorResult(; pm::EmpiricalPriorResult,
+                                   views::BlackLittermanViewsResult)
     @smart_assert(size(pm.X, 2) == size(views.P, 2))
-    return BlackLittermanPriorModel{typeof(pm), typeof(views)}(pm, views)
+    return BlackLittermanPriorResult{typeof(pm), typeof(views)}(pm, views)
 end
-function Base.getproperty(obj::BlackLittermanPriorModel, sym::Symbol)
+function Base.getproperty(obj::BlackLittermanPriorResult, sym::Symbol)
     return if sym == :X
         obj.pm.X
     elseif sym == :mu
@@ -115,11 +115,11 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_mu = prior_mu + v1 * (v2 \ v3) .+ pe.rf
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
-    return BlackLittermanPriorModel(;
-                                    pm = EmpiricalPriorResult(; X = posterior_X,
-                                                              mu = posterior_mu,
-                                                              sigma = posterior_sigma),
-                                    views = views)
+    return BlackLittermanPriorResult(;
+                                     pm = EmpiricalPriorResult(; X = posterior_X,
+                                                               mu = posterior_mu,
+                                                               sigma = posterior_sigma),
+                                     views = views)
 end
 
-export BlackLittermanPriorModel, BlackLittermanPriorEstimator
+export BlackLittermanPriorResult, BlackLittermanPriorEstimator

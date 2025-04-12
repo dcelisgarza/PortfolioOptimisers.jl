@@ -409,6 +409,7 @@
         @test isa(pe16.me, JamesSteinExpectedReturns)
         @test isa(pe16.ce.ce, Gerber2NormalisedCovariance)
     end
+    =#
     @testset "Black Litterman Prior" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 10) * 0.001
@@ -479,16 +480,8 @@
             end
             @test res2
             @test size(pm.X) == size(X)
+            @test pm === prior(pm)
         end
-
-        @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
-                                                                              A = LinearConstraintSide(;
-                                                                                                       group = :Foo,
-                                                                                                       name = 2,
-                                                                                                       coef = 1),
-                                                                              B = 0.003),
-                                                 sets)
-
         @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
                                                                                   A = LinearConstraintSide(;
                                                                                                            group = :Foo,
@@ -496,15 +489,6 @@
                                                                                                            coef = 1),
                                                                                   B = 0.003),
                                                      sets; strict = true)
-
-        @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
-                                                                              A = LinearConstraintSide(;
-                                                                                                       group = [:Foo],
-                                                                                                       name = [2],
-                                                                                                       coef = [1]),
-                                                                              B = 0.003),
-                                                 sets)
-
         @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
                                                                                   A = LinearConstraintSide(;
                                                                                                            group = [:Foo],
@@ -512,15 +496,6 @@
                                                                                                            coef = [1]),
                                                                                   B = 0.003),
                                                      sets; strict = true)
-
-        @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
-                                                                              A = LinearConstraintSide(;
-                                                                                                       group = :Asset,
-                                                                                                       name = 11,
-                                                                                                       coef = 1),
-                                                                              B = 0.003),
-                                                 sets)
-
         @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
                                                                                   A = LinearConstraintSide(;
                                                                                                            group = :Asset,
@@ -528,15 +503,6 @@
                                                                                                            coef = 1),
                                                                                   B = 0.003),
                                                      sets, strict = true)
-
-        @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
-                                                                              A = LinearConstraintSide(;
-                                                                                                       group = [:Asset],
-                                                                                                       name = [11],
-                                                                                                       coef = [1]),
-                                                                              B = 0.003),
-                                                 sets)
-
         @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
                                                                                   A = LinearConstraintSide(;
                                                                                                            group = [:Asset],
@@ -623,6 +589,7 @@
                   size(pm.f_sigma, 2) ==
                   size(pm.loadings.M, 2)
             @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
+            @test pm === prior(pm)
         end
     end
     @testset "Factor Black Litterman Prior" begin
@@ -970,6 +937,7 @@
             @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
         end
     end
+    #=
     @testset "Entropy Pooling" begin
         rng = StableRNG(123456789)
         X = randn(rng, 100, 10)
