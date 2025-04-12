@@ -33,8 +33,8 @@ function JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                                                                                     slv)
 end
 struct EntropyPoolingPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
-                                    T2 <: Union{<:EntropyPoolingView,
-                                                <:AbstractVector{<:EntropyPoolingView}},
+                                    T2 <: Union{<:EntropyPoolingViewEstimator,
+                                                <:AbstractVector{<:EntropyPoolingViewEstimator}},
                                     T3 <: DataFrame, T4 <: EntropyPoolingAlgorithm,
                                     T5 <: EntropyPoolingOptimisation,
                                     T6 <: Union{Nothing, <:AbstractVector}} <:
@@ -48,8 +48,8 @@ struct EntropyPoolingPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
 end
 function EntropyPoolingPriorEstimator(;
                                       pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
-                                      views::Union{<:EntropyPoolingView,
-                                                   <:AbstractVector{<:EntropyPoolingView}},
+                                      views::Union{<:EntropyPoolingViewEstimator,
+                                                   <:AbstractVector{<:EntropyPoolingViewEstimator}},
                                       sets::DataFrame = DataFrame(),
                                       alg::EntropyPoolingAlgorithm = H0_EntropyPooling(),
                                       opt::EntropyPoolingOptimisation = OptimEntropyPooling(),

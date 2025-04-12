@@ -1,12 +1,12 @@
-struct HighOrderPriorModel{T1 <: AbstractLowOrderPriorResult,
-                           T2 <: Union{Nothing, <:AbstractMatrix},
-                           T3 <: Union{Nothing, <:AbstractMatrix},
-                           T4 <: Union{Nothing, <:AbstractMatrix},
-                           T5 <: Union{Nothing, <:AbstractMatrix},
-                           T6 <: Union{Nothing, <:AbstractMatrixProcessingEstimator},
-                           T7 <: Union{Nothing, <:AbstractMatrix},
-                           T8 <: Union{Nothing, <:AbstractMatrix},
-                           T9 <: Union{Nothing, <:AbstractMatrixProcessingEstimator}} <:
+struct HighOrderPriorResult{T1 <: AbstractLowOrderPriorResult,
+                            T2 <: Union{Nothing, <:AbstractMatrix},
+                            T3 <: Union{Nothing, <:AbstractMatrix},
+                            T4 <: Union{Nothing, <:AbstractMatrix},
+                            T5 <: Union{Nothing, <:AbstractMatrix},
+                            T6 <: Union{Nothing, <:AbstractMatrixProcessingEstimator},
+                            T7 <: Union{Nothing, <:AbstractMatrix},
+                            T8 <: Union{Nothing, <:AbstractMatrix},
+                            T9 <: Union{Nothing, <:AbstractMatrixProcessingEstimator}} <:
        AbstractHighOrderPriorResult
     pm::T1
     kt::T2
@@ -18,15 +18,15 @@ struct HighOrderPriorModel{T1 <: AbstractLowOrderPriorResult,
     SV::T8
     sskmp::T9
 end
-function HighOrderPriorModel(; pm::AbstractLowOrderPriorResult,
-                             kt::Union{Nothing, <:AbstractMatrix},
-                             skt::Union{Nothing, <:AbstractMatrix},
-                             sk::Union{Nothing, <:AbstractMatrix},
-                             skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator},
-                             V::Union{Nothing, <:AbstractMatrix},
-                             ssk::Union{Nothing, <:AbstractMatrix},
-                             SV::Union{Nothing, <:AbstractMatrix},
-                             sskmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
+function HighOrderPriorResult(; pm::AbstractLowOrderPriorResult,
+                              kt::Union{Nothing, <:AbstractMatrix},
+                              skt::Union{Nothing, <:AbstractMatrix},
+                              sk::Union{Nothing, <:AbstractMatrix},
+                              skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator},
+                              V::Union{Nothing, <:AbstractMatrix},
+                              ssk::Union{Nothing, <:AbstractMatrix},
+                              SV::Union{Nothing, <:AbstractMatrix},
+                              sskmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
     if isa(kt, AbstractMatrix)
         @smart_assert(!isempty(kt))
         issquare(kt)
@@ -65,16 +65,17 @@ function HighOrderPriorModel(; pm::AbstractLowOrderPriorResult,
         @smart_assert(ssk_flag && SV_flag,
                       "If either ssk or SV, is nothing or empty, both must be nothing or empty.")
     end
-    return HighOrderPriorModel{typeof(pm), typeof(kt), typeof(skt), typeof(sk), typeof(V),
-                               typeof(skmp), typeof(ssk), typeof(SV), typeof(sskmp)}(pm, kt,
-                                                                                     skt,
-                                                                                     sk, V,
-                                                                                     skmp,
-                                                                                     ssk,
-                                                                                     SV,
-                                                                                     sskmp)
+    return HighOrderPriorResult{typeof(pm), typeof(kt), typeof(skt), typeof(sk), typeof(V),
+                                typeof(skmp), typeof(ssk), typeof(SV), typeof(sskmp)}(pm,
+                                                                                      kt,
+                                                                                      skt,
+                                                                                      sk, V,
+                                                                                      skmp,
+                                                                                      ssk,
+                                                                                      SV,
+                                                                                      sskmp)
 end
-function Base.getproperty(obj::HighOrderPriorModel, sym::Symbol)
+function Base.getproperty(obj::HighOrderPriorResult, sym::Symbol)
     return if sym == :X
         obj.pm.X
     elseif sym == :mu
@@ -86,8 +87,10 @@ function Base.getproperty(obj::HighOrderPriorModel, sym::Symbol)
     end
 end
 struct HighOrderPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
-                               T2 <: CokurtosisEstimator, T3 <: CokurtosisEstimator,
-                               T4 <: CoskewnessEstimator, T5 <: CoskewnessEstimator} <:
+                               T2 <: Union{Nothing, CokurtosisEstimator},
+                               T3 <: Union{Nothing, CokurtosisEstimator},
+                               T4 <: Union{Nothing, CoskewnessEstimator},
+                               T5 <: Union{Nothing, CoskewnessEstimator}} <:
        AbstractPriorEstimator_1o2_1o2
     pe::T1
     kte::T2
@@ -137,9 +140,9 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
     skt = cokurtosis(pe.skte, pm.X)
     sk, V = coskewness(pe.ske, pm.X)
     ssk, SV = coskewness(pe.sske, pm.X)
-    return HighOrderPriorModel(; pm = pm, kt = kt, skt = skt, sk = sk, V = V,
-                               skmp = isnothing(sk) ? nothing : pe.ske.mp, ssk = ssk,
-                               SV = SV, sskmp = isnothing(ssk) ? nothing : pe.sske.mp)
+    return HighOrderPriorResult(; pm = pm, kt = kt, skt = skt, sk = sk, V = V,
+                                skmp = isnothing(sk) ? nothing : pe.ske.mp, ssk = ssk,
+                                SV = SV, sskmp = isnothing(ssk) ? nothing : pe.sske.mp)
 end
 
-export HighOrderPriorModel, HighOrderPriorEstimator
+export HighOrderPriorResult, HighOrderPriorEstimator

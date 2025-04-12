@@ -37,8 +37,8 @@ function risk_measure_factory(r::SemiVariance, prior::EntropyPoolingModel, args.
                         target = r.target, w = w, mu = mu)
 end
 function risk_measure_factory(r::SemiVariance,
-                              prior::HighOrderPriorModel{<:EntropyPoolingModel, <:Any,
-                                                         <:Any, <:Any, <:Any}, args...;
+                              prior::HighOrderPriorResult{<:EntropyPoolingModel, <:Any,
+                                                          <:Any, <:Any, <:Any}, args...;
                               kwargs...)
     w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
@@ -61,9 +61,9 @@ function cluster_risk_measure_factory(r::SemiVariance, prior::EntropyPoolingMode
                         target = target, w = w, mu = mu)
 end
 function cluster_risk_measure_factory(r::SemiVariance,
-                                      prior::HighOrderPriorModel{<:EntropyPoolingModel,
-                                                                 <:Any, <:Any, <:Any,
-                                                                 <:Any},
+                                      prior::HighOrderPriorResult{<:EntropyPoolingModel,
+                                                                  <:Any, <:Any, <:Any,
+                                                                  <:Any},
                                       cluster::AbstractVector, args...; kwargs...)
     target = risk_measure_nothing_real_vec_factory(r.target, cluster)
     w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)

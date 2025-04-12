@@ -1,4 +1,3 @@
-#=
 @safetestset "Prior tests" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
           CSV, DataFrames, LinearAlgebra, Clarabel
@@ -13,241 +12,6 @@
                 break
             end
         end
-    end
-    @testset "Type tests" begin
-        pe1 = BayesianBlackLittermanPriorEstimator(; tau = 1,
-                                                   views = BlackLittermanViewsEstimator(;
-                                                                              A = LinearConstraintSide(;
-                                                                                                     name = nothing,
-                                                                                                     group = nothing)),
-                                                   pe = FactorPriorEstimator(;
-                                                                             pe = EmpiricalPriorEstimator(;
-                                                                                                          me = JamesSteinExpectedReturns(),
-                                                                                                          ce = PortfolioOptimisersCovariance(;
-                                                                                                                                             ce = Gerber0Covariance()))))
-        @test pe1.tau == 1
-        @test isa(pe1.me, JamesSteinExpectedReturns)
-        @test isa(pe1.ce.ce, Gerber0Covariance)
-        pe2 = BayesianBlackLittermanPriorEstimator(;
-                                                   views = BlackLittermanViewsEstimator(;
-                                                                              A = LinearConstraintSide(;
-                                                                                                     name = nothing,
-                                                                                                     group = nothing)),
-                                                   pe = FactorBlackLittermanPriorEstimator(;
-                                                                                           views = BlackLittermanViewsEstimator(;
-                                                                                                                      A = LinearConstraintSide(;
-                                                                                                                                             name = nothing,
-                                                                                                                                             group = nothing)),
-                                                                                           pe = EmpiricalPriorEstimator(;
-                                                                                                                        me = BodnarOkhrinParolyaExpectedReturns(),
-                                                                                                                        ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                           ce = Gerber2Covariance()))))
-        @test isa(pe2.me, BodnarOkhrinParolyaExpectedReturns)
-        @test isa(pe2.ce.ce, Gerber2Covariance)
-        pe3 = BayesianBlackLittermanPriorEstimator(;
-                                                   views = BlackLittermanViewsEstimator(;
-                                                                              A = LinearConstraintSide(;
-                                                                                                     name = nothing,
-                                                                                                     group = nothing)),
-                                                   pe = AugmentedBlackLittermanPriorEstimator(;
-                                                                                              a_views = BlackLittermanViewsEstimator(;
-                                                                                                                           A = LinearConstraintSide(;
-                                                                                                                                                  name = nothing,
-                                                                                                                                                  group = nothing)),
-                                                                                              f_views = BlackLittermanViewsEstimator(;
-                                                                                                                           A = LinearConstraintSide(;
-                                                                                                                                                  name = nothing,
-                                                                                                                                                  group = nothing)),
-                                                                                              a_pe = EmpiricalPriorEstimator(;
-                                                                                                                             me = ExcessExpectedReturns(),
-                                                                                                                             ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                                ce = Gerber1Covariance()))))
-        @test isa(pe3.me, ExcessExpectedReturns)
-        @test isa(pe3.ce.ce, Gerber1Covariance)
-        pe4 = BayesianBlackLittermanPriorEstimator(;
-                                                   views = BlackLittermanViewsEstimator(;
-                                                                              A = LinearConstraintSide(;
-                                                                                                     name = nothing,
-                                                                                                     group = nothing)),
-                                                   pe = BlackLittermanPriorEstimator(;
-                                                                                     views = BlackLittermanViewsEstimator(;
-                                                                                                                A = LinearConstraintSide(;
-                                                                                                                                       name = nothing,
-                                                                                                                                       group = nothing)),
-                                                                                     pe = EmpiricalPriorEstimator(;
-                                                                                                                  me = EquilibriumExpectedReturns(),
-                                                                                                                  ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                     ce = SmythBroby0Covariance()))))
-        @test isa(pe4.me, EquilibriumExpectedReturns)
-        @test isa(pe4.ce.ce, SmythBroby0Covariance)
-        pe5 = BayesianBlackLittermanPriorEstimator(;
-                                                   views = BlackLittermanViewsEstimator(;
-                                                                              A = LinearConstraintSide(;
-                                                                                                     name = nothing,
-                                                                                                     group = nothing)),
-                                                   pe = BayesianBlackLittermanPriorEstimator(;
-                                                                                             views = BlackLittermanViewsEstimator(;
-                                                                                                                        A = LinearConstraintSide(;
-                                                                                                                                               name = nothing,
-                                                                                                                                               group = nothing))))
-        @test isa(pe5.me, EquilibriumExpectedReturns)
-        @test isa(pe5.ce.ce, Full)
-        pe6 = BlackLittermanPriorEstimator(;
-                                           views = BlackLittermanViewsEstimator(;
-                                                                      A = LinearConstraintSide(;
-                                                                                             name = nothing,
-                                                                                             group = nothing)),
-                                           pe = EmpiricalPriorEstimator(;
-                                                                        me = BayesSteinExpectedReturns(),
-                                                                        ce = PortfolioOptimisersCovariance(;
-                                                                                                           ce = SmythBroby0NormalisedCovariance())))
-        @test isa(pe6.me, BayesSteinExpectedReturns)
-        @test isa(pe6.ce.ce, SmythBroby0NormalisedCovariance)
-        pe7 = BlackLittermanPriorEstimator(; tau = 0.5,
-                                           views = BlackLittermanViewsEstimator(;
-                                                                      A = LinearConstraintSide(;
-                                                                                             name = nothing,
-                                                                                             group = nothing)),
-                                           pe = FactorPriorEstimator(;
-                                                                     pe = EmpiricalPriorEstimator(;
-                                                                                                  me = JamesSteinExpectedReturns(),
-                                                                                                  ce = PortfolioOptimisersCovariance(;
-                                                                                                                                     ce = Gerber0NormalisedCovariance()))))
-        @test pe7.tau == 0.5
-        @test isa(pe7.me, JamesSteinExpectedReturns)
-        @test isa(pe7.ce.ce, Gerber0NormalisedCovariance)
-        pe8 = BlackLittermanPriorEstimator(;
-                                           views = BlackLittermanViewsEstimator(;
-                                                                      A = LinearConstraintSide(;
-                                                                                             name = nothing,
-                                                                                             group = nothing)),
-                                           pe = FactorBlackLittermanPriorEstimator(;
-                                                                                   views = BlackLittermanViewsEstimator(;
-                                                                                                              A = LinearConstraintSide(;
-                                                                                                                                     name = nothing,
-                                                                                                                                     group = nothing)),
-                                                                                   pe = EmpiricalPriorEstimator(;
-                                                                                                                me = BodnarOkhrinParolyaExpectedReturns(),
-                                                                                                                ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                   ce = Gerber2NormalisedCovariance()))))
-        @test isa(pe8.me, BodnarOkhrinParolyaExpectedReturns)
-        @test isa(pe8.ce.ce, Gerber2NormalisedCovariance)
-        pe9 = BlackLittermanPriorEstimator(;
-                                           views = BlackLittermanViewsEstimator(;
-                                                                      A = LinearConstraintSide(;
-                                                                                             name = nothing,
-                                                                                             group = nothing)),
-                                           pe = AugmentedBlackLittermanPriorEstimator(;
-                                                                                      a_views = BlackLittermanViewsEstimator(;
-                                                                                                                   A = LinearConstraintSide(;
-                                                                                                                                          name = nothing,
-                                                                                                                                          group = nothing)),
-                                                                                      f_views = BlackLittermanViewsEstimator(;
-                                                                                                                   A = LinearConstraintSide(;
-                                                                                                                                          name = nothing,
-                                                                                                                                          group = nothing)),
-                                                                                      a_pe = EmpiricalPriorEstimator(;
-                                                                                                                     me = ExcessExpectedReturns(),
-                                                                                                                     ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                        ce = Gerber1NormalisedCovariance()))))
-        @test isa(pe9.me, ExcessExpectedReturns)
-        @test isa(pe9.ce.ce, Gerber1NormalisedCovariance)
-        pe10 = BlackLittermanPriorEstimator(;
-                                            views = BlackLittermanViewsEstimator(;
-                                                                       A = LinearConstraintSide(;
-                                                                                              name = nothing,
-                                                                                              group = nothing)),
-                                            pe = BlackLittermanPriorEstimator(;
-                                                                              views = BlackLittermanViewsEstimator(;
-                                                                                                         A = LinearConstraintSide(;
-                                                                                                                                name = nothing,
-                                                                                                                                group = nothing))))
-        @test isa(pe10.me, EquilibriumExpectedReturns)
-        @test isa(pe10.ce.ce, Full)
-        pe11 = FactorPriorEstimator(;
-                                    pe = EmpiricalPriorEstimator(;
-                                                                 me = BayesSteinExpectedReturns(),
-                                                                 ce = PortfolioOptimisersCovariance(;
-                                                                                                    ce = SmythBroby0NormalisedCovariance())))
-        @test isa(pe11.me, BayesSteinExpectedReturns)
-        @test isa(pe11.ce.ce, SmythBroby0NormalisedCovariance)
-
-        pe12 = FactorPriorEstimator(;
-                                    pe = BlackLittermanPriorEstimator(;
-                                                                      views = BlackLittermanViewsEstimator(;
-                                                                                                 A = LinearConstraintSide(;
-                                                                                                                        name = nothing,
-                                                                                                                        group = nothing)),
-                                                                      pe = EmpiricalPriorEstimator(;
-                                                                                                   me = JamesSteinExpectedReturns(),
-                                                                                                   ce = PortfolioOptimisersCovariance(;
-                                                                                                                                      ce = Gerber2NormalisedCovariance()))))
-        @test isa(pe12.me, JamesSteinExpectedReturns)
-        @test isa(pe12.ce.ce, Gerber2NormalisedCovariance)
-        pe13 = FactorBlackLittermanPriorEstimator(; tau = 0.3,
-                                                  views = BlackLittermanViewsEstimator(;
-                                                                             A = LinearConstraintSide(;
-                                                                                                    name = nothing,
-                                                                                                    group = nothing)),
-                                                  pe = EmpiricalPriorEstimator(;
-                                                                               me = BayesSteinExpectedReturns(),
-                                                                               ce = PortfolioOptimisersCovariance(;
-                                                                                                                  ce = SmythBroby0NormalisedCovariance())))
-        @test pe13.tau == 0.3
-        @test isa(pe13.me, BayesSteinExpectedReturns)
-        @test isa(pe13.ce.ce, SmythBroby0NormalisedCovariance)
-        pe14 = FactorBlackLittermanPriorEstimator(;
-                                                  views = BlackLittermanViewsEstimator(;
-                                                                             A = LinearConstraintSide(;
-                                                                                                    name = nothing,
-                                                                                                    group = nothing)),
-                                                  pe = BlackLittermanPriorEstimator(;
-                                                                                    views = BlackLittermanViewsEstimator(;
-                                                                                                               A = LinearConstraintSide(;
-                                                                                                                                      name = nothing,
-                                                                                                                                      group = nothing)),
-                                                                                    pe = EmpiricalPriorEstimator(;
-                                                                                                                 me = JamesSteinExpectedReturns(),
-                                                                                                                 ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                    ce = Gerber2NormalisedCovariance()))))
-        @test isa(pe14.me, JamesSteinExpectedReturns)
-        @test isa(pe14.ce.ce, Gerber2NormalisedCovariance)
-        pe15 = AugmentedBlackLittermanPriorEstimator(; tau = 0.2,
-                                                     a_views = BlackLittermanViewsEstimator(;
-                                                                                  A = LinearConstraintSide(;
-                                                                                                         name = nothing,
-                                                                                                         group = nothing)),
-                                                     f_views = BlackLittermanViewsEstimator(;
-                                                                                  A = LinearConstraintSide(;
-                                                                                                         name = nothing,
-                                                                                                         group = nothing)),
-                                                     a_pe = EmpiricalPriorEstimator(;
-                                                                                    me = BayesSteinExpectedReturns(),
-                                                                                    ce = PortfolioOptimisersCovariance(;
-                                                                                                                       ce = SmythBroby0NormalisedCovariance())))
-        @test pe15.tau == 0.2
-        @test isa(pe15.me, BayesSteinExpectedReturns)
-        @test isa(pe15.ce.ce, SmythBroby0NormalisedCovariance)
-        pe16 = AugmentedBlackLittermanPriorEstimator(;
-                                                     a_views = BlackLittermanViewsEstimator(;
-                                                                                  A = LinearConstraintSide(;
-                                                                                                         name = nothing,
-                                                                                                         group = nothing)),
-                                                     f_views = BlackLittermanViewsEstimator(;
-                                                                                  A = LinearConstraintSide(;
-                                                                                                         name = nothing,
-                                                                                                         group = nothing)),
-                                                     a_pe = BlackLittermanPriorEstimator(;
-                                                                                         views = BlackLittermanViewsEstimator(;
-                                                                                                                    A = LinearConstraintSide(;
-                                                                                                                                           name = nothing,
-                                                                                                                                           group = nothing)),
-                                                                                         pe = EmpiricalPriorEstimator(;
-                                                                                                                      me = JamesSteinExpectedReturns(),
-                                                                                                                      ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                         ce = Gerber2NormalisedCovariance()))))
-        @test isa(pe16.me, JamesSteinExpectedReturns)
-        @test isa(pe16.ce.ce, Gerber2NormalisedCovariance)
     end
     @testset "Empirical Prior" begin
         rng = StableRNG(123456789)
@@ -272,7 +36,378 @@
                 find_tol(pm.sigma, sigma_t; name1 = :er, name2 = :er_t)
             end
             @test res2
+            @test pm === prior(pm)
         end
+    end
+    @testset "Factor Prior" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 100, 10)
+        F = X[:, [3, 8]]
+
+        pm1 = prior(FactorPriorEstimator(; residuals = false), transpose(X), transpose(F);
+                    dims = 2)
+        pm1_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-No-Residuals.csv"),
+                         DataFrame)
+        X_t = reshape(view(pm1_t, 1:1000, 1), 100, 10)
+        mu_t = view(pm1_t, 1001:1010, 1)
+        sigma_t = reshape(view(pm1_t, 1011:1110, 1), 10, 10)
+        chol_t = reshape(view(pm1_t, 1111:nrow(pm1_t), 1), :, 10)
+
+        @test isapprox(pm1.X, X_t)
+        @test isapprox(pm1.mu, mu_t)
+        @test isapprox(pm1.sigma, sigma_t)
+        @test isapprox(pm1.chol, chol_t)
+        @test pm1 === prior(pm1)
+
+        pm2 = prior(FactorPriorEstimator(; residuals = true), transpose(X), transpose(F);
+                    dims = 2)
+        pm2_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-Residuals.csv"),
+                         DataFrame)
+        X_t = reshape(view(pm2_t, 1:1000, 1), 100, 10)
+        mu_t = view(pm2_t, 1001:1010, 1)
+        sigma_t = reshape(view(pm2_t, 1011:1110, 1), 10, 10)
+        chol_t = reshape(view(pm2_t, 1111:nrow(pm2_t), 1), :, 10)
+
+        @test isapprox(pm2.X, X_t)
+        @test isapprox(pm2.mu, mu_t)
+        @test isapprox(pm2.sigma, sigma_t)
+        @test isapprox(pm2.chol, chol_t)
+    end
+    @testset "High Order Prior" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 100, 10)
+        pe = HighOrderPriorEstimator()
+        pm = prior(pe, transpose(X); dims = 2)
+        @test isapprox(pm.X, X)
+        @test isapprox(pm.mu, vec(mean(SimpleExpectedReturns(), X)))
+        @test isapprox(pm.sigma, cov(PortfolioOptimisersCovariance(), X))
+        @test isapprox(pm.kt, cokurtosis(Cokurtosis(; alg = Full()), X))
+        @test isapprox(pm.skt, cokurtosis(Cokurtosis(; alg = Semi()), X))
+        @test all(isapprox.((pm.sk, pm.V), coskewness(Coskewness(; alg = Full()), X)))
+        @test all(isapprox.((pm.ssk, pm.SV), coskewness(Coskewness(; alg = Semi()), X)))
+        pm = prior(HighOrderPriorEstimator(; kte = nothing, skte = nothing, ske = nothing,
+                                           sske = nothing), transpose(X); dims = 2)
+        @test isnothing(pm.kt)
+        @test isnothing(pm.skt)
+        @test isnothing(pm.sk)
+        @test isnothing(pm.V)
+        @test isnothing(pm.ssk)
+        @test isnothing(pm.SV)
+        @test pm === prior(pm)
+    end
+    @testset "Black Litterman Views" begin
+        assets = 1:10
+        sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        vc_1 = BlackLittermanViewsEstimator(;
+                                            A = LinearConstraintSide(; group = :Asset,
+                                                                     name = 2, coef = 1.0),
+                                            B = 0.003)
+        vc_2 = BlackLittermanViewsEstimator(;
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Asset,
+                                                                              :Asset],
+                                                                     name = [3, 8],
+                                                                     coef = [1.0, -1]),
+                                            B = -0.001)
+        vc_3 = BlackLittermanViewsEstimator(;
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Clusters,
+                                                                              :Asset],
+                                                                     name = [3, 9],
+                                                                     coef = [1.0, -1]),
+                                            B = 0.002)
+        vc_4 = BlackLittermanViewsEstimator(;
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Asset,
+                                                                              :Clusters],
+                                                                     name = [5, 1],
+                                                                     coef = [1.0, -1]),
+                                            B = 0.007)
+        vc_5 = BlackLittermanViewsEstimator(;
+                                            A = LinearConstraintSide(; group = :Clusters,
+                                                                     name = 2, coef = 1.0),
+                                            B = 0.001)
+        views = [vc_1, vc_2, vc_3, vc_4, vc_5]
+        blvr = views_constraints(views, sets)
+        @test isapprox(blvr.P,
+                       reshape([0.0, 0.0, 0.0, -0.3333333333333333, 0.0, 1.0, 0.0, 0.0,
+                                -0.3333333333333333, 0.0, 0.0, 1.0, 0.25, 0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0, 0.3333333333333333, 0.0, 0.0, 0.25, 1.0, 0.0,
+                                0.0, 0.0, 0.0, 0.0, 0.3333333333333333, 0.0, 0.0, 0.0, 0.0,
+                                0.3333333333333333, 0.0, -1.0, 0.0, -0.3333333333333333,
+                                0.0, 0.0, 0.0, -0.75, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0],
+                               :, 10))
+        @test isapprox(blvr.Q, [0.003, -0.001, 0.002, 0.007, 0.001])
+        @test blvr === views_constraints(blvr)
+        @test isnothing(views_constraints(nothing))
+        @test isnothing(views_constraints(BlackLittermanViewsEstimator(;
+                                                                       A = LinearConstraintSide(;
+                                                                                                group = nothing,
+                                                                                                name = nothing)),
+                                          sets))
+        vc = BlackLittermanViewsEstimator(;
+                                          A = LinearConstraintSide(; group = :Asset,
+                                                                   name = -1, coef = 1.0),
+                                          B = 0.003)
+        @test isnothing(views_constraints(vc, sets))
+        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
+
+        vc = BlackLittermanViewsEstimator(;
+                                          A = LinearConstraintSide(; group = [:Asset],
+                                                                   name = [-1],
+                                                                   coef = [1.0]), B = 0.003)
+        @test isnothing(views_constraints(vc, sets))
+        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
+
+        vc = BlackLittermanViewsEstimator(;
+                                          A = LinearConstraintSide(; group = :Foo,
+                                                                   name = -1, coef = 1.0),
+                                          B = 0.003)
+        @test isnothing(views_constraints(vc, sets))
+        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
+
+        vc = BlackLittermanViewsEstimator(;
+                                          A = LinearConstraintSide(; group = [:Foo],
+                                                                   name = [-1],
+                                                                   coef = [1.0]), B = 0.003)
+        @test isnothing(views_constraints(vc, sets))
+        @test_throws ArgumentError views_constraints(vc, sets, strict = true)
+    end
+    #=
+    @testset "Black Litteman type tests" begin
+        pe1 = BayesianBlackLittermanPriorEstimator(; tau = 1,
+                                                   views = BlackLittermanViewsEstimator(;
+                                                                                        A = LinearConstraintSide(;
+                                                                                                                 name = nothing,
+                                                                                                                 group = nothing)),
+                                                   pe = FactorPriorEstimator(;
+                                                                             pe = EmpiricalPriorEstimator(;
+                                                                                                          me = JamesSteinExpectedReturns(),
+                                                                                                          ce = PortfolioOptimisersCovariance(;
+                                                                                                                                             ce = Gerber0Covariance()))))
+        @test pe1.tau == 1
+        @test isa(pe1.me, JamesSteinExpectedReturns)
+        @test isa(pe1.ce.ce, Gerber0Covariance)
+        pe2 = BayesianBlackLittermanPriorEstimator(;
+                                                   views = BlackLittermanViewsEstimator(;
+                                                                                        A = LinearConstraintSide(;
+                                                                                                                 name = nothing,
+                                                                                                                 group = nothing)),
+                                                   pe = FactorBlackLittermanPriorEstimator(;
+                                                                                           views = BlackLittermanViewsEstimator(;
+                                                                                                                                A = LinearConstraintSide(;
+                                                                                                                                                         name = nothing,
+                                                                                                                                                         group = nothing)),
+                                                                                           pe = EmpiricalPriorEstimator(;
+                                                                                                                        me = BodnarOkhrinParolyaExpectedReturns(),
+                                                                                                                        ce = PortfolioOptimisersCovariance(;
+                                                                                                                                                           ce = Gerber2Covariance()))))
+        @test isa(pe2.me, BodnarOkhrinParolyaExpectedReturns)
+        @test isa(pe2.ce.ce, Gerber2Covariance)
+        pe3 = BayesianBlackLittermanPriorEstimator(;
+                                                   views = BlackLittermanViewsEstimator(;
+                                                                                        A = LinearConstraintSide(;
+                                                                                                                 name = nothing,
+                                                                                                                 group = nothing)),
+                                                   pe = AugmentedBlackLittermanPriorEstimator(;
+                                                                                              a_views = BlackLittermanViewsEstimator(;
+                                                                                                                                     A = LinearConstraintSide(;
+                                                                                                                                                              name = nothing,
+                                                                                                                                                              group = nothing)),
+                                                                                              f_views = BlackLittermanViewsEstimator(;
+                                                                                                                                     A = LinearConstraintSide(;
+                                                                                                                                                              name = nothing,
+                                                                                                                                                              group = nothing)),
+                                                                                              a_pe = EmpiricalPriorEstimator(;
+                                                                                                                             me = ExcessExpectedReturns(),
+                                                                                                                             ce = PortfolioOptimisersCovariance(;
+                                                                                                                                                                ce = Gerber1Covariance()))))
+        @test isa(pe3.me, ExcessExpectedReturns)
+        @test isa(pe3.ce.ce, Gerber1Covariance)
+        pe4 = BayesianBlackLittermanPriorEstimator(;
+                                                   views = BlackLittermanViewsEstimator(;
+                                                                                        A = LinearConstraintSide(;
+                                                                                                                 name = nothing,
+                                                                                                                 group = nothing)),
+                                                   pe = BlackLittermanPriorEstimator(;
+                                                                                     views = BlackLittermanViewsEstimator(;
+                                                                                                                          A = LinearConstraintSide(;
+                                                                                                                                                   name = nothing,
+                                                                                                                                                   group = nothing)),
+                                                                                     pe = EmpiricalPriorEstimator(;
+                                                                                                                  me = EquilibriumExpectedReturns(),
+                                                                                                                  ce = PortfolioOptimisersCovariance(;
+                                                                                                                                                     ce = SmythBroby0Covariance()))))
+        @test isa(pe4.me, EquilibriumExpectedReturns)
+        @test isa(pe4.ce.ce, SmythBroby0Covariance)
+        pe5 = BayesianBlackLittermanPriorEstimator(;
+                                                   views = BlackLittermanViewsEstimator(;
+                                                                                        A = LinearConstraintSide(;
+                                                                                                                 name = nothing,
+                                                                                                                 group = nothing)),
+                                                   pe = BayesianBlackLittermanPriorEstimator(;
+                                                                                             views = BlackLittermanViewsEstimator(;
+                                                                                                                                  A = LinearConstraintSide(;
+                                                                                                                                                           name = nothing,
+                                                                                                                                                           group = nothing))))
+        @test isa(pe5.me, EquilibriumExpectedReturns)
+        @test isa(pe5.ce.ce, Full)
+        pe6 = BlackLittermanPriorEstimator(;
+                                           views = BlackLittermanViewsEstimator(;
+                                                                                A = LinearConstraintSide(;
+                                                                                                         name = nothing,
+                                                                                                         group = nothing)),
+                                           pe = EmpiricalPriorEstimator(;
+                                                                        me = BayesSteinExpectedReturns(),
+                                                                        ce = PortfolioOptimisersCovariance(;
+                                                                                                           ce = SmythBroby0NormalisedCovariance())))
+        @test isa(pe6.me, BayesSteinExpectedReturns)
+        @test isa(pe6.ce.ce, SmythBroby0NormalisedCovariance)
+        pe7 = BlackLittermanPriorEstimator(; tau = 0.5,
+                                           views = BlackLittermanViewsEstimator(;
+                                                                                A = LinearConstraintSide(;
+                                                                                                         name = nothing,
+                                                                                                         group = nothing)),
+                                           pe = FactorPriorEstimator(;
+                                                                     pe = EmpiricalPriorEstimator(;
+                                                                                                  me = JamesSteinExpectedReturns(),
+                                                                                                  ce = PortfolioOptimisersCovariance(;
+                                                                                                                                     ce = Gerber0NormalisedCovariance()))))
+        @test pe7.tau == 0.5
+        @test isa(pe7.me, JamesSteinExpectedReturns)
+        @test isa(pe7.ce.ce, Gerber0NormalisedCovariance)
+        pe8 = BlackLittermanPriorEstimator(;
+                                           views = BlackLittermanViewsEstimator(;
+                                                                                A = LinearConstraintSide(;
+                                                                                                         name = nothing,
+                                                                                                         group = nothing)),
+                                           pe = FactorBlackLittermanPriorEstimator(;
+                                                                                   views = BlackLittermanViewsEstimator(;
+                                                                                                                        A = LinearConstraintSide(;
+                                                                                                                                                 name = nothing,
+                                                                                                                                                 group = nothing)),
+                                                                                   pe = EmpiricalPriorEstimator(;
+                                                                                                                me = BodnarOkhrinParolyaExpectedReturns(),
+                                                                                                                ce = PortfolioOptimisersCovariance(;
+                                                                                                                                                   ce = Gerber2NormalisedCovariance()))))
+        @test isa(pe8.me, BodnarOkhrinParolyaExpectedReturns)
+        @test isa(pe8.ce.ce, Gerber2NormalisedCovariance)
+        pe9 = BlackLittermanPriorEstimator(;
+                                           views = BlackLittermanViewsEstimator(;
+                                                                                A = LinearConstraintSide(;
+                                                                                                         name = nothing,
+                                                                                                         group = nothing)),
+                                           pe = AugmentedBlackLittermanPriorEstimator(;
+                                                                                      a_views = BlackLittermanViewsEstimator(;
+                                                                                                                             A = LinearConstraintSide(;
+                                                                                                                                                      name = nothing,
+                                                                                                                                                      group = nothing)),
+                                                                                      f_views = BlackLittermanViewsEstimator(;
+                                                                                                                             A = LinearConstraintSide(;
+                                                                                                                                                      name = nothing,
+                                                                                                                                                      group = nothing)),
+                                                                                      a_pe = EmpiricalPriorEstimator(;
+                                                                                                                     me = ExcessExpectedReturns(),
+                                                                                                                     ce = PortfolioOptimisersCovariance(;
+                                                                                                                                                        ce = Gerber1NormalisedCovariance()))))
+        @test isa(pe9.me, ExcessExpectedReturns)
+        @test isa(pe9.ce.ce, Gerber1NormalisedCovariance)
+        pe10 = BlackLittermanPriorEstimator(;
+                                            views = BlackLittermanViewsEstimator(;
+                                                                                 A = LinearConstraintSide(;
+                                                                                                          name = nothing,
+                                                                                                          group = nothing)),
+                                            pe = BlackLittermanPriorEstimator(;
+                                                                              views = BlackLittermanViewsEstimator(;
+                                                                                                                   A = LinearConstraintSide(;
+                                                                                                                                            name = nothing,
+                                                                                                                                            group = nothing))))
+        @test isa(pe10.me, EquilibriumExpectedReturns)
+        @test isa(pe10.ce.ce, Full)
+        pe11 = FactorPriorEstimator(;
+                                    pe = EmpiricalPriorEstimator(;
+                                                                 me = BayesSteinExpectedReturns(),
+                                                                 ce = PortfolioOptimisersCovariance(;
+                                                                                                    ce = SmythBroby0NormalisedCovariance())))
+        @test isa(pe11.me, BayesSteinExpectedReturns)
+        @test isa(pe11.ce.ce, SmythBroby0NormalisedCovariance)
+
+        pe12 = FactorPriorEstimator(;
+                                    pe = BlackLittermanPriorEstimator(;
+                                                                      views = BlackLittermanViewsEstimator(;
+                                                                                                           A = LinearConstraintSide(;
+                                                                                                                                    name = nothing,
+                                                                                                                                    group = nothing)),
+                                                                      pe = EmpiricalPriorEstimator(;
+                                                                                                   me = JamesSteinExpectedReturns(),
+                                                                                                   ce = PortfolioOptimisersCovariance(;
+                                                                                                                                      ce = Gerber2NormalisedCovariance()))))
+        @test isa(pe12.me, JamesSteinExpectedReturns)
+        @test isa(pe12.ce.ce, Gerber2NormalisedCovariance)
+        pe13 = FactorBlackLittermanPriorEstimator(; tau = 0.3,
+                                                  views = BlackLittermanViewsEstimator(;
+                                                                                       A = LinearConstraintSide(;
+                                                                                                                name = nothing,
+                                                                                                                group = nothing)),
+                                                  pe = EmpiricalPriorEstimator(;
+                                                                               me = BayesSteinExpectedReturns(),
+                                                                               ce = PortfolioOptimisersCovariance(;
+                                                                                                                  ce = SmythBroby0NormalisedCovariance())))
+        @test pe13.tau == 0.3
+        @test isa(pe13.me, BayesSteinExpectedReturns)
+        @test isa(pe13.ce.ce, SmythBroby0NormalisedCovariance)
+        pe14 = FactorBlackLittermanPriorEstimator(;
+                                                  views = BlackLittermanViewsEstimator(;
+                                                                                       A = LinearConstraintSide(;
+                                                                                                                name = nothing,
+                                                                                                                group = nothing)),
+                                                  pe = BlackLittermanPriorEstimator(;
+                                                                                    views = BlackLittermanViewsEstimator(;
+                                                                                                                         A = LinearConstraintSide(;
+                                                                                                                                                  name = nothing,
+                                                                                                                                                  group = nothing)),
+                                                                                    pe = EmpiricalPriorEstimator(;
+                                                                                                                 me = JamesSteinExpectedReturns(),
+                                                                                                                 ce = PortfolioOptimisersCovariance(;
+                                                                                                                                                    ce = Gerber2NormalisedCovariance()))))
+        @test isa(pe14.me, JamesSteinExpectedReturns)
+        @test isa(pe14.ce.ce, Gerber2NormalisedCovariance)
+        pe15 = AugmentedBlackLittermanPriorEstimator(; tau = 0.2,
+                                                     a_views = BlackLittermanViewsEstimator(;
+                                                                                            A = LinearConstraintSide(;
+                                                                                                                     name = nothing,
+                                                                                                                     group = nothing)),
+                                                     f_views = BlackLittermanViewsEstimator(;
+                                                                                            A = LinearConstraintSide(;
+                                                                                                                     name = nothing,
+                                                                                                                     group = nothing)),
+                                                     a_pe = EmpiricalPriorEstimator(;
+                                                                                    me = BayesSteinExpectedReturns(),
+                                                                                    ce = PortfolioOptimisersCovariance(;
+                                                                                                                       ce = SmythBroby0NormalisedCovariance())))
+        @test pe15.tau == 0.2
+        @test isa(pe15.me, BayesSteinExpectedReturns)
+        @test isa(pe15.ce.ce, SmythBroby0NormalisedCovariance)
+        pe16 = AugmentedBlackLittermanPriorEstimator(;
+                                                     a_views = BlackLittermanViewsEstimator(;
+                                                                                            A = LinearConstraintSide(;
+                                                                                                                     name = nothing,
+                                                                                                                     group = nothing)),
+                                                     f_views = BlackLittermanViewsEstimator(;
+                                                                                            A = LinearConstraintSide(;
+                                                                                                                     name = nothing,
+                                                                                                                     group = nothing)),
+                                                     a_pe = BlackLittermanPriorEstimator(;
+                                                                                         views = BlackLittermanViewsEstimator(;
+                                                                                                                              A = LinearConstraintSide(;
+                                                                                                                                                       name = nothing,
+                                                                                                                                                       group = nothing)),
+                                                                                         pe = EmpiricalPriorEstimator(;
+                                                                                                                      me = JamesSteinExpectedReturns(),
+                                                                                                                      ce = PortfolioOptimisersCovariance(;
+                                                                                                                                                         ce = Gerber2NormalisedCovariance()))))
+        @test isa(pe16.me, JamesSteinExpectedReturns)
+        @test isa(pe16.ce.ce, Gerber2NormalisedCovariance)
     end
     @testset "Black Litterman Prior" begin
         rng = StableRNG(123456789)
@@ -282,23 +417,34 @@
         sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
 
         vc_1 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = :Asset, name = 2,
-                                                         coef = 1.0), B = 0.003)
+                                            A = LinearConstraintSide(; group = :Asset,
+                                                                     name = 2, coef = 1.0),
+                                            B = 0.003)
         vc_2 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Asset, :Asset],
-                                                         name = [3, 8], coef = [1.0, -1]),
-                                  B = -0.001)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Asset,
+                                                                              :Asset],
+                                                                     name = [3, 8],
+                                                                     coef = [1.0, -1]),
+                                            B = -0.001)
         vc_3 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Clusters, :Asset],
-                                                         name = [3, 9], coef = [1.0, -1]),
-                                  B = 0.002)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Clusters,
+                                                                              :Asset],
+                                                                     name = [3, 9],
+                                                                     coef = [1.0, -1]),
+                                            B = 0.002)
         vc_4 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Asset, :Clusters],
-                                                         name = [5, 1], coef = [1.0, -1]),
-                                  B = 0.007)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Asset,
+                                                                              :Clusters],
+                                                                     name = [5, 1],
+                                                                     coef = [1.0, -1]),
+                                            B = 0.007)
         vc_5 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = :Clusters, name = 2,
-                                                         coef = 1.0), B = 0.001)
+                                            A = LinearConstraintSide(; group = :Clusters,
+                                                                     name = 2, coef = 1.0),
+                                            B = 0.001)
         views = [vc_1, vc_2, vc_3, vc_4, vc_5]
         pes = [BlackLittermanPriorEstimator(; views = views, sets = sets),
                BlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.0001),
@@ -336,97 +482,68 @@
         end
 
         @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
-                                                                    A = LinearConstraintSide(;
-                                                                                           group = :Foo,
-                                                                                           name = 2,
-                                                                                           coef = 1),
-                                                                    B = 0.003), sets)
+                                                                              A = LinearConstraintSide(;
+                                                                                                       group = :Foo,
+                                                                                                       name = 2,
+                                                                                                       coef = 1),
+                                                                              B = 0.003),
+                                                 sets)
 
         @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
-                                                                        A = LinearConstraintSide(;
-                                                                                               group = :Foo,
-                                                                                               name = 2,
-                                                                                               coef = 1),
-                                                                        B = 0.003), sets;
-                                                     strict = true)
+                                                                                  A = LinearConstraintSide(;
+                                                                                                           group = :Foo,
+                                                                                                           name = 2,
+                                                                                                           coef = 1),
+                                                                                  B = 0.003),
+                                                     sets; strict = true)
 
         @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
-                                                                    A = LinearConstraintSide(;
-                                                                                           group = [:Foo],
-                                                                                           name = [2],
-                                                                                           coef = [1]),
-                                                                    B = 0.003), sets)
+                                                                              A = LinearConstraintSide(;
+                                                                                                       group = [:Foo],
+                                                                                                       name = [2],
+                                                                                                       coef = [1]),
+                                                                              B = 0.003),
+                                                 sets)
 
         @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
-                                                                        A = LinearConstraintSide(;
-                                                                                               group = [:Foo],
-                                                                                               name = [2],
-                                                                                               coef = [1]),
-                                                                        B = 0.003), sets;
-                                                     strict = true)
+                                                                                  A = LinearConstraintSide(;
+                                                                                                           group = [:Foo],
+                                                                                                           name = [2],
+                                                                                                           coef = [1]),
+                                                                                  B = 0.003),
+                                                     sets; strict = true)
 
         @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
-                                                                    A = LinearConstraintSide(;
-                                                                                           group = :Asset,
-                                                                                           name = 11,
-                                                                                           coef = 1),
-                                                                    B = 0.003), sets)
+                                                                              A = LinearConstraintSide(;
+                                                                                                       group = :Asset,
+                                                                                                       name = 11,
+                                                                                                       coef = 1),
+                                                                              B = 0.003),
+                                                 sets)
 
         @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
-                                                                        A = LinearConstraintSide(;
-                                                                                               group = :Asset,
-                                                                                               name = 11,
-                                                                                               coef = 1),
-                                                                        B = 0.003), sets,
-                                                     strict = true)
+                                                                                  A = LinearConstraintSide(;
+                                                                                                           group = :Asset,
+                                                                                                           name = 11,
+                                                                                                           coef = 1),
+                                                                                  B = 0.003),
+                                                     sets, strict = true)
 
         @test_throws TypeError views_constraints(BlackLittermanViewsEstimator(;
-                                                                    A = LinearConstraintSide(;
-                                                                                           group = [:Asset],
-                                                                                           name = [11],
-                                                                                           coef = [1]),
-                                                                    B = 0.003), sets)
+                                                                              A = LinearConstraintSide(;
+                                                                                                       group = [:Asset],
+                                                                                                       name = [11],
+                                                                                                       coef = [1]),
+                                                                              B = 0.003),
+                                                 sets)
 
         @test_throws ArgumentError views_constraints(BlackLittermanViewsEstimator(;
-                                                                        A = LinearConstraintSide(;
-                                                                                               group = [:Asset],
-                                                                                               name = [11],
-                                                                                               coef = [1]),
-                                                                        B = 0.003), sets,
-                                                     strict = true)
-    end
-    @testset "Factor Prior" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 100, 10)
-        F = X[:, [3, 8]]
-
-        pm1 = prior(FactorPriorEstimator(; residuals = false), transpose(X), transpose(F);
-                    dims = 2)
-        pm1_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-No-Residuals.csv"),
-                         DataFrame)
-        X_t = reshape(view(pm1_t, 1:1000, 1), 100, 10)
-        mu_t = view(pm1_t, 1001:1010, 1)
-        sigma_t = reshape(view(pm1_t, 1011:1110, 1), 10, 10)
-        chol_t = reshape(view(pm1_t, 1111:nrow(pm1_t), 1), :, 10)
-
-        @test isapprox(pm1.X, X_t)
-        @test isapprox(pm1.mu, mu_t)
-        @test isapprox(pm1.sigma, sigma_t)
-        @test isapprox(pm1.chol, chol_t)
-
-        pm2 = prior(FactorPriorEstimator(; residuals = true), transpose(X), transpose(F);
-                    dims = 2)
-        pm2_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-Residuals.csv"),
-                         DataFrame)
-        X_t = reshape(view(pm2_t, 1:1000, 1), 100, 10)
-        mu_t = view(pm2_t, 1001:1010, 1)
-        sigma_t = reshape(view(pm2_t, 1011:1110, 1), 10, 10)
-        chol_t = reshape(view(pm2_t, 1111:nrow(pm2_t), 1), :, 10)
-
-        @test isapprox(pm2.X, X_t)
-        @test isapprox(pm2.mu, mu_t)
-        @test isapprox(pm2.sigma, sigma_t)
-        @test isapprox(pm2.chol, chol_t)
+                                                                                  A = LinearConstraintSide(;
+                                                                                                           group = [:Asset],
+                                                                                                           name = [11],
+                                                                                                           coef = [1]),
+                                                                                  B = 0.003),
+                                                     sets, strict = true)
     end
     @testset "Bayesian Black Litterman Prior" begin
         rng = StableRNG(123456789)
@@ -435,16 +552,23 @@
         assets = 1:10
         sets = DataFrame(:Factor => [1, 2, 3, 4])
         vc_1 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = :Factor, name = 2,
-                                                         coef = 1), B = 0.003)
+                                            A = LinearConstraintSide(; group = :Factor,
+                                                                     name = 2, coef = 1),
+                                            B = 0.003)
         vc_2 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Factor, :Factor],
-                                                         name = [4, 1], coef = [1, -1.0]),
-                                  B = -0.001)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Factor,
+                                                                              :Factor],
+                                                                     name = [4, 1],
+                                                                     coef = [1, -1.0]),
+                                            B = -0.001)
         vc_3 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Factor, :Factor],
-                                                         name = [2, 3], coef = [1, -1.0]),
-                                  B = 0.002)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Factor,
+                                                                              :Factor],
+                                                                     name = [2, 3],
+                                                                     coef = [1, -1.0]),
+                                            B = 0.002)
         views = [vc_1, vc_2, vc_3]
         pes = [BayesianBlackLittermanPriorEstimator(;
                                                     pe = FactorPriorEstimator(;
@@ -507,16 +631,23 @@
         F = X[:, [3, 8, 5, 10]]
 
         vc_1 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = :Factor, name = 2,
-                                                         coef = 1), B = 0.003)
+                                            A = LinearConstraintSide(; group = :Factor,
+                                                                     name = 2, coef = 1),
+                                            B = 0.003)
         vc_2 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Factor, :Factor],
-                                                         name = [4, 1], coef = [1, -1.0]),
-                                  B = -0.001)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Factor,
+                                                                              :Factor],
+                                                                     name = [4, 1],
+                                                                     coef = [1, -1.0]),
+                                            B = -0.001)
         vc_3 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Factor, :Factor],
-                                                         name = [2, 3], coef = [1, -1.0]),
-                                  B = 0.002)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Factor,
+                                                                              :Factor],
+                                                                     name = [2, 3],
+                                                                     coef = [1, -1.0]),
+                                            B = 0.002)
         views = [vc_1, vc_2, vc_3]
         sets = DataFrame(:Factor => [1, 2, 3, 4])
 
@@ -687,37 +818,55 @@
         assets = 1:10
         a_sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         vc_1 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = :Asset, name = 2,
-                                                         coef = 1.0), B = 0.003)
+                                            A = LinearConstraintSide(; group = :Asset,
+                                                                     name = 2, coef = 1.0),
+                                            B = 0.003)
         vc_2 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Asset, :Asset],
-                                                         name = [3, 8], coef = [1, -1.0]),
-                                  B = -0.001)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Asset,
+                                                                              :Asset],
+                                                                     name = [3, 8],
+                                                                     coef = [1, -1.0]),
+                                            B = -0.001)
         vc_3 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Clusters, :Asset],
-                                                         name = [3, 9], coef = [1, -1.0]),
-                                  B = 0.002)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Clusters,
+                                                                              :Asset],
+                                                                     name = [3, 9],
+                                                                     coef = [1, -1.0]),
+                                            B = 0.002)
         vc_4 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Asset, :Clusters],
-                                                         name = [5, 1], coef = [1, -1.0]),
-                                  B = 0.007)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Asset,
+                                                                              :Clusters],
+                                                                     name = [5, 1],
+                                                                     coef = [1, -1.0]),
+                                            B = 0.007)
         vc_5 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = :Clusters, name = 2,
-                                                         coef = 1.0), B = 0.001)
+                                            A = LinearConstraintSide(; group = :Clusters,
+                                                                     name = 2, coef = 1.0),
+                                            B = 0.001)
         a_views = [vc_1, vc_2, vc_3, vc_4, vc_5]
 
         f_sets = DataFrame(:Factor => [1, 2, 3, 4])
         vc_1 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = :Factor, name = 2,
-                                                         coef = 1.0), B = 0.003)
+                                            A = LinearConstraintSide(; group = :Factor,
+                                                                     name = 2, coef = 1.0),
+                                            B = 0.003)
         vc_2 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Factor, :Factor],
-                                                         name = [4, 1], coef = [1, -1.0]),
-                                  B = -0.001)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Factor,
+                                                                              :Factor],
+                                                                     name = [4, 1],
+                                                                     coef = [1, -1.0]),
+                                            B = -0.001)
         vc_3 = BlackLittermanViewsEstimator(;
-                                  A = LinearConstraintSide(; group = [:Factor, :Factor],
-                                                         name = [2, 3], coef = [1, -1.0]),
-                                  B = 0.002)
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Factor,
+                                                                              :Factor],
+                                                                     name = [2, 3],
+                                                                     coef = [1, -1.0]),
+                                            B = 0.002)
         f_views = [vc_1, vc_2, vc_3]
         pes = [AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets),
@@ -821,91 +970,88 @@
             @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
         end
     end
-    @testset "High Order Prior" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 100, 10)
-        pe = HighOrderPriorEstimator()
-        pm = prior(pe, transpose(X); dims = 2)
-        @test isapprox(pm.X, X)
-        @test isapprox(pm.mu, vec(mean(SimpleExpectedReturns(), X)))
-        @test isapprox(pm.sigma, cov(PortfolioOptimisersCovariance(), X))
-        @test isapprox(pm.kt, cokurtosis(FullCokurtosis(), X))
-        @test isapprox(pm.skt, cokurtosis(SemiCokurtosis(), X))
-        @test all(isapprox.((pm.sk, pm.V), coskewness(FullCoskewness(), X)))
-        @test all(isapprox.((pm.ssk, pm.SV), coskewness(SemiCoskewness(), X)))
-        pm = prior(pe, transpose(X); dims = 2, kurt = false, skurt = false, skew = false,
-                   sskew = false)
-        @test isnothing(pm.kt)
-        @test isnothing(pm.skt)
-        @test isnothing(pm.sk)
-        @test isnothing(pm.V)
-        @test isnothing(pm.ssk)
-        @test isnothing(pm.SV)
-    end
     @testset "Entropy Pooling" begin
         rng = StableRNG(123456789)
         X = randn(rng, 100, 10)
         sets = DataFrame(:Assets => 1:10, :Clusters => [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-        views = [EntropyPoolingView(;
-                                    A = C0_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 1),
-                                    B = ConstantEntropyPoolingConstraint(; coef = 0.1),
-                                    comp = EQ()),
-                 EntropyPoolingView(;
-                                    A = C0_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 2),
-                                    B = C0_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 2)),
-                 EntropyPoolingView(;
-                                    A = C1_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 2),
-                                    B = ConstantEntropyPoolingConstraint(; coef = 0.95),
-                                    comp = LEQ()),
-                 EntropyPoolingView(;
-                                    A = C0_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 3),
-                                    B = C0_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 3)),
-                 EntropyPoolingView(;
-                                    A = C1_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 3),
-                                    B = C1_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 3)),
-                 EntropyPoolingView(;
-                                    A = C2_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 3,
-                                                                          kind = SkewnessEntropyPoolingView()),
-                                    B = ConstantEntropyPoolingConstraint(; coef = -0.25),
-                                    comp = GEQ()),
-                 EntropyPoolingView(;
-                                    A = C0_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 4),
-                                    B = C0_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 4)),
-                 EntropyPoolingView(;
-                                    A = C1_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 4),
-                                    B = C1_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 4)),
-                 EntropyPoolingView(;
-                                    A = C2_LinearEntropyPoolingConstraint(; group = :Assets,
-                                                                          name = 4,
-                                                                          kind = KurtosisEntropyPoolingView()),
-                                    B = ConstantEntropyPoolingConstraint(; coef = 5.1),
-                                    comp = LEQ()),
-                 EntropyPoolingView(;
-                                    A = C4_LinearEntropyPoolingConstraint(;
-                                                                          group1 = :Assets,
-                                                                          group2 = :Assets,
-                                                                          name1 = 10,
-                                                                          name2 = 3),
-                                    B = C4_LinearEntropyPoolingConstraint(;
-                                                                          group1 = :Assets,
-                                                                          group2 = :Assets,
-                                                                          name1 = 10,
-                                                                          name2 = 3,
-                                                                          coef = 0.22),
-                                    comp = GEQ())]
+        views = [EntropyPoolingViewEstimator(;
+                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 1),
+                                             B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                           coef = 0.1),
+                                             comp = EQ()),
+                 EntropyPoolingViewEstimator(;
+                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 2),
+                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 2)),
+                 EntropyPoolingViewEstimator(;
+                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 2),
+                                             B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                           coef = 0.95),
+                                             comp = LEQ()),
+                 EntropyPoolingViewEstimator(;
+                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 3),
+                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 3)),
+                 EntropyPoolingViewEstimator(;
+                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 3),
+                                             B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 3)),
+                 EntropyPoolingViewEstimator(;
+                                             A = C2_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 3,
+                                                                                            kind = SkewnessEntropyPoolingViewAlgorithm()),
+                                             B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                           coef = -0.25),
+                                             comp = GEQ()),
+                 EntropyPoolingViewEstimator(;
+                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 4),
+                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 4)),
+                 EntropyPoolingViewEstimator(;
+                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 4),
+                                             B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 4)),
+                 EntropyPoolingViewEstimator(;
+                                             A = C2_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            name = 4,
+                                                                                            kind = KurtosisEntropyPoolingAlgorithm()),
+                                             B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                           coef = 5.1),
+                                             comp = LEQ()),
+                 EntropyPoolingViewEstimator(;
+                                             A = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group1 = :Assets,
+                                                                                            group2 = :Assets,
+                                                                                            name1 = 10,
+                                                                                            name2 = 3),
+                                             B = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group1 = :Assets,
+                                                                                            group2 = :Assets,
+                                                                                            name1 = 10,
+                                                                                            name2 = 3,
+                                                                                            coef = 0.22),
+                                             comp = GEQ())]
         pes = [EntropyPoolingPriorEstimator(; views = views, sets = sets),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H1_EntropyPooling()),
@@ -987,95 +1133,99 @@
             @test ens == exp(-re)
         end
 
-        views = [EntropyPoolingView(;
-                                    A = C0_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [1]),
-                                    B = ConstantEntropyPoolingConstraint(; coef = 0.1),
-                                    comp = EQ()),
-                 EntropyPoolingView(;
-                                    A = C0_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [2]),
-                                    B = C0_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [2])),
-                 EntropyPoolingView(;
-                                    A = C1_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [2]),
-                                    B = ConstantEntropyPoolingConstraint(; coef = 0.95),
-                                    comp = LEQ()),
-                 EntropyPoolingView(;
-                                    A = C0_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [3]),
-                                    B = C0_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [3])),
-                 EntropyPoolingView(;
-                                    A = C1_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [3]),
-                                    B = C1_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [3])),
-                 EntropyPoolingView(;
-                                    A = C2_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          name = [3],
-                                                                          coef = [1],
-                                                                          kind = SkewnessEntropyPoolingView()),
-                                    B = ConstantEntropyPoolingConstraint(; coef = -0.2),
-                                    comp = GEQ()),
-                 EntropyPoolingView(;
-                                    A = C0_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [4]),
-                                    B = C0_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [4])),
-                 EntropyPoolingView(;
-                                    A = C1_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [4]),
-                                    B = C1_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          coef = [1],
-                                                                          name = [4])),
-                 EntropyPoolingView(;
-                                    A = C2_LinearEntropyPoolingConstraint(;
-                                                                          group = [:Assets],
-                                                                          name = [4],
-                                                                          coef = [1],
-                                                                          kind = KurtosisEntropyPoolingView()),
-                                    B = ConstantEntropyPoolingConstraint(; coef = 5.1),
-                                    comp = LEQ()),
-                 EntropyPoolingView(;
-                                    A = C4_LinearEntropyPoolingConstraint(;
-                                                                          group1 = [:Assets],
-                                                                          group2 = [:Assets],
-                                                                          name1 = [3],
-                                                                          name2 = [10],
-                                                                          coef = [1]),
-                                    B = C4_LinearEntropyPoolingConstraint(;
-                                                                          group1 = [:Assets],
-                                                                          group2 = [:Assets],
-                                                                          name1 = [3],
-                                                                          name2 = [1],
-                                                                          coef = [0.22]),
-                                    comp = GEQ())]
+        views = [EntropyPoolingViewEstimator(;
+                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [1]),
+                                             B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                           coef = 0.1),
+                                             comp = EQ()),
+                 EntropyPoolingViewEstimator(;
+                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [2]),
+                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [2])),
+                 EntropyPoolingViewEstimator(;
+                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [2]),
+                                             B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                           coef = 0.95),
+                                             comp = LEQ()),
+                 EntropyPoolingViewEstimator(;
+                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [3]),
+                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [3])),
+                 EntropyPoolingViewEstimator(;
+                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [3]),
+                                             B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [3])),
+                 EntropyPoolingViewEstimator(;
+                                             A = C2_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            name = [3],
+                                                                                            coef = [1],
+                                                                                            kind = SkewnessEntropyPoolingViewAlgorithm()),
+                                             B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                           coef = -0.2),
+                                             comp = GEQ()),
+                 EntropyPoolingViewEstimator(;
+                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [4]),
+                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [4])),
+                 EntropyPoolingViewEstimator(;
+                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [4]),
+                                             B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            coef = [1],
+                                                                                            name = [4])),
+                 EntropyPoolingViewEstimator(;
+                                             A = C2_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = [:Assets],
+                                                                                            name = [4],
+                                                                                            coef = [1],
+                                                                                            kind = KurtosisEntropyPoolingAlgorithm()),
+                                             B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                           coef = 5.1),
+                                             comp = LEQ()),
+                 EntropyPoolingViewEstimator(;
+                                             A = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group1 = [:Assets],
+                                                                                            group2 = [:Assets],
+                                                                                            name1 = [3],
+                                                                                            name2 = [10],
+                                                                                            coef = [1]),
+                                             B = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group1 = [:Assets],
+                                                                                            group2 = [:Assets],
+                                                                                            name1 = [3],
+                                                                                            name2 = [1],
+                                                                                            coef = [0.22]),
+                                             comp = GEQ())]
 
         ress = (0.03270155949442489, 0.030586876690884276, 0.03058687450109127,
                 0.032701560391104334, 0.03058687741491548, 0.030586877801521424)
@@ -1149,89 +1299,101 @@
         @test isapprox(pm0.mu, pm1.mu)
         @test isapprox(pm0.sigma, pm1.sigma)
 
-        c = C0_LinearEntropyPoolingConstraint(; group = [nothing, nothing],
-                                              name = [nothing, nothing], coef = [-3, -3.5])
+        c = C0_LinearEntropyPoolingConstraintEstimator(; group = [nothing, nothing],
+                                                       name = [nothing, nothing],
+                                                       coef = [-3, -3.5])
         @test all(isnothing.(c.group)) && all(isnothing.(c.name))
         d = PortfolioOptimisers.freeze_A_view(c)
         @test all(d.coef .== -1)
-        c = C0_LinearEntropyPoolingConstraint(; group = nothing, name = nothing, coef = -4)
+        c = C0_LinearEntropyPoolingConstraintEstimator(; group = nothing, name = nothing,
+                                                       coef = -4)
         @test isnothing(c.group) && isnothing(c.name)
         d = PortfolioOptimisers.freeze_A_view(c)
         @test d.coef == -1
 
-        c = C1_LinearEntropyPoolingConstraint(; group = [nothing, nothing],
-                                              name = [nothing, nothing], coef = [-5, -5.5])
+        c = C1_LinearEntropyPoolingConstraintEstimator(; group = [nothing, nothing],
+                                                       name = [nothing, nothing],
+                                                       coef = [-5, -5.5])
         @test all(isnothing.(c.group)) && all(isnothing.(c.name))
         d = PortfolioOptimisers.freeze_A_view(c)
         @test all(d.coef .== -1)
-        c = C1_LinearEntropyPoolingConstraint(; group = nothing, name = nothing, coef = -6)
+        c = C1_LinearEntropyPoolingConstraintEstimator(; group = nothing, name = nothing,
+                                                       coef = -6)
         @test isnothing(c.group) && isnothing(c.name)
         d = PortfolioOptimisers.freeze_A_view(c)
         @test d.coef == -1
 
-        c = C1_LinearEntropyPoolingConstraint(; group = [nothing, nothing],
-                                              name = [nothing, nothing], coef = [-5, -5.5])
+        c = C1_LinearEntropyPoolingConstraintEstimator(; group = [nothing, nothing],
+                                                       name = [nothing, nothing],
+                                                       coef = [-5, -5.5])
         @test all(isnothing.(c.group)) && all(isnothing.(c.name))
         d = PortfolioOptimisers.freeze_A_view(c)
         @test all(d.coef .== -1)
-        c = C1_LinearEntropyPoolingConstraint(; group = nothing, name = nothing, coef = -6)
+        c = C1_LinearEntropyPoolingConstraintEstimator(; group = nothing, name = nothing,
+                                                       coef = -6)
         @test isnothing(c.group) && isnothing(c.name)
         d = PortfolioOptimisers.freeze_A_view(c)
         @test d.coef == -1
 
-        c = C2_LinearEntropyPoolingConstraint(; group = [nothing, nothing],
-                                              name = [nothing, nothing], coef = [-7, -7.5],
-                                              kind = SkewnessEntropyPoolingView())
+        c = C2_LinearEntropyPoolingConstraintEstimator(; group = [nothing, nothing],
+                                                       name = [nothing, nothing],
+                                                       coef = [-7, -7.5],
+                                                       kind = SkewnessEntropyPoolingViewAlgorithm())
         @test all(isnothing.(c.group)) && all(isnothing.(c.name))
         d = PortfolioOptimisers.freeze_A_view(c)
         @test all(d.coef .== -1)
 
-        c = C2_LinearEntropyPoolingConstraint(; group = nothing, name = nothing, coef = -8,
-                                              kind = SkewnessEntropyPoolingView())
+        c = C2_LinearEntropyPoolingConstraintEstimator(; group = nothing, name = nothing,
+                                                       coef = -8,
+                                                       kind = SkewnessEntropyPoolingViewAlgorithm())
         @test isnothing(c.group) && isnothing(c.name)
         d = PortfolioOptimisers.freeze_A_view(c)
         @test d.coef == -1
 
-        c = C4_LinearEntropyPoolingConstraint(; group1 = [nothing, nothing],
-                                              group2 = [nothing, nothing],
-                                              name1 = [nothing, nothing],
-                                              name2 = [nothing, nothing], coef = [-9, -9.5])
+        c = C4_LinearEntropyPoolingConstraintEstimator(; group1 = [nothing, nothing],
+                                                       group2 = [nothing, nothing],
+                                                       name1 = [nothing, nothing],
+                                                       name2 = [nothing, nothing],
+                                                       coef = [-9, -9.5])
         @test all(isnothing.(c.group1)) && all(isnothing.(c.name1))
         @test all(isnothing.(c.group2)) && all(isnothing.(c.name2))
         d = PortfolioOptimisers.freeze_A_view(c)
         @test all(d.coef .== -1)
 
-        c = C4_LinearEntropyPoolingConstraint(; group1 = nothing, name1 = nothing,
-                                              group2 = nothing, name2 = nothing, coef = -10)
+        c = C4_LinearEntropyPoolingConstraintEstimator(; group1 = nothing, name1 = nothing,
+                                                       group2 = nothing, name2 = nothing,
+                                                       coef = -10)
         @test isnothing(c.group1) && isnothing(c.name1)
         @test isnothing(c.group2) && isnothing(c.name2)
         d = PortfolioOptimisers.freeze_A_view(c)
         @test d.coef == -1
 
-        c = EntropyPoolingView(;
-                               A = C1_LinearEntropyPoolingConstraint(; group = nothing,
-                                                                     name = nothing,
-                                                                     coef = -6),
-                               B = C1_LinearEntropyPoolingConstraint(; group = nothing,
-                                                                     name = nothing,
-                                                                     coef = -6))
+        c = EntropyPoolingViewEstimator(;
+                                        A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                       group = nothing,
+                                                                                       name = nothing,
+                                                                                       coef = -6),
+                                        B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                       group = nothing,
+                                                                                       name = nothing,
+                                                                                       coef = -6))
         @test c == (c[5] = c)
         @test sort(c) == c
         @test sort!(c) == c
 
         @test_throws AssertionError JuMPEntropyPooling(; slv = Solver[])
         pe = EntropyPoolingPriorEstimator(;
-                                          views = EntropyPoolingView(;
-                                                                     A = C1_LinearEntropyPoolingConstraint(;
-                                                                                                           group = nothing,
-                                                                                                           name = nothing,
-                                                                                                           coef = -6),
-                                                                     B = C1_LinearEntropyPoolingConstraint(;
-                                                                                                           group = nothing,
-                                                                                                           name = nothing,
-                                                                                                           coef = -6)))
+                                          views = EntropyPoolingViewEstimator(;
+                                                                              A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                                             group = nothing,
+                                                                                                                             name = nothing,
+                                                                                                                             coef = -6),
+                                                                              B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                                             group = nothing,
+                                                                                                                             name = nothing,
+                                                                                                                             coef = -6)))
         @test isa(pe.ce, PortfolioOptimisersCovariance)
         @test isa(pe.me, SimpleExpectedReturns)
     end
+    =#
 end
-=#

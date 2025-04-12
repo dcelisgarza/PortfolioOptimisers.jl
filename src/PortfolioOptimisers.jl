@@ -62,13 +62,14 @@ include("./13_ConstraintGeneration/2_LinearConstraintGeneration.jl")
 include("./13_ConstraintGeneration/3_CardinalityConstraintGeneration.jl")
 include("./13_ConstraintGeneration/4_WeightBoundsConstraintGeneration.jl")
 include("./13_ConstraintGeneration/5_RiskBudgetConstraintGeneration.jl")
-include("./13_ConstraintGeneration/6_BlackLittermanViewsGeneration.jl")
-include("./13_ConstraintGeneration/7_PhilogenyConstraintGeneration.jl")
+include("./13_ConstraintGeneration/6_PhilogenyConstraintGeneration.jl")
 
 include("./14_Prior/1_Base_Prior.jl")
 include("./14_Prior/2_EmpiricalPrior.jl")
 include("./14_Prior/3_FactorPrior.jl")
 include("./14_Prior/4_HighOrderPrior.jl")
+include("./14_Prior/5_BlackLittermanViewsGeneration.jl")
+include("./14_Prior/6_BlackLittermanPrior.jl")
 
 include("./15_UncertaintySets/1_Base_UncertaintySets.jl")
 
