@@ -49,20 +49,20 @@ struct FactorPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
     mp::T2
     re::T3
     ve::T4
-    residuals::T5
+    rsd::T5
 end
 function FactorPriorEstimator(;
                               pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                               re::AbstractRegressionEstimator = StepwiseRegression(),
                               ve::AbstractVarianceEstimator = SimpleVariance(),
-                              residuals::Bool = true)
+                              rsd::Bool = true)
     return FactorPriorEstimator{typeof(pe), typeof(mp), typeof(re), typeof(ve),
-                                typeof(residuals)}(pe, mp, re, ve, residuals)
+                                typeof(rsd)}(pe, mp, re, ve, rsd)
 end
 function factory(pe::FactorPriorEstimator, w::Union{Nothing, <:AbstractWeights} = nothing)
     return FactorPriorEstimator(; pe = factory(pe.pe, w), mp = pe.mp, re = pe.re,
-                                ve = factory(pe.ve, w), residuals = pe.residuals)
+                                ve = factory(pe.ve, w), rsd = pe.rsd)
 end
 function Base.getproperty(obj::FactorPriorEstimator, sym::Symbol)
     return if sym == :me
@@ -89,7 +89,7 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
     posterior_sigma = M * f_sigma * transpose(M)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
     posterior_csigma = M * cholesky(f_sigma).L
-    if pe.residuals
+    if pe.rsd
         err = X - posterior_X
         err_sigma = diagm(vec(var(pe.ve, err; dims = 1)))
         posterior_sigma .+= err_sigma

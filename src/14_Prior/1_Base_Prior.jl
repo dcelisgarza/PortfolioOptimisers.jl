@@ -38,5 +38,8 @@ end
 function prior(pm::AbstractPriorResult, args...; kwargs...)
     return pm
 end
+function factory(::Nothing, args...; kwargs...)
+    return nothing
+end
 
 export prior

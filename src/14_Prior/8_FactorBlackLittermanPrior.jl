@@ -49,7 +49,7 @@ struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
     views::T6
     sets::T7
     rf::T8
-    residuals::T9
+    rsd::T9
     views_conf::T10
     w::T11
     l::T12
@@ -64,7 +64,7 @@ function FactorBlackLittermanPriorEstimator(;
                                             views::Union{<:BlackLittermanViewsEstimator,
                                                          <:AbstractVector{<:BlackLittermanViewsEstimator}},
                                             sets::DataFrame = DataFrame(), rf::Real = 0.0,
-                                            residuals::Bool = true,
+                                            rsd::Bool = true,
                                             views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                             w::Union{Nothing, <:AbstractVector} = nothing,
                                             l::Union{Nothing, <:Real} = nothing,
@@ -85,19 +85,18 @@ function FactorBlackLittermanPriorEstimator(;
     end
     return FactorBlackLittermanPriorEstimator{typeof(pe), typeof(f_mp), typeof(mp),
                                               typeof(re), typeof(ve), typeof(views),
-                                              typeof(sets), typeof(rf), typeof(residuals),
+                                              typeof(sets), typeof(rf), typeof(rsd),
                                               typeof(views_conf), typeof(w), typeof(l),
                                               typeof(tau)}(pe, f_mp, mp, re, ve, views,
-                                                           sets, rf, residuals, views_conf,
-                                                           w, l, tau)
+                                                           sets, rf, rsd, views_conf, w, l,
+                                                           tau)
 end
 function factory(pe::FactorBlackLittermanPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return FactorBlackLittermanPriorEstimator(; pe = factory(pe.pe, w), f_mp = pe.f_mp,
                                               mp = pe.mp, re = pe.re,
                                               ve = factory(pe.ve, w), views = pe.views,
-                                              sets = pe.sets, rf = pe.rf,
-                                              residuals = pe.residuals,
+                                              sets = pe.sets, rf = pe.rf, rsd = pe.rsd,
                                               views_conf = pe.views_conf, w = pe.w,
                                               l = pe.l, tau = pe.tau)
 end
@@ -159,7 +158,7 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
     posterior_sigma = M * f_posterior_sigma * transpose(M)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
     posterior_csigma = M * cholesky(f_posterior_sigma).L
-    if pe.residuals
+    if pe.rsd
         err = X - posterior_X
         err_sigma = diagm(vec(var(pe.ve, err; dims = 1)))
         posterior_sigma .+= err_sigma

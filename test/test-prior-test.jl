@@ -48,7 +48,7 @@
         X = randn(rng, 100, 10)
         F = X[:, [3, 8]]
 
-        pm1 = prior(FactorPriorEstimator(; residuals = false), transpose(X), transpose(F);
+        pm1 = prior(FactorPriorEstimator(; rsd = false), transpose(X), transpose(F);
                     dims = 2)
         pm1_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-No-Residuals.csv"),
                          DataFrame)
@@ -62,7 +62,7 @@
         @test isapprox(pm1.chol, chol_t)
         @test pm1 === prior(pm1)
 
-        pm2 = prior(FactorPriorEstimator(; residuals = true), transpose(X), transpose(F);
+        pm2 = prior(FactorPriorEstimator(; rsd = true), transpose(X), transpose(F);
                     dims = 2)
         pm2_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-Residuals.csv"),
                          DataFrame)
@@ -87,6 +87,16 @@
         @test pm1.fm.sigma == pm2.fm.sigma
         @test pm1.fm.loadings.b == pm2.fm.loadings.b
         @test pm1.fm.loadings.M == pm2.fm.loadings.M
+
+        pe1 = FactorPriorEstimator(; rsd = false)
+        ew = eweights(1:10, 0.3)
+        pe2 = PortfolioOptimisers.factory(pe1, ew)
+        @test pe2.pe.ce.ce.ce.w == ew
+        @test pe2.pe.ce.ce.me.w == ew
+        @test pe2.pe.me.w === ew
+        @test pe2.ve.me.w === ew
+        @test pe2.ve.w === ew
+        @test !pe2.rsd
     end
     @testset "High Order Prior" begin
         rng = StableRNG(123456789)
@@ -100,6 +110,28 @@
         @test isapprox(pm.skt, cokurtosis(Cokurtosis(; alg = Semi()), X))
         @test all(isapprox.((pm.sk, pm.V), coskewness(Coskewness(; alg = Full()), X)))
         @test all(isapprox.((pm.ssk, pm.SV), coskewness(Coskewness(; alg = Semi()), X)))
+
+        pe1 = HighOrderPriorEstimator()
+        ew = eweights(1:10, 0.3)
+        pe2 = PortfolioOptimisers.factory(pe1, ew)
+        @test pe2.pe.ce.ce.ce.w == ew
+        @test pe2.pe.ce.ce.me.w == ew
+        @test pe2.pe.me.w === ew
+        @test pe2.kte.me.w === ew
+        @test pe2.skte.me.w === ew
+        @test pe2.ske.me.w === ew
+        @test pe2.sske.me.w === ew
+
+        pe1 = HighOrderPriorEstimator(; kte = nothing, skte = nothing, ske = nothing,
+                                      sske = nothing)
+        pe2 = PortfolioOptimisers.factory(pe1, ew)
+        @test pe2.pe.ce.ce.ce.w == ew
+        @test pe2.pe.ce.ce.me.w == ew
+        @test pe2.pe.me.w === ew
+        @test isnothing(pe2.kte)
+        @test isnothing(pe2.skte)
+        @test isnothing(pe2.ske)
+        @test isnothing(pe2.sske)
 
         pm1 = prior(pe, ReturnsResult(; nx = 1:10, X = X))
         @test isapprox(pm.X, pm1.X)
@@ -549,6 +581,14 @@
             @test size(pm.X) == size(X)
             @test pm === prior(pm)
         end
+
+        pe1 = pes[1]
+        ew = eweights(1:1000, 0.3)
+        pe2 = PortfolioOptimisers.factory(pe1, ew)
+        @test pe2.pe.ce.ce.ce.w == ew
+        @test pe2.pe.ce.ce.me.w == ew
+        @test isnothing(pe2.pe.me.w)
+
         pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X))
         pm2 = prior(pes[1], X)
         @test pm1.X == pm2.X
@@ -663,6 +703,13 @@
             @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
             @test pm === prior(pm)
         end
+        pe1 = pes[1]
+        ew = eweights(1:1000, 0.3)
+        pe2 = PortfolioOptimisers.factory(pe1, ew)
+        @test pe2.pe.ce.ce.ce.w == ew
+        @test pe2.pe.ce.ce.me.w == ew
+        @test pe2.pe.me.me.w === ew
+
         pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
         pm2 = prior(pes[1], X, F)
         @test pm1.X == pm2.X
@@ -700,42 +747,40 @@
         sets = DataFrame(:Factor => [1, 2, 3, 4])
 
         pes = [FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
-                                                  residuals = false),
+                                                  rsd = false),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  residuals = false),
+                                                  rsd = false),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, residuals = false),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, w = (1:10) / sum(1:10),
-                                                  residuals = false),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
-                                                  residuals = false,
-                                                  views_conf = fill(eps(), length(views)),),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  residuals = false,
-                                                  views_conf = fill(eps(), length(views)),),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, residuals = false,
-                                                  views_conf = fill(eps(), length(views)),),
+                                                  l = 1, rsd = false),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
-                                                  residuals = false,
+                                                  rsd = false),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = false,
                                                   views_conf = fill(eps(), length(views)),),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
-                                                  residuals = false,
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+                                                  rsd = false,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+                                                  l = 1, rsd = false,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+                                                  l = 1, w = (1:10) / sum(1:10),
+                                                  rsd = false,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = false,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views)),),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  residuals = false,
+                                                  rsd = false,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views)),),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, residuals = false,
+                                                  l = 1, rsd = false,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views)),),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
-                                                  residuals = false,
+                                                  rsd = false,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views)))]
 
@@ -751,25 +796,25 @@
 
             res1 = isapprox(pm.X, X_t)
             if !res1
-                println("Test $i no residuals fails on X.")
+                println("Test $i no rsd fails on X.")
                 find_tol(pm.X, X_t; name1 = :X, name2 = :X_t)
             end
             @test res1
             res2 = isapprox(pm.mu, mu_t)
             if !res2
-                println("Test $i no residuals fails on mu.")
+                println("Test $i no rsd fails on mu.")
                 find_tol(pm.mu, mu_t; name1 = :mu, name2 = :mu_t)
             end
             @test res2
             res3 = isapprox(pm.sigma, sigma_t)
             if !res3
-                println("Test $i no residuals fails on sigma.")
+                println("Test $i no rsd fails on sigma.")
                 find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
             end
             @test res3
             res4 = isapprox(pm.chol, chol_t)
             if !res4
-                println("Test $i no residuals fails on chol.")
+                println("Test $i no rsd fails on chol.")
                 find_tol(pm.chol, chol_t; name1 = :chol, name2 = :chol_t)
             end
             @test res4
@@ -780,6 +825,15 @@
             @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
             @test pm === prior(pm)
         end
+        pe1 = pes[1]
+        ew = eweights(1:1000, 0.3)
+        pe2 = PortfolioOptimisers.factory(pe1, ew)
+        @test pe2.pe.ce.ce.ce.w == ew
+        @test pe2.pe.ce.ce.me.w == ew
+        @test pe2.pe.me.w === ew
+        @test pe2.ve.me.w === ew
+        @test pe2.ve.w === ew
+        @test !pe2.rsd
 
         pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
         pm2 = prior(pes[1], X, F)
@@ -792,43 +846,38 @@
         @test pm1.loadings.b == pm2.loadings.b
         @test pm1.loadings.M == pm2.loadings.M
 
-        pes = [FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
-                                                  residuals = true),
+        pes = [FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = true),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  residuals = true),
+                                                  rsd = true),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, residuals = true),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, w = (1:10) / sum(1:10),
-                                                  residuals = true),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
-                                                  residuals = true,
-                                                  views_conf = fill(eps(), length(views)),),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  residuals = true,
-                                                  views_conf = fill(eps(), length(views)),),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, residuals = true,
-                                                  views_conf = fill(eps(), length(views)),),
+                                                  l = 1, rsd = true),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
-                                                  residuals = true,
+                                                  rsd = true),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = true,
                                                   views_conf = fill(eps(), length(views)),),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
-                                                  residuals = true,
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+                                                  rsd = true,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+                                                  l = 1, rsd = true,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+                                                  l = 1, w = (1:10) / sum(1:10), rsd = true,
+                                                  views_conf = fill(eps(), length(views)),),
+               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views)),),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  residuals = true,
+                                                  rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views)),),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, residuals = true,
+                                                  l = 1, rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views)),),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, w = (1:10) / sum(1:10),
-                                                  residuals = true,
+                                                  l = 1, w = (1:10) / sum(1:10), rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views)))]
 
@@ -845,25 +894,25 @@
 
             res1 = isapprox(pm.X, X_t)
             if !res1
-                println("Test $i residuals fails on X.")
+                println("Test $i rsd fails on X.")
                 find_tol(pm.X, X_t; name1 = :X, name2 = :X_t)
             end
             @test res1
             res2 = isapprox(pm.mu, mu_t)
             if !res2
-                println("Test $i residuals fails on mu.")
+                println("Test $i rsd fails on mu.")
                 find_tol(pm.mu, mu_t; name1 = :mu, name2 = :mu_t)
             end
             @test res2
             res3 = isapprox(pm.sigma, sigma_t)
             if !res3
-                println("Test $i residuals fails on sigma.")
+                println("Test $i rsd fails on sigma.")
                 find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
             end
             @test res3
             res4 = isapprox(pm.chol, chol_t)
             if !res4
-                println("Test $i residuals fails on chol.")
+                println("Test $i rsd fails on chol.")
                 find_tol(pm.chol, chol_t; name1 = :chol, name2 = :chol_t)
             end
             @test res4
@@ -1029,6 +1078,18 @@
             @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
             @test pm === prior(pm)
         end
+        pe1 = pes[1]
+        ew = eweights(1:1000, 0.3)
+        pe2 = PortfolioOptimisers.factory(pe1, ew)
+        @test pe2.a_pe.ce.ce.ce.w == ew
+        @test pe2.a_pe.ce.ce.me.w == ew
+        @test pe2.a_pe.me.w === ew
+        @test pe2.f_pe.ce.ce.ce.w == ew
+        @test pe2.f_pe.ce.ce.me.w == ew
+        @test pe2.f_pe.me.w === ew
+        @test pe2.ve.me.w === ew
+        @test pe2.ve.w === ew
+
         pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
         pm2 = prior(pes[1], X, F)
         @test pm1.X == pm2.X
@@ -1202,6 +1263,13 @@
             @test ens == exp(-re)
             @test pm === prior(pm)
         end
+        pe1 = pes[1]
+        ew = eweights(1:1000, 0.3)
+        pe2 = PortfolioOptimisers.factory(pe1, ew)
+        @test pe2.pe.ce.ce.ce.w == ew
+        @test pe2.pe.ce.ce.me.w == ew
+        @test pe2.w === ew
+
         pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X))
         pm2 = prior(pes[1], X)
         @test pm1.X == pm2.X
