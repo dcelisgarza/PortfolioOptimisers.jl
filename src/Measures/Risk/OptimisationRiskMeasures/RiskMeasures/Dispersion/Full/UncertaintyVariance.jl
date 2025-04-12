@@ -1,5 +1,5 @@
 struct UncertaintySetVariance{T1 <: RiskMeasureSettings,
-                              T2 <: Union{Nothing, <:AbstractUncertaintySet,
+                              T2 <: Union{Nothing, <:AbstractUncertaintySetResult,
                                           <:AbstractUncertaintySetEstimator},
                               T3 <: Union{Nothing, <:AbstractMatrix{<:Real}}} <:
        SigmaRiskMeasure
@@ -8,7 +8,7 @@ struct UncertaintySetVariance{T1 <: RiskMeasureSettings,
     sigma::T3
 end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                ucs::Union{Nothing, <:AbstractUncertaintySet,
+                                ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                            <:AbstractUncertaintySetEstimator} = nothing,
                                 sigma::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing)
     if isa(sigma, AbstractMatrix)
@@ -21,7 +21,7 @@ function (r::UncertaintySetVariance)(w::AbstractVector)
     return dot(w, r.sigma, w)
 end
 function risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
-                              ucs::Union{Nothing, <:AbstractUncertaintySet,
+                              ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                          <:AbstractUncertaintySetEstimator} = nothing,
                               args...; kwargs...)
     uset = ucs_factory(r.ucs, ucs)
@@ -30,7 +30,7 @@ function risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorRes
 end
 function cluster_risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorResult,
                                       cluster::AbstractVector, ::Any,
-                                      ucs::Union{Nothing, <:AbstractUncertaintySet,
+                                      ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                                  <:AbstractUncertaintySetEstimator} = nothing,
                                       args...; kwargs...)
     uset = ucs_factory(r.ucs, ucs, cluster)

@@ -38,7 +38,7 @@ function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{<:Any
     set_max_ratio_return_constraints!(model, obj, mu)
     return nothing
 end
-function set_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
+function set_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySetResult,
                                  mu::AbstractVector)
     sc = model[:sc]
     w = model[:w]
@@ -50,7 +50,7 @@ function set_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
     @expression(model, ret, dot(mu, w) - fees - dot(d_mu, bucs_w))
     return nothing
 end
-function set_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySet,
+function set_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySetResult,
                                  mu::AbstractVector)
     sc = model[:sc]
     w = model[:w]
@@ -65,7 +65,7 @@ function set_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySet,
 end
 function set_return_constraints!(model::JuMP.Model,
                                  pret::ArithmeticReturn{<:Any,
-                                                        Union{<:AbstractUncertaintySet,
+                                                        Union{<:AbstractUncertaintySetResult,
                                                               <:AbstractUncertaintySetEstimator}},
                                  obj::ObjectiveFunction, pm::AbstractPriorResult)
     lb = pret.lb

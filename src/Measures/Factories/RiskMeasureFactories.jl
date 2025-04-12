@@ -29,11 +29,11 @@ function ucs_factory(::Nothing, ::Nothing)
     return nothing
 end
 function ucs_factory(::Nothing,
-                     prior_ucs::Union{<:AbstractUncertaintySet,
+                     prior_ucs::Union{<:AbstractUncertaintySetResult,
                                       <:AbstractUncertaintySetEstimator})
     return prior_ucs
 end
-function ucs_factory(risk_ucs::Union{<:AbstractUncertaintySet,
+function ucs_factory(risk_ucs::Union{<:AbstractUncertaintySetResult,
                                      <:AbstractUncertaintySetEstimator}, ::Any)
     return risk_ucs
 end

@@ -77,6 +77,9 @@ include("./14_Prior/10_EntropyPoolingViewsGeneration.jl")
 include("./14_Prior/11_EntropyPoolingPrior.jl")
 
 include("./15_UncertaintySets/1_Base_UncertaintySets.jl")
+include("./15_UncertaintySets/2_DeltaUncertaintySets.jl")
+include("./15_UncertaintySets/3_NormalUncertaintySets.jl")
+include("./15_UncertaintySets/4_BootstrapUncertaintySets.jl")
 
 #=
 
