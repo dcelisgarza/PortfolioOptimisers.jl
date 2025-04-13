@@ -15,12 +15,12 @@ function Turnover(; val::Union{<:Real, <:AbstractVector{<:Real}} = 0.0,
     @smart_assert(!isempty(w))
     return Turnover{typeof(val), typeof(w)}(val, w)
 end
-function cluster_turnover_factory(::Nothing, ::AbstractVector)
+function turnover_view(::Nothing, ::Any)
     return nothing
 end
-function cluster_turnover_factory(turnover::Turnover, cluster::AbstractVector)
-    val = scalar_array_view(turnover.val, cluster)
-    w = view(turnover.w, cluster)
+function turnover_view(turnover::Turnover, i)
+    val = scalar_array_view(turnover.val, i)
+    w = view(turnover.w, i)
     return Turnover(; val = val, w = w)
 end
 

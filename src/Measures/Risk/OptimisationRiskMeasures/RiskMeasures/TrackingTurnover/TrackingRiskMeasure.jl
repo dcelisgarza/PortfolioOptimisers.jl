@@ -20,7 +20,7 @@ function cluster_risk_measure_factory(r::TrackingRiskMeasure{<:Any, <:ReturnsTra
 end
 function cluster_risk_measure_factory(r::TrackingRiskMeasure{<:Any, <:WeightsTracking},
                                       ::Any, cluster::AbstractVector, args...; kwargs...)
-    fees = cluster_fees_factory(r.tracking.fees, cluster)
+    fees = fees_view(r.tracking.fees, cluster)
     w = view(r.tracking.w, cluster)
     return TrackingRiskMeasure(; settings = r.settings,
                                tracking = WeightsTracking(; w = w, fees = fees))
