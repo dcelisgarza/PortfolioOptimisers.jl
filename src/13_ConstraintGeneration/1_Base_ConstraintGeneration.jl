@@ -57,7 +57,6 @@ function split_equation(equation_str::AbstractString)
 
     return SplitEquationResult(; lhs = lhs, rhs = rhs, comp = comp)
 end
-
 # Function to tokenize and parse terms from a side of the equation
 function parse_side(side::AbstractString, strict::Bool = true)
     # Add leading + if needed for consistent parsing
@@ -104,14 +103,19 @@ function parse_side(side::AbstractString, strict::Bool = true)
             continue
         end
 
-        # Case 1: constant
-        if occursin(r"^[0-9]+\.?[0-9]*$", term)
-            constant_value += sign_factor * parse(Float64, term)
+        # Case 1: coefficient[/denominator]
+        m = match(r"^((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(?:\/((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?))?$",
+                  term)
+        if !isnothing(m)
+            coef = isnothing(m[1]) || isempty(m[1]) ? 1.0 : parse(Float64, m[1])
+            denom = isnothing(m[2]) || isempty(m[2]) ? 1.0 : parse(Float64, m[2])
+            constant_value += sign_factor * coef / denom
             continue
         end
 
         # Case 2: coefficient*variable[/denominator]
-        m = match(r"^(\d*\.?\d*)\*([a-zA-Z][a-zA-Z0-9_\.]*)(?:\/(\d+))?$", term)
+        m = match(r"^((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\*([a-zA-Z][a-zA-Z0-9_\.]*)(?:\/((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?))?$",
+                  term)
         if !isnothing(m)
             coef = isnothing(m[1]) || isempty(m[1]) ? 1.0 : parse(Float64, m[1])
             var = m[2]
@@ -121,7 +125,8 @@ function parse_side(side::AbstractString, strict::Bool = true)
         end
 
         # Case 3: variable*coefficient[/denominator]
-        m = match(r"^([a-zA-Z][a-zA-Z0-9_\.]*)\*(\d*\.?\d+)(?:\/(\d+))?$", term)
+        m = match(r"^([a-zA-Z][a-zA-Z0-9_\.]*)\*((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(?:\/((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?))?$",
+                  term)
         if !isnothing(m)
             var = m[1]
             coef = parse(Float64, m[2])
@@ -131,7 +136,8 @@ function parse_side(side::AbstractString, strict::Bool = true)
         end
 
         # Case 4: coefficient[/denominator]*variable
-        m = match(r"^(\d*\.?\d+)(?:\/(\d+))?\*([a-zA-Z][a-zA-Z0-9_\.]*)$", term)
+        m = match(r"^((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(?:\/((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?))?\*([a-zA-Z][a-zA-Z0-9_\.]*)$",
+                  term)
         if !isnothing(m)
             coef = parse(Float64, m[1])
             denom = isnothing(m[2]) || isempty(m[2]) ? 1.0 : parse(Float64, m[2])
@@ -141,18 +147,19 @@ function parse_side(side::AbstractString, strict::Bool = true)
         end
 
         # Case 5: coefficient[/denominator]*variable[/denominator]
-        m = match(r"^(\d*\.?\d+)(?:\/(\d+))?\*([a-zA-Z][a-zA-Z0-9_\.]*)(?:\/(\d+))?$", term)
+        m = match(r"^((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(?:\/((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?))?\*([a-zA-Z][a-zA-Z0-9_\.]*)(?:\/((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?))?$",
+                  term)
         if !isnothing(m)
             coef = parse(Float64, m[1])
             denom1 = isnothing(m[2]) || isempty(m[2]) ? 1.0 : parse(Float64, m[2])
             var = m[3]
-            denom2 = isnothing(m[3]) || isempty(m[3]) ? 1.0 : parse(Float64, m[3])
+            denom2 = isnothing(m[4]) || isempty(m[4]) ? 1.0 : parse(Float64, m[4])
             push!(variable_terms, (sign_factor * coef / (denom1 * denom2), var))
             continue
         end
 
         # Case 6: coefficient[/denominator]*variable*coefficient[/denominator]
-        m = match(r"^(\d*\.?\d+)(?:\/(\d+))?\*([a-zA-Z][a-zA-Z0-9_\.]*)\*(\d*\.?\d+)(?:\/(\d+))?$",
+        m = match(r"^((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(?:\/((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?))?\*([a-zA-Z][a-zA-Z0-9_\.]*)\*((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(?:\/((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?))?$",
                   term)
         if !isnothing(m)
             coef1 = parse(Float64, m[1])
@@ -165,7 +172,8 @@ function parse_side(side::AbstractString, strict::Bool = true)
         end
 
         # Case 7: variable/denominator
-        m = match(r"^([a-zA-Z][a-zA-Z0-9_\.]*)\/(\d+)$", term)
+        m = match(r"^([a-zA-Z][a-zA-Z0-9_\.]*)\/((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)$",
+                  term)
         if !isnothing(m)
             var = m[1]
             denom = parse(Float64, m[2])

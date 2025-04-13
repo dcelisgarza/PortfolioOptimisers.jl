@@ -1,7 +1,7 @@
 @safetestset "Equation tests" begin
     using PortfolioOptimisers, Test
     @testset "Equation parsing" begin
-        eqn = "- 7*f*8/9 + 10/11*g*12 + a - 1*b -c*2 +   3*d/4 - 1/5*e*6 + 13/14*h*15/16 - 3*a + - -   6 -  - --- 6 = -5"
+        eqn = "- 7*f*8/9 + 10/11*g*12 + a - 1e0*b -c*2 +   3*d/4 - 1/5*e*6  + - -   6 -  - --- 6 =  3*a +- 13/14*h*15/16-5"
         res = parse_constraint_equation(eqn)
         @test res.eqn ==
               "-2.0*a -b -2.0*c + 0.75*d -1.2*e -6.222222222222222*f + 10.909090909090908*g + 0.8705357142857143*h == -5.0"
@@ -28,14 +28,25 @@
         @test res.cnst == 3.0
         @test res.coef == [1, -1]
 
-        @test_throws ArgumentError parse_constraint_equation("A+b")
-
-        @test_throws ArgumentError parse_constraint_equation("A+2*2b>=6")
         res = parse_constraint_equation("A+2*2b>=6", false)
         @test res.eqn == "A >= 6.0"
         @test res.vars == ["A"]
         @test res.coef == [1]
         @test res.comp == ">="
         @test res.cnst == 6.0
+
+        @test_throws ArgumentError parse_constraint_equation("A+b")
+        @test_throws ArgumentError parse_constraint_equation("A+2*2b>=6")
+        @test_throws ArgumentError parse_constraint_equation("A+b=>2")
+        @test_throws ArgumentError parse_constraint_equation("A+b=<2")
+        @test_throws ArgumentError parse_constraint_equation("A+b===2")
+        @test_throws ArgumentError parse_constraint_equation("A+b===2")
+
+        res = parse_constraint_equation("a+3e-5/5e-6-b -d*1e-6/1e-4 <=3-- 1e-5*f/1e-8 + 1e-5/ 5e-6*f*1e-8 /2e-7")
+        @test res.eqn == "a -b -0.009999999999999998*d -1000.1000000000001*f <= -3.0"
+        @test res.vars == ["a", "b", "d", "f"]
+        @test res.coef == [1, -1, -1e-6 / 1e-4, -1e-5 / 1e-8 - 1e-5 / 5e-6 * 1e-8 / 2e-7]
+        @test res.comp == "<="
+        @test res.cnst == -3.0
     end
 end
