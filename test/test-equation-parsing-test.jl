@@ -42,10 +42,12 @@
         @test_throws ArgumentError parse_constraint_equation("A+b===2")
         @test_throws ArgumentError parse_constraint_equation("A+b===2")
 
-        res = parse_constraint_equation("a+3e-5/5e-6-b -d*1e-6/1e-4 <=3-- 1e-5*f/1e-8 + 1e-5/ 5e-6*f*1e-8 /2e-7")
-        @test res.eqn == "a -b -0.009999999999999998*d -1000.1000000000001*f <= -3.0"
-        @test res.vars == ["a", "b", "d", "f"]
-        @test res.coef == [1, -1, -1e-6 / 1e-4, -1e-5 / 1e-8 - 1e-5 / 5e-6 * 1e-8 / 2e-7]
+        res = parse_constraint_equation("1/2*a+3e-5/5e-6-b -d*1e-6/1e-4 +h/1<=3-- 1e-5*f/1e-8 + 1e-5/ 5e-6*f*1e-8 /2e-7 - 2/2*g/1")
+        @test res.eqn ==
+              "0.5*a -b -0.009999999999999998*d -1000.1000000000001*f + g + h <= -3.0"
+        @test res.vars == ["a", "b", "d", "f", "g", "h"]
+        @test res.coef ==
+              [1 / 2, -1, -1e-6 / 1e-4, -1e-5 / 1e-8 - 1e-5 / 5e-6 * 1e-8 / 2e-7, 1, 1]
         @test res.comp == "<="
         @test res.cnst == -3.0
     end

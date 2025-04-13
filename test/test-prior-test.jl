@@ -154,6 +154,29 @@
         @test isnothing(pm.SV)
         @test pm === prior(pm)
     end
+    @testset "High Order Factor Prior" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 10) * 0.001
+        F = X[:, [3, 8]]
+
+        pe1 = FactorPriorEstimator(; re = DimensionReductionRegression(;), rsd = true)
+        pm1 = prior(pe1, transpose(X), transpose(F); dims = 2)
+
+        pe2 = HighOrderPriorEstimator(; pe = pe1)
+        pm2 = prior(pe2, transpose(X), transpose(F); dims = 2)
+
+        @test pm1.X == pm2.X
+        @test pm1.mu == pm2.mu
+        @test pm1.sigma == pm2.sigma
+        @test pm2.kt ==
+              cokurtosis(Cokurtosis(; alg = Full()), pm2.X; mean = transpose(pm2.mu))
+        @test pm2.skt ==
+              cokurtosis(Cokurtosis(; alg = Semi()), pm2.X; mean = transpose(pm2.mu))
+        @test (pm2.sk, pm2.V) ==
+              coskewness(Coskewness(; alg = Full()), pm2.X; mean = transpose(pm2.mu))
+        @test (pm2.ssk, pm2.SV) ==
+              coskewness(Coskewness(; alg = Semi()), pm2.X; mean = transpose(pm2.mu))
+    end
     @testset "Black Litterman Views" begin
         assets = 1:10
         sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
@@ -622,6 +645,56 @@
                                                                                                                 coef = [1]),
                                                                                        B = 0.003),
                                                           sets, strict = true)
+    end
+    @testset "Black Litterman Factor Prior" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 10) * 0.001
+        F = X[:, [3, 8]]
+
+        assets = 1:10
+        sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+
+        vc_1 = BlackLittermanViewsEstimator(;
+                                            A = LinearConstraintSide(; group = :Asset,
+                                                                     name = 2, coef = 1.0),
+                                            B = 0.003)
+        vc_2 = BlackLittermanViewsEstimator(;
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Asset,
+                                                                              :Asset],
+                                                                     name = [3, 8],
+                                                                     coef = [1.0, -1]),
+                                            B = -0.001)
+        vc_3 = BlackLittermanViewsEstimator(;
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Clusters,
+                                                                              :Asset],
+                                                                     name = [3, 9],
+                                                                     coef = [1.0, -1]),
+                                            B = 0.002)
+        vc_4 = BlackLittermanViewsEstimator(;
+                                            A = LinearConstraintSide(;
+                                                                     group = [:Asset,
+                                                                              :Clusters],
+                                                                     name = [5, 1],
+                                                                     coef = [1.0, -1]),
+                                            B = 0.007)
+        vc_5 = BlackLittermanViewsEstimator(;
+                                            A = LinearConstraintSide(; group = :Clusters,
+                                                                     name = 2, coef = 1.0),
+                                            B = 0.001)
+        views = [vc_1, vc_2, vc_3, vc_4, vc_5]
+        pe1 = FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward()),
+                                   rsd = true)
+        pm1 = prior(pe1, transpose(X), transpose(F); dims = 2)
+
+        pe2 = BlackLittermanPriorEstimator(; pe = pe1, views = views, sets = sets)
+        pm2 = prior(pe2, transpose(X), transpose(F); dims = 2)
+        df = CSV.read(joinpath(@__DIR__, "./assets/Black-Litterman-Factor-Prior.csv"),
+                      DataFrame)
+        @test pm1.X == pm2.X
+        @test isapprox(pm2.mu, df[1:10, "1"])
+        @test isapprox(vec(pm2.sigma), df[11:end, "1"])
     end
     @testset "Bayesian Black Litterman Prior" begin
         rng = StableRNG(123456789)
