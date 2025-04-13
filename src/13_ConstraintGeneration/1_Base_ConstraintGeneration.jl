@@ -16,6 +16,16 @@ end
 function comparison_sign_ineq_flag(::GEQ)
     return -1, true
 end
+struct SplitEquationResult{T1 <: AbstractString, T2 <: AbstractString,
+                           T3 <: AbstractString} <: AbstractResult
+    lhs::T1
+    rhs::T2
+    comp::T3
+end
+function SplitEquationResult(; lhs::AbstractString, rhs::AbstractString,
+                             comp::AbstractString)
+    return SplitEquationResult{typeof(lhs), typeof(rhs), typeof(comp)}(lhs, rhs, comp)
+end
 function split_equation(equation_str::AbstractString)
     # Remove whitespace for easier parsing
     eq_clean = replace(equation_str, r"\s+" => "")
@@ -45,8 +55,9 @@ function split_equation(equation_str::AbstractString)
     lhs = eq_clean[1:(comp_pos - 1)]
     rhs = eq_clean[(comp_pos + length(comp)):end]
 
-    return (; lhs = lhs, rhs = rhs, comp = comp)
+    return SplitEquationResult(; lhs = lhs, rhs = rhs, comp = comp)
 end
+
 # Function to tokenize and parse terms from a side of the equation
 function parse_side(side::AbstractString, strict::Bool = true)
     # Add leading + if needed for consistent parsing
