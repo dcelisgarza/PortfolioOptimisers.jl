@@ -14,12 +14,12 @@ end
 function risk_measure_factory(r::TrackingRiskMeasure, ::Any, args...; kwargs...)
     return r
 end
-function cluster_risk_measure_factory(r::TrackingRiskMeasure{<:Any, <:ReturnsTracking},
-                                      args...; kwargs...)
+function risk_measure_view(r::TrackingRiskMeasure{<:Any, <:ReturnsTracking}, args...;
+                           kwargs...)
     return r
 end
-function cluster_risk_measure_factory(r::TrackingRiskMeasure{<:Any, <:WeightsTracking},
-                                      ::Any, cluster::AbstractVector, args...; kwargs...)
+function risk_measure_view(r::TrackingRiskMeasure{<:Any, <:WeightsTracking}, ::Any,
+                           cluster::AbstractVector, args...; kwargs...)
     fees = fees_view(r.tracking.fees, cluster)
     w = view(r.tracking.w, cluster)
     return TrackingRiskMeasure(; settings = r.settings,

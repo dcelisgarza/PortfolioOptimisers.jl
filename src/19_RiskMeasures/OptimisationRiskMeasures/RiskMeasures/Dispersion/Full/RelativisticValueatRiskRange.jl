@@ -42,10 +42,9 @@ function risk_measure_factory(r::RelativisticValueatRiskRange, ::Any,
                                         kappa_a = r.kappa_a, beta = r.beta,
                                         kappa_b = r.kappa_b, slv = slv)
 end
-function cluster_risk_measure_factory(r::RelativisticValueatRiskRange, ::Any, ::Any,
-                                      slv::Union{Nothing, <:Solver,
-                                                 <:AbstractVector{<:Solver}}, args...;
-                                      kwargs...)
+function risk_measure_view(r::RelativisticValueatRiskRange, ::Any, ::Any,
+                           slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
+                           args...; kwargs...)
     return risk_measure_factory(r, nothing, nothing, slv, args...; kwargs...)
 end
 

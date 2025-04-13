@@ -19,8 +19,8 @@ function risk_measure_factory(r::StandardDeviation, prior::AbstractPriorResult, 
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
-function cluster_risk_measure_factory(r::StandardDeviation, prior::AbstractPriorResult,
-                                      cluster::AbstractVector, args...; kwargs...)
+function risk_measure_view(r::StandardDeviation, prior::AbstractPriorResult,
+                           cluster::AbstractVector, args...; kwargs...)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, cluster)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end

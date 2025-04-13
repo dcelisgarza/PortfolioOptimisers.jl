@@ -47,9 +47,8 @@ for r ∈ risks
                  return $(r)(; settings = r.settings, ve = r.ve, target = r.target, w = r.w,
                              mu = mu)
              end
-             function cluster_risk_measure_factory(r::$(r), prior::AbstractPriorResult,
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(r::$(r), prior::AbstractPriorResult,
+                                        cluster::AbstractVector, args...; kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, cluster)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
                  return $(r)(; settings = r.settings, ve = r.ve, target = target, w = r.w,
@@ -62,9 +61,8 @@ for r ∈ risks
                  return $(r)(; settings = r.settings, ve = r.ve, target = r.target, w = w,
                              mu = mu)
              end
-             function cluster_risk_measure_factory(r::$(r), prior::EntropyPoolingResult,
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(r::$(r), prior::EntropyPoolingResult,
+                                        cluster::AbstractVector, args...; kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, cluster)
                  w = risk_measure_nothing_vec_factory(r.w, prior.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
@@ -81,13 +79,11 @@ for r ∈ risks
                  return $(r)(; settings = r.settings, ve = r.ve, target = r.target, w = w,
                              mu = mu)
              end
-             function cluster_risk_measure_factory(r::$(r),
-                                                   prior::HighOrderPriorResult{<:EntropyPoolingResult,
-                                                                               <:Any, <:Any,
-                                                                               <:Any,
-                                                                               <:Any},
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(r::$(r),
+                                        prior::HighOrderPriorResult{<:EntropyPoolingResult,
+                                                                    <:Any, <:Any, <:Any,
+                                                                    <:Any},
+                                        cluster::AbstractVector, args...; kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, cluster)
                  w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
@@ -106,9 +102,8 @@ for r ∈ risks
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
                  return $(r)(; settings = r.settings, target = r.target, w = r.w, mu = mu)
              end
-             function cluster_risk_measure_factory(r::$(r), prior::AbstractPriorResult,
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(r::$(r), prior::AbstractPriorResult,
+                                        cluster::AbstractVector, args...; kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, cluster)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
                  return $(r)(; settings = r.settings, target = target, w = r.w, mu = mu)
@@ -119,9 +114,8 @@ for r ∈ risks
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
                  return $(r)(; settings = r.settings, target = r.target, w = w, mu = mu)
              end
-             function cluster_risk_measure_factory(r::$(r), prior::EntropyPoolingResult,
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(r::$(r), prior::EntropyPoolingResult,
+                                        cluster::AbstractVector, args...; kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, cluster)
                  w = risk_measure_nothing_vec_factory(r.w, prior.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
@@ -136,13 +130,11 @@ for r ∈ risks
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
                  return $(r)(; settings = r.settings, target = r.target, w = w, mu = mu)
              end
-             function cluster_risk_measure_factory(r::$(r),
-                                                   prior::HighOrderPriorResult{<:EntropyPoolingResult,
-                                                                               <:Any, <:Any,
-                                                                               <:Any,
-                                                                               <:Any},
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(r::$(r),
+                                        prior::HighOrderPriorResult{<:EntropyPoolingResult,
+                                                                    <:Any, <:Any, <:Any,
+                                                                    <:Any},
+                                        cluster::AbstractVector, args...; kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, cluster)
                  w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
@@ -162,7 +154,7 @@ for r ∈ risks
              function risk_measure_factory(r::$(r), args...; kwargs...)
                  return r
              end
-             function cluster_risk_measure_factory(r::$(r), args...; kwargs...)
+             function risk_measure_view(r::$(r), args...; kwargs...)
                  return r
              end
          end)
@@ -187,7 +179,7 @@ for r ∈ risks
                  w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
                  return $(r)(; settings = r.settings, w = w)
              end
-             function cluster_risk_measure_factory(r::$(r), args...; kwargs...)
+             function risk_measure_view(r::$(r), args...; kwargs...)
                  return r
              end
          end)
@@ -203,10 +195,10 @@ for r ∈ risks
                  slv = risk_measure_solver_factory(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, slv = slv)
              end
-             function cluster_risk_measure_factory(r::$(r), ::Any, ::Any,
-                                                   slv::Union{Nothing, <:Solver,
-                                                              <:AbstractVector{<:Solver}},
-                                                   args...; kwargs...)
+             function risk_measure_view(r::$(r), ::Any, ::Any,
+                                        slv::Union{Nothing, <:Solver,
+                                                   <:AbstractVector{<:Solver}}, args...;
+                                        kwargs...)
                  return risk_measure_factory(r; slv = slv, kwargs = kwargs)
              end
          end)
@@ -224,10 +216,10 @@ for r ∈ risks
                  return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
                              slv = slv)
              end
-             function cluster_risk_measure_factory(r::$(r), ::Any, ::Any,
-                                                   slv::Union{Nothing, <:Solver,
-                                                              <:AbstractVector{<:Solver}},
-                                                   args...; kwargs...)
+             function risk_measure_view(r::$(r), ::Any, ::Any,
+                                        slv::Union{Nothing, <:Solver,
+                                                   <:AbstractVector{<:Solver}}, args...;
+                                        kwargs...)
                  return risk_measure_factory(r; slv = slv, kwargs = kwargs)
              end
          end)
@@ -273,17 +265,14 @@ for r ∈ risks
                  V = risk_measure_nothing_matrix_factory(r.V, nothing)
                  return $(r)(; settings = r.settings, mp = r.mp, sk = sk, V = V)
              end
-             function cluster_risk_measure_factory(::$(r){<:Any, <:Any, Nothing, <:Any},
-                                                   ::Nothing, prior::AbstractPriorResult,
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(::$(r){<:Any, <:Any, Nothing, <:Any}, ::Nothing,
+                                        prior::AbstractPriorResult, cluster::AbstractVector,
+                                        args...; kwargs...)
                  throw(ArgumentError("Neither the risk measure, nor the prior have the required data."))
              end
-             function cluster_risk_measure_factory(skew_rm::$(r){<:Any, <:Any,
-                                                                 <:AbstractMatrix, <:Any},
-                                                   prior::AbstractPriorResult,
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(skew_rm::$(r){<:Any, <:Any, <:AbstractMatrix,
+                                                      <:Any}, prior::AbstractPriorResult,
+                                        cluster::AbstractVector, args...; kwargs...)
                  idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
                  sk = view(skew_rm.sk, cluster, idx)
                  V = __coskewness(sk, prior.X, skew_rm.mp)
@@ -292,15 +281,13 @@ for r ∈ risks
                  end
                  return $(r)(; settings = r.settings, mp = r.mp, sk = sk, V = V)
              end
-             function cluster_risk_measure_factory(::$(r){<:Any, <:Any, Nothing, <:Any},
-                                                   prior::HighOrderPriorResult{<:Any, <:Any,
-                                                                               <:Any, <:Any,
-                                                                               <:Any, <:Any,
-                                                                               <:AbstractMatrix,
-                                                                               <:AbstractMatrix,
-                                                                               <:AbstractMatrixProcessingEstimator},
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(::$(r){<:Any, <:Any, Nothing, <:Any},
+                                        prior::HighOrderPriorResult{<:Any, <:Any, <:Any,
+                                                                    <:Any, <:Any, <:Any,
+                                                                    <:AbstractMatrix,
+                                                                    <:AbstractMatrix,
+                                                                    <:AbstractMatrixProcessingEstimator},
+                                        cluster::AbstractVector, args...; kwargs...)
                  idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
                  sk = view(_get_sk(r, prior), cluster, idx)
                  V = __coskewness(sk, prior.X, _get_smp(r, prior))
@@ -350,48 +337,40 @@ for r ∈ risks
                  kt = risk_measure_nothing_matrix_factory(r.kt, nothing)
                  return $(r)(; settings = r.settings, w = w, mu = mu, kt = kt)
              end
-             function cluster_risk_measure_factory(r::$(r){<:Any, <:Any, <:Any, <:Nothing},
-                                                   prior::AbstractPriorResult,
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(r::$(r){<:Any, <:Any, <:Any, <:Nothing},
+                                        prior::AbstractPriorResult, cluster::AbstractVector,
+                                        args...; kwargs...)
                  throw(ArgumentError("Neither the risk measure, nor the prior have the required data."))
              end
-             function cluster_risk_measure_factory(r::$(r){<:Any, <:Any, <:Any,
-                                                           <:AbstractMatrix},
-                                                   prior::AbstractPriorResult,
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(r::$(r){<:Any, <:Any, <:Any, <:AbstractMatrix},
+                                        prior::AbstractPriorResult, cluster::AbstractVector,
+                                        args...; kwargs...)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
                  idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
                  kt = risk_measure_nothing_matrix_factory(r.kt, nothing, idx)
                  return $(r)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
              end
-             function cluster_risk_measure_factory(r::$(r){<:Any, <:Any, <:Any,
-                                                           <:AbstractMatrix},
-                                                   prior::EntropyPoolingResult,
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(r::$(r){<:Any, <:Any, <:Any, <:AbstractMatrix},
+                                        prior::EntropyPoolingResult,
+                                        cluster::AbstractVector, args...; kwargs...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
                  idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
                  kt = risk_measure_nothing_matrix_factory(r.kt, nothing, idx)
                  return $(r)(; settings = r.settings, w = w, mu = mu, kt = kt)
              end
-             function cluster_risk_measure_factory(r::$(r), prior::HighOrderPriorResult,
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(r::$(r), prior::HighOrderPriorResult,
+                                        cluster::AbstractVector, args...; kwargs...)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
                  idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
                  kt = risk_measure_nothing_matrix_factory(r.kt, _get_kt(r, prior), idx)
                  return $(r)(; settings = r.settings, w = r.w, mu = mu, kt = kt)
              end
-             function cluster_risk_measure_factory(r::$(r),
-                                                   prior::HighOrderPriorResult{<:EntropyPoolingResult,
-                                                                               <:Any, <:Any,
-                                                                               <:Any,
-                                                                               <:Any},
-                                                   cluster::AbstractVector, args...;
-                                                   kwargs...)
+             function risk_measure_view(r::$(r),
+                                        prior::HighOrderPriorResult{<:EntropyPoolingResult,
+                                                                    <:Any, <:Any, <:Any,
+                                                                    <:Any},
+                                        cluster::AbstractVector, args...; kwargs...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
                  idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
@@ -404,7 +383,7 @@ function risk_measure_factory(rs::AbstractVector{<:OptimisationRiskMeasure}, arg
                               kwargs...)
     return risk_measure_factory.(rs, args...; kwargs...)
 end
-function cluster_risk_measure_factory(rs::AbstractVector{<:OptimisationRiskMeasure},
-                                      args...; kwargs...)
-    return cluster_risk_measure_factory.(rs, args...; kwargs...)
+function risk_measure_view(rs::AbstractVector{<:OptimisationRiskMeasure}, args...;
+                           kwargs...)
+    return risk_measure_view.(rs, args...; kwargs...)
 end

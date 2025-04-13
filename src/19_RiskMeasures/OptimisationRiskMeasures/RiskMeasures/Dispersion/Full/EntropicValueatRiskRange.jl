@@ -27,10 +27,9 @@ function risk_measure_factory(r::EntropicValueatRiskRange, ::Any,
     return EntropicValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
                                     slv = slv)
 end
-function cluster_risk_measure_factory(r::EntropicValueatRiskRange, ::Any, ::Any,
-                                      slv::Union{Nothing, <:Solver,
-                                                 <:AbstractVector{<:Solver}}, args...;
-                                      kwargs...)
+function risk_measure_view(r::EntropicValueatRiskRange, ::Any, ::Any,
+                           slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
+                           args...; kwargs...)
     return risk_measure_factory(r, nothing, nothing, slv, args...; kwargs...)
 end
 

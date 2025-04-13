@@ -45,26 +45,25 @@ function risk_measure_factory(r::SemiVariance,
     return SemiVariance(; settings = r.settings, formulation = r.formulation,
                         target = r.target, w = w, mu = mu)
 end
-function cluster_risk_measure_factory(r::SemiVariance, prior::AbstractPriorResult,
-                                      cluster::AbstractVector, args...; kwargs...)
+function risk_measure_view(r::SemiVariance, prior::AbstractPriorResult,
+                           cluster::AbstractVector, args...; kwargs...)
     target = risk_measure_nothing_real_vec_factory(r.target, cluster)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
     return SemiVariance(; settings = r.settings, formulation = r.formulation,
                         target = target, w = r.w, mu = mu)
 end
-function cluster_risk_measure_factory(r::SemiVariance, prior::EntropyPoolingResult,
-                                      cluster::AbstractVector, args...; kwargs...)
+function risk_measure_view(r::SemiVariance, prior::EntropyPoolingResult,
+                           cluster::AbstractVector, args...; kwargs...)
     target = risk_measure_nothing_real_vec_factory(r.target, cluster)
     w = risk_measure_nothing_vec_factory(r.w, prior.w)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
     return SemiVariance(; settings = r.settings, formulation = r.formulation,
                         target = target, w = w, mu = mu)
 end
-function cluster_risk_measure_factory(r::SemiVariance,
-                                      prior::HighOrderPriorResult{<:EntropyPoolingResult,
-                                                                  <:Any, <:Any, <:Any,
-                                                                  <:Any},
-                                      cluster::AbstractVector, args...; kwargs...)
+function risk_measure_view(r::SemiVariance,
+                           prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any, <:Any,
+                                                       <:Any, <:Any},
+                           cluster::AbstractVector, args...; kwargs...)
     target = risk_measure_nothing_real_vec_factory(r.target, cluster)
     w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
