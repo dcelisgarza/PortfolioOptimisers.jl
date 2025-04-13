@@ -116,7 +116,7 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
     return if success
         pweights(value.(q))
     else
-        @warn("model could not be optimised satisfactorily.\nSolvers: $trials.")
+        @warn("Model could not be optimised satisfactorily.\nSolvers: $trials.")
         pweights(fill(NaN, length(q)))
     end
 end

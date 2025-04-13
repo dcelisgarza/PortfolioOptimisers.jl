@@ -164,6 +164,8 @@
 
         pe2 = HighOrderPriorEstimator(; pe = pe1)
         pm2 = prior(pe2, transpose(X), transpose(F); dims = 2)
+        @test isa(pe2.me, SimpleExpectedReturns)
+        @test isa(pe2.ce, PortfolioOptimisersCovariance)
 
         @test pm1.X == pm2.X
         @test pm1.mu == pm2.mu
@@ -1173,7 +1175,7 @@
         @test pm1.fm.loadings.b == pm2.fm.loadings.b
         @test pm1.fm.loadings.M == pm2.fm.loadings.M
     end
-    @testset "Entropy Pooling" begin
+    @testset "Entropy Pooling Prior" begin
         rng = StableRNG(123456789)
         X = randn(rng, 100, 10)
         sets = DataFrame(:Assets => 1:10, :Clusters => [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
@@ -1611,4 +1613,61 @@
         @test isa(pe.ce, PortfolioOptimisersCovariance)
         @test isa(pe.me, SimpleExpectedReturns)
     end
+    @testset "Entropy Pooling Factor Prior" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 100, 10)
+        F = X[:, [3, 8]] + randn(rng, 100, 2) * 0.0001
+        sets = DataFrame(:Assets => 1:10, :Clusters => [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        views = [EntropyPoolingViewEstimator(;
+                                             A = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group1 = :Assets,
+                                                                                            group2 = :Assets,
+                                                                                            name1 = 10,
+                                                                                            name2 = 3),
+                                             B = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group1 = :Assets,
+                                                                                            group2 = :Assets,
+                                                                                            name1 = 10,
+                                                                                            name2 = 3,
+                                                                                            coef = 0.217),
+                                             comp = LEQ())]
+        pes = [EntropyPoolingPriorEstimator(; pe = FactorPriorEstimator(;), views = views,
+                                            sets = sets),
+               EntropyPoolingPriorEstimator(; pe = FactorPriorEstimator(;), views = views,
+                                            sets = sets, alg = H1_EntropyPooling()),
+               EntropyPoolingPriorEstimator(; pe = FactorPriorEstimator(;), views = views,
+                                            sets = sets, alg = H2_EntropyPooling())]
+
+        ress = (1.0759615986400306e-15, 1.0759615986400306e-15, 1.0759615986400306e-15)
+        enss = (0.9999999999999989, 0.9999999999999989, 0.9999999999999989)
+        for (i, (pe, re_t, ens_t)) ∈ enumerate(zip(pes, ress, enss))
+            pm = prior(pe, transpose(X), transpose(F); dims = 2)
+            res = cov2cor(pm.sigma)[10, 3] <= 0.217
+            if !res
+                println("Test Fails on iteration $i correlation")
+                find_tol(cov2cor(pm.sigma)[10, 3], 0.217; name1 = :covcor,
+                         name2 = ">= 0.05")
+            end
+            @test res
+
+            re = relative_entropy(pm.w,
+                                  range(; start = inv(100), stop = inv(100), length = 100))
+            ens = effective_number_scenarios(pm.w,
+                                             range(; start = inv(100), stop = inv(100),
+                                                   length = 100))
+            res = isapprox(re, re_t; rtol = 5e-7)
+            if !res
+                println("Test Fails on iteration $i re")
+                find_tol(re, re_t; name1 = :re, name2 = :re_t)
+            end
+            res = isapprox(ens, ens_t; rtol = 5e-7)
+            if !res
+                println("Test Fails on iteration $i ens")
+                find_tol(ens, ens_t; name1 = :ens, name2 = :ens_t)
+            end
+            @test ens == exp(-re)
+            @test pm === prior(pm)
+        end
+    end
 end
+

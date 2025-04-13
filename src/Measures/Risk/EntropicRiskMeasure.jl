@@ -21,7 +21,7 @@ function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:
     return if success
         objective_value(model)
     else
-        @warn("model could not be optimised satisfactorily.\nSolvers: $trials.")
+        @warn("Model could not be optimised satisfactorily.\nSolvers: $trials.")
         NaN
     end
 end

@@ -81,7 +81,7 @@ function owa_model_solve(model::JuMP.Model, method::OWAJuMPEstimator,
         phis ./= sum(phis)
         w = weights * phis
     else
-        @warn("model could not be optimised satisfactorily.\nType: $method\nReverting to ncrra_weights.")
+        @warn("Model could not be optimised satisfactorily.\nType: $method\nReverting to ncrra_weights.")
         w = ncrra_weights(weights, 0.5)
     end
 end
