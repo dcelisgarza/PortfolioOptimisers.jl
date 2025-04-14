@@ -2,7 +2,7 @@ abstract type AbstractRiskMeasure <: AbstractEstimator end
 
 abstract type NoOptimisationRiskMeasure <: AbstractRiskMeasure end
 abstract type MuNoOptimisationRiskMeasure <: NoOptimisationRiskMeasure end
-abstract type TargetNoOptimisationRiskMeasure <: MuNoOptimisationRiskMeasure end
+abstract type AbstractMomentNoOptimisationRiskMeasure <: MuNoOptimisationRiskMeasure end
 
 abstract type OptimisationRiskMeasure <: AbstractRiskMeasure end
 
@@ -14,12 +14,12 @@ abstract type SkewRiskMeasure <: RiskMeasure end
 abstract type SquareRootKurtosisRiskMeasure <: RiskMeasure end
 abstract type OrderedWeightsArrayRiskMeasure <: RiskMeasure end
 abstract type MuRiskMeasure <: RiskMeasure end
-abstract type TargetRiskMeasure <: MuRiskMeasure end
+abstract type AbstractMomentRiskMeasure <: MuRiskMeasure end
 
 abstract type HierarchicalRiskMeasure <: OptimisationRiskMeasure end
 abstract type SolverHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
 abstract type MuHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
-abstract type TargetHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
+abstract type AbstractMomentHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
 
 function risk_measure_factory(r::AbstractRiskMeasure, args...; kwargs...)
     return r
@@ -70,9 +70,10 @@ function calc_ret_mu(x::AbstractVector, w::AbstractVector, rm::MuRiskMeasures)
         dot(mu, w)
     end
 end
-const TargetRiskMeasures = Union{TargetRiskMeasure, TargetHierarchicalRiskMeasure,
-                                 TargetNoOptimisationRiskMeasure}
-function calc_target_ret_mu(x::AbstractVector, w::AbstractVector, rm::TargetRiskMeasures)
+const MomentRiskMeasures = Union{AbstractMomentRiskMeasure,
+                                 AbstractMomentHierarchicalRiskMeasure,
+                                 AbstractMomentNoOptimisationRiskMeasure}
+function calc_target_ret_mu(x::AbstractVector, w::AbstractVector, rm::MomentRiskMeasures)
     target = rm.target
     if isnothing(target)
         target = calc_ret_mu(x, w, rm)

@@ -1,224 +1,179 @@
 abstract type AbstractRiskMomentAlgorithm <: AbstractAlgorithm end
 abstract type AbstractLowOrderRiskMomentAlgorithm <: AbstractRiskMomentAlgorithm end
 abstract type AbstractHighOrderRiskMomentAlgorithm <: AbstractRiskMomentAlgorithm end
-struct Moment <: AbstractLowOrderRiskMomentAlgorithm end
-struct Deviation{T1 <: Integer} <: AbstractLowOrderRiskMomentAlgorithm
+function risk_moment_algorithm_factory(alg::AbstractRiskMomentAlgorithm, args...; kwargs...)
+    return alg
+end
+struct FirstLowerMoment <: AbstractLowOrderRiskMomentAlgorithm end
+struct SemiDeviation{T1 <: Integer} <: AbstractLowOrderRiskMomentAlgorithm
     ddof::T1
 end
-function Deviation(; ddof::Integer = 1)
+function SemiDeviation(; ddof::Integer = 1)
     @smart_assert(ddof >= 0)
-    return Deviation{typeof(ddof)}(ddof)
+    return SemiDeviation{typeof(ddof)}(ddof)
 end
-struct ThirdLower <: AbstractHighOrderRiskMomentAlgorithm end
-struct FourthLower <: AbstractHighOrderRiskMomentAlgorithm end
-struct FourthCentral <: AbstractHighOrderRiskMomentAlgorithm end
-struct FirstLowerPartialMoment{T1 <: RiskMeasureSettings,
-                               T2 <: AbstractLowOrderRiskMomentAlgorithm,
-                               T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                               T4 <: Union{Nothing, <:AbstractWeights},
-                               T5 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
-       TargetRiskMeasure
+struct SemiVariance{T1 <: Integer, T2 <: VarianceFormulation} <:
+       AbstractLowOrderRiskMomentAlgorithm
+    ddof::T1
+    formulation::T2
+end
+function SemiVariance(; ddof::Integer = 1, formulation::VarianceFormulation = SOC())
+    @smart_assert(ddof >= 0)
+    return SemiVariance{typeof(ddof), typeof(formulation)}(ddof, formulation)
+end
+struct MeanAbsoluteDeviation{T1 <: Union{Nothing, <:AbstractWeights}} <:
+       AbstractLowOrderRiskMomentAlgorithm
+    w::T1
+end
+function MeanAbsoluteDeviation(; w::Union{Nothing, <:AbstractWeights} = nothing)
+    if isa(w, AbstractWeights)
+        @smart_assert(!isempty(w))
+    end
+    return MeanAbsoluteDeviation{typeof(w)}(w)
+end
+function risk_moment_algorithm_factory(alg::MeanAbsoluteDeviation,
+                                       w::Union{<:Nothing, AbstractWeights}; kwargs...)
+    return MeanAbsoluteDeviation(; w = w)
+end
+struct ThirdLowerMoment <: AbstractHighOrderRiskMomentAlgorithm end
+struct FourthLowerMoment <: AbstractHighOrderRiskMomentAlgorithm end
+struct FourthCentralMoment <: AbstractHighOrderRiskMomentAlgorithm end
+abstract type AbstractHighOrderDeviationAlgorithm <: AbstractHighOrderRiskMomentAlgorithm end
+struct HighOrderDeviation{T1 <: AbstractHighOrderRiskMomentAlgorithm,
+                          T2 <: AbstractVarianceEstimator} <:
+       AbstractHighOrderDeviationAlgorithm
+    alg::T1
+    ve::T2
+end
+function HighOrderDeviation(;
+                            alg::AbstractHighOrderRiskMomentAlgorithm = ThirdLowerMoment(),
+                            ve::AbstractVarianceEstimator = SimpleVariance())
+    return HighOrderDeviation{typeof(alg), typeof(ve)}(alg, ve)
+end
+function risk_moment_algorithm_factory(alg::HighOrderDeviation,
+                                       w::Union{<:Nothing, <:AbstractWeights}; kwargs...)
+    return HighOrderDeviation(; alg = alg.alg, ve = factory(alg.ve, w))
+end
+struct LowOrderMoment{T1 <: RiskMeasureSettings, T2 <: AbstractLowOrderRiskMomentAlgorithm,
+                      T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                      T4 <: Union{Nothing, <:AbstractWeights},
+                      T5 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+       AbstractMomentRiskMeasure
     settings::T1
     alg::T2
     target::T3
     w::T4
     mu::T5
 end
-function FirstLowerPartialMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                 alg::AbstractLowOrderRiskMomentAlgorithm = Moment(),
-                                 target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
-                                 w::Union{Nothing, <:AbstractWeights} = nothing,
-                                 mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                        alg::AbstractLowOrderRiskMomentAlgorithm = FirstLowerMoment(),
+                        target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
+                        w::Union{Nothing, <:AbstractWeights} = nothing,
+                        mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(target, AbstractVector)
         @smart_assert(!isempty(target))
     end
     if isa(mu, AbstractVector)
         @smart_assert(!isempty(mu))
     end
-    return FirstLowerPartialMoment{typeof(settings), typeof(alg), typeof(target), typeof(w),
-                                   typeof(mu)}(settings, alg, target, w, mu)
+    return LowOrderMoment{typeof(settings), typeof(alg), typeof(target), typeof(w),
+                          typeof(mu)}(settings, alg, target, w, mu)
 end
-function (r::FirstLowerPartialMoment{<:Any, <:Moment, <:Any, <:Any, <:Any})(w::AbstractVector,
-                                                                            X::AbstractMatrix,
-                                                                            fees::Union{Nothing,
-                                                                                        <:Fees} = nothing)
+function (r::LowOrderMoment{<:Any, <:FirstLowerMoment, <:Any, <:Any, <:Any})(w::AbstractVector,
+                                                                             X::AbstractMatrix,
+                                                                             fees::Union{Nothing,
+                                                                                         <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     val = val[val .<= zero(eltype(val))]
     return -sum(val) / length(x)
 end
-function (r::FirstLowerPartialMoment{<:Any, <:Deviation, <:Any, <:Any, <:Any})(w::AbstractVector,
-                                                                               X::AbstractMatrix,
-                                                                               fees::Union{Nothing,
-                                                                                           <:Fees} = nothing)
+function (r::LowOrderMoment{<:Any, <:SemiDeviation, <:Any, <:Any, <:Any})(w::AbstractVector,
+                                                                          X::AbstractMatrix,
+                                                                          fees::Union{Nothing,
+                                                                                      <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     mu = calc_target_ret_mu(x, w, r)
     val = x .- mu
     val = val[val .<= zero(eltype(val))]
     return sqrt(dot(val, val) / (length(x) - r.alg.ddof))
 end
-struct MeanAbsoluteDeviation{T1 <: RiskMeasureSettings,
-                             T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                             T3 <: Union{Nothing, <:AbstractWeights},
-                             T4 <: Union{Nothing, <:AbstractVector{<:Real}},
-                             T5 <: Union{Nothing, <:AbstractWeights}} <: TargetRiskMeasure
-    settings::T1
-    target::T2
-    w::T3
-    mu::T4
-    we::T5
-end
-function MeanAbsoluteDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                               target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                               w::Union{Nothing, <:AbstractWeights} = nothing,
-                               mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                               we::Union{Nothing, <:AbstractWeights} = nothing)
-    if isa(target, AbstractVector)
-        @smart_assert(!isempty(target))
-    end
-    if isa(mu, AbstractVector)
-        @smart_assert(!isempty(mu))
-    end
-    return MeanAbsoluteDeviation{typeof(settings), typeof(target), typeof(w), typeof(mu),
-                                 typeof(we)}(settings, target, w, mu, we)
-end
-function (r::MeanAbsoluteDeviation)(w::AbstractVector, X::AbstractMatrix,
-                                    fees::Union{Nothing, <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    mu = calc_target_ret_mu(x, w, r)
-    we = r.we
-    return isnothing(we) ? mean(abs.(x .- mu)) : mean(abs.(x .- mu), we)
-end
-function risk_measure_factory(r::MeanAbsoluteDeviation, prior::AbstractPriorResult, args...;
-                              kwargs...)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    return MeanAbsoluteDeviation(; settings = r.settings, target = r.target, w = r.w,
-                                 mu = mu, we = r.we)
-end
-function risk_measure_factory(r::MeanAbsoluteDeviation, prior::EntropyPoolingResult,
-                              args...; kwargs...)
-    w = risk_measure_nothing_vec_factory(r.w, prior.w)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    we = risk_measure_nothing_vec_factory(r.we, prior.w)
-    return MeanAbsoluteDeviation(; settings = r.settings, target = r.target, w = w, mu = mu,
-                                 we = we)
-end
-function risk_measure_factory(r::MeanAbsoluteDeviation,
-                              (prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any,
-                                                           <:Any, <:Any, <:Any}), args...;
-                              kwargs...)
-    w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    we = risk_measure_nothing_vec_factory(r.we, prior.pm.w)
-    return MeanAbsoluteDeviation(; settings = r.settings, target = r.target, w = w, mu = mu,
-                                 we = we)
-end
-function risk_measure_view(r::MeanAbsoluteDeviation, prior::AbstractPriorResult,
-                           cluster::AbstractVector, args...; kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    return MeanAbsoluteDeviation(; settings = r.settings, target = target, w = r.w, mu = mu,
-                                 we = r.we)
-end
-function risk_measure_view(r::MeanAbsoluteDeviation, prior::EntropyPoolingResult,
-                           cluster::AbstractVector, args...; kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
-    w = risk_measure_nothing_vec_factory(r.w, prior.w)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    we = risk_measure_nothing_vec_factory(r.we, prior.w)
-    return MeanAbsoluteDeviation(; settings = r.settings, target = target, w = w, mu = mu,
-                                 we = we)
-end
-function risk_measure_view(r::MeanAbsoluteDeviation,
-                           prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any, <:Any,
-                                                       <:Any, <:Any},
-                           cluster::AbstractVector, args...; kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
-    w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    we = risk_measure_nothing_vec_factory(r.we, prior.pm.w)
-    return MeanAbsoluteDeviation(; settings = r.settings, target = target, w = w, mu = mu,
-                                 we = we)
-end
-struct SemiVariance{T1 <: RiskMeasureSettings, T2 <: VarianceFormulation,
-                    T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                    T4 <: Union{Nothing, <:AbstractWeights},
-                    T5 <: Union{Nothing, <:AbstractVector{<:Real}}} <: TargetRiskMeasure
-    settings::T1
-    formulation::T2
-    target::T3
-    w::T4
-    mu::T5
-end
-function SemiVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                      formulation::VarianceFormulation = SOC(),
-                      target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                      w::Union{Nothing, <:AbstractWeights} = nothing,
-                      mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
-    return SemiVariance(settings, formulation, target, w, mu)
-end
-function (r::SemiVariance)(w::AbstractVector, X::AbstractMatrix,
-                           fees::Union{Nothing, <:Fees} = nothing)
+function (r::LowOrderMoment{<:Any, <:SemiVariance, <:Any, <:Any, <:Any})(w::AbstractVector,
+                                                                         X::AbstractMatrix,
+                                                                         fees::Union{Nothing,
+                                                                                     <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     mu = calc_target_ret_mu(x, w, r)
     val = x .- mu
     val = val[val .<= zero(eltype(val))]
-    return dot(val, val) / (length(x) - 1)
+    return dot(val, val) / (length(x) - r.alg.ddof)
 end
-function risk_measure_factory(r::SemiVariance, prior::AbstractPriorResult, args...;
+function (r::LowOrderMoment{<:Any, <:MeanAbsoluteDeviation, <:Any, <:Any, <:Any})(w::AbstractVector,
+                                                                                  X::AbstractMatrix,
+                                                                                  fees::Union{Nothing,
+                                                                                              <:Fees} = nothing)
+    x = calc_net_returns(w, X, fees)
+    mu = calc_target_ret_mu(x, w, r)
+    w = r.alg.w
+    return isnothing(w) ? mean(abs.(x .- mu)) : mean(abs.(x .- mu), w)
+end
+function risk_measure_factory(r::LowOrderMoment, prior::AbstractPriorResult, args...;
                               kwargs...)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    return SemiVariance(; settings = r.settings, formulation = r.formulation,
-                        target = r.target, w = r.w, mu = mu)
+    return LowOrderMoment(; settings = r.settings, alg = r.alg, target = r.target, w = r.w,
+                          mu = mu)
 end
-function risk_measure_factory(r::SemiVariance, prior::EntropyPoolingResult, args...;
+function risk_measure_factory(r::LowOrderMoment, prior::EntropyPoolingResult, args...;
                               kwargs...)
     w = risk_measure_nothing_vec_factory(r.w, prior.w)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    return SemiVariance(; settings = r.settings, formulation = r.formulation,
-                        target = r.target, w = w, mu = mu)
+    alg = risk_moment_algorithm_factory(r.alg, prior.w)
+    return LowOrderMoment(; settings = r.settings, alg = alg, target = r.target, w = w,
+                          mu = mu)
 end
-function risk_measure_factory(r::SemiVariance,
+function risk_measure_factory(r::LowOrderMoment,
                               prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any,
                                                           <:Any, <:Any, <:Any}, args...;
                               kwargs...)
     w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
-    return SemiVariance(; settings = r.settings, formulation = r.formulation,
-                        target = r.target, w = w, mu = mu)
+    alg = risk_moment_algorithm_factory(r.alg, prior.pm.w)
+    return LowOrderMoment(; settings = r.settings, alg = alg, target = r.target, w = w,
+                          mu = mu)
 end
-function risk_measure_view(r::SemiVariance, prior::AbstractPriorResult,
-                           cluster::AbstractVector, args...; kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    return SemiVariance(; settings = r.settings, formulation = r.formulation,
-                        target = target, w = r.w, mu = mu)
+function risk_measure_view(r::LowOrderMoment, prior::AbstractPriorResult, i, args...;
+                           kwargs...)
+    target = risk_measure_nothing_real_vec_factory(r.target, i)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
+    return LowOrderMoment(; settings = r.settings, alg = r.alg, target = target, w = r.w,
+                          mu = mu)
 end
-function risk_measure_view(r::SemiVariance, prior::EntropyPoolingResult,
-                           cluster::AbstractVector, args...; kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
+function risk_measure_view(r::LowOrderMoment, prior::EntropyPoolingResult, i, args...;
+                           kwargs...)
+    target = risk_measure_nothing_real_vec_factory(r.target, i)
     w = risk_measure_nothing_vec_factory(r.w, prior.w)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    return SemiVariance(; settings = r.settings, formulation = r.formulation,
-                        target = target, w = w, mu = mu)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
+    alg = risk_moment_algorithm_factory(r.alg, prior.w)
+    return LowOrderMoment(; settings = r.settings, alg = alg, target = target, w = w,
+                          mu = mu)
 end
-function risk_measure_view(r::SemiVariance,
+function risk_measure_view(r::LowOrderMoment,
                            prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any, <:Any,
-                                                       <:Any, <:Any},
-                           cluster::AbstractVector, args...; kwargs...)
-    target = risk_measure_nothing_real_vec_factory(r.target, cluster)
+                                                       <:Any, <:Any}, i, args...; kwargs...)
+    target = risk_measure_nothing_real_vec_factory(r.target, i)
     w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
-    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, cluster)
-    return SemiVariance(; settings = r.settings, formulation = r.formulation,
-                        target = target, w = w, mu = mu)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
+    alg = risk_moment_algorithm_factory(r.alg, prior.pm.w)
+    return LowOrderMoment(; settings = r.settings, alg = alg, target = target, w = w,
+                          mu = mu)
 end
 struct HighOrderMoment{T1 <: RiskMeasureSettings,
                        T2 <: AbstractHighOrderRiskMomentAlgorithm,
                        T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                        T4 <: Union{Nothing, <:AbstractWeights},
                        T5 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
-       TargetHierarchicalRiskMeasure
+       AbstractMomentHierarchicalRiskMeasure
     settings::T1
     alg::T2
     target::T3
@@ -226,7 +181,7 @@ struct HighOrderMoment{T1 <: RiskMeasureSettings,
     mu::T5
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                         alg::AbstractHighOrderRiskMomentAlgorithm = ThirdLower(),
+                         alg::AbstractHighOrderRiskMomentAlgorithm = ThirdLowerMoment(),
                          target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                          w::Union{Nothing, <:AbstractWeights} = nothing,
                          mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
@@ -239,94 +194,109 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
     return HighOrderMoment{typeof(settings), typeof(alg), typeof(target), typeof(w),
                            typeof(mu)}(settings, alg, target, w, mu)
 end
-function (r::HighOrderMoment{<:Any, <:ThirdLower, <:Any, <:Any, <:Any})(w::AbstractVector,
-                                                                        X::AbstractMatrix,
-                                                                        fees::Union{Nothing,
-                                                                                    <:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:ThirdLowerMoment, <:Any, <:Any, <:Any})(w::AbstractVector,
+                                                                              X::AbstractMatrix,
+                                                                              fees::Union{Nothing,
+                                                                                          <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     return -sum(val[val .<= zero(eltype(val))] .^ 3) / length(x)
 end
-function (r::HighOrderMoment{<:Any, <:FourthLower, <:Any, <:Any, <:Any})(w::AbstractVector,
-                                                                         X::AbstractMatrix,
-                                                                         fees::Union{Nothing,
-                                                                                     <:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:FourthLowerMoment, <:Any, <:Any, <:Any})(w::AbstractVector,
+                                                                               X::AbstractMatrix,
+                                                                               fees::Union{Nothing,
+                                                                                           <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     return sum(val[val .<= zero(eltype(val))] .^ 4) / length(x)
 end
-function (r::HighOrderMoment{<:Any, <:FourthCentral, <:Any, <:Any, <:Any})(w::AbstractVector,
-                                                                           X::AbstractMatrix,
-                                                                           fees::Union{Nothing,
-                                                                                       <:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:FourthCentralMoment, <:Any, <:Any, <:Any})(w::AbstractVector,
+                                                                                 X::AbstractMatrix,
+                                                                                 fees::Union{Nothing,
+                                                                                             <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     return sum(val .^ 4) / length(x)
 end
-struct HighOrderDeviation{T1 <: RiskMeasureSettings,
-                          T2 <: AbstractHighOrderRiskMomentAlgorithm,
-                          T3 <: AbstractVarianceEstimator,
-                          T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                          T5 <: Union{Nothing, <:AbstractWeights},
-                          T6 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
-       TargetHierarchicalRiskMeasure
-    settings::T1
-    alg::T2
-    ve::T3
-    target::T4
-    w::T5
-    mu::T6
-end
-function HighOrderDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                            alg::AbstractHighOrderRiskMomentAlgorithm = ThirdLower(),
-                            ve::AbstractVarianceEstimator = SimpleVariance(),
-                            target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                            w::Union{Nothing, <:AbstractWeights} = nothing,
-                            mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
-    if isa(target, AbstractVector)
-        @smart_assert(!isempty(target))
-    end
-    if isa(mu, AbstractVector)
-        @smart_assert(!isempty(mu))
-    end
-    return HighOrderDeviation{typeof(settings), typeof(alg), typeof(ve), typeof(target),
-                              typeof(w), typeof(mu)}(settings, alg, ve, target, w, mu)
-end
-function (r::HighOrderDeviation{<:Any, <:ThirdLower, <:Any, <:Any, <:Any, <:Any})(w::AbstractVector,
-                                                                                  X::AbstractMatrix,
-                                                                                  fees::Union{Nothing,
-                                                                                              <:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:ThirdLowerMoment, <:Any}, <:Any,
+                             <:Any, <:Any})(w::AbstractVector, X::AbstractMatrix,
+                                            fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     val = val[val <= zero(target)]
-    sigma = std(r.ve, val; mean = zero(target))
+    sigma = std(r.alg.ve, val; mean = zero(target))
     return -sum(val[val <= zero(target)] .^ 3) / length(x) / sigma^3
 end
-function (r::HighOrderDeviation{<:Any, <:FourthLower, <:Any, <:Any, <:Any, <:Any})(w::AbstractVector,
-                                                                                   X::AbstractMatrix,
-                                                                                   fees::Union{Nothing,
-                                                                                               <:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:FourthLowerMoment, <:Any}, <:Any,
+                             <:Any, <:Any})(w::AbstractVector, X::AbstractMatrix,
+                                            fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
     val = val[val <= zero(target)]
-    sigma = std(r.ve, val; mean = zero(target))
+    sigma = std(r.alg.ve, val; mean = zero(target))
     return sum(val[val <= zero(target)] .^ 4) / length(x) / sigma^4
 end
-function (r::HighOrderDeviation{<:Any, <:FourthCentral, <:Any, <:Any, <:Any, <:Any})(w::AbstractVector,
-                                                                                     X::AbstractMatrix,
-                                                                                     fees::Union{Nothing,
-                                                                                                 <:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:FourthCentralMoment, <:Any},
+                             <:Any, <:Any, <:Any})(w::AbstractVector, X::AbstractMatrix,
+                                                   fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_target_ret_mu(x, w, r)
     val = x .- target
-    sigma = std(r.ve, x)
+    sigma = std(r.alg.ve, x)
     return sum(val .^ 4) / length(x) / sigma^4
 end
-
-export Moment, Deviation, ThirdLower, FourthLower, FourthCentral, FirstLowerPartialMoment,
-       MeanAbsoluteDeviation, SemiVariance, HighOrderMoment, HighOrderDeviation
+function risk_measure_factory(r::HighOrderMoment, prior::AbstractPriorResult, args...;
+                              kwargs...)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
+    return HighOrderMoment(; settings = r.settings, alg = r.alg, target = r.target, w = r.w,
+                           mu = mu)
+end
+function risk_measure_factory(r::HighOrderMoment, prior::EntropyPoolingResult, args...;
+                              kwargs...)
+    w = risk_measure_nothing_vec_factory(r.w, prior.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
+    alg = risk_moment_algorithm_factory(r.alg, prior.w)
+    return HighOrderMoment(; settings = r.settings, alg = alg, target = r.target, w = w,
+                           mu = mu)
+end
+function risk_measure_factory(r::HighOrderMoment,
+                              prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any,
+                                                          <:Any, <:Any, <:Any}, args...;
+                              kwargs...)
+    w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
+    alg = risk_moment_algorithm_factory(r.alg, prior.pm.w)
+    return HighOrderMoment(; settings = r.settings, alg = alg, target = r.target, w = w,
+                           mu = mu)
+end
+function risk_measure_view(r::HighOrderMoment, prior::AbstractPriorResult, i, args...;
+                           kwargs...)
+    target = risk_measure_nothing_real_vec_factory(r.target, i)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
+    return HighOrderMoment(; settings = r.settings, alg = r.alg, target = target, w = r.w,
+                           mu = mu)
+end
+function risk_measure_view(r::HighOrderMoment, prior::EntropyPoolingResult, i, args...;
+                           kwargs...)
+    target = risk_measure_nothing_real_vec_factory(r.target, i)
+    w = risk_measure_nothing_vec_factory(r.w, prior.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
+    alg = risk_moment_algorithm_factory(r.alg, prior.w)
+    return HighOrderMoment(; settings = r.settings, alg = alg, target = target, w = w,
+                           mu = mu)
+end
+function risk_measure_view(r::HighOrderMoment,
+                           prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any, <:Any,
+                                                       <:Any, <:Any}, i, args...; kwargs...)
+    target = risk_measure_nothing_real_vec_factory(r.target, i)
+    w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
+    alg = risk_moment_algorithm_factory(r.alg, prior.pm.w)
+    return HighOrderMoment(; settings = r.settings, alg = alg, target = target, w = w,
+                           mu = mu)
+end

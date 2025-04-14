@@ -18,7 +18,7 @@ struct Skewness{T1 <: AbstractVarianceEstimator,
                 T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                 T3 <: Union{Nothing, <:AbstractWeights},
                 T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
-       TargetNoOptimisationRiskMeasure
+       AbstractMomentNoOptimisationRiskMeasure
     ve::T1
     target::T2
     w::T3
@@ -47,7 +47,7 @@ end
 struct ThirdCentralMoment{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                           T2 <: Union{Nothing, <:AbstractWeights},
                           T3 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
-       TargetNoOptimisationRiskMeasure
+       AbstractMomentNoOptimisationRiskMeasure
     target::T1
     w::T2
     mu::T3
