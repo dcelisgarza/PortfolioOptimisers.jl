@@ -1,5 +1,6 @@
 abstract type AbstractRiskMomentAlgorithm <: AbstractAlgorithm end
 abstract type AbstractLowOrderRiskMomentAlgorithm <: AbstractRiskMomentAlgorithm end
+abstract type AbstractHighOrderRiskMomentAlgorithm <: AbstractRiskMomentAlgorithm end
 struct Moment <: AbstractLowOrderRiskMomentAlgorithm end
 struct Deviation{T1 <: Integer} <: AbstractLowOrderRiskMomentAlgorithm
     ddof::T1
@@ -8,10 +9,9 @@ function Deviation(; ddof::Integer = 1)
     @smart_assert(ddof >= 0)
     return Deviation{typeof(ddof)}(ddof)
 end
-abstract type AbstractHighOrderMomentAlgorithm <: AbstractRiskMomentAlgorithm end
-struct ThirdLower <: AbstractHighOrderMomentAlgorithm end
-struct FourthLower <: AbstractHighOrderMomentAlgorithm end
-struct FourthCentral <: AbstractHighOrderMomentAlgorithm end
+struct ThirdLower <: AbstractHighOrderRiskMomentAlgorithm end
+struct FourthLower <: AbstractHighOrderRiskMomentAlgorithm end
+struct FourthCentral <: AbstractHighOrderRiskMomentAlgorithm end
 struct FirstLowerPartialMoment{T1 <: RiskMeasureSettings,
                                T2 <: AbstractLowOrderRiskMomentAlgorithm,
                                T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
@@ -213,7 +213,8 @@ function risk_measure_view(r::SemiVariance,
     return SemiVariance(; settings = r.settings, formulation = r.formulation,
                         target = target, w = w, mu = mu)
 end
-struct HighOrderMoment{T1 <: RiskMeasureSettings, T2 <: AbstractHighOrderMomentAlgorithm,
+struct HighOrderMoment{T1 <: RiskMeasureSettings,
+                       T2 <: AbstractHighOrderRiskMomentAlgorithm,
                        T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                        T4 <: Union{Nothing, <:AbstractWeights},
                        T5 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
@@ -225,7 +226,7 @@ struct HighOrderMoment{T1 <: RiskMeasureSettings, T2 <: AbstractHighOrderMomentA
     mu::T5
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                         alg::AbstractHighOrderMomentAlgorithm = FourthLower(),
+                         alg::AbstractHighOrderRiskMomentAlgorithm = ThirdLower(),
                          target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                          w::Union{Nothing, <:AbstractWeights} = nothing,
                          mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
@@ -265,6 +266,67 @@ function (r::HighOrderMoment{<:Any, <:FourthCentral, <:Any, <:Any, <:Any})(w::Ab
     val = x .- target
     return sum(val .^ 4) / length(x)
 end
+struct HighOrderDeviation{T1 <: RiskMeasureSettings,
+                          T2 <: AbstractHighOrderRiskMomentAlgorithm,
+                          T3 <: AbstractVarianceEstimator,
+                          T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                          T5 <: Union{Nothing, <:AbstractWeights},
+                          T6 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+       TargetHierarchicalRiskMeasure
+    settings::T1
+    alg::T2
+    ve::T3
+    target::T4
+    w::T5
+    mu::T6
+end
+function HighOrderDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                            alg::AbstractHighOrderRiskMomentAlgorithm = ThirdLower(),
+                            ve::AbstractVarianceEstimator = SimpleVariance(),
+                            target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                            w::Union{Nothing, <:AbstractWeights} = nothing,
+                            mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+    if isa(target, AbstractVector)
+        @smart_assert(!isempty(target))
+    end
+    if isa(mu, AbstractVector)
+        @smart_assert(!isempty(mu))
+    end
+    return HighOrderDeviation{typeof(settings), typeof(alg), typeof(ve), typeof(target),
+                              typeof(w), typeof(mu)}(settings, alg, ve, target, w, mu)
+end
+function (r::HighOrderDeviation{<:Any, <:ThirdLower, <:Any, <:Any, <:Any, <:Any})(w::AbstractVector,
+                                                                                  X::AbstractMatrix,
+                                                                                  fees::Union{Nothing,
+                                                                                              <:Fees} = nothing)
+    x = calc_net_returns(w, X, fees)
+    target = calc_target_ret_mu(x, w, r)
+    val = x .- target
+    val = val[val <= zero(target)]
+    sigma = std(r.ve, val; mean = zero(target))
+    return -sum(val[val <= zero(target)] .^ 3) / length(x) / sigma^3
+end
+function (r::HighOrderDeviation{<:Any, <:FourthLower, <:Any, <:Any, <:Any, <:Any})(w::AbstractVector,
+                                                                                   X::AbstractMatrix,
+                                                                                   fees::Union{Nothing,
+                                                                                               <:Fees} = nothing)
+    x = calc_net_returns(w, X, fees)
+    target = calc_target_ret_mu(x, w, r)
+    val = x .- target
+    val = val[val <= zero(target)]
+    sigma = std(r.ve, val; mean = zero(target))
+    return sum(val[val <= zero(target)] .^ 4) / length(x) / sigma^4
+end
+function (r::HighOrderDeviation{<:Any, <:FourthCentral, <:Any, <:Any, <:Any, <:Any})(w::AbstractVector,
+                                                                                     X::AbstractMatrix,
+                                                                                     fees::Union{Nothing,
+                                                                                                 <:Fees} = nothing)
+    x = calc_net_returns(w, X, fees)
+    target = calc_target_ret_mu(x, w, r)
+    val = x .- target
+    sigma = std(r.ve, x)
+    return sum(val .^ 4) / length(x) / sigma^4
+end
 
 export Moment, Deviation, ThirdLower, FourthLower, FourthCentral, FirstLowerPartialMoment,
-       MeanAbsoluteDeviation, SemiVariance, HighOrderMoment
+       MeanAbsoluteDeviation, SemiVariance, HighOrderMoment, HighOrderDeviation
