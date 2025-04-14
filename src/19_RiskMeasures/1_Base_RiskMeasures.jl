@@ -11,7 +11,7 @@ abstract type SigmaRiskMeasure <: RiskMeasure end
 abstract type RiskContributionSigmaRiskMeasure <: SigmaRiskMeasure end
 abstract type SolverRiskMeasure <: RiskMeasure end
 abstract type SkewRiskMeasure <: RiskMeasure end
-abstract type KurtosisRiskMeasure <: RiskMeasure end
+abstract type SquareRootKurtosisRiskMeasure <: RiskMeasure end
 abstract type OrderedWeightsArrayRiskMeasure <: RiskMeasure end
 abstract type MuRiskMeasure <: RiskMeasure end
 abstract type TargetRiskMeasure <: MuRiskMeasure end
@@ -60,7 +60,7 @@ function ApproxOrderedWeightsArray(; p::AbstractVector{<:Real} = Float64[2, 3, 4
     return ApproxOrderedWeightsArray{typeof(p)}(p)
 end
 const MuRiskMeasures = Union{MuRiskMeasure, MuHierarchicalRiskMeasure,
-                             MuNoOptimisationRiskMeasure, KurtosisRiskMeasure}
+                             MuNoOptimisationRiskMeasure, SquareRootKurtosisRiskMeasure}
 function calc_ret_mu(x::AbstractVector, w::AbstractVector, rm::MuRiskMeasures)
     mu = rm.mu
     return mu = if isnothing(mu)
