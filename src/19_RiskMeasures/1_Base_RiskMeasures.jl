@@ -1,16 +1,16 @@
-abstract type AbstractRiskMeasure <: AbstractEstimator end
+abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
 
-abstract type NoOptimisationRiskMeasure <: AbstractRiskMeasure end
+abstract type NoOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 abstract type MuNoOptimisationRiskMeasure <: NoOptimisationRiskMeasure end
 abstract type AbstractMomentNoOptimisationRiskMeasure <: MuNoOptimisationRiskMeasure end
 
-abstract type OptimisationRiskMeasure <: AbstractRiskMeasure end
+abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 
 abstract type RiskMeasure <: OptimisationRiskMeasure end
 abstract type SigmaRiskMeasure <: RiskMeasure end
-abstract type RiskContributionSigmaRiskMeasure <: SigmaRiskMeasure end
+abstract type JuMPRiskContributionSigmaRiskMeasure <: SigmaRiskMeasure end
 abstract type SolverRiskMeasure <: RiskMeasure end
-abstract type SkewRiskMeasure <: RiskMeasure end
+abstract type AbstractNegativeSkewRiskMeasure <: RiskMeasure end
 abstract type SquareRootKurtosisRiskMeasure <: RiskMeasure end
 abstract type OrderedWeightsArrayRiskMeasure <: RiskMeasure end
 abstract type MuRiskMeasure <: RiskMeasure end
@@ -21,10 +21,10 @@ abstract type SolverHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
 abstract type MuHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
 abstract type AbstractMomentHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
 
-function risk_measure_factory(r::AbstractRiskMeasure, args...; kwargs...)
+function risk_measure_factory(r::AbstractBaseRiskMeasure, args...; kwargs...)
     return r
 end
-function risk_measure_view(r::AbstractRiskMeasure, args...; kwargs...)
+function risk_measure_view(r::AbstractBaseRiskMeasure, args...; kwargs...)
     return r
 end
 abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
