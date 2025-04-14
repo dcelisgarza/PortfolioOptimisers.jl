@@ -11,6 +11,11 @@ function ArithmeticReturn(; lb::Union{Nothing, <:Real} = nothing,
     if isa(lb, Real)
         @smart_assert(isfinite(lb))
     end
+    if isa(ucs, EllipseUncertaintySetResult)
+        @smart_assert(isa(ucs,
+                          <:EllipseUncertaintySetResult{<:Any, <:Any,
+                                                        <:MuEllipseUncertaintySetResult}))
+    end
     return ArithmeticReturn{typeof(lb), typeof(ucs)}(lb, ucs)
 end
 function cluster_return_factory(r::ArithmeticReturn, cluster::AbstractVector,

@@ -1,3 +1,6 @@
+abstract type Scalariser end
+struct SumScalariser <: Scalariser end
+struct MaxScalariser <: Scalariser end
 struct LogSumExpScalariser{T1 <: Real} <: Scalariser
     gamma::T1
 end
@@ -6,4 +9,4 @@ function LogSumExpScalariser(; gamma::Real = 1.0)
     return LogSumExpScalariser{typeof(gamma)}(gamma)
 end
 
-export LogSumExpScalariser
+export SumScalariser, MaxScalariser, LogSumExpScalariser

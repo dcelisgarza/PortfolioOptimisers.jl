@@ -77,16 +77,23 @@ function EllipseUncertaintySetAlgorithm(; diagonal::Bool = true,
     return EllipseUncertaintySetAlgorithm{typeof(diagonal), typeof(method)}(diagonal,
                                                                             method)
 end
-struct EllipseUncertaintySetResult{T1 <: AbstractMatrix, T2 <: Real} <:
+abstract type AbstractEllipseUncertaintySetResultClass <: AbstractUncertaintySetResult end
+struct MuEllipseUncertaintySetResult <: AbstractEllipseUncertaintySetResultClass end
+struct SigmaEllipseUncertaintySetResult <: AbstractEllipseUncertaintySetResultClass end
+struct EllipseUncertaintySetResult{T1 <: AbstractMatrix, T2 <: Real,
+                                   T3 <: AbstractEllipseUncertaintySetResultClass} <:
        AbstractUncertaintySetResult
     sigma::T1
     k::T2
+    class::T3
 end
-function EllipseUncertaintySetResult(; sigma::AbstractMatrix, k::Real)
+function EllipseUncertaintySetResult(; sigma::AbstractMatrix, k::Real,
+                                     class::AbstractEllipseUncertaintySetResultClass)
     @smart_assert(!isempty(sigma))
     issquare(sigma)
     @smart_assert(zero(k) < k)
-    return EllipseUncertaintySetResult{typeof(sigma), typeof(k)}(sigma, k)
+    return EllipseUncertaintySetResult{typeof(sigma), typeof(k), typeof(class)}(sigma, k,
+                                                                                class)
 end
 
 export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySetResult,

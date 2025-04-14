@@ -155,29 +155,35 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
 end
 ⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
 outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
-function scalar_array_view(x::Real, ::Any)
+function nothing_scalar_array_view(::Nothing, ::Any)
+    return nothing
+end
+function nothing_scalar_array_view(x::Real, ::Any)
     return x
 end
-function scalar_array_view(x::AbstractVector, i)
+function nothing_scalar_array_view(x::AbstractVector, i)
     return view(x, i)
 end
-function scalar_array_view(x::AbstractArray, i)
+function nothing_scalar_array_view(x::AbstractArray, i)
     return view(x, i, i)
 end
-function scalar_array_getindex(x::Real, ::Any)
+function nothing_scalar_array_getindex(x::Real, ::Any)
     return x
 end
-function scalar_array_getindex(x::AbstractVector, i)
+function nothing_scalar_array_getindex(::Nothing, ::Any)
+    return nothing
+end
+function nothing_scalar_array_getindex(x::AbstractVector, i)
     return x[i]
 end
-function scalar_array_getindex(x::AbstractMatrix, i)
+function nothing_scalar_array_getindex(x::AbstractMatrix, i)
     return x[i, i]
 end
-function fourth_moment_index_factory(N::Integer, cluster::AbstractVector)
+function fourth_moment_index_factory(N::Integer, i)
     idx = Vector{Int}(undef, 0)
-    sizehint!(idx, length(cluster)^2)
-    for c ∈ cluster
-        append!(idx, (((c - 1) * N + 1):(c * N))[cluster])
+    sizehint!(idx, length(i)^2)
+    for c ∈ i
+        append!(idx, (((c - 1) * N + 1):(c * N))[i])
     end
     return idx
 end

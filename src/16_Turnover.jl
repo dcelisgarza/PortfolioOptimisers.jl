@@ -19,7 +19,7 @@ function turnover_view(::Nothing, ::Any)
     return nothing
 end
 function turnover_view(turnover::Turnover, i)
-    val = scalar_array_view(turnover.val, i)
+    val = nothing_scalar_array_view(turnover.val, i)
     w = view(turnover.w, i)
     return Turnover(; val = val, w = w)
 end

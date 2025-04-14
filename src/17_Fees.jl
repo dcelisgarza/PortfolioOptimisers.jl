@@ -48,10 +48,10 @@ function fees_view(::Nothing, ::Any; kwargs...)
     return nothing
 end
 function fees_view(fees::Fees, i)
-    long = scalar_array_view(fees.long, i)
-    short = scalar_array_view(fees.short, i)
-    fixed_long = scalar_array_view(fees.fixed_long, i)
-    fixed_short = scalar_array_view(fees.fixed_short, i)
+    long = nothing_scalar_array_view(fees.long, i)
+    short = nothing_scalar_array_view(fees.short, i)
+    fixed_long = nothing_scalar_array_view(fees.fixed_long, i)
+    fixed_short = nothing_scalar_array_view(fees.fixed_short, i)
     turnover = turnover_view(fees.turnover, i)
     return Fees(; long = long, short = short, fixed_long = fixed_long,
                 fixed_short = fixed_short, turnover = turnover,

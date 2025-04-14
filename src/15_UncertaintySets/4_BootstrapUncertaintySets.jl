@@ -151,8 +151,10 @@ function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgor
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu),
-           EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma)
+    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu,
+                                       class = MuEllipseUncertaintySetResult()),
+           EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma,
+                                       class = SigmaEllipseUncertaintySetResult())
 end
 function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgorithm,
                                                 <:Any, <:Any, <:Any, <:Any, <:Any},
@@ -171,7 +173,8 @@ function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAl
         cov(ue.pe.ce, X_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
-    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu)
+    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu,
+                                       class = MuEllipseUncertaintySetResult())
 end
 function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgorithm,
                                                    <:Any, <:Any, <:Any, <:Any, <:Any},
@@ -190,7 +193,8 @@ function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySe
         cov(ue.pe.ce, X_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma)
+    return EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma,
+                                       class = SigmaEllipseUncertaintySetResult())
 end
 
 export StationaryBootstrap, CircularBootstrap, MovingBootstrap, ARCHUncertaintySetEstimator

@@ -86,6 +86,8 @@ include("./17_Fees.jl")
 include("./18_Tracking.jl")
 
 include("./19_RiskMeasures/1_Base_RiskMeasures.jl")
+include("./19_RiskMeasures/2_Base_RiskMeasureFactories.jl")
+include("./19_RiskMeasures/3_NoOptimisationRiskMeasures.jl")
 
 #=
 

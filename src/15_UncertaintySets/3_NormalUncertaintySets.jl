@@ -117,8 +117,11 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu),
-           EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma)
+
+    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu,
+                                       class = MuEllipseUncertaintySetResult()),
+           EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma,
+                                       class = SigmaEllipseUncertaintySetResult())
 end
 function ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                <:EllipseUncertaintySetAlgorithm{<:Any,
@@ -139,8 +142,10 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
     end
     k_mu = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu)
     k_sigma = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma)
-    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu),
-           EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma)
+    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu,
+                                       class = MuEllipseUncertaintySetResult()),
+           EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma,
+                                       class = SigmaEllipseUncertaintySetResult())
 end
 function ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                <:EllipseUncertaintySetAlgorithm{<:Any,
@@ -161,8 +166,10 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
     end
     k_mu = k_ucs(ue.alg.method, ue.q)
     k_sigma = k_ucs(ue.alg.method, ue.q)
-    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu),
-           EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma)
+    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu,
+                                       class = MuEllipseUncertaintySetResult()),
+           EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma,
+                                       class = SigmaEllipseUncertaintySetResult())
 end
 function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                   <:EllipseUncertaintySetAlgorithm{<:Any,
@@ -180,7 +187,8 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
         sigma_mu = Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
-    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu)
+    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu,
+                                       class = MuEllipseUncertaintySetResult())
 end
 function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                   <:EllipseUncertaintySetAlgorithm{<:Any,
@@ -196,7 +204,8 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
         sigma_mu = Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_mu)
-    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu)
+    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu,
+                                       class = MuEllipseUncertaintySetResult())
 end
 function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                   <:EllipseUncertaintySetAlgorithm{<:Any,
@@ -212,7 +221,8 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
         sigma_mu = Diagonal(sigma_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q)
-    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu)
+    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu,
+                                       class = MuEllipseUncertaintySetResult())
 end
 function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                      <:EllipseUncertaintySetAlgorithm{<:Any,
@@ -238,7 +248,8 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
         sigma_sigma = Diagonal(sigma_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma)
+    return EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma,
+                                       class = SigmaEllipseUncertaintySetResult())
 end
 function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                      <:EllipseUncertaintySetAlgorithm{<:Any,
@@ -257,7 +268,8 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
         sigma_sigma = Diagonal(sigma_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q, 1:(ue.n_sim), sigma_sigma)
-    return EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma)
+    return EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma,
+                                       class = SigmaEllipseUncertaintySetResult())
 end
 function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                      <:EllipseUncertaintySetAlgorithm{<:Any,
@@ -276,7 +288,8 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
         sigma_sigma = Diagonal(sigma_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q)
-    return EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma)
+    return EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma,
+                                       class = SigmaEllipseUncertaintySetResult())
 end
 
 export NormalUncertaintySetEstimator
