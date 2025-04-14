@@ -87,7 +87,9 @@ include("./18_Tracking.jl")
 
 include("./19_RiskMeasures/1_Base_RiskMeasures.jl")
 include("./19_RiskMeasures/2_Base_RiskMeasureFactories.jl")
-include("./19_RiskMeasures/3_SquareRootKurtosis.jl")
+include("./19_RiskMeasures/3_Variance.jl")
+include("./19_RiskMeasures/4_TargetRiskMeasures.jl")
+include("./19_RiskMeasures/5_SquareRootKurtosis.jl")
 
 #=
 
