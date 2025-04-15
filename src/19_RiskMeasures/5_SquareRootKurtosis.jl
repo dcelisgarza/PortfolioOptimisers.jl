@@ -47,5 +47,80 @@ function (r::SquareRootKurtosis{<:Any, <:Semi, <:Any, <:Any, <:Any})(w::Abstract
     val = x .- mu
     return sqrt(sum(val[val .<= zero(eltype(val))] .^ 4) / length(x))
 end
+function _get_kt(::Full, prior::HighOrderPriorResult)
+    return prior.kt
+end
+function _get_kt(::Semi, prior::HighOrderPriorResult)
+    return prior.skt
+end
+function risk_measure_factory(r::SquareRootKurtosis, prior::HighOrderPriorResult, args...;
+                              kwargs...)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
+    kt = risk_measure_nothing_matrix_factory(r.kt, _get_kt(r.alg, prior))
+    return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = r.w, mu = mu,
+                              kt = kt)
+end
+function risk_measure_factory(r::SquareRootKurtosis,
+                              prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any,
+                                                          <:Any, <:Any, <:Any}, args...;
+                              kwargs...)
+    w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
+    kt = risk_measure_nothing_matrix_factory(r.kt, _get_kt(r.alg, prior))
+    return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = w, mu = mu, kt = kt)
+end
+function risk_measure_factory(r::SquareRootKurtosis, prior::AbstractLowOrderPriorResult,
+                              args...; kwargs...)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
+    kt = risk_measure_nothing_matrix_factory(r.kt, nothing)
+    return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = r.w, mu = mu,
+                              kt = kt)
+end
+function risk_measure_factory(r::SquareRootKurtosis, prior::EntropyPoolingResult, args...;
+                              kwargs...)
+    w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
+    kt = risk_measure_nothing_matrix_factory(r.kt, nothing)
+    return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = w, mu = mu, kt = kt)
+end
+function risk_measure_view(r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Nothing},
+                           prior::AbstractPriorResult, i, args...; kwargs...)
+    throw(ArgumentError("Neither the risk measure, nor the prior have the required data."))
+end
+function risk_measure_view(r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any,
+                                                 <:AbstractMatrix},
+                           prior::AbstractPriorResult, i, args...; kwargs...)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
+    idx = fourth_moment_index_factory(size(prior.X, 2), i)
+    kt = risk_measure_nothing_matrix_factory(r.kt, nothing, idx)
+    return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = r.w, mu = mu,
+                              kt = kt)
+end
+function risk_measure_view(r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any,
+                                                 <:AbstractMatrix},
+                           prior::EntropyPoolingResult, i, args...; kwargs...)
+    w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
+    idx = fourth_moment_index_factory(size(prior.X, 2), i)
+    kt = risk_measure_nothing_matrix_factory(r.kt, nothing, idx)
+    return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = w, mu = mu, kt = kt)
+end
+function risk_measure_view(r::SquareRootKurtosis, prior::HighOrderPriorResult, i, args...;
+                           kwargs...)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
+    idx = fourth_moment_index_factory(size(prior.X, 2), i)
+    kt = risk_measure_nothing_matrix_factory(r.kt, _get_kt(r.alg, prior), idx)
+    return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = r.w, mu = mu,
+                              kt = kt)
+end
+function risk_measure_view(r::SquareRootKurtosis,
+                           prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any, <:Any,
+                                                       <:Any, <:Any}, i, args...; kwargs...)
+    w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
+    mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
+    idx = fourth_moment_index_factory(size(prior.X, 2), i)
+    kt = risk_measure_nothing_matrix_factory(r.kt, _get_kt(r.alg, prior), idx)
+    return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = w, mu = mu, kt = kt)
+end
 
 export SquareRootKurtosis

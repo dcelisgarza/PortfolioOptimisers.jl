@@ -91,6 +91,10 @@ include("./19_RiskMeasures/3_Variance.jl")
 include("./19_RiskMeasures/4_MomentRiskMeasures.jl")
 include("./19_RiskMeasures/5_SquareRootKurtosis.jl")
 include("./19_RiskMeasures/6_NegativeSkewness.jl")
+include("./19_RiskMeasures/7_XatRisk.jl")
+include("./19_RiskMeasures/8_ConditionalXatRisk.jl")
+include("./19_RiskMeasures/9_EntropicXatRisk.jl")
+include("./19_RiskMeasures/10_RelativisticXatRisk.jl")
 
 #=
 

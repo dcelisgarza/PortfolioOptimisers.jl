@@ -49,5 +49,71 @@ end
 function (r::NegativeSkewness{<:Any, <:QuadraticNegativeSkewness, <:Any, <:Any, <:Any})(w::AbstractVector)
     return dot(w, r.V, w)
 end
+function _get_sk(::Union{<:QuadraticNegativeSkewness{<:Full},
+                         <:LinearNegativeSkewness{<:Full}}, prior::HighOrderPriorResult)
+    return prior.sk
+end
+function _get_sk(::Union{<:QuadraticNegativeSkewness{<:Semi},
+                         <:LinearNegativeSkewness{<:Semi}}, prior::HighOrderPriorResult)
+    return prior.ssk
+end
+function _get_V(::Union{<:QuadraticNegativeSkewness{<:Full},
+                        <:LinearNegativeSkewness{<:Full}}, prior::HighOrderPriorResult)
+    return prior.V
+end
+function _get_V(::Union{<:QuadraticNegativeSkewness{<:Semi},
+                        <:LinearNegativeSkewness{<:Semi}}, prior::HighOrderPriorResult)
+    return prior.SV
+end
+function _get_smp(::Union{<:QuadraticNegativeSkewness{<:Full},
+                          <:LinearNegativeSkewness{<:Full}}, prior::HighOrderPriorResult)
+    return prior.skmp
+end
+function _get_smp(::Union{<:QuadraticNegativeSkewness{<:Semi},
+                          <:LinearNegativeSkewness{<:Semi}}, prior::HighOrderPriorResult)
+    return prior.sskmp
+end
+function risk_measure_factory(r::NegativeSkewness, prior::HighOrderPriorResult, args...;
+                              kwargs...)
+    sk = risk_measure_nothing_matrix_factory(r.sk, _get_sk(r.alg, prior))
+    V = risk_measure_nothing_matrix_factory(r.V, _get_V(r.alg, prior))
+    return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
+end
+function risk_measure_factory(r::NegativeSkewness, ::AbstractLowOrderPriorResult, args...;
+                              kwargs...)
+    sk = risk_measure_nothing_matrix_factory(r.sk, nothing)
+    V = risk_measure_nothing_matrix_factory(r.V, nothing)
+    return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
+end
+function risk_measure_view(::NegativeSkewness{<:Any, <:Any, <:Any, Nothing, <:Any},
+                           ::Nothing, prior::AbstractPriorResult, cluster::AbstractVector,
+                           args...; kwargs...)
+    throw(ArgumentError("Neither the risk measure, nor the prior have the required data."))
+end
+function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:AbstractMatrix,
+                                               <:Any}, prior::AbstractPriorResult,
+                           cluster::AbstractVector, args...; kwargs...)
+    idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
+    sk = view(r.sk, cluster, idx)
+    V = __coskewness(sk, prior.X, r.mp)
+    if all(iszero.(diag(V)))
+        V[diagind(V)] = I(size(V, 1))
+    end
+    return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
+end
+function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, Nothing, <:Any},
+                           prior::HighOrderPriorResult{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                       <:Any, <:AbstractMatrix,
+                                                       <:AbstractMatrix,
+                                                       <:AbstractMatrixProcessingEstimator},
+                           cluster::AbstractVector, args...; kwargs...)
+    idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
+    sk = view(_get_sk(r.alg, prior), cluster, idx)
+    V = __coskewness(sk, prior.X, _get_smp(r, prior))
+    if all(iszero.(diag(V)))
+        V[diagind(V)] = I(size(V, 1))
+    end
+    return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
+end
 
 export LinearNegativeSkewness, QuadraticNegativeSkewness, NegativeSkewness
