@@ -353,12 +353,12 @@
                                                                         me = ShrunkExpectedReturns(;
                                                                                                    alg = BayesStein()),
                                                                         ce = PortfolioOptimisersCovariance(;
-                                                                                                           ce = NormalisedSmythBrobyCovariance(;
-                                                                                                                                               alg = SmythBroby0()))))
+                                                                                                           ce = SmythBrobyCovariance(;
+                                                                                                                                     alg = NormalisedSmythBroby0()))))
         @test isa(pe6.me, ShrunkExpectedReturns{<:BayesStein, <:Any, <:Any, <:GrandMean})
         @test isa(pe6.ce.ce,
-                  NormalisedSmythBrobyCovariance{<:SmythBroby0, <:Any, <:Any, <:Any, <:Any,
-                                                 <:Any, <:Any, <:Any, <:Any})
+                  SmythBrobyCovariance{<:NormalisedSmythBroby0, <:Any, <:Any, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any, <:Any})
         pe7 = BlackLittermanPriorEstimator(; tau = 0.5,
                                            views = BlackLittermanViewsEstimator(;
                                                                                 A = LinearConstraintSide(;
@@ -369,12 +369,11 @@
                                                                                                   me = ShrunkExpectedReturns(;
                                                                                                                              alg = JamesStein()),
                                                                                                   ce = PortfolioOptimisersCovariance(;
-                                                                                                                                     ce = NormalisedGerberCovariance(;
-                                                                                                                                                                     alg = Gerber0())))))
+                                                                                                                                     ce = GerberCovariance(;
+                                                                                                                                                           alg = NormalisedGerber0())))))
         @test pe7.tau == 0.5
         @test isa(pe7.me, ShrunkExpectedReturns{<:JamesStein, <:Any, <:Any, <:GrandMean})
-        @test isa(pe7.ce.ce,
-                  NormalisedGerberCovariance{<:Gerber0, <:Any, <:Any, <:Any, <:Any})
+        @test isa(pe7.ce.ce, GerberCovariance{<:NormalisedGerber0, <:Any, <:Any, <:Any})
         pe8 = BlackLittermanPriorEstimator(;
                                            views = BlackLittermanViewsEstimator(;
                                                                                 A = LinearConstraintSide(;
@@ -389,12 +388,11 @@
                                                                                                                 me = ShrunkExpectedReturns(;
                                                                                                                                            alg = BodnarOkhrinParolya()),
                                                                                                                 ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                   ce = NormalisedGerberCovariance(;
-                                                                                                                                                                                   alg = Gerber2())))))
+                                                                                                                                                   ce = GerberCovariance(;
+                                                                                                                                                                         alg = NormalisedGerber2())))))
         @test isa(pe8.me,
                   ShrunkExpectedReturns{<:BodnarOkhrinParolya, <:Any, <:Any, <:GrandMean})
-        @test isa(pe8.ce.ce,
-                  NormalisedGerberCovariance{<:Gerber2, <:Any, <:Any, <:Any, <:Any})
+        @test isa(pe8.ce.ce, GerberCovariance{<:NormalisedGerber2, <:Any, <:Any, <:Any})
         pe9 = BlackLittermanPriorEstimator(;
                                            views = BlackLittermanViewsEstimator(;
                                                                                 A = LinearConstraintSide(;
@@ -412,11 +410,10 @@
                                                                                       a_pe = EmpiricalPriorEstimator(;
                                                                                                                      me = ExcessExpectedReturns(),
                                                                                                                      ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                        ce = NormalisedGerberCovariance(;
-                                                                                                                                                                                        alg = Gerber1())))))
+                                                                                                                                                        ce = GerberCovariance(;
+                                                                                                                                                                              alg = NormalisedGerber1())))))
         @test isa(pe9.me, ExcessExpectedReturns)
-        @test isa(pe9.ce.ce,
-                  NormalisedGerberCovariance{<:Gerber1, <:Any, <:Any, <:Any, <:Any})
+        @test isa(pe9.ce.ce, GerberCovariance{<:NormalisedGerber1, <:Any, <:Any, <:Any})
         pe10 = BlackLittermanPriorEstimator(;
                                             views = BlackLittermanViewsEstimator(;
                                                                                  A = LinearConstraintSide(;
@@ -434,12 +431,12 @@
                                                                  me = ShrunkExpectedReturns(;
                                                                                             alg = BayesStein()),
                                                                  ce = PortfolioOptimisersCovariance(;
-                                                                                                    ce = NormalisedSmythBrobyCovariance(;
-                                                                                                                                        alg = SmythBroby0()))))
+                                                                                                    ce = SmythBrobyCovariance(;
+                                                                                                                              alg = NormalisedSmythBroby0()))))
         @test isa(pe11.me, ShrunkExpectedReturns{<:BayesStein, <:Any, <:Any, <:GrandMean})
         @test isa(pe11.ce.ce,
-                  NormalisedSmythBrobyCovariance{<:SmythBroby0, <:Any, <:Any, <:Any, <:Any,
-                                                 <:Any, <:Any, <:Any, <:Any})
+                  SmythBrobyCovariance{<:NormalisedSmythBroby0, <:Any, <:Any, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any, <:Any})
         pe12 = FactorPriorEstimator(;
                                     pe = BlackLittermanPriorEstimator(;
                                                                       views = BlackLittermanViewsEstimator(;
@@ -450,11 +447,10 @@
                                                                                                    me = ShrunkExpectedReturns(;
                                                                                                                               alg = JamesStein()),
                                                                                                    ce = PortfolioOptimisersCovariance(;
-                                                                                                                                      ce = NormalisedGerberCovariance(;
-                                                                                                                                                                      alg = Gerber2())))))
+                                                                                                                                      ce = GerberCovariance(;
+                                                                                                                                                            alg = NormalisedGerber2())))))
         @test isa(pe12.me, ShrunkExpectedReturns{<:JamesStein, <:Any, <:Any, <:GrandMean})
-        @test isa(pe12.ce.ce,
-                  NormalisedGerberCovariance{<:Gerber2, <:Any, <:Any, <:Any, <:Any})
+        @test isa(pe12.ce.ce, GerberCovariance{<:NormalisedGerber2, <:Any, <:Any, <:Any})
         pe13 = FactorBlackLittermanPriorEstimator(; tau = 0.3,
                                                   views = BlackLittermanViewsEstimator(;
                                                                                        A = LinearConstraintSide(;
@@ -464,13 +460,13 @@
                                                                                me = ShrunkExpectedReturns(;
                                                                                                           alg = BayesStein()),
                                                                                ce = PortfolioOptimisersCovariance(;
-                                                                                                                  ce = NormalisedSmythBrobyCovariance(;
-                                                                                                                                                      alg = SmythBroby0()))))
+                                                                                                                  ce = SmythBrobyCovariance(;
+                                                                                                                                            alg = NormalisedSmythBroby0()))))
         @test pe13.tau == 0.3
         @test isa(pe13.me, ShrunkExpectedReturns{<:BayesStein, <:Any, <:Any, <:GrandMean})
         @test isa(pe13.ce.ce,
-                  NormalisedSmythBrobyCovariance{<:SmythBroby0, <:Any, <:Any, <:Any, <:Any,
-                                                 <:Any, <:Any, <:Any, <:Any})
+                  SmythBrobyCovariance{<:NormalisedSmythBroby0, <:Any, <:Any, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any, <:Any})
         pe14 = FactorBlackLittermanPriorEstimator(;
                                                   views = BlackLittermanViewsEstimator(;
                                                                                        A = LinearConstraintSide(;
@@ -485,11 +481,10 @@
                                                                                                                  me = ShrunkExpectedReturns(;
                                                                                                                                             alg = JamesStein()),
                                                                                                                  ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                    ce = NormalisedGerberCovariance(;
-                                                                                                                                                                                    alg = Gerber2())))))
+                                                                                                                                                    ce = GerberCovariance(;
+                                                                                                                                                                          alg = NormalisedGerber2())))))
         @test isa(pe14.me, ShrunkExpectedReturns{<:JamesStein, <:Any, <:Any, <:GrandMean})
-        @test isa(pe14.ce.ce,
-                  NormalisedGerberCovariance{<:Gerber2, <:Any, <:Any, <:Any, <:Any})
+        @test isa(pe14.ce.ce, GerberCovariance{<:NormalisedGerber2, <:Any, <:Any, <:Any})
         pe15 = AugmentedBlackLittermanPriorEstimator(; tau = 0.2,
                                                      a_views = BlackLittermanViewsEstimator(;
                                                                                             A = LinearConstraintSide(;
@@ -503,13 +498,13 @@
                                                                                     me = ShrunkExpectedReturns(;
                                                                                                                alg = BayesStein()),
                                                                                     ce = PortfolioOptimisersCovariance(;
-                                                                                                                       ce = NormalisedSmythBrobyCovariance(;
-                                                                                                                                                           alg = SmythBroby0()))))
+                                                                                                                       ce = SmythBrobyCovariance(;
+                                                                                                                                                 alg = NormalisedSmythBroby0()))))
         @test pe15.tau == 0.2
         @test isa(pe15.me, ShrunkExpectedReturns{<:BayesStein, <:Any, <:Any, <:GrandMean})
         @test isa(pe15.ce.ce,
-                  NormalisedSmythBrobyCovariance{<:SmythBroby0, <:Any, <:Any, <:Any, <:Any,
-                                                 <:Any, <:Any, <:Any, <:Any})
+                  SmythBrobyCovariance{<:NormalisedSmythBroby0, <:Any, <:Any, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any, <:Any})
         pe16 = AugmentedBlackLittermanPriorEstimator(;
                                                      a_views = BlackLittermanViewsEstimator(;
                                                                                             A = LinearConstraintSide(;
@@ -528,11 +523,10 @@
                                                                                                                       me = ShrunkExpectedReturns(;
                                                                                                                                                  alg = JamesStein()),
                                                                                                                       ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                         ce = NormalisedGerberCovariance(;
-                                                                                                                                                                                         alg = Gerber2())))))
+                                                                                                                                                         ce = GerberCovariance(;
+                                                                                                                                                                               alg = NormalisedGerber2())))))
         @test isa(pe16.me, ShrunkExpectedReturns{<:JamesStein, <:Any, <:Any, <:GrandMean})
-        @test isa(pe16.ce.ce,
-                  NormalisedGerberCovariance{<:Gerber2, <:Any, <:Any, <:Any, <:Any})
+        @test isa(pe16.ce.ce, GerberCovariance{<:NormalisedGerber2, <:Any, <:Any, <:Any})
     end
     @testset "Black Litterman Prior" begin
         rng = StableRNG(123456789)
@@ -1670,4 +1664,3 @@
         end
     end
 end
-
