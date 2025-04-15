@@ -146,6 +146,23 @@ function (r::RelativeEntropicDrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     return ERM(dd, r.slv, r.alpha)
 end
+for r ∈ (EntropicValueatRisk, EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)
+    eval(quote
+             function risk_measure_factory(r::$(r), ::Any,
+                                           slv::Union{Nothing, <:Solver,
+                                                      <:AbstractVector{<:Solver}}, args...;
+                                           kwargs...)
+                 slv = risk_measure_solver_factory(r.slv, slv)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, slv = slv)
+             end
+             function risk_measure_view(r::$(r), ::Any, ::Any,
+                                        slv::Union{Nothing, <:Solver,
+                                                   <:AbstractVector{<:Solver}}, args...;
+                                        kwargs...)
+                 return risk_measure_factory(r; slv = slv, kwargs = kwargs)
+             end
+         end)
+end
 
 export EntropicValueatRisk, EntropicValueatRiskRange, EntropicDrawdownatRisk,
        RelativeEntropicDrawdownatRisk

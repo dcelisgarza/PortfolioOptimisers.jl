@@ -48,17 +48,6 @@ end
 function HierarchicalRiskMeasureSettings(; scale::Real = 1.0)
     return HierarchicalRiskMeasureSettings{typeof(scale)}(scale)
 end
-abstract type OrderedWeightsArrayFormulation <: AbstractAlgorithm end
-struct ExactOrderedWeightsArray <: OrderedWeightsArrayFormulation end
-struct ApproxOrderedWeightsArray{T1 <: AbstractVector{<:Real}} <:
-       OrderedWeightsArrayFormulation
-    p::T1
-end
-function ApproxOrderedWeightsArray(; p::AbstractVector{<:Real} = Float64[2, 3, 4, 10, 50])
-    @smart_assert(!isempty(p))
-    @smart_assert(all(p .> zero(eltype(p))))
-    return ApproxOrderedWeightsArray{typeof(p)}(p)
-end
 const MuRiskMeasures = Union{MuRiskMeasure, MuHierarchicalRiskMeasure,
                              MuNoOptimisationRiskMeasure, SquareRootKurtosisRiskMeasure}
 function calc_ret_mu(x::AbstractVector, w::AbstractVector, rm::MuRiskMeasures)
@@ -81,6 +70,30 @@ function calc_target_ret_mu(x::AbstractVector, w::AbstractVector, rm::MomentRisk
     return target
 end
 const SolverRiskMeasures = Union{SolverRiskMeasure, SolverHierarchicalRiskMeasure}
+function risk_measure_factory(r::OptimisationRiskMeasure, args...; kwargs...)
+    return risk_measure_factory(r, args...; kwargs...)
+end
+function risk_measure_view(r::OptimisationRiskMeasure, args...; kwargs...)
+    return risk_measure_view(r, args...; kwargs...)
+end
+function risk_measure_factory(rs::AbstractVector{<:OptimisationRiskMeasure}, args...;
+                              kwargs...)
+    return risk_measure_factory.(rs, args...; kwargs...)
+end
+function risk_measure_view(rs::AbstractVector{<:OptimisationRiskMeasure}, args...;
+                           kwargs...)
+    return risk_measure_view.(rs, args...; kwargs...)
+end
+abstract type Scalariser end
+struct SumScalariser <: Scalariser end
+struct MaxScalariser <: Scalariser end
+struct LogSumExpScalariser{T1 <: Real} <: Scalariser
+    gamma::T1
+end
+function LogSumExpScalariser(; gamma::Real = 1.0)
+    @smart_assert(gamma > zero(gamma))
+    return LogSumExpScalariser{typeof(gamma)}(gamma)
+end
 
-export RiskMeasureSettings, HierarchicalRiskMeasureSettings, ExactOrderedWeightsArray,
-       ApproxOrderedWeightsArray
+export RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser, MaxScalariser,
+       LogSumExpScalariser

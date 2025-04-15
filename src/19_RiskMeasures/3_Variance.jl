@@ -42,5 +42,70 @@ function risk_measure_view(r::Variance, prior::AbstractPriorResult, i, args...; 
     return Variance(; settings = r.settings, formulation = r.formulation, sigma = sigma,
                     rc = r.rc)
 end
+struct StandardDeviation{T1 <: RiskMeasureSettings,
+                         T2 <: Union{Nothing, <:AbstractMatrix}} <: SigmaRiskMeasure
+    settings::T1
+    sigma::T2
+end
+function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                           sigma::Union{Nothing, <:AbstractMatrix} = nothing)
+    if isa(sigma, AbstractMatrix)
+        @smart_assert(!isempty(sigma))
+        issquare(sigma)
+    end
+    return StandardDeviation{typeof(settings), typeof(sigma)}(settings, sigma)
+end
+function (r::StandardDeviation)(w::AbstractVector)
+    return sqrt(dot(w, r.sigma, w))
+end
+function risk_measure_factory(r::StandardDeviation, prior::AbstractPriorResult, args...;
+                              kwargs...)
+    sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
+    return StandardDeviation(; settings = r.settings, sigma = sigma)
+end
+function risk_measure_view(r::StandardDeviation, prior::AbstractPriorResult,
+                           cluster::AbstractVector, args...; kwargs...)
+    sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, cluster)
+    return StandardDeviation(; settings = r.settings, sigma = sigma)
+end
+struct UncertaintySetVariance{T1 <: RiskMeasureSettings,
+                              T2 <: Union{Nothing, <:AbstractUncertaintySetResult,
+                                          <:AbstractUncertaintySetEstimator},
+                              T3 <: Union{Nothing, <:AbstractMatrix{<:Real}}} <:
+       SigmaRiskMeasure
+    settings::T1
+    ucs::T2
+    sigma::T3
+end
+function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                                ucs::Union{Nothing, <:AbstractUncertaintySetResult,
+                                           <:AbstractUncertaintySetEstimator} = nothing,
+                                sigma::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing)
+    if isa(sigma, AbstractMatrix)
+        @smart_assert(!isempty(sigma))
+    end
+    return UncertaintySetVariance{typeof(settings), typeof(ucs), typeof(sigma)}(settings,
+                                                                                ucs, sigma)
+end
+function (r::UncertaintySetVariance)(w::AbstractVector)
+    return dot(w, r.sigma, w)
+end
+function risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
+                              ucs::Union{Nothing, <:AbstractUncertaintySetResult,
+                                         <:AbstractUncertaintySetEstimator} = nothing,
+                              args...; kwargs...)
+    uset = ucs_factory(r.ucs, ucs)
+    sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
+    return UncertaintySetVariance(; settings = r.settings, ucs = uset, sigma = sigma)
+end
+function risk_measure_view(r::UncertaintySetVariance, prior::AbstractPriorResult,
+                           cluster::AbstractVector, ::Any,
+                           ucs::Union{Nothing, <:AbstractUncertaintySetResult,
+                                      <:AbstractUncertaintySetEstimator} = nothing, args...;
+                           kwargs...)
+    uset = ucs_factory(r.ucs, ucs, cluster)
+    sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, cluster)
+    return UncertaintySetVariance(; settings = r.settings, ucs = uset, sigma = sigma)
+end
 
-export Variance
+export Variance, StandardDeviation, UncertaintySetVariance

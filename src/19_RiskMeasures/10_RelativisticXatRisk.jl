@@ -207,6 +207,25 @@ function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     return RRM(dd, r.slv, r.alpha, r.kappa)
 end
+for r ∈ (RelativisticValueatRisk, RelativisticDrawdownatRisk,
+         RelativeRelativisticDrawdownatRisk)
+    eval(quote
+             function risk_measure_factory(r::$(r), ::Any,
+                                           slv::Union{Nothing, <:Solver,
+                                                      <:AbstractVector{<:Solver}}, args...;
+                                           kwargs...)
+                 slv = risk_measure_solver_factory(r.slv, slv)
+                 return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
+                             slv = slv)
+             end
+             function risk_measure_view(r::$(r), ::Any, ::Any,
+                                        slv::Union{Nothing, <:Solver,
+                                                   <:AbstractVector{<:Solver}}, args...;
+                                        kwargs...)
+                 return risk_measure_factory(r; slv = slv, kwargs = kwargs)
+             end
+         end)
+end
 
 export RelativisticValueatRisk, RelativisticValueatRiskRange, RelativisticDrawdownatRisk,
        RelativeRelativisticDrawdownatRisk

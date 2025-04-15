@@ -11,23 +11,19 @@ function expected_risk(r::Union{WorstRealisation, ValueatRisk, ValueatRiskRange,
                                 RelativeUlcerIndex, RelativeEntropicDrawdownatRisk,
                                 RelativeRelativisticDrawdownatRisk, GiniMeanDifference,
                                 Range, ConditionalValueatRiskRange, TailGini, TailGiniRange,
-                                OrderedWeightsArray, FourthCentralMoment, Skewness,
-                                SemiSkewness, Kurtosis, SemiKurtosis}, w::AbstractVector,
-                       X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+                                OrderedWeightsArray}, w::AbstractVector, X::AbstractMatrix,
+                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, X, fees))
 end
-function expected_risk(r::Union{MeanAbsoluteDeviation, SemiStandardDeviation,
-                                FirstLowerPartialMoment, ThirdLowerPartialMoment,
-                                FourthLowerPartialMoment, TrackingRiskMeasure,
-                                SquareRootKurtosis, SquareRootSemiKurtosis, SemiVariance,
-                                BrownianDistanceVariance}, w::AbstractVector,
-                       X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+function expected_risk(r::Union{LowOrderMoment, HighOrderMoment, TrackingRiskMeasure,
+                                SquareRootKurtosis, BrownianDistanceVariance},
+                       w::AbstractVector, X::AbstractMatrix,
+                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(w, X, fees)
 end
-function expected_risk(r::Union{StandardDeviation, NegativeSkewness, NegativeSemiSkewness,
-                                TurnoverRiskMeasure, Variance, UncertaintySetVariance,
-                                NegativeQuadraticSkewness, NegativeQuadraticSemiSkewness,
-                                EqualRiskMeasure}, w::AbstractVector, args...; kwargs...)
+function expected_risk(r::Union{StandardDeviation, NegativeSkewness, TurnoverRiskMeasure,
+                                Variance, UncertaintySetVariance, EqualRiskMeasure},
+                       w::AbstractVector, args...; kwargs...)
     return r(w)
 end
 function expected_risk(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
