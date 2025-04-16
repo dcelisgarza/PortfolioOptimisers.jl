@@ -44,7 +44,7 @@ function Fees(; long::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing
                 typeof(turnover), typeof(tol_kwargs)}(long, short, fixed_long, fixed_short,
                                                       turnover, tol_kwargs)
 end
-function fees_view(::Nothing, ::Any; kwargs...)
+function fees_view(::Nothing, ::Any)
     return nothing
 end
 function fees_view(fees::Fees, i::AbstractVector)
@@ -221,13 +221,13 @@ function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector, fees:
     fees_turnover = calc_asset_fees(w, latest_prices, fees.turnover)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
-function calc_net_returns(w::AbstractVector, X::AbstractMatrix, args...)
+function calc_net_returns(w::AbstractVector, X::AbstractMatrix, ::Nothing)
     return X * w
 end
 function calc_net_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees)
     return X * w .- calc_fees(w, fees)
 end
-function calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, args...)
+function calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, ::Nothing)
     return X .* transpose(w)
 end
 function calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees)
