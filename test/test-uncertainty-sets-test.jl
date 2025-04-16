@@ -99,15 +99,32 @@
         @test ues[1] === ucs_view(ues[1], ucrm1, [3])
         @test ucrm1 === ucs_factory(ucrm1, ues[2])
         ucrm2 = ucs_view(ucrm1, ues[2], [3])
-        @test ucrm2.lb == ucrm1.lb[[3]]
-        @test ucrm2.ub == ucrm1.ub[[3]]
+        @test ucrm2.lb == view(ucrm1.lb, [3])
+        @test ucrm2.ub == view(ucrm1.ub, [3])
+
+        @test ucrm1 === ucs_factory(ucrm1, ues[2])
+        ucrm2 = ucs_view(ucrm1, ues[2], [3])
+        @test ucrm2.lb == view(ucrm1.lb, [3])
+        @test ucrm2.ub == view(ucrm1.ub, [3])
 
         @test ues[2] === ucs_factory(nothing, ues[2])
         @test ues[2] === ucs_view(nothing, ues[2], [3])
         @test ucrm1 === ucs_factory(nothing, ucrm1)
         ucrm2 = ucs_view(nothing, ucrm1, [3])
-        @test ucrm2.lb == ucrm1.lb[[3]]
-        @test ucrm2.ub == ucrm1.ub[[3]]
+        @test ucrm2.lb == view(ucrm1.lb, [3])
+        @test ucrm2.ub == view(ucrm1.ub, [3])
+
+        @test ucrs1 === ucs_factory(ucrs1, ues[2])
+        ucrs2 = ucs_view(ucrs1, ues[2], [3])
+        @test ucrs2.lb == view(ucrs1.lb, [3], [3])
+        @test ucrs2.ub == view(ucrs1.ub, [3], [3])
+
+        @test ues[2] === ucs_factory(nothing, ues[2])
+        @test ues[2] === ucs_view(nothing, ues[2], [3])
+        @test ucrs1 === ucs_factory(nothing, ucrs1)
+        ucrs2 = ucs_view(nothing, ucrs1, [3])
+        @test ucrs2.lb == view(ucrs1.lb, [3], [3])
+        @test ucrs2.ub == view(ucrs1.ub, [3], [3])
     end
     @testset "Ellipse Uncertainty sets" begin
         rng = StableRNG(123456789)
@@ -271,20 +288,38 @@
         @test ucrs1.k == ucrs2.k
 
         @test isnothing(ucs_factory(nothing, nothing))
+        @test isnothing(ucs_view(nothing, nothing, 3))
         @test ues[1] === ucs_factory(ues[1], ues[2])
         @test ues[1] === ucs_view(ues[1], ues[2], [3])
         @test ues[1] === ucs_factory(ues[1], ucrm1)
         @test ues[1] === ucs_view(ues[1], ucrm1, [3])
         @test ucrm1 === ucs_factory(ucrm1, ues[2])
         ucrm2 = ucs_view(ucrm1, ues[2], [3])
-        @test ucrm2.sigma == ucrm1.sigma[[3], [3]]
+        @test ucrm2.sigma == view(ucrm1.sigma, [3], [3])
         @test ucrm2.k == ucrm1.k
 
         @test ues[2] === ucs_factory(nothing, ues[2])
         @test ues[2] === ucs_view(nothing, ues[2], [3])
         @test ucrm1 === ucs_factory(nothing, ucrm1)
         ucrm2 = ucs_view(nothing, ucrm1, [3])
-        @test ucrm2.sigma == ucrm1.sigma[[3], [3]]
+        @test ucrm2.sigma == view(ucrm1.sigma, [3], [3])
         @test ucrm2.k == ucrm1.k
+
+        @test ues[1] === ucs_factory(ues[1], ucrs1)
+        @test ues[1] === ucs_view(ues[1], ucrs1, [3, 5])
+        @test ucrs1 === ucs_factory(ucrs1, ues[2])
+        ucrm2 = ucs_view(ucrs1, ues[2], [3, 5])
+        i = PortfolioOptimisers.fourth_moment_index_factory(floor(Int,
+                                                                  sqrt(size(ucrs1.sigma, 1))),
+                                                            [3, 5])
+        @test ucrm2.sigma == view(ucrs1.sigma, i, i)
+        @test ucrm2.k == ucrs1.k
+
+        @test ues[2] === ucs_factory(nothing, ues[2])
+        @test ues[2] === ucs_view(nothing, ues[2], [3, 5])
+        @test ucrs1 === ucs_factory(nothing, ucrs1)
+        ucrm2 = ucs_view(nothing, ucrs1, [3, 5])
+        @test ucrm2.sigma == view(ucrs1.sigma, i, i)
+        @test ucrm2.k == ucrs1.k
     end
 end
