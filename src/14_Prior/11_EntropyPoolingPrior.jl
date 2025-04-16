@@ -171,21 +171,21 @@ function Base.getproperty(obj::EntropyPoolingPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
-struct EntropyPoolingResult{T1 <: AbstractPriorResult,
-                            T2 <: Union{<:LinearConstraintResult,
-                                        <:AbstractVector{<:LinearConstraintResult}},
-                            T3 <: AbstractWeights} <: AbstractEntropyPoolingPriorResult
+struct EntropyPoolingPriorResult{T1 <: AbstractPriorResult,
+                                 T2 <: Union{<:LinearConstraintResult,
+                                             <:AbstractVector{<:LinearConstraintResult}},
+                                 T3 <: AbstractWeights} <: AbstractEntropyPoolingPriorResult
     pm::T1
     views::T2
     w::T3
 end
-function EntropyPoolingResult(; pm::AbstractPriorResult,
-                              views::Union{<:LinearConstraintResult,
-                                           <:AbstractVector{<:LinearConstraintResult}},
-                              w::AbstractWeights)
+function EntropyPoolingPriorResult(; pm::AbstractPriorResult,
+                                   views::Union{<:LinearConstraintResult,
+                                                <:AbstractVector{<:LinearConstraintResult}},
+                                   w::AbstractWeights)
     @smart_assert(!isempty(w))
     @smart_assert(size(pm.X, 1) == length(w))
-    return EntropyPoolingResult{typeof(pm), typeof(views), typeof(w)}(pm, views, w)
+    return EntropyPoolingPriorResult{typeof(pm), typeof(views), typeof(w)}(pm, views, w)
 end
 function factory(pe::EntropyPoolingPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
@@ -193,7 +193,7 @@ function factory(pe::EntropyPoolingPriorEstimator,
                                         sets = pe.sets, alg = pe.alg, opt = pe.opt,
                                         w = isnothing(w) ? pe.w : w)
 end
-function Base.getproperty(obj::EntropyPoolingResult, sym::Symbol)
+function Base.getproperty(obj::EntropyPoolingPriorResult, sym::Symbol)
     return if sym == :X
         obj.pm.X
     elseif sym == :mu
@@ -228,8 +228,8 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_Entrop
     views = entropy_pooling_views(pm, pe.views, pe.sets; strict = strict)
     w = entropy_pooling(w, views, pe.opt)
     pe = factory(pe, w)
-    return EntropyPoolingResult(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
-                                views = views, w = w)
+    return EntropyPoolingPriorResult(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
+                                     views = views, w = w)
 end
 function _get_epw(::H1_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return w0
@@ -292,7 +292,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
         pe = factory(pe, wi)
         pm = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
-    return EntropyPoolingResult(; pm = pm, views = V_i, w = wi)
+    return EntropyPoolingPriorResult(; pm = pm, views = V_i, w = wi)
 end
 
 export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling,

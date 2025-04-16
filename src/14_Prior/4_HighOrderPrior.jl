@@ -137,7 +137,6 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
     end
     pm = prior(pe.pe, X, F)
     (; X, mu) = pm
-    display(mu)
     kt = cokurtosis(pe.kte, X; mean = transpose(mu))
     skt = cokurtosis(pe.skte, X; mean = transpose(mu))
     sk, V = coskewness(pe.ske, X; mean = transpose(mu))

@@ -61,9 +61,9 @@ function risk_measure_factory(r::SquareRootKurtosis, prior::HighOrderPriorResult
                               kt = kt)
 end
 function risk_measure_factory(r::SquareRootKurtosis,
-                              prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any,
-                                                          <:Any, <:Any, <:Any}, args...;
-                              kwargs...)
+                              prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
+                                                          <:Any, <:Any, <:Any, <:Any},
+                              args...; kwargs...)
     w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
     kt = risk_measure_nothing_matrix_factory(r.kt, _get_kt(r.alg, prior))
@@ -76,8 +76,8 @@ function risk_measure_factory(r::SquareRootKurtosis, prior::AbstractLowOrderPrio
     return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = r.w, mu = mu,
                               kt = kt)
 end
-function risk_measure_factory(r::SquareRootKurtosis, prior::EntropyPoolingResult, args...;
-                              kwargs...)
+function risk_measure_factory(r::SquareRootKurtosis, prior::EntropyPoolingPriorResult,
+                              args...; kwargs...)
     w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
     kt = risk_measure_nothing_matrix_factory(r.kt, nothing)
@@ -100,7 +100,7 @@ function risk_measure_view(r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any,
 end
 function risk_measure_view(r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any,
                                                  <:AbstractMatrix},
-                           prior::EntropyPoolingResult, i::AbstractVector, args...;
+                           prior::EntropyPoolingPriorResult, i::AbstractVector, args...;
                            kwargs...)
     w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
@@ -117,9 +117,9 @@ function risk_measure_view(r::SquareRootKurtosis, prior::HighOrderPriorResult,
                               kt = kt)
 end
 function risk_measure_view(r::SquareRootKurtosis,
-                           prior::HighOrderPriorResult{<:EntropyPoolingResult, <:Any, <:Any,
-                                                       <:Any, <:Any}, i::AbstractVector,
-                           args...; kwargs...)
+                           prior::HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any,
+                                                       <:Any, <:Any, <:Any},
+                           i::AbstractVector, args...; kwargs...)
     w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
     mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
     idx = fourth_moment_index_factory(size(prior.X, 2), i)

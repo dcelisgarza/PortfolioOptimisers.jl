@@ -75,6 +75,7 @@ include("./14_Prior/8_FactorBlackLittermanPrior.jl")
 include("./14_Prior/9_AugmentedBlackLittermanPrior.jl")
 include("./14_Prior/10_EntropyPoolingViewsGeneration.jl")
 include("./14_Prior/11_EntropyPoolingPrior.jl")
+include("./14_Prior/12_Base_Function_Prior_Extensions.jl")
 
 include("./15_UncertaintySets/1_Base_UncertaintySets.jl")
 include("./15_UncertaintySets/2_DeltaUncertaintySets.jl")

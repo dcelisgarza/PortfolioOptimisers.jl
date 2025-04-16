@@ -228,6 +228,7 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
     # Parse both sides
     lhs_terms, lhs_const = parse_side(lhs, strict)
     rhs_terms, rhs_const = parse_side(rhs, strict)
+    @smart_assert(isempty(lhs_terms) ⊼ isempty(rhs_terms))
 
     # Combine like terms - put all variables on left side
     var_coeffs = Dict{String, Float64}()
@@ -262,7 +263,6 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
     terms = String[]
     for (i, var) ∈ enumerate(vars)
         coef = coefs[i]
-
         if isapprox(abs(coef), 1.0)
             term = coef > 0 ? var : "-$var"
         else

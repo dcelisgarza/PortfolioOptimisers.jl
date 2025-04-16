@@ -71,7 +71,7 @@ function calc_target_ret_mu(x::AbstractVector, w::AbstractVector, rm::MomentRisk
 end
 const SolverRiskMeasures = Union{SolverRiskMeasure, SolverHierarchicalRiskMeasure}
 function risk_measure_factory(r::OptimisationRiskMeasure, args...; kwargs...)
-    return risk_measure_factory(r, args...; kwargs...)
+    return r
 end
 function risk_measure_view(r::OptimisationRiskMeasure, args...; kwargs...)
     return risk_measure_view(r, args...; kwargs...)

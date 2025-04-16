@@ -95,6 +95,7 @@ function risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorRes
                               ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                          <:AbstractUncertaintySetEstimator} = nothing,
                               args...; kwargs...)
+    println(ucs)
     uset = ucs_factory(r.ucs, ucs)
     sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = uset, sigma = sigma)

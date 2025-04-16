@@ -210,8 +210,8 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
                  return $(rt)(; settings = r.settings, alg = r.alg, target = r.target,
                               w = r.w, mu = mu)
              end
-             function risk_measure_factory(r::$(rt), prior::EntropyPoolingResult, args...;
-                                           kwargs...)
+             function risk_measure_factory(r::$(rt), prior::EntropyPoolingPriorResult,
+                                           args...; kwargs...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu)
                  alg = risk_moment_algorithm_factory(r.alg, prior.w)
@@ -219,7 +219,7 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
                               mu = mu)
              end
              function risk_measure_factory(r::$(rt),
-                                           prior::HighOrderPriorResult{<:EntropyPoolingResult,
+                                           prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any}, args...;
                                            kwargs...)
@@ -236,7 +236,7 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
                  return $(rt)(; settings = r.settings, alg = r.alg, target = target,
                               w = r.w, mu = mu)
              end
-             function risk_measure_view(r::$(rt), prior::EntropyPoolingResult,
+             function risk_measure_view(r::$(rt), prior::EntropyPoolingPriorResult,
                                         i::AbstractVector, args...; kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, i)
                  w = risk_measure_nothing_vec_factory(r.w, prior.w)
@@ -246,7 +246,7 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
                               mu = mu)
              end
              function risk_measure_view(r::$(rt),
-                                        prior::HighOrderPriorResult{<:EntropyPoolingResult,
+                                        prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
                                                                     <:Any, <:Any, <:Any,
                                                                     <:Any},
                                         i::AbstractVector, args...; kwargs...)

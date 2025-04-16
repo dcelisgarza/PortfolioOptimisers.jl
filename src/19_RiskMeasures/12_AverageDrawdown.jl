@@ -95,13 +95,13 @@ for r ∈ (AverageDrawdown, RelativeAverageDrawdown)
              function risk_measure_factory(r::$(r), args...; kwargs...)
                  return r
              end
-             function risk_measure_factory(r::$(r), prior::EntropyPoolingResult, args...;
-                                           kwargs...)
+             function risk_measure_factory(r::$(r), prior::EntropyPoolingPriorResult,
+                                           args...; kwargs...)
                  w = risk_measure_nothing_vec_factory(r.w, prior.w)
                  return $(r)(; settings = r.settings, w = w)
              end
              function risk_measure_factory(r::$(r),
-                                           prior::HighOrderPriorResult{<:EntropyPoolingResult,
+                                           prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any}, args...;
                                            kwargs...)
