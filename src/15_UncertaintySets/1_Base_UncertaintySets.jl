@@ -31,14 +31,12 @@ function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwarg
     return sigma_ucs(uc, rd.X, rd.F; kwargs...)
 end
 struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
-struct BoxUncertaintySetResult{T1 <: Union{<:AbstractVector, <:AbstractMatrix},
-                               T2 <: Union{<:AbstractVector, <:AbstractMatrix}} <:
+struct BoxUncertaintySetResult{T1 <: AbstractArray, T2 <: AbstractArray} <:
        AbstractUncertaintySetResult
     lb::T1
     ub::T2
 end
-function BoxUncertaintySetResult(; lb::Union{<:AbstractVector, <:AbstractMatrix},
-                                 ub::Union{<:AbstractVector, <:AbstractMatrix})
+function BoxUncertaintySetResult(; lb::AbstractArray, ub::AbstractArray)
     @smart_assert(!isempty(lb) && !isempty(ub))
     @smart_assert(size(lb) == size(ub))
     return BoxUncertaintySetResult{typeof(lb), typeof(ub)}(lb, ub)

@@ -1,7 +1,4 @@
-function ucs_factory(::Nothing, ::Nothing)
-    return nothing
-end
-function ucs_factory(::Nothing, ::Nothing, ::Any)
+function ucs_factory(::Nothing, ::Nothing, args...)
     return nothing
 end
 function ucs_factory(risk_ucs::Union{<:AbstractUncertaintySetResult,
@@ -19,11 +16,25 @@ end
 function ucs_factory(::Nothing, prior_ucs::AbstractUncertaintySetEstimator, ::Any)
     return prior_ucs
 end
-function ucs_factory(risk_ucs::BoxUncertaintySetResult{<:AbstractVector, <:AbstractVector},
+function ucs_factory(risk_ucs::BoxUncertaintySetResult{<:Union{<:AbstractVector,
+                                                               <:SubArray{<:Any, 0, <:Any,
+                                                                          <:Any, <:Any},
+                                                               <:SubArray{<:Any, 1, <:Any,
+                                                                          <:Any, <:Any}},
+                                                       <:Union{<:AbstractVector,
+                                                               <:SubArray{<:Any, 0, <:Any,
+                                                                          <:Any, <:Any},
+                                                               <:SubArray{<:Any, 1, <:Any,
+                                                                          <:Any, <:Any}}},
                      ::Any, i)
     return BoxUncertaintySetResult(; lb = view(risk_ucs.lb, i), ub = view(risk_ucs.ub, i))
 end
-function ucs_factory(risk_ucs::BoxUncertaintySetResult{<:AbstractMatrix, <:AbstractMatrix},
+function ucs_factory(risk_ucs::BoxUncertaintySetResult{<:Union{<:AbstractMatrix,
+                                                               <:SubArray{<:Any, 2, <:Any,
+                                                                          <:Any, <:Any}},
+                                                       <:Union{<:AbstractMatrix,
+                                                               <:SubArray{<:Any, 2, <:Any,
+                                                                          <:Any, <:Any}}},
                      ::Any, i)
     return BoxUncertaintySetResult(; lb = view(risk_ucs.lb, i, i),
                                    ub = view(risk_ucs.ub, i, i))
