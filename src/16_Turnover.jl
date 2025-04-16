@@ -18,7 +18,7 @@ end
 function turnover_view(::Nothing, ::Any)
     return nothing
 end
-function turnover_view(turnover::Turnover, i)
+function turnover_view(turnover::Turnover, i::AbstractVector)
     val = nothing_scalar_array_view(turnover.val, i)
     w = view(turnover.w, i)
     return Turnover(; val = val, w = w)

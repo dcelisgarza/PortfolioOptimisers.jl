@@ -19,9 +19,9 @@ function risk_measure_view(r::TrackingRiskMeasure{<:Any, <:ReturnsTracking}, arg
     return r
 end
 function risk_measure_view(r::TrackingRiskMeasure{<:Any, <:WeightsTracking}, ::Any,
-                           cluster::AbstractVector, args...; kwargs...)
-    fees = fees_view(r.tracking.fees, cluster)
-    w = view(r.tracking.w, cluster)
+                           i::AbstractVector, args...; kwargs...)
+    fees = fees_view(r.tracking.fees, i)
+    w = view(r.tracking.w, i)
     return TrackingRiskMeasure(; settings = r.settings,
                                tracking = WeightsTracking(; w = w, fees = fees))
 end

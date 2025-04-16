@@ -86,15 +86,15 @@ function risk_measure_factory(r::NegativeSkewness, ::AbstractLowOrderPriorResult
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
 function risk_measure_view(::NegativeSkewness{<:Any, <:Any, <:Any, Nothing, <:Any},
-                           ::Nothing, prior::AbstractPriorResult, cluster::AbstractVector,
+                           prior::Union{Nothing, <:AbstractPriorResult}, i::AbstractVector,
                            args...; kwargs...)
     throw(ArgumentError("Neither the risk measure, nor the prior have the required data."))
 end
 function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:AbstractMatrix,
                                                <:Any}, prior::AbstractPriorResult,
-                           cluster::AbstractVector, args...; kwargs...)
-    idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
-    sk = view(r.sk, cluster, idx)
+                           i::AbstractVector, args...; kwargs...)
+    idx = fourth_moment_index_factory(size(prior.X, 2), i)
+    sk = view(r.sk, i, idx)
     V = __coskewness(sk, prior.X, r.mp)
     if all(iszero.(diag(V)))
         V[diagind(V)] = I(size(V, 1))
@@ -106,9 +106,9 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, Nothing, <:A
                                                        <:Any, <:AbstractMatrix,
                                                        <:AbstractMatrix,
                                                        <:AbstractMatrixProcessingEstimator},
-                           cluster::AbstractVector, args...; kwargs...)
-    idx = fourth_moment_index_factory(size(prior.X, 2), cluster)
-    sk = view(_get_sk(r.alg, prior), cluster, idx)
+                           i::AbstractVector, args...; kwargs...)
+    idx = fourth_moment_index_factory(size(prior.X, 2), i)
+    sk = view(_get_sk(r.alg, prior), i, idx)
     V = __coskewness(sk, prior.X, _get_smp(r, prior))
     if all(iszero.(diag(V)))
         V[diagind(V)] = I(size(V, 1))

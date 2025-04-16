@@ -78,14 +78,14 @@ end
 abstract type AbstractEllipseUncertaintySetResultClass <: AbstractUncertaintySetResult end
 struct MuEllipseUncertaintySetResult <: AbstractEllipseUncertaintySetResultClass end
 struct SigmaEllipseUncertaintySetResult <: AbstractEllipseUncertaintySetResultClass end
-struct EllipseUncertaintySetResult{T1 <: AbstractMatrix, T2 <: Real,
+struct EllipseUncertaintySetResult{T1 <: AbstractArray, T2 <: Real,
                                    T3 <: AbstractEllipseUncertaintySetResultClass} <:
        AbstractUncertaintySetResult
     sigma::T1
     k::T2
     class::T3
 end
-function EllipseUncertaintySetResult(; sigma::AbstractMatrix, k::Real,
+function EllipseUncertaintySetResult(; sigma::AbstractArray, k::Real,
                                      class::AbstractEllipseUncertaintySetResultClass)
     @smart_assert(!isempty(sigma))
     issquare(sigma)

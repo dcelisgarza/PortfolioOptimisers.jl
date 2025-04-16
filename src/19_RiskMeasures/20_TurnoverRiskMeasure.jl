@@ -11,8 +11,8 @@ end
 function (r::TurnoverRiskMeasure)(w::AbstractVector)
     return norm(r.w - w, 1)
 end
-function risk_measure_view(r::TurnoverRiskMeasure; cluster::AbstractVector, kwargs...)
-    w = view(r.w, cluster)
+function risk_measure_view(r::TurnoverRiskMeasure, i::AbstractVector, args...; kwargs...)
+    w = view(r.w, i)
     return TurnoverRiskMeasure(; settings = r.settings, w = w)
 end
 

@@ -1,6 +1,6 @@
 @safetestset "Uncertainty tests" begin
     using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames
-    import PortfolioOptimisers: ucs_factory
+    import PortfolioOptimisers: ucs_factory, ucs_view
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -94,43 +94,20 @@
 
         @test isnothing(ucs_factory(nothing, nothing))
         @test ues[1] === ucs_factory(ues[1], ues[2])
-        @test ues[1] === ucs_factory(ues[1], ues[2], 3)
+        @test ues[1] === ucs_view(ues[1], ues[2], [3])
         @test ues[1] === ucs_factory(ues[1], ucrm1)
-        @test ues[1] === ucs_factory(ues[1], ucrm1, 3)
-
+        @test ues[1] === ucs_view(ues[1], ucrm1, [3])
         @test ucrm1 === ucs_factory(ucrm1, ues[2])
-        ucrm2 = ucs_factory(ucrm1, ues[2], 3)
-        @test ucrm2.lb == fill(ucrm1.lb[3])
-        @test ucrm2.ub == fill(ucrm1.ub[3])
-        ucrm3 = ucs_factory(ucrm2, ues[2], 1)
-        @test ucrm3.lb == fill(ucrm2.lb[1])
-        @test ucrm3.ub == fill(ucrm2.ub[1])
-        ucrm2 = ucs_factory(ucrm1, ues[2], [3])
+        ucrm2 = ucs_view(ucrm1, ues[2], [3])
         @test ucrm2.lb == ucrm1.lb[[3]]
         @test ucrm2.ub == ucrm1.ub[[3]]
-        ucrm3 = ucs_factory(ucrm2, ues[2], [1])
-        @test ucrm3.lb == ucrm2.lb[[1]]
-        @test ucrm3.ub == ucrm2.ub[[1]]
-        ucrm2 = ucs_factory(ucrm1, ues[2], [3, 5])
-        @test ucrm2.lb == view(ucrm1.lb, [3, 5])
-        @test ucrm2.ub == view(ucrm1.ub, [3, 5])
 
-        @test ucrs1 === ucs_factory(ucrs1, ues[2])
-        ucrs2 = ucs_factory(ucrs1, ues[2], 3)
-        @test ucrs2.lb == fill(ucrs1.lb[3, 3])
-        @test ucrs2.ub == fill(ucrs1.ub[3, 3])
-        ucrs3 = ucs_factory(ucrs2, ues[2], 1)
-        @test ucrs3.lb == fill(ucrs2.lb[1, 1])
-        @test ucrs3.ub == fill(ucrs2.ub[1, 1])
-        ucrs2 = ucs_factory(ucrs1, ues[2], [3])
-        @test ucrs2.lb == ucrs1.lb[[3], [3]]
-        @test ucrs2.ub == ucrs1.ub[[3], [3]]
-        ucrs3 = ucs_factory(ucrs2, ues[2], [1])
-        @test ucrs3.lb == ucrs2.lb[[1], [1]]
-        @test ucrs3.ub == ucrs2.ub[[1], [1]]
-        ucrs2 = ucs_factory(ucrs1, ues[2], [3, 5])
-        @test ucrs2.lb == view(ucrs1.lb, [3, 5], [3, 5])
-        @test ucrs2.ub == view(ucrs1.ub, [3, 5], [3, 5])
+        @test ues[2] === ucs_factory(nothing, ues[2])
+        @test ues[2] === ucs_view(nothing, ues[2], [3])
+        @test ucrm1 === ucs_factory(nothing, ucrm1)
+        ucrm2 = ucs_view(nothing, ucrm1, [3])
+        @test ucrm2.lb == ucrm1.lb[[3]]
+        @test ucrm2.ub == ucrm1.ub[[3]]
     end
     @testset "Ellipse Uncertainty sets" begin
         rng = StableRNG(123456789)
@@ -292,5 +269,22 @@
         ucrs2 = sigma_ucs(ues[1], ReturnsResult(; nx = 1:5, X = X))
         @test ucrs1.sigma == ucrs2.sigma
         @test ucrs1.k == ucrs2.k
+
+        @test isnothing(ucs_factory(nothing, nothing))
+        @test ues[1] === ucs_factory(ues[1], ues[2])
+        @test ues[1] === ucs_view(ues[1], ues[2], [3])
+        @test ues[1] === ucs_factory(ues[1], ucrm1)
+        @test ues[1] === ucs_view(ues[1], ucrm1, [3])
+        @test ucrm1 === ucs_factory(ucrm1, ues[2])
+        ucrm2 = ucs_view(ucrm1, ues[2], [3])
+        @test ucrm2.sigma == ucrm1.sigma[[3], [3]]
+        @test ucrm2.k == ucrm1.k
+
+        @test ues[2] === ucs_factory(nothing, ues[2])
+        @test ues[2] === ucs_view(nothing, ues[2], [3])
+        @test ucrm1 === ucs_factory(nothing, ucrm1)
+        ucrm2 = ucs_view(nothing, ucrm1, [3])
+        @test ucrm2.sigma == ucrm1.sigma[[3], [3]]
+        @test ucrm2.k == ucrm1.k
     end
 end

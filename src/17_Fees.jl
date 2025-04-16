@@ -47,7 +47,7 @@ end
 function fees_view(::Nothing, ::Any; kwargs...)
     return nothing
 end
-function fees_view(fees::Fees, i)
+function fees_view(fees::Fees, i::AbstractVector)
     long = nothing_scalar_array_view(fees.long, i)
     short = nothing_scalar_array_view(fees.short, i)
     fixed_long = nothing_scalar_array_view(fees.fixed_long, i)

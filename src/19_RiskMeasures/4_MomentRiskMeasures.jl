@@ -229,15 +229,15 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
                  return $(rt)(; settings = r.settings, alg = alg, target = r.target, w = w,
                               mu = mu)
              end
-             function risk_measure_view(r::$(rt), prior::AbstractPriorResult, i, args...;
-                                        kwargs...)
+             function risk_measure_view(r::$(rt), prior::AbstractPriorResult,
+                                        i::AbstractVector, args...; kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, i)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
                  return $(rt)(; settings = r.settings, alg = r.alg, target = target,
                               w = r.w, mu = mu)
              end
-             function risk_measure_view(r::$(rt), prior::EntropyPoolingResult, i, args...;
-                                        kwargs...)
+             function risk_measure_view(r::$(rt), prior::EntropyPoolingResult,
+                                        i::AbstractVector, args...; kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, i)
                  w = risk_measure_nothing_vec_factory(r.w, prior.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
@@ -248,8 +248,8 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
              function risk_measure_view(r::$(rt),
                                         prior::HighOrderPriorResult{<:EntropyPoolingResult,
                                                                     <:Any, <:Any, <:Any,
-                                                                    <:Any}, i, args...;
-                                        kwargs...)
+                                                                    <:Any},
+                                        i::AbstractVector, args...; kwargs...)
                  target = risk_measure_nothing_real_vec_factory(r.target, i)
                  w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
                  mu = risk_measure_nothing_vec_factory(r.mu, prior.mu, i)
