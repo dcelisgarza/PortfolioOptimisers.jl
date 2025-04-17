@@ -8,7 +8,7 @@ function _w_finite_flag(wb::Real)
     return isfinite(wb)
 end
 function _w_finite_flag(wb::AbstractVector)
-    return any(isfinite.(wb))
+    return any(isfinite, wb)
 end
 function set_weight_constraints!(::JuMP.Model, ::Nothing, ::Nothing, ::Bool)
     return nothing

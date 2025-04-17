@@ -110,10 +110,10 @@ function valid_k_clusters(clustering::Hclust, arr::AbstractVector)
     heights = [i.height for i ∈ nodes]
     nodes = nodes[sortperm(heights; rev = true)]
     while true
-        k = all(.!isfinite.(arr)) ? length(arr) : argmax(arr)
+        k = all(!isfinite, arr) ? length(arr) : argmax(arr)
         if validate_k_value(clustering, nodes, k)
             return k
-        elseif all(isinf.(arr))
+        elseif all(isinf, arr)
             return 1
         end
         arr[k] = typemin(eltype(arr))

@@ -147,7 +147,7 @@ function centrality_constraints(ccs::Union{<:CentralityConstraintEstimator,
     B_eq = Vector{eltype(X)}(undef, 0)
     for cc ∈ ccs
         A = centrality_vector(cc.A, X; dims = dims, kwargs...)
-        lhs_flag = isempty(A) || all(iszero.(A))
+        lhs_flag = isempty(A) || all(iszero, A)
         if lhs_flag
             continue
         end

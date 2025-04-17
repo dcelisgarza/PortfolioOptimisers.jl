@@ -1267,7 +1267,7 @@ function logo!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator}, sigma::Abstract
     issquare(sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     S = if iscov
         s .= sqrt.(s)
         StatsBase.cov2cor(sigma, s)

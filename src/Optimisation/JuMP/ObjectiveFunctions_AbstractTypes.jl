@@ -120,7 +120,7 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationType,
             push!(solvers_tried, name => Dict(:jump_error => jump_error))
             continue
         end
-        all_finite_weights = all(isfinite.(value.(model[:w])))
+        all_finite_weights = all(isfinite, value.(model[:w]))
         all_non_zero_weights = !all(isapprox.(abs.(value.(model[:w])), zero(datatype)))
         try
             assert_is_solved_and_feasible(model; check_sol...)

@@ -11,18 +11,15 @@ function risk_measure_factory(r::MeanReturn, args...)
     return r(; w = r.w)
 end
 function risk_measure_factory(r::MeanReturn, prior::EntropyPoolingPriorResult, args...)
-    w = risk_measure_nothing_vec_factory(r.w, prior.w)
+    w = risk_measure_nothing_real_array_factory(r.w, prior.w)
     return r(; w = w)
 end
-struct Skewness{T1 <: AbstractVarianceEstimator,
-                T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                T3 <: Union{Nothing, <:AbstractWeights},
-                T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+struct Skewness{T1 <: AbstractVarianceEstimator, T2 <: Union{Nothing, <:AbstractWeights},
+                T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
        AbstractMomentNoOptimisationRiskMeasure
     ve::T1
-    target::T2
-    w::T3
-    mu::T4
+    w::T2
+    mu::T3
 end
 function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
@@ -34,12 +31,12 @@ function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
     if isa(mu, AbstractVector)
         @smart_assert(!isempty(mu))
     end
-    return Skewness{typeof(ve), typeof(target), typeof(w), typeof(mu)}(ve, target, w, mu)
+    return Skewness{typeof(ve), typeof(w), typeof(mu)}(ve, w, mu)
 end
 function (r::Skewness)(w::AbstractVector, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
-    target = calc_target_ret_mu(x, w, r)
+    target = calc_moment_target(x, w, r)
     val = x .- target
     sigma = std(r.ve, x)
     return sum(val .^ 3) / length(x) / sigma^3

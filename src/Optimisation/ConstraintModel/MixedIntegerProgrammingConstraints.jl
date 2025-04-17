@@ -14,12 +14,12 @@ function BuyInThreshold(; sbi::Union{Nothing, <:Real, <:AbstractVector{<:Real}} 
         if sbi_flag
             @smart_assert(isfinite(sbi) && sbi >= zero(sbi))
         else
-            @smart_assert(all(isfinite.(sbi)) && all(sbi .>= zero(sbi)))
+            @smart_assert(all(isfinite, sbi) && all(sbi .>= zero(sbi)))
         end
         if lbi_flag
             @smart_assert(isfinite(lbi) && lbi >= zero(lbi))
         else
-            @smart_assert(all(isfinite.(lbi)) && all(lbi .>= zero(lbi)))
+            @smart_assert(all(isfinite, lbi) && all(lbi .>= zero(lbi)))
         end
         if !sbi_flag && !lbi_flag
             @smart_assert(length(sbi) == length(lbi))
@@ -28,13 +28,13 @@ function BuyInThreshold(; sbi::Union{Nothing, <:Real, <:AbstractVector{<:Real}} 
         if isa(sbi, Real)
             @smart_assert(isfinite(sbi) && sbi >= zero(sbi))
         else
-            @smart_assert(all(isfinite.(sbi)) && all(sbi .>= zero(sbi)))
+            @smart_assert(all(isfinite, sbi) && all(sbi .>= zero(sbi)))
         end
     elseif !lbi_flag && sbi_flag
         if isa(lbi, Real)
             @smart_assert(isfinite(lbi) && lbi >= zero(lbi))
         else
-            @smart_assert(all(isfinite.(lbi)) && all(lbi .>= zero(lbi)))
+            @smart_assert(all(isfinite, lbi) && all(lbi .>= zero(lbi)))
         end
     end
     return BuyInThreshold{typeof(sbi), typeof(lbi)}(sbi, lbi)

@@ -6,7 +6,7 @@ function set_risk_budget!(rb::AbstractVector,
     for (group, name, coef) ∈ zip(plca.group, plca.name, plca.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
-            if all(iszero.(idx))
+            if all(iszero, idx)
                 if strict
                     throw(ArgumentError("$(string(name)) is not in $(group).\n$(plca)"))
                 else
@@ -30,7 +30,7 @@ function set_risk_budget!(rb::AbstractVector,
     (; group, name, coef) = plca
     if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
-        if all(iszero.(idx))
+        if all(iszero, idx)
             if strict
                 throw(ArgumentError("$(string(name)) is not in $(group).\n$(plca)"))
             else

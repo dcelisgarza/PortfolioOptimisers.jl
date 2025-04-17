@@ -17,7 +17,7 @@ end
 function distance(de::GeneralDistance{<:SimpleDistance, <:Any}, rho::AbstractMatrix,
                   args...; kwargs...)
     s = diag(rho)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)
@@ -34,7 +34,7 @@ end
 function distance(de::GeneralDistance{<:SimpleAbsoluteDistance, <:Any}, rho::AbstractMatrix,
                   args...; kwargs...)
     s = diag(rho)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)
@@ -55,7 +55,7 @@ end
 function distance(de::GeneralDistance{<:LogDistance, <:Any}, rho::AbstractMatrix, args...;
                   kwargs...)
     s = diag(rho)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)
@@ -79,7 +79,7 @@ function distance(de::GeneralDistance{<:CorrelationDistance, <:Any}, rho::Abstra
                   args...; kwargs...)
     issquare(rho)
     s = diag(rho)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)

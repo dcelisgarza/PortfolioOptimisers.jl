@@ -28,7 +28,7 @@ function get_black_litterman_views_data(blve::LinearConstraintSide{<:AbstractVec
     for (group, name, coef) ∈ zip(blve.group, blve.name, blve.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
-            if all(iszero.(idx))
+            if all(iszero, idx)
                 if strict
                     throw(ArgumentError("$(string(name)) is not in $(group).\n$(blve)"))
                 else
@@ -63,7 +63,7 @@ function get_black_litterman_views_data(blve::LinearConstraintSide{<:Any, <:Any,
     (; group, name, coef) = blve
     if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
-        if all(iszero.(idx))
+        if all(iszero, idx)
             if strict
                 throw(ArgumentError("$(string(name)) is not in $(group).\n$(blve)"))
             else
@@ -99,7 +99,7 @@ function black_littterman_views(blves::Union{<:BlackLittermanViewsEstimator,
     Q = Vector{datatype}(undef, 0)
     for blve ∈ blves
         blve_A = get_black_litterman_views_data(blve.A, sets, strict)
-        if isempty(blve_A) || all(iszero.(blve_A))
+        if isempty(blve_A) || all(iszero, blve_A)
             continue
         end
         append!(P, blve_A)

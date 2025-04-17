@@ -309,13 +309,13 @@
         @test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
 
         (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
-        @test all(iszero.(lb))
-        @test all(isone.(ub))
+        @test all(iszero, lb)
+        @test all(isone, ub)
 
         hcc_1 = WeightBoundsConstraints(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
         (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
-        @test all(iszero.(lb))
-        @test all(isone.(ub))
+        @test all(iszero, lb)
+        @test all(isone, ub)
 
         (; lb, ub) = weight_bounds_constraints(nothing; N = 5)
         @test lb == fill(-Inf, 5)

@@ -1514,7 +1514,7 @@
         c = C0_LinearEntropyPoolingConstraintEstimator(; group = [nothing, nothing],
                                                        name = [nothing, nothing],
                                                        coef = [-3, -3.5])
-        @test all(isnothing.(c.group)) && all(isnothing.(c.name))
+        @test all(isnothing, c.group) && all(isnothing, c.name)
         d = PortfolioOptimisers.freeze_A_view(c)
         @test all(d.coef .== -1)
         c = C0_LinearEntropyPoolingConstraintEstimator(; group = nothing, name = nothing,
@@ -1526,7 +1526,7 @@
         c = C1_LinearEntropyPoolingConstraintEstimator(; group = [nothing, nothing],
                                                        name = [nothing, nothing],
                                                        coef = [-5, -5.5])
-        @test all(isnothing.(c.group)) && all(isnothing.(c.name))
+        @test all(isnothing, c.group) && all(isnothing, c.name)
         d = PortfolioOptimisers.freeze_A_view(c)
         @test all(d.coef .== -1)
         c = C1_LinearEntropyPoolingConstraintEstimator(; group = nothing, name = nothing,
@@ -1538,7 +1538,7 @@
         c = C1_LinearEntropyPoolingConstraintEstimator(; group = [nothing, nothing],
                                                        name = [nothing, nothing],
                                                        coef = [-5, -5.5])
-        @test all(isnothing.(c.group)) && all(isnothing.(c.name))
+        @test all(isnothing, c.group) && all(isnothing, c.name)
         d = PortfolioOptimisers.freeze_A_view(c)
         @test all(d.coef .== -1)
         c = C1_LinearEntropyPoolingConstraintEstimator(; group = nothing, name = nothing,
@@ -1551,7 +1551,7 @@
                                                        name = [nothing, nothing],
                                                        coef = [-7, -7.5],
                                                        kind = SkewnessEntropyPoolingViewAlgorithm())
-        @test all(isnothing.(c.group)) && all(isnothing.(c.name))
+        @test all(isnothing, c.group) && all(isnothing, c.name)
         d = PortfolioOptimisers.freeze_A_view(c)
         @test all(d.coef .== -1)
 
@@ -1567,8 +1567,8 @@
                                                        name1 = [nothing, nothing],
                                                        name2 = [nothing, nothing],
                                                        coef = [-9, -9.5])
-        @test all(isnothing.(c.group1)) && all(isnothing.(c.name1))
-        @test all(isnothing.(c.group2)) && all(isnothing.(c.name2))
+        @test all(isnothing, c.group1) && all(isnothing, c.name1)
+        @test all(isnothing, c.group2) && all(isnothing, c.name2)
         d = PortfolioOptimisers.freeze_A_view(c)
         @test all(d.coef .== -1)
 

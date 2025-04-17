@@ -17,7 +17,7 @@ function detone!(ce::Detone, pdm::Union{Nothing, <:PosDefEstimator}, X::Abstract
     @smart_assert(one(size(X, 1)) <= n <= size(X, 1))
     n -= 1
     s = diag(X)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         StatsBase.cov2cor!(X, s)

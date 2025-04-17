@@ -84,7 +84,7 @@ end
 function denoise!(de::Denoise, pdm::Union{Nothing, <:PosDefEstimator}, X::AbstractMatrix,
                   q::Real)
     s = diag(X)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         StatsBase.cov2cor!(X, s)

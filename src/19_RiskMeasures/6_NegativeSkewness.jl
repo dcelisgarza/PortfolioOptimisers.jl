@@ -75,14 +75,14 @@ function _get_smp(::Union{<:QuadraticNegativeSkewness{<:Semi},
 end
 function risk_measure_factory(r::NegativeSkewness, prior::HighOrderPriorResult, args...;
                               kwargs...)
-    sk = risk_measure_nothing_matrix_factory(r.sk, _get_sk(r.alg, prior))
-    V = risk_measure_nothing_matrix_factory(r.V, _get_V(r.alg, prior))
+    sk = risk_measure_nothing_real_array_factory(r.sk, _get_sk(r.alg, prior))
+    V = risk_measure_nothing_real_array_factory(r.V, _get_V(r.alg, prior))
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
 function risk_measure_factory(r::NegativeSkewness, ::AbstractLowOrderPriorResult, args...;
                               kwargs...)
-    sk = risk_measure_nothing_matrix_factory(r.sk, nothing)
-    V = risk_measure_nothing_matrix_factory(r.V, nothing)
+    sk = risk_measure_nothing_real_array_factory(r.sk, nothing)
+    V = risk_measure_nothing_real_array_factory(r.V, nothing)
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
 function risk_measure_view(::NegativeSkewness{<:Any, <:Any, <:Any, Nothing, <:Any},
@@ -96,7 +96,7 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:AbstractMa
     idx = fourth_moment_index_factory(size(prior.X, 2), i)
     sk = view(r.sk, i, idx)
     V = __coskewness(sk, prior.X, r.mp)
-    if all(iszero.(diag(V)))
+    if all(iszero, diag(V))
         V[diagind(V)] = I(size(V, 1))
     end
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
@@ -110,7 +110,7 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, Nothing, <:A
     idx = fourth_moment_index_factory(size(prior.X, 2), i)
     sk = view(_get_sk(r.alg, prior), i, idx)
     V = __coskewness(sk, prior.X, _get_smp(r, prior))
-    if all(iszero.(diag(V)))
+    if all(iszero, diag(V))
         V[diagind(V)] = I(size(V, 1))
     end
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)

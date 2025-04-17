@@ -44,25 +44,10 @@ function HierarchicalRiskMeasureSettings(; scale::Real = 1.0)
 end
 const MuRiskMeasures = Union{MuRiskMeasure, MuHierarchicalRiskMeasure,
                              MuNoOptimisationRiskMeasure, SquareRootKurtosisRiskMeasure}
-function calc_ret_mu(x::AbstractVector, w::AbstractVector, rm::MuRiskMeasures)
-    mu = rm.mu
-    return mu = if isnothing(mu)
-        wi = rm.w
-        isnothing(wi) ? mean(x) : mean(x, wi)
-    else
-        dot(mu, w)
-    end
-end
 const MomentRiskMeasures = Union{AbstractMomentRiskMeasure,
                                  AbstractMomentHierarchicalRiskMeasure,
                                  AbstractMomentNoOptimisationRiskMeasure}
-function calc_target_ret_mu(x::AbstractVector, w::AbstractVector, rm::MomentRiskMeasures)
-    target = rm.target
-    if isnothing(target)
-        target = calc_ret_mu(x, w, rm)
-    end
-    return target
-end
+
 const SolverRiskMeasures = Union{SolverRiskMeasure, SolverHierarchicalRiskMeasure}
 function risk_measure_factory(rs::AbstractVector{<:OptimisationRiskMeasure}, args...;
                               kwargs...)

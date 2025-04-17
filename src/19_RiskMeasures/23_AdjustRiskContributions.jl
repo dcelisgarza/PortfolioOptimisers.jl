@@ -1,29 +1,27 @@
 const SquaredRiskMeasures = Union{<:Variance,
-                                  <:LowOrderMoment{<:Any, <:SemiVariance, <:Any, <:Any,
-                                                   <:Any}, <:SquareRootKurtosis,
-                                  <:BrownianDistanceVariance,
+                                  <:LowOrderMoment{<:Any, <:SemiVariance, <:Any, <:Any},
+                                  <:SquareRootKurtosis, <:BrownianDistanceVariance,
                                   <:NegativeSkewness{<:Any, <:QuadraticNegativeSkewness,
                                                      <:Any, <:Any, <:Any},
                                   <:UncertaintySetVariance}
 const CubedRiskMeasures = Union{<:Skewness,
-                                <:HighOrderMoment{<:Any, <:ThirdLowerMoment, <:Any, <:Any,
-                                                  <:Any},
+                                <:HighOrderMoment{<:Any, <:ThirdLowerMoment, <:Any, <:Any},
                                 <:HighOrderMoment{<:Any,
                                                   <:HighOrderDeviation{<:ThirdLowerMoment,
-                                                                       <:Any}, <:Any, <:Any,
+                                                                       <:Any}, <:Any,
                                                   <:Any}}
 const FourthPowerRiskMeasures = Union{<:HighOrderMoment{<:Any, <:FourthLowerMoment, <:Any,
-                                                        <:Any, <:Any},
+                                                        <:Any},
                                       <:HighOrderMoment{<:Any, <:FourthCentralMoment, <:Any,
-                                                        <:Any, <:Any},
+                                                        <:Any},
                                       <:HighOrderMoment{<:Any,
                                                         <:HighOrderDeviation{<:FourthLowerMoment,
                                                                              <:Any}, <:Any,
-                                                        <:Any, <:Any},
+                                                        <:Any},
                                       <:HighOrderMoment{<:Any,
                                                         <:HighOrderDeviation{<:FourthCentralMoment,
                                                                              <:Any}, <:Any,
-                                                        <:Any, <:Any}}
+                                                        <:Any}}
 function adjust_risk_contribution(::Any, val, args...)
     return val
 end

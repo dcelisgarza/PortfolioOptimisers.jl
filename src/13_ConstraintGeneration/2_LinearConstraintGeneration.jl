@@ -122,7 +122,7 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
     B_eq = Vector{datatype}(undef, 0)
     for lc ∈ lcs
         A = get_constraint_data(lc.A, sets, strict)
-        lhs_flag = isempty(A) || all(iszero.(A))
+        lhs_flag = isempty(A) || all(iszero, A)
         if lhs_flag
             continue
         end

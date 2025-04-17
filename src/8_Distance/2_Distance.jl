@@ -11,7 +11,7 @@ function distance(::Distance{<:SimpleDistance}, ce::StatsBase.CovarianceEstimato
 end
 function distance(::Distance{<:SimpleDistance}, rho::AbstractMatrix, args...; kwargs...)
     s = diag(rho)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)
@@ -27,7 +27,7 @@ end
 function distance(::Distance{<:SimpleAbsoluteDistance}, rho::AbstractMatrix, args...;
                   kwargs...)
     s = diag(rho)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)
@@ -46,7 +46,7 @@ function distance(::Distance{<:LogDistance}, ce::LTDCovariance, X::AbstractMatri
 end
 function distance(::Distance{<:LogDistance}, rho::AbstractMatrix, args...; kwargs...)
     s = diag(rho)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)
@@ -70,7 +70,7 @@ function distance(::Distance{<:CorrelationDistance}, rho::AbstractMatrix, args..
                   kwargs...)
     issquare(rho)
     s = diag(rho)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)

@@ -30,13 +30,13 @@ function (r::Variance)(w::AbstractVector)
     return dot(w, r.sigma, w)
 end
 function risk_measure_factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
-    sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
+    sigma = risk_measure_nothing_real_array_factory(r.sigma, prior.sigma)
     return Variance(; settings = r.settings, formulation = r.formulation, sigma = sigma,
                     rc = r.rc)
 end
 function risk_measure_view(r::Variance, prior::AbstractPriorResult, i::AbstractVector,
                            args...; kwargs...)
-    sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, i)
+    sigma = risk_measure_nothing_real_array_factory(r.sigma, prior.sigma, i)
     if isa(r.rc, LinearConstraintResult)
         throw(ArgumentError("`rc` cannot be a `LinearConstraintResult` because there is no way to only consider items from a specific cluster."))
     end
@@ -61,12 +61,12 @@ function (r::StandardDeviation)(w::AbstractVector)
 end
 function risk_measure_factory(r::StandardDeviation, prior::AbstractPriorResult, args...;
                               kwargs...)
-    sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
+    sigma = risk_measure_nothing_real_array_factory(r.sigma, prior.sigma)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
 function risk_measure_view(r::StandardDeviation, prior::AbstractPriorResult,
                            i::AbstractVector, args...; kwargs...)
-    sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, i)
+    sigma = risk_measure_nothing_real_array_factory(r.sigma, prior.sigma, i)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
 struct UncertaintySetVariance{T1 <: RiskMeasureSettings,
@@ -96,7 +96,7 @@ function risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorRes
                                          <:AbstractUncertaintySetEstimator} = nothing,
                               args...; kwargs...)
     uset = ucs_factory(r.ucs, ucs)
-    sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma)
+    sigma = risk_measure_nothing_real_array_factory(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = uset, sigma = sigma)
 end
 function risk_measure_view(r::UncertaintySetVariance, prior::AbstractPriorResult,
@@ -105,7 +105,7 @@ function risk_measure_view(r::UncertaintySetVariance, prior::AbstractPriorResult
                                       <:AbstractUncertaintySetEstimator} = nothing, args...;
                            kwargs...)
     uset = ucs_view(r.ucs, ucs, i)
-    sigma = risk_measure_nothing_matrix_factory(r.sigma, prior.sigma, i)
+    sigma = risk_measure_nothing_real_array_factory(r.sigma, prior.sigma, i)
     return UncertaintySetVariance(; settings = r.settings, ucs = uset, sigma = sigma)
 end
 

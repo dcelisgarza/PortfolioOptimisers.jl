@@ -17,7 +17,7 @@ function posdef!(method::PosDefEstimator{<:NearestCorrelationMatrix.NCMAlgorithm
         return nothing
     end
     s = diag(X)
-    iscov = any(.!isone.(s))
+    iscov = any(!isone, s)
     if iscov
         s .= sqrt.(s)
         StatsBase.cov2cor!(X, s)

@@ -301,7 +301,7 @@ function freeze_B_view(pm::AbstractPriorResult,
                                                                  string(group) ∉
                                                                  group_names)
                                                          idx = sets[!, group] .== name
-                                                         if all(iszero.(idx))
+                                                         if all(iszero, idx)
                                                              if strict
                                                                  throw(ArgumentError("$(string(name)) is not in $(group).\n$(epv)"))
                                                              else
@@ -340,7 +340,7 @@ function freeze_B_view(pm::AbstractPriorResult,
     for (group, name, coef) ∈ zip(epv.group, epv.name, epv.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
-            if all(iszero.(idx))
+            if all(iszero, idx)
                 if strict
                     throw(ArgumentError("$(string(name)) is not in $(group).\n$(epv)"))
                 else
@@ -380,8 +380,8 @@ function freeze_B_view(pm::AbstractPriorResult,
                                                                  group_names)
                                                          idx1 = sets[!, group1] .== name1
                                                          idx2 = sets[!, group2] .== name2
-                                                         if all(iszero.(idx1)) ||
-                                                            all(iszero.(idx2))
+                                                         if all(iszero, idx1) ||
+                                                            all(iszero, idx2)
                                                              if strict
                                                                  throw(ArgumentError("$(string(name1)) or $(string(name1)) are not in $(group1) or $(group2).\n$(epv)"))
                                                              else
@@ -420,7 +420,7 @@ function freeze_B_view(pm::AbstractPriorResult,
              string(group2) ∉ group_names)
             idx1 = sets[!, group1] .== name1
             idx2 = sets[!, group2] .== name2
-            if all(iszero.(idx1)) || all(iszero.(idx2))
+            if all(iszero, idx1) || all(iszero, idx2)
                 if strict
                     throw(ArgumentError("$(string(name1)) or $(string(name1)) are not in $(group1) or $(group2).\n$(epv)"))
                 else
@@ -558,7 +558,7 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorResult,
              string(group2) ∉ group_names)
         idx1 = sets[!, group1] .== name1
         idx2 = sets[!, group1] .== name2
-        if all(iszero.(idx1)) || all(iszero.(idx2))
+        if all(iszero, idx1) || all(iszero, idx2)
             if strict
                 throw(ArgumentError("$(string(name1)) or $(string(name1)) are not in $(group1) or $(group2).\n$(epv)"))
             else
@@ -598,7 +598,7 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorResult,
              string(group2) ∉ group_names)
             idx1 = sets[!, group1] .== name1
             idx2 = sets[!, group1] .== name2
-            if all(iszero.(idx1)) || all(iszero.(idx2))
+            if all(iszero, idx1) || all(iszero, idx2)
                 if strict
                     throw(ArgumentError("$(string(name1)) or $(string(name1)) are not in $(group1) or $(group2).\n$(epv)"))
                 else
@@ -636,7 +636,7 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorResult,
     (; group, name, coef) = epv
     B = if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
-        if all(iszero.(idx))
+        if all(iszero, idx)
             if strict
                 throw(ArgumentError("$(string(name)) is not in $(group).\n$(epv)"))
             else
@@ -721,7 +721,7 @@ function get_B_entropy_pooling_view_data(pm::AbstractPriorResult,
     for (group, name, coef) ∈ zip(epv.group, epv.name, epv.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
-            if all(iszero.(idx))
+            if all(iszero, idx)
                 if strict
                     throw(ArgumentError("$(string(name)) is not in $(group).\n$(epv)"))
                 else
@@ -798,7 +798,7 @@ function get_A_entropy_pooling_view_data(pm::AbstractPriorResult,
              string(group2) ∉ group_names)
         idx1 = sets[!, group1] .== name1
         idx2 = sets[!, group2] .== name2
-        if all(iszero.(idx1)) || all(iszero.(idx2))
+        if all(iszero, idx1) || all(iszero, idx2)
             if strict
                 throw(ArgumentError("$(string(name1)) or $(string(name1)) are not in $(group1) or $(group2).\n$(epv)"))
             else
@@ -833,7 +833,7 @@ function get_A_entropy_pooling_view_data(pm::AbstractPriorResult,
              string(group2) ∉ group_names)
             idx1 = sets[!, group1] .== name1
             idx2 = sets[!, group2] .== name2
-            if all(iszero.(idx1)) || all(iszero.(idx2))
+            if all(iszero, idx1) || all(iszero, idx2)
                 if strict
                     throw(ArgumentError("$(string(name1)) or $(string(name1)) are not in $(group1) or $(group2).\n$(epv)"))
                 else
@@ -871,7 +871,7 @@ function get_A_entropy_pooling_view_data(pm::AbstractPriorResult,
     (; group, name, coef) = epv
     A = if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
-        if all(iszero.(idx))
+        if all(iszero, idx)
             if strict
                 throw(ArgumentError("$(string(name)) is not in $(group).\n$(epv)"))
             else
@@ -907,7 +907,7 @@ function get_A_entropy_pooling_view_data(pm::AbstractPriorResult,
     for (group, name, coef) ∈ zip(epv.group, epv.name, epv.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
-            if all(iszero.(idx))
+            if all(iszero, idx)
                 if strict
                     throw(ArgumentError("$(string(name)) is not in $(group).\n$(epv)"))
                 else

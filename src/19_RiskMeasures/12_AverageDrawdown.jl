@@ -97,7 +97,7 @@ for r ∈ (AverageDrawdown, RelativeAverageDrawdown)
              end
              function risk_measure_factory(r::$(r), prior::EntropyPoolingPriorResult,
                                            args...; kwargs...)
-                 w = risk_measure_nothing_vec_factory(r.w, prior.w)
+                 w = risk_measure_nothing_real_array_factory(r.w, prior.w)
                  return $(r)(; settings = r.settings, w = w)
              end
              function risk_measure_factory(r::$(r),
@@ -105,7 +105,7 @@ for r ∈ (AverageDrawdown, RelativeAverageDrawdown)
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any}, args...;
                                            kwargs...)
-                 w = risk_measure_nothing_vec_factory(r.w, prior.pm.w)
+                 w = risk_measure_nothing_real_array_factory(r.w, prior.pm.w)
                  return $(r)(; settings = r.settings, w = w)
              end
              function risk_measure_view(r::$(r), args...; kwargs...)

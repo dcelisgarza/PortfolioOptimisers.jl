@@ -1,6 +1,6 @@
 @safetestset "Risk Measure Tests" begin
     using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames, StatsBase,
-          Clarabel
+          Clarabel, LinearAlgebra
     import PortfolioOptimisers: risk_measure_factory
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
@@ -67,24 +67,21 @@
         zerovec = fill(0.0, 20)
         formulation = Quad()
         mu = rand(rng, 20)
-        rs = [LowOrderMoment(; settings = settings, target = target, w = ew, mu = mu),
-              LowOrderMoment(; target = zerovec),
-              LowOrderMoment(; target = nothing, mu = zerovec),
+        rs = [LowOrderMoment(; settings = settings, w = ew, mu = mu),
+              LowOrderMoment(; mu = 0), LowOrderMoment(; mu = zerovec),
               LowOrderMoment(; alg = SemiDeviation(; ddof = 2)),
               LowOrderMoment(; alg = SemiVariance(; ddof = 3, formulation = formulation)),
               LowOrderMoment(; alg = MeanAbsoluteDeviation()),
               LowOrderMoment(; alg = MeanAbsoluteDeviation(; w = ew))]
         r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
         @test r[1].settings === settings
-        @test r[1].target === target
         @test r[1].w === ew
         @test r[1].mu === mu
+        expected_risk(rs[1], w, X)
 
-        @test r[2].target === zerovec
-        @test r[2].mu === pr1.mu
+        @test r[2].mu == 0
 
         @test isa(r[3].alg, FirstLowerMoment)
-        @test isnothing(r[3].target)
         @test r[3].mu === zerovec
 
         @test r[4].alg.ddof == 2
@@ -100,10 +97,9 @@
         @test r[7].alg.w === ew
         @test r[7].mu === pr1.mu
 
-        rs = [HighOrderMoment(; settings = settings, target = target, w = ew, mu = mu),
-              HighOrderMoment(; alg = FourthLowerMoment(), target = zerovec),
-              HighOrderMoment(; alg = FourthCentralMoment(), target = nothing,
-                              mu = zerovec),
+        rs = [HighOrderMoment(; settings = settings, w = ew, mu = mu),
+              HighOrderMoment(; alg = FourthLowerMoment(), mu = 0),
+              HighOrderMoment(; alg = FourthCentralMoment(), mu = zerovec),
               HighOrderMoment(; alg = HighOrderDeviation(; alg = ThirdLowerMoment())),
               HighOrderMoment(;
                               alg = HighOrderDeviation(; alg = FourthLowerMoment(),
@@ -111,15 +107,12 @@
               HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()))]
         r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
         @test r[1].settings === settings
-        @test r[1].target === target
         @test r[1].w === ew
         @test r[1].mu === mu
 
-        @test r[2].target === zerovec
-        @test r[2].mu === pr1.mu
+        @test r[2].mu === 0
 
         @test isa(r[3].alg, FourthCentralMoment)
-        @test isnothing(r[3].target)
         @test r[3].mu === zerovec
 
         @test r[4].mu === pr1.mu
@@ -134,6 +127,5 @@
         #       SquareRootKurtosis(; settings = s, mu = fill(0.0, 20)),
         #       SquareRootKurtosis(; settings = s, kt = pr1.skt),
         #       SquareRootKurtosis(; settings = s, alg = Semi())]
-
     end
 end

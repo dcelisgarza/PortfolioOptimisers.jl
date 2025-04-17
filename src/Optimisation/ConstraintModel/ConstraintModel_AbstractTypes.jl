@@ -12,5 +12,5 @@ function non_zero_real_or_vec(x::Real)
     return !iszero(x)
 end
 function non_zero_real_or_vec(x::AbstractVector{<:Real})
-    return any(.!iszero.(x))
+    return any(!iszero, x)
 end
