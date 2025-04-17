@@ -21,12 +21,6 @@ abstract type SolverHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
 abstract type MuHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
 abstract type AbstractMomentHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
 
-function risk_measure_factory(r::AbstractBaseRiskMeasure, args...; kwargs...)
-    return r
-end
-function risk_measure_view(r::AbstractBaseRiskMeasure, args...; kwargs...)
-    return r
-end
 abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
 struct RiskMeasureSettings{T1 <: Bool, T2 <: Real, T3 <: Union{Nothing, <:Real}} <:
        AbstractRiskMeasureSettings
@@ -70,12 +64,6 @@ function calc_target_ret_mu(x::AbstractVector, w::AbstractVector, rm::MomentRisk
     return target
 end
 const SolverRiskMeasures = Union{SolverRiskMeasure, SolverHierarchicalRiskMeasure}
-function risk_measure_factory(r::OptimisationRiskMeasure, args...; kwargs...)
-    return r
-end
-function risk_measure_view(r::OptimisationRiskMeasure, args...; kwargs...)
-    return risk_measure_view(r, args...; kwargs...)
-end
 function risk_measure_factory(rs::AbstractVector{<:OptimisationRiskMeasure}, args...;
                               kwargs...)
     return risk_measure_factory.(rs, args...; kwargs...)

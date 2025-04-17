@@ -1,5 +1,6 @@
 @safetestset "Risk Measure Tests" begin
-    using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames, StatsBase
+    using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames, StatsBase,
+          Clarabel
     import PortfolioOptimisers: risk_measure_factory
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
@@ -15,21 +16,66 @@
     @testset "Risk" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
+        A = rand(rng, 3, 20)
+        B = rand(rng, 3)
         ew = eweights(1:1000, 1 / 1000; scale = true)
         pr1 = prior(HighOrderPriorEstimator(), X)
-        rs = [Variance(), StandardDeviation(), UncertaintySetVariance(),
-              LowOrderMoment(; alg = FirstLowerMoment()),
-              LowOrderMoment(; alg = SemiDeviation()),
-              LowOrderMoment(; alg = SemiVariance()),
-              LowOrderMoment(; alg = MeanAbsoluteDeviation()),
-              LowOrderMoment(; alg = MeanAbsoluteDeviation(; w = ew)),
-              HighOrderMoment(; alg = ThirdLowerMoment()),
-              HighOrderMoment(; alg = FourthLowerMoment()),
-              HighOrderMoment(; alg = FourthCentralMoment()),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = ThirdLowerMoment())),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment())),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()))]
+
+        slv = Solver(; name = :Clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false))
+        ucs1 = DeltaUncertaintySetEstimator(;)
+        ucs2 = NormalUncertaintySetEstimator(;)
+        settings = RiskMeasureSettings(; rke = false, scale = -1, ub = 3)
+        formulation = RSOC()
+        sigma = pr1.sigma * 1.5
+        rc = LinearConstraintResult(; ineq = PartialLinearConstraintResult(; A = A, B = B))
+        rs = [Variance(; settings = settings, formulation = formulation, sigma = sigma,
+                       rc = rc), Variance(;)]
+        r = risk_measure_factory(rs, pr1, Ref(slv), Ref(ucs2))
+        @test r[1].settings === settings
+        @test r[1].formulation === formulation
+        @test r[1].sigma === sigma
+        @test r[1].rc === rc
+        @test r[2].sigma === pr1.sigma
+
+        sigma = pr1.sigma * 2
+        rs = [StandardDeviation(; settings = settings, sigma = sigma), StandardDeviation(;)]
+        r = risk_measure_factory(rs, pr1, Ref(slv), Ref(ucs2))
+        @test r[1].settings === settings
+        @test r[1].sigma === sigma
+        @test r[2].sigma === pr1.sigma
+
+        sigma = pr1.sigma * 2.5
+        rs = [UncertaintySetVariance(; settings = settings, ucs = ucs1, sigma = sigma),
+              UncertaintySetVariance(;)]
+        r = risk_measure_factory(rs, pr1, Ref(slv), Ref(ucs2))
+        @test r[1].settings === settings
+        @test r[1].ucs === ucs
+        @test r[1].sigma === sigma
+        @test r[2].sigma === pr1.sigma
+        @test r[2].ucs === ucs2
+
+        # rs = [LowOrderMoment(; settings = s, alg = FirstLowerMoment()),
+        #       LowOrderMoment(; settings = s, alg = FirstLowerMoment(), target = fill(0.0, 20)),
+        #       LowOrderMoment(; settings = s, alg = FirstLowerMoment(), target = nothing,
+        #                      mu = fill(0.0, 20)),
+        #       LowOrderMoment(; settings = s, alg = SemiDeviation()),
+        #       LowOrderMoment(; settings = s, alg = SemiVariance()),
+        #       LowOrderMoment(; settings = s, alg = MeanAbsoluteDeviation()),
+        #       LowOrderMoment(; settings = s, alg = MeanAbsoluteDeviation(; w = ew))]
+        # rs = [HighOrderMoment(; settings = s, alg = ThirdLowerMoment()),
+        #       HighOrderMoment(; settings = s, alg = FourthLowerMoment()),
+        #       HighOrderMoment(; settings = s, alg = FourthCentralMoment()),
+        #       HighOrderMoment(; settings = s, alg = HighOrderDeviation(; alg = ThirdLowerMoment())),
+        #       HighOrderMoment(; settings = s,
+        #                       alg = HighOrderDeviation(; alg = FourthLowerMoment())),
+        #       HighOrderMoment(; settings = s,
+        #                       alg = HighOrderDeviation(; alg = FourthCentralMoment()))]
+        # rs = [SquareRootKurtosis(; settings = s, alg = Full()),
+        #       SquareRootKurtosis(; settings = s, w = ew),
+        #       SquareRootKurtosis(; settings = s, mu = fill(0.0, 20)),
+        #       SquareRootKurtosis(; settings = s, kt = pr1.skt),
+        #       SquareRootKurtosis(; settings = s, alg = Semi())]
         #! TODO: actual tests.
-        r = risk_measure_factory(rs, pr1)
     end
 end
