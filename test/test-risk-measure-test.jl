@@ -74,7 +74,6 @@
 
         @test r[2].target === zerovec
         @test r[2].mu === pr1.mu
-        @test r[2].target === zerovec
 
         @test isa(r[3].alg, FirstLowerMoment)
         @test isnothing(r[3].target)
@@ -93,16 +92,35 @@
         @test r[7].alg.w === ew
         @test r[7].mu === pr1.mu
 
-        #! continue with tests
+        rs = [HighOrderMoment(; settings = settings, target = target, w = ew, mu = mu),
+              HighOrderMoment(; alg = FourthLowerMoment(), target = zerovec),
+              HighOrderMoment(; alg = FourthCentralMoment(), target = nothing,
+                              mu = zerovec),
+              HighOrderMoment(; alg = HighOrderDeviation(; alg = ThirdLowerMoment())),
+              HighOrderMoment(;
+                              alg = HighOrderDeviation(; alg = FourthLowerMoment(),
+                                                       ve = SimpleVariance(; w = ew))),
+              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()))]
+        r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
+        @test r[1].settings === settings
+        @test r[1].target === target
+        @test r[1].w === ew
+        @test r[1].mu === mu
 
-        # rs = [HighOrderMoment(; settings = s, alg = ThirdLowerMoment()),
-        #       HighOrderMoment(; settings = s, alg = FourthLowerMoment()),
-        #       HighOrderMoment(; settings = s, alg = FourthCentralMoment()),
-        #       HighOrderMoment(; settings = s, alg = HighOrderDeviation(; alg = ThirdLowerMoment())),
-        #       HighOrderMoment(; settings = s,
-        #                       alg = HighOrderDeviation(; alg = FourthLowerMoment())),
-        #       HighOrderMoment(; settings = s,
-        #                       alg = HighOrderDeviation(; alg = FourthCentralMoment()))]
+        @test r[2].target === zerovec
+        @test r[2].mu === pr1.mu
+
+        @test isa(r[3].alg, FourthCentralMoment)
+        @test isnothing(r[3].target)
+        @test r[3].mu === zerovec
+
+        @test r[4].mu === pr1.mu
+
+        @test r[5].mu === pr1.mu
+        @test r[5].alg.ve.w === ew
+        @test isa(r[5].alg, HighOrderDeviation)
+        @test isa(r[5].alg.alg, FourthLowerMoment)
+
         # rs = [SquareRootKurtosis(; settings = s, alg = Full()),
         #       SquareRootKurtosis(; settings = s, w = ew),
         #       SquareRootKurtosis(; settings = s, mu = fill(0.0, 20)),

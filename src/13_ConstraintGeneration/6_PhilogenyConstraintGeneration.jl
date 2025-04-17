@@ -170,7 +170,7 @@ function centrality_constraints(ccs::Union{<:CentralityConstraintEstimator,
     if eq_flag
         A_eq = transpose(reshape(A_eq, size(X, 2), :))
     end
-    return if ineq_flag && eq_flag
+    return if !ineq_flag && !eq_flag
         nothing
     else
         LinearConstraintResult(;
