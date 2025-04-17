@@ -32,6 +32,9 @@ function JuMPEntropyPoolingEstimator(; slv::Union{<:Solver, <:AbstractVector{<:S
     end
     return JuMPEntropyPoolingEstimator{typeof(sc), typeof(so), typeof(slv)}(sc, so, slv)
 end
+function entropy_pooling(w::AbstractVector, epcs::Nothing, ::Any)
+    return w
+end
 function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
                          optim::OptimEntropyPoolingEstimator)
     (; A_eq, B_eq, A_ineq, B_ineq) = epcs

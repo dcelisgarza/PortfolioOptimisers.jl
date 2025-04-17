@@ -56,3 +56,5 @@ function expected_risk(sc::LogSumExpScalariser, rs::AbstractVector{<:RiskMeasure
     end
     return log(exp(rk)) / sc.gamma
 end
+
+export expected_risk

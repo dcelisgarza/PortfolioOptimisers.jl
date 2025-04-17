@@ -19,6 +19,8 @@
         A = rand(rng, 3, 20)
         B = rand(rng, 3)
         ew = eweights(1:1000, 1 / 1000; scale = true)
+        w = rand(rng, 20)
+        w ./= sum(w)
         pr1 = prior(HighOrderPriorEstimator(), X)
 
         slv = Solver(; name = :Clarabel, solver = Clarabel.Optimizer,
@@ -37,6 +39,8 @@
         @test r[1].sigma === sigma
         @test r[1].rc === rc
         @test r[2].sigma === pr1.sigma
+        @test expected_risk(r[1], w, X) == dot(w, sigma, w)
+        @test expected_risk(r[2], w, X) == dot(w, pr1.sigma, w)
 
         sigma = pr1.sigma * 2
         rs = [StandardDeviation(; settings = settings, sigma = sigma), StandardDeviation(;)]
@@ -44,6 +48,8 @@
         @test r[1].settings === settings
         @test r[1].sigma === sigma
         @test r[2].sigma === pr1.sigma
+        @test expected_risk(r[1], w, X) == sqrt(dot(w, sigma, w))
+        @test expected_risk(r[2], w, X) == sqrt(dot(w, pr1.sigma, w))
 
         sigma = pr1.sigma * 2.5
         rs = [UncertaintySetVariance(; settings = settings, ucs = ucs1, sigma = sigma),
@@ -54,6 +60,8 @@
         @test r[1].sigma === sigma
         @test r[2].sigma === pr1.sigma
         @test r[2].ucs === ucs2
+        @test expected_risk(r[1], w, X) == dot(w, sigma, w)
+        @test expected_risk(r[2], w, X) == dot(w, pr1.sigma, w)
 
         target = rand(rng, 20)
         zerovec = fill(0.0, 20)
