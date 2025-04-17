@@ -106,19 +106,20 @@ function calc_moment_target(::Union{<:LowOrderMoment{<:Any, <:Any, Nothing, Noth
 end
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:AbstractWeights,
                                                       Nothing},
-                                     <:HighOrderMoment{<:Any, <:Any, Nothing, Nothing}},
-                            ::Any, x::AbstractVector)
+                                     <:HighOrderMoment{<:Any, <:Any, <:AbstractWeights,
+                                                       Nothing}}, ::Any, x::AbstractVector)
     return mean(x, r.w)
 end
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Any,
                                                       <:AbstractVector},
-                                     <:HighOrderMoment{<:Any, <:Any, Nothing, Nothing}},
+                                     <:HighOrderMoment{<:Any, <:Any, <:Any,
+                                                       <:AbstractVector}},
                             w::AbstractVector, ::Any)
     return dot(w, r.mu)
 end
 function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Any, <:Real},
-                                     <:HighOrderMoment{<:Any, <:Any, Nothing, Nothing}},
-                            ::Any, ::Any)
+                                     <:HighOrderMoment{<:Any, <:Any, <:Any, <:Real}}, ::Any,
+                            ::Any)
     return r.mu
 end
 function calc_moment_val(r::Union{<:AbstractMomentRiskMeasure,
