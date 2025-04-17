@@ -104,18 +104,21 @@ function cardinality_constraints(lcs::Union{<:CardinalityConstraint,
     if eq_flag
         A_eq = transpose(reshape(A_eq, nrow(sets), :))
     end
-    return LinearConstraintResult(;
-                                  ineq = if ineq_flag
-                                      PartialLinearConstraintResult(; A = A_ineq,
-                                                                    B = B_ineq)
-                                  else
-                                      nothing
-                                  end,
-                                  eq = if eq_flag
-                                      PartialLinearConstraintResult(; A = A_eq, B = B_eq)
-                                  else
-                                      nothing
-                                  end)
+    return if !ineq_flag && !eq_flag
+        nothing
+    else
+        LinearConstraintResult(;
+                               ineq = if ineq_flag
+                                   PartialLinearConstraintResult(; A = A_ineq, B = B_ineq)
+                               else
+                                   nothing
+                               end,
+                               eq = if eq_flag
+                                   PartialLinearConstraintResult(; A = A_eq, B = B_eq)
+                               else
+                                   nothing
+                               end)
+    end
 end
 
 export CardinalityConstraintSide, CardinalityConstraint, cardinality_constraints

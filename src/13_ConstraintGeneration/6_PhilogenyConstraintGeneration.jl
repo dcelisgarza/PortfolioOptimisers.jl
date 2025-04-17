@@ -170,18 +170,21 @@ function centrality_constraints(ccs::Union{<:CentralityConstraintEstimator,
     if eq_flag
         A_eq = transpose(reshape(A_eq, size(X, 2), :))
     end
-    return LinearConstraintResult(;
-                                  ineq = if ineq_flag
-                                      PartialLinearConstraintResult(; A = A_ineq,
-                                                                    B = B_ineq)
-                                  else
-                                      nothing
-                                  end,
-                                  eq = if eq_flag
-                                      PartialLinearConstraintResult(; A = A_eq, B = B_eq)
-                                  else
-                                      nothing
-                                  end)
+    return if ineq_flag && eq_flag
+        nothing
+    else
+        LinearConstraintResult(;
+                               ineq = if ineq_flag
+                                   PartialLinearConstraintResult(; A = A_ineq, B = B_ineq)
+                               else
+                                   nothing
+                               end,
+                               eq = if eq_flag
+                                   PartialLinearConstraintResult(; A = A_eq, B = B_eq)
+                               else
+                                   nothing
+                               end)
+    end
 end
 function centrality_constraints(ccs::LinearConstraintResult, args...; kwargs...)
     return ccs

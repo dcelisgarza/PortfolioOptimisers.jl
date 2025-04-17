@@ -106,22 +106,18 @@
         @test isapprox(A_eq, A_eq_t)
         @test isapprox(B_eq, B_eq_t)
 
-        (; ineq, eq) = linear_constraints(LinearConstraint(;
-                                                           A = LinearConstraintSide(;
-                                                                                    group = nothing,
-                                                                                    name = nothing)),
-                                          sets)
-        @test isnothing(ineq)
-        @test isnothing(eq)
+        @test isnothing(linear_constraints(LinearConstraint(;
+                                                            A = LinearConstraintSide(;
+                                                                                     group = nothing,
+                                                                                     name = nothing)),
+                                           sets))
 
-        (; ineq, eq) = linear_constraints(LinearConstraint(;
-                                                           A = LinearConstraintSide(;
-                                                                                    group = [:Foo],
-                                                                                    name = [20],
-                                                                                    coef = [5]),
-                                                           B = 0.35), sets)
-        @test isnothing(ineq)
-        @test isnothing(eq)
+        @test isnothing(linear_constraints(LinearConstraint(;
+                                                            A = LinearConstraintSide(;
+                                                                                     group = [:Foo],
+                                                                                     name = [20],
+                                                                                     coef = [5]),
+                                                            B = 0.35), sets))
 
         @test_throws UndefKeywordError LinearConstraintSide(; coef = [2])
         lcs = LinearConstraintSide(; group = [nothing], name = [nothing], coef = [2])
@@ -236,21 +232,17 @@
         @test isapprox(A_eq, A_eq_t)
         @test isapprox(B_eq, B_eq_t)
 
-        (; ineq, eq) = cardinality_constraints(CardinalityConstraint(;
-                                                                     A = CardinalityConstraintSide(;
-                                                                                                   group = nothing,
-                                                                                                   name = nothing)),
-                                               sets)
-        @test isnothing(ineq)
-        @test isnothing(eq)
+        @test isnothing(cardinality_constraints(CardinalityConstraint(;
+                                                                      A = CardinalityConstraintSide(;
+                                                                                                    group = nothing,
+                                                                                                    name = nothing)),
+                                                sets))
 
-        (; ineq, eq) = cardinality_constraints(CardinalityConstraint(;
-                                                                     A = CardinalityConstraintSide(;
-                                                                                                   group = [:Foo],
-                                                                                                   name = [20]),
-                                                                     B = 5), sets)
-        @test isnothing(ineq)
-        @test isnothing(eq)
+        @test isnothing(cardinality_constraints(CardinalityConstraint(;
+                                                                      A = CardinalityConstraintSide(;
+                                                                                                    group = [:Foo],
+                                                                                                    name = [20]),
+                                                                      B = 5), sets))
 
         @test_throws UndefKeywordError CardinalityConstraintSide(; name = [2])
         lcs = CardinalityConstraintSide(; group = [nothing], name = [nothing])
