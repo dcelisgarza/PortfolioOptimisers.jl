@@ -66,10 +66,8 @@ function ThirdCentralMoment(;
 end
 function (r::ThirdCentralMoment)(w::AbstractVector, X::AbstractMatrix,
                                  fees::Union{Nothing, <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    target = calc_target_ret_mu(x, w, r)
-    val = x .- target
-    return sum(val .^ 3) / length(x)
+    val = calc_moment_val(r, w, X, fees)
+    return sum(val .^ 3) / size(X, 1)
 end
 
 export MeanReturn, ThirdCentralMoment, Skewness

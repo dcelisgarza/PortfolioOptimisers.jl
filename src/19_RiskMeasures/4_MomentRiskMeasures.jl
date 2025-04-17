@@ -1,6 +1,14 @@
 abstract type AbstractMomentMeasureAlgorithm <: AbstractAlgorithm end
 abstract type AbstractLowOrderMomentMeasureAlgorithm <: AbstractMomentMeasureAlgorithm end
 abstract type AbstractHighOrderMomentMeasureAlgorithm <: AbstractMomentMeasureAlgorithm end
+function calc_moment_val(r::Union{<:AbstractMomentMeasureAlgorithm,
+                                  <:AbstractMomentNoOptimisationRiskMeasure},
+                         w::AbstractVector, X::AbstractMatrix,
+                         fees::Union{Nothing, <:Fees} = nothing)
+    x = calc_net_returns(w, X, fees)
+    target = calc_target_ret_mu(x, w, r)
+    return x .- target
+end
 function risk_moment_algorithm_factory(alg::AbstractMomentMeasureAlgorithm, args...;
                                        kwargs...)
     return alg
@@ -85,40 +93,33 @@ function (r::LowOrderMoment{<:Any, <:FirstLowerMoment, <:Any, <:Any, <:Any})(w::
                                                                              X::AbstractMatrix,
                                                                              fees::Union{Nothing,
                                                                                          <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    target = calc_target_ret_mu(x, w, r)
-    val = x .- target
+    val = calc_moment_val(r, w, X, fees)
     val = val[val .<= zero(eltype(val))]
-    return -sum(val) / length(x)
+    return -sum(val) / size(X, 1)
 end
 function (r::LowOrderMoment{<:Any, <:SemiDeviation, <:Any, <:Any, <:Any})(w::AbstractVector,
                                                                           X::AbstractMatrix,
                                                                           fees::Union{Nothing,
                                                                                       <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    mu = calc_target_ret_mu(x, w, r)
-    val = x .- mu
+    val = calc_moment_val(r, w, X, fees)
     val = val[val .<= zero(eltype(val))]
-    return sqrt(dot(val, val) / (length(x) - r.alg.ddof))
+    return sqrt(dot(val, val) / (size(X, 1) - r.alg.ddof))
 end
 function (r::LowOrderMoment{<:Any, <:SemiVariance, <:Any, <:Any, <:Any})(w::AbstractVector,
                                                                          X::AbstractMatrix,
                                                                          fees::Union{Nothing,
                                                                                      <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    mu = calc_target_ret_mu(x, w, r)
-    val = x .- mu
+    val = calc_moment_val(r, w, X, fees)
     val = val[val .<= zero(eltype(val))]
-    return dot(val, val) / (length(x) - r.alg.ddof)
+    return dot(val, val) / (size(X, 1) - r.alg.ddof)
 end
 function (r::LowOrderMoment{<:Any, <:MeanAbsoluteDeviation, <:Any, <:Any, <:Any})(w::AbstractVector,
                                                                                   X::AbstractMatrix,
                                                                                   fees::Union{Nothing,
                                                                                               <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    mu = calc_target_ret_mu(x, w, r)
+    val = calc_moment_val(r, w, X, fees)
     w = r.alg.w
-    return isnothing(w) ? mean(abs.(x .- mu)) : mean(abs.(x .- mu), w)
+    return isnothing(w) ? mean(abs.(val)) : mean(abs.(val), w)
 end
 struct HighOrderMoment{T1 <: RiskMeasureSettings,
                        T2 <: AbstractHighOrderMomentMeasureAlgorithm,
@@ -150,48 +151,38 @@ function (r::HighOrderMoment{<:Any, <:ThirdLowerMoment, <:Any, <:Any, <:Any})(w:
                                                                               X::AbstractMatrix,
                                                                               fees::Union{Nothing,
                                                                                           <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    target = calc_target_ret_mu(x, w, r)
-    val = x .- target
-    return -sum(val[val .<= zero(eltype(val))] .^ 3) / length(x)
+    val = calc_moment_val(r, w, X, fees)
+    return -sum(val[val .<= zero(eltype(val))] .^ 3) / size(X, 1)
 end
 function (r::HighOrderMoment{<:Any, <:FourthLowerMoment, <:Any, <:Any, <:Any})(w::AbstractVector,
                                                                                X::AbstractMatrix,
                                                                                fees::Union{Nothing,
                                                                                            <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    target = calc_target_ret_mu(x, w, r)
-    val = x .- target
-    return sum(val[val .<= zero(eltype(val))] .^ 4) / length(x)
+    val = calc_moment_val(r, w, X, fees)
+    return sum(val[val .<= zero(eltype(val))] .^ 4) / size(X, 1)
 end
 function (r::HighOrderMoment{<:Any, <:FourthCentralMoment, <:Any, <:Any, <:Any})(w::AbstractVector,
                                                                                  X::AbstractMatrix,
                                                                                  fees::Union{Nothing,
                                                                                              <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    target = calc_target_ret_mu(x, w, r)
-    val = x .- target
-    return sum(val .^ 4) / length(x)
+    val = calc_moment_val(r, w, X, fees)
+    return sum(val .^ 4) / size(X, 1)
 end
 function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:ThirdLowerMoment, <:Any}, <:Any,
                              <:Any, <:Any})(w::AbstractVector, X::AbstractMatrix,
                                             fees::Union{Nothing, <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    target = calc_target_ret_mu(x, w, r)
-    val = x .- target
-    val = val[val <= zero(target)]
-    sigma = std(r.alg.ve, val; mean = zero(target))
-    return -sum(val[val <= zero(target)] .^ 3) / length(x) / sigma^3
+    val = calc_moment_val(r, w, X, fees)
+    val = val[val .<= zero(eltype(val))]
+    sigma = std(r.alg.ve, val; mean = zero(eltype(val)))
+    return -sum(val[val <= zero(eltype(val))] .^ 3) / size(X, 1) / sigma^3
 end
 function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:FourthLowerMoment, <:Any}, <:Any,
                              <:Any, <:Any})(w::AbstractVector, X::AbstractMatrix,
                                             fees::Union{Nothing, <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    target = calc_target_ret_mu(x, w, r)
-    val = x .- target
-    val = val[val <= zero(target)]
-    sigma = std(r.alg.ve, val; mean = zero(target))
-    return sum(val[val <= zero(target)] .^ 4) / length(x) / sigma^4
+    val = calc_moment_val(r, w, X, fees)
+    val = val[val .<= zero(eltype(val))]
+    sigma = std(r.alg.ve, val; mean = zero(eltype(val)))
+    return sum(val[val <= zero(eltype(val))] .^ 4) / size(X, 1) / sigma^4
 end
 function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:FourthCentralMoment, <:Any},
                              <:Any, <:Any, <:Any})(w::AbstractVector, X::AbstractMatrix,

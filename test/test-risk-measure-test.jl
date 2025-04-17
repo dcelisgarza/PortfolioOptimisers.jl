@@ -1,5 +1,5 @@
 @safetestset "Risk Measure Tests" begin
-    using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames
+    using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames, StatsBase
     import PortfolioOptimisers: risk_measure_factory
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
@@ -15,12 +15,14 @@
     @testset "Risk" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
+        ew = eweights(1:1000, 1 / 1000; scale = true)
         pr1 = prior(HighOrderPriorEstimator(), X)
         rs = [Variance(), StandardDeviation(), UncertaintySetVariance(),
               LowOrderMoment(; alg = FirstLowerMoment()),
               LowOrderMoment(; alg = SemiDeviation()),
               LowOrderMoment(; alg = SemiVariance()),
               LowOrderMoment(; alg = MeanAbsoluteDeviation()),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation(; w = ew)),
               HighOrderMoment(; alg = ThirdLowerMoment()),
               HighOrderMoment(; alg = FourthLowerMoment()),
               HighOrderMoment(; alg = FourthCentralMoment()),
