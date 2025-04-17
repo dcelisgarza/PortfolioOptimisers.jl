@@ -55,14 +55,28 @@
         @test r[2].sigma === pr1.sigma
         @test r[2].ucs === ucs2
 
-        # rs = [LowOrderMoment(; settings = s, alg = FirstLowerMoment()),
-        #       LowOrderMoment(; settings = s, alg = FirstLowerMoment(), target = fill(0.0, 20)),
-        #       LowOrderMoment(; settings = s, alg = FirstLowerMoment(), target = nothing,
-        #                      mu = fill(0.0, 20)),
-        #       LowOrderMoment(; settings = s, alg = SemiDeviation()),
-        #       LowOrderMoment(; settings = s, alg = SemiVariance()),
-        #       LowOrderMoment(; settings = s, alg = MeanAbsoluteDeviation()),
-        #       LowOrderMoment(; settings = s, alg = MeanAbsoluteDeviation(; w = ew))]
+        target = rand(rng, 20)
+        zerovec = fill(0.0, 20)
+        mu = rand(rng, 20)
+        rs = [LowOrderMoment(; settings = settings, target = target, w = ew, mu = mu),
+              LowOrderMoment(; target = zerovec),
+              LowOrderMoment(; target = nothing, mu = zerovec),
+              LowOrderMoment(; alg = SemiDeviation()),
+              LowOrderMoment(; alg = SemiVariance()),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation()),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation(; w = ew))]
+        r = risk_measure_factory(rs, pr1, Ref(slv), Ref(ucs2))
+        @test r[1].settings === settings
+        @test r[1].target === target
+        @test r[1].w === ew
+        @test r[1].mu === mu
+
+        @test r[2].target === zerovec
+        @test r[2].mu === pr1.mu
+        @test r[2].target === zerovec
+
+        #! continue with tests
+
         # rs = [HighOrderMoment(; settings = s, alg = ThirdLowerMoment()),
         #       HighOrderMoment(; settings = s, alg = FourthLowerMoment()),
         #       HighOrderMoment(; settings = s, alg = FourthCentralMoment()),
@@ -76,6 +90,6 @@
         #       SquareRootKurtosis(; settings = s, mu = fill(0.0, 20)),
         #       SquareRootKurtosis(; settings = s, kt = pr1.skt),
         #       SquareRootKurtosis(; settings = s, alg = Semi())]
-        #! TODO: actual tests.
+
     end
 end

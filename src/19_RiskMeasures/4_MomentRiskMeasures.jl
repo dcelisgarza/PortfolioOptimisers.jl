@@ -77,7 +77,7 @@ struct LowOrderMoment{T1 <: RiskMeasureSettings,
 end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         alg::AbstractLowOrderMomentMeasureAlgorithm = FirstLowerMoment(),
-                        target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
+                        target::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                         w::Union{Nothing, <:AbstractWeights} = nothing,
                         mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(target, AbstractVector)

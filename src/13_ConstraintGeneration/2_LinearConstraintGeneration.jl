@@ -45,7 +45,7 @@ end
 function LinearConstraintResult(;
                                 ineq::Union{Nothing, PartialLinearConstraintResult} = nothing,
                                 eq::Union{Nothing, PartialLinearConstraintResult} = nothing)
-    @smart_assert(!isnothing(ineq) ⊼ !isnothing(eq))
+    @smart_assert(isnothing(ineq) ⊼ isnothing(eq))
     return LinearConstraintResult{typeof(ineq), typeof(eq)}(ineq, eq)
 end
 function Base.getproperty(obj::LinearConstraintResult, sym::Symbol)
