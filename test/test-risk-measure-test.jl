@@ -31,7 +31,7 @@
         rc = LinearConstraintResult(; ineq = PartialLinearConstraintResult(; A = A, B = B))
         rs = [Variance(; settings = settings, formulation = formulation, sigma = sigma,
                        rc = rc), Variance(;)]
-        r = risk_measure_factory(rs, pr1, Ref(slv), Ref(ucs2))
+        r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
         @test r[1].settings === settings
         @test r[1].formulation === formulation
         @test r[1].sigma === sigma
@@ -40,7 +40,7 @@
 
         sigma = pr1.sigma * 2
         rs = [StandardDeviation(; settings = settings, sigma = sigma), StandardDeviation(;)]
-        r = risk_measure_factory(rs, pr1, Ref(slv), Ref(ucs2))
+        r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
         @test r[1].settings === settings
         @test r[1].sigma === sigma
         @test r[2].sigma === pr1.sigma
@@ -48,7 +48,7 @@
         sigma = pr1.sigma * 2.5
         rs = [UncertaintySetVariance(; settings = settings, ucs = ucs1, sigma = sigma),
               UncertaintySetVariance(;)]
-        r = risk_measure_factory(rs, pr1, Ref(slv), Ref(ucs2))
+        r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
         @test r[1].settings === settings
         @test r[1].ucs === ucs
         @test r[1].sigma === sigma
@@ -65,7 +65,7 @@
               LowOrderMoment(; alg = SemiVariance()),
               LowOrderMoment(; alg = MeanAbsoluteDeviation()),
               LowOrderMoment(; alg = MeanAbsoluteDeviation(; w = ew))]
-        r = risk_measure_factory(rs, pr1, Ref(slv), Ref(ucs2))
+        r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
         @test r[1].settings === settings
         @test r[1].target === target
         @test r[1].w === ew
