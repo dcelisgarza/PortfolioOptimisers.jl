@@ -154,13 +154,18 @@ function (r::LowOrderMoment{<:Any, <:SemiVariance, <:Any, <:Any})(w::AbstractVec
     val = val[val .<= zero(eltype(val))]
     return dot(val, val) / (size(X, 1) - r.alg.ddof)
 end
+function mean_abs_dev(::Nothing, x::AbstractVector)
+    return mean(abs.(x))
+end
+function mean_abs_dev(w::AbstractWeights, x::AbstractVector)
+    return mean(abs.(x), w)
+end
 function (r::LowOrderMoment{<:Any, <:MeanAbsoluteDeviation, <:Any, <:Any})(w::AbstractVector,
                                                                            X::AbstractMatrix,
                                                                            fees::Union{Nothing,
                                                                                        <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
-    w = r.alg.w
-    return isnothing(w) ? mean(abs.(val)) : mean(abs.(val), w)
+    return mean_abs_dev(r.alg.w, val)
 end
 function (r::HighOrderMoment{<:Any, <:ThirdLowerMoment, <:Any, <:Any})(w::AbstractVector,
                                                                        X::AbstractMatrix,

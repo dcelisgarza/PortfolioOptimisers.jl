@@ -77,25 +77,44 @@
         @test r[1].settings === settings
         @test r[1].w === ew
         @test r[1].mu === mu
-        expected_risk(rs[1], w, X)
+        val = X * w .- dot(w, mu)
+        val = val[val .<= zero(eltype(val))]
+        @test expected_risk(rs[1], w, X) == -sum(val) / size(X, 1)
 
         @test r[2].mu == 0
+        val = X * w
+        val = val[val .<= zero(eltype(val))]
+        @test expected_risk(rs[2], w, X) == -sum(val) / size(X, 1)
 
         @test isa(r[3].alg, FirstLowerMoment)
         @test r[3].mu === zerovec
+        val = X * w .- dot(w, zerovec)
+        val = val[val .<= zero(eltype(val))]
+        @test expected_risk(rs[3], w, X) == -sum(val) / size(X, 1)
 
         @test r[4].alg.ddof == 2
         @test r[4].mu === pr1.mu
+        val = X * w .- dot(w, pr1.mu)
+        val = val[val .<= zero(eltype(val))]
+        @test expected_risk(rs[4], w, X) ==
+              sqrt(dot(val, val) / (size(X, 1) - rs[4].alg.ddof))
 
         @test r[5].alg.ddof == 3
         @test r[5].alg.formulation === formulation
         @test r[5].mu === pr1.mu
+        val = X * w .- dot(w, pr1.mu)
+        val = val[val .<= zero(eltype(val))]
+        @test expected_risk(rs[5], w, X) == dot(val, val) / (size(X, 1) - rs[5].alg.ddof)
 
         @test isnothing(r[6].alg.w)
         @test r[6].mu === pr1.mu
+        val = X * w .- dot(w, pr1.mu)
+        @test expected_risk(rs[6], w, X) == mean(abs.(val))
 
         @test r[7].alg.w === ew
         @test r[7].mu === pr1.mu
+        val = X * w .- dot(w, pr1.mu)
+        @test expected_risk(rs[7], w, X) == mean(abs.(val), ew)
 
         rs = [HighOrderMoment(; settings = settings, w = ew, mu = mu),
               HighOrderMoment(; alg = FourthLowerMoment(), mu = 0),
