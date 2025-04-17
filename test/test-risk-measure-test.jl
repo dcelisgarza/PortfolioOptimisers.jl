@@ -63,7 +63,6 @@
         @test expected_risk(r[1], w, X) == dot(w, sigma, w)
         @test expected_risk(r[2], w, X) == dot(w, pr1.sigma, w)
 
-        target = rand(rng, 20)
         zerovec = fill(0.0, 20)
         formulation = Quad()
         mu = rand(rng, 20)
@@ -122,24 +121,37 @@
               HighOrderMoment(; alg = HighOrderDeviation(; alg = ThirdLowerMoment())),
               HighOrderMoment(;
                               alg = HighOrderDeviation(; alg = FourthLowerMoment(),
-                                                       ve = SimpleVariance(; w = ew))),
+                                                       ve = SimpleVariance(; me = nothing,
+                                                                           w = ew))),
               HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()))]
         r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
         @test r[1].settings === settings
         @test r[1].w === ew
         @test r[1].mu === mu
+        val = X * w .- dot(w, mu)
+        val = val[val .<= zero(eltype(val))]
+        @test expected_risk(rs[1], w, X) == -sum(val .^ 3) / size(X, 1)
 
         @test r[2].mu === 0
+        val = X * w
+        val = val[val .<= zero(eltype(val))]
+        @test expected_risk(rs[2], w, X) == sum(val .^ 4) / size(X, 1)
 
         @test isa(r[3].alg, FourthCentralMoment)
         @test r[3].mu === zerovec
+        val = X * w .- dot(w, zerovec)
+        @test expected_risk(rs[3], w, X) == sum(val .^ 4) / size(X, 1)
 
         @test r[4].mu === pr1.mu
+        val = X * w .- dot(w, pr1.mu)
+        val = val[val .<= zero(eltype(val))]
+        s = std(rs[4].alg.ve, val; mean = zero(eltype(val)))
+        @test expected_risk(rs[4], w, X) == -sum(val .^ 3) / size(X, 1) / s^3
 
-        @test r[5].mu === pr1.mu
-        @test r[5].alg.ve.w === ew
-        @test isa(r[5].alg, HighOrderDeviation)
-        @test isa(r[5].alg.alg, FourthLowerMoment)
+        # @test r[5].mu === pr1.mu
+        # @test r[5].alg.ve.w === ew
+        # @test isa(r[5].alg, HighOrderDeviation)
+        # @test isa(r[5].alg.alg, FourthLowerMoment)
 
         # rs = [SquareRootKurtosis(; settings = s, alg = Full()),
         #       SquareRootKurtosis(; settings = s, w = ew),

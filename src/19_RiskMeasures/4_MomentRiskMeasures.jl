@@ -48,7 +48,11 @@ struct HighOrderDeviation{T1 <: AbstractHighOrderMomentMeasureAlgorithm,
 end
 function HighOrderDeviation(;
                             alg::AbstractHighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
-                            ve::AbstractVarianceEstimator = SimpleVariance())
+                            ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing))
+    if hasproperty(ve, :me)
+        println(ve.me)
+        @smart_assert(isnothing(ve.me))
+    end
     return HighOrderDeviation{typeof(alg), typeof(ve)}(alg, ve)
 end
 function risk_moment_algorithm_factory(alg::HighOrderDeviation,
@@ -123,6 +127,7 @@ function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Any, <:Rea
     return r.mu
 end
 function calc_moment_val(r::Union{<:AbstractMomentRiskMeasure,
+                                  <:AbstractMomentHierarchicalRiskMeasure,
                                   <:AbstractMomentNoOptimisationRiskMeasure},
                          w::AbstractVector, X::AbstractMatrix,
                          fees::Union{Nothing, <:Fees} = nothing)
@@ -172,14 +177,16 @@ function (r::HighOrderMoment{<:Any, <:ThirdLowerMoment, <:Any, <:Any})(w::Abstra
                                                                        fees::Union{Nothing,
                                                                                    <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
-    return -sum(val[val .<= zero(eltype(val))] .^ 3) / size(X, 1)
+    val = val[val .<= zero(eltype(val))]
+    return -sum(val .^ 3) / size(X, 1)
 end
 function (r::HighOrderMoment{<:Any, <:FourthLowerMoment, <:Any, <:Any})(w::AbstractVector,
                                                                         X::AbstractMatrix,
                                                                         fees::Union{Nothing,
                                                                                     <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
-    return sum(val[val .<= zero(eltype(val))] .^ 4) / size(X, 1)
+    val = val[val .<= zero(eltype(val))]
+    return sum(val .^ 4) / size(X, 1)
 end
 function (r::HighOrderMoment{<:Any, <:FourthCentralMoment, <:Any, <:Any})(w::AbstractVector,
                                                                           X::AbstractMatrix,
@@ -193,16 +200,17 @@ function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:ThirdLowerMoment, <:A
                                      fees::Union{Nothing, <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     val = val[val .<= zero(eltype(val))]
-    sigma = std(r.alg.ve, val; mean = zero(eltype(val)))
-    return -sum(val[val <= zero(eltype(val))] .^ 3) / size(X, 1) / sigma^3
+    println(r.alg.ve)
+    sigma = StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
+    return -sum(val .^ 3) / size(X, 1) / sigma^3
 end
 function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:FourthLowerMoment, <:Any}, <:Any,
                              <:Any})(w::AbstractVector, X::AbstractMatrix,
                                      fees::Union{Nothing, <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     val = val[val .<= zero(eltype(val))]
-    sigma = std(r.alg.ve, val; mean = zero(eltype(val)))
-    return sum(val[val <= zero(eltype(val))] .^ 4) / size(X, 1) / sigma^4
+    sigma = StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
+    return sum(val .^ 4) / size(X, 1) / sigma^4
 end
 function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:FourthCentralMoment, <:Any},
                              <:Any, <:Any})(w::AbstractVector, X::AbstractMatrix,
@@ -211,7 +219,7 @@ function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:FourthCentralMoment, 
     target = calc_moment_target(x, w, r)
     val = x .- target
     sigma = std(r.alg.ve, x)
-    return sum(val .^ 4) / length(x) / sigma^4
+    return sum(val .^ 4) / size(X, 1) / sigma^4
 end
 for rt ∈ (LowOrderMoment, HighOrderMoment)
     eval(quote
