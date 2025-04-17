@@ -50,19 +50,20 @@
               UncertaintySetVariance(;)]
         r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
         @test r[1].settings === settings
-        @test r[1].ucs === ucs
+        @test r[1].ucs === ucs1
         @test r[1].sigma === sigma
         @test r[2].sigma === pr1.sigma
         @test r[2].ucs === ucs2
 
         target = rand(rng, 20)
         zerovec = fill(0.0, 20)
+        formulation = Quad()
         mu = rand(rng, 20)
         rs = [LowOrderMoment(; settings = settings, target = target, w = ew, mu = mu),
               LowOrderMoment(; target = zerovec),
               LowOrderMoment(; target = nothing, mu = zerovec),
-              LowOrderMoment(; alg = SemiDeviation()),
-              LowOrderMoment(; alg = SemiVariance()),
+              LowOrderMoment(; alg = SemiDeviation(; ddof = 2)),
+              LowOrderMoment(; alg = SemiVariance(; ddof = 3, formulation = formulation)),
               LowOrderMoment(; alg = MeanAbsoluteDeviation()),
               LowOrderMoment(; alg = MeanAbsoluteDeviation(; w = ew))]
         r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
@@ -74,6 +75,23 @@
         @test r[2].target === zerovec
         @test r[2].mu === pr1.mu
         @test r[2].target === zerovec
+
+        @test isa(r[3].alg, FirstLowerMoment)
+        @test isnothing(r[3].target)
+        @test r[3].mu === zerovec
+
+        @test r[4].alg.ddof == 2
+        @test r[4].mu === pr1.mu
+
+        @test r[5].alg.ddof == 3
+        @test r[5].alg.formulation === formulation
+        @test r[5].mu === pr1.mu
+
+        @test isnothing(r[6].alg.w)
+        @test r[6].mu === pr1.mu
+
+        @test r[7].alg.w === ew
+        @test r[7].mu === pr1.mu
 
         #! continue with tests
 
