@@ -98,7 +98,7 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat) .+ pe.rf .+ b
     return EmpiricalPartialFactorPriorResult(;
-                                             pm = EmpiricalPriorResult(; X = posterior_X,
+                                             pr = EmpiricalPriorResult(; X = posterior_X,
                                                                        mu = posterior_mu,
                                                                        sigma = posterior_sigma),
                                              fm = PartialFactorPriorResult(; mu = f_mu,

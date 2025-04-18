@@ -34,14 +34,14 @@ const AbstractPriorEstimatorMap_1o2_1o2 = Union{<:AbstractPriorEstimator_1_0,
                                                 <:AbstractPriorEstimator_2_1,
                                                 <:AbstractPriorEstimator_2_2,
                                                 <:AbstractPriorEstimator_1o2_1o2}
-function prior(pm::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
-    return prior(pm, rd.X, rd.F; kwargs...)
+function prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+    return prior(pr, rd.X, rd.F; kwargs...)
 end
-function prior_view(pm::AbstractPriorEstimator, args...; kwargs...)
-    return pm
+function prior_view(pr::AbstractPriorEstimator, args...; kwargs...)
+    return pr
 end
-function prior(pm::AbstractPriorResult, args...; kwargs...)
-    return pm
+function prior(pr::AbstractPriorResult, args...; kwargs...)
+    return pr
 end
 function factory(::Nothing, args...; kwargs...)
     return nothing

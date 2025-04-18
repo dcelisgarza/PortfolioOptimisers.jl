@@ -4,13 +4,13 @@ struct HighOrderPriorResult{T1 <: AbstractLowOrderPriorResult,
                             T4 <: Union{Nothing, <:AbstractMatrix},
                             T5 <: Union{Nothing, <:AbstractMatrixProcessingEstimator}} <:
        AbstractHighOrderPriorResult
-    pm::T1
+    pr::T1
     kt::T2
     sk::T3
     V::T4
     skmp::T5
 end
-function HighOrderPriorResult(; pm::AbstractLowOrderPriorResult,
+function HighOrderPriorResult(; pr::AbstractLowOrderPriorResult,
                               kt::Union{Nothing, <:AbstractMatrix},
                               sk::Union{Nothing, <:AbstractMatrix},
                               V::Union{Nothing, <:AbstractMatrix},
@@ -18,13 +18,13 @@ function HighOrderPriorResult(; pm::AbstractLowOrderPriorResult,
     if isa(kt, AbstractMatrix)
         @smart_assert(!isempty(kt))
         issquare(kt)
-        @smart_assert(length(pm.mu)^2 == size(kt, 1))
+        @smart_assert(length(pr.mu)^2 == size(kt, 1))
     end
     sk_flag = isa(sk, AbstractMatrix)
     V_flag = isa(V, AbstractMatrix)
     if sk_flag
         @smart_assert(!isempty(sk))
-        @smart_assert(length(pm.mu)^2 == size(sk, 2))
+        @smart_assert(length(pr.mu)^2 == size(sk, 2))
     end
     if V_flag
         @smart_assert(!isempty(V))
@@ -34,30 +34,30 @@ function HighOrderPriorResult(; pm::AbstractLowOrderPriorResult,
         @smart_assert(sk_flag && V_flag,
                       "If either sk or V, is nothing, both must be nothing.")
     end
-    return HighOrderPriorResult{typeof(pm), typeof(kt), typeof(sk), typeof(V),
-                                typeof(skmp)}(pm, kt, sk, V, skmp)
+    return HighOrderPriorResult{typeof(pr), typeof(kt), typeof(sk), typeof(V),
+                                typeof(skmp)}(pr, kt, sk, V, skmp)
 end
-function prior_view(pm::HighOrderPriorResult, i::AbstractVector)
-    idx = fourth_moment_index_factory(length(pm.mu), i)
-    kt = pm.kt
-    sk = pm.sk
-    skmp = pm.skmp
+function prior_view(pr::HighOrderPriorResult, i::AbstractVector)
+    idx = fourth_moment_index_factory(length(pr.mu), i)
+    kt = pr.kt
+    sk = pr.sk
+    skmp = pr.skmp
     sk = nothing_scalar_array_view_odd_order(sk, i, idx)
-    V = __coskewness(sk, pm.X, skmp)
+    V = __coskewness(sk, pr.X, skmp)
     if !isnothing(V) && all(iszero, diag(V))
         V[diagind(V)] = I(size(V, 1))
     end
-    return HighOrderPriorResult(; pm = prior_view(pm.pm, i),
+    return HighOrderPriorResult(; pr = prior_view(pr.pr, i),
                                 kt = nothing_scalar_array_view(kt, idx), sk = sk, V = V,
                                 skmp = skmp)
 end
 function Base.getproperty(obj::HighOrderPriorResult, sym::Symbol)
     return if sym == :X
-        obj.pm.X
+        obj.pr.X
     elseif sym == :mu
-        obj.pm.mu
+        obj.pr.mu
     elseif sym == :sigma
-        obj.pm.sigma
+        obj.pr.sigma
     else
         getfield(obj, sym)
     end
@@ -101,11 +101,11 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
             F = transpose(F)
         end
     end
-    pm = prior(pe.pe, X, F)
-    (; X, mu) = pm
+    pr = prior(pe.pe, X, F)
+    (; X, mu) = pr
     kt = cokurtosis(pe.kte, X; mean = transpose(mu))
     sk, V = coskewness(pe.ske, X; mean = transpose(mu))
-    return HighOrderPriorResult(; pm = pm, kt = kt, sk = sk, V = V,
+    return HighOrderPriorResult(; pr = pr, kt = kt, sk = sk, V = V,
                                 skmp = isnothing(sk) ? nothing : pe.ske.mp)
 end
 

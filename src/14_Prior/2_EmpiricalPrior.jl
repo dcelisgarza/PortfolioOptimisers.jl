@@ -11,9 +11,9 @@ function EmpiricalPriorResult(; X::AbstractMatrix, mu::AbstractVector,
     issquare(sigma)
     return EmpiricalPriorResult{typeof(X), typeof(mu), typeof(sigma)}(X, mu, sigma)
 end
-function prior_view(pm::EmpiricalPriorResult, i::AbstractVector)
-    return EmpiricalPriorResult(; X = view(pm.X, :, i), mu = view(pm.mu, i),
-                                sigma = view(pm.sigma, i, i))
+function prior_view(pr::EmpiricalPriorResult, i::AbstractVector)
+    return EmpiricalPriorResult(; X = view(pr.X, :, i), mu = view(pr.mu, i),
+                                sigma = view(pr.sigma, i, i))
 end
 struct EmpiricalPriorEstimator{T1 <: AbstractExpectedReturnsEstimator,
                                T2 <: StatsBase.CovarianceEstimator,

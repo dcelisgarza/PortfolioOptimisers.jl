@@ -21,7 +21,7 @@ struct MeanRiskModel{T1 <: AbstractPriorResult, T2 <: Union{Nothing, <:WeightBou
                      T6 <: Union{Nothing, <:PhilogenyConstraintResult},
                      T7 <: Union{Nothing, <:PhilogenyConstraintResult},
                      T8 <: JuMPPortfolioSolution} <: PortfolioModel
-    pm::T1
+    pr::T1
     wb::T2
     lcs::T3
     cent::T4
@@ -36,38 +36,38 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     set_objective_penalty!(model)
     set_model_scales!(model, mr.opt.sc, mr.opt.so, mr.opt.ss)
     set_model_fees!(model)
-    pm = prior(mr.opt.pe, rd.X, rd.F)
-    datatype = eltype(pm.X)
-    set_w!(model, pm.X, mr.opt.wi)
-    set_maximum_ratio_factor_variables!(model, pm.mu, mr.obj)
-    wb = weight_bounds_constraints(mr.opt.wb, mr.opt.sets; scalar = true, N = size(pm.X, 2),
+    pr = prior(mr.opt.pe, rd.X, rd.F)
+    datatype = eltype(pr.X)
+    set_w!(model, pr.X, mr.opt.wi)
+    set_maximum_ratio_factor_variables!(model, pr.mu, mr.obj)
+    wb = weight_bounds_constraints(mr.opt.wb, mr.opt.sets; scalar = true, N = size(pr.X, 2),
                                    strict = mr.opt.strict)
     lcs = linear_constraints(mr.opt.lcs, mr.opt.sets; datatype = datatype,
                              strict = mr.opt.strict)
-    cent = centrality_constraints(mr.opt.cent, pm.X)
+    cent = centrality_constraints(mr.opt.cent, pr.X)
     gcard = cardinality_constraints(mr.opt.card, mr.opt.sets; datatype = datatype,
                                     strict = mr.opt.strict)
-    nplg = philogeny_constraints(mr.opt.nplg, pm.X)
-    cplg = philogeny_constraints(mr.opt.cplg, pm.X)
+    nplg = philogeny_constraints(mr.opt.nplg, pr.X)
+    cplg = philogeny_constraints(mr.opt.cplg, pr.X)
     set_weight_constraints!(model, wb, mr.opt.bgt, mr.opt.sbgt)
     set_linear_weight_constraints!(model, lcs, :clcs_ineq, :clcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, mr.opt.lcm, :clcm_ineq, :clcm_eq)
     set_mip_constraints!(model, mr.opt.bit, mr.opt.card, gcard, mr.opt.fees, nplg, cplg, wb)
     set_turnover_constraints!(model, mr.opt.tn)
-    set_tracking_error_constraints!(model, pm.X, mr.opt.te)
+    set_tracking_error_constraints!(model, pr.X, mr.opt.te)
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)
     set_non_fixed_fees!(model, mr.opt.fees)
-    set_risk_constraints!(model, mr.r, mr, pm, nplg, cplg)
+    set_risk_constraints!(model, mr.r, mr, pr, nplg, cplg)
     scalarise_risk_expression!(model, mr.opt.sce)
     set_sdp_philogeny_constraints!(model, nplg, :sdp_nplg)
     set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
-    set_return_constraints!(model, mr.opt.ret, mr.obj, pm)
-    set_custom_constraint!(model, mr.opt.ccnt, mr, pm)
-    set_portfolio_objective_function!(model, mr.obj, mr.opt.ret, mr.opt.cobj, mr, pm)
+    set_return_constraints!(model, mr.opt.ret, mr.obj, pr)
+    set_custom_constraint!(model, mr.opt.ccnt, mr, pr)
+    set_portfolio_objective_function!(model, mr.obj, mr.opt.ret, mr.opt.cobj, mr, pr)
     sol = optimise_JuMP_model!(model, mr, datatype)
-    return MeanRiskModel(pm, wb, lcs, cent, gcard, nplg, cplg, sol)
+    return MeanRiskModel(pr, wb, lcs, cent, gcard, nplg, cplg, sol)
 end
 
 export MeanRiskEstimator

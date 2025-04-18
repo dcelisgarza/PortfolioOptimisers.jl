@@ -20,22 +20,22 @@ end
     pes = [EmpiricalPriorEstimator(), EmpiricalPriorEstimator(; horizon = 252)]
     pet = CSV.read(joinpath(@__DIR__, "./assets/Empirical-Prior.csv"), DataFrame)
     for i ∈ eachindex(pes)
-        pm = prior(pes[i], transpose(X); dims = 2)
-        mu_t = reshape(pet[1:10, i], size(pm.mu))
-        sigma_t = reshape(pet[11:end, i], size(pm.sigma))
-        res1 = isapprox(pm.mu, mu_t)
+        pr = prior(pes[i], transpose(X); dims = 2)
+        mu_t = reshape(pet[1:10, i], size(pr.mu))
+        sigma_t = reshape(pet[11:end, i], size(pr.sigma))
+        res1 = isapprox(pr.mu, mu_t)
         if !res1
             println("Test $i fails on mu.")
-            find_tol(pm.mu, mu_t; name1 = :er, name2 = :er_t)
+            find_tol(pr.mu, mu_t; name1 = :er, name2 = :er_t)
         end
         @test res1
-        res2 = isapprox(pm.sigma, sigma_t)
+        res2 = isapprox(pr.sigma, sigma_t)
         if !res2
             println("Test $i fails on sigma.")
-            find_tol(pm.sigma, sigma_t; name1 = :er, name2 = :er_t)
+            find_tol(pr.sigma, sigma_t; name1 = :er, name2 = :er_t)
         end
         @test res2
-        @test pm === prior(pm)
+        @test pr === prior(pr)
     end
     pm1 = prior(EmpiricalPriorEstimator(), ReturnsResult(; nx = 1:10, X = X))
     pm2 = prior(EmpiricalPriorEstimator(), X)
@@ -98,21 +98,21 @@ end
     rng = StableRNG(123456789)
     X = randn(rng, 100, 10)
     pe = HighOrderPriorEstimator()
-    pm = prior(pe, transpose(X); dims = 2)
-    @test isapprox(pm.X, X)
-    @test isapprox(pm.mu, vec(mean(SimpleExpectedReturns(), X)))
-    @test isapprox(pm.sigma, cov(PortfolioOptimisersCovariance(), X))
-    @test isapprox(pm.kt, cokurtosis(Cokurtosis(; alg = Full()), X))
-    @test all(isapprox.((pm.sk, pm.V), coskewness(Coskewness(; alg = Full()), X)))
+    pr = prior(pe, transpose(X); dims = 2)
+    @test isapprox(pr.X, X)
+    @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), X)))
+    @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), X))
+    @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Full()), X))
+    @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Full()), X)))
 
     pe = HighOrderPriorEstimator(; kte = Cokurtosis(; alg = Semi()),
                                  ske = Coskewness(; alg = Semi()))
-    pm = prior(pe, transpose(X); dims = 2)
-    @test isapprox(pm.X, X)
-    @test isapprox(pm.mu, vec(mean(SimpleExpectedReturns(), X)))
-    @test isapprox(pm.sigma, cov(PortfolioOptimisersCovariance(), X))
-    @test isapprox(pm.kt, cokurtosis(Cokurtosis(; alg = Semi()), X))
-    @test all(isapprox.((pm.sk, pm.V), coskewness(Coskewness(; alg = Semi()), X)))
+    pr = prior(pe, transpose(X); dims = 2)
+    @test isapprox(pr.X, X)
+    @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), X)))
+    @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), X))
+    @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Semi()), X))
+    @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Semi()), X)))
 
     pe1 = HighOrderPriorEstimator()
     ew = eweights(1:10, 0.3)
@@ -132,19 +132,19 @@ end
     @test isnothing(pe2.ske)
 
     pm1 = prior(pe, ReturnsResult(; nx = 1:10, X = X))
-    @test isapprox(pm.X, pm1.X)
-    @test isapprox(pm.mu, pm1.mu)
-    @test isapprox(pm.sigma, pm1.sigma)
-    @test isapprox(pm.kt, pm1.kt)
-    @test isapprox(pm.sk, pm1.sk)
-    @test isapprox(pm.V, pm1.V)
+    @test isapprox(pr.X, pm1.X)
+    @test isapprox(pr.mu, pm1.mu)
+    @test isapprox(pr.sigma, pm1.sigma)
+    @test isapprox(pr.kt, pm1.kt)
+    @test isapprox(pr.sk, pm1.sk)
+    @test isapprox(pr.V, pm1.V)
 
-    pm = prior(HighOrderPriorEstimator(; kte = nothing, ske = nothing), transpose(X);
+    pr = prior(HighOrderPriorEstimator(; kte = nothing, ske = nothing), transpose(X);
                dims = 2)
-    @test isnothing(pm.kt)
-    @test isnothing(pm.sk)
-    @test isnothing(pm.V)
-    @test pm === prior(pm)
+    @test isnothing(pr.kt)
+    @test isnothing(pr.sk)
+    @test isnothing(pr.V)
+    @test pr === prior(pr)
 end
 @testset "High Order Factor Prior" begin
     rng = StableRNG(123456789)
@@ -561,23 +561,23 @@ end
                                         views_conf = fill(1.0 - eps(), length(views)))]
     pet = CSV.read(joinpath(@__DIR__, "./assets/Black-Litterman-Prior.csv"), DataFrame)
     for i ∈ eachindex(pes)
-        pm = prior(pes[i], transpose(X); dims = 2)
-        mu_t = reshape(pet[1:10, i], size(pm.mu))
-        sigma_t = reshape(pet[11:end, i], size(pm.sigma))
-        res1 = isapprox(pm.mu, mu_t)
+        pr = prior(pes[i], transpose(X); dims = 2)
+        mu_t = reshape(pet[1:10, i], size(pr.mu))
+        sigma_t = reshape(pet[11:end, i], size(pr.sigma))
+        res1 = isapprox(pr.mu, mu_t)
         if !res1
             println("Test $i fails on mu.")
-            find_tol(pm.mu, mu_t; name1 = :er, name2 = :er_t)
+            find_tol(pr.mu, mu_t; name1 = :er, name2 = :er_t)
         end
         @test res1
-        res2 = isapprox(pm.sigma, sigma_t)
+        res2 = isapprox(pr.sigma, sigma_t)
         if !res2
             println("Test $i fails on sigma.")
-            find_tol(pm.sigma, sigma_t; name1 = :er, name2 = :er_t)
+            find_tol(pr.sigma, sigma_t; name1 = :er, name2 = :er_t)
         end
         @test res2
-        @test size(pm.X) == size(X)
-        @test pm === prior(pm)
+        @test size(pr.X) == size(X)
+        @test pr === prior(pr)
     end
 
     pe1 = pes[1]
@@ -717,33 +717,33 @@ end
     pet = CSV.read(joinpath(@__DIR__, "./assets/Bayesian-Black-Litterman-Prior.csv"),
                    DataFrame)
     for i ∈ eachindex(pes)
-        pm = prior(pes[i], transpose(X), transpose(F); dims = 2)
-        X_t = reshape(pet[1:1000, i], size(pm.X))
-        mu_t = reshape(pet[1001:1010, i], size(pm.mu))
-        sigma_t = reshape(pet[1011:end, i], size(pm.sigma))
-        res1 = isapprox(pm.mu, mu_t)
+        pr = prior(pes[i], transpose(X), transpose(F); dims = 2)
+        X_t = reshape(pet[1:1000, i], size(pr.X))
+        mu_t = reshape(pet[1001:1010, i], size(pr.mu))
+        sigma_t = reshape(pet[1011:end, i], size(pr.sigma))
+        res1 = isapprox(pr.mu, mu_t)
         if !res1
             println("Test $i fails on mu.")
-            find_tol(pm.X, X; name1 = :X, name2 = :X_t)
+            find_tol(pr.X, X; name1 = :X, name2 = :X_t)
         end
-        res2 = isapprox(pm.mu, mu_t)
+        res2 = isapprox(pr.mu, mu_t)
         if !res2
             println("Test $i fails on mu.")
-            find_tol(pm.mu, mu_t; name1 = :mu, name2 = :mu_t)
+            find_tol(pr.mu, mu_t; name1 = :mu, name2 = :mu_t)
         end
         @test res2
-        res3 = isapprox(pm.sigma, sigma_t)
+        res3 = isapprox(pr.sigma, sigma_t)
         if !res3
             println("Test $i fails on sigma.")
-            find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
+            find_tol(pr.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
         end
         @test res3
-        @test length(pm.f_mu) ==
-              size(pm.f_sigma, 1) ==
-              size(pm.f_sigma, 2) ==
-              size(pm.loadings.M, 2)
-        @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
-        @test pm === prior(pm)
+        @test length(pr.f_mu) ==
+              size(pr.f_sigma, 1) ==
+              size(pr.f_sigma, 2) ==
+              size(pr.loadings.M, 2)
+        @test length(pr.mu) == size(pr.loadings.M, 1) == length(pr.loadings.b)
+        @test pr === prior(pr)
     end
     pe1 = pes[1]
     ew = eweights(1:1000, 0.3)
@@ -824,42 +824,42 @@ end
                               "./assets/Factor-Black-Litterman-Prior-No-Residuals.csv"),
                      DataFrame)
     for (i, pe) ∈ enumerate(pes)
-        pm = prior(pe, transpose(X), transpose(F); dims = 2)
+        pr = prior(pe, transpose(X), transpose(F); dims = 2)
         X_t = reshape(view(pm1_t[!, i], 1:1000, 1), 100, 10)
         mu_t = view(pm1_t[!, i], 1001:1010, 1)
         sigma_t = reshape(view(pm1_t[!, i], 1011:1110, 1), 10, 10)
         chol_t = reshape(view(pm1_t[!, i], 1111:nrow(pm1_t), 1), :, 10)
 
-        res1 = isapprox(pm.X, X_t)
+        res1 = isapprox(pr.X, X_t)
         if !res1
             println("Test $i no rsd fails on X.")
-            find_tol(pm.X, X_t; name1 = :X, name2 = :X_t)
+            find_tol(pr.X, X_t; name1 = :X, name2 = :X_t)
         end
         @test res1
-        res2 = isapprox(pm.mu, mu_t)
+        res2 = isapprox(pr.mu, mu_t)
         if !res2
             println("Test $i no rsd fails on mu.")
-            find_tol(pm.mu, mu_t; name1 = :mu, name2 = :mu_t)
+            find_tol(pr.mu, mu_t; name1 = :mu, name2 = :mu_t)
         end
         @test res2
-        res3 = isapprox(pm.sigma, sigma_t)
+        res3 = isapprox(pr.sigma, sigma_t)
         if !res3
             println("Test $i no rsd fails on sigma.")
-            find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
+            find_tol(pr.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
         end
         @test res3
-        res4 = isapprox(pm.chol, chol_t)
+        res4 = isapprox(pr.chol, chol_t)
         if !res4
             println("Test $i no rsd fails on chol.")
-            find_tol(pm.chol, chol_t; name1 = :chol, name2 = :chol_t)
+            find_tol(pr.chol, chol_t; name1 = :chol, name2 = :chol_t)
         end
         @test res4
-        @test length(pm.f_mu) ==
-              size(pm.f_sigma, 1) ==
-              size(pm.f_sigma, 2) ==
-              size(pm.loadings.M, 2)
-        @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
-        @test pm === prior(pm)
+        @test length(pr.f_mu) ==
+              size(pr.f_sigma, 1) ==
+              size(pr.f_sigma, 2) ==
+              size(pr.loadings.M, 2)
+        @test length(pr.mu) == size(pr.loadings.M, 1) == length(pr.loadings.b)
+        @test pr === prior(pr)
     end
     pe1 = pes[1]
     ew = eweights(1:1000, 0.3)
@@ -921,34 +921,34 @@ end
                      DataFrame)
 
     for (i, pe) ∈ enumerate(pes)
-        pm = prior(pe, transpose(X), transpose(F); dims = 2)
+        pr = prior(pe, transpose(X), transpose(F); dims = 2)
         X_t = reshape(view(pm1_t[!, i], 1:1000, 1), 100, 10)
         mu_t = view(pm1_t[!, i], 1001:1010, 1)
         sigma_t = reshape(view(pm1_t[!, i], 1011:1110, 1), 10, 10)
         chol_t = reshape(view(pm1_t[!, i], 1111:nrow(pm1_t), 1), :, 10)
 
-        res1 = isapprox(pm.X, X_t)
+        res1 = isapprox(pr.X, X_t)
         if !res1
             println("Test $i rsd fails on X.")
-            find_tol(pm.X, X_t; name1 = :X, name2 = :X_t)
+            find_tol(pr.X, X_t; name1 = :X, name2 = :X_t)
         end
         @test res1
-        res2 = isapprox(pm.mu, mu_t)
+        res2 = isapprox(pr.mu, mu_t)
         if !res2
             println("Test $i rsd fails on mu.")
-            find_tol(pm.mu, mu_t; name1 = :mu, name2 = :mu_t)
+            find_tol(pr.mu, mu_t; name1 = :mu, name2 = :mu_t)
         end
         @test res2
-        res3 = isapprox(pm.sigma, sigma_t)
+        res3 = isapprox(pr.sigma, sigma_t)
         if !res3
             println("Test $i rsd fails on sigma.")
-            find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
+            find_tol(pr.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
         end
         @test res3
-        res4 = isapprox(pm.chol, chol_t)
+        res4 = isapprox(pr.chol, chol_t)
         if !res4
             println("Test $i rsd fails on chol.")
-            find_tol(pm.chol, chol_t; name1 = :chol, name2 = :chol_t)
+            find_tol(pr.chol, chol_t; name1 = :chol, name2 = :chol_t)
         end
         @test res4
     end
@@ -1075,35 +1075,35 @@ end
                     DataFrame)
 
     for (i, pe) ∈ enumerate(pes)
-        pm = prior(pe, transpose(X), transpose(F); dims = 2)
+        pr = prior(pe, transpose(X), transpose(F); dims = 2)
         X_t = reshape(view(pm_t[!, i], 1:1000, 1), 100, 10)
         mu_t = view(pm_t[!, i], 1001:1010, 1)
         sigma_t = reshape(view(pm_t[!, i], 1011:nrow(pm_t), 1), 10, 10)
 
-        res1 = isapprox(pm.X, X_t)
+        res1 = isapprox(pr.X, X_t)
         if !res1
             println("Test $i fails on X.")
-            find_tol(pm.X, X_t; name1 = :X, name2 = :X_t)
+            find_tol(pr.X, X_t; name1 = :X, name2 = :X_t)
         end
         @test res1
-        res2 = isapprox(pm.mu, mu_t)
+        res2 = isapprox(pr.mu, mu_t)
         if !res2
             println("Test $i fails on mu.")
-            find_tol(pm.mu, mu_t; name1 = :mu, name2 = :mu_t)
+            find_tol(pr.mu, mu_t; name1 = :mu, name2 = :mu_t)
         end
         @test res2
-        res3 = isapprox(pm.sigma, sigma_t)
+        res3 = isapprox(pr.sigma, sigma_t)
         if !res3
             println("Test $i fails on sigma.")
-            find_tol(pm.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
+            find_tol(pr.sigma, sigma_t; name1 = :sigma, name2 = :sigma_t)
         end
         @test res3
-        @test length(pm.f_mu) ==
-              size(pm.f_sigma, 1) ==
-              size(pm.f_sigma, 2) ==
-              size(pm.loadings.M, 2)
-        @test length(pm.mu) == size(pm.loadings.M, 1) == length(pm.loadings.b)
-        @test pm === prior(pm)
+        @test length(pr.f_mu) ==
+              size(pr.f_sigma, 1) ==
+              size(pr.f_sigma, 2) ==
+              size(pr.loadings.M, 2)
+        @test length(pr.mu) == size(pr.loadings.M, 1) == length(pr.loadings.b)
+        @test pr === prior(pr)
     end
     pe1 = pes[1]
     ew = eweights(1:1000, 0.3)
@@ -1238,41 +1238,41 @@ end
             0.9698761680726742, 0.9698761676977143)
 
     for (i, (pe, re_t, ens_t)) ∈ enumerate(zip(pes, ress, enss))
-        pm = prior(pe, transpose(X); dims = 2)
-        res = isapprox(pm.mu[1], 0.1; rtol = 5e-8)
+        pr = prior(pe, transpose(X); dims = 2)
+        res = isapprox(pr.mu[1], 0.1; rtol = 5e-8)
         if !res
             println("Test Fails on iteration $i mu")
-            find_tol(pm.mu[1], 0.1; name1 = :mu, name2 = "== 0.1")
+            find_tol(pr.mu[1], 0.1; name1 = :mu, name2 = "== 0.1")
         end
         @test res
-        res = diag(pm.sigma)[2] <= 0.95
+        res = diag(pr.sigma)[2] <= 0.95
         if !res
             println("Test Fails on iteration $i sigma")
-            find_tol(pm.sigma[1], 0.95; name1 = :mu, name2 = "<= 0.95")
+            find_tol(pr.sigma[1], 0.95; name1 = :mu, name2 = "<= 0.95")
         end
         @test res
-        res = skewness(pm.X[:, 3], pm.w) >= -0.25
+        res = skewness(pr.X[:, 3], pr.w) >= -0.25
         if !res
             println("Test Fails on iteration $i skewness")
-            find_tol(skewness(pm.X[:, 3], pm.w), -0.2; name1 = :skewness, name2 = ">= -0.2")
+            find_tol(skewness(pr.X[:, 3], pr.w), -0.2; name1 = :skewness, name2 = ">= -0.2")
         end
         @test res
-        res = kurtosis(pm.X[:, 4], pm.w) + 3 <= 5.1
+        res = kurtosis(pr.X[:, 4], pr.w) + 3 <= 5.1
         if !res
             println("Test Fails on iteration $i kurtosis")
-            find_tol(kurtosis(pm.X[:, 3], pm.w), 5.1; name1 = :kurtosis, name2 = "<= 5.1")
+            find_tol(kurtosis(pr.X[:, 3], pr.w), 5.1; name1 = :kurtosis, name2 = "<= 5.1")
         end
         @test res
-        res = cov2cor(pm.sigma)[10, 3] >= 0.22
+        res = cov2cor(pr.sigma)[10, 3] >= 0.22
         if !res
             println("Test Fails on iteration $i correlation")
-            find_tol(cov2cor(pm.sigma)[10, 3], 0.22; name1 = :covcor, name2 = ">= 0.05")
+            find_tol(cov2cor(pr.sigma)[10, 3], 0.22; name1 = :covcor, name2 = ">= 0.05")
         end
         @test res
 
-        re = relative_entropy(pm.w,
+        re = relative_entropy(pr.w,
                               range(; start = inv(100), stop = inv(100), length = 100))
-        ens = effective_number_scenarios(pm.w,
+        ens = effective_number_scenarios(pr.w,
                                          range(; start = inv(100), stop = inv(100),
                                                length = 100))
         res = isapprox(re, re_t; rtol = 5e-7)
@@ -1286,7 +1286,7 @@ end
             find_tol(ens, ens_t; name1 = :ens, name2 = :ens_t)
         end
         @test ens == exp(-re)
-        @test pm === prior(pm)
+        @test pr === prior(pr)
     end
     pe1 = pes[1]
     ew = eweights(1:1000, 0.3)
@@ -1401,41 +1401,41 @@ end
             0.9698761680726742, 0.9698761676977143)
 
     for (i, (pe, re_t, ens_t)) ∈ enumerate(zip(pes, ress, enss))
-        pm = prior(pe, transpose(X); dims = 2)
-        res = isapprox(pm.mu[1], 0.1; rtol = 5e-8)
+        pr = prior(pe, transpose(X); dims = 2)
+        res = isapprox(pr.mu[1], 0.1; rtol = 5e-8)
         if !res
             println("Test Fails on iteration $i mu")
-            find_tol(pm.mu[1], 0.1; name1 = :mu, name2 = "== 0.1")
+            find_tol(pr.mu[1], 0.1; name1 = :mu, name2 = "== 0.1")
         end
         @test res
-        res = diag(pm.sigma)[2] <= 0.95
+        res = diag(pr.sigma)[2] <= 0.95
         if !res
             println("Test Fails on iteration $i sigma")
-            find_tol(pm.sigma[1], 0.95; name1 = :mu, name2 = "<= 0.95")
+            find_tol(pr.sigma[1], 0.95; name1 = :mu, name2 = "<= 0.95")
         end
         @test res
-        res = skewness(pm.X[:, 3], pm.w) >= -0.25
+        res = skewness(pr.X[:, 3], pr.w) >= -0.25
         if !res
             println("Test Fails on iteration $i skewness")
-            find_tol(skewness(pm.X[:, 3], pm.w), -0.2; name1 = :skewness, name2 = ">= -0.2")
+            find_tol(skewness(pr.X[:, 3], pr.w), -0.2; name1 = :skewness, name2 = ">= -0.2")
         end
         @test res
-        res = kurtosis(pm.X[:, 4], pm.w) + 3 <= 5.1
+        res = kurtosis(pr.X[:, 4], pr.w) + 3 <= 5.1
         if !res
             println("Test Fails on iteration $i kurtosis")
-            find_tol(kurtosis(pm.X[:, 3], pm.w), 5.1; name1 = :kurtosis, name2 = "<= 5.1")
+            find_tol(kurtosis(pr.X[:, 3], pr.w), 5.1; name1 = :kurtosis, name2 = "<= 5.1")
         end
         @test res
-        res = cov2cor(pm.sigma)[10, 3] >= 0.22
+        res = cov2cor(pr.sigma)[10, 3] >= 0.22
         if !res
             println("Test Fails on iteration $i correlation")
-            find_tol(cov2cor(pm.sigma)[10, 3], 0.22; name1 = :covcor, name2 = ">= 0.05")
+            find_tol(cov2cor(pr.sigma)[10, 3], 0.22; name1 = :covcor, name2 = ">= 0.05")
         end
         @test res
 
-        re = relative_entropy(pm.w,
+        re = relative_entropy(pr.w,
                               range(; start = inv(100), stop = inv(100), length = 100))
-        ens = effective_number_scenarios(pm.w,
+        ens = effective_number_scenarios(pr.w,
                                          range(; start = inv(100), stop = inv(100),
                                                length = 100))
         res = isapprox(re, re_t; rtol = 5e-7)
@@ -1589,17 +1589,17 @@ end
     ress = (1.0759615986400306e-15, 1.0759615986400306e-15, 1.0759615986400306e-15)
     enss = (0.9999999999999989, 0.9999999999999989, 0.9999999999999989)
     for (i, (pe, re_t, ens_t)) ∈ enumerate(zip(pes, ress, enss))
-        pm = prior(pe, transpose(X), transpose(F); dims = 2)
-        res = cov2cor(pm.sigma)[10, 3] <= 0.217
+        pr = prior(pe, transpose(X), transpose(F); dims = 2)
+        res = cov2cor(pr.sigma)[10, 3] <= 0.217
         if !res
             println("Test Fails on iteration $i correlation")
-            find_tol(cov2cor(pm.sigma)[10, 3], 0.217; name1 = :covcor, name2 = ">= 0.05")
+            find_tol(cov2cor(pr.sigma)[10, 3], 0.217; name1 = :covcor, name2 = ">= 0.05")
         end
         @test res
 
-        re = relative_entropy(pm.w,
+        re = relative_entropy(pr.w,
                               range(; start = inv(100), stop = inv(100), length = 100))
-        ens = effective_number_scenarios(pm.w,
+        ens = effective_number_scenarios(pr.w,
                                          range(; start = inv(100), stop = inv(100),
                                                length = 100))
         res = isapprox(re, re_t; rtol = 5e-7)
@@ -1613,7 +1613,7 @@ end
             find_tol(ens, ens_t; name1 = :ens, name2 = :ens_t)
         end
         @test ens == exp(-re)
-        @test pm === prior(pm)
+        @test pr === prior(pr)
     end
 end
 # end

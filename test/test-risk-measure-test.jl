@@ -14,7 +14,7 @@
             end
         end
     end
-    @testset "Risk" begin
+    @testset "High Order Prior Risk" begin
         rng = StableRNG(123456789)
         X = randn(rng, 1000, 20)
         ew = eweights(1:1000, 1 / 1000; scale = true)
@@ -34,7 +34,7 @@
         ucs2view = ucs_view(nothing, ucs2, i)
         sigma = pr1.sigma * 1.5
         prv = prior_view(pr1, i)
-        sigmaview = nothing_scalar_array_view(sigma, i)
+        sigmav = nothing_scalar_array_view(sigma, i)
         rc = LinearConstraint(; A = LinearConstraintSide(; group = :A, name = :B), B = 0)
         rs = [Variance(; settings = settings, formulation = formulation, sigma = sigma,
                        rc = rc), Variance(;)]
@@ -47,9 +47,9 @@
         @test isapprox(expected_risk(r[1], w, X), dot(w, sigma, w))
         @test rv[1].settings === settings
         @test rv[1].formulation === formulation
-        @test rv[1].sigma === sigmaview
+        @test rv[1].sigma === sigmav
         @test rv[1].rc === rc
-        @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, sigmaview, wv))
+        @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, sigmav, wv))
 
         @test r[2].sigma === pr1.sigma
         @test isapprox(expected_risk(r[2], w, X), dot(w, pr1.sigma, w))
@@ -57,7 +57,7 @@
         @test isapprox(expected_risk(rv[2], wv, prv.X), dot(wv, prv.sigma, wv))
 
         sigma = pr1.sigma * 2
-        sigmaview = nothing_scalar_array_view(sigma, i)
+        sigmav = nothing_scalar_array_view(sigma, i)
         rs = [StandardDeviation(; settings = settings, sigma = sigma), StandardDeviation(;)]
         r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
         rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
@@ -65,8 +65,8 @@
         @test r[1].sigma === sigma
         @test isapprox(expected_risk(r[1], w, X), sqrt(dot(w, sigma, w)))
         @test rv[1].settings === settings
-        @test rv[1].sigma === sigmaview
-        @test isapprox(expected_risk(rv[1], wv, prv.X), sqrt(dot(wv, sigmaview, wv)))
+        @test rv[1].sigma === sigmav
+        @test isapprox(expected_risk(rv[1], wv, prv.X), sqrt(dot(wv, sigmav, wv)))
 
         @test r[2].sigma === pr1.sigma
         @test isapprox(expected_risk(r[2], w, X), sqrt(dot(w, pr1.sigma, w)))
@@ -74,7 +74,7 @@
         @test isapprox(expected_risk(rv[2], wv, prv.X), sqrt(dot(wv, prv.sigma, wv)))
 
         sigma = pr1.sigma * 2.5
-        sigmaview = nothing_scalar_array_view(sigma, i)
+        sigmav = nothing_scalar_array_view(sigma, i)
         rs = [UncertaintySetVariance(; settings = settings, ucs = ucs1, sigma = sigma),
               UncertaintySetVariance(;)]
         r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
@@ -85,8 +85,8 @@
         @test isapprox(expected_risk(r[1], w, X), dot(w, sigma, w))
         @test rv[1].settings === settings
         @test rv[1].ucs === ucs1view
-        @test rv[1].sigma === sigmaview
-        @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, sigmaview, wv))
+        @test rv[1].sigma === sigmav
+        @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, sigmav, wv))
 
         @test r[2].sigma === pr1.sigma
         @test r[2].ucs === ucs2
@@ -96,10 +96,10 @@
         @test isapprox(expected_risk(rv[2], wv, prv.X), dot(wv, prv.sigma, wv))
 
         zerovec = fill(0.0, 20)
-        zerovecview = nothing_scalar_array_view(zerovec, i)
+        zerovecv = nothing_scalar_array_view(zerovec, i)
         formulation = Quad()
         mu = rand(rng, 20)
-        muview = nothing_scalar_array_view(mu, i)
+        muv = nothing_scalar_array_view(mu, i)
         rs = [LowOrderMoment(; settings = settings, w = ew, mu = mu),
               LowOrderMoment(; mu = 0), LowOrderMoment(; mu = zerovec),
               LowOrderMoment(; alg = SemiDeviation(; ddof = 2)),
@@ -116,8 +116,8 @@
         @test isapprox(expected_risk(r[1], w, X), -sum(val) / size(X, 1))
         @test rv[1].settings === settings
         @test rv[1].w === ew
-        @test rv[1].mu === muview
-        val = prv.X * wv .- dot(wv, muview)
+        @test rv[1].mu === muv
+        val = prv.X * wv .- dot(wv, muv)
         val = val[val .<= zero(eltype(val))]
         @test isapprox(expected_risk(rv[1], wv, prv.X), -sum(val) / size(prv.X, 1))
 
@@ -135,8 +135,8 @@
         val = X * w .- dot(w, zerovec)
         val = val[val .<= zero(eltype(val))]
         @test isapprox(expected_risk(r[3], w, X), -sum(val) / size(X, 1))
-        @test rv[3].mu === zerovecview
-        val = prv.X * wv .- dot(wv, zerovecview)
+        @test rv[3].mu === zerovecv
+        val = prv.X * wv .- dot(wv, zerovecv)
         val = val[val .<= zero(eltype(val))]
         @test isapprox(expected_risk(rv[3], wv, prv.X), -sum(val) / size(prv.X, 1))
 
@@ -209,8 +209,8 @@
         @test isapprox(expected_risk(r[1], w, X), -sum(val .^ 3) / size(X, 1))
         @test rv[1].settings === settings
         @test rv[1].w === ew
-        @test rv[1].mu === muview
-        val = prv.X * wv .- dot(wv, muview)
+        @test rv[1].mu === muv
+        val = prv.X * wv .- dot(wv, muv)
         val = val[val .<= zero(eltype(val))]
         @test isapprox(expected_risk(rv[1], wv, prv.X), -sum(val .^ 3) / size(prv.X, 1))
 
@@ -228,8 +228,8 @@
         val = X * w .- dot(w, zerovec)
         @test isapprox(expected_risk(r[3], w, X), sum(val .^ 4) / size(X, 1))
         @test isa(rv[3].alg, FourthCentralMoment)
-        @test rv[3].mu === zerovecview
-        val = prv.X * wv .- dot(wv, zerovecview)
+        @test rv[3].mu === zerovecv
+        val = prv.X * wv .- dot(wv, zerovecv)
         @test isapprox(expected_risk(rv[3], wv, prv.X), sum(val .^ 4) / size(prv.X, 1))
 
         @test r[4].mu === pr1.mu
@@ -279,6 +279,59 @@
         s = std(rv[6].alg.ve, x)
         @test isapprox(expected_risk(rv[6], wv, prv.X),
                        sum(val .^ 4) / size(prv.X, 1) / s^4)
+
+        rs = [SquareRootKurtosis(; settings = settings, w = ew, mu = mu, kt = pr1.kt),
+              SquareRootKurtosis(; mu = 0), SquareRootKurtosis(; mu = zerovec),
+              SquareRootKurtosis(; alg = Semi())]
+        r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
+        rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
+        @test r[1].settings === settings
+        @test r[1].w === ew
+        @test r[1].mu === mu
+        @test r[1].kt === pr1.kt
+        val = X * w .- dot(w, mu)
+        @test isapprox(expected_risk(r[1], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
+        @test rv[1].settings === settings
+        @test rv[1].w === ew
+        @test rv[1].mu === muv
+        @test rv[1].kt == prv.kt
+        val = prv.X * wv .- dot(wv, muv)
+        @test isapprox(expected_risk(rv[1], wv, prv.X), sqrt(sum(val .^ 4) / size(X, 1)))
+
+        @test isnothing(r[2].w)
+        @test r[2].mu == 0
+        @test r[2].kt === pr1.kt
+        val = X * w
+        @test isapprox(expected_risk(r[2], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
+        @test isnothing(rv[2].w)
+        @test rv[2].mu == 0
+        @test rv[2].kt == prv.kt
+        val = prv.X * wv
+        @test isapprox(expected_risk(rv[2], wv, prv.X), sqrt(sum(val .^ 4) / size(X, 1)))
+
+        @test isnothing(r[3].w)
+        @test r[3].mu === zerovec
+        @test r[3].kt === pr1.kt
+        val = X * w .- dot(w, zerovec)
+        @test isapprox(expected_risk(r[3], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
+        @test isnothing(rv[3].w)
+        @test rv[3].mu === zerovecv
+        @test rv[3].kt == prv.kt
+        val = prv.X * wv .- dot(wv, zerovecv)
+        @test isapprox(expected_risk(rv[3], wv, prv.X), sqrt(sum(val .^ 4) / size(X, 1)))
+
+        @test r[4].alg == Semi()
+        @test r[4].mu === pr1.mu
+        @test r[4].kt === pr1.kt
+        val = X * w .- dot(w, pr1.mu)
+        val = val[val .<= zero(eltype(val))]
+        @test isapprox(expected_risk(r[4], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
+        @test rv[4].alg == Semi()
+        @test rv[4].mu === prv.mu
+        @test rv[4].kt == prv.kt
+        val = prv.X * wv .- dot(wv, prv.mu)
+        val = val[val .<= zero(eltype(val))]
+        @test isapprox(expected_risk(rv[4], wv, prv.X), sqrt(sum(val .^ 4) / size(X, 1)))
     end
 end
 

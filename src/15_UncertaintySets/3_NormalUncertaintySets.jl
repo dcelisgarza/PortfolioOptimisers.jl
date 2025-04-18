@@ -33,9 +33,9 @@ end
 function ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm, <:Any,
                                                <:Any, <:Any}, X::AbstractMatrix, args...;
              dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    T, N = size(pm.X)
-    sigma = pm.sigma
+    pr = prior(ue.pe, X, args...; dims = dims)
+    T, N = size(pr.X)
+    sigma = pr.sigma
     q = ue.q * 0.5
     sigma_mu = sigma / T
     Random.seed!(ue.rng, ue.seed)
@@ -59,20 +59,20 @@ end
 function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm,
                                                   <:Any, <:Any, <:Any}, X::AbstractMatrix,
                 args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    sigma = pm.sigma
+    pr = prior(ue.pe, X, args...; dims = dims)
+    sigma = pr.sigma
     q = ue.q * 0.5
-    mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma / size(pm.X, 1))) * 2
+    mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma / size(pr.X, 1))) * 2
     mu_l = range(; start = zero(eltype(sigma)), stop = zero(eltype(sigma)),
-                 length = size(pm.X, 2))
+                 length = size(pr.X, 2))
     return BoxUncertaintySetResult(; lb = mu_l, ub = mu_u)
 end
 function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm,
                                                      <:Any, <:Any, <:Any},
                    X::AbstractMatrix, args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    T, N = size(pm.X)
-    sigma = pm.sigma
+    pr = prior(ue.pe, X, args...; dims = dims)
+    T, N = size(pr.X)
+    sigma = pr.sigma
     q = ue.q * 0.5
     sigma_mu = sigma / T
     Random.seed!(ue.rng, ue.seed)
@@ -95,8 +95,8 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                                                 <:NormalKUncertaintyAlgorithm},
                                                <:Any, <:Any, <:Any}, X::AbstractMatrix,
              args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, mu, sigma) = pm
+    pr = prior(ue.pe, X, args...; dims = dims)
+    (; X, mu, sigma) = pr
     T, N = size(X)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
@@ -128,8 +128,8 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                                                 <:ChiSqKUncertaintyAlgorithm},
                                                <:Any, <:Any, <:Any}, X::AbstractMatrix,
              args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, sigma) = pm
+    pr = prior(ue.pe, X, args...; dims = dims)
+    (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
@@ -152,8 +152,8 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                                                 <:Any},
                                                <:Any, <:Any, <:Any}, X::AbstractMatrix,
              args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, sigma) = pm
+    pr = prior(ue.pe, X, args...; dims = dims)
+    (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
@@ -176,8 +176,8 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                                                    <:NormalKUncertaintyAlgorithm},
                                                   <:Any, <:Any, <:Any}, X::AbstractMatrix,
                 args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, mu, sigma) = pm
+    pr = prior(ue.pe, X, args...; dims = dims)
+    (; X, mu, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
@@ -195,8 +195,8 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                                                    <:ChiSqKUncertaintyAlgorithm},
                                                   <:Any, <:Any, <:Any}, X::AbstractMatrix,
                 args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, sigma) = pm
+    pr = prior(ue.pe, X, args...; dims = dims)
+    (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
@@ -212,8 +212,8 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                                                    <:Any},
                                                   <:Any, <:Any, <:Any}, X::AbstractMatrix,
                 args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, sigma) = pm
+    pr = prior(ue.pe, X, args...; dims = dims)
+    (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
@@ -229,8 +229,8 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                                                       <:NormalKUncertaintyAlgorithm},
                                                      <:Any, <:Any, <:Any},
                    X::AbstractMatrix, args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, sigma) = pm
+    pr = prior(ue.pe, X, args...; dims = dims)
+    (; X, sigma) = pr
     T, N = size(X)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
@@ -256,8 +256,8 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                                                       <:ChiSqKUncertaintyAlgorithm},
                                                      <:Any, <:Any, <:Any},
                    X::AbstractMatrix, args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, sigma) = pm
+    pr = prior(ue.pe, X, args...; dims = dims)
+    (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
@@ -276,8 +276,8 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
                                                                                       <:Any},
                                                      <:Any, <:Any, <:Any},
                    X::AbstractMatrix, args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    (; X, sigma) = pm
+    pr = prior(ue.pe, X, args...; dims = dims)
+    (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)

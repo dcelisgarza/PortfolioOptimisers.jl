@@ -17,27 +17,27 @@ function prior_view(pr::PartialFactorPriorResult, i::AbstractVector)
 end
 struct FactorPriorResult{T1 <: EmpiricalPriorResult, T2 <: PartialFactorPriorResult,
                          T3 <: AbstractMatrix} <: AbstractPriorResult_AFC
-    pm::T1
+    pr::T1
     fm::T2
     chol::T3
 end
-function FactorPriorResult(; pm::EmpiricalPriorResult, fm::PartialFactorPriorResult,
+function FactorPriorResult(; pr::EmpiricalPriorResult, fm::PartialFactorPriorResult,
                            chol::AbstractMatrix)
     @smart_assert(!isempty(chol))
-    @smart_assert(size(pm.X, 2) == size(chol, 2) == size(fm.loadings.M, 1))
-    return FactorPriorResult{typeof(pm), typeof(fm), typeof(chol)}(pm, fm, chol)
+    @smart_assert(size(pr.X, 2) == size(chol, 2) == size(fm.loadings.M, 1))
+    return FactorPriorResult{typeof(pr), typeof(fm), typeof(chol)}(pr, fm, chol)
 end
-function prior_view(pm::FactorPriorResult, i::AbstractVector)
-    return FactorPriorResult(; pm = prior_view(pm.pm, i), fm = prior_view(pm.fm, i),
-                             chol = view(pm.chol, :, i))
+function prior_view(pr::FactorPriorResult, i::AbstractVector)
+    return FactorPriorResult(; pr = prior_view(pr.pr, i), fm = prior_view(pr.fm, i),
+                             chol = view(pr.chol, :, i))
 end
 function Base.getproperty(obj::FactorPriorResult, sym::Symbol)
     return if sym == :X
-        obj.pm.X
+        obj.pr.X
     elseif sym == :mu
-        obj.pm.mu
+        obj.pr.mu
     elseif sym == :sigma
-        obj.pm.sigma
+        obj.pr.sigma
     elseif sym == :f_mu
         obj.fm.mu
     elseif sym == :f_sigma
@@ -104,7 +104,7 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
     return FactorPriorResult(;
-                             pm = EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,
+                             pr = EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,
                                                        sigma = posterior_sigma),
                              fm = PartialFactorPriorResult(; mu = f_mu, sigma = f_sigma,
                                                            loadings = loadings),

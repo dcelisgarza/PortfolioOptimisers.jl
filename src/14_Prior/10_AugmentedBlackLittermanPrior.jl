@@ -195,7 +195,7 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_mu = aug_posterior_mu[1:size(X, 2)] .+ pe.rf .+ b
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
     return EmpiricalPartialFactorPriorResult(;
-                                             pm = EmpiricalPriorResult(; X = posterior_X,
+                                             pr = EmpiricalPriorResult(; X = posterior_X,
                                                                        mu = posterior_mu,
                                                                        sigma = posterior_sigma),
                                              fm = PartialFactorPriorResult(;

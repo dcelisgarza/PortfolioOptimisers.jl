@@ -22,29 +22,29 @@ function split_factor_weight_constraints(alpha::Real, wb::WeightBounds, w::Abstr
 end
 function optimise!(hc::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); strict::Bool = false)
-    pm = prior(hc.opt.pe, rd.X, rd.F)
-    clm = clusterise(hc.opt.cle, pm.X)
-    r = risk_measure_factory(hc.r, pm, hc.opt.slv)
-    wu = Matrix{eltype(pm.X)}(undef, size(pm.X, 2), 2)
-    rku = unitary_expected_risks(r, pm.X, hc.opt.fees)
-    wb = weight_bounds_constraints(hc.opt.wb, hc.opt.sets; N = size(pm.X, 2),
+    pr = prior(hc.opt.pe, rd.X, rd.F)
+    clm = clusterise(hc.opt.cle, pr.X)
+    r = risk_measure_factory(hc.r, pr, hc.opt.slv)
+    wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
+    rku = unitary_expected_risks(r, pr.X, hc.opt.fees)
+    wb = weight_bounds_constraints(hc.opt.wb, hc.opt.sets; N = size(pr.X, 2),
                                    strict = strict)
-    w = ones(eltype(pm.X), size(pm.X, 2))
+    w = ones(eltype(pr.X), size(pr.X, 2))
     items = [clm.clustering.order]
     @inbounds while length(items) > 0
         items = [i[j:k] for i ∈ items
                  for (j, k) ∈ ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
                  if length(i) > 1]
         for i ∈ 1:2:length(items)
-            fill!(wu, zero(eltype(pm.X)))
+            fill!(wu, zero(eltype(pr.X)))
             lc = items[i]
             rc = items[i + 1]
             wu[lc, 1] .= inv.(view(rku, lc))
             wu[lc, 1] ./= sum(view(wu, lc, 1))
             wu[rc, 2] .= inv.(view(rku, rc))
             wu[rc, 2] ./= sum(view(wu, rc, 2))
-            lrisk = expected_risk(r, view(wu, :, 1), pm.X, hc.opt.fees)
-            rrisk = expected_risk(r, view(wu, :, 2), pm.X, hc.opt.fees)
+            lrisk = expected_risk(r, view(wu, :, 1), pr.X, hc.opt.fees)
+            rrisk = expected_risk(r, view(wu, :, 2), pr.X, hc.opt.fees)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)
             alpha = split_factor_weight_constraints(alpha, wb, w, lc, rc)
@@ -121,15 +121,15 @@ end
 function optimise!(hc::HierarchicalRiskParity{<:Any,
                                               <:AbstractVector{<:OptimisationRiskMeasure}},
                    rd::ReturnsResult = ReturnsResult())
-    pm = prior(hc.opt.pe, rd.X, rd.F)
-    clm = clusterise(hc.opt.cle, pm.X)
-    r = risk_measure_factory(hc.r, pm, hc.opt.slv)
-    wu = Matrix{eltype(pm.X)}(undef, size(pm.X, 2), 2)
-    wk = zeros(eltype(pm.X), size(pm.X, 2))
-    rku = Vector{eltype(pm.X)}(undef, size(pm.X, 2))
-    wb = weight_bounds_constraints(hc.opt.wb, hc.opt.sets; N = size(pm.X, 2),
+    pr = prior(hc.opt.pe, rd.X, rd.F)
+    clm = clusterise(hc.opt.cle, pr.X)
+    r = risk_measure_factory(hc.r, pr, hc.opt.slv)
+    wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
+    wk = zeros(eltype(pr.X), size(pr.X, 2))
+    rku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
+    wb = weight_bounds_constraints(hc.opt.wb, hc.opt.sets; N = size(pr.X, 2),
                                    strict = hc.opt.strict)
-    w = ones(eltype(pm.X), size(pm.X, 2))
+    w = ones(eltype(pr.X), size(pr.X, 2))
     items = [clm.clustering.order]
     @inbounds while length(items) > 0
         items = [i[j:k] for i ∈ items
@@ -138,7 +138,7 @@ function optimise!(hc::HierarchicalRiskParity{<:Any,
         for i ∈ 1:2:length(items)
             lc = items[i]
             rc = items[i + 1]
-            lrisk, rrisk = hrp_scalarised_risk(hc.opt.sce, wu, wk, rku, lc, rc, r, pm.X,
+            lrisk, rrisk = hrp_scalarised_risk(hc.opt.sce, wu, wk, rku, lc, rc, r, pr.X,
                                                hc.opt.fees)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)

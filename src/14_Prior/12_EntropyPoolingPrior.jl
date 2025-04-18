@@ -176,13 +176,13 @@ function Base.getproperty(obj::EntropyPoolingPriorEstimator, sym::Symbol)
 end
 struct EntropyPoolingPriorResult{T1 <: AbstractPriorResult, T2 <: AbstractWeights} <:
        AbstractEntropyPoolingPriorResult
-    pm::T1
+    pr::T1
     w::T2
 end
-function EntropyPoolingPriorResult(; pm::AbstractPriorResult, w::AbstractWeights)
+function EntropyPoolingPriorResult(; pr::AbstractPriorResult, w::AbstractWeights)
     @smart_assert(!isempty(w))
-    @smart_assert(size(pm.X, 1) == length(w))
-    return EntropyPoolingPriorResult{typeof(pm), typeof(w)}(pm, w)
+    @smart_assert(size(pr.X, 1) == length(w))
+    return EntropyPoolingPriorResult{typeof(pr), typeof(w)}(pr, w)
 end
 function factory(pe::EntropyPoolingPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
@@ -190,16 +190,16 @@ function factory(pe::EntropyPoolingPriorEstimator,
                                         sets = pe.sets, alg = pe.alg, opt = pe.opt,
                                         w = isnothing(w) ? pe.w : w)
 end
-function prior_view(pm::EntropyPoolingPriorResult, i::AbstractVector)
-    return EntropyPoolingPriorResult(; pm = prior_view(pm.pm, i), w = pm.w)
+function prior_view(pr::EntropyPoolingPriorResult, i::AbstractVector)
+    return EntropyPoolingPriorResult(; pr = prior_view(pr.pr, i), w = pr.w)
 end
 function Base.getproperty(obj::EntropyPoolingPriorResult, sym::Symbol)
     return if sym == :X
-        obj.pm.X
+        obj.pr.X
     elseif sym == :mu
-        obj.pm.mu
+        obj.pr.mu
     elseif sym == :sigma
-        obj.pm.sigma
+        obj.pr.sigma
     else
         getfield(obj, sym)
     end
@@ -224,11 +224,11 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_Entrop
     @smart_assert(length(w) == T)
     @smart_assert(nrow(pe.sets) == N)
     pe = factory(pe, w)
-    pm = prior(pe.pe, X, F; strict = strict, kwargs...)
-    views = entropy_pooling_views(pm, pe.views, pe.sets; strict = strict)
+    pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    views = entropy_pooling_views(pr, pe.views, pe.sets; strict = strict)
     w = entropy_pooling(w, views, pe.opt)
     pe = factory(pe, w)
-    return EntropyPoolingPriorResult(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
+    return EntropyPoolingPriorResult(; pr = prior(pe.pe, X, F; strict = strict, kwargs...),
                                      w = w)
 end
 function _get_epw(::H1_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
@@ -266,10 +266,10 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
     cache = Set{Int}()
     # Compute the prior observations.
     pe = factory(pe, w0)
-    pm = prior(pe.pe, X, F; strict = strict, kwargs...)
+    pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     for uvl ∈ uvls
         # Freeze updated parameters, ie parameters which were free in the previous iteration plus the ones which were adjusted via views. If there were no views the previous iteration, the free parameters become the new updated parameters and therefore frozen. In the first iteration, there is nothing to freeze.
-        constant_entropy_pooling_constraint!(pm, cache, [excluded;
+        constant_entropy_pooling_constraint!(pr, cache, [excluded;
                                                          included], views, pe.sets;
                                              strict = strict, w = wi)
 
@@ -285,13 +285,13 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
         # Views of the parameters to be updated.
         v = views[included]
         # Equality and inequality constraints for the views.
-        V_i = entropy_pooling_views(pm, v, pe.sets; w = w0, strict = strict)
+        V_i = entropy_pooling_views(pr, v, pe.sets; w = w0, strict = strict)
         # Compute the posterior observations.
         wi = entropy_pooling(_get_epw(pe.alg, w0, wi), V_i, pe.opt)
         pe = factory(pe, wi)
-        pm = prior(pe.pe, X, F; strict = strict, kwargs...)
+        pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
-    return EntropyPoolingPriorResult(; pm = pm, w = wi)
+    return EntropyPoolingPriorResult(; pr = pr, w = wi)
 end
 
 export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling,

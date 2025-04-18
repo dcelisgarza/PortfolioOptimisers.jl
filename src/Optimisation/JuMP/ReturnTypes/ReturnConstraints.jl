@@ -28,11 +28,11 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     return nothing
 end
 function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{<:Any, Nothing},
-                                 obj::ObjectiveFunction, pm::AbstractPriorResult)
+                                 obj::ObjectiveFunction, pr::AbstractPriorResult)
     w = model[:w]
     fees = model[:fees]
     lb = pret.lb
-    mu = pm.mu
+    mu = pr.mu
     @expression(model, ret, dot(mu, w) - fees)
     set_return_bounds!(model, lb)
     set_max_ratio_return_constraints!(model, obj, mu)
@@ -67,11 +67,11 @@ function set_return_constraints!(model::JuMP.Model,
                                  pret::ArithmeticReturn{<:Any,
                                                         Union{<:AbstractUncertaintySetResult,
                                                               <:AbstractUncertaintySetEstimator}},
-                                 obj::ObjectiveFunction, pm::AbstractPriorResult)
+                                 obj::ObjectiveFunction, pr::AbstractPriorResult)
     lb = pret.lb
     ucs = pret.ucs
-    X = pm.X
-    mu = pm.mu
+    X = pr.X
+    mu = pr.mu
     set_return_constraints!(model, mu_ucs(ucs, X), mu)
     set_return_bounds!(model, lb)
     set_max_ratio_return_constraints!(model, obj, mu)
@@ -85,11 +85,11 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     @constraint(model, sr_ekelly_risk, sc * risk <= sc * ohf)
 end
 function set_return_constraints!(model::JuMP.Model, pret::ExactKellyReturn,
-                                 obj::ObjectiveFunction, pm::AbstractPriorResult)
+                                 obj::ObjectiveFunction, pr::AbstractPriorResult)
     k = model[:k]
     sc = model[:sc]
     lb = pret.lb
-    X = pm.X
+    X = pr.X
     set_net_portfolio_returns!(model, X)
     net_X = model[:net_X]
     T = length(net_X)

@@ -6,7 +6,7 @@ abstract type ObjectiveFunction end
 abstract type CustomObjective end
 function add_custom_objective_term!(obj::ObjectiveFunction, pret::PortfolioReturnType,
                                     cobj::Nothing, obj_expr, mr::JuMPOptimisationType,
-                                    pm::AbstractPriorResult)
+                                    pr::AbstractPriorResult)
     return nothing
 end
 function set_objective_penalty!(model::JuMP.Model)
@@ -72,13 +72,13 @@ function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
 end
 function set_risk_constraints!(model::JuMP.Model,
                                rs::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                               opt::JuMPOptimisationType, pm::AbstractPriorResult,
+                               opt::JuMPOptimisationType, pr::AbstractPriorResult,
                                cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                            <:IntegerPhilogenyResult},
                                nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                            <:IntegerPhilogenyResult})
     for (i, r) ∈ enumerate(rs)
-        _set_risk_constraints!(model, r, opt, pm, i, cplg, nplg)
+        _set_risk_constraints!(model, r, opt, pr, i, cplg, nplg)
     end
     return nothing
 end

@@ -236,9 +236,9 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any}, args...;
                                            kwargs...)
-                 w = risk_measure_nothing_real_array_factory(r.w, prior.pm.w)
+                 w = risk_measure_nothing_real_array_factory(r.w, prior.pr.w)
                  mu = risk_measure_nothing_real_array_factory(r.mu, prior.mu)
-                 alg = risk_moment_algorithm_factory(r.alg, prior.pm.w)
+                 alg = risk_moment_algorithm_factory(r.alg, prior.pr.w)
                  return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
              end
              function risk_measure_view(r::$(rt), prior::AbstractPriorResult,
@@ -258,9 +258,9 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
                                                                     <:Any, <:Any, <:Any,
                                                                     <:Any},
                                         i::AbstractVector, args...; kwargs...)
-                 w = risk_measure_nothing_real_array_factory(r.w, prior.pm.w)
+                 w = risk_measure_nothing_real_array_factory(r.w, prior.pr.w)
                  mu = risk_measure_nothing_real_array_view(r.mu, prior.mu, i)
-                 alg = risk_moment_algorithm_factory(r.alg, prior.pm.w)
+                 alg = risk_moment_algorithm_factory(r.alg, prior.pr.w)
                  return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
              end
          end)

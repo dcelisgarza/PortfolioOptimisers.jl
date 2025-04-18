@@ -1,14 +1,14 @@
-function get_chol_or_sigma_pm(model::JuMP.Model, pm::AbstractPriorResult)
+function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     if !haskey(model, :G)
-        G = cholesky(pm.sigma).U
-        # G = sqrt(pm.sigma)
+        G = cholesky(pr.sigma).U
+        # G = sqrt(pr.sigma)
         @expression(model, G, G)
     end
     return model[:G]
 end
-function get_chol_or_sigma_pm(model::JuMP.Model, pm::FactorPriorResult)
+function get_chol_or_sigma_pm(model::JuMP.Model, pr::FactorPriorResult)
     if !haskey(model, :G)
-        G = pm.chol
+        G = pr.chol
         @expression(model, G, G)
     end
     return model[:G]
@@ -48,11 +48,11 @@ function set_risk_bounds_and_expression!(opt::MeanRiskEstimator, model::JuMP.Mod
     return nothing
 end
 function _set_risk_constraints!(model::JuMP.Model, r::StandardDeviation,
-                                opt::MeanRiskEstimator, pm::AbstractPriorResult, i::Integer,
+                                opt::MeanRiskEstimator, pr::AbstractPriorResult, i::Integer,
                                 args...)
     sc = model[:sc]
     w = model[:w]
-    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pm) : cholesky(r.sigma).U
+    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     key = Symbol(ShortString("sd_risk_$(i)"))
     sd_risk = model[key] = @variable(model)
     model[Symbol(ShortString("$(key)_soc"))] = @constraint(model,
@@ -88,28 +88,28 @@ function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
         false
     end
 end
-function set_variance_risk!(model::JuMP.Model, flag::Bool, pm::AbstractPriorResult,
+function set_variance_risk!(model::JuMP.Model, flag::Bool, pr::AbstractPriorResult,
                             i::Integer, r::Variance, key::Symbol)
     if flag
-        set_sdp_variance_risk!(model, pm, i, r, key)
+        set_sdp_variance_risk!(model, pr, i, r, key)
     else
-        set_variance_risk!(model, pm, i, r, key)
+        set_variance_risk!(model, pr, i, r, key)
     end
     return nothing
 end
-function set_sdp_variance_risk!(model::JuMP.Model, pm::AbstractPriorResult, i::Integer,
+function set_sdp_variance_risk!(model::JuMP.Model, pr::AbstractPriorResult, i::Integer,
                                 r::Variance, key::Symbol)
     W = model[:W]
-    sigma = isnothing(r.sigma) ? pm.sigma : r.sigma
+    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     sigma_W = model[Symbol(ShortString("sigma_W_$(i)"))] = @expression(model, sigma * W)
     model[key] = @expression(model, tr(sigma_W))
     return nothing
 end
-function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorResult, i::Integer,
+function set_variance_risk!(model::JuMP.Model, pr::AbstractPriorResult, i::Integer,
                             r::Variance{<:Any, <:SOC, <:Any, <:Any}, key::Symbol)
     sc = model[:sc]
     w = model[:w]
-    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pm) : cholesky(r.sigma).U
+    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     key_dev = Symbol(ShortString("dev_$(i)"))
     dev = model[key_dev] = @variable(model)
     model[key] = @expression(model, dev^2)
@@ -118,12 +118,12 @@ function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorResult, i::Integ
                                                                SecondOrderCone())
     return nothing
 end
-function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorResult, i::Integer,
+function set_variance_risk!(model::JuMP.Model, pr::AbstractPriorResult, i::Integer,
                             r::Variance{<:Any, <:Quad, <:Any, <:Any}, key::Symbol)
     sc = model[:sc]
     w = model[:w]
-    sigma = isnothing(r.sigma) ? pm.sigma : r.sigma
-    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pm) : cholesky(r.sigma).U
+    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
+    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     model[key] = @expression(model, dot(w, sigma, w))
     key_dev = Symbol(ShortString("dev_$(i)"))
     dev = model[key_dev] = @variable(model)
@@ -132,17 +132,17 @@ function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorResult, i::Integ
                                                                SecondOrderCone())
     return nothing
 end
-function set_variance_risk!(model::JuMP.Model, pm::AbstractPriorResult, i::Integer,
+function set_variance_risk!(model::JuMP.Model, pr::AbstractPriorResult, i::Integer,
                             r::Variance{<:Any, <:RSOC, <:Any, <:Any}, key::Symbol)
     sc = model[:sc]
     w = model[:w]
-    set_net_portfolio_returns!(model, pm.X)
+    set_net_portfolio_returns!(model, pr.X)
     net_X = model[:net_X]
-    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pm) : cholesky(r.sigma).U
+    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     key_dev = Symbol(ShortString("dev_$(i)"))
     t_variance = model[Symbol(ShortString("t_variance_$(i)"))] = @variable(model)
     dev = model[key_dev] = @variable(model)
-    mu = pm.mu
+    mu = pr.mu
     T = length(net_X)
     variance = model[Symbol(ShortString("variance_$(i)"))] = @expression(model,
                                                                          net_X .-
@@ -201,7 +201,7 @@ function rc_variance_constraints!(model::JuMP.Model, i::Integer, rc::LinearConst
     return nothing
 end
 function _set_risk_constraints!(model::JuMP.Model, r::Variance, opt::MeanRiskEstimator,
-                                pm::AbstractPriorResult, i::Integer,
+                                pr::AbstractPriorResult, i::Integer,
                                 cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                             <:IntegerPhilogenyResult},
                                 nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
@@ -209,12 +209,12 @@ function _set_risk_constraints!(model::JuMP.Model, r::Variance, opt::MeanRiskEst
     if !haskey(model, :variance_flag) && r.settings.rke
         @expression(model, variance_flag, true)
     end
-    rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pm.X),
+    rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
     sdp_flag = sdp_variance_flag!(model, rc_flag, cplg, nplg)
     key = Symbol(ShortString("variance_risk_$(i)"))
-    set_variance_risk!(model, sdp_flag, pm, i, r, key)
+    set_variance_risk!(model, sdp_flag, pr, i, r, key)
     variance_risk = model[key]
     rc_variance_constraints!(model, i, rc, variance_risk)
     var_bound_expr, var_bound_key = variance_risk_bounds_expr(sdp_flag, model, i)

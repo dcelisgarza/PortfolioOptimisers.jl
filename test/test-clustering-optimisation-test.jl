@@ -18,9 +18,9 @@
         X = randn(rng, 1000, 15)
         rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
 
-        pm = prior(HighOrderPriorEstimator(), rd)
-        clm = clusterise(ClusteringEstimator(), pm.X)
-        opt = HierarchicalOptimiser(; pe = pm, cle = clm,
+        pr = prior(HighOrderPriorEstimator(), rd)
+        clm = clusterise(ClusteringEstimator(), pr.X)
+        opt = HierarchicalOptimiser(; pe = pr, cle = clm,
                                     slv = Solver(; name = :clarabel,
                                                  solver = Clarabel.Optimizer,
                                                  check_sol = (; allow_local = true,
@@ -39,7 +39,7 @@
                  RelativeRelativisticDrawdownatRisk(; alpha = 0.3), RelativeUlcerIndex(),
                  EqualRiskMeasure(), FirstLowerPartialMoment(),
                  FirstLowerPartialMoment(; target = 2e-4),
-                 FirstLowerPartialMoment(; mu = pm.mu / 5),
+                 FirstLowerPartialMoment(; mu = pr.mu / 5),
                  FirstLowerPartialMoment(; w = ew), NegativeQuadraticSemiSkewness(),
                  NegativeSemiSkewness(), SemiStandardDeviation(), SemiVariance(),
                  BrownianDistanceVariance(), ConditionalValueatRiskRange(),
@@ -48,7 +48,7 @@
                  EntropicValueatRiskRange(; alpha = 0.18, beta = 0.31),
                  GiniMeanDifference(), MeanAbsoluteDeviation(),
                  MeanAbsoluteDeviation(; target = 2e-4),
-                 MeanAbsoluteDeviation(; mu = pm.mu / 5), MeanAbsoluteDeviation(; w = ew),
+                 MeanAbsoluteDeviation(; mu = pr.mu / 5), MeanAbsoluteDeviation(; w = ew),
                  MeanAbsoluteDeviation(; we = ew), NegativeQuadraticSkewness(),
                  NegativeSkewness(), Range(), RelativisticValueatRiskRange(),
                  RelativisticValueatRiskRange(; alpha = 0.14, kappa_a = 0.4, beta = 0.27,
@@ -87,21 +87,21 @@
             @test res
         end
 
-        opts = [HierarchicalOptimiser(; pe = pm, cle = clm, sce = SumScalariser(),
+        opts = [HierarchicalOptimiser(; pe = pr, cle = clm, sce = SumScalariser(),
                                       slv = Solver(; name = :clarabel,
                                                    solver = Clarabel.Optimizer,
                                                    check_sol = (; allow_local = true,
                                                                 allow_almost = true),
                                                    settings = Dict("max_step_fraction" => 0.75,
                                                                    "verbose" => false))),
-                HierarchicalOptimiser(; pe = pm, cle = clm, sce = MaxScalariser(),
+                HierarchicalOptimiser(; pe = pr, cle = clm, sce = MaxScalariser(),
                                       slv = Solver(; name = :clarabel,
                                                    solver = Clarabel.Optimizer,
                                                    check_sol = (; allow_local = true,
                                                                 allow_almost = true),
                                                    settings = Dict("max_step_fraction" => 0.75,
                                                                    "verbose" => false))),
-                HierarchicalOptimiser(; pe = pm, cle = clm,
+                HierarchicalOptimiser(; pe = pr, cle = clm,
                                       sce = LogSumExpScalariser(; gamma = 1e-3),
                                       slv = Solver(; name = :clarabel,
                                                    solver = Clarabel.Optimizer,
@@ -109,7 +109,7 @@
                                                                 allow_almost = true),
                                                    settings = Dict("max_step_fraction" => 0.75,
                                                                    "verbose" => false))),
-                HierarchicalOptimiser(; pe = pm, cle = clm,
+                HierarchicalOptimiser(; pe = pr, cle = clm,
                                       sce = LogSumExpScalariser(; gamma = 3),
                                       slv = Solver(; name = :clarabel,
                                                    solver = Clarabel.Optimizer,
@@ -135,9 +135,9 @@
         X = randn(rng, 1000, 15)
         rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
 
-        pm = prior(HighOrderPriorEstimator(), rd)
-        clm = clusterise(ClusteringEstimator(), pm.X)
-        opt = HierarchicalOptimiser(; pe = pm, cle = clm,
+        pr = prior(HighOrderPriorEstimator(), rd)
+        clm = clusterise(ClusteringEstimator(), pr.X)
+        opt = HierarchicalOptimiser(; pe = pr, cle = clm,
                                     slv = Solver(; name = :clarabel,
                                                  solver = Clarabel.Optimizer,
                                                  check_sol = (; allow_local = true,
@@ -157,7 +157,7 @@
                  RelativeRelativisticDrawdownatRisk(; alpha = 0.3), RelativeUlcerIndex(),
                  EqualRiskMeasure(), FirstLowerPartialMoment(),
                  FirstLowerPartialMoment(; target = 2e-4),
-                 FirstLowerPartialMoment(; mu = pm.mu / 5),
+                 FirstLowerPartialMoment(; mu = pr.mu / 5),
                  FirstLowerPartialMoment(; w = ew), NegativeQuadraticSemiSkewness(),
                  NegativeSemiSkewness(), SemiStandardDeviation(), SemiVariance(),
                  BrownianDistanceVariance(), ConditionalValueatRiskRange(),
@@ -166,7 +166,7 @@
                  EntropicValueatRiskRange(; alpha = 0.18, beta = 0.31),
                  GiniMeanDifference(), MeanAbsoluteDeviation(),
                  MeanAbsoluteDeviation(; target = 2e-4),
-                 MeanAbsoluteDeviation(; mu = pm.mu / 5), MeanAbsoluteDeviation(; w = ew),
+                 MeanAbsoluteDeviation(; mu = pr.mu / 5), MeanAbsoluteDeviation(; w = ew),
                  MeanAbsoluteDeviation(; we = ew), NegativeQuadraticSkewness(),
                  NegativeSkewness(), Range(), RelativisticValueatRiskRange(),
                  RelativisticValueatRiskRange(; alpha = 0.14, kappa_a = 0.4, beta = 0.27,
@@ -266,7 +266,7 @@
                   r2 = base)]
         df = CSV.read(joinpath(@__DIR__, "./assets/HERC_vector_rm.csv"), DataFrame)
         for (idx, sce) ∈ zip(1:4:16, sces)
-            opt = HierarchicalOptimiser(; pe = pm, cle = clm, sce = sce,
+            opt = HierarchicalOptimiser(; pe = pr, cle = clm, sce = sce,
                                         slv = Solver(; name = :clarabel,
                                                      solver = Clarabel.Optimizer,
                                                      check_sol = (; allow_local = true,

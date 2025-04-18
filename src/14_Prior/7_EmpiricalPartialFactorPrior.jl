@@ -1,20 +1,20 @@
 struct EmpiricalPartialFactorPriorResult{T1 <: EmpiricalPriorResult,
                                          T2 <: PartialFactorPriorResult} <:
        AbstractPriorResult_APF
-    pm::T1
+    pr::T1
     fm::T2
 end
-function EmpiricalPartialFactorPriorResult(; pm::EmpiricalPriorResult,
+function EmpiricalPartialFactorPriorResult(; pr::EmpiricalPriorResult,
                                            fm::PartialFactorPriorResult)
-    return EmpiricalPartialFactorPriorResult{typeof(pm), typeof(fm)}(pm, fm)
+    return EmpiricalPartialFactorPriorResult{typeof(pr), typeof(fm)}(pr, fm)
 end
 function Base.getproperty(obj::EmpiricalPartialFactorPriorResult, sym::Symbol)
     return if sym == :X
-        obj.pm.X
+        obj.pr.X
     elseif sym == :mu
-        obj.pm.mu
+        obj.pr.mu
     elseif sym == :sigma
-        obj.pm.sigma
+        obj.pr.sigma
     elseif sym == :f_mu
         obj.fm.mu
     elseif sym == :f_sigma
@@ -25,9 +25,9 @@ function Base.getproperty(obj::EmpiricalPartialFactorPriorResult, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function prior_view(pm::EmpiricalPartialFactorPriorResult, i::AbstractVector)
-    return EmpiricalPartialFactorPriorResult(; pm = prior_view(pm.pm, i),
-                                             fm = prior_view(pm.fm, i))
+function prior_view(pr::EmpiricalPartialFactorPriorResult, i::AbstractVector)
+    return EmpiricalPartialFactorPriorResult(; pr = prior_view(pr.pr, i),
+                                             fm = prior_view(pr.fm, i))
 end
 
 export EmpiricalPartialFactorPriorResult

@@ -75,14 +75,14 @@ end
 function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm, <:Any,
                                              <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
              args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    N = size(pm.X, 2)
-    mus, sigmas = bootstrap_generator(ue, pm.X)
+    pr = prior(ue.pe, X, args...; dims = dims)
+    N = size(pr.X, 2)
+    mus, sigmas = bootstrap_generator(ue, pr.X)
     q = ue.q * 0.5
-    mu_l = Vector{eltype(pm.X)}(undef, N)
-    mu_u = Vector{eltype(pm.X)}(undef, N)
-    sigma_l = Matrix{eltype(pm.X)}(undef, N, N)
-    sigma_u = Matrix{eltype(pm.X)}(undef, N, N)
+    mu_l = Vector{eltype(pr.X)}(undef, N)
+    mu_u = Vector{eltype(pr.X)}(undef, N)
+    sigma_l = Matrix{eltype(pr.X)}(undef, N, N)
+    sigma_u = Matrix{eltype(pr.X)}(undef, N, N)
     for j ∈ 1:N
         mu_j = mus[j, :]
         mu_l[j] = quantile(mu_j, q)
@@ -99,12 +99,12 @@ end
 function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm, <:Any,
                                                 <:Any, <:Any, <:Any, <:Any},
                 X::AbstractMatrix, args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    N = size(pm.X, 2)
-    mus = mu_bootstrap_generator(ue, pm.X)
+    pr = prior(ue.pe, X, args...; dims = dims)
+    N = size(pr.X, 2)
+    mus = mu_bootstrap_generator(ue, pr.X)
     q = ue.q * 0.5
-    mu_l = Vector{eltype(pm.X)}(undef, N)
-    mu_u = Vector{eltype(pm.X)}(undef, N)
+    mu_l = Vector{eltype(pr.X)}(undef, N)
+    mu_u = Vector{eltype(pr.X)}(undef, N)
     for j ∈ 1:N
         mu_j = mus[j, :]
         mu_l[j] = quantile(mu_j, q)
@@ -115,12 +115,12 @@ end
 function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm,
                                                    <:Any, <:Any, <:Any, <:Any, <:Any},
                    X::AbstractMatrix, args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    N = size(pm.X, 2)
-    sigmas = sigma_bootstrap_generator(ue, pm.X)
+    pr = prior(ue.pe, X, args...; dims = dims)
+    N = size(pr.X, 2)
+    sigmas = sigma_bootstrap_generator(ue, pr.X)
     q = ue.q * 0.5
-    sigma_l = Matrix{eltype(pm.X)}(undef, N, N)
-    sigma_u = Matrix{eltype(pm.X)}(undef, N, N)
+    sigma_l = Matrix{eltype(pr.X)}(undef, N, N)
+    sigma_u = Matrix{eltype(pr.X)}(undef, N, N)
     for j ∈ 1:N
         for i ∈ j:N
             sigma_ij = sigmas[i, j, :]
@@ -133,14 +133,14 @@ end
 function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
                                              <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
              args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    N = size(pm.X, 2)
-    mus, sigmas = bootstrap_generator(ue, pm.X)
-    X_mu = Matrix{eltype(pm.X)}(undef, N, ue.n_sim)
-    X_sigma = Matrix{eltype(pm.X)}(undef, N^2, ue.n_sim)
+    pr = prior(ue.pe, X, args...; dims = dims)
+    N = size(pr.X, 2)
+    mus, sigmas = bootstrap_generator(ue, pr.X)
+    X_mu = Matrix{eltype(pr.X)}(undef, N, ue.n_sim)
+    X_sigma = Matrix{eltype(pr.X)}(undef, N^2, ue.n_sim)
     for i ∈ axes(X_mu, 2)
-        X_mu[:, i] = vec(mus[:, i] - pm.mu)
-        X_sigma[:, i] = vec(sigmas[:, :, i] - pm.sigma)
+        X_mu[:, i] = vec(mus[:, i] - pr.mu)
+        X_sigma[:, i] = vec(sigmas[:, :, i] - pr.sigma)
     end
     X_mu = transpose(X_mu)
     X_sigma = transpose(X_sigma)
@@ -159,12 +159,12 @@ end
 function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgorithm,
                                                 <:Any, <:Any, <:Any, <:Any, <:Any},
                 X::AbstractMatrix, args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    N = size(pm.X, 2)
-    mus = mu_bootstrap_generator(ue, pm.X)
-    X_mu = Matrix{eltype(pm.X)}(undef, N, ue.n_sim)
+    pr = prior(ue.pe, X, args...; dims = dims)
+    N = size(pr.X, 2)
+    mus = mu_bootstrap_generator(ue, pr.X)
+    X_mu = Matrix{eltype(pr.X)}(undef, N, ue.n_sim)
     for i ∈ axes(X_mu, 2)
-        X_mu[:, i] = vec(mus[:, i] - pm.mu)
+        X_mu[:, i] = vec(mus[:, i] - pr.mu)
     end
     X_mu = transpose(X_mu)
     sigma_mu = if ue.alg.diagonal
@@ -179,12 +179,12 @@ end
 function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgorithm,
                                                    <:Any, <:Any, <:Any, <:Any, <:Any},
                    X::AbstractMatrix, args...; dims::Int = 1)
-    pm = prior(ue.pe, X, args...; dims = dims)
-    N = size(pm.X, 2)
-    sigmas = sigma_bootstrap_generator(ue, pm.X)
-    X_sigma = Matrix{eltype(pm.X)}(undef, N^2, ue.n_sim)
+    pr = prior(ue.pe, X, args...; dims = dims)
+    N = size(pr.X, 2)
+    sigmas = sigma_bootstrap_generator(ue, pr.X)
+    X_sigma = Matrix{eltype(pr.X)}(undef, N^2, ue.n_sim)
     for i ∈ axes(X_sigma, 2)
-        X_sigma[:, i] = vec(sigmas[:, :, i] - pm.sigma)
+        X_sigma[:, i] = vec(sigmas[:, :, i] - pr.sigma)
     end
     X_sigma = transpose(X_sigma)
     sigma_sigma = if ue.alg.diagonal

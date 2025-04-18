@@ -135,7 +135,7 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
     return FactorPriorResult(;
-                             pm = EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,
+                             pr = EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,
                                                        sigma = posterior_sigma),
                              fm = PartialFactorPriorResult(; mu = f_posterior_mu,
                                                            sigma = f_posterior_sigma,
