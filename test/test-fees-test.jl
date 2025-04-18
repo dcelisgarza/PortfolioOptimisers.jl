@@ -92,6 +92,13 @@
         @test fer2.turnover.val == 0.11
         @test fer2.turnover.w == view(w2, [3])
 
+        fer3 = fees_view(fes[3], [9, 8])
+        @test fer3.long == 0.01
+        @test fer3.fixed_long == 0.05
+        @test fer3.short == 0.02
+        @test fer3.fixed_short == 0.07
+        @test isnothing(fer3.turnover)
+
         fer1 = fees_view(fes[4], [5, 2])
         @test fer1.long == view(lw, [5, 2])
         @test fer1.fixed_long == view(flw, [5, 2])
