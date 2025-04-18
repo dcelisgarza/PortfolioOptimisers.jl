@@ -214,10 +214,8 @@ end
 function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:FourthCentralMoment, <:Any},
                              <:Any, <:Any})(w::AbstractVector, X::AbstractMatrix,
                                             fees::Union{Nothing, <:Fees} = nothing)
-    x = calc_net_returns(w, X, fees)
-    target = calc_moment_target(x, w, r)
-    val = x .- target
-    sigma = std(r.alg.ve, x)
+    val = calc_moment_val(r, w, X, fees)
+    sigma = StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
     return sum(val .^ 4) / size(X, 1) / sigma^4
 end
 for rt ∈ (LowOrderMoment, HighOrderMoment)

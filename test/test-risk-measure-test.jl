@@ -194,7 +194,9 @@
               HighOrderMoment(; alg = HighOrderDeviation(; alg = ThirdLowerMoment())),
               HighOrderMoment(;
                               alg = HighOrderDeviation(; alg = FourthLowerMoment(),
-                                                       ve = SimpleVariance(; me = nothing,
+                                                       ve = SimpleVariance(;
+                                                                           corrected = false,
+                                                                           me = nothing,
                                                                            w = ew))),
               HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()))]
         r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
@@ -242,15 +244,46 @@
         @test isapprox(expected_risk(rv[4], wv, prv.X),
                        -sum(val .^ 3) / size(prv.X, 1) / s^3)
 
-        # @test r[5].mu === pr1.mu
-        # @test r[5].alg.ve.w === ew
-        # @test isa(r[5].alg, HighOrderDeviation)
-        # @test isa(r[5].alg.alg, FourthLowerMoment)
+        @test r[5].mu === pr1.mu
+        @test r[5].alg.ve.w === ew
+        @test isa(r[5].alg, HighOrderDeviation)
+        @test isa(r[5].alg.alg, FourthLowerMoment)
+        val = X * w .- dot(w, pr1.mu)
+        val = val[val .<= zero(eltype(val))]
+        s = std(r[5].alg.ve, val; mean = zero(eltype(val)))
+        @test isapprox(expected_risk(r[5], w, X), sum(val .^ 4) / size(X, 1) / s^4)
+        @test rv[5].mu === prv.mu
+        @test rv[5].alg.ve.w === ew
+        @test isa(rv[5].alg, HighOrderDeviation)
+        @test isa(rv[5].alg.alg, FourthLowerMoment)
+        val = prv.X * wv .- dot(wv, prv.mu)
+        val = val[val .<= zero(eltype(val))]
+        s = std(rv[5].alg.ve, val; mean = zero(eltype(val)))
+        @test isapprox(expected_risk(rv[5], wv, prv.X),
+                       sum(val .^ 4) / size(prv.X, 1) / s^4)
 
-        # rs = [SquareRootKurtosis(; settings = s, alg = Full()),
-        #       SquareRootKurtosis(; settings = s, w = ew),
-        #       SquareRootKurtosis(; settings = s, mu = fill(0.0, 20)),
-        #       SquareRootKurtosis(; settings = s, kt = pr1.skt),
-        #       SquareRootKurtosis(; settings = s, alg = Semi())]
+        @test r[6].mu === pr1.mu
+        @test isnothing(r[6].alg.ve.w)
+        @test isa(r[6].alg, HighOrderDeviation)
+        @test isa(r[6].alg.alg, FourthCentralMoment)
+        x = X * w
+        val = x .- dot(w, pr1.mu)
+        s = std(r[6].alg.ve, x)
+        @test isapprox(expected_risk(r[6], w, X), sum(val .^ 4) / size(X, 1) / s^4)
+        @test rv[6].mu === prv.mu
+        @test isnothing(rv[6].alg.ve.w)
+        @test isa(rv[6].alg, HighOrderDeviation)
+        @test isa(rv[6].alg.alg, FourthCentralMoment)
+        x = prv.X * wv
+        val = x .- dot(wv, prv.mu)
+        s = std(rv[6].alg.ve, x)
+        @test isapprox(expected_risk(rv[6], wv, prv.X),
+                       sum(val .^ 4) / size(prv.X, 1) / s^4)
     end
 end
+
+# rs = [SquareRootKurtosis(; settings = s, alg = Full()),
+#       SquareRootKurtosis(; settings = s, w = ew),
+#       SquareRootKurtosis(; settings = s, mu = fill(0.0, 20)),
+#       SquareRootKurtosis(; settings = s, kt = pr1.skt),
+#       SquareRootKurtosis(; settings = s, alg = Semi())]
