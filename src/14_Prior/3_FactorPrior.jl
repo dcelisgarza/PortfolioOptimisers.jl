@@ -11,6 +11,10 @@ function PartialFactorPriorResult(; mu::AbstractVector, sigma::AbstractMatrix,
     return PartialFactorPriorResult{typeof(mu), typeof(sigma), typeof(loadings)}(mu, sigma,
                                                                                  loadings)
 end
+function prior_view(pr::PartialFactorPriorResult, i::AbstractVector)
+    return PartialFactorPriorResult(; mu = view(pr.mu, i), sigma = view(pr.sigma, i, i),
+                                    loadings = regression_result_view(pr.loadings, i))
+end
 struct FactorPriorResult{T1 <: EmpiricalPriorResult, T2 <: PartialFactorPriorResult,
                          T3 <: AbstractMatrix} <: AbstractPriorResult_AFC
     pm::T1
@@ -22,6 +26,10 @@ function FactorPriorResult(; pm::EmpiricalPriorResult, fm::PartialFactorPriorRes
     @smart_assert(!isempty(chol))
     @smart_assert(size(pm.X, 2) == size(chol, 2) == size(fm.loadings.M, 1))
     return FactorPriorResult{typeof(pm), typeof(fm), typeof(chol)}(pm, fm, chol)
+end
+function prior_view(pm::FactorPriorResult, i::AbstractVector)
+    return FactorPriorResult(; pm = prior_view(pm.pm, i), fm = prior_view(pm.fm, i),
+                             chol = view(pm.chol, :, i))
 end
 function Base.getproperty(obj::FactorPriorResult, sym::Symbol)
     return if sym == :X

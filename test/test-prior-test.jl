@@ -910,7 +910,7 @@
         @test pm1.mu == pm2.mu
         @test pm1.sigma == pm2.sigma
         @test pm1.chol == pm2.chol
-        @test pm1.f_mu == pm2.pm.f_mu
+        @test pm1.f_mu == pm2.f_mu
         @test pm1.f_sigma == pm2.f_sigma
         @test pm1.loadings.b == pm2.loadings.b
         @test pm1.loadings.M == pm2.loadings.M

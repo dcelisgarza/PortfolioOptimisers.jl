@@ -1,24 +1,3 @@
-struct BlackLittermanPriorResult{T1 <: EmpiricalPriorResult,
-                                 T2 <: BlackLittermanViewsResult} <: AbstractPriorResult_AV
-    pm::T1
-    views::T2
-end
-function BlackLittermanPriorResult(; pm::EmpiricalPriorResult,
-                                   views::BlackLittermanViewsResult)
-    @smart_assert(size(pm.X, 2) == size(views.P, 2))
-    return BlackLittermanPriorResult{typeof(pm), typeof(views)}(pm, views)
-end
-function Base.getproperty(obj::BlackLittermanPriorResult, sym::Symbol)
-    return if sym == :X
-        obj.pm.X
-    elseif sym == :mu
-        obj.pm.mu
-    elseif sym == :sigma
-        obj.pm.sigma
-    else
-        getfield(obj, sym)
-    end
-end
 struct BlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
                                     T2 <: AbstractMatrixProcessingEstimator,
                                     T3 <: Union{<:BlackLittermanViewsEstimator,
@@ -116,11 +95,8 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_mu = prior_mu + v1 * (v2 \ v3) .+ pe.rf
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
-    return BlackLittermanPriorResult(;
-                                     pm = EmpiricalPriorResult(; X = posterior_X,
-                                                               mu = posterior_mu,
-                                                               sigma = posterior_sigma),
-                                     views = views)
+    return EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,
+                                sigma = posterior_sigma)
 end
 
-export BlackLittermanPriorResult, BlackLittermanPriorEstimator
+export BlackLittermanPriorEstimator

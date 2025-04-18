@@ -1,39 +1,3 @@
-struct AugmentedBlackLittermanPriorResult{T1 <: EmpiricalPriorResult,
-                                          T2 <: PartialFactorPriorResult,
-                                          T3 <: BlackLittermanViewsResult,
-                                          T4 <: BlackLittermanViewsResult} <:
-       AbstractPriorResult_AVFV
-    pm::T1
-    fm::T2
-    a_views::T3
-    f_views::T4
-end
-function AugmentedBlackLittermanPriorResult(; pm::EmpiricalPriorResult,
-                                            fm::PartialFactorPriorResult,
-                                            a_views::BlackLittermanViewsResult,
-                                            f_views::BlackLittermanViewsResult)
-    @smart_assert(size(pm.X, 2) == size(a_views.P, 2))
-    @smart_assert(length(fm.mu) == size(f_views.P, 2))
-    return AugmentedBlackLittermanPriorResult{typeof(pm), typeof(fm), typeof(a_views),
-                                              typeof(f_views)}(pm, fm, a_views, f_views)
-end
-function Base.getproperty(obj::AugmentedBlackLittermanPriorResult, sym::Symbol)
-    return if sym == :X
-        obj.pm.X
-    elseif sym == :mu
-        obj.pm.mu
-    elseif sym == :sigma
-        obj.pm.sigma
-    elseif sym == :f_mu
-        obj.fm.mu
-    elseif sym == :f_sigma
-        obj.fm.sigma
-    elseif sym == :loadings
-        obj.fm.loadings
-    else
-        getfield(obj, sym)
-    end
-end
 struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
                                              T2 <: AbstractPriorEstimatorMap_2_1,
                                              T3 <: AbstractMatrixProcessingEstimator,
@@ -230,15 +194,14 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
     posterior_mu = aug_posterior_mu[1:size(X, 2)] .+ pe.rf .+ b
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
-    return AugmentedBlackLittermanPriorResult(;
-                                              pm = EmpiricalPriorResult(; X = posterior_X,
-                                                                        mu = posterior_mu,
-                                                                        sigma = posterior_sigma),
-                                              fm = PartialFactorPriorResult(;
-                                                                            mu = f_prior_mu,
-                                                                            sigma = f_prior_sigma,
-                                                                            loadings = loadings),
-                                              a_views = a_views, f_views = f_views)
+    return EmpiricalPartialFactorPriorResult(;
+                                             pm = EmpiricalPriorResult(; X = posterior_X,
+                                                                       mu = posterior_mu,
+                                                                       sigma = posterior_sigma),
+                                             fm = PartialFactorPriorResult(;
+                                                                           mu = f_prior_mu,
+                                                                           sigma = f_prior_sigma,
+                                                                           loadings = loadings))
 end
 
-export AugmentedBlackLittermanPriorResult, AugmentedBlackLittermanPriorEstimator
+export AugmentedBlackLittermanPriorEstimator

@@ -6,9 +6,7 @@ function get_chol_or_sigma_pm(model::JuMP.Model, pm::AbstractPriorResult)
     end
     return model[:G]
 end
-function get_chol_or_sigma_pm(model::JuMP.Model,
-                              pm::Union{<:FactorPriorResult,
-                                        <:FactorBlackLittermanPriorResult})
+function get_chol_or_sigma_pm(model::JuMP.Model, pm::FactorPriorResult)
     if !haskey(model, :G)
         G = pm.chol
         @expression(model, G, G)

@@ -174,21 +174,18 @@ function Base.getproperty(obj::EntropyPoolingPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
-struct EntropyPoolingPriorResult{T1 <: AbstractPriorResult,
-                                 T2 <: Union{<:LinearConstraintResult,
-                                             <:AbstractVector{<:LinearConstraintResult}},
-                                 T3 <: AbstractWeights} <: AbstractEntropyPoolingPriorResult
+struct EntropyPoolingPriorResult{T1 <: AbstractPriorResult, T2 <: AbstractWeights} <:
+       AbstractEntropyPoolingPriorResult
     pm::T1
-    views::T2
-    w::T3
+    w::T2
 end
-function EntropyPoolingPriorResult(; pm::AbstractPriorResult,
-                                   views::Union{<:LinearConstraintResult,
-                                                <:AbstractVector{<:LinearConstraintResult}},
-                                   w::AbstractWeights)
+function EntropyPoolingPriorResult(; pm::AbstractPriorResult, w::AbstractWeights)
     @smart_assert(!isempty(w))
     @smart_assert(size(pm.X, 1) == length(w))
-    return EntropyPoolingPriorResult{typeof(pm), typeof(views), typeof(w)}(pm, views, w)
+    return EntropyPoolingPriorResult{typeof(pm), typeof(w)}(pm, w)
+end
+function prior_view(pm::EntropyPoolingPriorResult, i::AbstractVector)
+    return EntropyPoolingPriorResult(; pm = prior_view(pm.pm, i), w = pm.w)
 end
 function factory(pe::EntropyPoolingPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
@@ -232,7 +229,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_Entrop
     w = entropy_pooling(w, views, pe.opt)
     pe = factory(pe, w)
     return EntropyPoolingPriorResult(; pm = prior(pe.pe, X, F; strict = strict, kwargs...),
-                                     views = views, w = w)
+                                     w = w)
 end
 function _get_epw(::H1_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return w0
@@ -267,7 +264,6 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
     excluded = Int[]
     included = Int[]
     cache = Set{Int}()
-    V_i = nothing
     # Compute the prior observations.
     pe = factory(pe, w0)
     pm = prior(pe.pe, X, F; strict = strict, kwargs...)
@@ -295,7 +291,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
         pe = factory(pe, wi)
         pm = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
-    return EntropyPoolingPriorResult(; pm = pm, views = V_i, w = wi)
+    return EntropyPoolingPriorResult(; pm = pm, w = wi)
 end
 
 export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling,

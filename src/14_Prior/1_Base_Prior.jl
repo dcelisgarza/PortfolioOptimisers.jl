@@ -8,14 +8,14 @@ abstract type AbstractLowOrderPriorResult <: AbstractPriorResult end
 abstract type AbstractPriorResult_A <: AbstractLowOrderPriorResult end
 # Asset + factor + chol
 abstract type AbstractPriorResult_AFC <: AbstractLowOrderPriorResult end
-# Asset + asset views
-abstract type AbstractPriorResult_AV <: AbstractLowOrderPriorResult end
-# Asset + factor + factor views + chol
-abstract type AbstractPriorResult_AFVC <: AbstractLowOrderPriorResult end
-# Asset + factor + factor views
-abstract type AbstractPriorResult_AFV <: AbstractLowOrderPriorResult end
+# # Asset + asset views
+# abstract type AbstractPriorResult_AV <: AbstractLowOrderPriorResult end
+# # Asset + factor + factor views + chol
+# abstract type AbstractPriorResult_AFVC <: AbstractLowOrderPriorResult end
+# Asset + partial factor
+abstract type AbstractPriorResult_APF <: AbstractLowOrderPriorResult end
 # Asset + asset views + factor + factor views 
-abstract type AbstractPriorResult_AVFV <: AbstractLowOrderPriorResult end
+# abstract type AbstractPriorResult_AVFV <: AbstractLowOrderPriorResult end
 abstract type AbstractHighOrderPriorResult <: AbstractPriorResult end
 abstract type AbstractEntropyPoolingPriorResult <: AbstractPriorResult end
 abstract type AbstractPriorEstimator_1_0 <: AbstractPriorEstimator end
@@ -34,6 +34,9 @@ const AbstractPriorEstimatorMap_1o2_1o2 = Union{<:AbstractPriorEstimator_1_0,
                                                 <:AbstractPriorEstimator_1o2_1o2}
 function prior(pm::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
     return prior(pm, rd.X, rd.F; kwargs...)
+end
+function prior_view(pm::AbstractPriorEstimator, args...; kwargs...)
+    return pm
 end
 function prior(pm::AbstractPriorResult, args...; kwargs...)
     return pm

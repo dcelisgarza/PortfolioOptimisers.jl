@@ -75,6 +75,24 @@ function HighOrderPriorResult(; pm::AbstractLowOrderPriorResult,
                                                                                       SV,
                                                                                       sskmp)
 end
+function prior_view(pm::HighOrderPriorResult, i::AbstractVector)
+    idx = fourth_moment_index_factory(length(pm.mu), i)
+    kt = pm.kt
+    skt = pm.skt
+    sk = pm.sk
+    V = pm.V
+    skmp = pm.skmp
+    ssk = pm.ssk
+    SV = pm.SV
+    sskmp = pm.sskmp
+    return HighOrderPriorResult(; pm = prior_view(pm.pm, i),
+                                kt = nothing_scalar_array_view(kt, idx),
+                                skt = nothing_scalar_array_view(skt, idx),
+                                sk = nothing_scalar_array_view_odd_order(sk, i, idx),
+                                V = nothing_scalar_array_view(V, i), skmp = skmp,
+                                ssk = nothing_scalar_array_view_odd_order(ssk, i, idx),
+                                SV = nothing_scalar_array_view(SV, i), sskmp = sskmp)
+end
 function Base.getproperty(obj::HighOrderPriorResult, sym::Symbol)
     return if sym == :X
         obj.pm.X

@@ -1,36 +1,3 @@
-struct BayesianBlackLittermanPriorResult{T1 <: EmpiricalPriorResult,
-                                         T2 <: PartialFactorPriorResult,
-                                         T3 <: BlackLittermanViewsResult} <:
-       AbstractPriorResult_AFV
-    pm::T1
-    fm::T2
-    f_views::T3
-end
-function BayesianBlackLittermanPriorResult(; pm::EmpiricalPriorResult,
-                                           fm::PartialFactorPriorResult,
-                                           f_views::BlackLittermanViewsResult)
-    @smart_assert(length(fm.mu) == size(f_views.P, 2))
-    return BayesianBlackLittermanPriorResult{typeof(pm), typeof(fm), typeof(f_views)}(pm,
-                                                                                      fm,
-                                                                                      f_views)
-end
-function Base.getproperty(obj::BayesianBlackLittermanPriorResult, sym::Symbol)
-    return if sym == :X
-        obj.pm.X
-    elseif sym == :mu
-        obj.pm.mu
-    elseif sym == :sigma
-        obj.pm.sigma
-    elseif sym == :f_mu
-        obj.fm.mu
-    elseif sym == :f_sigma
-        obj.fm.sigma
-    elseif sym == :loadings
-        obj.fm.loadings
-    else
-        getfield(obj, sym)
-    end
-end
 struct BayesianBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_2,
                                             T2 <: AbstractMatrixProcessingEstimator,
                                             T3 <: Union{<:BlackLittermanViewsEstimator,
@@ -130,14 +97,13 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_sigma = inv(v3 - v1 * (v2 \ transpose(M)) * v3)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat) .+ pe.rf .+ b
-    return BayesianBlackLittermanPriorResult(;
+    return EmpiricalPartialFactorPriorResult(;
                                              pm = EmpiricalPriorResult(; X = posterior_X,
                                                                        mu = posterior_mu,
                                                                        sigma = posterior_sigma),
                                              fm = PartialFactorPriorResult(; mu = f_mu,
                                                                            sigma = f_sigma,
-                                                                           loadings = loadings),
-                                             f_views = f_views)
+                                                                           loadings = loadings))
 end
 
-export BayesianBlackLittermanPriorResult, BayesianBlackLittermanPriorEstimator
+export BayesianBlackLittermanPriorEstimator

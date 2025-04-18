@@ -167,6 +167,12 @@ end
 function nothing_scalar_array_view(x::AbstractArray, i)
     return view(x, i, i)
 end
+function nothing_scalar_array_view_odd_order(::Nothing, i, j)
+    return nothing
+end
+function nothing_scalar_array_view_odd_order(x::AbstractArray, i, j)
+    return view(x, i, j)
+end
 function nothing_scalar_array_getindex(x::Real, ::Any)
     return x
 end
@@ -178,6 +184,12 @@ function nothing_scalar_array_getindex(x::AbstractVector, i)
 end
 function nothing_scalar_array_getindex(x::AbstractMatrix, i)
     return x[i, i]
+end
+function nothing_scalar_array_getindex(::Nothing, i, j)
+    return nothing
+end
+function nothing_scalar_array_getindex(x::AbstractArray, i, j)
+    return x[i, j]
 end
 function fourth_moment_index_factory(N::Integer, i)
     idx = Vector{Int}(undef, 0)
