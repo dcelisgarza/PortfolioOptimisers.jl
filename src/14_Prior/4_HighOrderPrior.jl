@@ -42,15 +42,14 @@ function prior_view(pm::HighOrderPriorResult, i::AbstractVector)
     kt = pm.kt
     sk = pm.sk
     skmp = pm.skmp
-    sk = view(sk, i, idx)
-    V = __coskewness(sk, prior.X, skmp)
-    if all(iszero, diag(V))
+    sk = nothing_scalar_array_view_odd_order(sk, i, idx)
+    V = __coskewness(sk, pm.X, skmp)
+    if !isnothing(V) && all(iszero, diag(V))
         V[diagind(V)] = I(size(V, 1))
     end
     return HighOrderPriorResult(; pm = prior_view(pm.pm, i),
-                                kt = nothing_scalar_array_view(kt, idx),
-                                sk = nothing_scalar_array_view_odd_order(sk, i, idx),
-                                V = nothing_scalar_array_view(V, i), skmp = skmp)
+                                kt = nothing_scalar_array_view(kt, idx), sk = sk, V = V,
+                                skmp = skmp)
 end
 function Base.getproperty(obj::HighOrderPriorResult, sym::Symbol)
     return if sym == :X

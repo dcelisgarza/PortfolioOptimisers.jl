@@ -50,7 +50,6 @@ function HighOrderDeviation(;
                             alg::AbstractHighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
                             ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing))
     if hasproperty(ve, :me)
-        println(ve.me)
         @smart_assert(isnothing(ve.me))
     end
     return HighOrderDeviation{typeof(alg), typeof(ve)}(alg, ve)
