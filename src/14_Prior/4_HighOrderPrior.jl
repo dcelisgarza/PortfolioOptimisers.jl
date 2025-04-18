@@ -2,40 +2,23 @@ struct HighOrderPriorResult{T1 <: AbstractLowOrderPriorResult,
                             T2 <: Union{Nothing, <:AbstractMatrix},
                             T3 <: Union{Nothing, <:AbstractMatrix},
                             T4 <: Union{Nothing, <:AbstractMatrix},
-                            T5 <: Union{Nothing, <:AbstractMatrix},
-                            T6 <: Union{Nothing, <:AbstractMatrixProcessingEstimator},
-                            T7 <: Union{Nothing, <:AbstractMatrix},
-                            T8 <: Union{Nothing, <:AbstractMatrix},
-                            T9 <: Union{Nothing, <:AbstractMatrixProcessingEstimator}} <:
+                            T5 <: Union{Nothing, <:AbstractMatrixProcessingEstimator}} <:
        AbstractHighOrderPriorResult
     pm::T1
     kt::T2
-    skt::T3
-    sk::T4
-    V::T5
-    skmp::T6
-    ssk::T7
-    SV::T8
-    sskmp::T9
+    sk::T3
+    V::T4
+    skmp::T5
 end
 function HighOrderPriorResult(; pm::AbstractLowOrderPriorResult,
                               kt::Union{Nothing, <:AbstractMatrix},
-                              skt::Union{Nothing, <:AbstractMatrix},
                               sk::Union{Nothing, <:AbstractMatrix},
-                              skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator},
                               V::Union{Nothing, <:AbstractMatrix},
-                              ssk::Union{Nothing, <:AbstractMatrix},
-                              SV::Union{Nothing, <:AbstractMatrix},
-                              sskmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
+                              skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
     if isa(kt, AbstractMatrix)
         @smart_assert(!isempty(kt))
         issquare(kt)
         @smart_assert(length(pm.mu)^2 == size(kt, 1))
-    end
-    if isa(skt, AbstractMatrix)
-        @smart_assert(!isempty(skt))
-        issquare(skt)
-        @smart_assert(length(pm.mu)^2 == size(skt, 1))
     end
     sk_flag = isa(sk, AbstractMatrix)
     V_flag = isa(V, AbstractMatrix)
@@ -51,47 +34,23 @@ function HighOrderPriorResult(; pm::AbstractLowOrderPriorResult,
         @smart_assert(sk_flag && V_flag,
                       "If either sk or V, is nothing, both must be nothing.")
     end
-    ssk_flag = isa(ssk, AbstractMatrix)
-    SV_flag = isa(SV, AbstractMatrix)
-    if ssk_flag
-        @smart_assert(!isempty(ssk))
-        @smart_assert(length(pm.mu)^2 == size(ssk, 2))
-    end
-    if SV_flag
-        @smart_assert(!isempty(SV))
-        issquare(SV)
-    end
-    if ssk_flag || SV_flag
-        @smart_assert(ssk_flag && SV_flag,
-                      "If either ssk or SV, is nothing or empty, both must be nothing or empty.")
-    end
-    return HighOrderPriorResult{typeof(pm), typeof(kt), typeof(skt), typeof(sk), typeof(V),
-                                typeof(skmp), typeof(ssk), typeof(SV), typeof(sskmp)}(pm,
-                                                                                      kt,
-                                                                                      skt,
-                                                                                      sk, V,
-                                                                                      skmp,
-                                                                                      ssk,
-                                                                                      SV,
-                                                                                      sskmp)
+    return HighOrderPriorResult{typeof(pm), typeof(kt), typeof(sk), typeof(V),
+                                typeof(skmp)}(pm, kt, sk, V, skmp)
 end
 function prior_view(pm::HighOrderPriorResult, i::AbstractVector)
     idx = fourth_moment_index_factory(length(pm.mu), i)
     kt = pm.kt
-    skt = pm.skt
     sk = pm.sk
-    V = pm.V
     skmp = pm.skmp
-    ssk = pm.ssk
-    SV = pm.SV
-    sskmp = pm.sskmp
+    sk = view(sk, i, idx)
+    V = __coskewness(sk, prior.X, skmp)
+    if all(iszero, diag(V))
+        V[diagind(V)] = I(size(V, 1))
+    end
     return HighOrderPriorResult(; pm = prior_view(pm.pm, i),
                                 kt = nothing_scalar_array_view(kt, idx),
-                                skt = nothing_scalar_array_view(skt, idx),
                                 sk = nothing_scalar_array_view_odd_order(sk, i, idx),
-                                V = nothing_scalar_array_view(V, i), skmp = skmp,
-                                ssk = nothing_scalar_array_view_odd_order(ssk, i, idx),
-                                SV = nothing_scalar_array_view(SV, i), sskmp = sskmp)
+                                V = nothing_scalar_array_view(V, i), skmp = skmp)
 end
 function Base.getproperty(obj::HighOrderPriorResult, sym::Symbol)
     return if sym == :X
@@ -106,34 +65,24 @@ function Base.getproperty(obj::HighOrderPriorResult, sym::Symbol)
 end
 struct HighOrderPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
                                T2 <: Union{Nothing, CokurtosisEstimator},
-                               T3 <: Union{Nothing, CokurtosisEstimator},
-                               T4 <: Union{Nothing, CoskewnessEstimator},
-                               T5 <: Union{Nothing, CoskewnessEstimator}} <:
+                               T3 <: Union{Nothing, CoskewnessEstimator}} <:
        AbstractPriorEstimator_1o2_1o2
     pe::T1
     kte::T2
-    skte::T3
-    ske::T4
-    sske::T5
+    ske::T3
 end
 function factory(pe::HighOrderPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
-                                   skte = factory(pe.skte, w), ske = factory(pe.ske, w),
-                                   sske = factory(pe.sske, w))
+                                   ske = factory(pe.ske, w))
 end
 function HighOrderPriorEstimator(;
                                  pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
                                  kte::Union{Nothing, CokurtosisEstimator} = Cokurtosis(;
                                                                                        alg = Full()),
-                                 skte::Union{Nothing, CokurtosisEstimator} = Cokurtosis(;
-                                                                                        alg = Semi()),
                                  ske::Union{Nothing, CoskewnessEstimator} = Coskewness(;
-                                                                                       alg = Full()),
-                                 sske::Union{Nothing, CoskewnessEstimator} = Coskewness(;
-                                                                                        alg = Semi()))
-    return HighOrderPriorEstimator{typeof(pe), typeof(kte), typeof(skte), typeof(ske),
-                                   typeof(sske)}(pe, kte, skte, ske, sske)
+                                                                                       alg = Full()))
+    return HighOrderPriorEstimator{typeof(pe), typeof(kte), typeof(ske)}(pe, kte, ske)
 end
 function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
     return if sym == :me
@@ -156,12 +105,9 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
     pm = prior(pe.pe, X, F)
     (; X, mu) = pm
     kt = cokurtosis(pe.kte, X; mean = transpose(mu))
-    skt = cokurtosis(pe.skte, X; mean = transpose(mu))
     sk, V = coskewness(pe.ske, X; mean = transpose(mu))
-    ssk, SV = coskewness(pe.sske, X; mean = transpose(mu))
-    return HighOrderPriorResult(; pm = pm, kt = kt, skt = skt, sk = sk, V = V,
-                                skmp = isnothing(sk) ? nothing : pe.ske.mp, ssk = ssk,
-                                SV = SV, sskmp = isnothing(ssk) ? nothing : pe.sske.mp)
+    return HighOrderPriorResult(; pm = pm, kt = kt, sk = sk, V = V,
+                                skmp = isnothing(sk) ? nothing : pe.ske.mp)
 end
 
 export HighOrderPriorResult, HighOrderPriorEstimator
