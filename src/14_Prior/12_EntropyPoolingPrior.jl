@@ -184,14 +184,14 @@ function EntropyPoolingPriorResult(; pm::AbstractPriorResult, w::AbstractWeights
     @smart_assert(size(pm.X, 1) == length(w))
     return EntropyPoolingPriorResult{typeof(pm), typeof(w)}(pm, w)
 end
-function prior_view(pm::EntropyPoolingPriorResult, i::AbstractVector)
-    return EntropyPoolingPriorResult(; pm = prior_view(pm.pm, i), w = pm.w)
-end
 function factory(pe::EntropyPoolingPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return EntropyPoolingPriorEstimator(; pe = factory(pe.pe, w), views = pe.views,
                                         sets = pe.sets, alg = pe.alg, opt = pe.opt,
                                         w = isnothing(w) ? pe.w : w)
+end
+function prior_view(pm::EntropyPoolingPriorResult, i::AbstractVector)
+    return EntropyPoolingPriorResult(; pm = prior_view(pm.pm, i), w = pm.w)
 end
 function Base.getproperty(obj::EntropyPoolingPriorResult, sym::Symbol)
     return if sym == :X

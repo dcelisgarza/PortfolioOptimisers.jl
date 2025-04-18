@@ -12,6 +12,8 @@ abstract type AbstractPriorResult_AFC <: AbstractLowOrderPriorResult end
 # abstract type AbstractPriorResult_AV <: AbstractLowOrderPriorResult end
 # # Asset + factor + factor views + chol
 # abstract type AbstractPriorResult_AFVC <: AbstractLowOrderPriorResult end
+# Partial factor
+abstract type AbstractPriorResult_PF <: AbstractLowOrderPriorResult end
 # Asset + partial factor
 abstract type AbstractPriorResult_APF <: AbstractLowOrderPriorResult end
 # Asset + asset views + factor + factor views 

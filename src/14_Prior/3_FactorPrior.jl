@@ -1,5 +1,5 @@
 struct PartialFactorPriorResult{T1 <: AbstractVector, T2 <: AbstractMatrix,
-                                T3 <: RegressionResult}
+                                T3 <: RegressionResult} <: AbstractPriorResult_PF
     mu::T1
     sigma::T2
     loadings::T3
