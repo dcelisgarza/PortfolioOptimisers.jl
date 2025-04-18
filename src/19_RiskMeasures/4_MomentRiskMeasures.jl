@@ -200,7 +200,6 @@ function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:ThirdLowerMoment, <:A
                                      fees::Union{Nothing, <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     val = val[val .<= zero(eltype(val))]
-    println(r.alg.ve)
     sigma = StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
     return -sum(val .^ 3) / size(X, 1) / sigma^3
 end
