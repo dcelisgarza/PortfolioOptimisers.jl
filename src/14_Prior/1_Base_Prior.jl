@@ -19,7 +19,7 @@ abstract type AbstractPriorResult_APF <: AbstractLowOrderPriorResult end
 # Asset + asset views + factor + factor views 
 # abstract type AbstractPriorResult_AVFV <: AbstractLowOrderPriorResult end
 abstract type AbstractHighOrderPriorResult <: AbstractPriorResult end
-abstract type AbstractEntropyPoolingPriorResult <: AbstractPriorResult end
+abstract type AbstractEntropyPoolingPriorResult <: AbstractLowOrderPriorResult end
 abstract type AbstractPriorEstimator_1_0 <: AbstractPriorEstimator end
 abstract type AbstractPriorEstimator_2_1 <: AbstractPriorEstimator end
 abstract type AbstractPriorEstimator_2_2 <: AbstractPriorEstimator end

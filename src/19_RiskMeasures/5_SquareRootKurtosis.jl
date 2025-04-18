@@ -91,7 +91,7 @@ function risk_measure_factory(r::SquareRootKurtosis, prior::AbstractLowOrderPrio
 end
 function risk_measure_factory(r::SquareRootKurtosis, prior::EntropyPoolingPriorResult,
                               args...; kwargs...)
-    w = risk_measure_nothing_real_array_factory(r.w, prior.pr.w)
+    w = risk_measure_nothing_real_array_factory(r.w, prior.w)
     mu = risk_measure_nothing_real_array_factory(r.mu, prior.mu)
     kt = risk_measure_nothing_real_array_factory(r.kt, nothing)
     return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = w, mu = mu, kt = kt)
