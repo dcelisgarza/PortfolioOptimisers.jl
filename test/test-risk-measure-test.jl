@@ -14,7 +14,7 @@
             end
         end
     end
-    @testset "High Order Prior Risk" begin
+    @testset "Variance and Moment risk measures" begin
         rng = StableRNG(123456789)
         X = randn(rng, 500, 20)
         ew = eweights(1:500, 1 / 500; scale = true)
@@ -50,7 +50,13 @@
                HighOrderPriorEstimator(;
                                        pe = EntropyPoolingPriorEstimator(; views = views,
                                                                          sets = sets,
-                                                                         alg = H1_EntropyPooling()))]
+                                                                         alg = H1_EntropyPooling())),
+               EntropyPoolingPriorEstimator(; views = views, sets = sets,
+                                            alg = H1_EntropyPooling())]
+        mu = rand(rng, 20)
+        muv = nothing_scalar_array_view(mu, i)
+        zerovec = fill(0.0, 20)
+        zerovecv = nothing_scalar_array_view(zerovec, i)
         for pe ∈ pes
             pr1 = prior(pe, X)
             sigma = pr1.sigma * 1.5
@@ -116,11 +122,7 @@
             @test rv[2].ucs === ucs2view
             @test isapprox(expected_risk(rv[2], wv, prv.X), dot(wv, prv.sigma, wv))
 
-            zerovec = fill(0.0, 20)
-            zerovecv = nothing_scalar_array_view(zerovec, i)
             formulation = Quad()
-            mu = rand(rng, 20)
-            muv = nothing_scalar_array_view(mu, i)
             rs = [LowOrderMoment(; settings = settings, w = ew, mu = mu),
                   LowOrderMoment(; mu = 0), LowOrderMoment(; mu = zerovec),
                   LowOrderMoment(; alg = SemiDeviation(; ddof = 2)),
@@ -195,7 +197,9 @@
             if isa(pr1,
                    HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test isnothing(r[6].alg.w)
-            else
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
                 @test r[6].alg.w === pr1.pr.w
             end
             @test r[6].mu === pr1.mu
@@ -204,8 +208,12 @@
             if isa(pr1,
                    HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test isnothing(rv[6].alg.w)
-            else
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
                 @test rv[6].alg.w === prv.pr.w
+            else
+                @test rv[6].alg.w === prv.w
             end
             @test rv[6].mu === prv.mu
             val = prv.X * wv .- dot(wv, prv.mu)
@@ -214,8 +222,12 @@
             if isa(pr1,
                    HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test r[7].alg.w === ew
-            else
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
                 @test r[7].alg.w === pr1.pr.w
+            else
+                @test r[7].alg.w === pr1.w
             end
             @test r[7].mu === pr1.mu
             val = X * w .- dot(w, pr1.mu)
@@ -225,14 +237,22 @@
                                        HighOrderPriorResult{<:EmpiricalPriorResult, <:Any,
                                                             <:Any, <:Any, <:Any})
                                     ew
-                                else
+                                elseif isa(pr1,
+                                           HighOrderPriorResult{<:EntropyPoolingPriorResult,
+                                                                <:Any, <:Any, <:Any, <:Any})
                                     pr1.pr.w
+                                else
+                                    pr1.w
                                 end))
             if isa(pr1,
                    HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test rv[7].alg.w === ew
-            else
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
                 @test rv[7].alg.w === prv.pr.w
+            else
+                @test rv[7].alg.w === prv.w
             end
             @test rv[7].mu === prv.mu
             val = prv.X * wv .- dot(wv, prv.mu)
@@ -242,8 +262,12 @@
                                        HighOrderPriorResult{<:EmpiricalPriorResult, <:Any,
                                                             <:Any, <:Any, <:Any})
                                     ew
-                                else
+                                elseif isa(pr1,
+                                           HighOrderPriorResult{<:EntropyPoolingPriorResult,
+                                                                <:Any, <:Any, <:Any, <:Any})
                                     prv.pr.w
+                                else
+                                    prv.w
                                 end))
 
             rs = [HighOrderMoment(; settings = settings, w = ew, mu = mu),
@@ -307,8 +331,12 @@
             if isa(pr1,
                    HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test r[5].alg.ve.w === ew
-            else
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
                 @test r[5].alg.ve.w === pr1.pr.w
+            else
+                @test r[5].alg.ve.w === pr1.w
             end
             @test isa(r[5].alg, HighOrderDeviation)
             @test isa(r[5].alg.alg, FourthLowerMoment)
@@ -320,8 +348,12 @@
             if isa(pr1,
                    HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test rv[5].alg.ve.w === ew
-            else
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
                 @test rv[5].alg.ve.w === prv.pr.w
+            else
+                @test rv[5].alg.ve.w === prv.w
             end
             @test isa(rv[5].alg, HighOrderDeviation)
             @test isa(rv[5].alg.alg, FourthLowerMoment)
@@ -335,8 +367,12 @@
             if isa(pr1,
                    HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test isnothing(r[6].alg.ve.w)
-            else
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
                 @test r[6].alg.ve.w === pr1.pr.w
+            else
+                @test r[6].alg.ve.w === pr1.w
             end
             @test isa(r[6].alg, HighOrderDeviation)
             @test isa(r[6].alg.alg, FourthCentralMoment)
@@ -348,8 +384,12 @@
             if isa(pr1,
                    HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test isnothing(rv[6].alg.ve.w)
-            else
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
                 @test rv[6].alg.ve.w === prv.pr.w
+            else
+                @test rv[6].alg.ve.w === prv.w
             end
             @test isa(rv[6].alg, HighOrderDeviation)
             @test isa(rv[6].alg.alg, FourthCentralMoment)
@@ -358,7 +398,54 @@
             s = std(rv[6].alg.ve, x)
             @test isapprox(expected_risk(rv[6], wv, prv.X),
                            sum(val .^ 4) / size(prv.X, 1) / s^4)
+        end
+    end
+    @testset "Square root kurtosis and negative skewness" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 500, 20)
+        ew = eweights(1:500, 1 / 500; scale = true)
+        w = rand(rng, 20)
+        w ./= sum(w)
+        i = [20, 3, 9]
+        wv = nothing_scalar_array_view(w, i)
+        slv = Solver(; name = :Clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false))
+        ucs1 = DeltaUncertaintySetEstimator(;)
+        ucs2 = NormalUncertaintySetEstimator(;)
+        settings = RiskMeasureSettings(; rke = false, scale = -1, ub = 3)
+        formulation = RSOC()
+        ucs1view = ucs_view(ucs1, ucs2, i)
+        ucs2view = ucs_view(nothing, ucs2, i)
+        rc = LinearConstraint(; A = LinearConstraintSide(; group = :A, name = :B), B = 0)
 
+        views = [EntropyPoolingViewEstimator(;
+                                             A = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group1 = :Assets,
+                                                                                            group2 = :Assets,
+                                                                                            name1 = 10,
+                                                                                            name2 = 3),
+                                             B = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group1 = :Assets,
+                                                                                            group2 = :Assets,
+                                                                                            name1 = 10,
+                                                                                            name2 = 3,
+                                                                                            coef = 0.217),
+                                             comp = LEQ())]
+        sets = DataFrame(:Assets => 1:20)
+        pes = [HighOrderPriorEstimator(),
+               HighOrderPriorEstimator(;
+                                       pe = EntropyPoolingPriorEstimator(; views = views,
+                                                                         sets = sets,
+                                                                         alg = H1_EntropyPooling()))]
+        mu = rand(rng, 20)
+        muv = nothing_scalar_array_view(mu, i)
+        zerovec = fill(0.0, 20)
+        zerovecv = nothing_scalar_array_view(zerovec, i)
+        for pe ∈ pes
+            pr1 = prior(pe, X)
+            sigma = pr1.sigma * 1.5
+            prv = prior_view(pr1, i)
+            sigmav = nothing_scalar_array_view(sigma, i)
             rs = [SquareRootKurtosis(; settings = settings, w = ew, mu = mu, kt = pr1.kt),
                   SquareRootKurtosis(; mu = 0), SquareRootKurtosis(; mu = zerovec),
                   SquareRootKurtosis(; alg = Semi())]

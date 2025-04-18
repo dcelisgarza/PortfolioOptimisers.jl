@@ -48,11 +48,11 @@ function Base.getproperty(obj::FactorPriorResult, sym::Symbol)
         getfield(obj, sym)
     end
 end
-struct FactorPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
+struct FactorPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_2_1,
                             T2 <: AbstractMatrixProcessingEstimator,
                             T3 <: AbstractRegressionEstimator,
                             T4 <: AbstractVarianceEstimator, T5 <: Bool} <:
-       AbstractPriorEstimator_2_1
+       AbstractLowOrderPriorEstimator_2_1
     pe::T1
     mp::T2
     re::T3
@@ -60,7 +60,7 @@ struct FactorPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
     rsd::T5
 end
 function FactorPriorEstimator(;
-                              pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
+                              pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                               re::AbstractRegressionEstimator = StepwiseRegression(),
                               ve::AbstractVarianceEstimator = SimpleVariance(),

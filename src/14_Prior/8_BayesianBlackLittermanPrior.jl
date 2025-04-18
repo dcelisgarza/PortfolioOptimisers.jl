@@ -1,11 +1,11 @@
-struct BayesianBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_2,
+struct BayesianBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_2_2,
                                             T2 <: AbstractMatrixProcessingEstimator,
                                             T3 <: Union{<:BlackLittermanViewsEstimator,
                                                         <:AbstractVector{<:BlackLittermanViewsEstimator}},
                                             T4 <: DataFrame, T5 <: Real,
                                             T6 <: Union{Nothing, <:AbstractVector},
                                             T7 <: Union{Nothing, <:Real}} <:
-       AbstractPriorEstimator_2_2
+       AbstractLowOrderPriorEstimator_2_2
     pe::T1
     mp::T2
     views::T3
@@ -15,9 +15,9 @@ struct BayesianBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_2,
     tau::T7
 end
 function BayesianBlackLittermanPriorEstimator(;
-                                              pe::AbstractPriorEstimatorMap_2_2 = FactorPriorEstimator(;
-                                                                                                       pe = EmpiricalPriorEstimator(;
-                                                                                                                                    me = EquilibriumExpectedReturns())),
+                                              pe::AbstractLowOrderPriorEstimatorMap_2_2 = FactorPriorEstimator(;
+                                                                                                               pe = EmpiricalPriorEstimator(;
+                                                                                                                                            me = EquilibriumExpectedReturns())),
                                               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                               views::Union{<:BlackLittermanViewsEstimator,
                                                            <:AbstractVector{<:BlackLittermanViewsEstimator}},

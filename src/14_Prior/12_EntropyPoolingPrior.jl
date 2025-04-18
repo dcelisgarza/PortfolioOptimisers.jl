@@ -132,13 +132,13 @@ end
 function effective_number_scenarios(x::AbstractVector, y::AbstractVector)
     return exp(-relative_entropy(x, y))
 end
-struct EntropyPoolingPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
+struct EntropyPoolingPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
                                     T2 <: Union{<:EntropyPoolingViewEstimator,
                                                 <:AbstractVector{<:EntropyPoolingViewEstimator}},
                                     T3 <: DataFrame, T4 <: AbstractEntropyPoolingAlgorithm,
                                     T5 <: AbstractEntropyPoolingEstimator,
                                     T6 <: Union{Nothing, <:AbstractVector}} <:
-       AbstractPriorEstimator_1o2_1o2
+       AbstractLowOrderPriorEstimator_1o2_1o2
     pe::T1
     views::T2
     sets::T3
@@ -147,7 +147,7 @@ struct EntropyPoolingPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
     w::T6
 end
 function EntropyPoolingPriorEstimator(;
-                                      pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
+                                      pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
                                       views::Union{<:EntropyPoolingViewEstimator,
                                                    <:AbstractVector{<:EntropyPoolingViewEstimator}},
                                       sets::DataFrame = DataFrame(),
@@ -296,4 +296,5 @@ end
 
 export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling,
        OptimEntropyPoolingEstimator, JuMPEntropyPoolingEstimator, entropy_pooling,
-       EntropyPoolingPriorEstimator, relative_entropy, effective_number_scenarios
+       EntropyPoolingPriorEstimator, EntropyPoolingPriorResult, relative_entropy,
+       effective_number_scenarios

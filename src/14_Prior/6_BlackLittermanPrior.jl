@@ -1,11 +1,11 @@
-struct BlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
+struct BlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
                                     T2 <: AbstractMatrixProcessingEstimator,
                                     T3 <: Union{<:BlackLittermanViewsEstimator,
                                                 <:AbstractVector{<:BlackLittermanViewsEstimator}},
                                     T4 <: DataFrame, T5 <: Real,
                                     T6 <: Union{Nothing, <:AbstractVector},
                                     T7 <: Union{Nothing, <:Real}} <:
-       AbstractPriorEstimator_1o2_1o2
+       AbstractLowOrderPriorEstimator_1o2_1o2
     pe::T1
     mp::T2
     views::T3
@@ -24,8 +24,8 @@ function Base.getproperty(obj::BlackLittermanPriorEstimator, sym::Symbol)
     end
 end
 function BlackLittermanPriorEstimator(;
-                                      pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(;
-                                                                                                      me = EquilibriumExpectedReturns()),
+                                      pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(;
+                                                                                                              me = EquilibriumExpectedReturns()),
                                       mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                       views::Union{<:BlackLittermanViewsEstimator,
                                                    <:AbstractVector{<:BlackLittermanViewsEstimator}},

@@ -62,10 +62,10 @@ function Base.getproperty(obj::HighOrderPriorResult, sym::Symbol)
         getfield(obj, sym)
     end
 end
-struct HighOrderPriorEstimator{T1 <: AbstractPriorEstimatorMap_1o2_1o2,
+struct HighOrderPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
                                T2 <: Union{Nothing, CokurtosisEstimator},
                                T3 <: Union{Nothing, CoskewnessEstimator}} <:
-       AbstractPriorEstimator_1o2_1o2
+       AbstractHighOrderPriorEstimator
     pe::T1
     kte::T2
     ske::T3
@@ -76,7 +76,7 @@ function factory(pe::HighOrderPriorEstimator,
                                    ske = factory(pe.ske, w))
 end
 function HighOrderPriorEstimator(;
-                                 pe::AbstractPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
+                                 pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
                                  kte::Union{Nothing, CokurtosisEstimator} = Cokurtosis(;
                                                                                        alg = Full()),
                                  ske::Union{Nothing, CoskewnessEstimator} = Coskewness(;

@@ -17,7 +17,8 @@ function prior_view(pr::EmpiricalPriorResult, i::AbstractVector)
 end
 struct EmpiricalPriorEstimator{T1 <: AbstractExpectedReturnsEstimator,
                                T2 <: StatsBase.CovarianceEstimator,
-                               T3 <: Union{Nothing, <:Real}} <: AbstractPriorEstimator_1_0
+                               T3 <: Union{Nothing, <:Real}} <:
+       AbstractLowOrderPriorEstimator_1_0
     me::T1
     ce::T2
     horizon::T3

@@ -1,9 +1,25 @@
-abstract type AbstractPriorResult <: AbstractResult end
 abstract type AbstractPriorEstimator <: AbstractEstimator end
+abstract type AbstractLowOrderPriorEstimator <: AbstractPriorEstimator end
+abstract type AbstractLowOrderPriorEstimator_1_0 <: AbstractLowOrderPriorEstimator end
+abstract type AbstractLowOrderPriorEstimator_2_1 <: AbstractLowOrderPriorEstimator end
+abstract type AbstractLowOrderPriorEstimator_2_2 <: AbstractLowOrderPriorEstimator end
+abstract type AbstractLowOrderPriorEstimator_1o2_1o2 <: AbstractLowOrderPriorEstimator end
+const AbstractLowOrderPriorEstimatorMap_2_1 = Union{<:AbstractLowOrderPriorEstimator_1_0,
+                                                    <:AbstractLowOrderPriorEstimator_1o2_1o2}
+const AbstractLowOrderPriorEstimatorMap_2_2 = Union{<:AbstractLowOrderPriorEstimator_2_1,
+                                                    <:AbstractLowOrderPriorEstimator_2_2,
+                                                    <:AbstractLowOrderPriorEstimator_1o2_1o2}
+const AbstractLowOrderPriorEstimatorMap_1o2_1o2 = Union{<:AbstractLowOrderPriorEstimator_1_0,
+                                                        <:AbstractLowOrderPriorEstimator_2_1,
+                                                        <:AbstractLowOrderPriorEstimator_2_2,
+                                                        <:AbstractLowOrderPriorEstimator_1o2_1o2}
+abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
+
+abstract type AbstractPriorResult <: AbstractResult end
+abstract type AbstractLowOrderPriorResult <: AbstractPriorResult end
 # 0 = no asset views, 1 = asset views 
 # 0 = no factor, 1 = factor + chol, 2 = factor
 # 0 = no factor views, 1 = factor views
-abstract type AbstractLowOrderPriorResult <: AbstractPriorResult end
 # Asset
 abstract type AbstractPriorResult_A <: AbstractLowOrderPriorResult end
 # Asset + factor + chol
@@ -18,22 +34,9 @@ abstract type AbstractPriorResult_PF <: AbstractLowOrderPriorResult end
 abstract type AbstractPriorResult_APF <: AbstractLowOrderPriorResult end
 # Asset + asset views + factor + factor views 
 # abstract type AbstractPriorResult_AVFV <: AbstractLowOrderPriorResult end
-abstract type AbstractHighOrderPriorResult <: AbstractPriorResult end
 abstract type AbstractEntropyPoolingPriorResult <: AbstractLowOrderPriorResult end
-abstract type AbstractPriorEstimator_1_0 <: AbstractPriorEstimator end
-abstract type AbstractPriorEstimator_2_1 <: AbstractPriorEstimator end
-abstract type AbstractPriorEstimator_2_2 <: AbstractPriorEstimator end
-abstract type AbstractPriorEstimator_1o2_1o2 <: AbstractPriorEstimator end
+abstract type AbstractHighOrderPriorResult <: AbstractPriorResult end
 
-const AbstractPriorEstimatorMap_2_1 = Union{<:AbstractPriorEstimator_1_0,
-                                            <:AbstractPriorEstimator_1o2_1o2}
-const AbstractPriorEstimatorMap_2_2 = Union{<:AbstractPriorEstimator_2_1,
-                                            <:AbstractPriorEstimator_2_2,
-                                            <:AbstractPriorEstimator_1o2_1o2}
-const AbstractPriorEstimatorMap_1o2_1o2 = Union{<:AbstractPriorEstimator_1_0,
-                                                <:AbstractPriorEstimator_2_1,
-                                                <:AbstractPriorEstimator_2_2,
-                                                <:AbstractPriorEstimator_1o2_1o2}
 function prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
     return prior(pr, rd.X, rd.F; kwargs...)
 end

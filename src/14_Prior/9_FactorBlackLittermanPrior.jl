@@ -1,4 +1,4 @@
-struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
+struct FactorBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_2_1,
                                           T2 <: AbstractMatrixProcessingEstimator,
                                           T3 <: AbstractMatrixProcessingEstimator,
                                           T4 <: AbstractRegressionEstimator,
@@ -10,7 +10,7 @@ struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
                                           T11 <: Union{Nothing, <:AbstractVector},
                                           T12 <: Union{Nothing, <:Real},
                                           T13 <: Union{Nothing, <:Real}} <:
-       AbstractPriorEstimator_2_1
+       AbstractLowOrderPriorEstimator_2_1
     pe::T1
     f_mp::T2
     mp::T3
@@ -26,7 +26,7 @@ struct FactorBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
     tau::T13
 end
 function FactorBlackLittermanPriorEstimator(;
-                                            pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
+                                            pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                                             f_mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                             mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                             re::AbstractRegressionEstimator = StepwiseRegression(),

@@ -1,5 +1,5 @@
-struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1,
-                                             T2 <: AbstractPriorEstimatorMap_2_1,
+struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_2_1,
+                                             T2 <: AbstractLowOrderPriorEstimatorMap_2_1,
                                              T3 <: AbstractMatrixProcessingEstimator,
                                              T4 <: AbstractRegressionEstimator,
                                              T5 <: AbstractVarianceEstimator,
@@ -13,7 +13,7 @@ struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1
                                              T13 <: Union{Nothing, <:AbstractVector},
                                              T14 <: Union{Nothing, <:Real},
                                              T15 <: Union{Nothing, <:Real}} <:
-       AbstractPriorEstimator_2_1
+       AbstractLowOrderPriorEstimator_2_1
     a_pe::T1
     f_pe::T2
     mp::T3
@@ -31,8 +31,8 @@ struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractPriorEstimatorMap_2_1
     tau::T15
 end
 function AugmentedBlackLittermanPriorEstimator(;
-                                               a_pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
-                                               f_pe::AbstractPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
+                                               a_pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
+                                               f_pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
                                                mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                                re::AbstractRegressionEstimator = StepwiseRegression(),
                                                ve::AbstractVarianceEstimator = SimpleVariance(),
