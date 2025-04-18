@@ -332,11 +332,30 @@
         val = prv.X * wv .- dot(wv, prv.mu)
         val = val[val .<= zero(eltype(val))]
         @test isapprox(expected_risk(rv[4], wv, prv.X), sqrt(sum(val .^ 4) / size(X, 1)))
+
+        rs = [NegativeSkewness(; settings = settings, alg = QuadraticNegativeSkewness(),
+                               sk = pr1.sk, V = pr1.V), NegativeSkewness(;)]
+        r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
+        rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
+
+        @test r[1].settings === settings
+        @test r[1].alg === QuadraticNegativeSkewness()
+        @test r[1].sk === pr1.sk
+        @test r[1].V === pr1.V
+        @test isapprox(expected_risk(r[1], w, X), dot(w, pr1.V, w))
+        @test rv[1].settings === settings
+        @test rv[1].alg === QuadraticNegativeSkewness()
+        @test rv[1].sk == prv.sk
+        @test rv[1].V == prv.V
+        @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, prv.V, wv))
+
+        @test r[2].alg == LinearNegativeSkewness()
+        @test r[2].sk === pr1.sk
+        @test r[2].V === pr1.V
+        @test isapprox(expected_risk(r[2], w, X), sqrt(dot(w, pr1.V, w)))
+        @test rv[2].alg === LinearNegativeSkewness()
+        @test rv[2].sk == prv.sk
+        @test rv[2].V == prv.V
+        @test isapprox(expected_risk(rv[2], wv, prv.X), sqrt(dot(wv, prv.V, wv)))
     end
 end
-
-# rs = [SquareRootKurtosis(; settings = s, alg = Full()),
-#       SquareRootKurtosis(; settings = s, w = ew),
-#       SquareRootKurtosis(; settings = s, mu = fill(0.0, 20)),
-#       SquareRootKurtosis(; settings = s, kt = pr1.skt),
-#       SquareRootKurtosis(; settings = s, alg = Semi())]

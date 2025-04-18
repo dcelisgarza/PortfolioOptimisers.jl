@@ -1,18 +1,6 @@
 abstract type AbstractNegativeSkewnessAlgorithm <: AbstractAlgorithm end
-struct LinearNegativeSkewness{T1 <: AbstractMomentAlgorithm} <:
-       AbstractNegativeSkewnessAlgorithm
-    alg::T1
-end
-function LinearNegativeSkewness(; alg::AbstractMomentAlgorithm = Full())
-    return LinearNegativeSkewness{typeof(alg)}(alg)
-end
-struct QuadraticNegativeSkewness{T1 <: AbstractMomentAlgorithm} <:
-       AbstractNegativeSkewnessAlgorithm
-    alg::T1
-end
-function QuadraticNegativeSkewness(; alg::AbstractMomentAlgorithm = Full())
-    return QuadraticNegativeSkewness{typeof(alg)}(alg)
-end
+struct LinearNegativeSkewness <: AbstractNegativeSkewnessAlgorithm end
+struct QuadraticNegativeSkewness <: AbstractNegativeSkewnessAlgorithm end
 struct NegativeSkewness{T1 <: RiskMeasureSettings, T2 <: AbstractNegativeSkewnessAlgorithm,
                         T3 <: AbstractMatrixProcessingEstimator,
                         T4 <: Union{Nothing, <:AbstractMatrix},
