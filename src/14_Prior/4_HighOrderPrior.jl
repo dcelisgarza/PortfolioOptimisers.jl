@@ -43,7 +43,7 @@ function prior_view(pr::HighOrderPriorResult, i::AbstractVector)
     sk = pr.sk
     skmp = pr.skmp
     sk = nothing_scalar_array_view_odd_order(sk, i, idx)
-    V = __coskewness(sk, pr.X, skmp)
+    V = __coskewness(sk, view(pr.X, :, i), skmp)
     if !isnothing(V) && all(iszero, diag(V))
         V[diagind(V)] = I(size(V, 1))
     end

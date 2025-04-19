@@ -2,7 +2,9 @@
     using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames, StatsBase,
           Clarabel, LinearAlgebra
     import PortfolioOptimisers: risk_measure_factory, risk_measure_view, ucs_view,
-                                nothing_scalar_array_view, prior_view
+                                nothing_scalar_array_view, prior_view,
+                                fourth_moment_index_factory,
+                                nothing_scalar_array_view_odd_order, __coskewness
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -436,7 +438,9 @@
                HighOrderPriorEstimator(;
                                        pe = EntropyPoolingPriorEstimator(; views = views,
                                                                          sets = sets,
-                                                                         alg = H1_EntropyPooling()))]
+                                                                         alg = H1_EntropyPooling())),
+               EntropyPoolingPriorEstimator(; views = views, sets = sets,
+                                            alg = H1_EntropyPooling())]
         mu = rand(rng, 20)
         muv = nothing_scalar_array_view(mu, i)
         zerovec = fill(0.0, 20)
@@ -446,87 +450,220 @@
             sigma = pr1.sigma * 1.5
             prv = prior_view(pr1, i)
             sigmav = nothing_scalar_array_view(sigma, i)
-            rs = [SquareRootKurtosis(; settings = settings, w = ew, mu = mu, kt = pr1.kt),
-                  SquareRootKurtosis(; mu = 0), SquareRootKurtosis(; mu = zerovec),
-                  SquareRootKurtosis(; alg = Semi())]
+            kt = cokurtosis(Cokurtosis(), X)
+            idx = fourth_moment_index_factory(size(X, 2), i)
+            ktv = nothing_scalar_array_view(kt, idx)
+            rs = [SquareRootKurtosis(; settings = settings, w = ew, mu = mu,
+                                     kt = if isa(pr1, HighOrderPriorResult)
+                                         pr1.kt
+                                     else
+                                         kt
+                                     end),
+                  SquareRootKurtosis(; mu = 0, kt = if isa(pr1, HighOrderPriorResult)
+                                         nothing
+                                     else
+                                         kt
+                                     end),
+                  SquareRootKurtosis(; mu = zerovec,
+                                     kt = if isa(pr1, HighOrderPriorResult)
+                                         nothing
+                                     else
+                                         kt
+                                     end),
+                  SquareRootKurtosis(; alg = Semi(),
+                                     kt = if isa(pr1, HighOrderPriorResult)
+                                         nothing
+                                     else
+                                         kt
+                                     end)]
             r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
             rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].w === ew
             @test r[1].mu === mu
-            @test r[1].kt === pr1.kt
+            if isa(pr1, HighOrderPriorResult)
+                @test r[1].kt === pr1.kt
+            else
+                @test r[1].kt === kt
+            end
             val = X * w .- dot(w, mu)
             @test isapprox(expected_risk(r[1], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
             @test rv[1].settings === settings
             @test rv[1].w === ew
             @test rv[1].mu === muv
-            @test rv[1].kt == prv.kt
+            if isa(pr1, HighOrderPriorResult)
+                @test rv[1].kt == prv.kt
+            else
+                @test rv[1].kt == ktv
+            end
             val = prv.X * wv .- dot(wv, muv)
             @test isapprox(expected_risk(rv[1], wv, prv.X),
                            sqrt(sum(val .^ 4) / size(X, 1)))
 
-            @test isnothing(r[2].w)
+            if isa(pr1,
+                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                @test isnothing(r[2].w)
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
+                @test r[2].w === pr1.pr.w
+            else
+                @test r[2].w === pr1.w
+            end
             @test r[2].mu == 0
-            @test r[2].kt === pr1.kt
+            if isa(pr1, HighOrderPriorResult)
+                @test r[2].kt === pr1.kt
+            else
+                @test r[2].kt == kt
+            end
             val = X * w
             @test isapprox(expected_risk(r[2], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
-            @test isnothing(rv[2].w)
+            if isa(prv,
+                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                @test isnothing(rv[2].w)
+            elseif isa(prv,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
+                @test rv[2].w === prv.pr.w
+            else
+                @test rv[2].w === prv.w
+            end
             @test rv[2].mu == 0
-            @test rv[2].kt == prv.kt
+            if !isa(pr1, EntropyPoolingPriorResult)
+                @test rv[2].kt == prv.kt
+            else
+                @test rv[2].kt == ktv
+            end
             val = prv.X * wv
             @test isapprox(expected_risk(rv[2], wv, prv.X),
                            sqrt(sum(val .^ 4) / size(X, 1)))
 
-            @test isnothing(r[3].w)
+            if isa(pr1,
+                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                @test isnothing(r[3].w)
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
+                @test r[3].w === pr1.pr.w
+            else
+                @test r[3].w === pr1.w
+            end
             @test r[3].mu === zerovec
-            @test r[3].kt === pr1.kt
+            if !isa(pr1, EntropyPoolingPriorResult)
+                @test r[3].kt == pr1.kt
+            else
+                @test r[3].kt == kt
+            end
             val = X * w .- dot(w, zerovec)
             @test isapprox(expected_risk(r[3], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
-            @test isnothing(rv[3].w)
+            if isa(pr1,
+                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                @test isnothing(rv[3].w)
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
+                @test rv[3].w === pr1.pr.w
+            else
+                @test rv[3].w === pr1.w
+            end
             @test rv[3].mu === zerovecv
-            @test rv[3].kt == prv.kt
+            if !isa(pr1, EntropyPoolingPriorResult)
+                @test rv[3].kt == prv.kt
+            else
+                @test rv[3].kt == ktv
+            end
             val = prv.X * wv .- dot(wv, zerovecv)
             @test isapprox(expected_risk(rv[3], wv, prv.X),
                            sqrt(sum(val .^ 4) / size(X, 1)))
 
             @test r[4].alg == Semi()
             @test r[4].mu === pr1.mu
-            @test r[4].kt === pr1.kt
+            if !isa(pr1, EntropyPoolingPriorResult)
+                @test r[4].kt == pr1.kt
+            else
+                @test r[4].kt == kt
+            end
             val = X * w .- dot(w, pr1.mu)
             val = val[val .<= zero(eltype(val))]
             @test isapprox(expected_risk(r[4], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
             @test rv[4].alg == Semi()
             @test rv[4].mu === prv.mu
-            @test rv[4].kt == prv.kt
+            if !isa(pr1, EntropyPoolingPriorResult)
+                @test rv[4].kt == prv.kt
+            else
+                @test rv[4].kt == ktv
+            end
             val = prv.X * wv .- dot(wv, prv.mu)
             val = val[val .<= zero(eltype(val))]
             @test isapprox(expected_risk(rv[4], wv, prv.X),
                            sqrt(sum(val .^ 4) / size(X, 1)))
 
+            ske = Coskewness()
+            sk, V = coskewness(Coskewness(), X)
+            skv = nothing_scalar_array_view_odd_order(sk, i, idx)
+            Vv = __coskewness(skv, view(pr1.X, :, i), ske.mp)
             rs = [NegativeSkewness(; settings = settings, alg = QuadraticNegativeSkewness(),
-                                   sk = pr1.sk, V = pr1.V), NegativeSkewness(;)]
+                                   sk = if !isa(pr1, EntropyPoolingPriorResult)
+                                       pr1.sk
+                                   else
+                                       sk
+                                   end, V = if !isa(pr1, EntropyPoolingPriorResult)
+                                       pr1.V
+                                   else
+                                       V
+                                   end),
+                  NegativeSkewness(; sk = if !isa(pr1, EntropyPoolingPriorResult)
+                                       pr1.sk
+                                   else
+                                       sk
+                                   end, V = if !isa(pr1, EntropyPoolingPriorResult)
+                                       pr1.V
+                                   else
+                                       V
+                                   end)]
             r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
             rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
 
             @test r[1].settings === settings
             @test r[1].alg === QuadraticNegativeSkewness()
-            @test r[1].sk === pr1.sk
-            @test r[1].V === pr1.V
-            @test isapprox(expected_risk(r[1], w, X), dot(w, pr1.V, w))
+            if !isa(pr1, EntropyPoolingPriorResult)
+                @test r[1].sk === pr1.sk
+                @test r[1].V === pr1.V
+                @test isapprox(expected_risk(r[1], w, X), dot(w, pr1.V, w))
+            else
+                @test r[1].sk == sk
+                @test r[1].V == V
+                @test isapprox(expected_risk(r[1], w, X), dot(w, V, w))
+            end
             @test rv[1].settings === settings
             @test rv[1].alg === QuadraticNegativeSkewness()
-            @test rv[1].sk == prv.sk
-            @test rv[1].V == prv.V
-            @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, prv.V, wv))
-
-            @test r[2].alg == LinearNegativeSkewness()
-            @test r[2].sk === pr1.sk
-            @test r[2].V === pr1.V
-            @test isapprox(expected_risk(r[2], w, X), sqrt(dot(w, pr1.V, w)))
-            @test rv[2].alg === LinearNegativeSkewness()
-            @test rv[2].sk == prv.sk
-            @test rv[2].V == prv.V
-            @test isapprox(expected_risk(rv[2], wv, prv.X), sqrt(dot(wv, prv.V, wv)))
+            if !isa(pr1, EntropyPoolingPriorResult)
+                @test rv[1].sk == prv.sk
+                @test rv[1].V == prv.V
+                @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, prv.V, wv))
+            else
+                @test rv[1].sk == skv
+                @test rv[1].V == Vv
+                @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, Vv, wv))
+            end
+            if !isa(pr1, EntropyPoolingPriorResult)
+                @test r[2].sk === pr1.sk
+                @test r[2].V === pr1.V
+                @test isapprox(expected_risk(r[2], w, X), sqrt(dot(w, pr1.V, w)))
+            else
+                @test r[2].sk == sk
+                @test r[2].V == V
+                @test isapprox(expected_risk(r[2], w, X), sqrt(dot(w, V, w)))
+            end
+            if !isa(pr1, EntropyPoolingPriorResult)
+                @test rv[2].sk == prv.sk
+                @test rv[2].V == prv.V
+                @test isapprox(expected_risk(rv[2], wv, prv.X), sqrt(dot(wv, prv.V, wv)))
+            else
+                @test rv[2].sk == skv
+                @test rv[2].V == Vv
+                @test isapprox(expected_risk(rv[2], wv, prv.X), sqrt(dot(wv, Vv, wv)))
+            end
         end
     end
 end
