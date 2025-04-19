@@ -11,13 +11,13 @@ function expected_risk(r::Union{WorstRealisation, ValueatRisk, ValueatRiskRange,
                                 RelativeUlcerIndex, RelativeEntropicDrawdownatRisk,
                                 RelativeRelativisticDrawdownatRisk, GiniMeanDifference,
                                 Range, ConditionalValueatRiskRange, TailGini, TailGiniRange,
-                                OrderedWeightsArray}, w::AbstractVector, X::AbstractMatrix,
+                                OrderedWeightsArray, BrownianDistanceVariance},
+                       w::AbstractVector, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, X, fees))
 end
 function expected_risk(r::Union{LowOrderMoment, HighOrderMoment, TrackingRiskMeasure,
-                                SquareRootKurtosis, BrownianDistanceVariance},
-                       w::AbstractVector, X::AbstractMatrix,
+                                SquareRootKurtosis}, w::AbstractVector, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(w, X, fees)
 end

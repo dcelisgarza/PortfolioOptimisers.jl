@@ -710,6 +710,7 @@
         settings = RiskMeasureSettings(; rke = false, scale = 2, ub = 3)
         hcsettings = HierarchicalRiskMeasureSettings(; scale = -2)
         rs2 = [ConditionalValueatRisk(; settings = settings, alpha = 0.1),
+               DistributionallyRobustConditionalValueatRisk(; alpha = 0.1),
                ConditionalValueatRiskRange(; settings = settings, alpha = 0.2, beta = 0.3),
                ConditionalDrawdownatRisk(; settings = settings, alpha = 0.4),
                RelativeConditionalDrawdownatRisk(; settings = hcsettings, alpha = 0.5)]
@@ -719,12 +720,13 @@
         @test all(rs2 .=== rv2)
         er2 = expected_risk.(r2, Ref(w), Ref(X))
         res = isapprox(er2,
-                       [0.004336619383058753, 0.002433632636088897, 0.030517667443021403,
-                        0.012855891046985323])
+                       [0.004336619383058753, 0.004336619383058753, 0.002433632636088897,
+                        0.030517667443021403, 0.012855891046985323])
         if !res
             find_tol(er1,
-                     [0.004336619383058753, 0.002433632636088897, 0.030517667443021403,
-                      0.012855891046985323]; name1 = :er1, name2 = :res)
+                     [0.004336619383058753, 0.004336619383058753, 0.002433632636088897,
+                      0.030517667443021403, 0.012855891046985323]; name1 = :er1,
+                     name2 = :res)
         end
         @test res
 
@@ -846,5 +848,28 @@
                                [3.7517665162794507, 0.9888287864252111])
             end
         end
+    end
+    @testset "Settings only risk measures" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 500, 10)
+        ew = eweights(1:500, 1 / 500; scale = true)
+        w = rand(rng, 10)
+        w ./= sum(w)
+        pe = EmpiricalPriorEstimator()
+        settings = RiskMeasureSettings(; rke = false, scale = 2, ub = 3)
+        hcsettings = HierarchicalRiskMeasureSettings(; scale = -2)
+        pr1 = prior(pe, X)
+        rs = [UlcerIndex(; settings = settings),
+              RelativeUlcerIndex(; settings = hcsettings), MaximumDrawdown(),
+              RelativeMaximumDrawdown(), WorstRealisation(), Range(), EqualRiskMeasure()]
+        r = risk_measure_factory(rs)
+        rv = risk_measure_view(rs)
+        @test all(rs .=== r)
+        @test all(rs .=== rv)
+        x = X * w
+        lb, ub = extrema(x)
+        @test isapprox(expected_risk.(r, Ref(w), Ref(X)),
+                       [4.729197396913109, 0.9852613709401206, 10.012825798312244,
+                        1.0000278890665872, -lb, ub - lb, inv(length(w))])
     end
 end
