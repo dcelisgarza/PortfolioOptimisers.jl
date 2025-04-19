@@ -446,7 +446,7 @@
         muv = nothing_scalar_array_view(mu, i)
         zerovec = fill(0.0, 20)
         zerovecv = nothing_scalar_array_view(zerovec, i)
-        for pe ∈ reverse(pes)
+        for pe ∈ pes
             pr1 = prior(pe, X)
             sigma = pr1.sigma * 1.5
             prv = prior_view(pr1, i)
@@ -625,9 +625,9 @@
                                        pr1.V
                                    else
                                        V
-                                   end)]
-            r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
-            rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
+                                   end), NegativeSkewness(;)]
+            r = risk_measure_factory(rs[1:2], Ref(pr1), Ref(slv), Ref(ucs2))
+            rv = risk_measure_view(rs[1:2], Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
 
             @test r[1].settings === settings
             @test r[1].alg === QuadraticNegativeSkewness()
@@ -668,6 +668,15 @@
                 @test rv[2].sk == skv
                 @test rv[2].V == Vv
                 @test isapprox(expected_risk(rv[2], wv, prv.X), sqrt(dot(wv, Vv, wv)))
+            end
+            if isa(pr1, HighOrderPriorResult)
+                r = risk_measure_factory(rs[3], pr1, slv, ucs2)
+                rv = risk_measure_view(rs[3], pr1, i, slv, ucs2)
+                @test r.sk === pr1.sk
+                @test r.V === pr1.V
+            else
+                @test_throws ArgumentError risk_measure_factory(rs[3], pr1, slv, ucs2)
+                @test_throws ArgumentError risk_measure_view(rs[3], pr1, i, slv, ucs2)
             end
         end
     end

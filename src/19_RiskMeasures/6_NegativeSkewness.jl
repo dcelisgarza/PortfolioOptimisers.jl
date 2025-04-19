@@ -54,7 +54,7 @@ function risk_measure_view(::NegativeSkewness{<:Any, <:Any, <:Any, Nothing, <:An
                                         <:HighOrderPriorResult{<:Any, <:Any, Nothing, <:Any,
                                                                <:Any}}, i::AbstractVector,
                            args...; kwargs...)
-    throw(ArgumentError("Neither the risk measure, nor the prior have the required data."))
+    throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
 end
 function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:AbstractMatrix,
                                                <:Any}, prior::AbstractPriorResult,
