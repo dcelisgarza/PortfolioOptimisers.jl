@@ -109,7 +109,7 @@ for r ∈ (AverageDrawdown, RelativeAverageDrawdown)
                  return $(r)(; settings = r.settings, w = w)
              end
              function risk_measure_view(r::$(r), args...; kwargs...)
-                 return r
+                 return risk_measure_factory(r, args...; kwargs...)
              end
          end)
 end

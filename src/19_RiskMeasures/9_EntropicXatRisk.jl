@@ -113,7 +113,7 @@ function (r::EntropicDrawdownatRisk)(x::AbstractVector)
 end
 struct RelativeEntropicDrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real,
                                       T3 <:
-                                      Union{Nothing, <:Solver, <:AbstractVector{Solver}}} <:
+                                      Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}} <:
        SolverHierarchicalRiskMeasure
     settings::T1
     alpha::T2

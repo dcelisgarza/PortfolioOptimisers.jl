@@ -151,7 +151,6 @@ function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(), alpha::R
     end
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(kappa) < kappa < one(kappa))
-    println(typeof(settings), typeof(alpha), typeof(kappa), typeof(slv))
     return RelativisticDrawdownatRisk{typeof(settings), typeof(alpha), typeof(kappa),
                                       typeof(slv)}(settings, alpha, kappa, slv)
 end

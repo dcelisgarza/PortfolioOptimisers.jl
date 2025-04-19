@@ -685,8 +685,8 @@
         X = randn(rng, 500, 20) * 0.01
         w = rand(rng, 20)
         w ./= sum(w)
-        slv = Solver(; name = :Clarabel, solver = Clarabel.Optimizer,
-                     settings = Dict("verbose" => false))
+        slv = [Solver(; name = :Clarabel, solver = Clarabel.Optimizer,
+                      settings = Dict("verbose" => false))]
         settings = HierarchicalRiskMeasureSettings(; scale = 2)
         rs1 = [ValueatRisk(; settings = settings, alpha = 0.1),
                ValueatRiskRange(; settings = settings, alpha = 0.2, beta = 0.3),
@@ -796,5 +796,55 @@
         @test isapprox(er1,
                        [0.0027927028241994376, 0.005092766618669591, 0.0027927028241994376,
                         0.005092766618669591, 0.010867592331463578])
+    end
+    @testset "Average drawdown" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 500, 10)
+        ew = eweights(1:500, 1 / 500; scale = true)
+        w = rand(rng, 10)
+        w ./= sum(w)
+        views = [EntropyPoolingViewEstimator(;
+                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            coef = 1,
+                                                                                            name = 1),
+                                             B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                           coef = 0.02),
+                                             comp = EQ())]
+        sets = DataFrame(:Assets => 1:10)
+        pes = [EmpiricalPriorEstimator(),
+               EntropyPoolingPriorEstimator(; views = views, sets = sets,
+                                            alg = H1_EntropyPooling()),
+               HighOrderPriorEstimator(;
+                                       pe = EntropyPoolingPriorEstimator(; views = views,
+                                                                         sets = sets,
+                                                                         alg = H1_EntropyPooling()))]
+        settings = RiskMeasureSettings(; rke = false, scale = 2, ub = 3)
+        for pe ∈ pes
+            pr1 = prior(pe, X)
+            rs = [AverageDrawdown(; settings = settings), RelativeAverageDrawdown(; w = ew)]
+            r = risk_measure_factory(rs, Ref(pr1))
+            rv = risk_measure_view(rs, Ref(pr1), nothing)
+            if isa(pr1, EmpiricalPriorResult)
+                @test all(r .=== rs)
+                @test all(rv .=== rs)
+                @test isapprox(expected_risk.(r, Ref(w), Ref(X)),
+                               [3.751365586265874, 0.9888287864252111])
+            elseif isa(pr1,
+                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
+                                            <:Any, <:Any})
+                r[1].w === pr1.pr.w
+                r[2].w === ew
+                @test all(rv .=== r)
+                @test isapprox(expected_risk.(r, Ref(w), Ref(X)),
+                               [3.7517665162794507, 0.9888287864252111])
+            else
+                r[1].w === pr1.w
+                r[2].w === ew
+                @test all(rv .=== r)
+                @test isapprox(expected_risk.(r, Ref(w), Ref(X)),
+                               [3.7517665162794507, 0.9888287864252111])
+            end
+        end
     end
 end
