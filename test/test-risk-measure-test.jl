@@ -953,7 +953,6 @@
                                             alg = H1_EntropyPooling())]
         mu = rand(rng, 20)
         muv = nothing_scalar_array_view(mu, i)
-
         for pe ∈ pes
             pr1 = prior(pe, X)
             rs = [MeanReturn(;), MeanReturn(; w = ew), ThirdCentralMoment(),
@@ -961,7 +960,8 @@
                   Skewness(;
                            ve = SimpleVariance(; corrected = false,
                                                me = SimpleExpectedReturns(; w = ew),
-                                               w = ew), w = ew, mu = mu)]
+                                               w = ew), w = ew, mu = mu),
+                  ThirdCentralMoment(; mu = 0), Skewness(; mu = 0)]
             r = risk_measure_factory(rs, Ref(pr1))
             rv = risk_measure_view(rs, Ref(pr1), Ref(i))
             er = expected_risk.(r, Ref(w), Ref(X))
@@ -977,7 +977,8 @@
                 @test isapprox(er,
                                [0.005409516986537154, 0.0076144516706446825,
                                 0.0013290846602404623, -0.19156209155128498,
-                                0.08735509114197064, -1.2778663258289709])
+                                0.08735509114197064, -1.2778663258289709,
+                                0.002323701237582384, 0.1526176806960154])
             elseif isa(pr1, HighOrderPriorResult)
                 @test r[1].w === pr1.pr.w
                 @test rv[1].w === pr1.pr.w
@@ -990,7 +991,8 @@
                 @test isapprox(er,
                                [0.005211295487597505, 0.0076144516706446825,
                                 0.0013655247071769562, -0.19156209155128498,
-                                0.08979373959490125, -1.2778663258289709])
+                                0.08979373959490125, -1.2778663258289709,
+                                0.002323701237582384, 0.15269965197093327])
             else
                 @test r[1].w === pr1.w
                 @test rv[1].w === pr1.w
@@ -1003,14 +1005,21 @@
                 @test isapprox(er,
                                [0.005211295487597505, 0.0076144516706446825,
                                 0.0013655247071769562, -0.19156209155128498,
-                                0.08979373959490125, -1.2778663258289709])
+                                0.08979373959490125, -1.2778663258289709,
+                                0.002323701237582384, 0.15269965197093327])
             end
             @test r[2].w === ew
             @test rv[2].w === ew
             @test r[4].w === ew
             @test rv[4].w === ew
+            @test r[4].mu === mu
+            @test rv[4].mu === muv
             @test r[6].ve.me.w === ew
             @test rv[6].ve.me.w === ew
+            @test r[7].mu == 0
+            @test rv[7].mu == 0
+            @test r[8].mu == 0
+            @test rv[8].mu == 0
         end
     end
 end

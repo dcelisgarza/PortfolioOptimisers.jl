@@ -21,14 +21,14 @@ end
 function risk_measure_view(r::MeanReturn, args...; kwargs...)
     return risk_measure_factory(r, args...; kwargs...)
 end
-struct ThirdCentralMoment{T1 <: Union{Nothing, <:Real, <:AbstractWeights},
-                          T2 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+struct ThirdCentralMoment{T1 <: Union{Nothing, <:AbstractWeights},
+                          T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
        AbstractMomentNoOptimisationRiskMeasure
     w::T1
     mu::T2
 end
 function ThirdCentralMoment(; w::Union{Nothing, <:AbstractWeights} = nothing,
-                            mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+                            mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
     if isa(mu, AbstractVector)
         @smart_assert(!isempty(mu))
     end
@@ -43,7 +43,7 @@ struct Skewness{T1 <: AbstractVarianceEstimator, T2 <: Union{Nothing, <:Abstract
 end
 function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   w::Union{Nothing, <:AbstractWeights} = nothing,
-                  mu::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+                  mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
     if isa(mu, AbstractVector)
         @smart_assert(!isempty(mu))
     end
