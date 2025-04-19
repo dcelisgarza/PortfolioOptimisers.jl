@@ -897,9 +897,9 @@
         w1v = nothing_scalar_array_view(w1, i)
         w2v = nothing_scalar_array_view(w2, i)
         Xv = view(X, :, i)
+        settings = RiskMeasureSettings(; rke = false, scale = 5, ub = 3)
         rs = [TurnoverRiskMeasure(; settings = settings, w = w2),
-              TrackingRiskMeasure(; settings = settings,
-                                  tracking = WeightsTracking(; w = w2)),
+              TrackingRiskMeasure(; tracking = WeightsTracking(; w = w2)),
               TrackingRiskMeasure(; settings = settings,
                                   tracking = ReturnsTracking(; w = X * w2))]
         r = risk_measure_factory(rs)
