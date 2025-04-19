@@ -440,17 +440,18 @@
                                                                          sets = sets,
                                                                          alg = H1_EntropyPooling())),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
-                                            alg = H1_EntropyPooling())]
+                                            alg = H1_EntropyPooling()),
+               EmpiricalPriorEstimator()]
         mu = rand(rng, 20)
         muv = nothing_scalar_array_view(mu, i)
         zerovec = fill(0.0, 20)
         zerovecv = nothing_scalar_array_view(zerovec, i)
-        for pe ∈ pes
+        for pe ∈ reverse(pes)
             pr1 = prior(pe, X)
             sigma = pr1.sigma * 1.5
             prv = prior_view(pr1, i)
             sigmav = nothing_scalar_array_view(sigma, i)
-            kt = cokurtosis(Cokurtosis(), X)
+            kt = cokurtosis(Cokurtosis(), X; mean = transpose(pr1.mu))
             idx = fourth_moment_index_factory(size(X, 2), i)
             ktv = nothing_scalar_array_view(kt, idx)
             rs = [SquareRootKurtosis(; settings = settings, w = ew, mu = mu,
@@ -501,7 +502,8 @@
                            sqrt(sum(val .^ 4) / size(X, 1)))
 
             if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
+               isa(pr1, EmpiricalPriorResult)
                 @test isnothing(r[2].w)
             elseif isa(pr1,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -519,7 +521,8 @@
             val = X * w
             @test isapprox(expected_risk(r[2], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
             if isa(prv,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
+               isa(pr1, EmpiricalPriorResult)
                 @test isnothing(rv[2].w)
             elseif isa(prv,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -529,7 +532,7 @@
                 @test rv[2].w === prv.w
             end
             @test rv[2].mu == 0
-            if !isa(pr1, EntropyPoolingPriorResult)
+            if isa(pr1, HighOrderPriorEstimator)
                 @test rv[2].kt == prv.kt
             else
                 @test rv[2].kt == ktv
@@ -539,7 +542,8 @@
                            sqrt(sum(val .^ 4) / size(X, 1)))
 
             if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
+               isa(pr1, EmpiricalPriorResult)
                 @test isnothing(r[3].w)
             elseif isa(pr1,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -549,7 +553,7 @@
                 @test r[3].w === pr1.w
             end
             @test r[3].mu === zerovec
-            if !isa(pr1, EntropyPoolingPriorResult)
+            if isa(pr1, HighOrderPriorEstimator)
                 @test r[3].kt == pr1.kt
             else
                 @test r[3].kt == kt
@@ -557,7 +561,8 @@
             val = X * w .- dot(w, zerovec)
             @test isapprox(expected_risk(r[3], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
             if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
+               isa(pr1, EmpiricalPriorResult)
                 @test isnothing(rv[3].w)
             elseif isa(pr1,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -567,7 +572,7 @@
                 @test rv[3].w === pr1.w
             end
             @test rv[3].mu === zerovecv
-            if !isa(pr1, EntropyPoolingPriorResult)
+            if isa(pr1, HighOrderPriorEstimator)
                 @test rv[3].kt == prv.kt
             else
                 @test rv[3].kt == ktv
@@ -578,7 +583,7 @@
 
             @test r[4].alg == Semi()
             @test r[4].mu === pr1.mu
-            if !isa(pr1, EntropyPoolingPriorResult)
+            if isa(pr1, HighOrderPriorEstimator)
                 @test r[4].kt == pr1.kt
             else
                 @test r[4].kt == kt
@@ -588,7 +593,7 @@
             @test isapprox(expected_risk(r[4], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
             @test rv[4].alg == Semi()
             @test rv[4].mu === prv.mu
-            if !isa(pr1, EntropyPoolingPriorResult)
+            if isa(pr1, HighOrderPriorEstimator)
                 @test rv[4].kt == prv.kt
             else
                 @test rv[4].kt == ktv
@@ -603,20 +608,20 @@
             skv = nothing_scalar_array_view_odd_order(sk, i, idx)
             Vv = __coskewness(skv, view(pr1.X, :, i), ske.mp)
             rs = [NegativeSkewness(; settings = settings, alg = QuadraticNegativeSkewness(),
-                                   sk = if !isa(pr1, EntropyPoolingPriorResult)
+                                   sk = if isa(pr1, HighOrderPriorEstimator)
                                        pr1.sk
                                    else
                                        sk
-                                   end, V = if !isa(pr1, EntropyPoolingPriorResult)
+                                   end, V = if isa(pr1, HighOrderPriorEstimator)
                                        pr1.V
                                    else
                                        V
                                    end),
-                  NegativeSkewness(; sk = if !isa(pr1, EntropyPoolingPriorResult)
+                  NegativeSkewness(; sk = if isa(pr1, HighOrderPriorEstimator)
                                        pr1.sk
                                    else
                                        sk
-                                   end, V = if !isa(pr1, EntropyPoolingPriorResult)
+                                   end, V = if isa(pr1, HighOrderPriorEstimator)
                                        pr1.V
                                    else
                                        V
@@ -626,7 +631,7 @@
 
             @test r[1].settings === settings
             @test r[1].alg === QuadraticNegativeSkewness()
-            if !isa(pr1, EntropyPoolingPriorResult)
+            if isa(pr1, HighOrderPriorEstimator)
                 @test r[1].sk === pr1.sk
                 @test r[1].V === pr1.V
                 @test isapprox(expected_risk(r[1], w, X), dot(w, pr1.V, w))
@@ -637,7 +642,7 @@
             end
             @test rv[1].settings === settings
             @test rv[1].alg === QuadraticNegativeSkewness()
-            if !isa(pr1, EntropyPoolingPriorResult)
+            if isa(pr1, HighOrderPriorEstimator)
                 @test rv[1].sk == prv.sk
                 @test rv[1].V == prv.V
                 @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, prv.V, wv))
@@ -646,7 +651,7 @@
                 @test rv[1].V == Vv
                 @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, Vv, wv))
             end
-            if !isa(pr1, EntropyPoolingPriorResult)
+            if isa(pr1, HighOrderPriorEstimator)
                 @test r[2].sk === pr1.sk
                 @test r[2].V === pr1.V
                 @test isapprox(expected_risk(r[2], w, X), sqrt(dot(w, pr1.V, w)))
@@ -655,7 +660,7 @@
                 @test r[2].V == V
                 @test isapprox(expected_risk(r[2], w, X), sqrt(dot(w, V, w)))
             end
-            if !isa(pr1, EntropyPoolingPriorResult)
+            if isa(pr1, HighOrderPriorEstimator)
                 @test rv[2].sk == prv.sk
                 @test rv[2].V == prv.V
                 @test isapprox(expected_risk(rv[2], wv, prv.X), sqrt(dot(wv, prv.V, wv)))
