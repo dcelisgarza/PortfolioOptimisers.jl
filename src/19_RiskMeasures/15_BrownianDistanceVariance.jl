@@ -22,4 +22,5 @@ function (::BrownianDistanceVariance)(x::AbstractVector)
     return val
 end
 
-export BrownianDistanceVariance
+export NormOneConeBrownianDistanceVariance, IneqBrownianDistanceVariance,
+       BrownianDistanceVariance

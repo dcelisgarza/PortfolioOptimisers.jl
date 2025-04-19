@@ -9,8 +9,8 @@ function WeightsTracking(; w::AbstractVector{<:Real},
     @smart_assert(!isempty(w))
     return WeightsTracking{typeof(w), typeof(fees)}(w, fees)
 end
-function tracking_benchmark(X::AbstractMatrix{<:Real}, tracking::WeightsTracking)
-    return calc_net_asset_returns(X, tracking.w, tracking.fees)
+function tracking_benchmark(tracking::WeightsTracking, X::AbstractMatrix{<:Real})
+    return calc_net_returns(tracking.w, X, tracking.fees)
 end
 struct ReturnsTracking{T1 <: AbstractVector{<:Real}} <: AbstractTracking
     w::T1
@@ -19,7 +19,7 @@ function ReturnsTracking(; w::AbstractVector{<:Real})
     @smart_assert(!isempty(w))
     return ReturnsTracking{typeof(w)}(w)
 end
-function tracking_benchmark(::Any, tracking::ReturnsTracking)
+function tracking_benchmark(tracking::ReturnsTracking, ::Any)
     return tracking.w
 end
 struct TrackingError{T1 <: Real, T2 <: AbstractTracking}

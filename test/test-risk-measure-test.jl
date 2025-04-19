@@ -34,6 +34,13 @@
         ucs2view = ucs_view(nothing, ucs2, i)
         rc = LinearConstraint(; A = LinearConstraintSide(; group = :A, name = :B), B = 0)
 
+        rs = BrownianDistanceVariance(; settings = settings,
+                                      formulation = IneqBrownianDistanceVariance())
+        r = risk_measure_factory(rs)
+        rv = risk_measure_view(rs)
+        @test r === rs === rv
+        @test isapprox(expected_risk(r, w, X), 0.2018426182783387)
+
         views = [EntropyPoolingViewEstimator(;
                                              A = C4_LinearEntropyPoolingConstraintEstimator(;
                                                                                             group1 = :Assets,
@@ -860,7 +867,6 @@
     @testset "Settings only risk measures" begin
         rng = StableRNG(123456789)
         X = randn(rng, 500, 10)
-        ew = eweights(1:500, 1 / 500; scale = true)
         w = rand(rng, 10)
         w ./= sum(w)
         pe = EmpiricalPriorEstimator()
@@ -879,5 +885,46 @@
         @test isapprox(expected_risk.(r, Ref(w), Ref(X)),
                        [4.729197396913109, 0.9852613709401206, 10.012825798312244,
                         1.0000278890665872, -lb, ub - lb, inv(length(w))])
+    end
+    @testset "Tracking and turnover" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 500, 10)
+        w1 = 1:10
+        w2 = 10:-1:1
+        w1 /= sum(w1)
+        w2 /= sum(w2)
+        i = [8, 5, 3]
+        w1v = nothing_scalar_array_view(w1, i)
+        w2v = nothing_scalar_array_view(w2, i)
+        Xv = view(X, :, i)
+        rs = [TurnoverRiskMeasure(; settings = settings, w = w2),
+              TrackingRiskMeasure(; settings = settings,
+                                  tracking = WeightsTracking(; w = w2)),
+              TrackingRiskMeasure(; settings = settings,
+                                  tracking = ReturnsTracking(; w = X * w2))]
+        r = risk_measure_factory(rs)
+        rv = risk_measure_view(rs, nothing, Ref(i))
+
+        @test all(rs .=== r)
+        @test rv[1].w == rv[2].tracking.w == view(w2, i)
+        @test rs[3] === r[3] === rv[3]
+
+        er1 = expected_risk.(r, Ref(w2), Ref(X))
+        @test all(iszero, er1)
+
+        er2 = expected_risk.(r, Ref(w1), Ref(X))
+        @test isapprox(er2,
+                       [norm(w1 - w2, 1), norm((X * w1 - X * w2) / (sqrt(size(X, 1) - 1))),
+                        norm((X * w1 - X * w2) / (sqrt(size(X, 1) - 1)))])
+
+        er3 = expected_risk.(rv, Ref(w2v), Ref(Xv))
+        @test all(iszero, er3[1:2])
+        @test isapprox(er3[3], norm((Xv * w2v - X * w2) / (sqrt(size(X, 1) - 1))))
+
+        er4 = expected_risk.(rv, Ref(w1v), Ref(Xv))
+        @test isapprox(er4,
+                       [norm(w1v - w2v, 1),
+                        norm((Xv * w1v - Xv * w2v) / (sqrt(size(X, 1) - 1))),
+                        norm((Xv * w1v - X * w2) / (sqrt(size(X, 1) - 1)))])
     end
 end
