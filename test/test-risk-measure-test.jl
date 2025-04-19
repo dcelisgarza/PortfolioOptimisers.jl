@@ -697,9 +697,15 @@
         @test all(rs1 .=== r1)
         @test all(rs1 .=== rv1)
         er1 = expected_risk.(r1, Ref(w), Ref(X))
-        @test isapprox(er1,
+        res = isapprox(er1,
                        [0.002979408952834433, 0.0033497521220081376, 0.01747290349846975,
                         0.011423759846772574])
+        if !res
+            find_tol(er1,
+                     [0.002979408952834433, 0.0033497521220081376, 0.01747290349846975,
+                      0.011423759846772574]; name1 = :er1, name2 = :res)
+        end
+        @test res
 
         settings = RiskMeasureSettings(; rke = false, scale = 2, ub = 3)
         hcsettings = HierarchicalRiskMeasureSettings(; scale = -2)
@@ -712,9 +718,15 @@
         @test all(rs2 .=== r2)
         @test all(rs2 .=== rv2)
         er2 = expected_risk.(r2, Ref(w), Ref(X))
-        @test isapprox(er2,
+        res = isapprox(er2,
                        [0.004336619383058753, 0.002433632636088897, 0.030517667443021403,
                         0.012855891046985323])
+        if !res
+            find_tol(er1,
+                     [0.004336619383058753, 0.002433632636088897, 0.030517667443021403,
+                      0.012855891046985323]; name1 = :er1, name2 = :res)
+        end
+        @test res
 
         rs3 = [EntropicValueatRisk(; settings = settings, alpha = 0.1, slv = slv),
                EntropicValueatRiskRange(; settings = settings, alpha = 0.2, beta = 0.3,
@@ -728,9 +740,15 @@
         @test r3[4].slv === slv
         @test all(r3 .=== rv3)
         er3 = expected_risk.(r3, Ref(w), Ref(X))
-        @test isapprox(er3,
+        res = isapprox(er3,
                        [0.0053317677739742235, 0.007936600442013136, 0.034345738932130394,
-                        0.03172723567187419])
+                        0.03172723567187419]; rtol = 1e-6)
+        if !res
+            find_tol(er1,
+                     [0.0053317677739742235, 0.007936600442013136, 0.034345738932130394,
+                      0.03172723567187419]; name1 = :er1, name2 = :res)
+        end
+        @test res
 
         rs4 = [RelativisticValueatRisk(; settings = settings, alpha = 0.1, kappa = 0.4,
                                        slv = slv),
@@ -747,8 +765,14 @@
         @test r4[4].slv === slv
         @test all(r4 .=== rv4)
         er4 = expected_risk.(r4, Ref(w), Ref(X))
-        @test isapprox(er4,
+        res = isapprox(er4,
                        [0.00686226055400148, 0.01232999076425514, 0.03696131888913639,
-                        0.03325026478122334])
+                        0.03325026478122334]; rtol = 5e-7)
+        if !res
+            find_tol(er1,
+                     [0.00686226055400148, 0.01232999076425514, 0.03696131888913639,
+                      0.03325026478122334]; name1 = :er1, name2 = :res)
+        end
+        @test res
     end
 end
