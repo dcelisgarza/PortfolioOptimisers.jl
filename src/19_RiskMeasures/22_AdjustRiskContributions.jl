@@ -4,7 +4,7 @@ const SquaredRiskMeasures = Union{<:Variance,
                                   <:NegativeSkewness{<:Any, <:QuadraticNegativeSkewness,
                                                      <:Any, <:Any, <:Any},
                                   <:UncertaintySetVariance}
-const CubedRiskMeasures = Union{<:Skewness,
+const CubedRiskMeasures = Union{<:ThirdCentralMoment, <:Skewness,
                                 <:HighOrderMoment{<:Any, <:ThirdLowerMoment, <:Any, <:Any},
                                 <:HighOrderMoment{<:Any,
                                                   <:HighOrderDeviation{<:ThirdLowerMoment,
@@ -28,7 +28,7 @@ end
 function adjust_risk_contribution(::SquaredRiskMeasures, val, args...)
     return val * 0.5
 end
-function adjust_risk_contribution(::Skewness, val, args...)
+function adjust_risk_contribution(::CubedRiskMeasures, val, args...)
     return val / 3
 end
 function adjust_risk_contribution(::FourthPowerRiskMeasures, val, args...)
