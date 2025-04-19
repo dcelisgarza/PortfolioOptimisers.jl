@@ -775,4 +775,26 @@
         end
         @test res
     end
+    @testset "OWA" begin
+        rng = StableRNG(987456321)
+        X = randn(rng, 500, 20) * 0.01
+        w = rand(rng, 20)
+        w ./= sum(w)
+        settings = RiskMeasureSettings(; rke = false, scale = 2, ub = 3)
+        rs1 = [OrderedWeightsArray(; settings = settings),
+               OrderedWeightsArray(; formulation = ExactOrderedWeightsArray(),
+                                   w = owa_tg(500; alpha_i = 0.001, alpha = 0.06,
+                                              a_sim = 70)), GiniMeanDifference(),
+               TailGini(; alpha_i = 0.001, alpha = 0.06, a_sim = 70), TailGiniRange()]
+        r1 = risk_measure_factory(rs1)
+        rv1 = risk_measure_view(rs1)
+        @test all(rs1 .=== r1)
+        @test all(rs1 .=== rv1)
+        er1 = expected_risk.(r1, Ref(w), Ref(X))
+        @test er1[1] == er1[3]
+        @test er1[2] == er1[4]
+        @test isapprox(er1,
+                       [0.0027927028241994376, 0.005092766618669591, 0.0027927028241994376,
+                        0.005092766618669591, 0.010867592331463578])
+    end
 end
