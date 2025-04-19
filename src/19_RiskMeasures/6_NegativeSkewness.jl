@@ -62,9 +62,6 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:AbstractMa
     idx = fourth_moment_index_factory(size(prior.X, 2), i)
     sk = view(r.sk, i, idx)
     V = __coskewness(sk, view(prior.X, :, i), r.mp)
-    if all(iszero, diag(V))
-        V[diagind(V)] = I(size(V, 1))
-    end
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
 function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, Nothing, <:Any},
@@ -75,9 +72,6 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, Nothing, <:A
     idx = fourth_moment_index_factory(size(prior.X, 2), i)
     sk = view(prior.sk, i, idx)
     V = __coskewness(sk, view(prior.X, :, i), prior.skmp)
-    if all(iszero, diag(V))
-        V[diagind(V)] = I(size(V, 1))
-    end
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
 

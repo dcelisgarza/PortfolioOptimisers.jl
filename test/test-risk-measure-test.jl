@@ -680,4 +680,75 @@
             end
         end
     end
+    @testset "X at risk" begin
+        rng = StableRNG(987654321)
+        X = randn(rng, 500, 20) * 0.01
+        w = rand(rng, 20)
+        w ./= sum(w)
+        slv = Solver(; name = :Clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false))
+        settings = HierarchicalRiskMeasureSettings(; scale = 2)
+        rs1 = [ValueatRisk(; settings = settings, alpha = 0.1),
+               ValueatRiskRange(; settings = settings, alpha = 0.2, beta = 0.3),
+               DrawdownatRisk(; settings = settings, alpha = 0.4),
+               RelativeDrawdownatRisk(; settings = settings, alpha = 0.5)]
+        r1 = risk_measure_factory(rs1)
+        rv1 = risk_measure_view(rs1)
+        @test all(rs1 .=== r1)
+        @test all(rs1 .=== rv1)
+        er1 = expected_risk.(r1, Ref(w), Ref(X))
+        @test isapprox(er1,
+                       [0.002979408952834433, 0.0033497521220081376, 0.01747290349846975,
+                        0.011423759846772574])
+
+        settings = RiskMeasureSettings(; rke = false, scale = 2, ub = 3)
+        hcsettings = HierarchicalRiskMeasureSettings(; scale = -2)
+        rs2 = [ConditionalValueatRisk(; settings = settings, alpha = 0.1),
+               ConditionalValueatRiskRange(; settings = settings, alpha = 0.2, beta = 0.3),
+               ConditionalDrawdownatRisk(; settings = settings, alpha = 0.4),
+               RelativeConditionalDrawdownatRisk(; settings = hcsettings, alpha = 0.5)]
+        r2 = risk_measure_factory(rs2)
+        rv2 = risk_measure_view(rs2)
+        @test all(rs2 .=== r2)
+        @test all(rs2 .=== rv2)
+        er2 = expected_risk.(r2, Ref(w), Ref(X))
+        @test isapprox(er2,
+                       [0.004336619383058753, 0.002433632636088897, 0.030517667443021403,
+                        0.012855891046985323])
+
+        rs3 = [EntropicValueatRisk(; settings = settings, alpha = 0.1, slv = slv),
+               EntropicValueatRiskRange(; settings = settings, alpha = 0.2, beta = 0.3,
+                                        slv = slv),
+               EntropicDrawdownatRisk(; settings = settings, alpha = 0.4),
+               RelativeEntropicDrawdownatRisk(; settings = hcsettings, alpha = 0.5)]
+        r3 = risk_measure_factory(rs3, nothing, Ref(slv))
+        rv3 = risk_measure_view(rs3, nothing, nothing, Ref(slv))
+        @test all(rs3[1:2] .=== r3[1:2])
+        @test r3[3].slv === slv
+        @test r3[4].slv === slv
+        @test all(r3 .=== rv3)
+        er3 = expected_risk.(r3, Ref(w), Ref(X))
+        @test isapprox(er3,
+                       [0.0053317677739742235, 0.007936600442013136, 0.034345738932130394,
+                        0.03172723567187419])
+
+        rs4 = [RelativisticValueatRisk(; settings = settings, alpha = 0.1, kappa = 0.4,
+                                       slv = slv),
+               RelativisticValueatRiskRange(; settings = settings, alpha = 0.02,
+                                            kappa_a = 0.2, beta = 0.05, kappa_b = 0.2,
+                                            slv = slv),
+               RelativisticDrawdownatRisk(; settings = settings, alpha = 0.4, kappa = 0.35),
+               RelativeRelativisticDrawdownatRisk(; settings = hcsettings, alpha = 0.5,
+                                                  kappa = 0.25)]
+        r4 = risk_measure_factory(rs4, nothing, Ref(slv))
+        rv4 = risk_measure_view(rs4, nothing, nothing, Ref(slv))
+        @test all(rs4[1:2] .=== r4[1:2])
+        @test r4[3].slv === slv
+        @test r4[4].slv === slv
+        @test all(r4 .=== rv4)
+        er4 = expected_risk.(r4, Ref(w), Ref(X))
+        @test isapprox(er4,
+                       [0.00686226055400148, 0.01232999076425514, 0.03696131888913639,
+                        0.03325026478122334])
+    end
 end

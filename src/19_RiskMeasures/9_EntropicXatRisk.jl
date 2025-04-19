@@ -159,7 +159,7 @@ for r ∈ (EntropicValueatRisk, EntropicDrawdownatRisk, RelativeEntropicDrawdown
                                         slv::Union{Nothing, <:Solver,
                                                    <:AbstractVector{<:Solver}}, args...;
                                         kwargs...)
-                 return risk_measure_factory(r; slv = slv, kwargs = kwargs)
+                 return risk_measure_factory(r, nothing, slv, args...; kwargs...)
              end
          end)
 end

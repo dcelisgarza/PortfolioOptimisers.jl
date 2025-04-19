@@ -138,12 +138,12 @@ struct RelativisticDrawdownatRisk{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: R
                                   Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}} <:
        SolverRiskMeasure
     settings::T1
-    alpha::T1
-    kappa::T2
+    alpha::T2
+    kappa::T3
     slv::T4
 end
 function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(), alpha::Real = 0.05,
-                                    kappa = 0.3,
+                                    kappa::Real = 0.3,
                                     slv::Union{Nothing, <:Solver,
                                                <:AbstractVector{<:Solver}} = nothing)
     if isa(slv, AbstractVector)
@@ -151,6 +151,7 @@ function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(), alpha::R
     end
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(kappa) < kappa < one(kappa))
+    println(typeof(settings), typeof(alpha), typeof(kappa), typeof(slv))
     return RelativisticDrawdownatRisk{typeof(settings), typeof(alpha), typeof(kappa),
                                       typeof(slv)}(settings, alpha, kappa, slv)
 end
@@ -222,7 +223,7 @@ for r ∈ (RelativisticValueatRisk, RelativisticDrawdownatRisk,
                                         slv::Union{Nothing, <:Solver,
                                                    <:AbstractVector{<:Solver}}, args...;
                                         kwargs...)
-                 return risk_measure_factory(r; slv = slv, kwargs = kwargs)
+                 return risk_measure_factory(r, nothing, slv, args...; kwargs...)
              end
          end)
 end
