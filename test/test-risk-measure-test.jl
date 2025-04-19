@@ -824,28 +824,36 @@
         settings = RiskMeasureSettings(; rke = false, scale = 2, ub = 3)
         for pe ∈ pes
             pr1 = prior(pe, X)
-            rs = [AverageDrawdown(; settings = settings), RelativeAverageDrawdown(; w = ew)]
+            rs = [AverageDrawdown(; settings = settings), RelativeAverageDrawdown(;),
+                  AverageDrawdown(; w = ew), RelativeAverageDrawdown(; w = ew)]
             r = risk_measure_factory(rs, Ref(pr1))
             rv = risk_measure_view(rs, Ref(pr1), nothing)
             if isa(pr1, EmpiricalPriorResult)
                 @test all(r .=== rs)
                 @test all(rv .=== rs)
                 @test isapprox(expected_risk.(r, Ref(w), Ref(X)),
-                               [3.751365586265874, 0.9888287864252111])
+                               [3.751365586265874, 0.9811305224406326, 3.36092436959623,
+                                0.9888287864252111])
             elseif isa(pr1,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
                                             <:Any, <:Any})
                 r[1].w === pr1.pr.w
-                r[2].w === ew
+                r[2].w === pr1.pr.w
+                r[3].w === ew
+                r[4].w === ew
                 @test all(rv .=== r)
                 @test isapprox(expected_risk.(r, Ref(w), Ref(X)),
-                               [3.7517665162794507, 0.9888287864252111])
+                               [3.7517665162794507, 0.9811101606850575, 3.36092436959623,
+                                0.9888287864252111])
             else
                 r[1].w === pr1.w
-                r[2].w === ew
+                r[2].w === pr1.w
+                r[3].w === ew
+                r[4].w === ew
                 @test all(rv .=== r)
                 @test isapprox(expected_risk.(r, Ref(w), Ref(X)),
-                               [3.7517665162794507, 0.9888287864252111])
+                               [3.7517665162794507, 0.9811101606850575, 3.36092436959623,
+                                0.9888287864252111])
             end
         end
     end
