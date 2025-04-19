@@ -5,7 +5,6 @@ abstract type MuNoOptimisationRiskMeasure <: NoOptimisationRiskMeasure end
 abstract type AbstractMomentNoOptimisationRiskMeasure <: MuNoOptimisationRiskMeasure end
 
 abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end
-
 abstract type RiskMeasure <: OptimisationRiskMeasure end
 abstract type SigmaRiskMeasure <: RiskMeasure end
 abstract type JuMPRiskContributionSigmaRiskMeasure <: SigmaRiskMeasure end
@@ -49,17 +48,17 @@ const MomentRiskMeasures = Union{AbstractMomentRiskMeasure,
                                  AbstractMomentNoOptimisationRiskMeasure}
 
 const SolverRiskMeasures = Union{SolverRiskMeasure, SolverHierarchicalRiskMeasure}
-function risk_measure_factory(rs::OptimisationRiskMeasure, args...; kwargs...)
+function risk_measure_factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
     return rs
 end
-function risk_measure_view(rs::OptimisationRiskMeasure, args...; kwargs...)
+function risk_measure_view(rs::AbstractBaseRiskMeasure, args...; kwargs...)
     return rs
 end
-function risk_measure_factory(rs::AbstractVector{<:OptimisationRiskMeasure}, args...;
+function risk_measure_factory(rs::AbstractVector{<:AbstractBaseRiskMeasure}, args...;
                               kwargs...)
     return risk_measure_factory.(rs, args...; kwargs...)
 end
-function risk_measure_view(rs::AbstractVector{<:OptimisationRiskMeasure}, args...;
+function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, args...;
                            kwargs...)
     return risk_measure_view.(rs, args...; kwargs...)
 end

@@ -927,4 +927,90 @@
                         norm((Xv * w1v - Xv * w2v) / (sqrt(size(X, 1) - 1))),
                         norm((Xv * w1v - X * w2) / (sqrt(size(X, 1) - 1)))])
     end
+    @testset "No optimisation risk measures" begin
+        rng = StableRNG(123456789)
+        X = randn(rng, 500, 20)
+        ew = eweights(1:500, 1 / 500; scale = true)
+        w = rand(rng, 20)
+        w ./= sum(w)
+        i = [20, 3, 9]
+        wv = nothing_scalar_array_view(w, i)
+        views = [EntropyPoolingViewEstimator(;
+                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                            group = :Assets,
+                                                                                            coef = 1,
+                                                                                            name = 1),
+                                             B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                           coef = 0.02),
+                                             comp = EQ())]
+        sets = DataFrame(:Assets => 1:20)
+        pes = [EmpiricalPriorEstimator(),
+               HighOrderPriorEstimator(;
+                                       pe = EntropyPoolingPriorEstimator(; views = views,
+                                                                         sets = sets,
+                                                                         alg = H1_EntropyPooling())),
+               EntropyPoolingPriorEstimator(; views = views, sets = sets,
+                                            alg = H1_EntropyPooling())]
+        mu = rand(rng, 20)
+        muv = nothing_scalar_array_view(mu, i)
+
+        for pe ∈ pes
+            pr1 = prior(pe, X)
+            rs = [MeanReturn(;), MeanReturn(; w = ew), ThirdCentralMoment(),
+                  ThirdCentralMoment(; mu = mu, w = ew), Skewness(),
+                  Skewness(;
+                           ve = SimpleVariance(; corrected = false,
+                                               me = SimpleExpectedReturns(; w = ew),
+                                               w = ew), w = ew, mu = mu)]
+            r = risk_measure_factory(rs, Ref(pr1))
+            rv = risk_measure_view(rs, Ref(pr1), Ref(i))
+            er = expected_risk.(r, Ref(w), Ref(X))
+            if isa(pr1, EmpiricalPriorResult)
+                @test isnothing(r[1].w)
+                @test isnothing(rv[1].w)
+                @test isnothing(r[3].w)
+                @test isnothing(rv[3].w)
+                @test isnothing(r[5].w)
+                @test isnothing(rv[5].w)
+                @test isnothing(r[5].ve.me.w)
+                @test isnothing(rv[5].ve.me.w)
+                @test isapprox(er,
+                               [0.005409516986537154, 0.0076144516706446825,
+                                0.0013290846602404623, -0.11048583259699596,
+                                0.08735509114197064, -1.364524291534291])
+            elseif isa(pr1, HighOrderPriorResult)
+                @test r[1].w === pr1.pr.w
+                @test rv[1].w === pr1.pr.w
+                @test r[3].w === pr1.pr.w
+                @test rv[3].w === pr1.pr.w
+                @test r[5].w === pr1.pr.w
+                @test rv[5].w === pr1.pr.w
+                @test r[5].ve.me.w === pr1.pr.w
+                @test rv[5].ve.me.w === pr1.pr.w
+                @test isapprox(er,
+                               [0.005211295487597505, 0.0076144516706446825,
+                                0.0013655247071769562, -0.11048583259699596,
+                                0.08979373959490125, -1.364524291534291])
+            else
+                @test r[1].w === pr1.w
+                @test rv[1].w === pr1.w
+                @test r[3].w === pr1.w
+                @test rv[3].w === pr1.w
+                @test r[5].w === pr1.w
+                @test rv[5].w === pr1.w
+                @test r[5].ve.me.w === pr1.w
+                @test rv[5].ve.me.w === pr1.w
+                @test isapprox(er,
+                               [0.005211295487597505, 0.0076144516706446825,
+                                0.0013655247071769562, -0.11048583259699596,
+                                0.08979373959490125, -1.364524291534291])
+            end
+            @test r[2].w === ew
+            @test rv[2].w === ew
+            @test r[4].w === ew
+            @test rv[4].w === ew
+            @test r[6].ve.me.w === ew
+            @test rv[6].ve.me.w === ew
+        end
+    end
 end

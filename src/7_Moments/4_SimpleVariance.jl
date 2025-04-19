@@ -10,8 +10,7 @@ function SimpleVariance(;
                         w::Union{Nothing, <:AbstractWeights} = nothing)
     return SimpleVariance{typeof(me), typeof(corrected), typeof(w)}(me, corrected, w)
 end
-function StatsBase.std(ve::SimpleVariance{<:Any, <:Any, <:Any}, X::AbstractMatrix;
-                       dims::Int = 1, mean = nothing)
+function StatsBase.std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing)
     mu = isnothing(mean) ? StatsBase.mean(ve.me, X; dims = dims) : mean
     return if isnothing(ve.w)
         std(X; dims = dims, corrected = ve.corrected, mean = mu)
@@ -19,16 +18,14 @@ function StatsBase.std(ve::SimpleVariance{<:Any, <:Any, <:Any}, X::AbstractMatri
         std(X, ve.w, dims; corrected = ve.corrected, mean = mu)
     end
 end
-function StatsBase.std(ve::SimpleVariance{Nothing, <:Any, <:Any}, X::AbstractVector;
-                       mean = nothing)
+function StatsBase.std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
     return if isnothing(ve.w)
         std(X; corrected = ve.corrected, mean = mean)
     else
         std(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
-function StatsBase.var(ve::SimpleVariance{<:Any, <:Any, <:Any}, X::AbstractMatrix;
-                       dims::Int = 1, mean = nothing)
+function StatsBase.var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing)
     mu = isnothing(mean) ? StatsBase.mean(ve.me, X; dims = dims) : mean
     return if isnothing(ve.w)
         var(X; dims = dims, corrected = ve.corrected, mean = mu)
@@ -36,8 +33,7 @@ function StatsBase.var(ve::SimpleVariance{<:Any, <:Any, <:Any}, X::AbstractMatri
         var(X, ve.w, dims; corrected = ve.corrected, mean = mu)
     end
 end
-function StatsBase.var(ve::SimpleVariance{Nothing, <:Any, <:Any}, X::AbstractVector;
-                       mean = nothing)
+function StatsBase.var(ve::SimpleVariance, X::AbstractVector; mean = nothing)
     return if isnothing(ve.w)
         var(X; corrected = ve.corrected, mean = mean)
     else
