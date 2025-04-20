@@ -199,157 +199,197 @@
             @test res
         end
     end
-end
-#=
-@testset "Hierarchical Equal Risk Contribution" begin
-    rng = StableRNG(123456789)
-    X = randn(rng, 1000, 15)
-    rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-
-    pr = prior(HighOrderPriorEstimator(), rd)
-    clm = clusterise(ClusteringEstimator(), pr.X)
-    opt = HierarchicalOptimiser(; pe = pr, cle = clm,
-                                slv = Solver(; name = :clarabel,
-                                             solver = Clarabel.Optimizer,
-                                             check_sol = (; allow_local = true,
-                                                          allow_almost = true),
-                                             settings = Dict("max_step_fraction" => 0.75,
-                                                             "verbose" => false)))
-    ew = eweights(1:size(X, 1), inv(size(X, 1)); scale = true)
-
-    df = CSV.read(joinpath(@__DIR__, "./assets/HERC_same_measures.csv"), DataFrame)
-    risks = [ValueatRiskRange(), ValueatRiskRange(; alpha = 0.3, beta = 0.25),
-             ValueatRisk(), ValueatRisk(; alpha = 0.3), DrawdownatRisk(),
-             DrawdownatRisk(; alpha = 0.3), RelativeDrawdownatRisk(),
-             RelativeDrawdownatRisk(; alpha = 0.3), RelativeAverageDrawdown(),
-             RelativeAverageDrawdown(; w = ew), RelativeEntropicDrawdownatRisk(),
-             RelativeEntropicDrawdownatRisk(; alpha = 0.3), RelativeMaximumDrawdown(),
-             RelativeRelativisticDrawdownatRisk(),
-             RelativeRelativisticDrawdownatRisk(; alpha = 0.3), RelativeUlcerIndex(),
-             EqualRiskMeasure(), FirstLowerPartialMoment(),
-             FirstLowerPartialMoment(; target = 2e-4),
-             FirstLowerPartialMoment(; mu = pr.mu / 5), FirstLowerPartialMoment(; w = ew),
-             NegativeQuadraticSemiSkewness(), NegativeSemiSkewness(),
-             SemiStandardDeviation(), SemiVariance(), BrownianDistanceVariance(),
-             ConditionalValueatRiskRange(),
-             ConditionalValueatRiskRange(; alpha = 0.3, beta = 0.25),
-             EntropicValueatRiskRange(),
-             EntropicValueatRiskRange(; alpha = 0.18, beta = 0.31), GiniMeanDifference(),
-             MeanAbsoluteDeviation(), MeanAbsoluteDeviation(; target = 2e-4),
-             MeanAbsoluteDeviation(; mu = pr.mu / 5), MeanAbsoluteDeviation(; w = ew),
-             MeanAbsoluteDeviation(; we = ew), NegativeQuadraticSkewness(),
-             NegativeSkewness(), Range(), RelativisticValueatRiskRange(),
-             RelativisticValueatRiskRange(; alpha = 0.14, kappa_a = 0.4, beta = 0.27,
-                                          kappa_b = 0.1), SquareRootKurtosis(),
-             SquareRootSemiKurtosis(), StandardDeviation(), TailGiniRange(),
-             TailGiniRange(; alpha_i = 1e-6, alpha = 0.16, a_sim = 125, beta_i = 1e-6,
-                           beta = 0.2, b_sim = 200), UncertaintySetVariance(), Variance()]
-    for (i, risk) ∈ enumerate(risks)
-        w1 = optimise!(HierarchicalEqualRiskContribution(; ri = risk, opt = opt))
-        res = if i == 14
-            isapprox(w1, df[:, i]; rtol = 1e-5)
-        elseif i == 29
-            if Sys.isapple()
-                isapprox(w1, df[:, i]; rtol = 1e-7)
-            else
-                isapprox(w1, df[:, i]; rtol = 5e-8)
-            end
-        elseif i == 30
-            isapprox(w1, df[:, i]; rtol = 5e-7)
-        elseif i == 40
-            isapprox(w1, df[:, i]; rtol = 1e-7)
-        elseif i == 41
-            if Sys.isapple()
-                isapprox(w1, df[:, i]; rtol = 5e-3)
-            else
-                isapprox(w1, df[:, i]; rtol = 1e-7)
-            end
-        else
-            isapprox(w1, df[:, i])
-        end
-        if !res
-            println("$i\n$(string(risk)) failed")
-            find_tol(w1, df[:, i]; name1 = :w1, name2 = :df)
-        end
-        @test res
-    end
-
-    df = CSV.read(joinpath(@__DIR__, "./assets/HERC_different_risk_measures.csv"),
-                  DataFrame)
-    for (i, (risk1, risk2)) ∈ enumerate(zip(risks, circshift(risks, 3)))
-        w1 = optimise!(HierarchicalEqualRiskContribution(; ri = risk1, ro = risk2,
-                                                         opt = opt))
-        res = if i == 14
-            isapprox(w1, df[:, i]; rtol = 1e-5)
-        elseif i == 29
-            if Sys.isapple()
-                isapprox(w1, df[:, i]; rtol = 1e-7)
-            else
-                isapprox(w1, df[:, i]; rtol = 5e-8)
-            end
-        elseif i == 30
-            isapprox(w1, df[:, i]; rtol = 1e-7)
-        elseif i == 32 && Sys.isapple()
-            isapprox(w1, df[:, i]; rtol = 1e-7)
-        elseif i == 33
-            isapprox(w1, df[:, i]; rtol = 1e-7)
-        elseif i == 40
-            isapprox(w1, df[:, i]; rtol = 5e-8)
-        elseif i == 41
-            if Sys.isapple()
-                isapprox(w1, df[:, i]; rtol = 5e-3)
-            else
-                isapprox(w1, df[:, i]; rtol = 5e-8)
-            end
-        elseif i == 44
-            if Sys.isapple()
-                isapprox(w1, df[:, i]; rtol = 5e-5)
-            else
-                isapprox(w1, df[:, i]; rtol = 5e-8)
-            end
-        else
-            isapprox(w1, df[:, i])
-        end
-        if !res
-            println("$i\n$(string(risk1))\n$(string(risk2)) failed")
-            find_tol(w1, df[:, i]; name1 = :w1, name2 = :df)
-        end
-        @test res
-    end
-
-    sces = [SumScalariser(), MaxScalariser(), LogSumExpScalariser(; gamma = 1e-3),
-            LogSumExpScalariser(; gamma = 3)]
-    base = [MeanAbsoluteDeviation(; settings = RiskMeasureSettings(; scale = 2.3)),
-            StandardDeviation(; settings = RiskMeasureSettings(; scale = 4.2))]
-    risks = [(r1 = base, r2 = base)
-             (r1 = base,
-              r2 = [ConditionalValueatRisk(; settings = RiskMeasureSettings(; scale = 3.2)),
-                    WorstRealisation(; settings = RiskMeasureSettings(; scale = 0.2))])
-             (r1 = base,
-              r2 = ConditionalValueatRisk(; settings = RiskMeasureSettings(; scale = 3.2)))
-             (r1 = ConditionalValueatRisk(; settings = RiskMeasureSettings(; scale = 3.2)),
-              r2 = base)]
-    df = CSV.read(joinpath(@__DIR__, "./assets/HERC_vector_rm.csv"), DataFrame)
-    for (idx, sce) ∈ zip(1:4:16, sces)
-        opt = HierarchicalOptimiser(; pe = pr, cle = clm, sce = sce,
-                                    slv = Solver(; name = :clarabel,
-                                                 solver = Clarabel.Optimizer,
-                                                 check_sol = (; allow_local = true,
-                                                              allow_almost = true),
-                                                 settings = Dict("max_step_fraction" => 0.75,
-                                                                 "verbose" => false)))
-        for (i, rs) ∈ enumerate(risks)
-            w = PortfolioOptimisers.optimise!(HierarchicalEqualRiskContribution(;
-                                                                                ri = rs.r1,
-                                                                                ro = rs.r2,
-                                                                                opt = opt))
-            res = isapprox(w, df[!, idx + i - 1])
+    @testset "Hierarchical Equal Risk Contribution" begin
+        rng = StableRNG(987456321)
+        X = randn(rng, 500, 10)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+        pr = prior(HighOrderPriorEstimator(), rd)
+        clm = clusterise(ClusteringEstimator(), pr.X)
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+        opt = HierarchicalOptimiser(; pe = pr, cle = clm, slv = slv)
+        ew = eweights(1:size(X, 1), inv(size(X, 1)); scale = true)
+        w1 = fill(inv(10), 10)
+        rf = 4.34 / 100 / 252
+        sigma = cov(GerberCovariance(), X)
+        mu = vec(mean(ShrunkExpectedReturns(; ce = GerberCovariance()), X))
+        sk, V = coskewness(Coskewness(; alg = Semi()), X; mean = transpose(mu))
+        df = CSV.read(joinpath(@__DIR__, "./assets/HERC_same_measures.csv"), DataFrame)
+        risks = [Variance(; sigma = sigma),#
+                 Variance(),# 2
+                 ###
+                 UncertaintySetVariance(; sigma = sigma),#
+                 UncertaintySetVariance(),# 4
+                 ###
+                 StandardDeviation(; sigma = sigma),#
+                 StandardDeviation(),# 6
+                 ###
+                 BrownianDistanceVariance(),# 7
+                 ###
+                 LowOrderMoment(; mu = mu),#
+                 LowOrderMoment(; mu = rf),#
+                 LowOrderMoment(; w = ew),#
+                 LowOrderMoment(),# 11
+                 ###
+                 LowOrderMoment(; alg = SemiDeviation(), mu = mu),#
+                 LowOrderMoment(; alg = SemiDeviation(), mu = rf),#
+                 LowOrderMoment(; alg = SemiDeviation(), w = ew),#
+                 LowOrderMoment(; alg = SemiDeviation()),# 15
+                 ###
+                 LowOrderMoment(; alg = SemiVariance(), mu = mu),#
+                 LowOrderMoment(; alg = SemiVariance(), mu = rf),#
+                 LowOrderMoment(; alg = SemiVariance(), w = ew),#
+                 LowOrderMoment(; alg = SemiVariance()),# 19
+                 ###
+                 LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),#
+                 LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),#
+                 LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),#
+                 LowOrderMoment(; alg = MeanAbsoluteDeviation()),# 23
+                 ###
+                 HighOrderMoment(; mu = mu),#
+                 HighOrderMoment(; mu = rf),#
+                 HighOrderMoment(; w = ew),#
+                 HighOrderMoment(),# 27
+                 ###
+                 HighOrderMoment(; alg = FourthLowerMoment(), mu = mu),#
+                 HighOrderMoment(; alg = FourthLowerMoment(), mu = rf),#
+                 HighOrderMoment(; alg = FourthLowerMoment(), w = ew),#
+                 HighOrderMoment(; alg = FourthLowerMoment()),# 31
+                 ###
+                 HighOrderMoment(; alg = FourthCentralMoment(), mu = mu),#
+                 HighOrderMoment(; alg = FourthCentralMoment(), mu = rf),#
+                 HighOrderMoment(; alg = FourthCentralMoment(), w = ew),#
+                 HighOrderMoment(; alg = FourthCentralMoment()),# 35
+                 ###
+                 HighOrderMoment(; alg = HighOrderDeviation(), mu = mu),#
+                 HighOrderMoment(; alg = HighOrderDeviation(), mu = rf),#
+                 HighOrderMoment(; alg = HighOrderDeviation(), w = ew),#
+                 HighOrderMoment(; alg = HighOrderDeviation()),# 39
+                 ###
+                 HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
+                                 mu = mu),#
+                 HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
+                                 mu = rf),#
+                 HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
+                                 w = ew),#
+                 HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment())),# 43
+                 ###
+                 HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()),
+                                 mu = mu),#
+                 HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()),
+                                 mu = rf),#
+                 HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()),
+                                 w = ew),#
+                 HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment())),# 47
+                 ###
+                 SquareRootKurtosis(),#
+                 SquareRootKurtosis(; mu = mu),#
+                 SquareRootKurtosis(; alg = Semi()),#
+                 SquareRootKurtosis(; alg = Semi(), mu = mu),# 51
+                 ###
+                 NegativeSkewness(),#
+                 NegativeSkewness(; alg = QuadraticNegativeSkewness()),#
+                 NegativeSkewness(; sk = sk, V = V),#
+                 NegativeSkewness(; alg = QuadraticNegativeSkewness(), sk = sk, V = V),# 55
+                 ###
+                 ValueatRisk(),#
+                 ValueatRiskRange(),#
+                 DrawdownatRisk(),#
+                 RelativeDrawdownatRisk(),# 59
+                 ###
+                 ConditionalValueatRisk(),#
+                 DistributionallyRobustConditionalValueatRisk(),#
+                 ConditionalValueatRiskRange(),#
+                 ConditionalDrawdownatRisk(),#
+                 RelativeConditionalDrawdownatRisk(),# 64
+                 ###
+                 EntropicValueatRisk(),#
+                 EntropicValueatRiskRange(),#
+                 EntropicDrawdownatRisk(),#
+                 RelativeEntropicDrawdownatRisk(),# 68
+                 ###
+                 RelativisticValueatRisk(),#
+                 RelativisticValueatRiskRange(),#
+                 RelativisticDrawdownatRisk(),#
+                 RelativeRelativisticDrawdownatRisk(),# 72
+                 ###
+                 OrderedWeightsArray(),#
+                 GiniMeanDifference(),#
+                 TailGini(),#
+                 TailGiniRange(),# 76
+                 ###
+                 AverageDrawdown(),#
+                 AverageDrawdown(; w = ew),#
+                 RelativeAverageDrawdown(),#
+                 RelativeAverageDrawdown(; w = ew),# 80
+                 ###
+                 UlcerIndex(),#
+                 RelativeUlcerIndex(),# 82
+                 ###
+                 MaximumDrawdown(),#
+                 RelativeMaximumDrawdown(),# 84
+                 ###
+                 WorstRealisation(),# 85
+                 ###
+                 Range(),# 86
+                 ###
+                 EqualRiskMeasure(),# 87
+                 ###
+                 TurnoverRiskMeasure(; w = w1),#
+                 TrackingRiskMeasure(; tracking = WeightsTracking(; w = w1)),#
+                 TrackingRiskMeasure(; tracking = ReturnsTracking(; w = pr.X * w1))]
+        names = string.(risks)
+        idx = [(findfirst(x -> x == '{', s) - 1) for s ∈ names]
+        names = [n[1:i] for (n, i) ∈ zip(names, idx)]
+        for (i, (risk, name)) ∈ enumerate(zip(risks, names))
+            name = name * "_$(i)"
+            w = optimise!(HierarchicalEqualRiskContribution(; ri = risk, opt = opt))
+            res = isapprox(w, df[!, name])
             if !res
-                println("Failed on vector rm HERC\n$sce\n$i")
-                find_tol(w, df[!, idx + i - 1]; name1 = :w, name2 = :df)
+                println("$name failed")
+                find_tol(w, df[!, name]; name1 = :w1, name2 = :df)
             end
             @test res
         end
+
+        rng = StableRNG(123456789)
+        X = randn(rng, 1000, 15)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+        pr = prior(HighOrderPriorEstimator(), rd)
+        clm = clusterise(ClusteringEstimator(), pr.X)
+        opt = HierarchicalOptimiser(; pe = pr, cle = clm, slv = slv)
+        sces = [SumScalariser(), MaxScalariser(), LogSumExpScalariser(; gamma = 1e-3),
+                LogSumExpScalariser(; gamma = 3)]
+        base = [LowOrderMoment(; alg = MeanAbsoluteDeviation(),
+                               settings = RiskMeasureSettings(; scale = 2.3)),
+                StandardDeviation(; settings = RiskMeasureSettings(; scale = 4.2))]
+        risks = [(r1 = base, r2 = base);
+                 (r1 = base,
+                  r2 = [ConditionalValueatRisk(;
+                                               settings = RiskMeasureSettings(;
+                                                                              scale = 3.2)),
+                        WorstRealisation(; settings = RiskMeasureSettings(; scale = 0.2))])
+                 (r1 = base,
+                  r2 = ConditionalValueatRisk(;
+                                              settings = RiskMeasureSettings(; scale = 3.2)))
+                 (r1 = ConditionalValueatRisk(;
+                                              settings = RiskMeasureSettings(; scale = 3.2)),
+                  r2 = base);
+                 (r1 = base[1], r2 = base[2])]
+        df = CSV.read(joinpath(@__DIR__, "./assets/HERC_vector_rm.csv"), DataFrame)
+        for (idx, sce) ∈ zip(1:5:20, sces)
+            opt = HierarchicalOptimiser(; pe = pr, cle = clm, sce = sce, slv = slv)
+            for (i, rs) ∈ enumerate(risks)
+                w = optimise!(HierarchicalEqualRiskContribution(; ri = rs.r1, ro = rs.r2,
+                                                                opt = opt))
+                res = isapprox(w, df[!, idx + i - 1])
+                if !res
+                    println("Failed on vector rm HERC\n$sce\n$i")
+                    find_tol(w, df[!, idx + i - 1]; name1 = :w, name2 = :df)
+                end
+                @test res
+            end
+        end
     end
 end
-=#
