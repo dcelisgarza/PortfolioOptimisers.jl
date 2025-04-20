@@ -41,7 +41,7 @@ function set_risk_bounds_and_expression!(opt::MeanRiskEstimator, model::JuMP.Mod
     return nothing
 end
 function set_risk_bounds_and_expression!(opt::MeanRiskEstimator, model::JuMP.Model,
-                                         r_expr_ub, ub::Union{Nothing, Real}, key::Symbol,
+                                         r_expr_ub, ub::Union{Nothing, <:Real}, key::Symbol,
                                          r_expr, settings::RiskMeasureSettings)
     set_risk_upper_bound!(opt, model, r_expr_ub, ub, key)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
@@ -63,10 +63,10 @@ function _set_risk_constraints!(model::JuMP.Model, r::StandardDeviation,
 end
 function sdp_rc_variance_flag!(::JuMP.Model, ::MeanRiskEstimator,
                                ::Union{Nothing,
-                                       LinearConstraintResult{<:PartialLinearConstraintResult{Nothing,
-                                                                                              Nothing},
-                                                              <:PartialLinearConstraintResult{Nothing,
-                                                                                              Nothing}}})
+                                       <:LinearConstraintResult{<:PartialLinearConstraintResult{Nothing,
+                                                                                                Nothing},
+                                                                <:PartialLinearConstraintResult{Nothing,
+                                                                                                Nothing}}})
     return false
 end
 function sdp_rc_variance_flag!(model::JuMP.Model, ::MeanRiskEstimator,

@@ -1,12 +1,12 @@
 struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                             T2 <: Union{<:ClusteringEstimator,
-                                         <:AbstractPortfolioOptimisersClusteringResult},
-                             T3 <: Union{Nothing, Fees},
+                             T2 <: Union{<:ClusteringEstimator, <:AbstractClusteringResult},
+                             T3 <: Union{Nothing, <:Fees},
                              T4 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                              T5 <: Scalariser,
-                             T6 <: Union{Nothing, <:WeightBounds, WeightBoundsConstraints},
+                             T6 <: Union{Nothing, <:WeightBoundsResult,
+                                         <:WeightBoundsConstraints},
                              T7 <: ClusteringWeightFinaliser,
-                             T8 <: Union{Nothing, DataFrame}, T9 <: Bool}
+                             T8 <: Union{Nothing, <:DataFrame}, T9 <: Bool}
     pe::T1
     cle::T2
     fees::T3
@@ -20,13 +20,14 @@ end
 function HierarchicalOptimiser(;
                                pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                                cle::Union{<:ClusteringEstimator,
-                                          <:AbstractPortfolioOptimisersClusteringResult} = ClusteringEstimator(),
+                                          <:AbstractClusteringResult} = ClusteringEstimator(),
                                fees::Union{Nothing, <:Fees} = nothing,
                                slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
                                sce::Scalariser = SumScalariser(),
-                               wb::Union{Nothing, <:WeightBounds, WeightBoundsConstraints} = nothing,
+                               wb::Union{Nothing, <:WeightBoundsResult,
+                                         <:WeightBoundsConstraints} = nothing,
                                cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
-                               sets::Union{Nothing, DataFrame} = nothing,
+                               sets::Union{Nothing, <:DataFrame} = nothing,
                                strict::Bool = false)
     if isa(sets, DataFrame)
         @smart_assert(!isempty(sets))
@@ -60,4 +61,5 @@ function unitary_expected_risks!(wk::AbstractVector, rk::AbstractVector,
     end
     return nothing
 end
+
 export HierarchicalOptimiser

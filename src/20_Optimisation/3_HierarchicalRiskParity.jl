@@ -12,8 +12,9 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
     end
     return HierarchicalRiskParity{typeof(opt), typeof(r)}(opt, r)
 end
-function split_factor_weight_constraints(alpha::Real, wb::WeightBounds, w::AbstractVector,
-                                         lc::AbstractVector, rc::AbstractVector)
+function split_factor_weight_constraints(alpha::Real, wb::WeightBoundsResult,
+                                         w::AbstractVector, lc::AbstractVector,
+                                         rc::AbstractVector)
     lb = wb.lb
     ub = wb.ub
     alpha = min(sum(view(ub, lc)) / w[lc[1]], max(sum(view(lb, lc)) / w[lc[1]], alpha))

@@ -191,7 +191,7 @@ function asset_philogeny(w::AbstractVector, X::AbstractMatrix)
     c /= sum(aw)
     return c
 end
-function asset_philogeny(cle::Union{NetworkEstimator, ClusteringEstimator},
+function asset_philogeny(cle::Union{<:NetworkEstimator, <:ClusteringEstimator},
                          w::AbstractVector, X::AbstractMatrix; dims::Int = 1, kwargs...)
     return asset_philogeny(w, philogeny_matrix(cle, X; dims = dims, kwargs...))
 end

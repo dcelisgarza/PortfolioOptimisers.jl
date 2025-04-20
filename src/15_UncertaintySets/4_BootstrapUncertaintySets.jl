@@ -31,7 +31,7 @@ function ARCHUncertaintySetEstimator(;
                                      bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
                                      n_sim::Integer = 3_000, block_size::Integer = 3,
                                      q::Real = 0.05,
-                                     seed::Union{<:Integer, Nothing} = nothing)
+                                     seed::Union{Nothing, <:Integer} = nothing)
     @smart_assert(n_sim > zero(n_sim))
     @smart_assert(block_size > zero(block_size))
     @smart_assert(zero(q) < q < one(q))

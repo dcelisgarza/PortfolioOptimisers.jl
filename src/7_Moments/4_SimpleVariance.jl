@@ -1,11 +1,11 @@
-struct SimpleVariance{T1 <: Union{Nothing, AbstractExpectedReturnsEstimator}, T2 <: Bool,
+struct SimpleVariance{T1 <: Union{Nothing, <:AbstractExpectedReturnsEstimator}, T2 <: Bool,
                       T3 <: Union{Nothing, <:AbstractWeights}} <: AbstractVarianceEstimator
     me::T1
     corrected::T2
     w::T3
 end
 function SimpleVariance(;
-                        me::Union{Nothing, AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
+                        me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
                         corrected::Bool = true,
                         w::Union{Nothing, <:AbstractWeights} = nothing)
     return SimpleVariance{typeof(me), typeof(corrected), typeof(w)}(me, corrected, w)

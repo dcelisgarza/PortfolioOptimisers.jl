@@ -15,7 +15,7 @@ function NormalUncertaintySetEstimator(;
                                        alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                                        n_sim::Integer = 3_000, q::Real = 0.05,
                                        rng::AbstractRNG = Random.default_rng(),
-                                       seed::Union{<:Integer, Nothing} = nothing)
+                                       seed::Union{Nothing, <:Integer} = nothing)
     @smart_assert(n_sim > zero(n_sim))
     @smart_assert(zero(q) < q < one(q))
     return NormalUncertaintySetEstimator{typeof(pe), typeof(alg), typeof(n_sim), typeof(q),

@@ -1,4 +1,4 @@
-abstract type BrownianDistanceVarianceFormulation end
+abstract type BrownianDistanceVarianceFormulation <: AbstractAlgorithm end
 struct NormOneConeBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
 struct IneqBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
 struct BrownianDistanceVariance{T1 <: RiskMeasureSettings,

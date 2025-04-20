@@ -6,7 +6,7 @@ struct MeanRiskEstimator{T1 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasu
     opt::T3
 end
 function MeanRiskEstimator(;
-                           r::Union{RiskMeasure, AbstractVector{<:RiskMeasure}} = StandardDeviation(),
+                           r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
                            obj::ObjectiveFunction = MinimumRisk(),
                            opt::JuMPOptimiser = JuMPOptimiser())
     return MeanRiskEstimator{typeof(r), typeof(obj), typeof(opt)}(r, obj, opt)

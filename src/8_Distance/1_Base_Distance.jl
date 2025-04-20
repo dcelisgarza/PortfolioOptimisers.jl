@@ -5,13 +5,13 @@ struct SimpleAbsoluteDistance <: AbstractDistanceAlgorithm end
 struct LogDistance <: AbstractDistanceAlgorithm end
 struct CorrelationDistance <: AbstractDistanceAlgorithm end
 struct CanonicalDistance <: AbstractDistanceAlgorithm end
-struct VariationInfoDistance{T1 <: Union{<:Integer, <:AbstractBins}, T2 <: Bool} <:
+struct VariationInfoDistance{T1 <: Union{<:AbstractBins, <:Integer}, T2 <: Bool} <:
        AbstractDistanceAlgorithm
     bins::T1
     normalise::T2
 end
 function VariationInfoDistance(;
-                               bins::Union{<:Integer, <:AbstractBins} = HacineGharbiRavier(),
+                               bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                                normalise::Bool = true)
     if isa(bins, Integer)
         @smart_assert(bins > zero(bins))

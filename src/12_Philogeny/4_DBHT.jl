@@ -843,7 +843,7 @@ end
 ```
 DendroConstruct(Zi::AbstractMatrix{<:Real}, LabelVec1::AbstractVector{<:Real},
                 LabelVec2::AbstractVector{<:Real},
-                LinkageDist::Union{<:Real, AbstractVector{<:Real}})
+                LinkageDist::Union{<:Real, <:AbstractVector{<:Real}})
 ```
 
 Construct the linkage matrix by continuially adding rows to the matrix.
@@ -860,7 +860,7 @@ Construct the linkage matrix by continuially adding rows to the matrix.
 """
 function DendroConstruct(Zi::AbstractMatrix{<:Real}, LabelVec1::AbstractVector{<:Real},
                          LabelVec2::AbstractVector{<:Real},
-                         LinkageDist::Union{<:Real, AbstractVector{<:Real}})
+                         LinkageDist::Union{<:Real, <:AbstractVector{<:Real}})
     indx = LabelVec1 .!= LabelVec2
     Z = vcat(Zi, hcat(transpose(sort!(unique(LabelVec1[indx]))), LinkageDist))
     return Z

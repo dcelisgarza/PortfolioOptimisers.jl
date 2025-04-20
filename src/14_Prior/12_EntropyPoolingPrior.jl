@@ -25,14 +25,14 @@ struct JuMPEntropyPoolingEstimator{T1 <: Real, T2 <: Real,
 end
 function JuMPEntropyPoolingEstimator(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                                      sc::Real = 1, so::Real = 1)
-    @smart_assert(sc >= zero(sc))
-    @smart_assert(so >= zero(so))
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
+    @smart_assert(sc >= zero(sc))
+    @smart_assert(so >= zero(so))
     return JuMPEntropyPoolingEstimator{typeof(sc), typeof(so), typeof(slv)}(sc, so, slv)
 end
-function entropy_pooling(w::AbstractVector, epcs::Nothing, ::Any)
+function entropy_pooling(w::AbstractVector, ::Nothing, ::Any)
     return w
 end
 function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,

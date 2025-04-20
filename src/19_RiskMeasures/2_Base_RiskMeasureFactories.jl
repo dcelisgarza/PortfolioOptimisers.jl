@@ -20,7 +20,7 @@ function risk_measure_nothing_real_array_view(::Nothing, prior_variable::Abstrac
                                               i::AbstractVector)
     return nothing_scalar_array_view(prior_variable, i)
 end
-function risk_measure_nothing_real_array_view(risk_variable::Union{Nothing, Real},
+function risk_measure_nothing_real_array_view(risk_variable::Union{Nothing, <:Real},
                                               ::AbstractVector)
     return risk_variable
 end

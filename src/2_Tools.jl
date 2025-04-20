@@ -40,7 +40,7 @@ function drop_incomplete(X::AbstractMatrix, any_missing::Bool = true)
 end
 function select_kextremes(X::AbstractMatrix) end
 struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
-                     T2 <: Union{Nothing, AbstractMatrix},
+                     T2 <: Union{Nothing, <:AbstractMatrix},
                      T3 <: Union{Nothing, <:AbstractVector},
                      T4 <: Union{Nothing, <:AbstractMatrix},
                      T5 <: Union{Nothing, <:AbstractVector}} <: AbstractReturnsResult
@@ -51,10 +51,10 @@ struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
     ts::T5
 end
 function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
-                       X::Union{Nothing, AbstractMatrix} = nothing,
-                       nf::Union{Nothing, AbstractVector} = nothing,
-                       F::Union{Nothing, AbstractMatrix} = nothing,
-                       ts::Union{Nothing, AbstractVector} = nothing)
+                       X::Union{Nothing, <:AbstractMatrix} = nothing,
+                       nf::Union{Nothing, <:AbstractVector} = nothing,
+                       F::Union{Nothing, <:AbstractMatrix} = nothing,
+                       ts::Union{Nothing, <:AbstractVector} = nothing)
     nxs_flag = !isnothing(nx)
     X_flag = !isnothing(X)
     if nxs_flag || X_flag

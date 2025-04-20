@@ -1,30 +1,32 @@
-function expected_risk(r::Union{WorstRealisation, ValueatRisk, ValueatRiskRange,
-                                ConditionalValueatRisk,
-                                DistributionallyRobustConditionalValueatRisk,
-                                EntropicValueatRisk, EntropicValueatRiskRange,
-                                RelativisticValueatRisk, RelativisticValueatRiskRange,
-                                DrawdownatRisk, MaximumDrawdown, AverageDrawdown,
-                                ConditionalDrawdownatRisk, UlcerIndex,
-                                EntropicDrawdownatRisk, RelativisticDrawdownatRisk,
-                                RelativeDrawdownatRisk, RelativeMaximumDrawdown,
-                                RelativeAverageDrawdown, RelativeConditionalDrawdownatRisk,
-                                RelativeUlcerIndex, RelativeEntropicDrawdownatRisk,
-                                RelativeRelativisticDrawdownatRisk, GiniMeanDifference,
-                                Range, ConditionalValueatRiskRange, TailGini, TailGiniRange,
-                                OrderedWeightsArray, BrownianDistanceVariance, MeanReturn},
+function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
+                                <:ConditionalValueatRisk,
+                                <:DistributionallyRobustConditionalValueatRisk,
+                                <:EntropicValueatRisk, <:EntropicValueatRiskRange,
+                                <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
+                                <:DrawdownatRisk, <:MaximumDrawdown, <:AverageDrawdown,
+                                <:ConditionalDrawdownatRisk, <:UlcerIndex,
+                                <:EntropicDrawdownatRisk, <:RelativisticDrawdownatRisk,
+                                <:RelativeDrawdownatRisk, <:RelativeMaximumDrawdown,
+                                <:RelativeAverageDrawdown,
+                                <:RelativeConditionalDrawdownatRisk, <:RelativeUlcerIndex,
+                                <:RelativeEntropicDrawdownatRisk,
+                                <:RelativeRelativisticDrawdownatRisk, <:GiniMeanDifference,
+                                <:Range, <:ConditionalValueatRiskRange, <:TailGini,
+                                <:TailGiniRange, <:OrderedWeightsArray,
+                                <:BrownianDistanceVariance, <:MeanReturn},
                        w::AbstractVector, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, X, fees))
 end
-function expected_risk(r::Union{LowOrderMoment, HighOrderMoment, TrackingRiskMeasure,
-                                SquareRootKurtosis, ThirdCentralMoment, Skewness},
+function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
+                                <:SquareRootKurtosis, <:ThirdCentralMoment, <:Skewness},
                        w::AbstractVector, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(w, X, fees)
 end
-function expected_risk(r::Union{StandardDeviation, NegativeSkewness, TurnoverRiskMeasure,
-                                Variance, UncertaintySetVariance, EqualRiskMeasure},
-                       w::AbstractVector, args...; kwargs...)
+function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,
+                                <:TurnoverRiskMeasure, <:Variance, <:UncertaintySetVariance,
+                                <:EqualRiskMeasure}, w::AbstractVector, args...; kwargs...)
     return r(w)
 end
 function expected_risk(::SumScalariser, rs::AbstractVector{<:RiskMeasure},

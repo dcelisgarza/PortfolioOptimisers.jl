@@ -36,15 +36,15 @@ function PartialLinearConstraintResult(; A::AbstractMatrix, B::AbstractVector)
     @smart_assert(!isempty(A) && !isempty(B))
     return PartialLinearConstraintResult{typeof(A), typeof(B)}(A, B)
 end
-struct LinearConstraintResult{T1 <: Union{Nothing, PartialLinearConstraintResult},
-                              T2 <: Union{Nothing, PartialLinearConstraintResult}} <:
+struct LinearConstraintResult{T1 <: Union{Nothing, <:PartialLinearConstraintResult},
+                              T2 <: Union{Nothing, <:PartialLinearConstraintResult}} <:
        AbstractConstraintResult
     ineq::T1
     eq::T2
 end
 function LinearConstraintResult(;
-                                ineq::Union{Nothing, PartialLinearConstraintResult} = nothing,
-                                eq::Union{Nothing, PartialLinearConstraintResult} = nothing)
+                                ineq::Union{Nothing, <:PartialLinearConstraintResult} = nothing,
+                                eq::Union{Nothing, <:PartialLinearConstraintResult} = nothing)
     @smart_assert(isnothing(ineq) ⊼ isnothing(eq))
     return LinearConstraintResult{typeof(ineq), typeof(eq)}(ineq, eq)
 end

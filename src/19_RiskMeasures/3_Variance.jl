@@ -1,4 +1,4 @@
-abstract type VarianceFormulation end
+abstract type VarianceFormulation <: AbstractAlgorithm end
 struct Quad <: VarianceFormulation end
 struct SOC <: VarianceFormulation end
 struct RSOC <: VarianceFormulation end

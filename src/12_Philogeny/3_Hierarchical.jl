@@ -4,8 +4,8 @@ struct ClusterNode{tid, tl, tr, td, tcnt}
     right::tr
     height::td
     level::tcnt
-    function ClusterNode(id, left::Union{ClusterNode, Nothing} = nothing,
-                         right::Union{ClusterNode, Nothing} = nothing, height::Real = 0.0,
+    function ClusterNode(id, left::Union{Nothing, <:ClusterNode} = nothing,
+                         right::Union{Nothing, <:ClusterNode} = nothing, height::Real = 0.0,
                          level::Int = 1)
         ilevel = isnothing(left) ? level : (left.level + right.level)
         return new{typeof(id), typeof(left), typeof(right), typeof(height), typeof(level)}(id,

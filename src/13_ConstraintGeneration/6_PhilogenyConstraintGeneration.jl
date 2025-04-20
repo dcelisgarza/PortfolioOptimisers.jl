@@ -102,7 +102,7 @@ end
 function philogeny_constraints(::Nothing, args...; kwargs...)
     return nothing
 end
-abstract type VectorToRealMeasure end
+abstract type VectorToRealMeasure <: AbstractAlgorithm end
 struct MinValue <: VectorToRealMeasure end
 function vec_to_real_measure(::MinValue, val::AbstractVector)
     return minimum(val)

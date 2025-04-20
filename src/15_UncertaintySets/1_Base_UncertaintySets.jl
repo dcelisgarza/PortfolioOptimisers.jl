@@ -64,14 +64,14 @@ function k_ucs(type::Real, args...)
     return type
 end
 struct EllipseUncertaintySetAlgorithm{T1 <: Bool,
-                                      T2 <: Union{<:AbstractUncertaintyKAlgorithm, Real}} <:
+                                      T2 <: Union{<:AbstractUncertaintyKAlgorithm, <:Real}} <:
        AbstractUncertaintySetAlgorithm
     diagonal::T1
     method::T2
 end
 function EllipseUncertaintySetAlgorithm(; diagonal::Bool = true,
                                         method::Union{<:AbstractUncertaintyKAlgorithm,
-                                                      Real} = ChiSqKUncertaintyAlgorithm())
+                                                      <:Real} = ChiSqKUncertaintyAlgorithm())
     return EllipseUncertaintySetAlgorithm{typeof(diagonal), typeof(method)}(diagonal,
                                                                             method)
 end
