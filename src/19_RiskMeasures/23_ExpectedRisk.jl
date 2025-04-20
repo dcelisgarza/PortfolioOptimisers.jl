@@ -34,7 +34,7 @@ function expected_risk(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
                        fees::Union{Nothing, <:Fees} = nothing)
     rk = zero(eltype(X))
     for r ∈ rs
-        rk += r.settings.scale * expected_risk(r, w, X; fees = fees)
+        rk += r.settings.scale * expected_risk(r, w, X, fees)
     end
     return rk
 end
@@ -43,7 +43,7 @@ function expected_risk(::MaxScalariser, rs::AbstractVector{<:RiskMeasure},
                        fees::Union{Nothing, <:Fees} = nothing)
     rk = zero(eltype(X))
     for r ∈ rs
-        ri = r.settings.scale * expected_risk(r, w, X; fees = fees)
+        ri = r.settings.scale * expected_risk(r, w, X, fees)
         if ri > rk
             rk = ri
         end
@@ -55,7 +55,7 @@ function expected_risk(sc::LogSumExpScalariser, rs::AbstractVector{<:RiskMeasure
                        fees::Union{Nothing, <:Fees} = nothing)
     rk = zero(eltype(X))
     for r ∈ rs
-        rk += r.settings.scale * sc.gamma * expected_risk(r, w, X; fees = fees)
+        rk += r.settings.scale * sc.gamma * expected_risk(r, w, X, fees)
     end
     return log(exp(rk)) / sc.gamma
 end

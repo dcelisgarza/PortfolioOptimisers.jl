@@ -1,6 +1,7 @@
 struct HierarchicalRiskParity{T1 <: HierarchicalOptimiser,
                               T2 <: Union{<:OptimisationRiskMeasure,
-                                          <:AbstractVector{<:OptimisationRiskMeasure}}}
+                                          <:AbstractVector{<:OptimisationRiskMeasure}}} <:
+       ClusteringOptimisationEstimator
     opt::T1
     r::T2
 end
@@ -124,7 +125,7 @@ function optimise!(hc::HierarchicalRiskParity{<:Any,
                    rd::ReturnsResult = ReturnsResult())
     pr = prior(hc.opt.pe, rd.X, rd.F)
     clm = clusterise(hc.opt.cle, pr.X)
-    r = risk_measure_factory(hc.r, pr, hc.opt.slv)
+    r = risk_measure_factory(hc.r, Ref(pr), Ref(hc.opt.slv))
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     wk = zeros(eltype(pr.X), size(pr.X, 2))
     rku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))

@@ -111,9 +111,10 @@ include("./19_RiskMeasures/21_NoOptimisationRiskMeasures.jl")
 include("./19_RiskMeasures/22_AdjustRiskContributions.jl")
 include("./19_RiskMeasures/23_ExpectedRisk.jl")
 
-include("./20_Optimisation/1_Base_ClusteringOptimisation.jl")
-include("./20_Optimisation/2_HierarchicalOptimiser.jl")
-include("./20_Optimisation/3_HierarchicalRiskParity.jl")
-include("./20_Optimisation/4_HierarchicalEqualRiskContribution.jl")
+include("./20_Optimisation/1_Base_Optimisation.jl")
+include("./20_Optimisation/2_Base_ClusteringOptimisation.jl")
+include("./20_Optimisation/3_HierarchicalOptimiser.jl")
+include("./20_Optimisation/4_HierarchicalRiskParity.jl")
+include("./20_Optimisation/5_HierarchicalEqualRiskContribution.jl")
 
 end

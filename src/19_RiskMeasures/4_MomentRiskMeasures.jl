@@ -33,7 +33,7 @@ function MeanAbsoluteDeviation(; w::Union{Nothing, <:AbstractWeights} = nothing)
     return MeanAbsoluteDeviation{typeof(w)}(w)
 end
 function risk_moment_algorithm_factory(alg::MeanAbsoluteDeviation,
-                                       w::Union{<:Nothing, AbstractWeights}; kwargs...)
+                                       w::Union{<:Nothing, <:AbstractWeights}; kwargs...)
     return MeanAbsoluteDeviation(; w = w)
 end
 struct ThirdLowerMoment <: AbstractHighOrderMomentMeasureAlgorithm end

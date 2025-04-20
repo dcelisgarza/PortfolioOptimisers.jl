@@ -6,7 +6,8 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
                              T6 <: Union{Nothing, <:WeightBoundsResult,
                                          <:WeightBoundsConstraints},
                              T7 <: ClusteringWeightFinaliser,
-                             T8 <: Union{Nothing, <:DataFrame}, T9 <: Bool}
+                             T8 <: Union{Nothing, <:DataFrame}, T9 <: Bool} <:
+       BaseClusteringOptimisationEstimator
     pe::T1
     cle::T2
     fees::T3
