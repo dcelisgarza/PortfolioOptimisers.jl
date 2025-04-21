@@ -29,11 +29,14 @@ struct JuMPResult{T1 <: AbstractDict, T2 <: Bool} <: AbstractJuMPResult
     trials::T1
     success::T2
 end
+function JuMPResult(; trials::AbstractDict, success::Bool)
+    if !success
+        @warn("Model could not be solved satisfactorily.\n$trials")
+    end
+    return JuMPResult{typeof(trials), typeof(success)}(trials, success)
+end
 function optimise_JuMP_model!(model::JuMP.Model,
                               slv::Union{<:Solver, <:AbstractVector{<:Solver}})
-    if isa(slv, AbstractVector)
-        @smart_assert(!isempty(slv))
-    end
     trials = Dict()
     success = false
     for solver ∈ slv

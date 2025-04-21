@@ -53,11 +53,9 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                      end)
         @expression(model, risk, -dot(z, x))
         @objective(model, Max, risk)
-        (; trials, success) = optimise_JuMP_model!(model, slv)
-        if success
+        if optimise_JuMP_model!(model, slv).success
             objective_value(model)
         else
-            @warn("Model could not be optimised satisfactorily.\nSolvers: $trials.")
             NaN
         end
     end
