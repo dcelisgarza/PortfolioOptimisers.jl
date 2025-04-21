@@ -34,8 +34,7 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                  end)
     @expression(model, risk, t + ln_k * z + sum(psi .+ theta))
     @objective(model, Min, risk)
-    (; trials, success) = optimise_JuMP_model!(model, slv)
-    return if success
+    return if optimise_JuMP_model!(model, slv).success
         objective_value(model)
     else
         model = JuMP.Model()

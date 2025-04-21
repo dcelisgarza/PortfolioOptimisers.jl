@@ -115,11 +115,9 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
                  end)
     @objective(model, Min, so * (t - dot(q, log_p)))
     # Solve the optimization problem
-    (; trials, success) = optimise_JuMP_model!(model, slv)
-    return if success
+    return if optimise_JuMP_model!(model, slv).success
         pweights(value.(q))
     else
-        @warn("Model could not be optimised satisfactorily.\nSolvers: $trials.")
         pweights(fill(NaN, length(q)))
     end
 end

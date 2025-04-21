@@ -3,7 +3,7 @@ abstract type ObjectiveFunction <: AbstractEstimator end
 abstract type ConstraintEstimator <: AbstractEstimator end
 abstract type CustomConstraint <: ConstraintEstimator end
 abstract type CustomObjective <: ConstraintEstimator end
-abstract type JuMPReturnEstimator <: AbstractEstimator end
+abstract type JuMPReturnsEstimator <: AbstractEstimator end
 function add_custom_objective_term!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                                     pr::AbstractPriorResult, args...)
     return nothing
@@ -28,17 +28,17 @@ function set_model_scales!(model::JuMP.Model, so::Real, sc::Real)
                  end)
     return nothing
 end
-function _constant_to_numberset_initial_w!(args...)
+function set_initial_w!(args...)
     return nothing
 end
-function _constant_to_numberset_initial_w!(w::AbstractVector, wi::AbstractVector)
+function set_initial_w!(w::AbstractVector, wi::AbstractVector)
     @smart_assert(length(wi) == length(w))
     set_start_value.(w, wi)
     return nothing
 end
 function set_w!(model::JuMP.Model, X::AbstractMatrix, wi::Union{Nothing, <:AbstractVector})
     @variable(model, w[1:size(X, 2)])
-    _constant_to_numberset_initial_w!(w, wi)
+    set_initial_w!(w, wi)
     return nothing
 end
 function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
