@@ -1,13 +1,13 @@
 struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                      T2 <: Union{Nothing, <:AbstractVector{<:Real}},
-                     T3 <: Union{Nothing, <:WeightBounds, <:WeightBoundsConstraints},
-                     T4 <: Union{Nothing, <:Real, <:BudgetConstraint},
-                     T5 <: Union{Nothing, <:Real, <:BudgetConstraint},
+                     T3 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraints},
+                     T4 <: Union{Nothing, <:Real, <:BudgetRange},
+                     T5 <: Union{Nothing, <:Real, <:BudgetRange},
                      T6 <: Union{Nothing, <:LinearConstraint,
                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintResult},
                      T7 <: Union{Nothing, <:LinearConstraintResult},
-                     T8 <: Union{Nothing, <:CentralityConstraint,
-                                 <:AbstractVector{<:CentralityConstraint},
+                     T8 <: Union{Nothing, <:CentralityConstraintEstimator,
+                                 <:AbstractVector{<:CentralityConstraintEstimator},
                                  <:LinearConstraintResult}, T9 <: Union{Nothing, <:Integer},
                      T10 <: Union{Nothing, <:CardinalityConstraint,
                                   <:AbstractVector{<:CardinalityConstraint},
@@ -22,15 +22,15 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T16 <: Union{Nothing, <:TrackingError}, T17 <: Union{Nothing, <:Real},
                      T18 <: Union{Nothing, <:Real}, T19 <: Union{Nothing, <:Real},
                      T20 <: Union{Nothing, <:Fees}, T21 <: Scalariser,
-                     T22 <: PortfolioReturnType, T23 <: Union{Nothing, <:CustomConstraint},
+                     T22 <: JuMPReturnsEstimator, T23 <: Union{Nothing, <:CustomConstraint},
                      T24 <: Union{Nothing, <:CustomObjective}, T25 <: Real, T26 <: Real,
                      T27 <: Union{Nothing, <:Real},
                      T28 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T29 <: Bool,
-                     T30 <: Bool, T31 <: Bool} <: JuMPOptimisationType
+                     T30 <: Bool, T31 <: Bool} <: JuMPOptimisationEstimator
     pe::T1 # PriorEstimator
     wi::T2
-    wb::T3 # WeightBounds
-    bgt::T4 # BudgetConstraint
+    wb::T3 # WeightBoundsResult
+    bgt::T4 # BudgetRange
     sbgt::T5 # LongShortSum
     lcs::T6
     lcm::T7
@@ -62,24 +62,24 @@ end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                        wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                       wb::Union{Nothing, <:WeightBounds, <:WeightBoundsConstraints} = WeightBounds(),
-                       bgt::Union{Nothing, <:Real, <:BudgetConstraint} = 1.0,
-                       sbgt::Union{Nothing, <:Real, <:BudgetConstraint} = nothing,
+                       wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraints} = WeightBoundsResult(),
+                       bgt::Union{Nothing, <:Real, <:BudgetRange} = 1.0,
+                       sbgt::Union{Nothing, <:Real, <:BudgetRange} = nothing,
                        lcs::Union{Nothing, <:LinearConstraint,
                                   <:AbstractVector{<:LinearConstraint},
                                   <:LinearConstraintResult} = nothing,
                        lcm::Union{Nothing, <:LinearConstraintResult} = nothing,
-                       cent::Union{Nothing, <:CentralityConstraint,
-                                   <:AbstractVector{<:CentralityConstraint},
+                       cent::Union{Nothing, <:CentralityConstraintEstimator,
+                                   <:AbstractVector{<:CentralityConstraintEstimator},
                                    <:LinearConstraintResult} = nothing,
                        card::Union{Nothing, <:Integer} = nothing,
                        gcard::Union{Nothing, <:CardinalityConstraint,
                                     <:AbstractVector{<:CardinalityConstraint},
                                     <:LinearConstraintResult} = nothing,
                        sets::Union{Nothing, <:DataFrame} = nothing,
-                       nplg::Union{Nothing, <:PhilogenyEstimator,
+                       nplg::Union{Nothing, <:PhilogenyConstraintEstimator,
                                    <:PhilogenyConstraintResult} = nothing,
-                       cplg::Union{Nothing, <:PhilogenyEstimator,
+                       cplg::Union{Nothing, <:PhilogenyConstraintEstimator,
                                    <:PhilogenyConstraintResult} = nothing,
                        bit::Union{Nothing, <:BuyInThreshold} = nothing,
                        tn::Union{Nothing, <:Turnover} = nothing,
@@ -89,7 +89,7 @@ function JuMPOptimiser(;
                        l2::Union{Nothing, <:Real} = nothing,
                        fees::Union{Nothing, <:Fees} = nothing,
                        sce::Scalariser = SumScalariser(),
-                       ret::PortfolioReturnType = ArithmeticReturn(),
+                       ret::JuMPReturnsEstimator = ArithmeticReturn(),
                        ccnt::Union{Nothing, <:CustomConstraint} = nothing,
                        cobj::Union{Nothing, <:CustomObjective} = nothing, sc::Real = 1,
                        so::Real = 1, ss::Union{Nothing, <:Real} = nothing,
@@ -115,8 +115,8 @@ function JuMPOptimiser(;
     end
     if isa(lcs, LinearConstraint) ||
        isa(lcs, AbstractVector{<:LinearConstraint}) ||
-       isa(cent, CentralityConstraint) ||
-       isa(cent, AbstractVector{<:CentralityConstraint}) ||
+       isa(cent, CentralityConstraintEstimator) ||
+       isa(cent, AbstractVector{<:CentralityConstraintEstimator}) ||
        isa(gcard, CardinalityConstraint) ||
        isa(gcard, AbstractVector{<:CardinalityConstraint})
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))

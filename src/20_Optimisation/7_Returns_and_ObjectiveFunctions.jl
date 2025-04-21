@@ -70,7 +70,7 @@ function set_return_bounds!(model::JuMP.Model, lb::Real)
     sc = model[:sc]
     k = model[:k]
     ret = model[:ret]
-    @constraint(model, ret_lb, sc * ret >= sc * lb * k)
+    @constraint(model, ret_lb, sc * ret >= sc * Parameter(lb) * k)
     return nothing
 end
 function set_max_ratio_return_constraints!(args...)
@@ -92,47 +92,48 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     end
     return nothing
 end
-function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio, k, sc, ret)
-    ohf = model[:ohf]
-    risk = model[:risk]
-    rf = obj.rf
-    add_to_expression!(ret, -rf, k)
-    @constraint(model, sr_ekelly_risk, sc * risk <= sc * ohf)
+function add_fees_to_ret!(model::JuMP.Model, ret)
+    if !haskey(model, :fees)
+        return nothing
+    end
+    fees = model[:fees]
+    add_to_expression!(ret, -fees)
+    return nothing
 end
 function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{<:Any, Nothing},
                                  obj::ObjectiveFunction, pr::AbstractPriorResult)
     w = model[:w]
-    fees = model[:fees]
     lb = pret.lb
     mu = pr.mu
-    @expression(model, ret, dot(mu, w) - fees)
-    set_return_bounds!(model, lb)
+    @expression(model, ret, dot(mu, w))
+    add_fees_to_ret!(model, ret)
     set_max_ratio_return_constraints!(model, obj, mu)
+    set_return_bounds!(model, lb)
     return nothing
 end
-function set_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySetResult,
-                                 mu::AbstractVector)
+function set_uc_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySetResult,
+                                    mu::AbstractVector)
     sc = model[:sc]
     w = model[:w]
-    fees = model[:fees]
     N = length(w)
     d_mu = (ucs.ub - ucs.lb) * 0.5
     @variable(model, bucs_w[1:N])
     @constraint(model, bucs_ret[i = 1:N], [sc * bucs_w[i]; sc * w[i]] ∈ MOI.NormOneCone(2))
-    @expression(model, ret, dot(mu, w) - fees - dot(d_mu, bucs_w))
+    @expression(model, ret, dot(mu, w) - dot(d_mu, bucs_w))
+    add_fees_to_ret!(model, ret)
     return nothing
 end
-function set_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySetResult,
-                                 mu::AbstractVector)
+function set_uc_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySetResult,
+                                    mu::AbstractVector)
     sc = model[:sc]
     w = model[:w]
-    fees = model[:fees]
     G = cholesky(ucs.sigma).U
     k = ucs.k
     @expression(model, x_eucs_w, G * w)
     @variable(model, t_eucs_gw)
     @constraint(model, eucs_ret, [sc * t_eucs_gw; sc * x_eucs_w] ∈ SecondOrderCone())
-    @expression(model, ret, dot(mu, w) - fees - k * t_eucs_gw)
+    @expression(model, ret, dot(mu, w) - k * t_eucs_gw)
+    add_fees_to_ret!(model, ret)
     return nothing
 end
 function set_return_constraints!(model::JuMP.Model,
@@ -144,10 +145,21 @@ function set_return_constraints!(model::JuMP.Model,
     ucs = pret.ucs
     X = pr.X
     mu = pr.mu
-    set_return_constraints!(model, mu_ucs(ucs, X), mu)
-    set_return_bounds!(model, lb)
+    set_uc_return_constraints!(model, mu_ucs(ucs, X), mu)
     set_max_ratio_return_constraints!(model, obj, mu)
+    set_return_bounds!(model, lb)
     return nothing
+end
+function set_max_ratio_kelly_return_constraints!(args...)
+    return nothing
+end
+function set_max_ratio_kelly_return_constraints!(model::JuMP.Model, obj::MaximumRatio, k,
+                                                 sc, ret)
+    ohf = model[:ohf]
+    risk = model[:risk]
+    rf = obj.rf
+    add_to_expression!(ret, -rf, k)
+    @constraint(model, sr_ekelly_risk, sc * risk <= sc * ohf)
 end
 function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
                                  obj::ObjectiveFunction, pr::AbstractPriorResult)
@@ -160,75 +172,80 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
     T = length(net_X)
     @variable(model, t_ekelly[1:T])
     @expression(model, ret, sum(t_ekelly) / T)
-    set_max_ratio_return_constraints!(model, obj, k, sc, ret)
+    add_fees_to_ret!(model, ret)
+    set_max_ratio_kelly_return_constraints!(model, obj, k, sc, ret)
     @expression(model, kret, k .+ net_X)
     @constraint(model, ekelly_ret[i = 1:T],
                 [sc * t_ekelly[i], sc * k, sc * kret[i]] ∈ MOI.ExponentialCone())
     set_return_bounds!(model, lb)
     return nothing
 end
+function add_penalty_to_objective!(model::JuMP.Model, sign::Integer, expr)
+    if !haskey(model, :op)
+        return nothing
+    end
+    op = model[:op]
+    add_to_expression!(expr, sign, op)
+    return nothing
+end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
                                            pret::JuMPReturnsEstimator,
                                            cobj::Union{Nothing, <:CustomObjective},
-                                           mr::JuMPOptimisationEstimator,
+                                           opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
-    op = model[:op]
     risk = model[:risk]
     @expression(model, obj_expr, risk)
-    add_to_expression!(obj_expr, 1, op)
-    add_custom_objective_term!(obj, pret, cobj, obj_expr, mr, pr)
+    add_penalty_to_objective!(model, 1, obj_expr)
+    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
     @objective(model, Min, so * obj_expr)
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtility,
                                            pret::JuMPReturnsEstimator,
                                            cobj::Union{Nothing, <:CustomObjective},
-                                           mr::JuMPOptimisationEstimator,
+                                           opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
     ret = model[:ret]
     risk = model[:risk]
     l = obj.l
-    op = model[:op]
     @expression(model, obj_expr, ret - l * risk)
-    add_to_expression!(obj_expr, -1, op)
-    add_custom_objective_term!(obj, pret, cobj, obj_expr, mr, pr)
+    add_penalty_to_objective!(model, -1, obj_expr)
+    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
     @objective(model, Max, so * obj_expr)
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::KellyReturn,
                                            cobj::Union{Nothing, <:CustomObjective},
-                                           mr::JuMPOptimisationEstimator,
+                                           opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
     ret = model[:ret]
-    op = model[:op]
     @expression(model, obj_expr, ret)
-    add_to_expression!(obj_expr, -1, op)
-    add_custom_objective_term!(obj, pret, cobj, obj_expr, mr, pr)
+    add_penalty_to_objective!(model, -1, obj_expr)
+    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
     @objective(model, Max, so * obj_expr)
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::JuMPReturnsEstimator,
                                            cobj::Union{Nothing, <:CustomObjective},
-                                           mr::JuMPOptimisationEstimator,
+                                           opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
-    op = model[:op]
     if haskey(model, :sr_risk)
         ret = model[:ret]
         @expression(model, obj_expr, ret)
-        add_to_expression!(obj_expr, -1, op)
-        add_custom_objective_term!(obj, pret, cobj, obj_expr, mr, pr)
+        add_penalty_to_objective!(model, -1, obj_expr)
+        add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
         @objective(model, Max, so * obj_expr)
     else
         risk = model[:risk]
         @expression(model, obj_expr, risk)
-        add_to_expression!(obj_expr, 1, op)
-        add_custom_objective_term!(obj, pret, cobj, obj_expr, mr, pr)
+        add_penalty_to_objective!(model, 1, obj_expr)
+        add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
         @objective(model, Min, so * obj_expr)
     end
     return nothing
@@ -236,14 +253,13 @@ end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn,
                                            pret::JuMPReturnsEstimator,
                                            cobj::Union{Nothing, <:CustomObjective},
-                                           mr::JuMPOptimisationEstimator,
+                                           opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
     ret = model[:ret]
-    op = model[:op]
     @expression(model, obj_expr, ret)
-    add_to_expression!(obj_expr, -1, op)
-    add_custom_objective_term!(obj, pret, cobj, obj_expr, mr, pr)
+    add_penalty_to_objective!(model, -1, obj_expr)
+    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
     @objective(model, Max, so * obj_expr)
     return nothing
 end

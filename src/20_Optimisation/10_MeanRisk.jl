@@ -1,6 +1,6 @@
 struct MeanRiskEstimator{T1 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                          T2 <: ObjectiveFunction, T3 <: JuMPOptimiser} <:
-       JuMPOptimisationType
+       JuMPOptimisationEstimator
     r::T1
     obj::T2
     opt::T3
@@ -9,18 +9,21 @@ function MeanRiskEstimator(;
                            r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
                            obj::ObjectiveFunction = MinimumRisk(),
                            opt::JuMPOptimiser = JuMPOptimiser())
+    if isa(r, AbstractVector)
+        @smart_assert(!isempty(r))
+    end
     return MeanRiskEstimator{typeof(r), typeof(obj), typeof(opt)}(r, obj, opt)
 end
 function cleanup_weights(model::JuMP.Model, ::MeanRiskEstimator)
     return value.(model[:w]) / value(model[:k])
 end
-struct MeanRiskModel{T1 <: AbstractPriorResult, T2 <: Union{Nothing, <:WeightBounds},
-                     T3 <: Union{Nothing, <:LinearConstraintResult},
-                     T4 <: Union{Nothing, <:LinearConstraintResult},
-                     T5 <: Union{Nothing, <:LinearConstraintResult},
-                     T6 <: Union{Nothing, <:PhilogenyConstraintResult},
-                     T7 <: Union{Nothing, <:PhilogenyConstraintResult},
-                     T8 <: JuMPPortfolioSolution} <: PortfolioModel
+struct MeanRiskResult{T1 <: AbstractPriorResult, T2 <: Union{Nothing, <:WeightBoundsResult},
+                      T3 <: Union{Nothing, <:LinearConstraintResult},
+                      T4 <: Union{Nothing, <:LinearConstraintResult},
+                      T5 <: Union{Nothing, <:LinearConstraintResult},
+                      T6 <: Union{Nothing, <:PhilogenyConstraintResult},
+                      T7 <: Union{Nothing, <:PhilogenyConstraintResult},
+                      T8 <: JuMPPortfolioResult} <: JuMPOptimisationResult
     pr::T1
     wb::T2
     lcs::T3
@@ -33,9 +36,7 @@ end
 function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     model = JuMP.Model()
     set_string_names_on_creation(model, mr.opt.str_names)
-    set_objective_penalty!(model)
-    set_model_scales!(model, mr.opt.sc, mr.opt.so, mr.opt.ss)
-    set_model_fees!(model)
+    set_model_scales!(model, mr.opt.sc, mr.opt.so)
     pr = prior(mr.opt.pe, rd.X, rd.F)
     datatype = eltype(pr.X)
     set_w!(model, pr.X, mr.opt.wi)
@@ -53,22 +54,23 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     set_linear_weight_constraints!(model, lcs, :clcs_ineq, :clcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, mr.opt.lcm, :clcm_ineq, :clcm_eq)
-    set_mip_constraints!(model, mr.opt.bit, mr.opt.card, gcard, mr.opt.fees, nplg, cplg, wb)
+    set_mip_constraints!(model, wb, mr.opt.card, gcard, nplg, cplg, mr.opt.bit, mr.opt.fees,
+                         mr.opt.ss)
     set_turnover_constraints!(model, mr.opt.tn)
     set_tracking_error_constraints!(model, pr.X, mr.opt.te)
     set_number_effective_assets!(model, mr.opt.nea)
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)
     set_non_fixed_fees!(model, mr.opt.fees)
+    set_return_constraints!(model, mr.opt.ret, mr.obj, pr)
     set_risk_constraints!(model, mr.r, mr, pr, nplg, cplg)
     scalarise_risk_expression!(model, mr.opt.sce)
     set_sdp_philogeny_constraints!(model, nplg, :sdp_nplg)
     set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
-    set_return_constraints!(model, mr.opt.ret, mr.obj, pr)
-    set_custom_constraint!(model, mr.opt.ccnt, mr, pr)
+    add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     set_portfolio_objective_function!(model, mr.obj, mr.opt.ret, mr.opt.cobj, mr, pr)
     sol = optimise_JuMP_model!(model, mr, datatype)
-    return MeanRiskModel(pr, wb, lcs, cent, gcard, nplg, cplg, sol)
+    return MeanRiskResult(pr, wb, lcs, cent, gcard, nplg, cplg, sol)
 end
 
 export MeanRiskEstimator

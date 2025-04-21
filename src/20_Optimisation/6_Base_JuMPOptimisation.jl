@@ -1,4 +1,5 @@
 abstract type JuMPOptimisationEstimator <: OptimisationEstimator end
+abstract type JuMPOptimisationResult <: AbstractResult end
 abstract type ObjectiveFunction <: AbstractEstimator end
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 function cluster_return_factory(r::JuMPReturnsEstimator, args...; kwargs...)
@@ -7,12 +8,10 @@ end
 abstract type JuMPConstraintEstimator <: AbstractEstimator end
 abstract type CustomConstraint <: JuMPConstraintEstimator end
 abstract type CustomObjective <: JuMPConstraintEstimator end
-function add_custom_objective_term!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
-                                    pr::AbstractPriorResult, args...)
+function add_custom_objective_term!(args...; kwargs...)
     return nothing
 end
-function add_custom_constraint!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
-                                pr::AbstractPriorResult, args...)
+function add_custom_constraint!(args...; kwargs...)
     return nothing
 end
 function add_to_objective_penalty!(model::JuMP.Model, expr)
@@ -88,8 +87,16 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::RiskMeasure,
                                            <:IntegerPhilogenyResult})
     return nothing
 end
-function set_risk_constraints!(model::JuMP.Model,
-                               rs::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
+                               opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
+                               cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
+                                           <:IntegerPhilogenyResult},
+                               nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
+                                           <:IntegerPhilogenyResult})
+    set_risk_constraints!(model, 1, r, opt, pr, cplg, nplg)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasure},
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
                                cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                            <:IntegerPhilogenyResult},
@@ -100,14 +107,16 @@ function set_risk_constraints!(model::JuMP.Model,
     end
     return nothing
 end
-struct JuMPPortfolioResult{T1 <: AbstractVector, T2 <: JuMP.Model, T3 <: JuMPResult} <:
+struct JuMPPortfolioResult{T1 <: JuMPResult, T2, T3 <: Union{Nothing, <:JuMP.Model}} <:
        AbstractResult
-    w::T1
-    model::T2
-    result::T3
+    res::T1
+    sol::T2
+    model::T3
 end
 function process_model(model::JuMP.Model, ::JuMPOptimisationEstimator)
-    return value.(model[:w]) / value(model[:k])
+    ik = inv(value(model[:k]))
+    w = value(model[:w]) * ik
+    return w
 end
 function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                               datatype::Type = Float64)
@@ -148,8 +157,8 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
               name => Dict(:objective_val => objective_value(model),
                            :err => solution_summary(model), :settings => settings))
     end
-    return JuMPPortfolioResult(process_model(model, opt), model,
-                               JuMPResult(trials, success))
+    return JuMPPortfolioResult(JuMPResult(trials, success), process_model(model, opt),
+                               model)
 end
 function set_scalar_risk_expression!(model::JuMP.Model, ::SumScalariser)
     risk_vec = model[:risk_vec]
@@ -201,7 +210,11 @@ function set_net_portfolio_returns!(model::JuMP.Model, X::AbstractMatrix)
     end
     set_portfolio_returns!(model, X)
     X = model[:X]
-    fees = model[:fees]
-    @expression(model, net_X, X .- fees)
+    if haskey(model, :fees)
+        fees = model[:fees]
+        @expression(model, net_X, X .- fees)
+    else
+        @expression(model, net_X, X)
+    end
     return nothing
 end
