@@ -9,6 +9,9 @@ function WeightsTracking(; w::AbstractVector{<:Real},
     @smart_assert(!isempty(w))
     return WeightsTracking{typeof(w), typeof(fees)}(w, fees)
 end
+function tracking_benchmark(args...)
+    return nothing
+end
 function tracking_benchmark(tracking::WeightsTracking, X::AbstractMatrix{<:Real})
     return calc_net_returns(tracking.w, X, tracking.fees)
 end

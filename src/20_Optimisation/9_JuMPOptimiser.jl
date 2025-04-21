@@ -20,12 +20,13 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T14 <: Union{Nothing, <:BuyInThreshold},
                      T15 <: Union{Nothing, <:Turnover},
                      T16 <: Union{Nothing, <:TrackingError}, T17 <: Union{Nothing, <:Real},
-                     T18 <: Union{Nothing, <:Real}, T19 <: Union{Nothing, <:Fees},
-                     T20 <: Scalariser, T21 <: PortfolioReturnType,
-                     T22 <: Union{Nothing, <:CustomConstraint},
-                     T23 <: Union{Nothing, <:CustomObjective}, T24 <: Real, T25 <: Real,
-                     T26 <: Real, T27 <: Union{<:Solver, <:AbstractVector{<:Solver}},
-                     T28 <: Bool, T29 <: Bool, T30 <: Bool} <: JuMPOptimisationType
+                     T18 <: Union{Nothing, <:Real}, T19 <: Union{Nothing, <:Real},
+                     T20 <: Union{Nothing, <:Fees}, T21 <: Scalariser,
+                     T22 <: PortfolioReturnType, T23 <: Union{Nothing, <:CustomConstraint},
+                     T24 <: Union{Nothing, <:CustomObjective}, T25 <: Real, T26 <: Real,
+                     T27 <: Union{Nothing, <:Real},
+                     T28 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T29 <: Bool,
+                     T30 <: Bool, T31 <: Bool} <: JuMPOptimisationType
     pe::T1 # PriorEstimator
     wi::T2
     wb::T3 # WeightBounds
@@ -42,20 +43,21 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
     bit::T14 # BuyInThreshold
     tn::T15 # Turnover
     te::T16 # TrackingError
-    l1::T17
-    l2::T18
-    fees::T19
-    sce::T20
-    ret::T21
-    ccnt::T22
-    cobj::T23
-    sc::T24
-    so::T25
-    ss::T26
-    slv::T27
-    str_names::T28
-    save::T29
-    strict::T30
+    nea::T17
+    l1::T18
+    l2::T19
+    fees::T20
+    sce::T21
+    ret::T22
+    ccnt::T23
+    cobj::T24
+    sc::T25
+    so::T26
+    ss::T27
+    slv::T28
+    str_names::T29
+    save::T30
+    strict::T31
 end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
@@ -82,6 +84,7 @@ function JuMPOptimiser(;
                        bit::Union{Nothing, <:BuyInThreshold} = nothing,
                        tn::Union{Nothing, <:Turnover} = nothing,
                        te::Union{Nothing, <:TrackingError} = nothing,
+                       nea::Union{Nothing, <:Real} = nothing,
                        l1::Union{Nothing, <:Real} = nothing,
                        l2::Union{Nothing, <:Real} = nothing,
                        fees::Union{Nothing, <:Fees} = nothing,
@@ -89,7 +92,7 @@ function JuMPOptimiser(;
                        ret::PortfolioReturnType = ArithmeticReturn(),
                        ccnt::Union{Nothing, <:CustomConstraint} = nothing,
                        cobj::Union{Nothing, <:CustomObjective} = nothing, sc::Real = 1,
-                       so::Real = 1, ss::Real = 100_000.0,
+                       so::Real = 1, ss::Union{Nothing, <:Real} = nothing,
                        slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                        str_names::Bool = false, save::Bool = false, strict::Bool = false)
     if isa(wi, AbstractVector)
@@ -121,17 +124,25 @@ function JuMPOptimiser(;
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
+    if !isnothing(nea)
+        @smart_assert(nea > zero(nea))
+    end
     return JuMPOptimiser{typeof(pe), typeof(wi), typeof(wb), typeof(bgt), typeof(sbgt),
                          typeof(lcs), typeof(lcm), typeof(cent), typeof(card),
                          typeof(gcard), typeof(sets), typeof(nplg), typeof(cplg),
-                         typeof(bit), typeof(tn), typeof(te), typeof(l1), typeof(l2),
-                         typeof(fees), typeof(sce), typeof(ret), typeof(ccnt), typeof(cobj),
-                         typeof(sc), typeof(so), typeof(ss), typeof(slv), typeof(str_names),
-                         typeof(save), typeof(strict)}(pe, wi, wb, bgt, sbgt, lcs, lcm,
-                                                       cent, card, gcard, sets, nplg, cplg,
-                                                       bit, tn, te, l1, l2, fees, sce, ret,
-                                                       ccnt, cobj, sc, so, ss, slv,
-                                                       str_names, save, strict)
+                         typeof(bit), typeof(tn), typeof(te), typeof(nea), typeof(l1),
+                         typeof(l2), typeof(fees), typeof(sce), typeof(ret), typeof(ccnt),
+                         typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(slv),
+                         typeof(str_names), typeof(save), typeof(strict)}(pe, wi, wb, bgt,
+                                                                          sbgt, lcs, lcm,
+                                                                          cent, card, gcard,
+                                                                          sets, nplg, cplg,
+                                                                          bit, tn, te, nea,
+                                                                          l1, l2, fees, sce,
+                                                                          ret, ccnt, cobj,
+                                                                          sc, so, ss, slv,
+                                                                          str_names, save,
+                                                                          strict)
 end
 
 export JuMPOptimiser

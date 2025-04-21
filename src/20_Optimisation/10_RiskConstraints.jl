@@ -61,12 +61,7 @@ function _set_risk_constraints!(model::JuMP.Model, r::StandardDeviation,
     set_risk_bounds_and_expression!(opt, model, sd_risk, r.settings, key)
     return nothing
 end
-function sdp_rc_variance_flag!(::JuMP.Model, ::MeanRiskEstimator,
-                               ::Union{Nothing,
-                                       <:LinearConstraintResult{<:PartialLinearConstraintResult{Nothing,
-                                                                                                Nothing},
-                                                                <:PartialLinearConstraintResult{Nothing,
-                                                                                                Nothing}}})
+function sdp_rc_variance_flag!(::JuMP.Model, ::MeanRiskEstimator, ::Nothing)
     return false
 end
 function sdp_rc_variance_flag!(model::JuMP.Model, ::MeanRiskEstimator,

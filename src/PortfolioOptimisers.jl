@@ -117,6 +117,7 @@ include("./20_Optimisation/3_HierarchicalOptimiser.jl")
 include("./20_Optimisation/4_HierarchicalRiskParity.jl")
 include("./20_Optimisation/5_HierarchicalEqualRiskContribution.jl")
 include("./20_Optimisation/6_Base_JuMPOptimisation.jl")
-include("./20_Optimisation/7_JuMPConstraints.jl")
+include("./20_Optimisation/7_Returns_and_ObjectiveFunctions.jl")
+include("./20_Optimisation/8_JuMPConstraints.jl")
 
 end
