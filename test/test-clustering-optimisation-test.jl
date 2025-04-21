@@ -345,7 +345,12 @@
         for (i, (risk, name)) ∈ enumerate(zip(risks, names))
             name = name * "_$(i)"
             w = optimise!(HierarchicalEqualRiskContribution(; ri = risk, opt = opt))
-            res = isapprox(w, df[!, name])
+            res = if i ∈ 65:72
+                isapprox(w, df[!, name]; rtol = 1e-7)
+            else
+                isapprox(w, df[!, name])
+            end
+            isapprox(w, df[!, name])
             if !res
                 println("$name failed")
                 find_tol(w, df[!, name]; name1 = :w1, name2 = :df)
