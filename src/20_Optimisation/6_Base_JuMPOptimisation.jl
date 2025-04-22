@@ -115,7 +115,7 @@ struct JuMPPortfolioResult{T1 <: JuMPResult, T2, T3 <: Union{Nothing, <:JuMP.Mod
 end
 function process_model(model::JuMP.Model, ::JuMPOptimisationEstimator)
     ik = inv(value(model[:k]))
-    w = value(model[:w]) * ik
+    w = value.(model[:w]) * ik
     return w
 end
 function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
@@ -218,3 +218,5 @@ function set_net_portfolio_returns!(model::JuMP.Model, X::AbstractMatrix)
     end
     return nothing
 end
+
+export JuMPPortfolioResult

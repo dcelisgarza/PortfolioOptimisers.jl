@@ -70,7 +70,7 @@ function set_return_bounds!(model::JuMP.Model, lb::Real)
     sc = model[:sc]
     k = model[:k]
     ret = model[:ret]
-    @constraint(model, ret_lb, sc * ret >= sc * Parameter(lb) * k)
+    @constraint(model, ret_lb, sc * ret >= sc * lb * k)
     return nothing
 end
 function set_max_ratio_return_constraints!(args...)

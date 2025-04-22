@@ -6,7 +6,7 @@ struct MeanRiskEstimator{T1 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasu
     opt::T3
 end
 function MeanRiskEstimator(;
-                           r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
+                           r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                            obj::ObjectiveFunction = MinimumRisk(),
                            opt::JuMPOptimiser = JuMPOptimiser())
     if isa(r, AbstractVector)
@@ -62,9 +62,9 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)
     set_non_fixed_fees!(model, mr.opt.fees)
-    set_return_constraints!(model, mr.opt.ret, mr.obj, pr)
     set_risk_constraints!(model, mr.r, mr, pr, nplg, cplg)
     scalarise_risk_expression!(model, mr.opt.sce)
+    set_return_constraints!(model, mr.opt.ret, mr.obj, pr)
     set_sdp_philogeny_constraints!(model, nplg, :sdp_nplg)
     set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
