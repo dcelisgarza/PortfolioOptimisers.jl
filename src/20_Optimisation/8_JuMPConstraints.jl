@@ -602,16 +602,16 @@ function set_sdp_constraints!(model::JuMP.Model)
     return nothing
 end
 function set_sdp_frc_constraints!(model::JuMP.Model)
-    if haskey(model, :W1)
+    if haskey(model, :W)
         return nothing
     end
     w1 = model[:w1]
     sc = model[:sc]
     k = model[:k]
     Nf = length(w1)
-    @variable(model, W1[1:Nf, 1:Nf], Symmetric)
-    @expression(model, M1, hcat(vcat(W1, transpose(w1)), vcat(w1, k)))
-    @constraint(model, M1_PSD, sc * M1 ∈ PSDCone())
+    @variable(model, W[1:Nf, 1:Nf], Symmetric)
+    @expression(model, M, hcat(vcat(W, transpose(w1)), vcat(w1, k)))
+    @constraint(model, M_PSD, sc * M ∈ PSDCone())
     return nothing
 end
 function set_sdp_philogeny_constraints!(args...)
@@ -639,13 +639,13 @@ function set_sdp_frc_philogeny_constraints!(model::JuMP.Model,
                                             adj::SemiDefinitePhilogenyResult, key::Symbol)
     sc = model[:sc]
     set_sdp_frc_constraints!(model)
-    W1 = model[:W1]
+    W = model[:W]
     A = adj.A
-    model[key] = @constraint(model, sc * A .* W1 == 0)
+    model[key] = @constraint(model, sc * A .* W == 0)
     if !haskey(model, :variance_flag)
         key = Symbol(key, :_p)
         p = adj.p
-        plp = model[key] = @expression(model, p * tr(W1))
+        plp = model[key] = @expression(model, p * tr(W))
         add_to_objective_penalty!(model, plp)
     end
     return nothing

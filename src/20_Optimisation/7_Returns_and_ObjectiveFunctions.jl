@@ -111,8 +111,8 @@ function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{<:Any
     set_return_bounds!(model, lb)
     return nothing
 end
-function set_uc_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySetResult,
-                                    mu::AbstractVector)
+function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySetResult,
+                                     mu::AbstractVector)
     sc = model[:sc]
     w = model[:w]
     N = length(w)
@@ -123,8 +123,8 @@ function set_uc_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySetRes
     add_fees_to_ret!(model, ret)
     return nothing
 end
-function set_uc_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySetResult,
-                                    mu::AbstractVector)
+function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySetResult,
+                                     mu::AbstractVector)
     sc = model[:sc]
     w = model[:w]
     G = cholesky(ucs.sigma).U
@@ -145,7 +145,7 @@ function set_return_constraints!(model::JuMP.Model,
     ucs = pret.ucs
     X = pr.X
     mu = pr.mu
-    set_uc_return_constraints!(model, mu_ucs(ucs, X), mu)
+    set_ucs_return_constraints!(model, mu_ucs(ucs, X), mu)
     set_max_ratio_return_constraints!(model, obj, mu)
     set_return_bounds!(model, lb)
     return nothing

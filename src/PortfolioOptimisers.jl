@@ -121,6 +121,7 @@ include("./20_Optimisation/7_Returns_and_ObjectiveFunctions.jl")
 include("./20_Optimisation/8_JuMPConstraints.jl")
 include("./20_Optimisation/9_JuMPOptimiser.jl")
 include("./20_Optimisation/10_MeanRisk.jl")
-include("./20_Optimisation/11_RiskConstraints.jl")
+include("./20_Optimisation/11_FactorRiskContribution.jl")
+include("./20_Optimisation/12_RiskConstraints.jl")
 
 end

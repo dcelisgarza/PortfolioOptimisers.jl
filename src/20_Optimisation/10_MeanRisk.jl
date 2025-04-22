@@ -54,8 +54,8 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     set_portfolio_objective_function!(model, mr.obj, mr.opt.ret, mr.opt.cobj, mr, pr)
     res, sol = optimise_JuMP_model!(model, mr, datatype)
-    return JuMPOptimisationResult(MeanRiskEstimator, pr, wb, lcs, cent, gcard, nplg, cplg,
-                                  res, sol, model)
+    return JuMPOptimisationResult(Type{MeanRiskEstimator}, pr, wb, lcs, cent, gcard, nplg,
+                                  cplg, res, sol, model)
 end
 
 export MeanRiskEstimator
