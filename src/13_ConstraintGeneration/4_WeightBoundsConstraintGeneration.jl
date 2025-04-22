@@ -40,18 +40,18 @@ function WeightBoundsResult(; lb::Union{Nothing, <:Real, <:AbstractVector{<:Real
     validate_bounds(lb, ub)
     return WeightBoundsResult{typeof(lb), typeof(ub)}(lb, ub)
 end
-struct WeightBoundsConstraints{T1, T2,
-                               T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                               T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
+struct WeightBoundsConstraint{T1, T2,
+                              T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                              T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
        AbstractEstimator
     group::T1
     name::T2
     lb::T3
     ub::T4
 end
-function WeightBoundsConstraints(; group, name,
-                                 lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
-                                 ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
+function WeightBoundsConstraint(; group, name,
+                                lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
+                                ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
     lb_flag = isa(lb, AbstractVector)
@@ -62,14 +62,14 @@ function WeightBoundsConstraints(; group, name,
         @smart_assert(length(group) == length(name) == length(lb) == length(ub))
     end
     validate_bounds(lb, ub)
-    return WeightBoundsConstraints{typeof(group), typeof(name), typeof(lb), typeof(ub)}(group,
-                                                                                        name,
-                                                                                        lb,
-                                                                                        ub)
+    return WeightBoundsConstraint{typeof(group), typeof(name), typeof(lb), typeof(ub)}(group,
+                                                                                       name,
+                                                                                       lb,
+                                                                                       ub)
 end
-function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:Any, <:Any,
-                                                                <:Union{Nothing, <:Real},
-                                                                <:Union{Nothing, <:Real}},
+function weight_bounds_constraints(hcc::WeightBoundsConstraint{<:Any, <:Any,
+                                                               <:Union{Nothing, <:Real},
+                                                               <:Union{Nothing, <:Real}},
                                    sets::DataFrame; strict::Bool = false)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
@@ -96,10 +96,10 @@ function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:Any, <:Any,
     end
     return WeightBoundsResult(; lb = LB, ub = UB)
 end
-function weight_bounds_constraints(hcc::WeightBoundsConstraints{<:AbstractVector,
-                                                                <:AbstractVector,
-                                                                <:AbstractVector,
-                                                                <:AbstractVector},
+function weight_bounds_constraints(hcc::WeightBoundsConstraint{<:AbstractVector,
+                                                               <:AbstractVector,
+                                                               <:AbstractVector,
+                                                               <:AbstractVector},
                                    sets::DataFrame; strict::Bool = false, kwargs...)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
@@ -151,4 +151,4 @@ function weight_bounds_constraints(wb::Nothing, args...; scalar::Bool = false,
     return WeightBoundsResult(; lb = fill(-Inf, N), ub = fill(Inf, N))
 end
 
-export WeightBoundsConstraints, WeightBoundsResult, weight_bounds_constraints
+export WeightBoundsConstraint, WeightBoundsResult, weight_bounds_constraints

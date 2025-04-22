@@ -1,6 +1,6 @@
 struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                      T2 <: Union{Nothing, <:AbstractVector{<:Real}},
-                     T3 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraints},
+                     T3 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
                      T4 <: Union{Nothing, <:Real, <:BudgetRange},
                      T5 <: Union{Nothing, <:Real, <:BudgetRange},
                      T6 <: Union{Nothing, <:LinearConstraint,
@@ -62,7 +62,7 @@ end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                        wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                       wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraints} = WeightBoundsResult(),
+                       wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = WeightBoundsResult(),
                        bgt::Union{Nothing, <:Real, <:BudgetRange} = 1.0,
                        sbgt::Union{Nothing, <:Real, <:BudgetRange} = nothing,
                        lcs::Union{Nothing, <:LinearConstraint,
@@ -113,7 +113,8 @@ function JuMPOptimiser(;
     if isa(gcard, AbstractVector)
         @smart_assert(!isempty(gcard))
     end
-    if isa(lcs, LinearConstraint) ||
+    if isa(wb, WeightBoundsConstraint) ||
+       isa(lcs, LinearConstraint) ||
        isa(lcs, AbstractVector{<:LinearConstraint}) ||
        isa(cent, CentralityConstraintEstimator) ||
        isa(cent, AbstractVector{<:CentralityConstraintEstimator}) ||

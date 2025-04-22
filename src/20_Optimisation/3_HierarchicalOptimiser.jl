@@ -3,8 +3,8 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
                              T3 <: Union{Nothing, <:Fees},
                              T4 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                              T5 <: Scalariser,
-                             T6 <: Union{Nothing, <:WeightBoundsResult,
-                                         <:WeightBoundsConstraints},
+                             T6 <:
+                             Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
                              T7 <: ClusteringWeightFinaliser,
                              T8 <: Union{Nothing, <:DataFrame}, T9 <: Bool} <:
        BaseClusteringOptimisationEstimator
@@ -26,12 +26,12 @@ function HierarchicalOptimiser(;
                                slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
                                sce::Scalariser = SumScalariser(),
                                wb::Union{Nothing, <:WeightBoundsResult,
-                                         <:WeightBoundsConstraints} = nothing,
+                                         <:WeightBoundsConstraint} = nothing,
                                cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
                                sets::Union{Nothing, <:DataFrame} = nothing,
                                strict::Bool = false)
-    if isa(sets, DataFrame)
-        @smart_assert(!isempty(sets))
+    if isa(wb, WeightBoundsConstraint)
+        @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
     return HierarchicalOptimiser{typeof(pe), typeof(cle), typeof(fees), typeof(slv),
                                  typeof(sce), typeof(wb), typeof(cwf), typeof(sets),
