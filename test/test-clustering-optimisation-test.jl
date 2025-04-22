@@ -208,7 +208,9 @@
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
-        opt = HierarchicalOptimiser(; pe = pr, cle = clm, slv = slv)
+        opt = HierarchicalOptimiser(; pe = pr, cle = clm,
+                                    cwf = JuMP_ClusteringWeightFiniliser(; slv = slv),
+                                    slv = slv)
         ew = eweights(1:size(X, 1), inv(size(X, 1)); scale = true)
         w1 = fill(inv(10), 10)
         rf = 4.34 / 100 / 252

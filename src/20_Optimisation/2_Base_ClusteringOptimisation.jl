@@ -38,9 +38,9 @@ function JuMP_ClusteringWeightFiniliser(;
                                                                                             so,
                                                                                             slv)
 end
-function set_clustering_weight_finaliser_version!(model::JuMP.Model,
-                                                  ::RelativeErrorClusteringWeightFiniliser,
-                                                  wi::AbstractVector)
+function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
+                                              ::RelativeErrorClusteringWeightFiniliser,
+                                              wi::AbstractVector)
     wi[iszero.(wi)] .= eps(eltype(wi))
     w = model[:w]
     sc = model[:sc]
@@ -52,9 +52,9 @@ function set_clustering_weight_finaliser_version!(model::JuMP.Model,
     @objective(model, Min, so * t)
     return nothing
 end
-function set_clustering_weight_finaliser_version!(model::JuMP.Model,
-                                                  ::SquareRelativeErrorClusteringWeightFiniliser,
-                                                  wi::AbstractVector)
+function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
+                                              ::SquareRelativeErrorClusteringWeightFiniliser,
+                                              wi::AbstractVector)
     wi[iszero.(wi)] .= eps(eltype(wi))
     w = model[:w]
     sc = model[:sc]
@@ -64,9 +64,9 @@ function set_clustering_weight_finaliser_version!(model::JuMP.Model,
     @objective(model, Min, so * t)
     return nothing
 end
-function set_clustering_weight_finaliser_version!(model::JuMP.Model,
-                                                  ::AbsoluteErrorClusteringWeightFiniliser,
-                                                  wi::AbstractVector)
+function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
+                                              ::AbsoluteErrorClusteringWeightFiniliser,
+                                              wi::AbstractVector)
     w = model[:w]
     sc = model[:sc]
     so = model[:so]
@@ -75,9 +75,9 @@ function set_clustering_weight_finaliser_version!(model::JuMP.Model,
     @objective(model, Min, so * t)
     return nothing
 end
-function set_clustering_weight_finaliser_version!(model::JuMP.Model,
-                                                  ::SquareAbsoluteErrorClusteringWeightFiniliser,
-                                                  wi::AbstractVector)
+function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
+                                              ::SquareAbsoluteErrorClusteringWeightFiniliser,
+                                              wi::AbstractVector)
     w = model[:w]
     sc = model[:sc]
     so = model[:so]
@@ -104,7 +104,7 @@ function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wb::WeightBounds
     if !isnothing(ub)
         @constraint(model, sc * w <= sc * ub)
     end
-    set_clustering_weight_finaliser_version!(model, cwf.alg, wi)
+    set_clustering_weight_finaliser_alg!(model, cwf.alg, wi)
     return if optimise_JuMP_model!(model, cwf.slv).success
         value.(model[:w])
     else
@@ -137,11 +137,6 @@ function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wb::WeightBo
         w *= s1 / sum(w)
     end
     return w
-end
-function finalise_hierarchical_weights(cwf::ClusteringWeightFinaliser,
-                                       wb::WeightBoundsResult, w::AbstractVector)
-    w = opt_weight_bounds(cwf, wb, w)
-    return w / sum(w)
 end
 
 export HeuristicClusteringWeightFiniliser, RelativeErrorClusteringWeightFiniliser,
