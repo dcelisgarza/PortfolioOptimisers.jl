@@ -25,10 +25,10 @@
         sigma1 = cov(X)
         sigma2 = copy(sigma1)
         sigma3 = copy(sigma1)
-        fix_non_positive_definite_matrix!(FNPDM_NearestCorrelationMatrix(), sigma1)
+        posdef!(PosDefEstimator(), sigma1)
         @test isposdef(sigma1)
 
-        fix_non_positive_definite_matrix!(nothing, sigma2)
+        posdef!(nothing, sigma2)
         @test !isposdef(sigma2)
         @test isapprox(sigma2, sigma3)
     end
@@ -38,11 +38,12 @@
         T, N = size(X)
         q = T / N
         sigma = cov(X)
-        des = [nothing, FixedDenoise(), ShrunkDenoise(), SpectralDenoise()]
+        des = [nothing, Denoise(; alg = FixedDenoise()), Denoise(; alg = ShrunkDenoise()),
+               Denoise(; alg = SpectralDenoise())]
         denoise_t = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv"), DataFrame)
         for i ∈ 1:ncol(denoise_t)
             sigma1 = copy(sigma)
-            denoise!(des[i], FNPDM_NearestCorrelationMatrix(), sigma1, q)
+            denoise!(des[i], PosDefEstimator(), sigma1, q)
             MN = size(sigma1)
             res = isapprox(sigma1, reshape(denoise_t[!, i], MN))
             if !res
@@ -61,7 +62,7 @@
         detone = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv"), DataFrame)
         for i ∈ 1:ncol(detone)
             sigma1 = copy(sigma)
-            detone!(des[i], FNPDM_NearestCorrelationMatrix(), sigma1)
+            detone!(des[i], PosDefEstimator(), sigma1)
             MN = size(sigma1)
             res = isapprox(sigma1, reshape(detone[!, i], MN))
             if !res
