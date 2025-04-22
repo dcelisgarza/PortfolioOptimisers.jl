@@ -17,22 +17,6 @@ end
 function cleanup_weights(model::JuMP.Model, ::MeanRiskEstimator)
     return value.(model[:w]) / value(model[:k])
 end
-struct MeanRiskResult{T1 <: AbstractPriorResult, T2 <: Union{Nothing, <:WeightBoundsResult},
-                      T3 <: Union{Nothing, <:LinearConstraintResult},
-                      T4 <: Union{Nothing, <:LinearConstraintResult},
-                      T5 <: Union{Nothing, <:LinearConstraintResult},
-                      T6 <: Union{Nothing, <:PhilogenyConstraintResult},
-                      T7 <: Union{Nothing, <:PhilogenyConstraintResult},
-                      T8 <: JuMPPortfolioResult} <: JuMPOptimisationResult
-    pr::T1
-    wb::T2
-    lcs::T3
-    cent::T4
-    gcard::T5
-    nplg::T6
-    cplg::T7
-    sol::T8
-end
 function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     model = JuMP.Model()
     set_string_names_on_creation(model, mr.opt.str_names)
@@ -69,8 +53,9 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     set_portfolio_objective_function!(model, mr.obj, mr.opt.ret, mr.opt.cobj, mr, pr)
-    sol = optimise_JuMP_model!(model, mr, datatype)
-    return MeanRiskResult(pr, wb, lcs, cent, gcard, nplg, cplg, sol)
+    res, sol = optimise_JuMP_model!(model, mr, datatype)
+    return JuMPOptimisationResult(MeanRiskEstimator, pr, wb, lcs, cent, gcard, nplg, cplg,
+                                  res, sol, model)
 end
 
 export MeanRiskEstimator

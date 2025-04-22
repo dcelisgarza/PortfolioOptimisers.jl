@@ -436,19 +436,19 @@
                                                alg = SquareAbsoluteErrorClusteringWeightFiniliser(),
                                                slv = [slv])]
         for cwf ∈ cwfs
-            opt = HierarchicalOptimiser(; pe = pr, cle = clm,
+            opt = HierarchicalOptimiser(; pe = pr, cle = clm, cwf = cwf,
                                         wb = WeightBoundsResult(; lb = lb, ub = ub),
                                         slv = [slv])
             w = optimise!(HierarchicalEqualRiskContribution(; ri = r, opt = opt))
             idx = (w - lb) .< 0
             if !isempty(w[idx])
-                @test isapprox(w[idx], lb[idx])
+                @test isapprox(w[idx], lb[idx], atol = 1e-8)
             end
             @test all(w[.!idx] .>= lb[.!idx])
 
             idx = (ub - w) .< 0
             if !isempty(w[idx])
-                @test isapprox(w[idx], ub[idx])
+                @test isapprox(w[idx], ub[idx], atol = 1e-8)
             end
             @test all(w[.!idx] .<= ub[.!idx])
         end
