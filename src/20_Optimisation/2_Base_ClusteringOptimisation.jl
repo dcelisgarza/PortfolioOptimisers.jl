@@ -1,6 +1,6 @@
 abstract type BaseClusteringOptimisationEstimator <: OptimisationEstimator end
 abstract type ClusteringOptimisationEstimator <: BaseClusteringOptimisationEstimator end
-abstract type ClusteringWeightFinaliser <: AbstractEstimator end
+abstract type ClusteringWeightFinaliser <: AbstractAlgorithm end
 struct HeuristicClusteringWeightFiniliser{T1 <: Integer} <: ClusteringWeightFinaliser
     iter::T1
 end
@@ -15,27 +15,28 @@ struct SquareRelativeErrorClusteringWeightFiniliser <:
 struct AbsoluteErrorClusteringWeightFiniliser <: JuMP_ClusteringWeightFiniliserFormulation end
 struct SquareAbsoluteErrorClusteringWeightFiniliser <:
        JuMP_ClusteringWeightFiniliserFormulation end
-struct JuMP_ClusteringWeightFiniliser{T1 <: Real, T2 <: Real,
-                                      T3 <: JuMP_ClusteringWeightFiniliserFormulation,
+struct JuMP_ClusteringWeightFiniliser{T1 <: JuMP_ClusteringWeightFiniliserFormulation,
+                                      T2 <: Real, T3 <: Real,
                                       T4 <: Union{<:Solver, <:AbstractVector{<:Solver}}} <:
        ClusteringWeightFinaliser
-    sc::T1
-    so::T2
-    v::T3
+    alg::T1
+    sc::T2
+    so::T3
     slv::T4
 end
-function JuMP_ClusteringWeightFiniliser(; sc::Real = 1.0, so::Real = 1.0,
-                                        v::JuMP_ClusteringWeightFiniliserFormulation = RelativeErrorClusteringWeightFiniliser(),
+function JuMP_ClusteringWeightFiniliser(;
+                                        alg::JuMP_ClusteringWeightFiniliserFormulation = RelativeErrorClusteringWeightFiniliser(),
+                                        sc::Real = 1.0, so::Real = 1.0,
                                         slv::Union{<:Solver, <:AbstractVector{<:Solver}})
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
     @smart_assert(sc > zero(sc))
     @smart_assert(so > zero(so))
-    return JuMP_ClusteringWeightFiniliser{typeof(sc), typeof(so), typeof(v), typeof(slv)}(sc,
-                                                                                          so,
-                                                                                          v,
-                                                                                          slv)
+    return JuMP_ClusteringWeightFiniliser{typeof(alg), typeof(sc), typeof(so), typeof(slv)}(alg,
+                                                                                            sc,
+                                                                                            so,
+                                                                                            slv)
 end
 function set_clustering_weight_finaliser_version!(model::JuMP.Model,
                                                   ::RelativeErrorClusteringWeightFiniliser,
@@ -103,11 +104,11 @@ function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wb::WeightBounds
     if !isnothing(ub)
         @constraint(model, sc * w <= sc * ub)
     end
-    set_clustering_weight_finaliser_version!(model, cwf.v, wi)
+    set_clustering_weight_finaliser_version!(model, cwf.alg, wi)
     return if optimise_JuMP_model!(model, cwf.slv).success
         value.(model[:w])
     else
-        @warn("Version: $(cwf.v)\nReverting to Heuristic type.")
+        @warn("Version: $(cwf.alg)\nReverting to Heuristic type.")
         opt_weight_bounds(HeuristicClusteringWeightFiniliser(), wb, wi)
     end
 end
@@ -121,7 +122,7 @@ function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wb::WeightBo
     iter = cwf.iter
     s1 = sum(w)
     for _ ∈ 1:iter
-        if !(any(ub .< w) || any(lb .> w))
+        if any(ub .< w) ⊼ any(lb .> w)
             break
         end
         old_w = copy(w)
@@ -130,7 +131,7 @@ function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wb::WeightBo
         w_add = sum(max.(old_w - ub, zero(eltype(w))))
         w_sub = sum(min.(old_w - lb, zero(eltype(w))))
         delta = w_add + w_sub
-        if delta != 0
+        if !iszero(delta)
             w[idx] += delta * w[idx] / sum(w[idx])
         end
         w *= s1 / sum(w)

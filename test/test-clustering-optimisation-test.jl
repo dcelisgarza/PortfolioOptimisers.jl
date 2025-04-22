@@ -397,4 +397,60 @@
             end
         end
     end
+    @testset "Bounds tests" begin
+        rng = StableRNG(987456321)
+        X = randn(rng, 500, 10)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+        pr = prior(HighOrderPriorEstimator(), rd)
+        clm = clusterise(ClusteringEstimator(), pr.X)
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+        lb = [0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ub = [0.2, 1, 1, 1, 1, 1, 1, 1, 0.05, 0]
+        opt = HierarchicalOptimiser(; pe = pr, cle = clm,
+                                    wb = WeightBoundsResult(; lb = lb, ub = ub), slv = slv)
+        r = [Variance(), ConditionalValueatRisk()]
+        w = optimise!(HierarchicalRiskParity(; r = r, opt = opt))
+        idx = (w - lb) .< 0
+        if !isempty(w[idx])
+            @test isapprox(w[idx], lb[idx])
+        end
+        @test all(w[.!idx] .>= lb[.!idx])
+
+        idx = (ub - w) .< 0
+        if !isempty(w[idx])
+            @test isapprox(w[idx], ub[idx])
+        end
+        @test all(w[.!idx] .<= ub[.!idx])
+
+        cwfs = [HeuristicClusteringWeightFiniliser(),
+                JuMP_ClusteringWeightFiniliser(; slv = [slv]),
+                JuMP_ClusteringWeightFiniliser(;
+                                               alg = SquareRelativeErrorClusteringWeightFiniliser(),
+                                               slv = [slv]),
+                JuMP_ClusteringWeightFiniliser(;
+                                               alg = AbsoluteErrorClusteringWeightFiniliser(),
+                                               slv = [slv]),
+                JuMP_ClusteringWeightFiniliser(;
+                                               alg = SquareAbsoluteErrorClusteringWeightFiniliser(),
+                                               slv = [slv])]
+        for cwf ∈ cwfs
+            opt = HierarchicalOptimiser(; pe = pr, cle = clm,
+                                        wb = WeightBoundsResult(; lb = lb, ub = ub),
+                                        slv = [slv])
+            w = optimise!(HierarchicalEqualRiskContribution(; ri = r, opt = opt))
+            idx = (w - lb) .< 0
+            if !isempty(w[idx])
+                @test isapprox(w[idx], lb[idx])
+            end
+            @test all(w[.!idx] .>= lb[.!idx])
+
+            idx = (ub - w) .< 0
+            if !isempty(w[idx])
+                @test isapprox(w[idx], ub[idx])
+            end
+            @test all(w[.!idx] .<= ub[.!idx])
+        end
+    end
 end
