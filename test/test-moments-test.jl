@@ -114,9 +114,9 @@
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = NormalisedGerber0()),
                GerberCovariance(;
-                                alg = NormalisedGerber0(me = SimpleExpectedReturns(;
+                                alg = NormalisedGerber0(;
+                                                        me = SimpleExpectedReturns(;
                                                                                    w = ew)),
-
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = Gerber1()),
@@ -125,9 +125,9 @@
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = NormalisedGerber1()),
                GerberCovariance(;
-                                alg = NormalisedGerber1(me = SimpleExpectedReturns(;
+                                alg = NormalisedGerber1(;
+                                                        me = SimpleExpectedReturns(;
                                                                                    w = ew)),
-
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = Gerber2()),
@@ -136,9 +136,9 @@
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = NormalisedGerber2()),
                GerberCovariance(;
-                                alg = NormalisedGerber2(me = SimpleExpectedReturns(;
+                                alg = NormalisedGerber2(;
+                                                        me = SimpleExpectedReturns(;
                                                                                    w = ew)),
-
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                SmythBrobyCovariance(; alg = SmythBroby0()),
@@ -290,9 +290,9 @@
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = NormalisedGerber0()),
                GerberCovariance(;
-                                alg = NormalisedGerber0(me = SimpleExpectedReturns(;
+                                alg = NormalisedGerber0(;
+                                                        me = SimpleExpectedReturns(;
                                                                                    w = ew)),
-
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = Gerber1()),
@@ -301,9 +301,9 @@
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = NormalisedGerber1()),
                GerberCovariance(;
-                                alg = NormalisedGerber1(me = SimpleExpectedReturns(;
+                                alg = NormalisedGerber1(;
+                                                        me = SimpleExpectedReturns(;
                                                                                    w = ew)),
-
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = Gerber2()),
@@ -312,9 +312,9 @@
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = NormalisedGerber2()),
                GerberCovariance(;
-                                alg = NormalisedGerber2(me = SimpleExpectedReturns(;
+                                alg = NormalisedGerber2(;
+                                                        me = SimpleExpectedReturns(;
                                                                                    w = ew)),
-
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                SmythBrobyCovariance(; alg = SmythBroby0()),
@@ -779,7 +779,7 @@
         ce2 = PortfolioOptimisers.factory(ce1, fw)
         @test ce2.ve.w == fw
 
-        ce1 = GerberCovariance(alg = NormalisedGerber0())
+        ce1 = GerberCovariance(; alg = NormalisedGerber0())
         ce2 = PortfolioOptimisers.factory(ce1, fw)
         @test ce2.alg.me.w == fw
         @test ce2.ve.w == fw
@@ -789,7 +789,7 @@
         @test ce2.me.w == fw
         @test ce2.ve.w == fw
 
-        ce1 = SmythBrobyCovariance(alg = NormalisedSmythBroby0())
+        ce1 = SmythBrobyCovariance(; alg = NormalisedSmythBroby0())
         ce2 = PortfolioOptimisers.factory(ce1, fw)
         @test ce2.me.w == fw
         @test ce2.ve.w == fw
