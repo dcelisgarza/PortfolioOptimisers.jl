@@ -292,3 +292,40 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::UncertaintySetV
     set_risk_bounds_and_expression!(model, opt, ucs_variance_risk, r.settings, key)
     return nothing
 end
+function calc_risk_constraint_target(::LowOrderMoment{<:Any, <:Any, <:Any, Nothing},
+                                     w::AbstractVector, mu::AbstractVector, args...)
+    return dot(w, mu)
+end
+function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:Any,
+                                                       <:AbstractVector}, w::AbstractVector,
+                                     args...)
+    return dot(w, r.mu)
+end
+function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:Any, <:Real}, ::Any,
+                                     ::Any, k)
+    return r.mu * k
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::LowOrderMoment{<:Any, <:MeanAbsoluteDeviation, <:Any,
+                                                 <:Any}, opt::MeanRiskEstimator,
+                               pr::AbstractPriorResult, args...)
+    sc = model[:sc]
+    w = model[:w]
+    k = model[:k]
+    key = Symbol(:mad_risk_, i)
+    target = calc_risk_constraint_target(r, w, pr.mu, k)
+    set_net_portfolio_returns!(model, pr.X)
+    net_X = model[:net_X]
+    T = size(net_X, 1)
+    mad = model[Symbol(:mad_, i)] = @variable(model, [1:T], lower_bound = 0)
+    mar_mad = model[Symbol(:mar_mad_, i)] = @expression(model, (net_X + mad) .- target)
+    w = r.alg.w
+    mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(w)
+        @expression(model, mean(mad + mar_mad))
+    else
+        @expression(model, mean(mad + mar_mad, w))
+    end
+    model[Symbol(:cmar_mad_, i)] = @constraint(model, sc * mar_mad .>= 0)
+    set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
+    return nothing
+end
