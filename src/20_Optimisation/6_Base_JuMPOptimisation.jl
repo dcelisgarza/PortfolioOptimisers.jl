@@ -206,25 +206,31 @@ function set_scalar_risk_expression!(model::JuMP.Model, ::MaxScalariser)
 end
 function set_portfolio_returns!(model::JuMP.Model, X::AbstractMatrix)
     if haskey(model, :X)
-        return nothing
+        return model[:X]
     end
     w = model[:w]
     @expression(model, X, X * w)
-    return nothing
+    return X
 end
 function set_net_portfolio_returns!(model::JuMP.Model, X::AbstractMatrix)
     if haskey(model, :net_X)
-        return nothing
+        return model[:net_X]
     end
-    set_portfolio_returns!(model, X)
-    X = model[:X]
+    X = set_portfolio_returns!(model, X)
     if haskey(model, :fees)
         fees = model[:fees]
         @expression(model, net_X, X .- fees)
     else
         @expression(model, net_X, X)
     end
-    return nothing
+    return net_X
+end
+function set_portfolio_returns_plus_one!(model::JuMP.Model, X::AbstractMatrix)
+    if haskey(model, :Xap1)
+        return model[:Xap1]
+    end
+    @expression(model, Xap1, one(eltype(X)) .+ X)
+    return Xap1
 end
 
 export JuMPOptimisationResult

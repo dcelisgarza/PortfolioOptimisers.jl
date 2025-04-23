@@ -130,14 +130,13 @@ function set_variance_risk!(model::JuMP.Model, i::Integer,
                             pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
     w = model[:w]
-    set_net_portfolio_returns!(model, pr.X)
-    net_X = model[:net_X]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     key_dev = Symbol(:dev_, i)
     t_variance = model[Symbol(:t_variance_, i)] = @variable(model)
     dev = model[key_dev] = @variable(model)
     mu = pr.mu
-    T = length(net_X)
     variance = model[Symbol(:variance_, i)] = @expression(model, net_X .- dot(mu, w))
     model[key] = @expression(model, t_variance / (T - one(T)))
     model[Symbol(key_dev, :_soc)] = @constraint(model,
@@ -314,9 +313,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     k = model[:k]
     key = Symbol(:mad_risk_, i)
     target = calc_risk_constraint_target(r, w, pr.mu, k)
-    set_net_portfolio_returns!(model, pr.X)
-    net_X = model[:net_X]
-    T = size(net_X, 1)
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
     mad = model[Symbol(:mad_, i)] = @variable(model, [1:T], lower_bound = 0)
     mar_mad = model[Symbol(:mar_mad_, i)] = @expression(model, (net_X + mad) .- target)
     w = r.alg.w
@@ -327,5 +325,237 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     end
     model[Symbol(:cmar_mad_, i)] = @constraint(model, sc * mar_mad >= 0)
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
+    return nothing
+end
+function set_semi_variance_risk!(model::JuMP.Model, ::Quad, i::Integer, iTm1::Real,
+                                 semi_variance, semi_dev, key::Symbol)
+    return model[key] = @expression(model, iTm1 * dot(semi_variance, semi_variance))
+end
+function set_semi_variance_risk!(model::JuMP.Model, ::RSOC, i::Integer, iTm1::Real,
+                                 semi_variance, semi_dev, key::Symbol)
+    sc = model[:sc]
+    tsemi_variance = model[Symbol(:tsemi_variance_, i)] = @variable(model)
+    model[Symbol(:csemi_variance_rsoc_, i)] = @constraint(model,
+                                                          [sc * tsemi_variance; 0.5;
+                                                           sc * semi_variance] in
+                                                          RotatedSecondOrderCone())
+    return model[key] = @expression(model, iTm1 * tsemi_variance)
+end
+function set_semi_variance_risk!(model::JuMP.Model, ::SOC, i::Integer, iTm1::Real,
+                                 semi_variance, semi_dev, key::Symbol)
+    return model[key] = @expression(model, iTm1 * semi_dev^2)
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::LowOrderMoment{<:Any, <:SemiVariance, <:Any, <:Any},
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    sc = model[:sc]
+    w = model[:w]
+    k = model[:k]
+    key = Symbol(:semi_variance_risk_, i)
+    target = calc_risk_constraint_target(r, w, pr.mu, k)
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    semi_variance = model[Symbol(:semi_variance_, i)] = @variable(model, [1:T],
+                                                                  lower_bound = 0)
+    semi_dev = model[Symbol(:semi_dev_, i)] = @variable(model)
+    factor = T - r.alg.ddof
+    semi_variance_risk = set_semi_variance_risk!(model, r.alg.formulation, i, inv(factor),
+                                                 semi_variance, semi_dev, key)
+    model[Symbol(:csemi_variance_mar_, i)], model[Symbol(:csemi_variance_soc_, i)] = @constraints(model,
+                                                                                                  begin
+                                                                                                      sc *
+                                                                                                      ((net_X +
+                                                                                                        semi_variance) .-
+                                                                                                       target) >=
+                                                                                                      0
+                                                                                                      [sc *
+                                                                                                       semi_dev
+                                                                                                       sc *
+                                                                                                       semi_variance] ∈
+                                                                                                      SecondOrderCone()
+                                                                                                  end)
+    set_risk_bounds_and_expression!(model, opt, semi_variance_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::LowOrderMoment{<:Any, <:SemiDeviation, <:Any, <:Any},
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    sc = model[:sc]
+    w = model[:w]
+    k = model[:k]
+    key = Symbol(:semi_sd_risk_, i)
+    target = calc_risk_constraint_target(r, w, pr.mu, k)
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    tsemi_sd = model[Symbol(:tsemi_sd_, i)] = @variable(model, [1:T], lower_bound = 0)
+    semi_sd = model[Symbol(:semi_sd_, i)] = @variable(model)
+    factor = T - r.alg.ddof
+    semi_sd_risk = model[key] = @expression(model, semi_sd / sqrt(factor))
+    model[Symbol(:csemi_variance_mar_, i)], model[Symbol(:csemi_variance_soc_, i)] = @constraints(model,
+                                                                                                  begin
+                                                                                                      sc *
+                                                                                                      ((net_X +
+                                                                                                        tsemi_sd) .-
+                                                                                                       target) >=
+                                                                                                      0
+                                                                                                      [sc *
+                                                                                                       semi_sd
+                                                                                                       sc *
+                                                                                                       tsemi_sd] ∈
+                                                                                                      SecondOrderCone()
+                                                                                                  end)
+
+    set_risk_bounds_and_expression!(model, opt, semi_sd_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::LowOrderMoment{<:Any, <:FirstLowerMoment, <:Any, <:Any},
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    sc = model[:sc]
+    w = model[:w]
+    k = model[:k]
+    key = Symbol(:flm_risk_, i)
+    target = calc_risk_constraint_target(r, w, pr.mu, k)
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    flm = model[Symbol(:flm_, i)] = @variable(model, [1:T], lower_bound = 0)
+    flm_risk = model[key] = @expression(model, sum(flm) / T)
+    model[Symbol(:cflm_mar_, i)] = @constraint(model, sc * ((net_X + flm) .- target) >= 0)
+    set_risk_bounds_and_expression!(model, opt, flm_risk, r.settings, key)
+    return nothing
+end
+function set_wr_risk_expression!(model::JuMP.Model, X::AbstractMatrix)
+    if haskey(model, :wr_risk)
+        return model[:wr_risk]
+    end
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, X)
+    @variable(model, wr_risk)
+    @constraint(model, cwr, sc * (wr_risk .+ net_X) >= 0)
+    return wr_risk
+end
+function set_risk_constraints!(model::JuMP.Model, ::Integer, r::WorstRealisation,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    if haskey(model, :wr_risk)
+        return nothing
+    end
+    wr_risk = set_wr_risk_expression!(model, pr.X)
+    set_risk_bounds_and_expression!(model, opt, wr_risk, r.settings, :wr_risk)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, ::Integer, r::Range,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    if haskey(model, :range_risk)
+        return nothing
+    end
+    sc = model[:sc]
+    wr_risk = set_wr_risk_expression!(model, pr.X)
+    net_X = model[:net_X]
+    @variable(model, br_risk)
+    @expression(model, range_risk, wr_risk - br_risk)
+    @constraint(model, cbr, sc * (br_risk .+ net_X) <= 0)
+    set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, :range_risk)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer, r::ConditionalValueatRisk,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    iat = inv(r.alpha * T)
+    key = Symbol(:cvar_risk_, i)
+    var = model[Symbol(:var_, i)] = @variable(model)
+    z_cvar = model[Symbol(:z_cvar_, i)] = @variable(model, [1:T], lower_bound = 0)
+    cvar_risk = model[key] = @expression(model, var + sum(z_cvar) * iat)
+    model[Symbol(:ccvar_, i)] = @constraint(model, sc * ((z_cvar + net_X) .+ var) >= 0)
+    set_risk_bounds_and_expression!(model, opt, cvar_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::DistributionallyRobustConditionalValueatRisk,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    sc = model[:sc]
+    w = model[:w]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    Xap1 = set_portfolio_returns_plus_one!(model, pr.X)
+    key = Symbol(:drcvar_risk_, i)
+    T, N = size(pr.X)
+
+    b1 = r.l
+    alpha = r.alpha
+    radius = r.r
+
+    a1 = -one(alpha)
+    a2 = -one(alpha) - b1 * inv(alpha)
+    b2 = b1 * (one(alpha) - inv(alpha))
+
+    lb = model[Symbol(:drcvar_lb_, i)] = @variable(model)
+    tau = model[Symbol(:drcvar_tau_, i)] = @variable(model)
+    s, tu_drcvar, tv_drcvar, u, v = model[Symbol(:drcvar_s_, i)], model[Symbol(:tu_drcvar_, i)], model[Symbol(:tv_drcvar_, i)], model[Symbol(:drcvar_u_, i)], model[Symbol(:drcvar_v_, i)] = @variables(model,
+                                                                                                                                                                                                        begin
+                                                                                                                                                                                                            [1:T]
+                                                                                                                                                                                                            [1:T]
+                                                                                                                                                                                                            [1:T]
+                                                                                                                                                                                                            [1:T,
+                                                                                                                                                                                                             1:N],
+                                                                                                                                                                                                            (lower_bound = 0)
+                                                                                                                                                                                                            [1:T,
+                                                                                                                                                                                                             1:N],
+                                                                                                                                                                                                            (lower_bound = 0)
+                                                                                                                                                                                                        end)
+    cu_drcvar, cv_drcvar, cu_drcvar_infnorm, cv_drcvar_infnorm, constr_u_drcvar_lb, constr_v_drcvar_lb = model[Symbol(:cu_drcvar_, i)], model[Symbol(:cv_drcvar_, i)], model[Symbol(:cu_drcvar_infnorm_, i)], model[Symbol(:cv_drcvar_infnorm_, i)], model[Symbol(:constr_u_drcvar_lb_, i)], model[Symbol(:constr_v_drcvar_lb_, i)] = @constraints(model,
+                                                                                                                                                                                                                                                                                                                                                   begin
+                                                                                                                                                                                                                                                                                                                                                       sc *
+                                                                                                                                                                                                                                                                                                                                                       (b1 *
+                                                                                                                                                                                                                                                                                                                                                        tau .+
+                                                                                                                                                                                                                                                                                                                                                        (vec(sum(u .*
+                                                                                                                                                                                                                                                                                                                                                                 Xap1;
+                                                                                                                                                                                                                                                                                                                                                                 dims = 2)) -
+                                                                                                                                                                                                                                                                                                                                                         net_X -
+                                                                                                                                                                                                                                                                                                                                                         s)) <=
+                                                                                                                                                                                                                                                                                                                                                       0
+                                                                                                                                                                                                                                                                                                                                                       sc *
+                                                                                                                                                                                                                                                                                                                                                       (b2 *
+                                                                                                                                                                                                                                                                                                                                                        tau .+
+                                                                                                                                                                                                                                                                                                                                                        (a2 *
+                                                                                                                                                                                                                                                                                                                                                         net_X +
+                                                                                                                                                                                                                                                                                                                                                         vec(sum(v .*
+                                                                                                                                                                                                                                                                                                                                                                 Xap1;
+                                                                                                                                                                                                                                                                                                                                                                 dims = 2)) -
+                                                                                                                                                                                                                                                                                                                                                         s)) <=
+                                                                                                                                                                                                                                                                                                                                                       0
+                                                                                                                                                                                                                                                                                                                                                       [i = 1:T],
+                                                                                                                                                                                                                                                                                                                                                       [sc *
+                                                                                                                                                                                                                                                                                                                                                        tu_drcvar[i]
+                                                                                                                                                                                                                                                                                                                                                        sc *
+                                                                                                                                                                                                                                                                                                                                                        (a1 *
+                                                                                                                                                                                                                                                                                                                                                         w -
+                                                                                                                                                                                                                                                                                                                                                         view(u,
+                                                                                                                                                                                                                                                                                                                                                              i,
+                                                                                                                                                                                                                                                                                                                                                              :))] in
+                                                                                                                                                                                                                                                                                                                                                       MOI.NormInfinityCone(1 +
+                                                                                                                                                                                                                                                                                                                                                                            N)
+                                                                                                                                                                                                                                                                                                                                                       [i = 1:T],
+                                                                                                                                                                                                                                                                                                                                                       [sc *
+                                                                                                                                                                                                                                                                                                                                                        tv_drcvar[i]
+                                                                                                                                                                                                                                                                                                                                                        sc *
+                                                                                                                                                                                                                                                                                                                                                        (-view(v,
+                                                                                                                                                                                                                                                                                                                                                               i,
+                                                                                                                                                                                                                                                                                                                                                               :) .-
+                                                                                                                                                                                                                                                                                                                                                         a2 *
+                                                                                                                                                                                                                                                                                                                                                         w)] in
+                                                                                                                                                                                                                                                                                                                                                       MOI.NormInfinityCone(1 +
+                                                                                                                                                                                                                                                                                                                                                                            N)
+                                                                                                                                                                                                                                                                                                                                                       sc *
+                                                                                                                                                                                                                                                                                                                                                       (tu_drcvar .-
+                                                                                                                                                                                                                                                                                                                                                        lb) <=
+                                                                                                                                                                                                                                                                                                                                                       0
+                                                                                                                                                                                                                                                                                                                                                       sc *
+                                                                                                                                                                                                                                                                                                                                                       (tv_drcvar .-
+                                                                                                                                                                                                                                                                                                                                                        lb) <=
+                                                                                                                                                                                                                                                                                                                                                       0
+                                                                                                                                                                                                                                                                                                                                                   end)
+    drcvar_risk = model[key] = @expression(model, radius * lb + mean(s))
+    set_risk_bounds_and_expression!(model, opt, drcvar_risk, r.settings, key)
     return nothing
 end

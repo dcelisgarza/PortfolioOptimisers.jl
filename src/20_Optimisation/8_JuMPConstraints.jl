@@ -519,8 +519,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, X::AbstractMatrix,
                                          tr::TrackingError)
     k = model[:k]
     sc = model[:sc]
-    set_net_portfolio_returns!(model, X)
-    net_X = model[:net_X]
+    net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(tr.tracking, X)
     err = tr.err
     @variable(model, t_tr)

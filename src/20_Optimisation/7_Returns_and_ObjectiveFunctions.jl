@@ -167,8 +167,7 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
     sc = model[:sc]
     lb = pret.lb
     X = pr.X
-    set_net_portfolio_returns!(model, X)
-    net_X = model[:net_X]
+    net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
     @variable(model, t_ekelly[1:T])
     @expression(model, ret, sum(t_ekelly) / T)
