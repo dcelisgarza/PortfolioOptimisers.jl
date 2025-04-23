@@ -26,17 +26,17 @@ function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
         Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.dist, v2, ce.args...; ce.kwargs...)
     else
-        Distances.pairwise(ce.dist, v1 .* ce.w, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.dist, v2 .* ce.w, ce.args...; ce.kwargs...)
+        Distances.pairwise(ce.dist, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
+        Distances.pairwise(ce.dist, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
     end
     mu_a1, mu_b1 = mean(a; dims = 1), mean(b; dims = 1)
     mu_a2, mu_b2 = mean(a; dims = 2), mean(b; dims = 2)
     mu_a3, mu_b3 = mean(a), mean(b)
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
-    dcov2_xx = sum(A .* A) / N2
-    dcov2_xy = sum(A .* B) / N2
-    dcov2_yy = sum(B .* B) / N2
+    dcov2_xx = sum(A ⊙ A) / N2
+    dcov2_xy = sum(A ⊙ B) / N2
+    dcov2_yy = sum(B ⊙ B) / N2
     return sqrt(dcov2_xy) / sqrt(sqrt(dcov2_xx) * sqrt(dcov2_yy))
 end
 function cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
@@ -65,15 +65,15 @@ function cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
         Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),
         Distances.pairwise(ce.dist, v2, ce.args...; ce.kwargs...)
     else
-        Distances.pairwise(ce.dist, v1 .* ce.w, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.dist, v2 .* ce.w, ce.args...; ce.kwargs...)
+        Distances.pairwise(ce.dist, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
+        Distances.pairwise(ce.dist, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
     end
     mu_a1, mu_b1 = mean(a; dims = 1), mean(b; dims = 1)
     mu_a2, mu_b2 = mean(a; dims = 2), mean(b; dims = 2)
     mu_a3, mu_b3 = mean(a), mean(b)
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
-    dcov2_xy = sum(A .* B) / N2
+    dcov2_xy = sum(A ⊙ B) / N2
     return sqrt(dcov2_xy)
 end
 function cov_distance(ce::DistanceCovariance, X::AbstractMatrix)

@@ -147,7 +147,7 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     # Black litterman on the factors.
     loadings = regression(pe.re, X, F)
     (; b, M) = loadings
-    posterior_X = F * transpose(M) .+ transpose(b)
+    posterior_X = F * transpose(M) + transpose(b)
     (; P, Q) = a_views = black_littterman_views(pe.a_views, pe.a_sets;
                                                 datatype = eltype(posterior_X),
                                                 strict = strict)
@@ -162,7 +162,7 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
                                  idx = iszero.(a_views_conf)
                                  a_views_conf[idx] .= eps(eltype(a_views_conf))
                                  alphas = inv.(a_views_conf) .- 1
-                                 alphas .* P * a_prior_sigma * transpose(P)
+                                 alphas ⊙ P * a_prior_sigma * transpose(P)
                              end)
     f_views_conf = pe.f_views_conf
     f_omega = tau * Diagonal(if isnothing(f_views_conf)
@@ -171,7 +171,7 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
                                  idx = iszero.(f_views_conf)
                                  f_views_conf[idx] .= eps(eltype(f_views_conf))
                                  alphas = inv.(f_views_conf) .- 1
-                                 alphas .* f_P * f_prior_sigma * transpose(f_P)
+                                 alphas ⊙ f_P * f_prior_sigma * transpose(f_P)
                              end)
     aug_prior_sigma = hcat(vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
                            vcat(M * f_prior_sigma, f_prior_sigma))
@@ -187,12 +187,12 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     end
     v1 = tau * aug_prior_sigma * transpose(aug_P)
     v2 = aug_P * v1 + aug_omega
-    v3 = aug_Q .- aug_P * aug_prior_mu
+    v3 = aug_Q - aug_P * aug_prior_mu
     aug_posterior_mu = aug_prior_mu + v1 * (v2 \ v3)
     aug_posterior_sigma = aug_prior_sigma + tau * aug_prior_sigma -
                           v1 * (v2 \ transpose(v1))
     matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
-    posterior_mu = aug_posterior_mu[1:size(X, 2)] .+ pe.rf .+ b
+    posterior_mu = (aug_posterior_mu[1:size(X, 2)] + b) .+ pe.rf
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
     return EmpiricalPartialFactorPriorResult(;
                                              pr = EmpiricalPriorResult(; X = posterior_X,

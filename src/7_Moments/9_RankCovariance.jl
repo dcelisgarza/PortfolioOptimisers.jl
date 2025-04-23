@@ -18,7 +18,7 @@ function StatsBase.cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1, 
         X = transpose(X)
     end
     std_vec = std(ce.ve, X; dims = 1)
-    return corkendall(X) .* (std_vec ⊗ std_vec)
+    return corkendall(X) ⊙ (std_vec ⊗ std_vec)
 end
 function factory(ce::KendallCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return KendallCovariance(; ve = factory(ce.ve, w))
@@ -42,7 +42,7 @@ function StatsBase.cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1,
         X = transpose(X)
     end
     std_vec = std(ce.ve, X; dims = 1)
-    return corspearman(X) .* (std_vec ⊗ std_vec)
+    return corspearman(X) ⊙ (std_vec ⊗ std_vec)
 end
 function factory(ce::SpearmanCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return SpearmanCovariance(; ve = factory(ce.ve, w))

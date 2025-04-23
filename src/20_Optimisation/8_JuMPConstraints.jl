@@ -175,10 +175,10 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     k = model[:k]
     sc = model[:sc]
     if !isnothing(lb) && w_finite_flag(lb)
-        @constraint(model, w_lb, sc * w .>= sc * k * lb)
+        @constraint(model, w_lb, sc * w >= sc * k * lb)
     end
     if !isnothing(ub) && w_finite_flag(ub)
-        @constraint(model, w_ub, sc * w .<= sc * k * ub)
+        @constraint(model, w_ub, sc * w <= sc * k * ub)
     end
     set_budget_constraints!(model, bgt, w; key = :bgt, key_lb = :bgt_lb, key_ub = :bgt_ub)
     if flag
@@ -278,11 +278,11 @@ function mip_wb(model::JuMP.Model, wb::WeightBoundsResult, il::AbstractVector,
     w = model[:w]
     lb = wb.lb
     if !isnothing(lb) && isfinite(lb)
-        @constraint(model, w_mip_lb, sc * w .>= sc * is .* lb)
+        @constraint(model, w_mip_lb, sc * w >= sc * is ⊙ lb)
     end
     ub = wb.ub
     if !isnothing(ub) && isfinite(ub)
-        @constraint(model, w_mip_ub, sc * w .<= sc * il .* ub)
+        @constraint(model, w_mip_ub, sc * w <= sc * il ⊙ ub)
     end
     return nothing
 end
@@ -340,18 +340,18 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
     @constraint(model, i_mip_ub, i_mip <= 1)
     mip_wb(model, wb, il, is)
     if lbi_flag
-        @constraint(model, w_mip_lbi, sc * w >= sc * (il .* lbi .- ss * (1 .- ilb)))
+        @constraint(model, w_mip_lbi, sc * w >= sc * (il ⊙ lbi - ss * (1 .- ilb)))
     end
     if sbi_flag
-        @constraint(model, w_mip_sbi, sc * w <= sc * (is .* sbi .+ ss * (1 .- isb)))
+        @constraint(model, w_mip_sbi, sc * w <= sc * (is ⊙ sbi + ss * (1 .- isb)))
     end
     if ffl_flag || ffs_flag
         if ffl_flag
-            @expression(model, ffl, sum(ffl .* il))
+            @expression(model, ffl, sum(ffl ⊙ il))
             add_to_fees!(model, ffl)
         end
         if ffs_flag
-            @expression(model, ffs, sum(ffs .* is))
+            @expression(model, ffs, sum(ffs ⊙ is))
             add_to_fees!(model, ffs)
         end
     end
@@ -382,17 +382,17 @@ function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
     end
     ub = wb.ub
     if !isnothing(ub) && isfinite(ub)
-        @constraint(model, w_mip_ub, sc * w .<= sc * i_mip .* ub)
+        @constraint(model, w_mip_ub, sc * w <= sc * i_mip ⊙ ub)
     end
     if lbi_flag
-        @constraint(model, w_mip_lbi, sc * w .>= sc * i_mip .* lbi)
+        @constraint(model, w_mip_lbi, sc * w >= sc * i_mip ⊙ lbi)
     end
     if ffl_flag
-        @expression(model, ffl, sum(ffl .* i_mip))
+        @expression(model, ffl, sum(ffl ⊙ i_mip))
         add_to_fees!(model, ffl)
     end
     if haskey(model, :sw)
-        @constraint(model, w_mip_lb, sc * w >= sc * i_mip .* wb.lb)
+        @constraint(model, w_mip_lb, sc * w >= sc * i_mip ⊙ wb.lb)
     end
     return ib
 end
@@ -476,7 +476,7 @@ function set_turnover_fees!(model::JuMP.Model, turnover::Turnover)
     @variable(model, t_ftn[1:N])
     @expressions(model, begin
                      x_ftn, w - wt * k
-                     ftn, sum(val .* t_ftn)
+                     ftn, sum(val ⊙ t_ftn)
                  end)
     @constraint(model, cftn[i = 1:N], [sc * t_ftn[i]; sc * x_ftn[i]] ∈ MOI.NormOneCone(2))
     add_to_fees!(model, ftn)
@@ -493,7 +493,7 @@ function set_short_non_fixed_fees!(args...)
 end
 function set_long_non_fixed_fees!(model::JuMP.Model, fl::Union{<:Real, <:AbstractVector})
     lw = model[:lw]
-    @expression(model, fl, sum(fl .* lw))
+    @expression(model, fl, sum(fl ⊙ lw))
     add_to_fees!(model, fl)
     return nothing
 end
@@ -502,7 +502,7 @@ function set_short_non_fixed_fees!(model::JuMP.Model, fs::Union{<:Real, <:Abstra
         return nothing
     end
     sw = model[:sw]
-    @expression(model, fs, sum(fs .* sw))
+    @expression(model, fs, sum(fs ⊙ sw))
     add_to_fees!(model, fs)
     return nothing
 end
@@ -623,7 +623,7 @@ function set_sdp_philogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhil
     set_sdp_constraints!(model)
     W = model[:W]
     A = adj.A
-    model[key] = @constraint(model, sc * A .* W == 0)
+    model[key] = @constraint(model, sc * A ⊙ W == 0)
     if !haskey(model, :variance_flag)
         key = Symbol(key, :_p)
         p = adj.p
@@ -641,7 +641,7 @@ function set_sdp_frc_philogeny_constraints!(model::JuMP.Model,
     set_sdp_frc_constraints!(model)
     W = model[:W]
     A = adj.A
-    model[key] = @constraint(model, sc * A .* W == 0)
+    model[key] = @constraint(model, sc * A ⊙ W == 0)
     if !haskey(model, :variance_flag)
         key = Symbol(key, :_p)
         p = adj.p

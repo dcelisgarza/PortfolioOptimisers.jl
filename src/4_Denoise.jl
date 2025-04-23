@@ -58,8 +58,8 @@ function errPDF(x, vals; kernel = AverageShiftedHistograms.Kernels.gaussian, m =
                 n = 1000, q = 1000)
     e_min, e_max = x * (1 - sqrt(1.0 / q))^2, x * (1 + sqrt(1.0 / q))^2
     rg = range(e_min, e_max; length = n)
-    pdf1 = q ./ (2 * pi * x * rg) .*
-           sqrt.(clamp.((e_max .- rg) .* (rg .- e_min), zero(x), typemax(x)))
+    pdf1 = q ⊘ (2 * pi * x * rg) ⊙
+           sqrt.(clamp.((e_max .- rg) ⊙ (rg .- e_min), zero(x), typemax(x)))
     e_min, e_max = x * (1 - sqrt(1.0 / q))^2, x * (1 + sqrt(1.0 / q))^2
     res = ash(vals; rng = range(e_min, e_max; length = n), kernel = kernel, m = m)
     pdf2 = [AverageShiftedHistograms.pdf(res, i) for i ∈ pdf1]

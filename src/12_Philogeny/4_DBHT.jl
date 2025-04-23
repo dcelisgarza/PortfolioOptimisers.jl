@@ -77,7 +77,7 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
     clique3 = zeros(Int, N - 4, 3)   # Initialize list of 3-cliques (non-face triangles)
 
     # Find 3 vertices with largest strength
-    s = sum(W .* (W .> mean(W)); dims = 2)
+    s = sum(W ⊙ (W .> mean(W)); dims = 2)
     j = sortperm(vec(s); rev = true)
 
     in_v[1:4] .= j[1:4]
@@ -143,7 +143,7 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
         kk += 2
     end
 
-    A = sparse(W .* ((A + A') .== 1))
+    A = sparse(W ⊙ ((A + A') .== 1))
 
     cliques = if nargout > 3
         vcat(transpose(in_v[1:4]), hcat(clique3, in_v[5:end]))
@@ -263,7 +263,7 @@ function clique3(A::AbstractMatrix{<:Real})
     A = A - Diagonal(A)
     A = A .!= 0
     A2 = A * A
-    P = (A2 .!= 0) .* (A .!= 0)
+    P = (A2 .!= 0) ⊙ (A .!= 0)
     P = sparse(UpperTriangular(P))
     r, c = findnz(P .!= 0)[1:2]
     E = hcat(r, c)
@@ -274,7 +274,7 @@ function clique3(A::AbstractMatrix{<:Real})
     for n ∈ eachindex(r)
         i = r[n]
         j = c[n]
-        a = A[i, :] .* A[j, :]
+        a = A[i, :] ⊙ A[j, :]
         idx = findnz(a .!= 0)[1]
         K3[n] = idx
         N3[n] = length(idx)
@@ -290,7 +290,7 @@ function clique3(A::AbstractMatrix{<:Real})
             a = clique[:, 1] .== candidate[1]
             b = clique[:, 2] .== candidate[2]
             c = clique[:, 3] .== candidate[3]
-            check = a .* b .* c
+            check = a ⊙ b ⊙ c
             check = sum(check)
 
             if check == 0
@@ -777,9 +777,9 @@ function BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real
 
         # Assign converging bubble membership of vertices in `uv'
         for v ∈ eachindex(uv)
-            v_cont = vec(sum(Rpm[:, uv[v]] .* Bubv; dims = 1))  # sum of edge weights linked to uv(v) in each converging bubble
+            v_cont = vec(sum(Rpm[:, uv[v]] ⊙ Bubv; dims = 1))  # sum of edge weights linked to uv(v) in each converging bubble
             all_cont = vec(3 * (sum(Bubv; dims = 1) .- 2))  # number of edges in converging bubble
-            imx = argmax(v_cont ./ all_cont)    # computing chi(v,b_{alpha})
+            imx = argmax(v_cont ⊘ all_cont)    # computing chi(v,b_{alpha})
             Mdjv[uv[v], imx] = 1    # Pick the most strongly associated converging bubble
         end
 
@@ -788,7 +788,7 @@ function BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real
         Tc[v] .= ci
 
         # Compute the distance between a vertex and the converging bubbles
-        Udjv = Dpm * Mdjv * diagm(1 ./ vec(sum(Mdjv .!= 0; dims = 1)))
+        Udjv = Dpm * Mdjv * diagm(1 ⊘ vec(sum(Mdjv .!= 0; dims = 1)))
         Udjv[Adjv .== 0] .= typemax(eltype(Dpm))
 
         imn = vec(getindex.(argmin(Udjv[vec(sum(Mdjv; dims = 2)) .== 0, :]; dims = 2), 2))  # Look for the closest converging bubble
@@ -829,9 +829,9 @@ function BubbleMember(Rpm::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
 
     for n ∈ eachindex(vu)
         bub = findall(Mc[vu[n], :] .!= 0)
-        vu_bub = vec(sum(Rpm[:, vu[n]] .* Mv[:, bub]; dims = 1))
+        vu_bub = vec(sum(Rpm[:, vu[n]] ⊙ Mv[:, bub]; dims = 1))
         all_bub = diag(transpose(Mv[:, bub]) * Rpm * Mv[:, bub]) / 2
-        frac = vu_bub ./ all_bub
+        frac = vu_bub ⊘ all_bub
         imx = vec(argmax(frac; dims = 1))
         Mvv[vu[n], bub[imx]] .= 1
     end
@@ -978,7 +978,7 @@ function HierarchyConstruct4s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<
 
     # Intra-cluster hierarchy construction
     for n ∈ eachindex(kvec)
-        Mc = vec(E[:, kvec[n]]) .* Mv   # Get the list of bubbles which coincide with nth cluster
+        Mc = vec(E[:, kvec[n]]) ⊙ Mv   # Get the list of bubbles which coincide with nth cluster
         Mvv = BubbleMember(Rpm, Mv, Mc) # Assign each vertex in the nth cluster to a specific bubble
         Bub = findall(vec(sum(Mvv; dims = 1) .> 0)) # Get the list of bubbles which contain the vertices of nth cluster 
         nc = sum(Tc .== kvec[n]) - 1

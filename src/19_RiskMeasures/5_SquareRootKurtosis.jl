@@ -49,7 +49,7 @@ function calc_moment_val(r::SquareRootKurtosis, w::AbstractVector, X::AbstractMa
                          fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
-    return x .- target
+    return x ⊖ target
 end
 function (r::SquareRootKurtosis{<:Any, <:Full, <:Any, <:Any, <:Any})(w::AbstractVector,
                                                                      X::AbstractMatrix,

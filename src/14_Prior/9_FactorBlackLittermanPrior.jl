@@ -92,7 +92,7 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
     # Black litterman on the factors.
     loadings = regression(pe.re, X, F)
     (; b, M) = loadings
-    posterior_X = F * transpose(M) .+ transpose(b)
+    posterior_X = F * transpose(M) + transpose(b)
     f_views = black_littterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
                                      strict = strict)
     f_P, f_Q = f_views.P, f_views.Q
@@ -104,7 +104,7 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
                                  idx = iszero.(views_conf)
                                  views_conf[idx] .= eps(eltype(views_conf))
                                  alphas = inv.(views_conf) .- 1
-                                 alphas .* f_P * f_prior_sigma * transpose(f_P)
+                                 alphas ⊙ f_P * f_prior_sigma * transpose(f_P)
                              end)
     f_prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
@@ -119,12 +119,12 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
     end
     v1 = tau * f_prior_sigma * transpose(f_P)
     v2 = f_P * v1 + f_omega
-    v3 = f_Q .- f_P * f_prior_mu
-    f_posterior_mu = f_prior_mu + v1 * (v2 \ v3) .+ pe.rf
+    v3 = f_Q - f_P * f_prior_mu
+    f_posterior_mu = (f_prior_mu + v1 * (v2 \ v3)) .+ pe.rf
     f_posterior_sigma = f_prior_sigma + tau * f_prior_sigma - v1 * (v2 \ transpose(v1))
     matrix_processing!(pe.f_mp, f_posterior_sigma, F)
     # Reconstruct the posteriors using the black litterman adjusted factor statistics.
-    posterior_mu = M * f_posterior_mu .+ b
+    posterior_mu = M * f_posterior_mu + b
     posterior_sigma = M * f_posterior_sigma * transpose(M)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
     posterior_csigma = M * cholesky(f_posterior_sigma).L

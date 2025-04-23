@@ -44,7 +44,7 @@ function regression(y::AbstractVector, mu::AbstractVector, sigma::AbstractVector
                     x1::AbstractMatrix, Vp::AbstractMatrix)
     fit_result = GLM.lm(x1, y)
     beta_pc = coef(fit_result)[2:end]
-    beta = Vp * beta_pc ./ sigma
+    beta = Vp * beta_pc ⊘ sigma
     beta0 = mean(y) - dot(beta, mu)
     pushfirst!(beta, beta0)
     return beta

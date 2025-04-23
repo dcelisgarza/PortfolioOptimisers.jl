@@ -71,7 +71,7 @@ function gerber(ce::GerberCovariance{<:Gerber0, <:Any, <:Any, <:Any}, X::Abstrac
     # H = nconc - ndisc
     UmD = U - D
     UpD = U + D
-    rho = (transpose(UmD) * UmD) ./ (transpose(UpD) * UpD)
+    rho = (transpose(UmD) * UmD) ⊘ (transpose(UpD) * UpD)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -87,7 +87,7 @@ function gerber(ce::GerberCovariance{<:NormalisedGerber0, <:Any, <:Any, <:Any},
     # H = nconc - ndisc
     UmD = U - D
     UpD = U + D
-    rho = (transpose(UmD) * UmD) ./ (transpose(UpD) * UpD)
+    rho = (transpose(UmD) * UmD) ⊘ (transpose(UpD) * UpD)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -105,7 +105,7 @@ function gerber(ce::GerberCovariance{<:Gerber1, <:Any, <:Any, <:Any}, X::Abstrac
     # ndisc = transpose(U) * D + transpose(D) * U
     # H = nconc - ndisc
     UmD = U - D
-    rho = transpose(UmD) * (UmD) ./ (T .- transpose(N) * N)
+    rho = transpose(UmD) * (UmD) ⊘ (T - transpose(N) * N)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -122,7 +122,7 @@ function gerber(ce::GerberCovariance{<:NormalisedGerber1, <:Any, <:Any, <:Any},
     # ndisc = transpose(U) * D + transpose(D) * U
     # H = nconc - ndisc
     UmD = U - D
-    rho = transpose(UmD) * (UmD) ./ (T .- transpose(N) * N)
+    rho = transpose(UmD) * (UmD) ⊘ (T - transpose(N) * N)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -140,7 +140,7 @@ function gerber(ce::GerberCovariance{<:Gerber2, <:Any, <:Any, <:Any}, X::Abstrac
     UmD = U - D
     H = transpose(UmD) * (UmD)
     h = sqrt.(diag(H))
-    rho = H ./ (h * transpose(h))
+    rho = H ⊘ (h * transpose(h))
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -157,7 +157,7 @@ function gerber(ce::GerberCovariance{<:NormalisedGerber2, <:Any, <:Any, <:Any},
     UmD = U - D
     H = transpose(UmD) * (UmD)
     h = sqrt.(diag(H))
-    rho = H ./ (h * transpose(h))
+    rho = H ⊘ (h * transpose(h))
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -179,7 +179,7 @@ function StatsBase.cov(ce::GerberCovariance{<:UnNormalisedGerberCovarianceAlgori
         X = transpose(X)
     end
     std_vec = std(ce.ve, X; dims = 1)
-    return gerber(ce, X, std_vec) .* (std_vec ⊗ std_vec)
+    return gerber(ce, X, std_vec) ⊙ (std_vec ⊗ std_vec)
 end
 function StatsBase.cor(ce::GerberCovariance{<:NormalisedGerberCovarianceAlgorithm, <:Any,
                                             <:Any, <:Any}, X::AbstractMatrix; dims::Int = 1,
@@ -192,7 +192,7 @@ function StatsBase.cor(ce::GerberCovariance{<:NormalisedGerberCovarianceAlgorith
     std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
-    X = (X .- mean_vec) ./ std_vec
+    X = (X .- mean_vec) ⊘ std_vec
     return gerber(ce, X)
 end
 function StatsBase.cov(ce::GerberCovariance{<:NormalisedGerberCovarianceAlgorithm, <:Any,
@@ -206,8 +206,8 @@ function StatsBase.cov(ce::GerberCovariance{<:NormalisedGerberCovarianceAlgorith
     std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
-    X = (X .- mean_vec) ./ std_vec
-    return gerber(ce, X) .* (std_vec ⊗ std_vec)
+    X = (X .- mean_vec) ⊘ std_vec
+    return gerber(ce, X) ⊙ (std_vec ⊗ std_vec)
 end
 function factory(ce::GerberCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),

@@ -69,7 +69,7 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
     function common_op(x)
         if x != last_x
             copy!(last_x, x)
-            log_x .= log_p .- one(eltype(log_p)) .- lhs' * x
+            log_x .= log_p .- (one(eltype(log_p)) - dot(lhs, x))
             y .= exp.(log_x)
             grad .= rhs - lhs * y
         end
@@ -86,7 +86,7 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
     result = Optim.optimize(f, g!, lb, ub, x0, optim.args...; optim.kwargs...)
     # Compute posterior probabilities
     x = Optim.minimizer(result)
-    return pweights(exp.(log_p .- one(eltype(log_p)) .- lhs' * x))
+    return pweights(exp.(log_p .- (one(eltype(log_p)) - dot(lhs, x))))
 end
 function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
                          optim::JuMPEntropyPoolingEstimator)

@@ -234,8 +234,8 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Integer, ucs::BoxUncertain
         W = model[:W]
         N = size(W, 1)
         @variables(model, begin
-                       Au[1:N, 1:N] .>= 0, Symmetric
-                       Al[1:N, 1:N] .>= 0, Symmetric
+                       Au[1:N, 1:N] >= 0, Symmetric
+                       Al[1:N, 1:N] >= 0, Symmetric
                    end)
         @constraint(model, cbucs_variance, sc * (Au - Al) == sc * W)
     end
@@ -325,7 +325,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     else
         @expression(model, mean(mad + mar_mad, w))
     end
-    model[Symbol(:cmar_mad_, i)] = @constraint(model, sc * mar_mad .>= 0)
+    model[Symbol(:cmar_mad_, i)] = @constraint(model, sc * mar_mad >= 0)
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
     return nothing
 end

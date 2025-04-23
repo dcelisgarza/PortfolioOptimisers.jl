@@ -266,7 +266,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:SmythBroby2, <:Any, <:Any, <:Any,
         end
     end
     h = sqrt.(diag(rho))
-    rho .= rho ./ (h * transpose(h))
+    rho .= rho ⊘ (h * transpose(h))
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -301,7 +301,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:NormalisedSmythBroby2, <:Any, <:A
         end
     end
     h = sqrt.(diag(rho))
-    rho .= Symmetric(rho ./ (h * transpose(h)), :U)
+    rho .= Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -535,7 +535,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:SmythBrobyGerber2, <:Any, <:Any, 
         end
     end
     h = sqrt.(diag(rho))
-    rho .= rho ./ (h * transpose(h))
+    rho .= rho ⊘ (h * transpose(h))
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -574,7 +574,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:NormalisedSmythBrobyGerber2, <:An
         end
     end
     h = sqrt.(diag(rho))
-    rho .= Symmetric(rho ./ (h * transpose(h)), :U)
+    rho .= Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -604,7 +604,7 @@ function StatsBase.cov(ce::SmythBrobyCovariance{<:UnNormalisedSmythBrobyCovarian
     std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
-    return smythbroby(ce, X, mean_vec, std_vec) .* (std_vec ⊗ std_vec)
+    return smythbroby(ce, X, mean_vec, std_vec) ⊙ (std_vec ⊗ std_vec)
 end
 function StatsBase.cor(ce::SmythBrobyCovariance{<:NormalisedSmythBrobyCovarianceAlgorithm,
                                                 <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -618,7 +618,7 @@ function StatsBase.cor(ce::SmythBrobyCovariance{<:NormalisedSmythBrobyCovariance
     std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
-    X = (X .- mean_vec) ./ std_vec
+    X = (X .- mean_vec) ⊘ std_vec
     return smythbroby(ce, X)
 end
 function StatsBase.cov(ce::SmythBrobyCovariance{<:NormalisedSmythBrobyCovarianceAlgorithm,
@@ -633,8 +633,8 @@ function StatsBase.cov(ce::SmythBrobyCovariance{<:NormalisedSmythBrobyCovariance
     std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
-    X = (X .- mean_vec) ./ std_vec
-    return smythbroby(ce, X) .* (std_vec ⊗ std_vec)
+    X = (X .- mean_vec) ⊘ std_vec
+    return smythbroby(ce, X) ⊙ (std_vec ⊗ std_vec)
 end
 
 export SmythBroby0, SmythBroby1, SmythBroby2, SmythBrobyGerber0, SmythBrobyGerber1,

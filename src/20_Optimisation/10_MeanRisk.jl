@@ -25,7 +25,7 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     datatype = eltype(pr.X)
     set_w!(model, pr.X, mr.opt.wi)
     set_maximum_ratio_factor_variables!(model, pr.mu, mr.obj)
-    wb = weight_bounds_constraints(mr.opt.wb, mr.opt.sets; scalar = true, N = size(pr.X, 2),
+    wb = weight_bounds_constraints(mr.opt.wb, mr.opt.sets; N = size(pr.X, 2),
                                    strict = mr.opt.strict)
     lcs = linear_constraints(mr.opt.lcs, mr.opt.sets; datatype = datatype,
                              strict = mr.opt.strict)

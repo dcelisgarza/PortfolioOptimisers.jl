@@ -274,7 +274,7 @@ function _freeze_view(epc::C4_LinearEntropyPoolingConstraintEstimator,
     dsigma = diag(sigma)
     dsigma1 = sqrt.(view(dsigma, idx1))
     dsigma2 = sqrt.(view(dsigma, idx2))
-    return sign(coef) * sum(dsigma1 .* dsigma2)
+    return sign(coef) * sum(dsigma1 ⊙ dsigma2)
 end
 function freeze_B_view(::AbstractPriorResult,
                        epv::ConstantEntropyPoolingConstraintEstimator, ::DataFrame, ::Bool,
@@ -523,7 +523,7 @@ function _get_B_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraintEst
     dsigma = diag(sigma)
     dsigma1 = sqrt.(view(dsigma, idx1))
     dsigma2 = sqrt.(view(dsigma, idx2))
-    return coef * sum(dsigma1 .* dsigma2)
+    return coef * sum(dsigma1 ⊙ dsigma2)
 end
 function get_B_entropy_pooling_view_data(pr::AbstractPriorResult,
                                          epvbs::AbstractVector{<:EntropyPoolingConstraintEstimator},
@@ -760,7 +760,7 @@ function _get_A_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraintEst
     X = view(pr.X, :, idx)
     mu = view(pr.mu, idx)
     dsigma = view(diag(pr.sigma), idx)
-    return coef * ((X .- transpose(mu)) .^ 3) ./ (dsigma .* sqrt.(dsigma))
+    return coef * ((X .- transpose(mu)) .^ 3) ⊘ (dsigma ⊙ sqrt.(dsigma))
 end
 function _get_A_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraintEstimator{<:Any,
                                                                                        <:Any,
@@ -771,7 +771,7 @@ function _get_A_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraintEst
     X = view(pr.X, :, idx)
     mu = view(pr.mu, idx)
     dsigma = view(diag(pr.sigma), idx)
-    return coef * ((X .- transpose(mu)) .^ 4) ./ (dsigma .^ 2)
+    return coef * ((X .- transpose(mu)) .^ 4) ⊘ (dsigma .^ 2)
 end
 function _get_A_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraintEstimator,
                                           pr::AbstractPriorResult, idx1::AbstractVector,
@@ -780,7 +780,7 @@ function _get_A_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraintEst
     X2 = view(pr.X, :, idx2)
     mu1 = view(pr.mu, idx1)
     mu2 = view(pr.mu, idx2)
-    return coef * vec((X1 .- transpose(mu1)) .* (X2 .- transpose(mu2)))
+    return coef * vec((X1 .- transpose(mu1)) ⊙ (X2 .- transpose(mu2)))
 end
 function get_A_entropy_pooling_view_data(pr::AbstractPriorResult,
                                          epv::C4_LinearEntropyPoolingConstraintEstimator{<:Any,

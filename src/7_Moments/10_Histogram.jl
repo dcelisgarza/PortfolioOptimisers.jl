@@ -85,10 +85,10 @@ function intrinsic_mutual_info(X::AbstractMatrix)
     log_nz = log.(nz)
     nz_nm = nz / nz_sum
 
-    outer = p_i[getindex.(mask, 1)] .* p_j[getindex.(mask, 2)]
-    log_outer = -log.(outer) .+ log(sum(p_i)) .+ log(sum(p_j))
+    outer = p_i[getindex.(mask, 1)] ⊙ p_j[getindex.(mask, 2)]
+    log_outer = -log.(outer) .+ (log(sum(p_i)) + log(sum(p_j)))
 
-    mi = (nz_nm .* (log_nz .- log(nz_sum)) .+ nz_nm .* log_outer)
+    mi = (nz_nm ⊙ (log_nz .- log(nz_sum)) + nz_nm ⊙ log_outer)
     mi[abs.(mi) .< eps(eltype(mi))] .= zero(eltype(X))
 
     return sum(mi)

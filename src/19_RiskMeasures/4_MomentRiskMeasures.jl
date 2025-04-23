@@ -132,7 +132,7 @@ function calc_moment_val(r::Union{<:AbstractMomentRiskMeasure,
                          fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
-    return x .- target
+    return x ⊖ target
 end
 function (r::LowOrderMoment{<:Any, <:FirstLowerMoment, <:Any, <:Any})(w::AbstractVector,
                                                                       X::AbstractMatrix,

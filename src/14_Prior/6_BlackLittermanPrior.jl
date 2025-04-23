@@ -86,13 +86,13 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
                                idx = iszero.(views_conf)
                                views_conf[idx] .= eps(eltype(views_conf))
                                alphas = inv.(views_conf) .- 1
-                               alphas .* P * prior_sigma * transpose(P)
+                               alphas ⊙ P * prior_sigma * transpose(P)
                            end)
 
     v1 = tau * prior_sigma * transpose(P)
     v2 = P * v1 + omega
-    v3 = Q .- P * prior_mu
-    posterior_mu = prior_mu + v1 * (v2 \ v3) .+ pe.rf
+    v3 = Q - P * prior_mu
+    posterior_mu = (prior_mu + v1 * (v2 \ v3)) .+ pe.rf
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
     return EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,

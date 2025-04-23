@@ -155,6 +155,15 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
 end
 ⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
 outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
+⊙(A::AbstractArray, B::AbstractArray) = A .* B
+⊙(A::AbstractArray, B::Real) = A * B
+⊙(A::Real, B::AbstractArray) = A * B
+⊘(A::AbstractArray, B::AbstractArray) = A ./ B
+⊘(A::AbstractArray, B::Real) = A / B
+⊘(A::Real, B::AbstractArray) = A ./ B
+⊖(A::AbstractArray, B::AbstractArray) = A - B
+⊖(A::AbstractArray, B::Real) = A .- B
+⊖(A::Real, B::AbstractArray) = A .- B
 function nothing_scalar_array_view(::Nothing, ::Any)
     return nothing
 end

@@ -63,11 +63,11 @@ function owa_model_setup(method::OWAJuMPEstimator, weights::AbstractMatrix{<:Rea
                    phi[1:N]
                end)
     @constraints(model, begin
-                     sc * 0 .<= sc * phi .<= sc * max_phi
-                     sc * sum(phi) == sc * 1
-                     sc * theta .== sc * weights * phi
-                     sc * phi[2:end] .<= sc * phi[1:(end - 1)]
-                     sc * theta[2:end] .>= sc * theta[1:(end - 1)]
+                     0 .<= sc * phi .<= sc * max_phi
+                     sc * sum(phi) == sc
+                     sc * theta == sc * weights * phi
+                     sc * phi[2:end] <= sc * phi[1:(end - 1)]
+                     sc * theta[2:end] >= sc * theta[1:(end - 1)]
                  end)
     return model
 end
@@ -114,7 +114,7 @@ function owa_l_moment_crm(method::OWAJuMPEstimator{<:MinimumSquareDistance, <:An
     theta = model[:theta]
     @variable(model, t)
     @constraint(model,
-                [sc * t; sc * (theta[2:end] .- theta[1:(end - 1)])] ∈ SecondOrderCone())
+                [sc * t; sc * (theta[2:end] - theta[1:(end - 1)])] ∈ SecondOrderCone())
     @objective(model, Min, so * t)
     return owa_model_solve(model, method, weights)
 end
@@ -178,13 +178,13 @@ function owa_rg(T::Integer)
     return w
 end
 function owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
-    return owa_cvar(T, alpha) .- reverse(owa_cvar(T, beta))
+    return owa_cvar(T, alpha) - reverse(owa_cvar(T, beta))
 end
 function owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
                      weights_a::AbstractVector{<:Real},
                      betas::AbstractVector{<:Real} = alphas,
                      weights_b::AbstractVector{<:Real} = weights_a)
-    w = owa_wcvar(T, alphas, weights_a) .- reverse(owa_wcvar(T, betas, weights_b))
+    w = owa_wcvar(T, alphas, weights_a) - reverse(owa_wcvar(T, betas, weights_b))
     return w
 end
 function owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,

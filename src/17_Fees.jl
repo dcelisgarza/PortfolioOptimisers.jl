@@ -63,23 +63,23 @@ end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Real,
                    op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees))))
-    return sum(fees * w[idx] .* latest_prices[idx])
+    return sum(fees * w[idx] ⊙ latest_prices[idx])
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
                    fees::AbstractVector{<:Real}, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees))))
-    return dot(fees[idx], w[idx] .* latest_prices[idx])
+    return dot(fees[idx], w[idx] ⊙ latest_prices[idx])
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector, ::Nothing)
     return zero(promote_type(eltype(w), eltype(latest_prices)))
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
                    turnover::Turnover{<:Real, <:Any})
-    return sum(turnover.val * abs.(w - turnover.w) .* latest_prices)
+    return sum(turnover.val * abs.(w - turnover.w) ⊙ latest_prices)
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
                    turnover::Turnover{<:AbstractVector, <:Any})
-    return dot(turnover.val, abs.(w - turnover.w) .* latest_prices)
+    return dot(turnover.val, abs.(w - turnover.w) ⊙ latest_prices)
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Fees)
     fees_long = calc_fees(w, latest_prices, fees.long, .>=)
@@ -144,7 +144,7 @@ end
 function calc_asset_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    fees_w[idx] .= fees[idx] .* w[idx]
+    fees_w[idx] .= fees[idx] ⊙ w[idx]
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, ::Nothing)
@@ -155,7 +155,7 @@ function calc_asset_fees(w::AbstractVector, turnover::Turnover{<:Real, <:Any})
 end
 function calc_asset_fees(w::AbstractVector,
                          turnover::Turnover{<:AbstractVector{<:Real}, <:Any})
-    return turnover.val .* abs.(w - turnover.w)
+    return turnover.val ⊙ abs.(w - turnover.w)
 end
 function calc_asset_fixed_fees(w::AbstractVector, ::Nothing, ::NamedTuple, ::Function)
     return zeros(eltype(w), length(w))
@@ -192,26 +192,26 @@ function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector, fees:
                          op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(latest_prices), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees))))
-    fees_w[idx] .= fees * w[idx] .* latest_prices[idx]
+    fees_w[idx] .= fees * w[idx] ⊙ latest_prices[idx]
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
                          fees::AbstractVector{<:Real}, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(latest_prices), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees))))
-    fees_w[idx] .= fees[idx] .* w[idx] .* latest_prices[idx]
+    fees_w[idx] .= fees[idx] ⊙ w[idx] ⊙ latest_prices[idx]
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
                          turnover::Turnover{<:Real, <:Any})
-    return turnover.val * abs.(w - turnover.w) .* latest_prices
+    return turnover.val * abs.(w - turnover.w) ⊙ latest_prices
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector, ::Nothing)
     return zeros(promote_type(eltype(w), eltype(latest_prices)), length(w))
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
                          turnover::Turnover{<:AbstractVector{<:Real}, <:Any})
-    return turnover.val .* abs.(w - turnover.w) .* latest_prices
+    return turnover.val ⊙ abs.(w - turnover.w) ⊙ latest_prices
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Fees)
     fees_long = calc_asset_fees(w, latest_prices, fees.long, .>=)
@@ -228,10 +228,10 @@ function calc_net_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees)
     return X * w .- calc_fees(w, fees)
 end
 function calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, ::Nothing)
-    return X .* transpose(w)
+    return X ⊙ transpose(w)
 end
 function calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees)
-    return X .* transpose(w) .- transpose(calc_asset_fees(w, fees))
+    return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
 
 export Fees, calc_fees, calc_asset_fees, calc_net_returns, calc_net_asset_returns

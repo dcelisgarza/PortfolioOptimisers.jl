@@ -47,7 +47,7 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     so = model[:so]
     @variable(model, t)
     @constraint(model,
-                [sc * t; sc * (w ./ wi .- one(eltype(wi)))] in
+                [sc * t; sc * (w ⊘ wi .- one(eltype(wi)))] in
                 MOI.NormOneCone(length(w) + 1))
     @objective(model, Min, so * t)
     return nothing
@@ -60,7 +60,7 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     sc = model[:sc]
     so = model[:so]
     @variable(model, t)
-    @constraint(model, [sc * t; sc * (w ./ wi .- one(eltype(wi)))] in SecondOrderCone())
+    @constraint(model, [sc * t; sc * (w ⊘ wi .- one(eltype(wi)))] in SecondOrderCone())
     @objective(model, Min, so * t)
     return nothing
 end

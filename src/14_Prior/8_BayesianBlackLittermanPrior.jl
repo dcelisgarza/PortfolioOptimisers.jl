@@ -86,7 +86,7 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
                                  idx = iszero.(views_conf)
                                  views_conf[idx] .= eps(eltype(views_conf))
                                  alphas = inv.(views_conf) .- 1
-                                 alphas .* f_P * f_sigma * transpose(f_P)
+                                 alphas ⊙ f_P * f_sigma * transpose(f_P)
                              end)
     (; b, M) = loadings
     sigma_hat = inv(f_sigma) + transpose(f_P) * (f_omega \ f_P)
@@ -96,7 +96,7 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     v3 = inv(prior_sigma)
     posterior_sigma = inv(v3 - v1 * (v2 \ transpose(M)) * v3)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
-    posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat) .+ pe.rf .+ b
+    posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b) .+ pe.rf
     return EmpiricalPartialFactorPriorResult(;
                                              pr = EmpiricalPriorResult(; X = posterior_X,
                                                                        mu = posterior_mu,

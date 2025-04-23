@@ -30,9 +30,9 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                      MOI.PowerCone(invopk)
                      [i = 1:T],
                      [omega[i] * invomk, theta[i] * invk, -z * invk2] ∈ MOI.PowerCone(omk)
-                     -x .- t .+ epsilon .+ omega .<= 0
+                     (-x + epsilon + omega) .- t .<= 0
                  end)
-    @expression(model, risk, t + ln_k * z + sum(psi .+ theta))
+    @expression(model, risk, t + ln_k * z + sum(psi + theta))
     @objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
         objective_value(model)
@@ -46,7 +46,7 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                    end)
         @constraints(model, begin
                          sum(z) == 1
-                         sum(nu .- tau) * invk2 <= ln_k
+                         sum(nu - tau) * invk2 <= ln_k
                          [i = 1:T], [nu[i], 1, z[i]] ∈ MOI.PowerCone(invopk)
                          [i = 1:T], [z[i], 1, tau[i]] ∈ MOI.PowerCone(omk)
                      end)

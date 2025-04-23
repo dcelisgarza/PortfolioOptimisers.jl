@@ -92,8 +92,8 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
     f_mu, f_sigma = f_prior.mu, f_prior.sigma
     loadings = regression(pe.re, X, F)
     (; b, M) = loadings
-    posterior_X = F * transpose(M) .+ transpose(b)
-    posterior_mu = M * f_mu .+ b
+    posterior_X = F * transpose(M) + transpose(b)
+    posterior_mu = M * f_mu + b
     posterior_sigma = M * f_sigma * transpose(M)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
     posterior_csigma = M * cholesky(f_sigma).L
