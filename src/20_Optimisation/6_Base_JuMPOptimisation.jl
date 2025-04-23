@@ -158,6 +158,8 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                 break
             end
         catch err
+            @warn("Failed to solve optimisation problem.")
+            println(err.msg)
             push!(trials,
                   name => Dict(:objective_val => objective_value(model), :err => err,
                                :settings => settings))
