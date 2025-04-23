@@ -73,7 +73,7 @@
 
         Xar = calc_net_asset_returns(w1, X, nothing)
         fa1 = calc_asset_fees(w1, fes[4])
-        @test Xar == X ⊙ transpose(w1)
+        @test Xar == X .* transpose(w1)
         @test Xar .- transpose(fa1) == calc_net_asset_returns(w1, X, fes[4])
 
         @test isnothing(fees_view(nothing, 3))
