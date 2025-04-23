@@ -105,7 +105,7 @@ function gerber(ce::GerberCovariance{<:Gerber1, <:Any, <:Any, <:Any}, X::Abstrac
     # ndisc = transpose(U) * D + transpose(D) * U
     # H = nconc - ndisc
     UmD = U - D
-    rho = transpose(UmD) * (UmD) ⊘ (T - transpose(N) * N)
+    rho = transpose(UmD) * (UmD) ⊘ (T .- transpose(N) * N)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -122,7 +122,7 @@ function gerber(ce::GerberCovariance{<:NormalisedGerber1, <:Any, <:Any, <:Any},
     # ndisc = transpose(U) * D + transpose(D) * U
     # H = nconc - ndisc
     UmD = U - D
-    rho = transpose(UmD) * (UmD) ⊘ (T - transpose(N) * N)
+    rho = transpose(UmD) * (UmD) ⊘ (T .- transpose(N) * N)
     posdef!(ce.pdm, rho)
     return rho
 end
