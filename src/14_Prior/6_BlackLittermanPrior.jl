@@ -75,9 +75,9 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
 
-    (; P, Q) = views = black_littterman_views(pe.views, pe.sets;
-                                              datatype = eltype(posterior_X),
-                                              strict = strict)
+    (; P, Q) = views = black_litterman_views(pe.views, pe.sets;
+                                             datatype = eltype(posterior_X),
+                                             strict = strict)
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
     views_conf = pe.views_conf
     omega = tau * Diagonal(if isnothing(views_conf)

@@ -69,7 +69,7 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
     function common_op(x)
         if x != last_x
             copy!(last_x, x)
-            log_x .= log_p .- (one(eltype(log_p)) - dot(lhs, x))
+            log_x .= log_p - (one(eltype(log_p)) .+ transpose(lhs) * x)
             y .= exp.(log_x)
             grad .= rhs - lhs * y
         end
@@ -86,7 +86,7 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
     result = Optim.optimize(f, g!, lb, ub, x0, optim.args...; optim.kwargs...)
     # Compute posterior probabilities
     x = Optim.minimizer(result)
-    return pweights(exp.(log_p .- (one(eltype(log_p)) - dot(lhs, x))))
+    return pweights(exp.(log_p - (one(eltype(log_p)) .+ transpose(lhs) * x)))
 end
 function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
                          optim::JuMPEntropyPoolingEstimator)
@@ -102,16 +102,17 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
     (; sc, so, slv) = optim
     # Equality constraints from A_ineq and B_ineq if provided
     if !isnothing(A_eq) && !isnothing(B_eq)
-        @constraint(model, constr_eq, sc * A_eq * q == sc * B_eq)
+        @constraint(model, ceq, sc * A_eq * q == sc * B_eq)
     end
     # Inequality constraints from A_ineq and B_ineq if provided
     if !isnothing(A_ineq) && !isnothing(B_ineq)
-        @constraint(model, constr_ineq, sc * A_ineq * q <= sc * B_ineq)
+        @constraint(model, cineq, sc * A_ineq * q <= sc * B_ineq)
     end
     # Equality constraints from A_eq and B_eq and probabilities equal to 1
-    @constraints(model, begin
+    @constraints(model,
+                 begin
                      sum(q) == 1
-                     sc * [t; ones(S); q] in MOI.RelativeEntropyCone(2 * S + 1)
+                     [sc * t; fill(sc, S); sc * q] in MOI.RelativeEntropyCone(2 * S + 1)
                  end)
     @objective(model, Min, so * (t - dot(q, log_p)))
     # Solve the optimization problem

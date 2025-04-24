@@ -75,8 +75,8 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
                                                         prior_model.f_mu,
                                                         prior_model.f_sigma,
                                                         prior_model.loadings
-    f_views = black_littterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
-                                     strict = strict)
+    f_views = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
+                                    strict = strict)
     f_P, f_Q = f_views.P, f_views.Q
     tau = isnothing(pe.tau) ? inv(size(F, 1)) : pe.tau
     views_conf = pe.views_conf

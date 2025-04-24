@@ -438,7 +438,7 @@ function set_wr_risk_expression!(model::JuMP.Model, X::AbstractMatrix)
     @constraint(model, cwr, sc * (wr_risk .+ net_X) >= 0)
     return wr_risk
 end
-function set_risk_constraints!(model::JuMP.Model, ::Integer, r::WorstRealisation,
+function set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation,
                                opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
     if haskey(model, :wr_risk)
         return nothing
@@ -447,8 +447,8 @@ function set_risk_constraints!(model::JuMP.Model, ::Integer, r::WorstRealisation
     set_risk_bounds_and_expression!(model, opt, wr_risk, r.settings, :wr_risk)
     return nothing
 end
-function set_risk_constraints!(model::JuMP.Model, ::Integer, r::Range,
-                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+function set_risk_constraints!(model::JuMP.Model, ::Any, r::Range, opt::MeanRiskEstimator,
+                               pr::AbstractPriorResult, args...)
     if haskey(model, :range_risk)
         return nothing
     end
@@ -839,7 +839,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_drawdown_constraints!(model::JuMP.Model, X::AbstractMatrix)
     if haskey(model, :dd)
-        return nothing
+        return model[:dd]
     end
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, X)
@@ -852,17 +852,84 @@ function set_drawdown_constraints!(model::JuMP.Model, X::AbstractMatrix)
                  end)
     return dd
 end
-function set_risk_constraints!(model::JuMP.Model, i::Integer, r::MaximumDrawdown,
+function set_risk_constraints!(model::JuMP.Model, i::Integer, r::AverageDrawdown,
                                opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
-    if haskey(model, :mdd_risk)
+    key = Symbol(:add_risk_, i)
+    sc = model[:sc]
+    dd = set_drawdown_constraints!(model, pr.X)
+    T = length(dd) - 1
+    w = r.w
+    add_risk = model[Symbol(key)] = if isnothing(w)
+        @expression(model, mean(view(dd, 2:(T + 1))))
+    else
+        @expression(model, mean(view(dd, 2:(T + 1)), w))
+    end
+    set_risk_bounds_and_expression!(model, opt, add_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    if haskey(model, :uci)
         return nothing
     end
     sc = model[:sc]
     dd = set_drawdown_constraints!(model, pr.X)
     T = length(dd) - 1
-    @variable(model, mdd_risk)
-    model[Symbol(:cmdd_, i)] = @constraint(model,
-                                           sc * (view(dd, 2:(T + 1)) .- mdd_risk) <= 0)
-    set_risk_bounds_and_expression!(model, opt, mdd_risk, r.settings, :mdd_risk)
+    @variable(model, uci)
+    @expression(model, uci_risk, uci / sqrt(T))
+    @constraint(model, cuci_soc, [sc * uci; sc * view(dd, 2:(T + 1))] ∈ SecondOrderCone())
+    set_risk_bounds_and_expression!(model, opt, uci_risk, r.settings, :uci_risk)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer, r::ConditionalDrawdownatRisk,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:cdar_risk_, i)
+    sc = model[:sc]
+    dd = set_drawdown_constraints!(model, pr.X)
+    T = length(dd) - 1
+    iat = inv(r.alpha * T)
+    dar, z_cdar = model[Symbol(:dar_, i)], model[Symbol(:z_cdar_, i)] = @variables(model,
+                                                                                   begin
+                                                                                       ()
+                                                                                       [1:T],
+                                                                                       (lower_bound = 0)
+                                                                                   end)
+    cdar_risk = model[key] = @expression(model, dar + sum(z_cdar) * iat)
+    @constraint(model, ccdar, sc * ((z_cdar - view(dd, 2:(T + 1))) .+ dar) >= 0)
+    set_risk_bounds_and_expression!(model, opt, cdar_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicDrawdownatRisk,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:edar_risk_, i)
+    sc = model[:sc]
+    dd = set_drawdown_constraints!(model, pr.X)
+    T = length(dd) - 1
+    at = r.alpha * T
+    t_edar, z_edar, u_edar = model[Symbol(:t_edar_, i)], model[Symbol(:z_edar_, i)], model[Symbol(:u_edar_, i)] = @variables(model,
+                                                                                                                             begin
+                                                                                                                                 ()
+                                                                                                                                 (),
+                                                                                                                                 (lower_bound = 0)
+                                                                                                                                 [1:T]
+                                                                                                                             end)
+    edar_risk = model[key] = @expression(model, t_edar - z_edar * log(at))
+    model[Symbol(:cedar_, i)], model[Symbol(:cedar_exp_cone_, i)] = @constraints(model,
+                                                                                 begin
+                                                                                     sc *
+                                                                                     (sum(u_edar) -
+                                                                                      z_edar) <=
+                                                                                     0
+                                                                                     [i = 1:T],
+                                                                                     [sc *
+                                                                                      (dd[i + 1] -
+                                                                                       t_edar),
+                                                                                      sc *
+                                                                                      z_edar,
+                                                                                      sc *
+                                                                                      u_edar[i]] ∈
+                                                                                     MOI.ExponentialCone()
+                                                                                 end)
+    set_risk_bounds_and_expression!(model, opt, edar_risk, r.settings, key)
     return nothing
 end
