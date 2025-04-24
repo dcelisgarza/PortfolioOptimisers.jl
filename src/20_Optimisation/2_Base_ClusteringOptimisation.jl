@@ -1,6 +1,11 @@
 abstract type BaseClusteringOptimisationEstimator <: OptimisationEstimator end
 abstract type ClusteringOptimisationEstimator <: BaseClusteringOptimisationEstimator end
 abstract type ClusteringWeightFinaliser <: AbstractAlgorithm end
+struct ClusteringOptimisationResult{T1 <: OptimisationReturnCode, T2 <: AbstractVector} <:
+       OptimisationResult
+    retcode::T1
+    w::T2
+end
 struct HeuristicClusteringWeightFiniliser{T1 <: Integer} <: ClusteringWeightFinaliser
     iter::T1
 end
@@ -137,6 +142,12 @@ function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wb::WeightBo
         w *= s1 / sum(w)
     end
     return w
+end
+function clustering_optimisation_result(cwf::ClusteringWeightFinaliser,
+                                        wb::WeightBoundsResult, w::AbstractVector)
+    w = opt_weight_bounds(cwf, wb, w)
+    res = any(!isfinite, w) ? OptimisationSuccess() : OptimisationFailure()
+    return ClusteringOptimisationResult(res, w)
 end
 
 export HeuristicClusteringWeightFiniliser, RelativeErrorClusteringWeightFiniliser,

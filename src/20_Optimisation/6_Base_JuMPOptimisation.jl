@@ -13,6 +13,12 @@ end
 function add_custom_constraint!(args...; kwargs...)
     return nothing
 end
+struct ProcessedJuMPModel{T1 <: AbstractVector} <: AbstractResult
+    w::T1
+end
+function ProcessedJuMPModel(; w::AbstractVector)
+    return ProcessedJuMPModel{typeof(w)}(w)
+end
 struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
                               T3 <: Union{Nothing, <:WeightBoundsResult},
                               T4 <: Union{Nothing, <:LinearConstraintResult},
@@ -20,8 +26,8 @@ struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
                               T6 <: Union{Nothing, <:LinearConstraintResult},
                               T7 <: Union{Nothing, <:PhilogenyConstraintResult},
                               T8 <: Union{Nothing, <:PhilogenyConstraintResult},
-                              T9 <: JuMPResult, T10, T11 <: Union{Nothing, <:JuMP.Model}} <:
-       AbstractResult
+                              T9 <: OptimisationReturnCode, T10 <: ProcessedJuMPModel,
+                              T11 <: Union{Nothing, <:JuMP.Model}} <: OptimisationResult
     alg::T1
     pr::T2
     wb::T3
@@ -30,9 +36,16 @@ struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
     gcard::T6
     nplg::T7
     cplg::T8
-    res::T9
-    sol::T10
+    retcode::T9
+    pm::T10
     model::T11
+end
+function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
+    return if sym == :w
+        r.pm.w
+    else
+        getfield(r, sym)
+    end
 end
 function add_to_objective_penalty!(model::JuMP.Model, expr)
     op = if !haskey(model, :op)
@@ -125,7 +138,7 @@ end
 function process_model(model::JuMP.Model, ::JuMPOptimisationEstimator)
     ik = inv(value(model[:k]))
     w = value.(model[:w]) * ik
-    return w
+    return ProcessedJuMPModel(; w = w)
 end
 function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                               datatype::Type = Float64)
@@ -168,7 +181,8 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
               name => Dict(:objective_val => objective_value(model),
                            :err => solution_summary(model), :settings => settings))
     end
-    return JuMPResult(trials, success), process_model(model, opt)
+    res = success ? OptimisationSuccess(trials) : OptimisationFailure(trials)
+    return res, process_model(model, opt)
 end
 function set_scalar_risk_expression!(model::JuMP.Model, ::SumScalariser)
     risk_vec = model[:risk_vec]

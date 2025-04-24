@@ -150,7 +150,7 @@ function optimise!(hc::HierarchicalRiskParity{<:Any,
             w[rc] .*= one(alpha) - alpha
         end
     end
-    return opt_weight_bounds(hc.opt.cwf, wb, w / sum(w))
+    return clustering_optimisation_result(hc.opt.cwf, wb, w / sum(w))
 end
 
 export HierarchicalRiskParity

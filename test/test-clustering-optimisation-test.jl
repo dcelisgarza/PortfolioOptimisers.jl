@@ -157,7 +157,7 @@
         names = [n[1:i] for (n, i) ∈ zip(names, idx)]
         for (i, (risk, name)) ∈ enumerate(zip(risks, names))
             name = name * "_$(i)"
-            w = optimise!(HierarchicalRiskParity(; r = risk, opt = opt))
+            w = optimise!(HierarchicalRiskParity(; r = risk, opt = opt)).w
             res = if i ∈ 65:72
                 isapprox(w, df[!, name]; rtol = 5e-8)
             else
@@ -190,7 +190,7 @@
                 StandardDeviation(; settings = RiskMeasureSettings(; scale = 0.3))]
 
         for (i, opt) ∈ enumerate(opts)
-            w1 = optimise!(HierarchicalRiskParity(; r = risk, opt = opt))
+            w1 = optimise!(HierarchicalRiskParity(; r = risk, opt = opt)).w
             res = isapprox(w1, df[:, i])
             if !res
                 println("$i\n$(string(risk)) failed")
@@ -346,7 +346,7 @@
         names = [n[1:i] for (n, i) ∈ zip(names, idx)]
         for (i, (risk, name)) ∈ enumerate(zip(risks, names))
             name = name * "_$(i)"
-            w = optimise!(HierarchicalEqualRiskContribution(; ri = risk, opt = opt))
+            w = optimise!(HierarchicalEqualRiskContribution(; ri = risk, opt = opt)).w
             res = if i ∈ 65:72
                 isapprox(w, df[!, name]; rtol = 1e-7)
             else
@@ -389,7 +389,7 @@
             opt = HierarchicalOptimiser(; pe = pr, cle = clm, sce = sce, slv = slv)
             for (i, rs) ∈ enumerate(risks)
                 w = optimise!(HierarchicalEqualRiskContribution(; ri = rs.r1, ro = rs.r2,
-                                                                opt = opt))
+                                                                opt = opt)).w
                 res = isapprox(w, df[!, idx + i - 1])
                 if !res
                     println("Failed on vector rm HERC\n$sce\n$i")
@@ -413,7 +413,7 @@
         opt = HierarchicalOptimiser(; pe = pr, cle = clm,
                                     wb = WeightBoundsResult(; lb = lb, ub = ub), slv = slv)
         r = [Variance(), ConditionalValueatRisk()]
-        w = optimise!(HierarchicalRiskParity(; r = r, opt = opt))
+        w = optimise!(HierarchicalRiskParity(; r = r, opt = opt)).w
         idx = (w - lb) .< 0
         if !isempty(w[idx])
             @test isapprox(w[idx], lb[idx])
@@ -441,7 +441,7 @@
             opt = HierarchicalOptimiser(; pe = pr, cle = clm, cwf = cwf,
                                         wb = WeightBoundsResult(; lb = lb, ub = ub),
                                         slv = [slv])
-            w = optimise!(HierarchicalEqualRiskContribution(; ri = r, opt = opt))
+            w = optimise!(HierarchicalEqualRiskContribution(; ri = r, opt = opt)).w
             idx = (w - lb) .< 0
             if !isempty(w[idx])
                 @test isapprox(w[idx], lb[idx], atol = 1e-8)

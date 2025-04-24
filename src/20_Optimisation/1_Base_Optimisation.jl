@@ -1,6 +1,19 @@
 abstract type OptimisationEstimator <: AbstractEstimator end
-abstract type PortfolioResult <: AbstractResult end
+abstract type OptimisationResult <: AbstractResult end
+abstract type OptimisationReturnCode <: AbstractResult end
+struct OptimisationSuccess{T1} <: OptimisationReturnCode
+    res::T1
+end
+function OptimisationSuccess(; res = nothing)
+    return OptimisationSuccess(res)
+end
+struct OptimisationFailure{T1} <: OptimisationReturnCode
+    res::T1
+end
+function OptimisationFailure(; res = nothing)
+    return OptimisationFailure(res)
+end
 
 function optimise! end
 
-export optimise!
+export optimise!, OptimisationSuccess, OptimisationFailure
