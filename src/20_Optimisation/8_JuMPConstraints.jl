@@ -589,7 +589,7 @@ function set_l2_regularisation!(model::JuMP.Model, l2::Real)
 end
 function set_sdp_constraints!(model::JuMP.Model)
     if haskey(model, :W)
-        return nothing
+        return model[:W]
     end
     w = model[:w]
     k = model[:k]
@@ -598,11 +598,11 @@ function set_sdp_constraints!(model::JuMP.Model)
     @variable(model, W[1:N, 1:N], Symmetric)
     @expression(model, M, hcat(vcat(W, transpose(w)), vcat(w, k)))
     @constraint(model, M_PSD, sc * M ∈ PSDCone())
-    return nothing
+    return W
 end
 function set_sdp_frc_constraints!(model::JuMP.Model)
     if haskey(model, :W)
-        return nothing
+        return model[:W]
     end
     w1 = model[:w1]
     sc = model[:sc]
@@ -611,7 +611,7 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
     @variable(model, W[1:Nf, 1:Nf], Symmetric)
     @expression(model, M, hcat(vcat(W, transpose(w1)), vcat(w1, k)))
     @constraint(model, M_PSD, sc * M ∈ PSDCone())
-    return nothing
+    return W
 end
 function set_sdp_philogeny_constraints!(args...)
     return nothing
@@ -619,8 +619,7 @@ end
 function set_sdp_philogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhilogenyResult,
                                         key::Symbol)
     sc = model[:sc]
-    set_sdp_constraints!(model)
-    W = model[:W]
+    W = set_sdp_constraints!(model)
     A = adj.A
     model[key] = @constraint(model, sc * A ⊙ W == 0)
     if !haskey(model, :variance_flag)

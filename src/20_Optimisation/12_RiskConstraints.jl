@@ -933,3 +933,133 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicDrawdow
     set_risk_bounds_and_expression!(model, opt, edar_risk, r.settings, key)
     return nothing
 end
+function set_risk_constraints!(model::JuMP.Model, i::Integer, r::RelativisticDrawdownatRisk,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:rldar_risk_, i)
+    sc = model[:sc]
+    dd = set_drawdown_constraints!(model, pr.X)
+    T = length(dd) - 1
+    alpha = r.alpha
+    kappa = r.kappa
+    iat = inv(alpha * T)
+    ik2 = inv(2 * kappa)
+    lnk = (iat^kappa - iat^(-kappa)) * ik2
+    opk = one(kappa) + kappa
+    omk = one(kappa) - kappa
+    ik = inv(kappa)
+    iopk = inv(opk)
+    iomk = inv(omk)
+    t_rldar, z_rldar, omega_rldar, psi_rldar, theta_rldar, epsilon_rldar = model[Symbol(:t_rldar_, i)], model[Symbol(:z_rldar_, i)], model[Symbol(:omega_rldar_, i)], model[Symbol(:psi_rldar_, i)], model[Symbol(:theta_rldar_, i)], model[Symbol(:epsilon_rldar_, i)] = @variables(model,
+                                                                                                                                                                                                                                                                                     begin
+                                                                                                                                                                                                                                                                                         ()
+                                                                                                                                                                                                                                                                                         (),
+                                                                                                                                                                                                                                                                                         (lower_bound = 0)
+                                                                                                                                                                                                                                                                                         [1:T]
+                                                                                                                                                                                                                                                                                         [1:T]
+                                                                                                                                                                                                                                                                                         [1:T]
+                                                                                                                                                                                                                                                                                         [1:T]
+                                                                                                                                                                                                                                                                                     end)
+    rldar_risk = model[key] = @expression(model,
+                                          t_rldar +
+                                          lnk * z_rldar +
+                                          sum(psi_rldar + theta_rldar))
+    model[Symbol(:crldar_pcone_a_, i)], model[Symbol(:crldar_pcone_b_, i)], model[Symbol(:crldar_, i)] = @constraints(model,
+                                                                                                                      begin
+                                                                                                                          [i = 1:T],
+                                                                                                                          [sc *
+                                                                                                                           z_rldar *
+                                                                                                                           opk *
+                                                                                                                           ik2,
+                                                                                                                           sc *
+                                                                                                                           psi_rldar[i] *
+                                                                                                                           opk *
+                                                                                                                           ik,
+                                                                                                                           sc *
+                                                                                                                           epsilon_rldar[i]] ∈
+                                                                                                                          MOI.PowerCone(iopk)
+                                                                                                                          [i = 1:T],
+                                                                                                                          [sc *
+                                                                                                                           omega_rldar[i] *
+                                                                                                                           iomk,
+                                                                                                                           sc *
+                                                                                                                           theta_rldar[i] *
+                                                                                                                           ik,
+                                                                                                                           -sc *
+                                                                                                                           z_rldar *
+                                                                                                                           ik2] ∈
+                                                                                                                          MOI.PowerCone(omk)
+                                                                                                                          sc *
+                                                                                                                          ((epsilon_rldar +
+                                                                                                                            omega_rldar +
+                                                                                                                            view(dd,
+                                                                                                                                 2:(T + 1))) .-
+                                                                                                                           t_rldar) <=
+                                                                                                                          0
+                                                                                                                      end)
+    set_risk_bounds_and_expression!(model, opt, rldar_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any,
+                                                     <:AbstractMatrix, <:Real, <:Any},
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:sqrt_kurtosis_risk_, i)
+    sc = model[:sc]
+    W = set_sdp_constraints!(model)
+    kt = isnothing(r.kt) ? pr.kt : r.kt
+    N = size(W, 1)
+    Nf = clamp(r.N, 1, N)
+    Nf *= isnothing(r.Nsc) ? 2 : clamp(r.Nsc, 1, N)
+    Nf = clamp(Nf, 1, N^2)
+    sqrt_kurtosis_risk, x_kurt = model[key], model[Symbol(:x_kurt_, i)] = @variables(model,
+                                                                                     begin
+                                                                                         ()
+                                                                                         [1:Nf]
+                                                                                     end)
+    A = block_vec_pq(kt, N, N)
+    vals_A, vecs_A = eigen(A)
+    vals_A = clamp.(real(vals_A), 0, Inf) .+ clamp.(imag(vals_A), 0, Inf)im
+    Bi = Vector{Matrix{eltype(kt)}}(undef, Nf)
+    N_eig = length(vals_A)
+    for i ∈ 1:Nf
+        j = i - 1
+        B = reshape(real(complex(sqrt(vals_A[end - j])) * view(vecs_A, :, N_eig - j)), N, N)
+        Bi[i] = B
+    end
+    model[Symbol(:capprox_kurt_soc_, i)], model[Symbol(:capprox_kurt_, i)] = @constraints(model,
+                                                                                          begin
+                                                                                              [sc *
+                                                                                               sqrt_kurtosis_risk
+                                                                                               sc *
+                                                                                               x_kurt] ∈
+                                                                                              SecondOrderCone()
+                                                                                              [i = 1:Nf],
+                                                                                              sc *
+                                                                                              (x_kurt[i] -
+                                                                                               tr(Bi[i] *
+                                                                                                  W)) ==
+                                                                                              0
+                                                                                          end)
+    set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any,
+                                                     <:AbstractMatrix, Nothing, <:Any},
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:sqrt_kurtosis_risk_, i)
+    sc = model[:sc]
+    W = set_sdp_constraints!(model)
+    kt = isnothing(r.kt) ? pr.kt : r.kt
+    sqrt_kurtosis_risk = model[key] = @variable(model)
+    L_2 = pr.L_2
+    S_2 = pr.S_2
+    sqrt_sigma_4 = sqrt(S_2 * kt * transpose(S_2))
+    zkurt = model[Symbol(:zkurt_, i)] = @expression(model, L_2 * vec(W))
+    model[Symbol(:ckurt_soc_, i)] = @constraint(model,
+                                                [sc * sqrt_kurtosis_risk;
+                                                 sc * sqrt_sigma_4 * zkurt] ∈
+                                                SecondOrderCone())
+    set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings, key)
+    return nothing
+end
