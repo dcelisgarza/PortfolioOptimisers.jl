@@ -13,22 +13,22 @@ end
 function add_custom_constraint!(args...; kwargs...)
     return nothing
 end
-struct ProcessedJuMPModel{T1 <: AbstractVector} <: AbstractResult
+struct JuMPOptimisationSolution{T1 <: AbstractVector} <: OptimisationModelResult
     w::T1
 end
-function ProcessedJuMPModel(; w::AbstractVector)
-    return ProcessedJuMPModel{typeof(w)}(w)
+function JuMPOptimisationSolution(; w::AbstractVector)
+    return JuMPOptimisationSolution{typeof(w)}(w)
 end
 struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
-                              T3 <: Union{Nothing, <:WeightBoundsResult},
+                              T3 <: WeightBoundsResult,
                               T4 <: Union{Nothing, <:LinearConstraintResult},
                               T5 <: Union{Nothing, <:LinearConstraintResult},
                               T6 <: Union{Nothing, <:LinearConstraintResult},
                               T7 <: Union{Nothing, <:PhilogenyConstraintResult},
                               T8 <: Union{Nothing, <:PhilogenyConstraintResult},
-                              T9 <: OptimisationReturnCode, T10 <: ProcessedJuMPModel,
-                              T11 <: Union{Nothing, <:JuMP.Model}} <: OptimisationResult
-    alg::T1
+                              T9 <: OptimisationReturnCode, T10 <: JuMPOptimisationSolution,
+                              T11 <: JuMP.Model} <: OptimisationResult
+    oe::T1
     pr::T2
     wb::T3
     lcs::T4
@@ -37,12 +37,12 @@ struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
     nplg::T7
     cplg::T8
     retcode::T9
-    pm::T10
+    sol::T10
     model::T11
 end
 function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
     return if sym == :w
-        r.pm.w
+        r.sol.w
     else
         getfield(r, sym)
     end
@@ -138,7 +138,7 @@ end
 function process_model(model::JuMP.Model, ::JuMPOptimisationEstimator)
     ik = inv(value(model[:k]))
     w = value.(model[:w]) * ik
-    return ProcessedJuMPModel(; w = w)
+    return JuMPOptimisationSolution(; w = w)
 end
 function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                               datatype::Type = Float64)
@@ -181,8 +181,8 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
               name => Dict(:objective_val => objective_value(model),
                            :err => solution_summary(model), :settings => settings))
     end
-    res = success ? OptimisationSuccess(trials) : OptimisationFailure(trials)
-    return res, process_model(model, opt)
+    retcode = success ? OptimisationSuccess(trials) : OptimisationFailure(trials)
+    return retcode, process_model(model, opt)
 end
 function set_scalar_risk_expression!(model::JuMP.Model, ::SumScalariser)
     risk_vec = model[:risk_vec]

@@ -30,7 +30,7 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                      MOI.PowerCone(invopk)
                      [i = 1:T],
                      [omega[i] * invomk, theta[i] * invk, -z * invk2] ∈ MOI.PowerCone(omk)
-                     (-x + epsilon + omega) .- t <= 0
+                     (epsilon + omega - x) .- t <= 0
                  end)
     @expression(model, risk, t + ln_k * z + sum(psi + theta))
     @objective(model, Min, risk)

@@ -18,6 +18,18 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
     sets::T8
     strict::T9
 end
+struct HierarchicalOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
+                                      T3 <: Union{Nothing, <:WeightBoundsResult},
+                                      T4 <: AbstractClusteringResult,
+                                      T5 <: OptimisationReturnCode, T6 <: AbstractVector} <:
+       OptimisationResult
+    oe::T1
+    pr::T2
+    wb::T3
+    clm::T4
+    retcode::T5
+    w::T6
+end
 function HierarchicalOptimiser(;
                                pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                                cle::Union{<:ClusteringEstimator,

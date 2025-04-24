@@ -337,11 +337,11 @@ function optimise!(hc::HierarchicalEqualRiskContribution,
         empty!(lc)
         empty!(rc)
     end
-    return clustering_optimisation_result(hc.opt.cwf,
-                                          weight_bounds_constraints(hc.opt.wb, hc.opt.sets;
-                                                                    N = length(w),
-                                                                    strict = hc.opt.strict),
-                                          w / sum(w))
+    wb = weight_bounds_constraints(hc.opt.wb, hc.opt.sets; N = length(w),
+                                   strict = hc.opt.strict)
+    retcode, w = clustering_optimisation_result(hc.opt.cwf, wb, w / sum(w))
+    return HierarchicalOptimisationResult(Type{HierarchicalEqualRiskContribution}, pr, wb,
+                                          clm, retcode, w)
 end
 
 export HierarchicalEqualRiskContribution

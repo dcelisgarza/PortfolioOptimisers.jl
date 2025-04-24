@@ -53,9 +53,9 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     set_portfolio_objective_function!(model, mr.obj, mr.opt.ret, mr.opt.cobj, mr, pr)
-    retcode, pm = optimise_JuMP_model!(model, mr, datatype)
+    retcode, sol = optimise_JuMP_model!(model, mr, datatype)
     return JuMPOptimisationResult(Type{MeanRiskEstimator}, pr, wb, lcs, cent, gcard, nplg,
-                                  cplg, retcode, pm, model)
+                                  cplg, retcode, sol, model)
 end
 
 export MeanRiskEstimator

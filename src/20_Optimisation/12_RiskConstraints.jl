@@ -49,10 +49,10 @@ function set_variance_risk_bounds_and_expression!(model::JuMP.Model, opt::MeanRi
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer, r::StandardDeviation,
                                opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:sd_risk_, i)
     sc = model[:sc]
     w = model[:w]
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
-    key = Symbol(:sd_risk_, i)
     sd_risk = model[key] = @variable(model)
     model[Symbol(key, :_soc)] = @constraint(model,
                                             [sc * sd_risk; sc * G * w] ∈ SecondOrderCone())
@@ -308,10 +308,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                r::LowOrderMoment{<:Any, <:MeanAbsoluteDeviation, <:Any,
                                                  <:Any}, opt::MeanRiskEstimator,
                                pr::AbstractPriorResult, args...)
+    key = Symbol(:mad_risk_, i)
     sc = model[:sc]
     w = model[:w]
     k = model[:k]
-    key = Symbol(:mad_risk_, i)
     target = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
@@ -348,10 +348,10 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                r::LowOrderMoment{<:Any, <:SemiVariance, <:Any, <:Any},
                                opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:semi_variance_risk_, i)
     sc = model[:sc]
     w = model[:w]
     k = model[:k]
-    key = Symbol(:semi_variance_risk_, i)
     target = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
@@ -380,10 +380,10 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                r::LowOrderMoment{<:Any, <:SemiDeviation, <:Any, <:Any},
                                opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:semi_sd_risk_, i)
     sc = model[:sc]
     w = model[:w]
     k = model[:k]
-    key = Symbol(:semi_sd_risk_, i)
     target = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
@@ -415,10 +415,10 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                r::LowOrderMoment{<:Any, <:FirstLowerMoment, <:Any, <:Any},
                                opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:flm_risk_, i)
     sc = model[:sc]
     w = model[:w]
     k = model[:k]
-    key = Symbol(:flm_risk_, i)
     target = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
@@ -463,11 +463,11 @@ function set_risk_constraints!(model::JuMP.Model, ::Integer, r::Range,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer, r::ConditionalValueatRisk,
                                opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:cvar_risk_, i)
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     iat = inv(r.alpha * T)
-    key = Symbol(:cvar_risk_, i)
     var, z_cvar = model[Symbol(:z_cvar_, i)], model[Symbol(:var_, i)] = @variables(model,
                                                                                    begin
                                                                                        ()
@@ -482,11 +482,11 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                r::DistributionallyRobustConditionalValueatRisk,
                                opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:drcvar_risk_, i)
     sc = model[:sc]
     w = model[:w]
     net_X = set_net_portfolio_returns!(model, pr.X)
     Xap1 = set_portfolio_returns_plus_one!(model, pr.X)
-    key = Symbol(:drcvar_risk_, i)
     T, N = size(pr.X)
 
     b1 = r.l
@@ -570,12 +570,12 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                r::ConditionalValueatRiskRange, opt::MeanRiskEstimator,
                                pr::AbstractPriorResult, args...)
+    key = Symbol(:cvar_range_risk_, i)
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     iat = inv(r.alpha * T)
     ibt = inv(r.beta * T)
-    key = Symbol(:cvar_range_risk_, i)
     var_l, var_h, z_cvar_l, z_cvar_h = model[Symbol(:var_l_, i)], model[Symbol(:var_h_, i)], model[Symbol(:z_cvar_l_, i)], model[Symbol(:z_cvar_h_, i)] = @variables(model,
                                                                                                                                                                      begin
                                                                                                                                                                          ()
@@ -613,11 +613,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueatRisk,
                                opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:evar_risk_, i)
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     at = r.alpha * T
-    key = Symbol(:evar_risk_, i)
     t_evar, z_evar, u_evar = model[Symbol(:t_evar_, i)], model[Symbol(:z_evar_, i)], model[Symbol(:u_evar_, i)] = @variables(model,
                                                                                                                              begin
                                                                                                                                  ()
@@ -644,7 +644,225 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
                                                                                       u_evar[i]] ∈
                                                                                      MOI.ExponentialCone()
                                                                                  end)
-
     set_risk_bounds_and_expression!(model, opt, evar_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer, r::RelativisticValueatRisk,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:rlvar_risk_, i)
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    alpha = r.alpha
+    kappa = r.kappa
+    iat = inv(alpha * T)
+    ik2 = inv(2 * kappa)
+    lnk = (iat^kappa - iat^(-kappa)) * ik2
+    opk = one(kappa) + kappa
+    omk = one(kappa) - kappa
+    ik = inv(kappa)
+    iopk = inv(opk)
+    iomk = inv(omk)
+    t_rlvar, z_rlvar, omega_rlvar, psi_rlvar, theta_rlvar, epsilon_rlvar = model[Symbol(:t_rlvar_, i)], model[Symbol(:z_rlvar_, i)], model[Symbol(:omega_rlvar_, i)], model[Symbol(:psi_rlvar_, i)], model[Symbol(:theta_rlvar_, i)], model[Symbol(:epsilon_rlvar_, i)] = @variables(model,
+                                                                                                                                                                                                                                                                                     begin
+                                                                                                                                                                                                                                                                                         ()
+                                                                                                                                                                                                                                                                                         (),
+                                                                                                                                                                                                                                                                                         (lower_bound = 0)
+                                                                                                                                                                                                                                                                                         [1:T]
+                                                                                                                                                                                                                                                                                         [1:T]
+                                                                                                                                                                                                                                                                                         [1:T]
+                                                                                                                                                                                                                                                                                         [1:T]
+                                                                                                                                                                                                                                                                                     end)
+    rlvar_risk = model[key] = @expression(model,
+                                          t_rlvar +
+                                          lnk * z_rlvar +
+                                          sum(psi_rlvar + theta_rlvar))
+    model[Symbol(:crlvar_pcone_a_, i)], model[Symbol(:crlvar_pcone_b_, i)], model[Symbol(:crlvar_, i)] = @constraints(model,
+                                                                                                                      begin
+                                                                                                                          [i = 1:T],
+                                                                                                                          [sc *
+                                                                                                                           z_rlvar *
+                                                                                                                           opk *
+                                                                                                                           ik2,
+                                                                                                                           sc *
+                                                                                                                           psi_rlvar[i] *
+                                                                                                                           opk *
+                                                                                                                           ik,
+                                                                                                                           sc *
+                                                                                                                           epsilon_rlvar[i]] ∈
+                                                                                                                          MOI.PowerCone(iopk)
+                                                                                                                          [i = 1:T],
+                                                                                                                          [sc *
+                                                                                                                           omega_rlvar[i] *
+                                                                                                                           iomk,
+                                                                                                                           sc *
+                                                                                                                           theta_rlvar[i] *
+                                                                                                                           ik,
+                                                                                                                           -sc *
+                                                                                                                           z_rlvar *
+                                                                                                                           ik2] ∈
+                                                                                                                          MOI.PowerCone(omk)
+                                                                                                                          sc *
+                                                                                                                          ((epsilon_rlvar +
+                                                                                                                            omega_rlvar -
+                                                                                                                            net_X) .-
+                                                                                                                           t_rlvar) <=
+                                                                                                                          0
+                                                                                                                      end)
+    set_risk_bounds_and_expression!(model, opt, rlvar_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::RelativisticValueatRiskRange, opt::MeanRiskEstimator,
+                               pr::AbstractPriorResult, args...)
+    key = Symbol(:rlvar_range_risk_, i)
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    alpha = r.alpha
+    kappa_a = r.kappa_a
+    iat = inv(alpha * T)
+    ik2_a = inv(2 * kappa_a)
+    lnk_a = (iat^kappa_a - iat^(-kappa_a)) * ik2_a
+    opk_a = one(kappa_a) + kappa_a
+    omk_a = one(kappa_a) - kappa_a
+    ik_a = inv(kappa_a)
+    iopk_a = inv(opk_a)
+    iomk_a = inv(omk_a)
+    beta = r.beta
+    kappa_b = r.kappa_b
+    ibt = inv(beta * T)
+    ik2_b = inv(2 * kappa_b)
+    lnk_b = (ibt^kappa_b - ibt^(-kappa_b)) * ik2_b
+    opk_b = one(kappa_b) + kappa_b
+    omk_b = one(kappa_b) - kappa_b
+    ik_b = inv(kappa_b)
+    iopk_b = inv(opk_b)
+    iomk_b = inv(omk_b)
+
+    t_rlvar_l, z_rlvar_l, omega_rlvar_l, psi_rlvar_l, theta_rlvar_l, epsilon_rlvar_l, t_rlvar_h, z_rlvar_h, omega_rlvar_h, psi_rlvar_h, theta_rlvar_h, epsilon_rlvar_h = model[Symbol(:t_rlvar_l_, i)], model[Symbol(:z_rlvar_l_, i)], model[Symbol(:omega_rlvar_l_, i)], model[Symbol(:psi_rlvar_l_, i)], model[Symbol(:theta_rlvar_l_, i)], model[Symbol(:epsilon_rlvar_l_, i)], model[Symbol(:t_rlvar_h_, i)], model[Symbol(:z_rlvar_h_, i)], model[Symbol(:omega_rlvar_h_, i)], model[Symbol(:psi_rlvar_h_, i)], model[Symbol(:theta_rlvar_h_, i)], model[Symbol(:epsilon_rlvar_h_, i)] = @variables(model,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         begin
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ()
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             (),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             (lower_bound = 0)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             [1:T]
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             [1:T]
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             [1:T]
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             [1:T]
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ()
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             (),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             (upper_bound = 0)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             [1:T]
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             [1:T]
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             [1:T]
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             [1:T]
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         end)
+    rlvar_risk_l, rlvar_risk_h = model[Symbol(:rlvar_risk_l_, i)], model[Symbol(:rlvar_risk_h_, i)] = @expressions(model,
+                                                                                                                   begin
+                                                                                                                       t_rlvar_l +
+                                                                                                                       lnk_a *
+                                                                                                                       z_rlvar_l +
+                                                                                                                       sum(psi_rlvar_l +
+                                                                                                                           theta_rlvar_l)
+                                                                                                                       t_rlvar_h +
+                                                                                                                       lnk_b *
+                                                                                                                       z_rlvar_h +
+                                                                                                                       sum(psi_rlvar_h +
+                                                                                                                           theta_rlvar_h)
+                                                                                                                   end)
+    rlvar_range_risk = model[Symbol(:rlvar_range_risk_, i)] = @expression(model,
+                                                                          rlvar_risk_l -
+                                                                          rlvar_risk_h)
+    model[Symbol(:crlvar_l_pcone_a_, i)], model[Symbol(:crlvar_l_pcone_b_, i)], model[Symbol(:crlvar_l_, i)], model[Symbol(:crlvar_h_pcone_a_, i)], model[Symbol(:crlvar_h_pcone_b_, i)], model[Symbol(:crlvar_h_, i)] = @constraints(model,
+                                                                                                                                                                                                                                      begin
+                                                                                                                                                                                                                                          [i = 1:T],
+                                                                                                                                                                                                                                          [sc *
+                                                                                                                                                                                                                                           z_rlvar_l *
+                                                                                                                                                                                                                                           opk_a *
+                                                                                                                                                                                                                                           ik2_a,
+                                                                                                                                                                                                                                           sc *
+                                                                                                                                                                                                                                           psi_rlvar_l[i] *
+                                                                                                                                                                                                                                           opk_a *
+                                                                                                                                                                                                                                           ik_a,
+                                                                                                                                                                                                                                           sc *
+                                                                                                                                                                                                                                           epsilon_rlvar_l[i]] ∈
+                                                                                                                                                                                                                                          MOI.PowerCone(iopk_a)
+                                                                                                                                                                                                                                          [i = 1:T],
+                                                                                                                                                                                                                                          [sc *
+                                                                                                                                                                                                                                           omega_rlvar_l[i] *
+                                                                                                                                                                                                                                           iomk_a,
+                                                                                                                                                                                                                                           sc *
+                                                                                                                                                                                                                                           theta_rlvar_l[i] *
+                                                                                                                                                                                                                                           ik_a,
+                                                                                                                                                                                                                                           sc *
+                                                                                                                                                                                                                                           -z_rlvar_l *
+                                                                                                                                                                                                                                           ik2_a] ∈
+                                                                                                                                                                                                                                          MOI.PowerCone(omk_a)
+                                                                                                                                                                                                                                          sc *
+                                                                                                                                                                                                                                          ((epsilon_rlvar_l +
+                                                                                                                                                                                                                                            omega_rlvar_l -
+                                                                                                                                                                                                                                            net_X) .-
+                                                                                                                                                                                                                                           t_rlvar_l) <=
+                                                                                                                                                                                                                                          0
+                                                                                                                                                                                                                                          [i = 1:T],
+                                                                                                                                                                                                                                          [sc *
+                                                                                                                                                                                                                                           -z_rlvar_h *
+                                                                                                                                                                                                                                           opk_b *
+                                                                                                                                                                                                                                           ik2_b,
+                                                                                                                                                                                                                                           sc *
+                                                                                                                                                                                                                                           -psi_rlvar_h[i] *
+                                                                                                                                                                                                                                           opk_b *
+                                                                                                                                                                                                                                           ik_b,
+                                                                                                                                                                                                                                           sc *
+                                                                                                                                                                                                                                           -epsilon_rlvar_h[i]] ∈
+                                                                                                                                                                                                                                          MOI.PowerCone(iopk_b)
+                                                                                                                                                                                                                                          [i = 1:T],
+                                                                                                                                                                                                                                          [sc *
+                                                                                                                                                                                                                                           -omega_rlvar_h[i] *
+                                                                                                                                                                                                                                           iomk_b,
+                                                                                                                                                                                                                                           sc *
+                                                                                                                                                                                                                                           -theta_rlvar_h[i] *
+                                                                                                                                                                                                                                           ik_b,
+                                                                                                                                                                                                                                           sc *
+                                                                                                                                                                                                                                           z_rlvar_h *
+                                                                                                                                                                                                                                           ik2_b] ∈
+                                                                                                                                                                                                                                          MOI.PowerCone(omk_b)
+                                                                                                                                                                                                                                          sc *
+                                                                                                                                                                                                                                          ((net_X -
+                                                                                                                                                                                                                                            epsilon_rlvar_h -
+                                                                                                                                                                                                                                            omega_rlvar_h) .+
+                                                                                                                                                                                                                                           t_rlvar_h) <=
+                                                                                                                                                                                                                                          0
+                                                                                                                                                                                                                                      end)
+    set_risk_bounds_and_expression!(model, opt, rlvar_range_risk, r.settings, key)
+    return nothing
+end
+function set_drawdown_constraints!(model::JuMP.Model, X::AbstractMatrix)
+    if haskey(model, :dd)
+        return nothing
+    end
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, X)
+    T = length(net_X)
+    @variable(model, dd[1:(T + 1)])
+    @constraints(model, begin
+                     cdd_start, sc * dd[1] == 0
+                     cdd_geq_0, sc * view(dd, 2:(T + 1)) >= 0
+                     cdd, sc * (net_X + view(dd, 2:(T + 1)) - view(dd, 1:T)) >= 0
+                 end)
+    return dd
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer, r::MaximumDrawdown,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    if haskey(model, :mdd_risk)
+        return nothing
+    end
+    sc = model[:sc]
+    dd = set_drawdown_constraints!(model, pr.X)
+    T = length(dd) - 1
+    @variable(model, mdd_risk)
+    model[Symbol(:cmdd_, i)] = @constraint(model,
+                                           sc * (view(dd, 2:(T + 1)) .- mdd_risk) <= 0)
+    set_risk_bounds_and_expression!(model, opt, mdd_risk, r.settings, :mdd_risk)
     return nothing
 end

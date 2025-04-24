@@ -13,6 +13,7 @@ end
 function OptimisationFailure(; res = nothing)
     return OptimisationFailure(res)
 end
+abstract type OptimisationModelResult <: AbstractResult end
 
 function optimise! end
 
