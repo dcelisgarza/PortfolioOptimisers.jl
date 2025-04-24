@@ -5,14 +5,14 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
     end
     T = length(x)
     at = alpha * T
-    invat = 1 / at
-    ln_k = (invat^kappa - invat^(-kappa)) / (2 * kappa)
-    invk2 = 1 / (2 * kappa)
-    opk = 1 + kappa
-    omk = 1 - kappa
-    invk = 1 / kappa
-    invopk = 1 / opk
-    invomk = 1 / omk
+    invat = inv(at)
+    invk2 = inv(2 * kappa)
+    ln_k = (invat^kappa - invat^(-kappa)) * invk2
+    opk = one(kappa) + kappa
+    omk = one(kappa) - kappa
+    invk = inv(kappa)
+    invopk = inv(opk)
+    invomk = inv(omk)
     model = JuMP.Model()
     set_string_names_on_creation(model, false)
     @variables(model, begin
@@ -30,7 +30,7 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                      MOI.PowerCone(invopk)
                      [i = 1:T],
                      [omega[i] * invomk, theta[i] * invk, -z * invk2] ∈ MOI.PowerCone(omk)
-                     (-x + epsilon + omega) .- t .<= 0
+                     (-x + epsilon + omega) .- t <= 0
                  end)
     @expression(model, risk, t + ln_k * z + sum(psi + theta))
     @objective(model, Min, risk)
