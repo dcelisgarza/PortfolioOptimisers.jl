@@ -1000,17 +1000,16 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::RelativisticDra
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any,
-                                                     <:AbstractMatrix, <:Real, <:Any},
-                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                     <:Real}, opt::MeanRiskEstimator,
+                               pr::HighOrderPriorResult, args...)
     key = Symbol(:sqrt_kurtosis_risk_, i)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
     kt = isnothing(r.kt) ? pr.kt : r.kt
     N = size(W, 1)
-    Nf = clamp(r.N, 1, N)
-    Nf *= isnothing(r.Nsc) ? 2 : clamp(r.Nsc, 1, N)
-    Nf = clamp(Nf, 1, N^2)
+    f = clamp(isnothing(r.N) ? 2 : r.N, 1, N)
+    Nf = f * N
     sqrt_kurtosis_risk, x_kurt = model[key], model[Symbol(:x_kurt_, i)] = @variables(model,
                                                                                      begin
                                                                                          ()
@@ -1044,22 +1043,27 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any,
-                                                     <:AbstractMatrix, Nothing, <:Any},
-                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                     Nothing}, opt::MeanRiskEstimator,
+                               pr::HighOrderPriorResult, args...)
     key = Symbol(:sqrt_kurtosis_risk_, i)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
     kt = isnothing(r.kt) ? pr.kt : r.kt
     sqrt_kurtosis_risk = model[key] = @variable(model)
-    L_2 = pr.L_2
-    S_2 = pr.S_2
-    sqrt_sigma_4 = sqrt(S_2 * kt * transpose(S_2))
-    zkurt = model[Symbol(:zkurt_, i)] = @expression(model, L_2 * vec(W))
+    L2 = pr.L2
+    S2 = pr.S2
+    sqrt_sigma_4 = sqrt(S2 * kt * transpose(S2))
+    zkurt = model[Symbol(:zkurt_, i)] = @expression(model, L2 * vec(W))
     model[Symbol(:ckurt_soc_, i)] = @constraint(model,
                                                 [sc * sqrt_kurtosis_risk;
                                                  sc * sqrt_sigma_4 * zkurt] ∈
                                                 SecondOrderCone())
     set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings, key)
     return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer, r::SquareRootKurtosis,
+                               opt::MeanRiskEstimator, pr::AbstractLowOrderPriorEstimator,
+                               args...)
+    throw(ArgumentError("SquareRootKurtosis requires a HighOrderPriorResult, not a $(typeof(pr))."))
 end

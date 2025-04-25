@@ -150,38 +150,6 @@ function summation_matrix(n::Int, diag::Bool = true)
         sparse(1:m, v1, 2, m, nsq)
     end
 end
-function dup_elim_matrices(n::Int)
-    m   = div(n * (n + 1), 2)
-    nsq = n^2
-    v1  = zeros(Int, nsq)
-    v2  = zeros(Int, m)
-    r1  = 1
-    r2  = 1
-    a   = 1
-    b2  = 0
-    for i ∈ 1:n
-        b1 = i
-        for j ∈ 0:(i - 2)
-            v1[r1] = b1
-            b1 += n - j - 1
-            r1 += 1
-        end
-
-        for j ∈ 0:(n - i)
-            v1[r1] = a + j
-            v2[r2] = a + j + b2
-            r1 += 1
-            r2 += 1
-        end
-        a += n - i + 1
-        b2 += i
-    end
-
-    d = sparse(1:nsq, v1, 1, nsq, m)
-    l = sparse(1:m, v2, 1, m, nsq)
-
-    return d, l
-end
 function dup_elim_sum_matrices(n::Int)
     m   = div(n * (n + 1), 2)
     nsq = n^2
@@ -247,7 +215,7 @@ function HighOrderPriorResult(; pr::AbstractLowOrderPriorResult,
         issquare(kt)
         N = length(pr.mu)
         @smart_assert(length(pr.mu)^2 == size(kt, 1))
-        @smart_assert(size(L2) == size(transpose(S2)) == (N^2, div(N * (N + 1), 2)))
+        @smart_assert(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
     end
     sk_flag = isa(sk, AbstractMatrix)
     V_flag = isa(V, AbstractMatrix)
@@ -266,16 +234,16 @@ function HighOrderPriorResult(; pr::AbstractLowOrderPriorResult,
     return HighOrderPriorResult{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk),
                                 typeof(V), typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
 end
-function dup_elim_view(args...)
+function dup_elim_sum_view(args...)
     return nothing, nothing
 end
-function dup_elim_view(::AbstractMatrix, N)
-    return dup_elim_matrices(N)
+function dup_elim_sum_view(::AbstractMatrix, N)
+    return dup_elim_sum_matrices(N)
 end
 function prior_view(pr::HighOrderPriorResult, i::AbstractVector)
     idx = fourth_moment_index_factory(length(pr.mu), i)
     kt = pr.kt
-    L2, S2 = dup_elim_view(kt, length(i))
+    L2, S2 = dup_elim_sum_view(kt, length(i))[2:3]
     sk = pr.sk
     skmp = pr.skmp
     sk = nothing_scalar_array_view_odd_order(sk, i, idx)
@@ -337,7 +305,7 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
     pr = prior(pe.pe, X, F)
     (; X, mu) = pr
     kt = cokurtosis(pe.kte, X; mean = transpose(mu))
-    L2, S2 = !isnothing(kt) ? dup_elim_matrices(length(mu)) : (nothing, nothing)
+    L2, S2 = !isnothing(kt) ? dup_elim_sum_matrices(length(mu))[2:3] : (nothing, nothing)
     sk, V = coskewness(pe.ske, X; mean = transpose(mu))
     return HighOrderPriorResult(; pr = pr, kt = kt, L2 = L2, S2 = S2, sk = sk, V = V,
                                 skmp = isnothing(sk) ? nothing : pe.ske.mp)
