@@ -1179,3 +1179,83 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     set_risk_bounds_and_expression!(model, opt, aowa_risk, r.settings, key)
     return nothing
 end
+function set_brownian_distance_variance_constraints!(model::JuMP.Model,
+                                                     ::NormOneConeBrownianDistanceVariance,
+                                                     Dt::AbstractMatrix, Dx::AbstractMatrix)
+    T = size(Dt, 1)
+    sc = model[:sc]
+    @constraint(model, cbdvariance_noc[j = 1:T, i = j:T],
+                [sc * Dt[i, j]; sc * Dx[i, j]] in MOI.NormOneCone(2))
+    return nothing
+end
+function set_brownian_distance_variance_constraints!(model::JuMP.Model,
+                                                     ::IneqBrownianDistanceVariance,
+                                                     Dt::AbstractMatrix, Dx::AbstractMatrix)
+    T = size(Dt, 1)
+    sc = model[:sc]
+    @constraints(model,
+                 begin
+                     cp_bdvariance[j = 1:T, i = j:T], sc * (Dt[i, j] - Dx[i, j]) >= 0
+                     cn_bdvariance[j = 1:T, i = j:T], sc * (Dt[i, j] + Dx[i, j]) >= 0
+                 end)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVariance,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    if haskey(model, :bdvariance_risk)
+        return nothing
+    end
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    iT2 = inv(T^2)
+    ovec = range(1; stop = 1, length = T)
+    @variable(model, Dt[1:T, 1:T], Symmetric)
+    @expressions(model, begin
+                     Dx, net_X * transpose(ovec) - ovec * transpose(net_X)
+                     bdvariance_risk, iT2 * (dot(Dt, Dt) + iT2 * sum(Dt)^2)
+                 end)
+    set_brownian_distance_variance_constraints!(model, r.formulation, Dt, Dx)
+    set_risk_bounds_and_expression!(model, opt, bdvariance_risk, r.settings,
+                                    :bdvariance_risk)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::NegativeSkewness{<:Any, <:LinearNegativeSkewness, <:Any,
+                                                   <:Any, <:Any}, opt::MeanRiskEstimator,
+                               pr::HighOrderPriorResult, args...)
+    key = Symbol(:nskew_risk_, i)
+    sc = model[:sc]
+    w = model[:w]
+    V = isnothing(r.V) ? pr.V : r.V
+    G = real(sqrt(V))
+    nskew_risk = model[key] = @variable(model)
+    model[Symbol(:cnskew_soc_, i)] = @constraint(model,
+                                                 [sc * nskew_risk; sc * G * w] ∈
+                                                 SecondOrderCone())
+    set_risk_bounds_and_expression!(model, opt, nskew_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::NegativeSkewness{<:Any, <:QuadraticNegativeSkewness,
+                                                   <:Any, <:Any, <:Any},
+                               opt::MeanRiskEstimator, pr::HighOrderPriorResult, args...)
+    key = Symbol(:qnskew_risk_, i)
+    sc = model[:sc]
+    w = model[:w]
+    V = isnothing(r.V) ? pr.V : r.V
+    G = real(sqrt(V))
+    t_qnskew_risk = model[Symbol(:t_qnskew_risk_, i)] = @variable(model)
+    model[Symbol(:cqnskew_soc_, i)] = @constraint(model,
+                                                  [sc * t_qnskew_risk; sc * G * w] ∈
+                                                  SecondOrderCone())
+    qnskew_risk = model[key] = @expression(model, t_qnskew_risk^2)
+    ub = r.settings.ub
+    set_risk_upper_bound!(model, opt, t_qnskew_risk, !isnothing(ub) ? sqrt(ub) : ub, key)
+    set_risk_expression!(model, qnskew_risk, r.settings.scale, r.settings.rke)
+    return nothing
+end
+function set_risk_constraints!(::JuMP.Model, ::Integer, ::NegativeSkewness,
+                               ::MeanRiskEstimator, pr::AbstractLowOrderPriorEstimator,
+                               args...)
+    throw(ArgumentError("NegativeSkewness requires a HighOrderPriorResult, not a $(typeof(pr))."))
+end
