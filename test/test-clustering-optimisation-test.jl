@@ -128,9 +128,9 @@
                  RelativeRelativisticDrawdownatRisk(),# 72
                  ###
                  OrderedWeightsArray(),#
-                 GiniMeanDifference(),#
-                 TailGini(),#
-                 TailGiniRange(),# 76
+                 OrderedWeightsArray(; w = owa_gmd(500)),#
+                 OrderedWeightsArray(; w = owa_tg(500)),#
+                 OrderedWeightsArray(; w = owa_tgrg(500)),# 76
                  ###
                  AverageDrawdown(),#
                  AverageDrawdown(; w = ew),#
@@ -317,9 +317,9 @@
                  RelativeRelativisticDrawdownatRisk(),# 72
                  ###
                  OrderedWeightsArray(),#
-                 GiniMeanDifference(),#
-                 TailGini(),#
-                 TailGiniRange(),# 76
+                 OrderedWeightsArray(; w = owa_gmd(500)),#
+                 OrderedWeightsArray(; w = owa_tg(500)),#
+                 OrderedWeightsArray(; w = owa_tgrg(500)),# 76
                  ###
                  AverageDrawdown(),#
                  AverageDrawdown(; w = ew),#

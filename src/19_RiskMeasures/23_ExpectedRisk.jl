@@ -10,9 +10,8 @@ function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRisk
                                 <:RelativeAverageDrawdown,
                                 <:RelativeConditionalDrawdownatRisk, <:RelativeUlcerIndex,
                                 <:RelativeEntropicDrawdownatRisk,
-                                <:RelativeRelativisticDrawdownatRisk, <:GiniMeanDifference,
-                                <:Range, <:ConditionalValueatRiskRange, <:TailGini,
-                                <:TailGiniRange, <:OrderedWeightsArray,
+                                <:RelativeRelativisticDrawdownatRisk, <:Range,
+                                <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
                                 <:BrownianDistanceVariance, <:MeanReturn},
                        w::AbstractVector, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing; kwargs...)

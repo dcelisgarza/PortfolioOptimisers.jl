@@ -793,8 +793,11 @@
         rs1 = [OrderedWeightsArray(; settings = settings),
                OrderedWeightsArray(; formulation = ExactOrderedWeightsArray(),
                                    w = owa_tg(500; alpha_i = 0.001, alpha = 0.06,
-                                              a_sim = 70)), GiniMeanDifference(),
-               TailGini(; alpha_i = 0.001, alpha = 0.06, a_sim = 70), TailGiniRange()]
+                                              a_sim = 70)), OrderedWeightsArray(),
+               OrderedWeightsArray(;
+                                   w = owa_tg(500; alpha_i = 0.001, alpha = 0.06,
+                                              a_sim = 70)),
+               OrderedWeightsArray(; w = owa_tgrg(500))]
         r1 = risk_measure_factory(rs1)
         rv1 = risk_measure_view(rs1)
         @test all(rs1 .=== r1)

@@ -1062,8 +1062,120 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings, key)
     return nothing
 end
-function set_risk_constraints!(model::JuMP.Model, i::Integer, r::SquareRootKurtosis,
-                               opt::MeanRiskEstimator, pr::AbstractLowOrderPriorEstimator,
+function set_risk_constraints!(::JuMP.Model, ::Integer, ::SquareRootKurtosis,
+                               ::MeanRiskEstimator, pr::AbstractLowOrderPriorEstimator,
                                args...)
     throw(ArgumentError("SquareRootKurtosis requires a HighOrderPriorResult, not a $(typeof(pr))."))
+end
+function set_owa_constraints!(model::JuMP.Model, X::AbstractMatrix)
+    if haskey(model, :owa)
+        return model[:owa]
+    end
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, X)
+    T = size(X, 1)
+    @variable(model, owa[1:T])
+    @constraint(model, sc * (net_X - owa) == 0)
+    return owa
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::OrderedWeightsArray{<:Any, <:ExactOrderedWeightsArray,
+                                                      <:Any}, opt::MeanRiskEstimator,
+                               pr::AbstractPriorResult, args...)
+    key = Symbol(:owa_risk_, i)
+    sc = model[:sc]
+    T = size(pr.X, 1)
+    owa = set_owa_constraints!(model, pr.X)
+    ovec = range(1; stop = 1, length = T)
+    owa_a, owa_b = model[Symbol(:owa_a_, i)], model[Symbol(:owa_b_, i)] = @variables(model,
+                                                                                     begin
+                                                                                         [1:T]
+                                                                                         [1:T]
+                                                                                     end)
+    owa_risk = model[key] = @expression(model, sum(owa_a + owa_b))
+    owa_w = isnothing(r.w) ? owa_gmd(T) : r.w
+    model[Symbol(:cowa_, i)] = @constraint(model,
+                                           sc * (owa * transpose(owa_w) -
+                                                 ovec * transpose(owa_a) -
+                                                 owa_b * transpose(ovec)) in Nonpositives())
+    set_risk_bounds_and_expression!(model, opt, owa_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::OrderedWeightsArray{<:Any, <:ApproxOrderedWeightsArray,
+                                                      <:Any}, opt::MeanRiskEstimator,
+                               pr::AbstractPriorResult, args...)
+    key = Symbol(:aowa_risk_, i)
+    sc = model[:sc]
+    T = size(pr.X, 1)
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    owa_p = r.formulation.p
+    M = length(owa_p)
+    owa_t, owa_nu, owa_eta, owa_epsilon, owa_psi, owa_z, owa_y = model[Symbol(:owa_t_, i)], model[Symbol(:owa_nu_, i)], model[Symbol(:owa_eta_, i)], model[Symbol(:owa_epsilon_, i)], model[Symbol(:owa_psi_, i)], model[Symbol(:owa_z_, i)], model[Symbol(:owa_y_, i)] = @variables(model,
+                                                                                                                                                                                                                                                                                     begin
+                                                                                                                                                                                                                                                                                         ()
+                                                                                                                                                                                                                                                                                         [1:T],
+                                                                                                                                                                                                                                                                                         (lower_bound = 0)
+                                                                                                                                                                                                                                                                                         [1:T],
+                                                                                                                                                                                                                                                                                         (lower_bound = 0)
+                                                                                                                                                                                                                                                                                         [1:T,
+                                                                                                                                                                                                                                                                                          1:M]
+                                                                                                                                                                                                                                                                                         [1:T,
+                                                                                                                                                                                                                                                                                          1:M]
+                                                                                                                                                                                                                                                                                         [1:M]
+                                                                                                                                                                                                                                                                                         [1:M],
+                                                                                                                                                                                                                                                                                         (lower_bound = 0)
+                                                                                                                                                                                                                                                                                     end)
+    owa_w = isnothing(r.w) ? -owa_gmd(T) : -r.w
+    owa_s = sum(owa_w)
+    owa_l = minimum(owa_w)
+    owa_h = maximum(owa_w)
+    owa_d = [norm(owa_w, p) for p ∈ owa_p]
+    aowa_risk, neg_owa_z_owa_p, owa_p_o_owa_pm1 = model[key], model[Symbol(:neg_owa_z_owa_p_, i)], model[Symbol(:owa_p_o_owa_pm1_, i)] = @expressions(model,
+                                                                                                                                                      begin
+                                                                                                                                                          owa_s *
+                                                                                                                                                          owa_t -
+                                                                                                                                                          owa_l *
+                                                                                                                                                          sum(owa_nu) +
+                                                                                                                                                          owa_h *
+                                                                                                                                                          sum(owa_eta) +
+                                                                                                                                                          dot(owa_d,
+                                                                                                                                                              owa_y)
+                                                                                                                                                          -sc *
+                                                                                                                                                          owa_z .*
+                                                                                                                                                          owa_p
+                                                                                                                                                          sc *
+                                                                                                                                                          owa_p ./
+                                                                                                                                                          (owa_p .-
+                                                                                                                                                           one(eltype(owa_p)))
+                                                                                                                                                      end)
+    model[Symbol(:ca1_owa_, i)], model[Symbol(:ca2_owa_, i)], model[Symbol(:ca_owa_pcone_, i)] = @constraints(model,
+                                                                                                              begin
+                                                                                                                  sc *
+                                                                                                                  ((net_X -
+                                                                                                                    owa_nu +
+                                                                                                                    owa_eta -
+                                                                                                                    vec(sum(owa_epsilon;
+                                                                                                                            dims = 2))) .+
+                                                                                                                   owa_t) ==
+                                                                                                                  0
+                                                                                                                  sc *
+                                                                                                                  (owa_z +
+                                                                                                                   owa_y -
+                                                                                                                   vec(sum(owa_psi;
+                                                                                                                           dims = 1))) ==
+                                                                                                                  0
+                                                                                                                  [i = 1:M,
+                                                                                                                   j = 1:T],
+                                                                                                                  [neg_owa_z_owa_p[i],
+                                                                                                                   owa_psi[j,
+                                                                                                                           i] *
+                                                                                                                   owa_p_o_owa_pm1[i],
+                                                                                                                   sc *
+                                                                                                                   owa_epsilon[j,
+                                                                                                                               i]] ∈
+                                                                                                                  MOI.PowerCone(inv(owa_p[i]))
+                                                                                                              end)
+    set_risk_bounds_and_expression!(model, opt, aowa_risk, r.settings, key)
+    return nothing
 end
