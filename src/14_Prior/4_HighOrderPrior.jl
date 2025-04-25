@@ -273,10 +273,9 @@ function dup_elim_view(::AbstractMatrix, N)
     return dup_elim_matrices(N)
 end
 function prior_view(pr::HighOrderPriorResult, i::AbstractVector)
-    N = length(pr.mu)
-    idx = fourth_moment_index_factory(N, i)
+    idx = fourth_moment_index_factory(length(pr.mu), i)
     kt = pr.kt
-    L2, S2 = dup_elim_view(kt, N)
+    L2, S2 = dup_elim_view(kt, length(i))
     sk = pr.sk
     skmp = pr.skmp
     sk = nothing_scalar_array_view_odd_order(sk, i, idx)
