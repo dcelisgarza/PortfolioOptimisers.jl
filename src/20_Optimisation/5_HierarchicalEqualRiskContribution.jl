@@ -287,9 +287,10 @@ function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any,
     return w, rkcl
 end
 function optimise!(hc::HierarchicalEqualRiskContribution,
-                   rd::ReturnsResult = ReturnsResult())
-    pr = prior(hc.opt.pe, rd.X, rd.F)
-    clm = clusterise(hc.opt.cle, pr.X)
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                   branchorder::Symbol = :optimal)
+    pr = prior(hc.opt.pe, rd.X, rd.F; dims = dims)
+    clm = clusterise(hc.opt.cle, pr.X; dims = dims, branchorder = branchorder)
     idx = cutree(clm.clustering; k = clm.k)
     cls = [findall(x -> x == i, idx) for i ∈ 1:(clm.k)]
     w, rkcl = herc_risk(hc, pr, cls)

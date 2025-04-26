@@ -23,14 +23,14 @@ function split_factor_weight_constraints(alpha::Real, wb::WeightBoundsResult,
                             max(sum(view(lb, rc)) / w[rc[1]], one(alpha) - alpha))
 end
 function optimise!(hc::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
-                   rd::ReturnsResult = ReturnsResult(); strict::Bool = false)
-    pr = prior(hc.opt.pe, rd.X, rd.F)
-    clm = clusterise(hc.opt.cle, pr.X)
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1)
+    pr = prior(hc.opt.pe, rd.X, rd.F; dims = dims)
+    clm = clusterise(hc.opt.cle, pr.X; dims = dims)
     r = risk_measure_factory(hc.r, pr, hc.opt.slv)
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     rku = unitary_expected_risks(r, pr.X, hc.opt.fees)
     wb = weight_bounds_constraints(hc.opt.wb, hc.opt.sets; N = size(pr.X, 2),
-                                   strict = strict)
+                                   strict = hc.opt.strict)
     w = ones(eltype(pr.X), size(pr.X, 2))
     items = [clm.clustering.order]
     @inbounds while length(items) > 0
@@ -124,9 +124,9 @@ function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::AbstractMatrix,
 end
 function optimise!(hc::HierarchicalRiskParity{<:Any,
                                               <:AbstractVector{<:OptimisationRiskMeasure}},
-                   rd::ReturnsResult = ReturnsResult())
-    pr = prior(hc.opt.pe, rd.X, rd.F)
-    clm = clusterise(hc.opt.cle, pr.X)
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1)
+    pr = prior(hc.opt.pe, rd.X, rd.F; dims = dims)
+    clm = clusterise(hc.opt.cle, pr.X; dims = dims)
     r = risk_measure_factory(hc.r, Ref(pr), Ref(hc.opt.slv))
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     wk = zeros(eltype(pr.X), size(pr.X, 2))

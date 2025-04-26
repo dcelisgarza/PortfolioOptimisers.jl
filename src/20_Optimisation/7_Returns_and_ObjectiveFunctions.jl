@@ -34,7 +34,7 @@ struct MinimumRisk <: ObjectiveFunction end
 struct MaximumUtility{T1 <: Real} <: ObjectiveFunction
     l::T1
 end
-function MaximumUtility(; l::Real = 2.0)
+function MaximumUtility(; l::Real = 2)
     @smart_assert(l >= zero(l))
     return MaximumUtility{typeof(l)}(l)
 end
