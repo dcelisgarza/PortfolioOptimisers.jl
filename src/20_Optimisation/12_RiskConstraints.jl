@@ -1259,3 +1259,39 @@ function set_risk_constraints!(::JuMP.Model, ::Integer, ::NegativeSkewness,
                                args...)
     throw(ArgumentError("NegativeSkewness requires a HighOrderPriorResult, not a $(typeof(pr))."))
 end
+function set_risk_constraints!(model::JuMP.Model, i::Integer, r::TrackingRiskMeasure,
+                               opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    key = Symbol(:tracking_risk_, i)
+    sc = model[:sc]
+    w = model[:w]
+    k = model[:k]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = @variable(model)
+    tracking_risk = model[key] = @expression(model, t_tracking_risk / sqrt(T - one(T)))
+    tracking = r.tracking
+    benchmark = tracking_benchmark(tracking, pr.X)
+    tracking_r = model[Symbol(:tracking_r_, i)] = @expression(model, net_X - benchmark * k)
+    model[Symbol(:ctracking_r_soc_, i)] = @constraint(model,
+                                                      [sc * t_tracking_risk;
+                                                       sc * tracking_r] ∈ SecondOrderCone())
+    set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer, r::TurnoverRiskMeasure,
+                               opt::MeanRiskEstimator, ::AbstractPriorResult, args...)
+    key = Symbol(:turnover_risk_, i)
+    sc = model[:sc]
+    w = model[:w]
+    k = model[:k]
+    N = length(w)
+    turnover_risk = model[key] = @variable(model)
+    benchmark = r.w
+    turnover_r = model[Symbol(:turnover_r_, i)] = @expression(model, w - benchmark * k)
+    model[Symbol(:cturnover_r_noc_, i)] = @constraint(model,
+                                                      [sc * turnover_risk;
+                                                       sc * turnover_r] ∈
+                                                      MOI.NormOneCone(1 + N))
+    set_risk_bounds_and_expression!(model, opt, turnover_risk, r.settings, key)
+    return nothing
+end
