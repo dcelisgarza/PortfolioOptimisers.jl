@@ -30,5 +30,44 @@ function (r::OrderedWeightsArray)(x::AbstractVector)
     w = isnothing(r.w) ? owa_gmd(length(x)) : r.w
     return dot(w, sort!(x))
 end
+struct OrderedWeightsArrayRange{T1 <: RiskMeasureSettings,
+                                T2 <: OrderedWeightsArrayFormulation,
+                                T3 <: Union{Nothing, <:AbstractVector},
+                                T4 <: Union{Nothing, <:AbstractVector}} <:
+       OrderedWeightsArrayRiskMeasure
+    settings::T1
+    formulation::T2
+    w1::T3
+    w2::T4
+end
+function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                                  formulation::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
+                                  w1::Union{Nothing, <:AbstractVector} = nothing,
+                                  w2::Union{Nothing, <:AbstractVector} = nothing,
+                                  reversed::Bool = false)
+    w1_flag = isa(w1, AbstractVector)
+    w2_flag = isa(w2, AbstractVector)
+    if w1_flag
+        @smart_assert(!isempty(w1))
+    end
+    if w2_flag
+        @smart_assert(!isempty(w2))
+        if !reversed
+            w2 = reverse(w2)
+        end
+    end
+    if w1_flag && w2_flag
+        @smart_assert(length(w1) == length(w2))
+    end
+    return OrderedWeightsArrayRange{typeof(settings), typeof(formulation), typeof(w1),
+                                    typeof(w2)}(settings, formulation, w1, w2)
+end
+function (r::OrderedWeightsArrayRange)(x::AbstractVector)
+    w1 = isnothing(r.w1) ? owa_tg(length(x)) : r.w1
+    w2 = isnothing(r.w2) ? reverse(w1) : r.w2
+    w = w1 - w2
+    return dot(w, sort!(x))
+end
 
-export ExactOrderedWeightsArray, ApproxOrderedWeightsArray, OrderedWeightsArray
+export ExactOrderedWeightsArray, ApproxOrderedWeightsArray, OrderedWeightsArray,
+       OrderedWeightsArrayRange

@@ -190,7 +190,7 @@ end
 function owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,
                   a_sim::Integer = 100, beta_i::Real = alpha_i, beta::Real = alpha,
                   b_sim::Integer = a_sim)
-    w = owa_tg(T; alpha_i = alpha_i, alpha = alpha, a_sim = a_sim) .-
+    w = owa_tg(T; alpha_i = alpha_i, alpha = alpha, a_sim = a_sim) -
         reverse(owa_tg(T; alpha_i = beta_i, alpha = beta, a_sim = b_sim))
 
     return w

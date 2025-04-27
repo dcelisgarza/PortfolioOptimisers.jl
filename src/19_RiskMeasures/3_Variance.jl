@@ -79,7 +79,7 @@ struct UncertaintySetVariance{T1 <: RiskMeasureSettings,
 end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                           <:AbstractUncertaintySetEstimator} = nothing,
+                                           <:AbstractUncertaintySetEstimator} = NormalUncertaintySetEstimator(;),
                                 sigma::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing)
     if isa(sigma, AbstractMatrix)
         @smart_assert(!isempty(sigma))
