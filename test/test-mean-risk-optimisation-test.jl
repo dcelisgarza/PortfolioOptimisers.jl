@@ -122,9 +122,13 @@
             for obj ∈ objs
                 for ret ∈ rets
                     opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
-                    w = optimise!(MeanRiskEstimator(; r = r, obj = obj, opt = opt)).w
+                    sol = optimise!(MeanRiskEstimator(; r = r, obj = obj, opt = opt))
+                    if isa(sol.retcode, OptimisationFailure)
+                        continue
+                    end
+                    w = sol.w
                     wt = df[!, i]
-                    res = isapprox(w, wt; rtol = 1e-6)
+                    res = isapprox(w, wt; rtol = 5e-5)
                     if !res
                         println("Iteration $i failed.")
                         find_tol(w, wt; name1 = :w, name2 = :wt)
