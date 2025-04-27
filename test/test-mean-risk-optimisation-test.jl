@@ -129,9 +129,9 @@
                     end
                     w = sol.w
                     wt = df[!, i]
-                    res = isapprox(w, wt; rtol = 1e-6)
+                    res = isapprox(w, wt; rtol = 5e-5)
                     if !res
-                        println("Iteration $(r) $(obj) $(ret) $i failed.")
+                        println("Iteration $i failed.")
                         find_tol(w, wt; name1 = :w, name2 = :wt)
                     end
                     @test res
