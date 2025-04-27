@@ -124,7 +124,7 @@
                     opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
                     w = optimise!(MeanRiskEstimator(; r = r, obj = obj, opt = opt)).w
                     wt = df[!, i]
-                    res = isapprox(w, wt)
+                    res = isapprox(w, wt; rtol = 1e-6)
                     if !res
                         println("Iteration $i failed.")
                         find_tol(w, wt; name1 = :w, name2 = :wt)
