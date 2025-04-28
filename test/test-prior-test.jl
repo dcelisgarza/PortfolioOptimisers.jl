@@ -172,7 +172,7 @@
         @test pr === prior(pr)
 
         pr = prior(HighOrderPriorEstimator(; kte = nothing), X)
-        prv = prior_view(pr, i)
+        prv = prior_view(pr, [10, 5, 9])
         @test isnothing(prv.kt)
         @test isnothing(prv.L2)
         @test isnothing(prv.S2)
