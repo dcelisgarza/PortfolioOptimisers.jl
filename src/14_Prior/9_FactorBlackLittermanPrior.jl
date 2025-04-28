@@ -137,9 +137,9 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
     return FactorPriorResult(;
                              pr = EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,
                                                        sigma = posterior_sigma),
-                             fm = PartialFactorPriorResult(; mu = f_posterior_mu,
-                                                           sigma = f_posterior_sigma,
-                                                           loadings = loadings),
+                             fpr = PartialFactorPriorResult(; mu = f_posterior_mu,
+                                                            sigma = f_posterior_sigma,
+                                                            loadings = loadings),
                              chol = transpose(reshape(posterior_csigma,
                                                       length(posterior_mu), :)))
 end

@@ -18,17 +18,17 @@ end
 struct FactorPriorResult{T1 <: EmpiricalPriorResult, T2 <: PartialFactorPriorResult,
                          T3 <: AbstractMatrix} <: AbstractPriorResult_AFC
     pr::T1
-    fm::T2
+    fpr::T2
     chol::T3
 end
-function FactorPriorResult(; pr::EmpiricalPriorResult, fm::PartialFactorPriorResult,
+function FactorPriorResult(; pr::EmpiricalPriorResult, fpr::PartialFactorPriorResult,
                            chol::AbstractMatrix)
     @smart_assert(!isempty(chol))
-    @smart_assert(size(pr.X, 2) == size(chol, 2) == size(fm.loadings.M, 1))
-    return FactorPriorResult{typeof(pr), typeof(fm), typeof(chol)}(pr, fm, chol)
+    @smart_assert(size(pr.X, 2) == size(chol, 2) == size(fpr.loadings.M, 1))
+    return FactorPriorResult{typeof(pr), typeof(fpr), typeof(chol)}(pr, fpr, chol)
 end
 function prior_view(pr::FactorPriorResult, i::AbstractVector)
-    return FactorPriorResult(; pr = prior_view(pr.pr, i), fm = prior_view(pr.fm, i),
+    return FactorPriorResult(; pr = prior_view(pr.pr, i), fpr = prior_view(pr.fpr, i),
                              chol = view(pr.chol, :, i))
 end
 function Base.getproperty(obj::FactorPriorResult, sym::Symbol)
@@ -39,11 +39,11 @@ function Base.getproperty(obj::FactorPriorResult, sym::Symbol)
     elseif sym == :sigma
         obj.pr.sigma
     elseif sym == :f_mu
-        obj.fm.mu
+        obj.fpr.mu
     elseif sym == :f_sigma
-        obj.fm.sigma
+        obj.fpr.sigma
     elseif sym == :loadings
-        obj.fm.loadings
+        obj.fpr.loadings
     else
         getfield(obj, sym)
     end
@@ -106,8 +106,8 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
     return FactorPriorResult(;
                              pr = EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,
                                                        sigma = posterior_sigma),
-                             fm = PartialFactorPriorResult(; mu = f_mu, sigma = f_sigma,
-                                                           loadings = loadings),
+                             fpr = PartialFactorPriorResult(; mu = f_mu, sigma = f_sigma,
+                                                            loadings = loadings),
                              chol = transpose(reshape(posterior_csigma,
                                                       length(posterior_mu), :)))
 end

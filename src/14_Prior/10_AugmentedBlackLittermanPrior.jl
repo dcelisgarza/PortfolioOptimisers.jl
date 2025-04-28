@@ -117,6 +117,10 @@ function Base.getproperty(obj::AugmentedBlackLittermanPriorEstimator, sym::Symbo
         obj.a_pe.me
     elseif sym == :ce
         obj.a_pe.ce
+    elseif sym == :f_me
+        obj.f_pe.me
+    elseif sym == :f_ce
+        obj.f_pe.ce
     else
         getfield(obj, sym)
     end
@@ -197,10 +201,10 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
                                              pr = EmpiricalPriorResult(; X = posterior_X,
                                                                        mu = posterior_mu,
                                                                        sigma = posterior_sigma),
-                                             fm = PartialFactorPriorResult(;
-                                                                           mu = f_prior_mu,
-                                                                           sigma = f_prior_sigma,
-                                                                           loadings = loadings))
+                                             fpr = PartialFactorPriorResult(;
+                                                                            mu = f_prior_mu,
+                                                                            sigma = f_prior_sigma,
+                                                                            loadings = loadings))
 end
 
 export AugmentedBlackLittermanPriorEstimator

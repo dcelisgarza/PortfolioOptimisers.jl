@@ -257,6 +257,14 @@ function Base.getproperty(obj::HighOrderPriorResult, sym::Symbol)
         obj.pr.mu
     elseif sym == :sigma
         obj.pr.sigma
+    elseif sym == :f_mu
+        obj.pr.fpr.mu
+    elseif sym == :f_sigma
+        obj.pr.fpr.sigma
+    elseif sym == :loadings
+        obj.pr.fpr.loadings
+    elseif sym == :chol
+        obj.pr.chol
     else
         getfield(obj, sym)
     end

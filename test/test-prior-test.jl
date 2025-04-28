@@ -91,10 +91,10 @@
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
         @test pr1.chol == pr2.chol
-        @test pr1.fm.mu == pr2.fm.mu
-        @test pr1.fm.sigma == pr2.fm.sigma
-        @test pr1.fm.loadings.b == pr2.fm.loadings.b
-        @test pr1.fm.loadings.M == pr2.fm.loadings.M
+        @test pr1.fpr.mu == pr2.fpr.mu
+        @test pr1.fpr.sigma == pr2.fpr.sigma
+        @test pr1.fpr.loadings.b == pr2.fpr.loadings.b
+        @test pr1.fpr.loadings.M == pr2.fpr.loadings.M
 
         pe1 = FactorPriorEstimator(; rsd = false)
         ew = eweights(1:10, 0.3)
@@ -107,16 +107,16 @@
         @test !pe2.rsd
 
         i = [10, 5, 9]
-        pe1 == prior_view(pe1, i)
+        pe1 === prior_view(pe1, i)
         pr1 = prior(pe1, X, F)
         pv1 = prior_view(pr1, i)
         @test pv1.mu == view(pr1.mu, i)
         @test pv1.sigma == view(pr1.sigma, i, i)
         @test pv1.X == view(pr1.X, :, i)
-        @test pv1.fm.mu == pr1.fm.mu
-        @test pv1.fm.sigma == pr1.fm.sigma
-        @test pv1.fm.loadings.b == view(pr1.fm.loadings.b, i)
-        @test pv1.fm.loadings.M == view(pr1.fm.loadings.M, i, :)
+        @test pv1.fpr.mu == pr1.fpr.mu
+        @test pv1.fpr.sigma == pr1.fpr.sigma
+        @test pv1.fpr.loadings.b == view(pr1.fpr.loadings.b, i)
+        @test pv1.fpr.loadings.M == view(pr1.fpr.loadings.M, i, :)
         @test pv1.chol == view(pr1.chol, :, i)
     end
     @testset "High Order Prior" begin
@@ -224,6 +224,19 @@
                                   mean = transpose(pr2.mu)))
         @test (pr2.sk, pr2.V) ==
               coskewness(Coskewness(; alg = Full()), pr2.X; mean = transpose(pr2.mu))
+
+        i = [10, 5, 9]
+        pe2 == prior_view(pe2, i)
+        pr1 = prior(pe2, X, F)
+        pv1 = prior_view(pr1, i)
+        @test pv1.mu == view(pr1.mu, i)
+        @test pv1.sigma == view(pr1.sigma, i, i)
+        @test pv1.X == view(pr1.X, :, i)
+        @test pv1.f_mu == pr1.f_mu
+        @test pv1.f_sigma == pr1.f_sigma
+        @test pv1.loadings.b == view(pr1.loadings.b, i)
+        @test pv1.loadings.M == view(pr1.loadings.M, i, :)
+        @test pv1.chol == view(pr1.chol, :, i)
     end
     @testset "Black Litterman Views" begin
         assets = 1:10
@@ -830,10 +843,21 @@
         @test pr1.X == pr2.X
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
-        @test pr1.fm.mu == pr2.fm.mu
-        @test pr1.fm.sigma == pr2.fm.sigma
-        @test pr1.fm.loadings.b == pr2.fm.loadings.b
-        @test pr1.fm.loadings.M == pr2.fm.loadings.M
+        @test pr1.fpr.mu == pr2.fpr.mu
+        @test pr1.fpr.sigma == pr2.fpr.sigma
+        @test pr1.fpr.loadings.b == pr2.fpr.loadings.b
+        @test pr1.fpr.loadings.M == pr2.fpr.loadings.M
+
+        i = [10, 5, 9]
+        pes[1] === prior_view(pes[1], i)
+        pv1 = prior_view(pr1, i)
+        @test pv1.mu == view(pr1.mu, i)
+        @test pv1.sigma == view(pr1.sigma, i, i)
+        @test pv1.X == view(pr1.X, :, i)
+        @test pv1.f_mu == pr1.fpr.mu
+        @test pv1.f_sigma == pr1.fpr.sigma
+        @test pv1.loadings.b == view(pr1.fpr.loadings.b, i)
+        @test pv1.loadings.M == view(pr1.fpr.loadings.M, i, :)
     end
     @testset "Factor Black Litterman Prior" begin
         rng = StableRNG(123456789)
@@ -1210,10 +1234,10 @@
         @test pr1.X == pr2.X
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
-        @test pr1.fm.mu == pr2.fm.mu
-        @test pr1.fm.sigma == pr2.fm.sigma
-        @test pr1.fm.loadings.b == pr2.fm.loadings.b
-        @test pr1.fm.loadings.M == pr2.fm.loadings.M
+        @test pr1.f_mu == pr2.fpr.mu
+        @test pr1.f_sigma == pr2.fpr.sigma
+        @test pr1.loadings.b == pr2.fpr.loadings.b
+        @test pr1.loadings.M == pr2.fpr.loadings.M
     end
     @testset "Entropy Pooling Prior" begin
         rng = StableRNG(123456789)
@@ -1708,5 +1732,16 @@
             @test ens == exp(-re)
             @test pr === prior(pr)
         end
+        i = [10, 5, 9]
+        pes[1] === prior_view(pes[1], i)
+        pr1 = prior(pes[1], X, F)
+        pv1 = prior_view(pr1, i)
+        @test pv1.mu == view(pr1.mu, i)
+        @test pv1.sigma == view(pr1.sigma, i, i)
+        @test pv1.X == view(pr1.X, :, i)
+        @test pv1.f_mu == pr1.f_mu
+        @test pv1.f_sigma == pr1.pr.fpr.sigma
+        @test pv1.loadings.b == view(pr1.pr.fpr.loadings.b, i)
+        @test pv1.loadings.M == view(pr1.pr.fpr.loadings.M, i, :)
     end
 end

@@ -101,9 +101,9 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
                                              pr = EmpiricalPriorResult(; X = posterior_X,
                                                                        mu = posterior_mu,
                                                                        sigma = posterior_sigma),
-                                             fm = PartialFactorPriorResult(; mu = f_mu,
-                                                                           sigma = f_sigma,
-                                                                           loadings = loadings))
+                                             fpr = PartialFactorPriorResult(; mu = f_mu,
+                                                                            sigma = f_sigma,
+                                                                            loadings = loadings))
 end
 
 export BayesianBlackLittermanPriorEstimator
