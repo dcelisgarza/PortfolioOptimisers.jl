@@ -18,9 +18,9 @@ function ArithmeticReturn(; lb::Union{Nothing, <:Real} = nothing,
     end
     return ArithmeticReturn{typeof(lb), typeof(ucs)}(lb, ucs)
 end
-function cluster_return_factory(r::ArithmeticReturn, i::AbstractVector,
-                                ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                           <:AbstractUncertaintySetEstimator}, args...)
+function jump_return_view(r::ArithmeticReturn, i::AbstractVector,
+                          ucs::Union{Nothing, <:AbstractUncertaintySetResult,
+                                     <:AbstractUncertaintySetEstimator}, args...)
     uset = ucs_view(r.ucs, ucs, i)
     return ArithmeticReturn(; lb = r.lb, ucs = uset)
 end

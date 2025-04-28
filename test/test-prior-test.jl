@@ -564,6 +564,8 @@
         @test isa(pe15.ce.ce,
                   SmythBrobyCovariance{<:NormalisedSmythBroby0, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any})
+        @test isa(pe15.f_me, SimpleExpectedReturns)
+        @test isa(pe15.f_ce, PortfolioOptimisersCovariance)
         pe16 = AugmentedBlackLittermanPriorEstimator(;
                                                      a_views = BlackLittermanViewsEstimator(;
                                                                                             A = LinearConstraintSide(;
@@ -1743,5 +1745,6 @@
         @test pv1.f_sigma == pr1.pr.fpr.sigma
         @test pv1.loadings.b == view(pr1.pr.fpr.loadings.b, i)
         @test pv1.loadings.M == view(pr1.pr.fpr.loadings.M, i, :)
+        @test pv1.chol == view(pr1.chol, :, i)
     end
 end

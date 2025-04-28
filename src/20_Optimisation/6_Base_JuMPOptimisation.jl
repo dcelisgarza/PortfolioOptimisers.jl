@@ -1,7 +1,7 @@
 abstract type JuMPOptimisationEstimator <: OptimisationEstimator end
 abstract type ObjectiveFunction <: AbstractEstimator end
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
-function cluster_return_factory(r::JuMPReturnsEstimator, args...; kwargs...)
+function jump_return_view(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end
 abstract type JuMPConstraintEstimator <: AbstractEstimator end

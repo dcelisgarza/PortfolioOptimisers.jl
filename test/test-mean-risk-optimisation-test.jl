@@ -148,4 +148,54 @@
             end
         end
     end
+    @testset "Returns lower bounds" begin
+        rng = StableRNG(987456321)
+        X = randn(rng, 200, 10)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+        pr = prior(EmpiricalPriorEstimator(), rd)
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+        rf = 4.34 / 100 / 252
+        ucs1 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+                                                    rng = rng,
+                                                    alg = BoxUncertaintySetAlgorithm(),
+                                                    seed = 987654321), X)
+        ucs2 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+                                                    rng = rng,
+                                                    alg = EllipseUncertaintySetAlgorithm(),
+                                                    seed = 987654321), X)
+
+        ret = ArithmeticReturn()
+        opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res1 = optimise!(mre)
+
+        ret = ArithmeticReturn(; lb = dot(res1.w, pr.mu))
+        opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        res2 = optimise!(mre)
+        @test abs(ret.lb - dot(res2.w, pr.mu)) <= 1e-9
+
+        opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(), opt = opt)
+        res3 = optimise!(mre)
+        @test abs(ret.lb - dot(res3.w, pr.mu)) <= 5e-7
+
+        ret = KellyReturn()
+        opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res1 = optimise!(mre)
+
+        ret = KellyReturn(; lb = mean(log1p.(pr.X * res1.w)))
+        opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        res2 = optimise!(mre)
+        @test abs(mean(log1p.(pr.X * res2.w)) - ret.lb) <= 1e-10
+
+        opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(), opt = opt)
+        res3 = optimise!(mre)
+        @test abs(mean(log1p.(pr.X * res3.w)) - ret.lb) <= 1e-8
+    end
 end
