@@ -12,8 +12,8 @@ function PartialFactorPriorResult(; mu::AbstractVector, sigma::AbstractMatrix,
                                                                                  loadings)
 end
 function prior_view(pr::PartialFactorPriorResult, i::AbstractVector)
-    return PartialFactorPriorResult(; mu = view(pr.mu, i), sigma = view(pr.sigma, i, i),
-                                    loadings = regression_result_view(pr.loadings, i))
+    return PartialFactorPriorResult(; mu = pr.mu, sigma = pr.sigma,
+                                    loadings = regression_view(pr.loadings, i))
 end
 struct FactorPriorResult{T1 <: EmpiricalPriorResult, T2 <: PartialFactorPriorResult,
                          T3 <: AbstractMatrix} <: AbstractPriorResult_AFC

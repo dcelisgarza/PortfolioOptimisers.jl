@@ -466,6 +466,9 @@
         @test isapprox(s2, sqrt.(v2))
         @test !isapprox(s1, s2)
         @test !isapprox(v1, v2)
+
+        @test isapprox(var(ve1, X[:, 1]), var(X[:, 1]; corrected = true))
+        @test isapprox(var(ve2, X[:, 1]), var(X[:, 1], ew; corrected = false))
     end
     @testset "Misc tests" begin
         @test iszero(PortfolioOptimisers.intrinsic_mutual_info(rand(1, 1)))

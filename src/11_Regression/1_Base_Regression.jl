@@ -14,8 +14,11 @@ function RegressionResult(; b::Union{Nothing, <:AbstractVector}, M::AbstractMatr
     end
     return RegressionResult{typeof(b), typeof(M)}(b, M)
 end
-function regression_result_view(r::RegressionResult, i::AbstractVector)
+function regression_view(r::RegressionResult, i::AbstractVector)
     return RegressionResult(; b = view(r.b, i), M = view(r.M, i, :))
+end
+function regression_view(r::AbstractRegressionEstimator, args...)
+    return r
 end
 function regression end
 

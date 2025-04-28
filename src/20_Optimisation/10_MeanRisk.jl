@@ -14,9 +14,6 @@ function MeanRiskEstimator(;
     end
     return MeanRiskEstimator{typeof(r), typeof(obj), typeof(opt)}(r, obj, opt)
 end
-function cleanup_weights(model::JuMP.Model, ::MeanRiskEstimator)
-    return value.(model[:w]) / value(model[:k])
-end
 function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     model = JuMP.Model()
     set_string_names_on_creation(model, mr.opt.str_names)

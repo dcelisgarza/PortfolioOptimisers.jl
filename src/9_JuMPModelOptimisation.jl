@@ -67,7 +67,7 @@ function optimise_JuMP_model!(model::JuMP.Model,
                                :settings => settings))
         end
     end
-    return JuMPResult(trials, success)
+    return JuMPResult(; trials = trials, success = success)
 end
 
 export Solver

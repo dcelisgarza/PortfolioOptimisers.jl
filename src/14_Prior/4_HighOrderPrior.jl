@@ -52,8 +52,6 @@ function duplication_matrix(n::Int, diag::Bool = true)
         for i ∈ v
             !haskey(counts, i) ? counts[i] = 1 : counts[i] += 1
         end
-        display(counts)
-        display(v)
         repeated_elem = Set{Int}()
         for (key, value) ∈ counts
             if value > 1
@@ -235,7 +233,7 @@ function HighOrderPriorResult(; pr::AbstractLowOrderPriorResult,
                                 typeof(V), typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
 end
 function dup_elim_sum_view(args...)
-    return nothing, nothing
+    return nothing, nothing, nothing
 end
 function dup_elim_sum_view(::AbstractMatrix, N)
     return dup_elim_sum_matrices(N)

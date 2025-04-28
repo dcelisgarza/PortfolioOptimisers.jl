@@ -1,6 +1,8 @@
 @safetestset "Prior tests" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
-          CSV, DataFrames, LinearAlgebra, Clarabel
+          CSV, DataFrames, LinearAlgebra, Clarabel, SparseArrays
+    using PortfolioOptimisers: duplication_matrix, elimination_matrix, summation_matrix,
+                               prior_view
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -37,18 +39,24 @@
             @test res2
             @test pr === prior(pr)
         end
-        pm1 = prior(EmpiricalPriorEstimator(), ReturnsResult(; nx = 1:10, X = X))
-        pm2 = prior(EmpiricalPriorEstimator(), X)
-        @test pm1.X == pm2.X
-        @test pm1.mu == pm2.mu
-        @test pm1.sigma == pm2.sigma
+        pr1 = prior(EmpiricalPriorEstimator(), ReturnsResult(; nx = 1:10, X = X))
+        pr2 = prior(EmpiricalPriorEstimator(), X)
+        @test pr1.X == pr2.X
+        @test pr1.mu == pr2.mu
+        @test pr1.sigma == pr2.sigma
+        i = [10, 5, 9]
+        pes[1] == prior_view(pes[1], i)
+        pv1 = prior_view(pr1, i)
+        pv1.mu == view(pr1.mu, i)
+        pv1.sigma == view(pr1.sigma, i, i)
+        pv1.X == view(pr1.X, :, i)
     end
     @testset "Factor Prior" begin
         rng = StableRNG(123456789)
         X = randn(rng, 100, 10)
         F = X[:, [3, 8]]
 
-        pm1 = prior(FactorPriorEstimator(; rsd = false), transpose(X), transpose(F);
+        pr1 = prior(FactorPriorEstimator(; rsd = false), transpose(X), transpose(F);
                     dims = 2)
         pm1_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-No-Residuals.csv"),
                          DataFrame)
@@ -56,13 +64,13 @@
         mu_t = view(pm1_t, 1001:1010, 1)
         sigma_t = reshape(view(pm1_t, 1011:1110, 1), 10, 10)
         chol_t = reshape(view(pm1_t, 1111:nrow(pm1_t), 1), :, 10)
-        @test isapprox(pm1.X, X_t)
-        @test isapprox(pm1.mu, mu_t)
-        @test isapprox(pm1.sigma, sigma_t)
-        @test isapprox(pm1.chol, chol_t)
-        @test pm1 === prior(pm1)
+        @test isapprox(pr1.X, X_t)
+        @test isapprox(pr1.mu, mu_t)
+        @test isapprox(pr1.sigma, sigma_t)
+        @test isapprox(pr1.chol, chol_t)
+        @test pr1 === prior(pr1)
 
-        pm2 = prior(FactorPriorEstimator(; rsd = true), transpose(X), transpose(F);
+        pr2 = prior(FactorPriorEstimator(; rsd = true), transpose(X), transpose(F);
                     dims = 2)
         pm2_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-Residuals.csv"),
                          DataFrame)
@@ -70,23 +78,23 @@
         mu_t = view(pm2_t, 1001:1010, 1)
         sigma_t = reshape(view(pm2_t, 1011:1110, 1), 10, 10)
         chol_t = reshape(view(pm2_t, 1111:nrow(pm2_t), 1), :, 10)
-        @test isapprox(pm2.X, X_t)
-        @test isapprox(pm2.mu, mu_t)
-        @test isapprox(pm2.sigma, sigma_t)
-        @test isapprox(pm2.chol, chol_t)
+        @test isapprox(pr2.X, X_t)
+        @test isapprox(pr2.mu, mu_t)
+        @test isapprox(pr2.sigma, sigma_t)
+        @test isapprox(pr2.chol, chol_t)
 
-        pm1 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())),
+        pr1 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())),
                     ReturnsResult(; nx = 1:10, X = X, nf = 1:2, F = F))
-        pm2 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())), X,
+        pr2 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())), X,
                     F)
-        @test pm1.X == pm2.X
-        @test pm1.mu == pm2.mu
-        @test pm1.sigma == pm2.sigma
-        @test pm1.chol == pm2.chol
-        @test pm1.fm.mu == pm2.fm.mu
-        @test pm1.fm.sigma == pm2.fm.sigma
-        @test pm1.fm.loadings.b == pm2.fm.loadings.b
-        @test pm1.fm.loadings.M == pm2.fm.loadings.M
+        @test pr1.X == pr2.X
+        @test pr1.mu == pr2.mu
+        @test pr1.sigma == pr2.sigma
+        @test pr1.chol == pr2.chol
+        @test pr1.fm.mu == pr2.fm.mu
+        @test pr1.fm.sigma == pr2.fm.sigma
+        @test pr1.fm.loadings.b == pr2.fm.loadings.b
+        @test pr1.fm.loadings.M == pr2.fm.loadings.M
 
         pe1 = FactorPriorEstimator(; rsd = false)
         ew = eweights(1:10, 0.3)
@@ -97,6 +105,19 @@
         @test pe2.ve.me.w === ew
         @test pe2.ve.w === ew
         @test !pe2.rsd
+
+        i = [10, 5, 9]
+        pe1 == prior_view(pe1, i)
+        pr1 = prior(pe1, X, F)
+        pv1 = prior_view(pr1, i)
+        @test pv1.mu == view(pr1.mu, i)
+        @test pv1.sigma == view(pr1.sigma, i, i)
+        @test pv1.X == view(pr1.X, :, i)
+        @test pv1.fm.mu == pr1.fm.mu
+        @test pv1.fm.sigma == pr1.fm.sigma
+        @test pv1.fm.loadings.b == view(pr1.fm.loadings.b, i)
+        @test pv1.fm.loadings.M == view(pr1.fm.loadings.M, i, :)
+        @test pv1.chol == view(pr1.chol, :, i)
     end
     @testset "High Order Prior" begin
         rng = StableRNG(123456789)
@@ -135,13 +156,13 @@
         @test isnothing(pe2.kte)
         @test isnothing(pe2.ske)
 
-        pm1 = prior(pe, ReturnsResult(; nx = 1:10, X = X))
-        @test isapprox(pr.X, pm1.X)
-        @test isapprox(pr.mu, pm1.mu)
-        @test isapprox(pr.sigma, pm1.sigma)
-        @test isapprox(pr.kt, pm1.kt)
-        @test isapprox(pr.sk, pm1.sk)
-        @test isapprox(pr.V, pm1.V)
+        pr1 = prior(pe, ReturnsResult(; nx = 1:10, X = X))
+        @test isapprox(pr.X, pr1.X)
+        @test isapprox(pr.mu, pr1.mu)
+        @test isapprox(pr.sigma, pr1.sigma)
+        @test isapprox(pr.kt, pr1.kt)
+        @test isapprox(pr.sk, pr1.sk)
+        @test isapprox(pr.V, pr1.V)
 
         pr = prior(HighOrderPriorEstimator(; kte = nothing, ske = nothing), transpose(X);
                    dims = 2)
@@ -149,6 +170,38 @@
         @test isnothing(pr.sk)
         @test isnothing(pr.V)
         @test pr === prior(pr)
+
+        pr = prior(HighOrderPriorEstimator(; kte = nothing), X)
+        prv = prior_view(pr, i)
+        @test isnothing(prv.kt)
+        @test isnothing(prv.L2)
+        @test isnothing(prv.S2)
+
+        @test duplication_matrix(5) ==
+              sparse([1, 2, 6, 3, 11, 4, 16, 5, 21, 7, 8, 12, 9, 17, 10, 22, 13, 14, 18, 15,
+                      23, 19, 20, 24, 25],
+                     [1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 8, 8, 9, 9, 10, 11, 11, 12, 12,
+                      13, 14, 14, 15],
+                     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                      1, 1], 25, 15)
+        @test duplication_matrix(5, false) ==
+              sparse([2, 6, 3, 11, 4, 16, 5, 21, 8, 12, 9, 17, 10, 22, 14, 18, 15, 23, 20,
+                      24], [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10],
+                     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 25, 10)
+        @test elimination_matrix(5) ==
+              sparse([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+                     [1, 2, 3, 4, 5, 7, 8, 9, 10, 13, 14, 15, 19, 20, 25],
+                     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 15, 25)
+        @test elimination_matrix(5, false) ==
+              sparse([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [2, 3, 4, 5, 8, 9, 10, 14, 15, 20],
+                     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 10, 25)
+        @test summation_matrix(5) ==
+              sparse([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+                     [1, 2, 3, 4, 5, 7, 8, 9, 10, 13, 14, 15, 19, 20, 25],
+                     [1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 1, 2, 1], 15, 25)
+        @test summation_matrix(5, false) ==
+              sparse([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [2, 3, 4, 5, 8, 9, 10, 14, 15, 20],
+                     [2, 2, 2, 2, 2, 2, 2, 2, 2, 2], 10, 25)
     end
     @testset "High Order Factor Prior" begin
         rng = StableRNG(123456789)
@@ -156,21 +209,21 @@
         F = X[:, [3, 8]]
 
         pe1 = FactorPriorEstimator(; re = DimensionReductionRegression(;), rsd = true)
-        pm1 = prior(pe1, transpose(X), transpose(F); dims = 2)
+        pr1 = prior(pe1, transpose(X), transpose(F); dims = 2)
 
         pe2 = HighOrderPriorEstimator(; pe = pe1)
-        pm2 = prior(pe2, transpose(X), transpose(F); dims = 2)
+        pr2 = prior(pe2, transpose(X), transpose(F); dims = 2)
         @test isa(pe2.me, SimpleExpectedReturns)
         @test isa(pe2.ce, PortfolioOptimisersCovariance)
 
-        @test pm1.X == pm2.X
-        @test pm1.mu == pm2.mu
-        @test pm1.sigma == pm2.sigma
-        @test isapprox(pm2.kt,
-                       cokurtosis(Cokurtosis(; alg = Full()), pm2.X;
-                                  mean = transpose(pm2.mu)))
-        @test (pm2.sk, pm2.V) ==
-              coskewness(Coskewness(; alg = Full()), pm2.X; mean = transpose(pm2.mu))
+        @test pr1.X == pr2.X
+        @test pr1.mu == pr2.mu
+        @test pr1.sigma == pr2.sigma
+        @test isapprox(pr2.kt,
+                       cokurtosis(Cokurtosis(; alg = Full()), pr2.X;
+                                  mean = transpose(pr2.mu)))
+        @test (pr2.sk, pr2.V) ==
+              coskewness(Coskewness(; alg = Full()), pr2.X; mean = transpose(pr2.mu))
     end
     @testset "Black Litterman Views" begin
         assets = 1:10
@@ -601,11 +654,11 @@
         @test pe2.pe.ce.ce.me.w == ew
         @test isnothing(pe2.pe.me.w)
 
-        pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X))
-        pm2 = prior(pes[1], X)
-        @test pm1.X == pm2.X
-        @test pm1.mu == pm2.mu
-        @test pm1.sigma == pm2.sigma
+        pr1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X))
+        pr2 = prior(pes[1], X)
+        @test pr1.X == pr2.X
+        @test pr1.mu == pr2.mu
+        @test pr1.sigma == pr2.sigma
         @test_throws ArgumentError black_litterman_views(BlackLittermanViewsEstimator(;
                                                                                       A = LinearConstraintSide(;
                                                                                                                group = :Foo,
@@ -675,15 +728,15 @@
         views = [vc_1, vc_2, vc_3, vc_4, vc_5]
         pe1 = FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward()),
                                    rsd = true)
-        pm1 = prior(pe1, transpose(X), transpose(F); dims = 2)
+        pr1 = prior(pe1, transpose(X), transpose(F); dims = 2)
 
         pe2 = BlackLittermanPriorEstimator(; pe = pe1, views = views, sets = sets)
-        pm2 = prior(pe2, transpose(X), transpose(F); dims = 2)
+        pr2 = prior(pe2, transpose(X), transpose(F); dims = 2)
         df = CSV.read(joinpath(@__DIR__, "./assets/Black-Litterman-Factor-Prior.csv"),
                       DataFrame)
-        @test pm1.X == pm2.X
-        @test isapprox(pm2.mu, df[1:10, "1"])
-        @test isapprox(vec(pm2.sigma), df[11:end, "1"])
+        @test pr1.X == pr2.X
+        @test isapprox(pr2.mu, df[1:10, "1"])
+        @test isapprox(vec(pr2.sigma), df[11:end, "1"])
     end
     @testset "Bayesian Black Litterman Prior" begin
         rng = StableRNG(123456789)
@@ -772,15 +825,15 @@
         @test pe2.pe.ce.ce.me.w == ew
         @test pe2.pe.me.me.w === ew
 
-        pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
-        pm2 = prior(pes[1], X, F)
-        @test pm1.X == pm2.X
-        @test pm1.mu == pm2.mu
-        @test pm1.sigma == pm2.sigma
-        @test pm1.fm.mu == pm2.fm.mu
-        @test pm1.fm.sigma == pm2.fm.sigma
-        @test pm1.fm.loadings.b == pm2.fm.loadings.b
-        @test pm1.fm.loadings.M == pm2.fm.loadings.M
+        pr1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
+        pr2 = prior(pes[1], X, F)
+        @test pr1.X == pr2.X
+        @test pr1.mu == pr2.mu
+        @test pr1.sigma == pr2.sigma
+        @test pr1.fm.mu == pr2.fm.mu
+        @test pr1.fm.sigma == pr2.fm.sigma
+        @test pr1.fm.loadings.b == pr2.fm.loadings.b
+        @test pr1.fm.loadings.M == pr2.fm.loadings.M
     end
     @testset "Factor Black Litterman Prior" begin
         rng = StableRNG(123456789)
@@ -897,16 +950,16 @@
         @test pe2.ve.w === ew
         @test !pe2.rsd
 
-        pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
-        pm2 = prior(pes[1], X, F)
-        @test pm1.X == pm2.X
-        @test pm1.mu == pm2.mu
-        @test pm1.sigma == pm2.sigma
-        @test pm1.chol == pm2.chol
-        @test pm1.f_mu == pm2.f_mu
-        @test pm1.f_sigma == pm2.f_sigma
-        @test pm1.loadings.b == pm2.loadings.b
-        @test pm1.loadings.M == pm2.loadings.M
+        pr1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
+        pr2 = prior(pes[1], X, F)
+        @test pr1.X == pr2.X
+        @test pr1.mu == pr2.mu
+        @test pr1.sigma == pr2.sigma
+        @test pr1.chol == pr2.chol
+        @test pr1.f_mu == pr2.f_mu
+        @test pr1.f_sigma == pr2.f_sigma
+        @test pr1.loadings.b == pr2.loadings.b
+        @test pr1.loadings.M == pr2.loadings.M
 
         pes = [FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = true),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
@@ -1152,15 +1205,15 @@
         @test pe2.ve.me.w === ew
         @test pe2.ve.w === ew
 
-        pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
-        pm2 = prior(pes[1], X, F)
-        @test pm1.X == pm2.X
-        @test pm1.mu == pm2.mu
-        @test pm1.sigma == pm2.sigma
-        @test pm1.fm.mu == pm2.fm.mu
-        @test pm1.fm.sigma == pm2.fm.sigma
-        @test pm1.fm.loadings.b == pm2.fm.loadings.b
-        @test pm1.fm.loadings.M == pm2.fm.loadings.M
+        pr1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X, nf = 1:4, F = F))
+        pr2 = prior(pes[1], X, F)
+        @test pr1.X == pr2.X
+        @test pr1.mu == pr2.mu
+        @test pr1.sigma == pr2.sigma
+        @test pr1.fm.mu == pr2.fm.mu
+        @test pr1.fm.sigma == pr2.fm.sigma
+        @test pr1.fm.loadings.b == pr2.fm.loadings.b
+        @test pr1.fm.loadings.M == pr2.fm.loadings.M
     end
     @testset "Entropy Pooling Prior" begin
         rng = StableRNG(123456789)
@@ -1332,11 +1385,11 @@
         @test pe2.pe.ce.ce.me.w == ew
         @test pe2.w === ew
 
-        pm1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X))
-        pm2 = prior(pes[1], X)
-        @test pm1.X == pm2.X
-        @test pm1.mu == pm2.mu
-        @test pm1.sigma == pm2.sigma
+        pr1 = prior(pes[1], ReturnsResult(; nx = 1:10, X = X))
+        pr2 = prior(pes[1], X)
+        @test pr1.X == pr2.X
+        @test pr1.mu == pr2.mu
+        @test pr1.sigma == pr2.sigma
 
         views = [EntropyPoolingViewEstimator(;
                                              A = C0_LinearEntropyPoolingConstraintEstimator(;
@@ -1493,16 +1546,16 @@
         w = pweights(range(; start = inv(size(X, 1)), stop = inv(size(X, 1)),
                            length = size(X, 1)))
         pm0 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets, w = w), X)
-        pm1 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets,), X)
-        @test isapprox(pm0.mu, pm1.mu)
-        @test isapprox(pm0.sigma, pm1.sigma)
+        pr1 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets,), X)
+        @test isapprox(pm0.mu, pr1.mu)
+        @test isapprox(pm0.sigma, pr1.sigma)
 
         pm0 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                                  alg = H1_EntropyPooling(), w = w), X)
-        pm1 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets,
+        pr1 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                                  alg = H1_EntropyPooling()), X)
-        @test isapprox(pm0.mu, pm1.mu)
-        @test isapprox(pm0.sigma, pm1.sigma)
+        @test isapprox(pm0.mu, pr1.mu)
+        @test isapprox(pm0.sigma, pr1.sigma)
 
         c = C0_LinearEntropyPoolingConstraintEstimator(; group = [nothing, nothing],
                                                        name = [nothing, nothing],
