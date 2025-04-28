@@ -27,7 +27,7 @@ struct MeanAbsoluteDeviation{T1 <: Union{Nothing, <:AbstractWeights}} <:
     w::T1
 end
 function MeanAbsoluteDeviation(; w::Union{Nothing, <:AbstractWeights} = nothing)
-    if isa(w, AbstractWeights)
+    if isa(w, AbstractVector)
         @smart_assert(!isempty(w))
     end
     return MeanAbsoluteDeviation{typeof(w)}(w)

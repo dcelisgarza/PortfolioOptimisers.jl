@@ -18,17 +18,34 @@ function ArithmeticReturn(; lb::Union{Nothing, <:Real} = nothing,
     end
     return ArithmeticReturn{typeof(lb), typeof(ucs)}(lb, ucs)
 end
-function jump_return_view(r::ArithmeticReturn, i::AbstractVector,
-                          ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                     <:AbstractUncertaintySetEstimator}, args...)
+function jump_returns_view(r::ArithmeticReturn, i::AbstractVector,
+                           ucs::Union{Nothing, <:AbstractUncertaintySetResult,
+                                      <:AbstractUncertaintySetEstimator}, args...)
     uset = ucs_view(r.ucs, ucs, i)
     return ArithmeticReturn(; lb = r.lb, ucs = uset)
 end
-struct KellyReturn{T1 <: Union{Nothing, <:Real}} <: JuMPReturnsEstimator
+struct KellyReturn{T1 <: Union{Nothing, <:Real}, T2 <: Union{Nothing, <:AbstractWeights}} <:
+       JuMPReturnsEstimator
     lb::T1
+    w::T2
 end
-function KellyReturn(; lb::Union{Nothing, <:Real} = nothing)
-    return KellyReturn{typeof(lb)}(lb)
+function KellyReturn(; lb::Union{Nothing, <:Real} = nothing,
+                     w::Union{Nothing, <:AbstractWeights} = nothing)
+    if isa(w, AbstractVector)
+        @smart_assert(!isempty(w))
+    end
+    return KellyReturn{typeof(lb), typeof(w)}(lb, w)
+end
+function jump_returns_factory(r::KellyReturn, pr::EntropyPoolingPriorResult; kwargs...)
+    return KellyReturn(; lb = r.lb,
+                       w = risk_measure_nothing_real_array_factory(r.w, prior.w))
+end
+function jump_returns_factory(r::KellyReturn,
+                              prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
+                                                          <:Any, <:Any, <:Any, <:Any},
+                              args...; kwargs...)
+    return KellyReturn(; lb = r.lb,
+                       w = risk_measure_nothing_real_array_factory(r.w, prior.pr.w))
 end
 struct MinimumRisk <: ObjectiveFunction end
 struct MaximumUtility{T1 <: Real} <: ObjectiveFunction
@@ -170,7 +187,12 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
     net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
     @variable(model, t_ekelly[1:T])
-    @expression(model, ret, sum(t_ekelly) / T)
+    w = pret.w
+    if isnothing(w)
+        @expression(model, ret, mean(t_ekelly))
+    else
+        @expression(model, ret, mean(t_ekelly, w))
+    end
     add_fees_to_ret!(model, ret)
     set_max_ratio_kelly_return_constraints!(model, obj, k, sc, ret)
     @expression(model, kret, k .+ net_X)
