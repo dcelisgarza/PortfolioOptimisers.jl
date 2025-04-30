@@ -33,12 +33,6 @@
             owa = owa_l_moment_crm(200; k = 5, method = owas[i])
             res = if i == 4
                 isapprox(owa, owa_t[!, i]; rtol = 0.05)
-            elseif i == 5
-                if Sys.isapple()
-                    isapprox(owa, owa_t[!, i]; rtol = 5e-3)
-                else
-                    isapprox(owa, owa_t[!, i]; rtol = 1e-5)
-                end
             elseif i == 7 || Sys.iswindows() && i == 8 || Sys.isapple() && i == 11
                 isapprox(owa, owa_t[!, i]; rtol = 5e-8)
             else
