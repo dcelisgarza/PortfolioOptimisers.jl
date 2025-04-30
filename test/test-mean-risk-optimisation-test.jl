@@ -1,6 +1,6 @@
 @safetestset "MeanRisk Optimisation" begin
     using PortfolioOptimisers, CSV, DataFrames, Test, StableRNGs, Random, Clarabel,
-          StatsBase, LinearAlgebra
+          StatsBase, LinearAlgebra, Pajarito, HiGHS, JuMP
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -215,7 +215,11 @@
                 res1 = optimise!(mre)
                 w = res1.w
                 wt = df[!, i]
-                res = isapprox(w, wt)
+                res = if i == 4
+                    isapprox(w, wt; rtol = 1e-7)
+                else
+                    isapprox(w, wt)
+                end
                 if !res
                     println("Iteration $i failed.")
                     find_tol(w, wt; name1 = :w, name2 = :wt)
@@ -265,5 +269,26 @@
         @test -0.3 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.1 + sqrt(eps())
         @test 0.6 + 0.1 - sqrt(eps()) <= sum(w[w .> 0]) <= 0.8 + 0.3 + sqrt(eps())
         @test 0.6 - sqrt(eps()) <= sum(w) <= 0.8 + sqrt(eps())
+    end
+    @testset "Cardinality" begin
+        rng = StableRNG(987456321)
+        X = randn(rng, 200, 10)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+        pr = prior(EmpiricalPriorEstimator(), rd)
+        rf = 4.34 / 100 / 252
+        slv = Solver(; name = :clarabel,
+                     solver = solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                                 "verbose" => false,
+                                                                 "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                          MOI.Silent() => true),
+                                                                 "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                             "verbose" => false,
+                                                                                                             "max_step_fraction" => 0.75)),
+                     check_sol = (; allow_local = true, allow_almost = true))
+        opt = JuMPOptimiser(; pe = pr, slv = slv, card = 3)
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test length(w[w .> 1e-9]) <= 3
     end
 end

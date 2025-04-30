@@ -278,11 +278,11 @@ function mip_wb(model::JuMP.Model, wb::WeightBoundsResult, il::AbstractVector,
     sc = model[:sc]
     w = model[:w]
     lb = wb.lb
-    if !isnothing(lb) && isfinite(lb)
+    if !isnothing(lb) && w_finite_flag(lb)
         @constraint(model, w_mip_lb, sc * w >= sc * is ⊙ lb)
     end
     ub = wb.ub
-    if !isnothing(ub) && isfinite(ub)
+    if !isnothing(ub) && w_finite_flag(ub)
         @constraint(model, w_mip_ub, sc * w <= sc * il ⊙ ub)
     end
     return nothing
@@ -297,10 +297,10 @@ function add_to_fees!(model::JuMP.Model, expr)
     return nothing
 end
 function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResult,
-                                         lbi::Union{<:Real, <:AbstractVector},
-                                         sbi::Union{<:Real, <:AbstractVector},
-                                         ffl::Union{<:Real, <:AbstractVector},
-                                         ffs::Union{<:Real, <:AbstractVector},
+                                         bitl::Union{Nothing, <:Real, <:AbstractVector},
+                                         bits::Union{Nothing, <:Real, <:AbstractVector},
+                                         ffl::Union{Nothing, <:Real, <:AbstractVector},
+                                         ffs::Union{Nothing, <:Real, <:AbstractVector},
                                          ss::Union{Nothing, <:Real}, lbi_flag::Bool,
                                          sbi_flag::Bool, ffl_flag::Bool, ffs_flag::Bool)
     w = model[:w]
@@ -341,10 +341,10 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
     @constraint(model, i_mip_ub, i_mip <= 1)
     mip_wb(model, wb, il, is)
     if lbi_flag
-        @constraint(model, w_mip_lbi, sc * w >= sc * (il ⊙ lbi - ss * (1 .- ilb)))
+        @constraint(model, w_mip_lbi, sc * w >= sc * (il ⊙ bitl - ss * (1 .- ilb)))
     end
     if sbi_flag
-        @constraint(model, w_mip_sbi, sc * w <= sc * (is ⊙ sbi + ss * (1 .- isb)))
+        @constraint(model, w_mip_sbi, sc * w <= sc * (is ⊙ bits + ss * (1 .- isb)))
     end
     if ffl_flag || ffs_flag
         if ffl_flag
@@ -359,9 +359,9 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
     return ib
 end
 function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
-                         ffl::Union{<:Real, <:AbstractVector},
-                         lbi::Union{<:Real, <:AbstractVector}, ss::Union{Nothing, <:Real},
-                         lbi_flag::Bool, ffl_flag::Bool)
+                         ffl::Union{Nothing, <:Real, <:AbstractVector},
+                         bitl::Union{Nothing, <:Real, <:AbstractVector},
+                         ss::Union{Nothing, <:Real}, lbi_flag::Bool, ffl_flag::Bool)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -382,11 +382,11 @@ function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
         @expression(model, i_mip, ibf)
     end
     ub = wb.ub
-    if !isnothing(ub) && isfinite(ub)
+    if !isnothing(ub)
         @constraint(model, w_mip_ub, sc * w <= sc * i_mip ⊙ ub)
     end
     if lbi_flag
-        @constraint(model, w_mip_lbi, sc * w >= sc * i_mip ⊙ lbi)
+        @constraint(model, w_mip_lbi, sc * w >= sc * i_mip ⊙ bitl)
     end
     if ffl_flag
         @expression(model, ffl, sum(ffl ⊙ i_mip))
@@ -408,16 +408,16 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     gcard_flag = !isnothing(gcard)
     n_flag = isa(nplg, IntegerPhilogenyResult)
     c_flag = isa(cplg, IntegerPhilogenyResult)
-    lbi_flag, sbi_flag = if !isnothing(bit)
-        non_zero_real_or_vec(bit.lbi), non_zero_real_or_vec(bit.sbi)
+    lbi_flag, sbi_flag, bitl, bits = if !isnothing(bit)
+        non_zero_real_or_vec(bit.l), non_zero_real_or_vec(bit.s), bit.l, bit.s
     else
-        false, false
+        false, false, nothing, nothing
     end
-    ffl_flag, ffs_flag = if !isnothing(fees)
-        non_zero_real_or_vec(fees.fixed_long)
-        non_zero_real_or_vec(fees.fixed_short)
+    ffl_flag, ffs_flag, ffl, ffs = if !isnothing(fees)
+        non_zero_real_or_vec(fees.fixed_long), non_zero_real_or_vec(fees.fixed_short),
+        fees.fixed_long, fees.fixed_short
     else
-        false, false
+        false, false, nothing, nothing
     end
     if !(card_flag ||
          gcard_flag ||
@@ -430,11 +430,10 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
         return nothing
     end
     ib = if (sbi_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
-        short_mip_threshold_constraints(model, wb, bit.l, bit.s, fees.fixed_long,
-                                        fees.fixed_short, ss, lbi_flag, sbi_flag, ffl_flag,
-                                        ffs_flag)
+        short_mip_threshold_constraints(model, wb, bitl, bits, ffl, ffs, ss, lbi_flag,
+                                        sbi_flag, ffl_flag, ffs_flag)
     else
-        mip_constraints(model, wb, fees.fixed_long, bit.l, ss, lbi_flag, ffl_flag)
+        mip_constraints(model, wb, ffl, bitl, ss, lbi_flag, ffl_flag)
     end
     sc = model[:sc]
     if card_flag

@@ -27,7 +27,7 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     lcs = linear_constraints(mr.opt.lcs, mr.opt.sets; datatype = datatype,
                              strict = mr.opt.strict)
     cent = centrality_constraints(mr.opt.cent, pr.X)
-    gcard = cardinality_constraints(mr.opt.card, mr.opt.sets; datatype = datatype,
+    gcard = cardinality_constraints(mr.opt.gcard, mr.opt.sets; datatype = datatype,
                                     strict = mr.opt.strict)
     nplg = philogeny_constraints(mr.opt.nplg, pr.X)
     cplg = philogeny_constraints(mr.opt.cplg, pr.X)
