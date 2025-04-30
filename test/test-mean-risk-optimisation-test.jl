@@ -12,7 +12,7 @@
             end
         end
     end
-    @testset "MeanRisk single risk measure optimisation" begin
+    @testset "MeanRisk measures" begin
         rng = StableRNG(987456321)
         X = randn(rng, 200, 10)
         rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
@@ -220,9 +220,50 @@
                     println("Iteration $i failed.")
                     find_tol(w, wt; name1 = :w, name2 = :wt)
                 end
+                @test res
                 df[!, "$(i)"] = res1.w
                 i += 1
             end
         end
+    end
+    @testset "Budget range" begin
+        rng = StableRNG(987456321)
+        X = randn(rng, 200, 10)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+        pr = prior(EmpiricalPriorEstimator(), rd)
+        rf = 4.34 / 100 / 252
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+        opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = BudgetRange(; lb = 0.8, ub = 1.5))
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre, rd)
+        @test 0.8 <= sum(res.w) <= 1.5
+
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mre, rd)
+        @test 0.8 <= sum(res.w) <= 1.5
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15), bgt = 0.7,
+                            sbgt = 0.2)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test isapprox(sum(w[w .< 0]), -0.2, rtol = 1e-6)
+        @test isapprox(sum(w[w .> 0]), 0.7 + 0.2, rtol = 1e-6)
+        @test isapprox(sum(w), 0.7, rtol = 1e-6)
+        @test all(-0.1 - sqrt(eps()) .<= w .<= 0.15 + sqrt(eps()))
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15),
+                            bgt = BudgetRange(; lb = 0.6, ub = 0.8),
+                            sbgt = BudgetRange(; lb = 0.1, ub = 0.3))
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test -0.3 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.1 + sqrt(eps())
+        @test 0.6 + 0.1 - sqrt(eps()) <= sum(w[w .> 0]) <= 0.8 + 0.3 + sqrt(eps())
+        @test 0.6 - sqrt(eps()) <= sum(w) <= 0.8 + sqrt(eps())
     end
 end

@@ -8,10 +8,10 @@ function BudgetRange(; lb::Union{Nothing, <:Real} = 1.0, ub::Union{Nothing, <:Re
     ub_flag = isnothing(ub)
     @smart_assert(lb_flag ⊼ ub_flag)
     if !lb_flag
-        @smart_assert(isfinite(lb))
+        @smart_assert(isfinite(lb) && lb >= 0)
     end
     if !ub_flag
-        @smart_assert(isfinite(ub))
+        @smart_assert(isfinite(ub) && ub >= 0)
     end
     if !lb_flag && !ub_flag
         @smart_assert(lb <= ub)
@@ -172,6 +172,7 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     flag = w_neg_flag(lb) || w_neg_flag(ub)
     @smart_assert(long_only ⊼ flag, "Long-only strategy cannot have negative weight limits")
     w = model[:w]
+    N = length(w)
     k = model[:k]
     sc = model[:sc]
     if !isnothing(lb) && w_finite_flag(lb)

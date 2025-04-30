@@ -968,7 +968,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::ConditionalDraw
                                                                                        (lower_bound = 0)
                                                                                    end)
     cdar_risk = model[key] = @expression(model, dar + sum(z_cdar) * iat)
-    @constraint(model, ccdar, sc * ((z_cdar - view(dd, 2:(T + 1))) .+ dar) >= 0)
+    model[Symbol(:ccdar_, i)] = @constraint(model,
+                                            sc * ((z_cdar - view(dd, 2:(T + 1))) .+ dar) >=
+                                            0)
     set_risk_bounds_and_expression!(model, opt, cdar_risk, r.settings, key)
     return nothing
 end

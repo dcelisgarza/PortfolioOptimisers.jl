@@ -99,7 +99,10 @@ function JuMPOptimiser(;
         @smart_assert(!isempty(wi))
     end
     if isa(bgt, Real)
-        @smart_assert(isfinite(bgt))
+        @smart_assert(isfinite(bgt) && bgt >= 0)
+    end
+    if isa(sbgt, Real)
+        @smart_assert(isfinite(sbgt) && sbgt >= 0)
     end
     if isa(lcs, AbstractVector)
         @smart_assert(!isempty(lcs))
