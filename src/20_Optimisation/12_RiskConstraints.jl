@@ -19,7 +19,7 @@ function set_risk_upper_bound!(model::JuMP.Model, ::MeanRiskEstimator, r_expr, u
                                key)
     k = model[:k]
     sc = model[:sc]
-    model[Symbol(key, :_ub)] = @constraint(model, sc * r_expr <= sc * ub * k)
+    model[Symbol(key, :_ub)] = @constraint(model, sc * (r_expr - ub * k) <= 0)
     return nothing
 end
 function set_risk_expression!(model::JuMP.Model, r_expr, scale::Real, rke::Bool)
@@ -175,13 +175,14 @@ function rc_variance_constraints!(model::JuMP.Model, i::Integer, rc::LinearConst
     vsw = vec(diag(sigma_W))
     if !isnothing(rc.A_ineq)
         model[Symbol(rc_key, :_ineq)] = @constraint(model,
-                                                    sc * rc.A_ineq * vsw <=
-                                                    sc * rc.B_ineq * variance_risk)
+                                                    sc * (rc.A_ineq * vsw -
+                                                          rc.B_ineq * variance_risk) <= 0)
     end
     if !isnothing(rc.A_eq)
         model[Symbol(rc_key, :_eq)] = @constraint(model,
-                                                  sc * rc.A_eq * vsw ==
-                                                  sc * rc.B_eq * variance_risk)
+                                                  sc *
+                                                  (rc.A_eq * vsw - rc.B_eq * variance_risk) ==
+                                                  0)
     end
     return nothing
 end
@@ -236,7 +237,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Integer, ucs::BoxUncertain
                        Au[1:N, 1:N] >= 0, Symmetric
                        Al[1:N, 1:N] >= 0, Symmetric
                    end)
-        @constraint(model, cbucs_variance, sc * (Au - Al) == sc * W)
+        @constraint(model, cbucs_variance, sc * (Au - Al - W) == 0)
     end
     key = Symbol(:bucs_variance_risk_, i)
     Au = model[:Au]

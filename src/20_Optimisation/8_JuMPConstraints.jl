@@ -25,7 +25,7 @@ function set_budget_constraints!(model::JuMP.Model, val::Real, w::AbstractVector
                                  key::Symbol = :bgt, kwargs...)
     k = model[:k]
     sc = model[:sc]
-    model[key] = @constraint(model, sc * sum(w) == sc * k * val)
+    model[key] = @constraint(model, sc * (sum(w) - k * val) == 0)
     return nothing
 end
 function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::AbstractVector;
@@ -36,10 +36,10 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::Abstrac
     lb = bgt.lb
     ub = bgt.ub
     if !isnothing(lb)
-        model[key_lb] = @constraint(model, sc * sum(w) >= sc * k * lb)
+        model[key_lb] = @constraint(model, sc * (sum(w) - k * lb) >= 0)
     end
     if !isnothing(ub)
-        model[key_ub] = @constraint(model, sc * sum(w) <= sc * k * ub)
+        model[key_ub] = @constraint(model, sc * (sum(w) - k * ub) <= 0)
     end
     return nothing
 end
@@ -50,21 +50,21 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Real, ::Noth
     lw = model[:lw]
     k = model[:k]
     sc = model[:sc]
-    @constraint(model, lbgt, sc * sum(lw) == sc * k * bgt)
+    @constraint(model, lbgt, sc * (sum(lw) - k * bgt) == 0)
     return nothing
 end
-function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, bgt::Real)
+function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, sbgt::Real)
     sw = model[:sw]
     k = model[:k]
     sc = model[:sc]
-    @constraint(model, sbgt, sc * sum(sw) == sc * k * sbgt)
+    @constraint(model, sbgt, sc * (sum(sw) - k * sbgt) == 0)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Real, sbgt::Real)
     lw = model[:lw]
     k = model[:k]
     sc = model[:sc]
-    @constraint(model, lsbgt, sc * sum(lw) == sc * k * (bgt + sbgt))
+    @constraint(model, lsbgt, sc * (sum(lw) - k * (bgt + sbgt)) == 0)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, ::Nothing)
@@ -73,11 +73,11 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     sc = model[:sc]
     lb = bgt.lb
     if !isnothing(lb)
-        @constraint(model, lbgt_lb, sc * sum(lw) >= sc * k * lb)
+        @constraint(model, lbgt_lb, sc * (sum(lw) - k * lb) >= 0)
     end
     ub = bgt.ub
     if !isnothing(ub)
-        @constraint(model, lbgt_ub, sc * sum(lw) <= sc * k * ub)
+        @constraint(model, lbgt_ub, sc * (sum(lw) - k * ub) <= 0)
     end
     return nothing
 end
@@ -87,11 +87,11 @@ function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, sbgt::
     sc = model[:sc]
     lb = sbgt.lb
     if !isnothing(lb)
-        @constraint(model, sbgt_lb, sc * sum(sw) >= sc * k * lb)
+        @constraint(model, sbgt_lb, sc * (sum(sw) - k * lb) >= 0)
     end
     ub = sbgt.ub
     if !isnothing(ub)
-        @constraint(model, sbgt_ub, sc * sum(sw) <= sc * k * ub)
+        @constraint(model, sbgt_ub, sc * (sum(sw) - k * ub) <= 0)
     end
     return nothing
 end
@@ -101,11 +101,11 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     sc = model[:sc]
     lb = bgt.lb
     if !isnothing(lb)
-        @constraint(model, lbgt_lb, sc * sum(lw) >= sc * k * (lb + sbgt))
+        @constraint(model, lbgt_lb, sc * (sum(lw) - k * (lb + sbgt)) >= 0)
     end
     ub = bgt.ub
     if !isnothing(ub)
-        @constraint(model, lbgt_ub, sc * sum(lw) <= sc * k * (ub + sbgt))
+        @constraint(model, lbgt_ub, sc * (sum(lw) - k * (ub + sbgt)) <= 0)
     end
     return nothing
 end
@@ -115,11 +115,11 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Real, sbgt::
     sc = model[:sc]
     lb = sbgt.lb
     if !isnothing(lb)
-        @constraint(model, lbgt_lb, sc * sum(lw) >= sc * k * (lb + bgt))
+        @constraint(model, lbgt_lb, sc * (sum(lw) - k * (lb + bgt)) >= 0)
     end
     ub = sbgt.ub
     if !isnothing(ub)
-        @constraint(model, lbgt_ub, sc * sum(lw) <= sc * k * (ub + bgt))
+        @constraint(model, lbgt_ub, sc * (sum(lw) - k * (ub + bgt)) <= 0)
     end
     return nothing
 end
@@ -133,18 +133,18 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     lb_flag = isnothing(lb)
     slb_flag = isnothing(slb)
     if !lb_flag && !slb_flag
-        @constraint(model, lbgt_lb, sc * sum(lw) >= sc * k * (lb + slb))
+        @constraint(model, lbgt_lb, sc * (sum(lw) - k * (lb + slb)) >= 0)
     elseif !lb_flag && slb_flag
-        @constraint(model, lbgt_lb, sc * sum(lw) >= sc * k * lb)
+        @constraint(model, lbgt_lb, sc * (sum(lw) - k * lb) >= 0)
     end
     ub = bgt.ub
     sub = sbgt.ub
     ub_flag = isnothing(ub)
     sub_flag = isnothing(sub)
     if !ub_flag && !sub_flag
-        @constraint(model, lbgt_ub, sc * sum(lw) <= sc * k * (ub + sub))
+        @constraint(model, lbgt_ub, sc * (sum(lw) - k * (ub + sub)) <= 0)
     elseif !ub_flag && sub_flag
-        @constraint(model, lbgt_ub, sc * sum(lw) <= sc * k * ub)
+        @constraint(model, lbgt_ub, sc * (sum(lw) - k * ub) <= 0)
     end
     return nothing
 end
@@ -176,10 +176,10 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     k = model[:k]
     sc = model[:sc]
     if !isnothing(lb) && w_finite_flag(lb)
-        @constraint(model, w_lb, sc * w >= sc * k * lb)
+        @constraint(model, w_lb, sc * (w - k * lb) >= 0)
     end
     if !isnothing(ub) && w_finite_flag(ub)
-        @constraint(model, w_ub, sc * w <= sc * k * ub)
+        @constraint(model, w_ub, sc * (w - k * ub) <= 0)
     end
     set_budget_constraints!(model, bgt, w; key = :bgt, key_lb = :bgt_lb, key_ub = :bgt_ub)
     if flag
@@ -188,8 +188,8 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
                        sw[1:N] >= 0
                    end)
         @constraints(model, begin
-                         w_lw, sc * w <= sc * lw
-                         w_sw, sc * w >= -sc * sw
+                         w_lw, sc * (w - lw) <= 0
+                         w_sw, sc * (w + sw) >= 0
                      end)
         set_budget_constraints!(model, sbgt, sw; key = :sbgt, key_lb = :sbgt_lb,
                                 key_ub = :sbgt_ub)
@@ -219,12 +219,12 @@ function set_linear_weight_constraints!(model::JuMP.Model, lcm::LinearConstraint
     if !isnothing(lcm.ineq)
         A = lcm.ineq.A
         B = lcm.ineq.B
-        model[key_ineq] = @constraint(model, sc * A * w <= sc * k * B)
+        model[key_ineq] = @constraint(model, sc * (A * w - k * B) <= 0)
     end
     if !isnothing(lcm.eq)
         A = lcm.eq.A
         B = lcm.eq.B
-        model[key_eq] = @constraint(model, sc * A * w == sc * k * B)
+        model[key_eq] = @constraint(model, sc * (A * w - k * B) == 0)
     end
     return nothing
 end
@@ -279,11 +279,11 @@ function mip_wb(model::JuMP.Model, wb::WeightBoundsResult, il::AbstractVector,
     w = model[:w]
     lb = wb.lb
     if !isnothing(lb) && w_finite_flag(lb)
-        @constraint(model, w_mip_lb, sc * w >= sc * is ⊙ lb)
+        @constraint(model, w_mip_lb, sc * (w - is ⊙ lb) >= 0)
     end
     ub = wb.ub
     if !isnothing(ub) && w_finite_flag(ub)
-        @constraint(model, w_mip_ub, sc * w <= sc * il ⊙ ub)
+        @constraint(model, w_mip_ub, sc * (w - il ⊙ ub) <= 0)
     end
     return nothing
 end
@@ -322,16 +322,16 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
                      end)
     else
         @variables(model, begin
-                       isf[1:N] >= 0
                        ilf[1:N] >= 0
+                       isf[1:N] >= 0
                    end)
         @constraints(model, begin
-                         ilf_ub, ilf <= k
-                         isf_ub, isf <= k
-                         ilfd_ub, ilf <= ss * ilb
-                         isfd_ub, isf <= ss * isb
-                         ilfd_lb, ilf >= k .- ss * (1 .- ilb)
-                         isfd_lb, isf >= k .- ss * (1 .- isb)
+                         ilf_ub, ilf .- k <= 0
+                         isf_ub, isf .- k <= 0
+                         ilfd_ub, ilf - ss * ilb <= 0
+                         isfd_ub, isf - ss * isb <= 0
+                         ilfd_lb, (ilf + ss * (1 .- ilb)) .- k >= 0
+                         isfd_lb, (isf + ss * (1 .- isb)) .- k >= 0
                      end)
         @expressions(model, begin
                          il, ilf
@@ -341,10 +341,10 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
     @constraint(model, i_mip_ub, i_mip <= 1)
     mip_wb(model, wb, il, is)
     if lbi_flag
-        @constraint(model, w_mip_lbi, sc * w >= sc * (il ⊙ bitl - ss * (1 .- ilb)))
+        @constraint(model, w_mip_lbi, sc * (w - (il ⊙ bitl - ss * (1 .- ilb))) >= 0)
     end
     if sbi_flag
-        @constraint(model, w_mip_sbi, sc * w <= sc * (is ⊙ bits + ss * (1 .- isb)))
+        @constraint(model, w_mip_sbi, sc * (w - (is ⊙ bits + ss * (1 .- isb))) <= 0)
     end
     if ffl_flag || ffs_flag
         if ffl_flag
@@ -375,25 +375,25 @@ function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
         end
         @variable(model, ibf[1:N] >= 0)
         @constraints(model, begin
-                         ibf_ub, ibf <= k
-                         ibfd_ub, ibf <= ss * ib
-                         ibfd_lb, ibf >= k .- ss * (1 .- ib)
+                         ibf_ub, ibf .- k <= 0
+                         ibfd_ub, ibf - ss * ib <= 0
+                         ibfd_lb, (ibf + ss * (1 .- ib)) .- k >= 0
                      end)
         @expression(model, i_mip, ibf)
     end
     ub = wb.ub
     if !isnothing(ub)
-        @constraint(model, w_mip_ub, sc * w <= sc * i_mip ⊙ ub)
+        @constraint(model, w_mip_ub, sc * (w - i_mip ⊙ ub) <= 0)
     end
     if lbi_flag
-        @constraint(model, w_mip_lbi, sc * w >= sc * i_mip ⊙ bitl)
+        @constraint(model, w_mip_lbi, sc * (w - i_mip ⊙ bitl) >= 0)
     end
     if ffl_flag
         @expression(model, ffl, sum(ffl ⊙ i_mip))
         add_to_fees!(model, ffl)
     end
     if haskey(model, :sw)
-        @constraint(model, w_mip_lb, sc * w >= sc * i_mip ⊙ wb.lb)
+        @constraint(model, w_mip_lb, sc * (w - i_mip ⊙ wb.lb) >= 0)
     end
     return ib
 end
@@ -437,29 +437,29 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     sc = model[:sc]
     if card_flag
-        @constraint(model, card, sc * sum(ib) <= sc * card)
+        @constraint(model, card, sc * (sum(ib) - card) <= 0)
     end
     if gcard_flag
         if !isnothing(gcard.ineq)
             A = gcard.ineq.A
             B = gcard.ineq.B
-            @constraint(model, gcard_ineq, sc * A * ib <= sc * B)
+            @constraint(model, gcard_ineq, sc * (A * ib - B) <= 0)
         end
         if !isnothing(gcard.eq)
             A = gcard.eq.A
             B = gcard.eq.B
-            @constraint(model, gcard_eq, sc * A * ib == sc * B)
+            @constraint(model, gcard_eq, sc * (A * ib - B) == 0)
         end
     end
     if n_flag
         A = nplg.A
         B = nplg.B
-        @constraint(model, card_nplg, sc * A * ib <= sc * B)
+        @constraint(model, card_nplg, sc * (A * ib - B) <= 0)
     end
     if c_flag
         A = cplg.A
         B = cplg.B
-        @constraint(model, card_cplg, sc * A * ib <= sc * B)
+        @constraint(model, card_cplg, sc * (A * ib - B) <= 0)
     end
     return nothing
 end
@@ -526,7 +526,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, X::AbstractMatrix,
     @expression(model, tr, net_X - wb * k)
     @constraints(model, begin
                      ctr_soc, [sc * t_tr; sc * tr] ∈ SecondOrderCone()
-                     ctr, sc * t_tr <= sc * err * k * sqrt(size(X, 1) - 1)
+                     ctr, sc * (t_tr - err * k * sqrt(size(X, 1) - 1)) <= 0
                  end)
     return nothing
 end
@@ -545,7 +545,7 @@ function set_turnover_constraints!(model::JuMP.Model, tn::Turnover)
     @constraints(model,
                  begin
                      ctr_noc[i = 1:N], [sc * t_tn[i]; sc * tn[i]] ∈ MOI.NormOneCone(2)
-                     ctr, sc * t_tn <= sc * val * k
+                     ctr, sc * (t_tn ⊖ val * k) <= 0
                  end)
     return nothing
 end
@@ -559,7 +559,7 @@ function set_number_effective_assets!(model::JuMP.Model, val::Real)
     @variable(model, nea)
     @constraints(model, begin
                      c_nea_soc, [sc * nea; sc * w] ∈ SecondOrderCone()
-                     c_nea, sc * nea * sqrt(val) <= sc * k
+                     c_nea, sc * (nea * sqrt(val) - k) <= 0
                  end)
     return nothing
 end

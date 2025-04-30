@@ -63,11 +63,11 @@ function owa_model_setup(method::OWAJuMPEstimator, weights::AbstractMatrix{<:Rea
                    phi[1:N]
                end)
     @constraints(model, begin
-                     0 .<= sc * phi .<= sc * max_phi
-                     sc * sum(phi) == sc
-                     sc * theta == sc * weights * phi
-                     sc * phi[2:end] <= sc * phi[1:(end - 1)]
-                     sc * theta[2:end] >= sc * theta[1:(end - 1)]
+                     0 .<= sc * (phi .- max_phi) <= 0
+                     sc * (sum(phi) - 1) == 0
+                     sc * (theta - weights * phi) == 0
+                     sc * (phi[2:end] - phi[1:(end - 1)]) <= 0
+                     sc * (theta[2:end] - theta[1:(end - 1)]) >= 0
                  end)
     return model
 end
@@ -98,7 +98,7 @@ function owa_l_moment_crm(method::OWAJuMPEstimator{<:MaximumEntropy, <:Any, <:An
                    x[1:T]
                end)
     @constraints(model, begin
-                     sc * sum(x) == sc * 1
+                     sc * (sum(x) - 1) == 0
                      [sc * t; ovec; sc * x] ∈ MOI.RelativeEntropyCone(2 * T + 1)
                      [i = 1:T], [sc * x[i]; sc * theta[i]] ∈ MOI.NormOneCone(2)
                  end)

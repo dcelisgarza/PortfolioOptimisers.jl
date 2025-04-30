@@ -97,12 +97,12 @@ function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wb::WeightBounds
     @expression(model, sc, cwf.sc)
     @expression(model, so, cwf.so)
     @variable(model, w[1:length(wi)])
-    @constraint(model, sum(w) == sum(wi))
+    @constraint(model, sc * (sum(w) - sum(wi)) == 0)
     if !isnothing(lb)
-        @constraint(model, sc * w >= sc * lb)
+        @constraint(model, sc * (w - lb) >= 0)
     end
     if !isnothing(ub)
-        @constraint(model, sc * w <= sc * ub)
+        @constraint(model, sc * (w - ub) <= 0)
     end
     set_clustering_weight_finaliser_alg!(model, cwf.alg, wi)
     return if optimise_JuMP_model!(model, cwf.slv).success

@@ -102,16 +102,16 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
     (; sc, so, slv) = optim
     # Equality constraints from A_ineq and B_ineq if provided
     if !isnothing(A_eq) && !isnothing(B_eq)
-        @constraint(model, ceq, sc * A_eq * q == sc * B_eq)
+        @constraint(model, ceq, sc * (A_eq * q - B_eq) == 0)
     end
     # Inequality constraints from A_ineq and B_ineq if provided
     if !isnothing(A_ineq) && !isnothing(B_ineq)
-        @constraint(model, cineq, sc * A_ineq * q <= sc * B_ineq)
+        @constraint(model, cineq, sc * (A_ineq * q - B_ineq) <= 0)
     end
     # Equality constraints from A_eq and B_eq and probabilities equal to 1
     @constraints(model,
                  begin
-                     sum(q) == 1
+                     sc * (sum(q) - one(eltype(w))) == 0
                      [sc * t; fill(sc, S); sc * q] in MOI.RelativeEntropyCone(2 * S + 1)
                  end)
     @objective(model, Min, so * (t - dot(q, log_p)))

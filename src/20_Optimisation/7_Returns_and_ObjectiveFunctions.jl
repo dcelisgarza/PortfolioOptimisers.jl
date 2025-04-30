@@ -87,7 +87,7 @@ function set_return_bounds!(model::JuMP.Model, lb::Real)
     sc = model[:sc]
     k = model[:k]
     ret = model[:ret]
-    @constraint(model, ret_lb, sc * ret >= sc * lb * k)
+    @constraint(model, ret_lb, sc * (ret - lb * k) >= 0)
     return nothing
 end
 function set_max_ratio_return_constraints!(args...)
@@ -103,9 +103,9 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     if haskey(model, :bucs_w) || haskey(model, :t_eucs_gw) || all(mu .<= zero(eltype(mu)))
         risk = model[:risk]
         add_to_expression!(ret, -rf, k)
-        @constraint(model, sr_risk, sc * risk <= sc * ohf)
+        @constraint(model, sr_risk, sc * (risk - ohf) <= 0)
     else
-        @constraint(model, sr_ret, sc * (ret - rf * k) == sc * ohf)
+        @constraint(model, sr_ret, sc * (ret - rf * k - ohf) == 0)
     end
     return nothing
 end
@@ -176,7 +176,7 @@ function set_max_ratio_kelly_return_constraints!(model::JuMP.Model, obj::Maximum
     risk = model[:risk]
     rf = obj.rf
     add_to_expression!(ret, -rf, k)
-    @constraint(model, sr_ekelly_risk, sc * risk <= sc * ohf)
+    @constraint(model, sr_ekelly_risk, sc * (risk - ohf) <= 0)
 end
 function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
                                  obj::ObjectiveFunction, pr::AbstractPriorResult)

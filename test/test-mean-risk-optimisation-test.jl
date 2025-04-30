@@ -290,5 +290,13 @@
         res = optimise!(mre, rd)
         w = res.w
         @test length(w[w .> 1e-9]) <= 3
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            sbgt = 0.2, card = 5)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test length(w[abs.(w) .> 1e-9]) <= 5
     end
 end

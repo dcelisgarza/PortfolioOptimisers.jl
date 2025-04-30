@@ -12,7 +12,7 @@ function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:
                    u[1:T]
                end)
     @constraints(model, begin
-                     sum(u) <= z
+                     sum(u) - z <= 0
                      [i = 1:T], [-x[i] - t, z, u[i]] ∈ MOI.ExponentialCone()
                  end)
     @expression(model, risk, t - z * log(alpha * T))

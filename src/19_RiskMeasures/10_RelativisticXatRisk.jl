@@ -45,8 +45,8 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                        tau[1:T]
                    end)
         @constraints(model, begin
-                         sum(z) == 1
-                         sum(nu - tau) * invk2 <= ln_k
+                         sum(z) - 1 == 0
+                         sum(nu - tau) * invk2 - ln_k <= 0
                          [i = 1:T], [nu[i], 1, z[i]] ∈ MOI.PowerCone(invopk)
                          [i = 1:T], [z[i], 1, tau[i]] ∈ MOI.PowerCone(omk)
                      end)
