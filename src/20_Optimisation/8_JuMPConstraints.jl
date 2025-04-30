@@ -255,13 +255,13 @@ function BuyInThreshold(; s::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 
         if !s_flag && !l_flag
             @smart_assert(length(s) == length(l))
         end
-    elseif l_flag && !s_flag
+    elseif !l_flag && s_flag
         if isa(s, Real)
             @smart_assert(isfinite(s) && s > zero(s))
         else
             @smart_assert(all(isfinite, s) && all(s .> zero(s)))
         end
-    elseif !l_flag && s_flag
+    elseif l_flag && !s_flag
         if isa(l, Real)
             @smart_assert(isfinite(l) && l > zero(l))
         else
@@ -279,11 +279,11 @@ function mip_wb(model::JuMP.Model, wb::WeightBoundsResult, il::AbstractVector,
     w = model[:w]
     lb = wb.lb
     if !isnothing(lb) && w_finite_flag(lb)
-        @constraint(model, w_mip_lb, sc * (w - is ⊙ lb) >= 0)
+        @constraint(model, w_mip_lb, sc * (w - is ⊙ lb) .>= 0)
     end
     ub = wb.ub
     if !isnothing(ub) && w_finite_flag(ub)
-        @constraint(model, w_mip_ub, sc * (w - il ⊙ ub) <= 0)
+        @constraint(model, w_mip_ub, sc * (w - il ⊙ ub) .<= 0)
     end
     return nothing
 end
@@ -307,7 +307,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
     k = model[:k]
     sc = model[:sc]
     if isnothing(ss)
-        ss = 100_000.0
+        ss = 1_000_000.0
     end
     N = length(w)
     @variables(model, begin
@@ -338,13 +338,13 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
                          is, isf
                      end)
     end
-    @constraint(model, i_mip_ub, i_mip <= 1)
+    @constraint(model, i_mip_ub, i_mip .- 1 <= 0)
     mip_wb(model, wb, il, is)
     if lbi_flag
-        @constraint(model, w_mip_lbi, sc * (w - (il ⊙ bitl - ss * (1 .- ilb))) >= 0)
+        @constraint(model, w_mip_lbi, sc * (w - il ⊙ bitl + ss * (1 .- ilb)) >= 0)
     end
     if sbi_flag
-        @constraint(model, w_mip_sbi, sc * (w - (is ⊙ bits + ss * (1 .- isb))) <= 0)
+        @constraint(model, w_mip_sbi, sc * (w + is ⊙ bits - ss * (1 .- isb)) <= 0)
     end
     if ffl_flag || ffs_flag
         if ffl_flag
@@ -356,7 +356,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
             add_to_fees!(model, ffs)
         end
     end
-    return ib
+    return i_mip
 end
 function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
                          ffl::Union{Nothing, <:Real, <:AbstractVector},
