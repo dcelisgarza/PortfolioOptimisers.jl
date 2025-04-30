@@ -142,7 +142,6 @@
                         find_tol(w, wt; name1 = :w, name2 = :wt)
                     end
                     @test res
-                    df[!, "$i"] = w
                     i += 1
                 end
             end
@@ -197,5 +196,28 @@
         mre = MeanRiskEstimator(; obj = MaximumRatio(), opt = opt)
         res3 = optimise!(mre)
         @test abs(mean(log1p.(pr.X * res3.w)) - ret.lb) <= 1e-8
+
+        ucss = (ucs1, ucs2)
+        objs = (MinimumRisk(), MaximumRatio(; rf = rf))
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk_ReturnUncertainty.csv"),
+                      DataFrame)
+        i = 1
+        for ucs ∈ ucss
+            for obj ∈ objs
+                ret = ArithmeticReturn(; ucs = ucs)
+                opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
+                mre = MeanRiskEstimator(; obj = obj, opt = opt)
+                res1 = optimise!(mre)
+                w = res1.w
+                wt = df[!, i]
+                res = isapprox(w, wt)
+                if !res
+                    println("Iteration $i failed.")
+                    find_tol(w, wt; name1 = :w, name2 = :wt)
+                end
+                df[!, "$(i)"] = res1.w
+                i += 1
+            end
+        end
     end
 end

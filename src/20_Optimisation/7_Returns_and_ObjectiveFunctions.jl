@@ -13,8 +13,8 @@ function ArithmeticReturn(; lb::Union{Nothing, <:Real} = nothing,
     end
     if isa(ucs, EllipseUncertaintySetResult)
         @smart_assert(isa(ucs,
-                          <:EllipseUncertaintySetResult{<:Any, <:Any,
-                                                        <:MuEllipseUncertaintySetResult}))
+                          EllipseUncertaintySetResult{<:Any, <:Any,
+                                                      <:MuEllipseUncertaintySetResult}))
     end
     return ArithmeticReturn{typeof(lb), typeof(ucs)}(lb, ucs)
 end
@@ -155,8 +155,8 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintyS
 end
 function set_return_constraints!(model::JuMP.Model,
                                  pret::ArithmeticReturn{<:Any,
-                                                        Union{<:AbstractUncertaintySetResult,
-                                                              <:AbstractUncertaintySetEstimator}},
+                                                        <:Union{<:AbstractUncertaintySetResult,
+                                                                <:AbstractUncertaintySetEstimator}},
                                  obj::ObjectiveFunction, pr::AbstractPriorResult)
     lb = pret.lb
     ucs = pret.ucs
