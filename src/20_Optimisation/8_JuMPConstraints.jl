@@ -307,7 +307,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
     k = model[:k]
     sc = model[:sc]
     if isnothing(ss)
-        ss = 1_000_000.0
+        ss = 1_000.0
     end
     N = length(w)
     @variables(model, begin

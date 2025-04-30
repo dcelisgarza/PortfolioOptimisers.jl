@@ -301,7 +301,7 @@
     end
     @testset "Buy in threshold" begin
         rng = StableRNG(987456321)
-        X = randn(rng, 200, 10)
+        X = randn(rng, 100, 10)
         rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
         pr = prior(EmpiricalPriorEstimator(), rd)
         rf = 4.34 / 100 / 252
@@ -325,7 +325,7 @@
         mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test all(isapprox.(w[abs.(w) .> 1e-9], 0.2))
+        @test all(w[abs.(w) .> 1e-9] .- 0.2 .>= -sqrt(eps()))
 
         opt = JuMPOptimiser(; str_names = true, pe = pr, slv = slv,
                             bit = BuyInThreshold(; l = 0.5, s = 0.15), sbgt = 1, bgt = 0.7,
@@ -333,27 +333,18 @@
         mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
+        w = w[abs.(w) .> 1e-9]
+        @test all(w[w .< 0] .+ 0.15 .<= sqrt(eps()))
+        @test all(w[w .>= 0] .- 0.5 .>= -sqrt(eps()))
 
-        # using PortfolioOptimiser
-        # portfolio = Portfolio(; ret = pr.X, assets = 1:10,
-        #                       solvers = PortOptSolver(; name = :PClGL,
-        #                                               solver = optimizer_with_attributes(Pajarito.Optimizer,
-        #                                                                                  "verbose" => false,
-        #                                                                                  "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-        #                                                                                                                           MOI.Silent() => true),
-        #                                                                                  "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-        #                                                                                                                              "verbose" => false,
-        #                                                                                                                              "max_step_fraction" => 0.75))))
-        # asset_statistics!(portfolio)
-
-        # portfolio.short = true
-        # portfolio.long_t = 0.5
-        # portfolio.short_budget = -1
-        # portfolio.budget = 0.7
-        # portfolio.short_lb = -1
-        # portfolio.short_t = -0.15
-
-        # w3 = PortfolioOptimiser.optimise!(portfolio, Trad(; obj = MinRisk(), str_names = true))
-
+        opt = JuMPOptimiser(; str_names = true, pe = pr, slv = slv,
+                            bit = BuyInThreshold(; l = 0.15, s = 0.2), sbgt = 0.5, bgt = 1,
+                            wb = WeightBoundsResult(; lb = -0.5, ub = 1))
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        w = w[abs.(w) .> 1e-9]
+        @test all(w[w .< 0] .+ 0.2 .<= sqrt(eps()))
+        @test all(w[w .>= 0] .- 0.15 .>= -sqrt(eps()))
     end
 end
