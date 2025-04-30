@@ -63,7 +63,8 @@ function owa_model_setup(method::OWAJuMPEstimator, weights::AbstractMatrix{<:Rea
                    phi[1:N]
                end)
     @constraints(model, begin
-                     0 .<= sc * (phi .- max_phi) <= 0
+                     sc * phi >= 0
+                     sc * (phi .- max_phi) <= 0
                      sc * (sum(phi) - 1) == 0
                      sc * (theta - weights * phi) == 0
                      sc * (phi[2:end] - phi[1:(end - 1)]) <= 0
