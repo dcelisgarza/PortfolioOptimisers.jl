@@ -122,26 +122,31 @@
             for obj ∈ objs
                 for ret ∈ rets
                     opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
-                    sol = optimise!(MeanRiskEstimator(; r = r, obj = obj, opt = opt))
-                    if isa(sol.retcode, OptimisationFailure)
+                    sol1 = optimise!(MeanRiskEstimator(; r = r, obj = obj, opt = opt))
+                    sol2 = optimise!(MeanRiskEstimator(; r = [r, r], obj = obj, opt = opt))
+                    if isa(sol1.retcode, OptimisationFailure) ||
+                       isa(sol2.retcode, OptimisationFailure)
                         i += 1
                         continue
                     end
-                    w = sol.w
+                    w1 = sol1.w
+                    w2 = sol1.w
+                    @test isapprox(w1, w2)
                     wt = df[!, i]
                     res = if i ∈ (92, 140, 142, 160, 364, 380, 396, 460, 474, 506, 510, 520,
                                   540, 556)
-                        isapprox(w, wt; rtol = 1e-4)
+                        isapprox(w1, wt; rtol = 1e-4)
                     elseif i == 726
-                        isapprox(w, wt; rtol = 5e-4)
+                        isapprox(w1, wt; rtol = 5e-4)
                     else
-                        isapprox(w, wt; rtol = 5e-5)
+                        isapprox(w1, wt; rtol = 5e-5)
                     end
                     if !res
                         println("Iteration $i failed.")
-                        find_tol(w, wt; name1 = :w, name2 = :wt)
+                        find_tol(w1, wt; name1 = :w1, name2 = :wt)
                     end
                     @test res
+
                     i += 1
                 end
             end
