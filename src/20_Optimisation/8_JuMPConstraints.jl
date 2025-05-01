@@ -237,11 +237,11 @@ function mip_wb(model::JuMP.Model, wb::WeightBoundsResult, il::AbstractVector,
     w = model[:w]
     lb = wb.lb
     if !isnothing(lb) && w_finite_flag(lb)
-        @constraint(model, w_mip_lb, sc * (w - is ⊙ lb) .>= 0)
+        @constraint(model, w_mip_lb, sc * (w - is ⊙ lb) >= 0)
     end
     ub = wb.ub
     if !isnothing(ub) && w_finite_flag(ub)
-        @constraint(model, w_mip_ub, sc * (w - il ⊙ ub) .<= 0)
+        @constraint(model, w_mip_ub, sc * (w - il ⊙ ub) <= 0)
     end
     return nothing
 end
@@ -339,19 +339,13 @@ function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
                      end)
         @expression(model, i_mip, ibf)
     end
-    ub = wb.ub
-    if !isnothing(ub)
-        @constraint(model, w_mip_ub, sc * (w - i_mip ⊙ ub) <= 0)
-    end
+    mip_wb(model, wb, i_mip, i_mip)
     if lt_flag
         @constraint(model, w_mip_lt, sc * (w - i_mip ⊙ lt) >= 0)
     end
     if ffl_flag
         @expression(model, ffl, sum(ffl ⊙ ib))
         add_to_fees!(model, ffl)
-    end
-    if haskey(model, :sw)
-        @constraint(model, w_mip_lb, sc * (w - i_mip ⊙ wb.lb) >= 0)
     end
     return ib
 end
