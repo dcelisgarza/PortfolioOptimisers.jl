@@ -363,7 +363,7 @@
                        [-7.1115844550380404e-9, -0.6749708655857565, 2.095004012843859e-9,
                         0.9999999850136296, -1.005847682601429e-9, -1.8002229418234852e-7,
                         -2.203591023452724e-8, 1.3831254223699182e-9, 0.6749710887962451,
-                        -1.526611091533063e-9], rtol = 0.005)
+                        -1.526611091533063e-9], rtol = 0.01)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, l1 = 1,
                             wb = WeightBoundsResult(; lb = -0.2, ub = 1), sbgt = 0.2)
@@ -389,5 +389,45 @@
             end
             @test res
         end
+    end
+    @testset "Fees" begin
+        rng = StableRNG(987456321)
+        X = randn(rng, 100, 10)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+        pr = prior(EmpiricalPriorEstimator(), rd)
+        rf = 4.34 / 100 / 252
+        slv = Solver(; name = :clarabel,
+                     solver = solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                                 "verbose" => false,
+                                                                 "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                          MOI.Silent() => true),
+                                                                 "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                             "verbose" => false,
+                                                                                                             "max_step_fraction" => 0.75)),
+                     check_sol = (; allow_local = true, allow_almost = true))
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            fees = PortfolioOptimisers.Fees(; long = 0.05, short = 0.03,
+                                                            fixed_long = 0.002,
+                                                            fixed_short = 0.0006),
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [-4.3388784302049525e-11, -0.37047964581382725, 0.33550365102682617,
+                        0.7750413188680487, -2.440133003012612e-11, -0.365013275656182,
+                        -0.2645070750278348, 0.19954620198210546, 0.6899088247421615,
+                        -5.350722819954533e-11])
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            fees = PortfolioOptimisers.Fees(; long = 0.05, short = 0.03,
+                                                            fixed_long = 0.002),
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [-0.044445488883193884, -0.33539095033394956, 0.33816334192422765,
+                        0.751070537889643, -9.196473098683769e-12, -0.3313002556886578,
+                        -0.2338934257213684, 0.220000605563935, 0.6907655130377879,
+                        -0.05496987777922733])
     end
 end

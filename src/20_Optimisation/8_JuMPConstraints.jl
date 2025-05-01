@@ -245,13 +245,13 @@ function mip_wb(model::JuMP.Model, wb::WeightBoundsResult, il::AbstractVector,
     end
     return nothing
 end
-function add_to_fees!(model::JuMP.Model, expr)
-    fees = if !haskey(model, :fees)
+function add_to_fees!(model::JuMP.Model, expr::AbstractJuMPScalar)
+    if !haskey(model, :fees)
         @expression(model, fees, expr)
     else
-        model[:fees]
+        fees = model[:fees]
+        add_to_expression!(fees, expr)
     end
-    add_to_expression!(fees, expr)
     return nothing
 end
 function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResult,
