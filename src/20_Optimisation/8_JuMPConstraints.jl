@@ -306,11 +306,11 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
     end
     if ffl_flag || ffs_flag
         if ffl_flag
-            @expression(model, ffl, sum(ffl ⊙ il))
+            @expression(model, ffl, sum(ffl ⊙ ilb))
             add_to_fees!(model, ffl)
         end
         if ffs_flag
-            @expression(model, ffs, sum(ffs ⊙ is))
+            @expression(model, ffs, sum(ffs ⊙ isb))
             add_to_fees!(model, ffs)
         end
     end
@@ -347,7 +347,7 @@ function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
         @constraint(model, w_mip_lt, sc * (w - i_mip ⊙ lt) >= 0)
     end
     if ffl_flag
-        @expression(model, ffl, sum(ffl ⊙ i_mip))
+        @expression(model, ffl, sum(ffl ⊙ ib))
         add_to_fees!(model, ffl)
     end
     if haskey(model, :sw)
