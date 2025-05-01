@@ -35,8 +35,8 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     set_linear_weight_constraints!(model, lcs, :clcs_ineq, :clcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, mr.opt.lcm, :clcm_ineq, :clcm_eq)
-    set_mip_constraints!(model, wb, mr.opt.card, gcard, nplg, cplg, mr.opt.bit, mr.opt.fees,
-                         mr.opt.ss)
+    set_mip_constraints!(model, wb, mr.opt.card, gcard, nplg, cplg, mr.opt.lt, mr.opt.st,
+                         mr.opt.fees, mr.opt.ss)
     set_turnover_constraints!(model, mr.opt.tn)
     set_tracking_error_constraints!(model, pr.X, mr.opt.te)
     set_number_effective_assets!(model, mr.opt.nea)

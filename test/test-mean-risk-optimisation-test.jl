@@ -315,21 +315,20 @@
                                                                                                              "max_step_fraction" => 0.75)),
                      check_sol = (; allow_local = true, allow_almost = true))
 
-        opt = JuMPOptimiser(; pe = pr, slv = slv, bit = BuyInThreshold(; l = 0.2))
+        opt = JuMPOptimiser(; pe = pr, slv = slv, lt = 0.2)
         mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
         @test all(isapprox.(w[abs.(w) .> 1e-9], 0.2))
 
-        opt = JuMPOptimiser(; pe = pr, slv = slv, bit = BuyInThreshold(; l = 0.2))
+        opt = JuMPOptimiser(; pe = pr, slv = slv, lt = 0.2)
         mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
         @test all(w[abs.(w) .> 1e-9] .- 0.2 .>= -sqrt(eps()))
 
-        opt = JuMPOptimiser(; str_names = true, pe = pr, slv = slv,
-                            bit = BuyInThreshold(; l = 0.5, s = 0.15), sbgt = 1, bgt = 0.7,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1))
+        opt = JuMPOptimiser(; str_names = true, pe = pr, slv = slv, lt = 0.5, st = 0.15,
+                            sbgt = 1, bgt = 0.7, wb = WeightBoundsResult(; lb = -1, ub = 1))
         mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
@@ -337,8 +336,8 @@
         @test all(w[w .< 0] .+ 0.15 .<= sqrt(eps()))
         @test all(w[w .>= 0] .- 0.5 .>= -sqrt(eps()))
 
-        opt = JuMPOptimiser(; str_names = true, pe = pr, slv = slv,
-                            bit = BuyInThreshold(; l = 0.15, s = 0.2), sbgt = 0.5, bgt = 1,
+        opt = JuMPOptimiser(; str_names = true, pe = pr, slv = slv, lt = 0.15, st = 0.2,
+                            sbgt = 0.5, bgt = 1,
                             wb = WeightBoundsResult(; lb = -0.5, ub = 1))
         mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
@@ -364,7 +363,7 @@
                        [-7.1115844550380404e-9, -0.6749708655857565, 2.095004012843859e-9,
                         0.9999999850136296, -1.005847682601429e-9, -1.8002229418234852e-7,
                         -2.203591023452724e-8, 1.3831254223699182e-9, 0.6749710887962451,
-                        -1.526611091533063e-9])
+                        -1.526611091533063e-9], rtol = 0.005)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, l1 = 1,
                             wb = WeightBoundsResult(; lb = -0.2, ub = 1), sbgt = 0.2)

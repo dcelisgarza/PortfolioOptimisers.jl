@@ -228,48 +228,6 @@ function set_linear_weight_constraints!(model::JuMP.Model, lcm::LinearConstraint
     end
     return nothing
 end
-struct BuyInThreshold{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                      T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
-       AbstractEstimator
-    s::T1
-    l::T2
-end
-function BuyInThreshold(; s::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                        l::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
-    s_flag = !isnothing(s)
-    l_flag = !isnothing(l)
-    @smart_assert(!s_flag ⊼ !l_flag)
-    if s_flag && l_flag
-        s_flag = isa(s, Real)
-        l_flag = isa(l, Real)
-        if s_flag
-            @smart_assert(isfinite(s) && s > zero(s))
-        else
-            @smart_assert(all(isfinite, s) && all(s .> zero(s)))
-        end
-        if l_flag
-            @smart_assert(isfinite(l) && l > zero(l))
-        else
-            @smart_assert(all(isfinite, l) && all(l .> zero(l)))
-        end
-        if !s_flag && !l_flag
-            @smart_assert(length(s) == length(l))
-        end
-    elseif !l_flag && s_flag
-        if isa(s, Real)
-            @smart_assert(isfinite(s) && s > zero(s))
-        else
-            @smart_assert(all(isfinite, s) && all(s .> zero(s)))
-        end
-    elseif l_flag && !s_flag
-        if isa(l, Real)
-            @smart_assert(isfinite(l) && l > zero(l))
-        else
-            @smart_assert(all(isfinite, l) && all(l .> zero(l)))
-        end
-    end
-    return BuyInThreshold{typeof(s), typeof(l)}(s, l)
-end
 function mip_wb(args...)
     return nothing
 end
@@ -297,12 +255,12 @@ function add_to_fees!(model::JuMP.Model, expr)
     return nothing
 end
 function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResult,
-                                         bitl::Union{Nothing, <:Real, <:AbstractVector},
-                                         bits::Union{Nothing, <:Real, <:AbstractVector},
+                                         lt::Union{Nothing, <:Real, <:AbstractVector},
+                                         st::Union{Nothing, <:Real, <:AbstractVector},
                                          ffl::Union{Nothing, <:Real, <:AbstractVector},
                                          ffs::Union{Nothing, <:Real, <:AbstractVector},
-                                         ss::Union{Nothing, <:Real}, lbi_flag::Bool,
-                                         sbi_flag::Bool, ffl_flag::Bool, ffs_flag::Bool)
+                                         ss::Union{Nothing, <:Real}, lt_flag::Bool,
+                                         st_flag::Bool, ffl_flag::Bool, ffs_flag::Bool)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -340,11 +298,11 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
     end
     @constraint(model, i_mip_ub, i_mip .- 1 <= 0)
     mip_wb(model, wb, il, is)
-    if lbi_flag
-        @constraint(model, w_mip_lbi, sc * (w - il ⊙ bitl + ss * (1 .- ilb)) >= 0)
+    if lt_flag
+        @constraint(model, w_mip_lt, sc * (w - il ⊙ lt + ss * (1 .- ilb)) >= 0)
     end
-    if sbi_flag
-        @constraint(model, w_mip_sbi, sc * (w + is ⊙ bits - ss * (1 .- isb)) <= 0)
+    if st_flag
+        @constraint(model, w_mip_st, sc * (w + is ⊙ st - ss * (1 .- isb)) <= 0)
     end
     if ffl_flag || ffs_flag
         if ffl_flag
@@ -360,8 +318,8 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
 end
 function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
                          ffl::Union{Nothing, <:Real, <:AbstractVector},
-                         bitl::Union{Nothing, <:Real, <:AbstractVector},
-                         ss::Union{Nothing, <:Real}, lbi_flag::Bool, ffl_flag::Bool)
+                         lt::Union{Nothing, <:Real, <:AbstractVector},
+                         ss::Union{Nothing, <:Real}, lt_flag::Bool, ffl_flag::Bool)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -385,8 +343,8 @@ function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
     if !isnothing(ub)
         @constraint(model, w_mip_ub, sc * (w - i_mip ⊙ ub) <= 0)
     end
-    if lbi_flag
-        @constraint(model, w_mip_lbi, sc * (w - i_mip ⊙ bitl) >= 0)
+    if lt_flag
+        @constraint(model, w_mip_lt, sc * (w - i_mip ⊙ lt) >= 0)
     end
     if ffl_flag
         @expression(model, ffl, sum(ffl ⊙ i_mip))
@@ -402,17 +360,15 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
                               gcard::Union{Nothing, <:LinearConstraintResult},
                               nplg::Union{Nothing, <:PhilogenyConstraintResult},
                               cplg::Union{Nothing, <:PhilogenyConstraintResult},
-                              bit::Union{Nothing, <:BuyInThreshold},
+                              lt::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                              st::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                               fees::Union{Nothing, <:Fees}, ss::Union{Nothing, <:Real})
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     n_flag = isa(nplg, IntegerPhilogenyResult)
     c_flag = isa(cplg, IntegerPhilogenyResult)
-    lbi_flag, sbi_flag, bitl, bits = if !isnothing(bit)
-        non_zero_real_or_vec(bit.l), non_zero_real_or_vec(bit.s), bit.l, bit.s
-    else
-        false, false, nothing, nothing
-    end
+    lt_flag = !isnothing(lt)
+    st_flag = !isnothing(st)
     ffl_flag, ffs_flag, ffl, ffs = if !isnothing(fees)
         non_zero_real_or_vec(fees.fixed_long), non_zero_real_or_vec(fees.fixed_short),
         fees.fixed_long, fees.fixed_short
@@ -423,17 +379,17 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
          gcard_flag ||
          n_flag ||
          c_flag ||
-         lbi_flag ||
-         sbi_flag ||
+         lt_flag ||
+         st_flag ||
          ffl_flag ||
          ffs_flag)
         return nothing
     end
-    ib = if (sbi_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
-        short_mip_threshold_constraints(model, wb, bitl, bits, ffl, ffs, ss, lbi_flag,
-                                        sbi_flag, ffl_flag, ffs_flag)
+    ib = if (st_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
+        short_mip_threshold_constraints(model, wb, lt, st, ffl, ffs, ss, lt_flag, st_flag,
+                                        ffl_flag, ffs_flag)
     else
-        mip_constraints(model, wb, ffl, bitl, ss, lbi_flag, ffl_flag)
+        mip_constraints(model, wb, ffl, lt, ss, lt_flag, ffl_flag)
     end
     sc = model[:sc]
     if card_flag
@@ -649,4 +605,4 @@ function set_sdp_frc_philogeny_constraints!(model::JuMP.Model,
     return nothing
 end
 
-export BudgetRange, BuyInThreshold
+export BudgetRange

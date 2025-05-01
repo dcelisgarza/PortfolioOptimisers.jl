@@ -17,16 +17,17 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                                   <:PhilogenyConstraintResult},
                      T13 <: Union{Nothing, <:PhilogenyConstraintEstimator,
                                   <:PhilogenyConstraintResult},
-                     T14 <: Union{Nothing, <:BuyInThreshold},
-                     T15 <: Union{Nothing, <:Turnover},
-                     T16 <: Union{Nothing, <:TrackingError}, T17 <: Union{Nothing, <:Real},
-                     T18 <: Union{Nothing, <:Real}, T19 <: Union{Nothing, <:Real},
-                     T20 <: Union{Nothing, <:Fees}, T21 <: Scalariser,
-                     T22 <: JuMPReturnsEstimator, T23 <: Union{Nothing, <:CustomConstraint},
-                     T24 <: Union{Nothing, <:CustomObjective}, T25 <: Real, T26 <: Real,
-                     T27 <: Union{Nothing, <:Real},
-                     T28 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T29 <: Bool,
-                     T30 <: Bool, T31 <: Bool} <: JuMPOptimisationEstimator
+                     T14 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                     T15 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                     T16 <: Union{Nothing, <:Turnover},
+                     T17 <: Union{Nothing, <:TrackingError}, T18 <: Union{Nothing, <:Real},
+                     T19 <: Union{Nothing, <:Real}, T20 <: Union{Nothing, <:Real},
+                     T21 <: Union{Nothing, <:Fees}, T22 <: Scalariser,
+                     T23 <: JuMPReturnsEstimator, T24 <: Union{Nothing, <:CustomConstraint},
+                     T25 <: Union{Nothing, <:CustomObjective}, T26 <: Real, T27 <: Real,
+                     T28 <: Union{Nothing, <:Real},
+                     T29 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T30 <: Bool,
+                     T31 <: Bool, T32 <: Bool} <: JuMPOptimisationEstimator
     pe::T1 # PriorEstimator
     wi::T2
     wb::T3 # WeightBoundsResult
@@ -40,24 +41,33 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
     sets::T11
     nplg::T12
     cplg::T13
-    bit::T14 # BuyInThreshold
-    tn::T15 # Turnover
-    te::T16 # TrackingError
-    nea::T17
-    l1::T18
-    l2::T19
-    fees::T20
-    sce::T21
-    ret::T22
-    ccnt::T23
-    cobj::T24
-    sc::T25
-    so::T26
-    ss::T27
-    slv::T28
-    str_names::T29
-    save::T30
-    strict::T31
+    lt::T14 # long threshold
+    st::T15
+    tn::T16 # Turnover
+    te::T17 # TrackingError
+    nea::T18
+    l1::T19
+    l2::T20
+    fees::T21
+    sce::T22
+    ret::T23
+    ccnt::T24
+    cobj::T25
+    sc::T26
+    so::T27
+    ss::T28
+    slv::T29
+    str_names::T30
+    save::T31
+    strict::T32
+end
+function assert_finite_nonnegative_real_or_vec(val::Real)
+    @smart_assert(isfinite(val) && val > zero(val))
+    return nothing
+end
+function assert_finite_nonnegative_real_or_vec(val::AbstractVector{<:Real})
+    @smart_assert(any(isfinite, val) && any(val .> zero(val)) && all(val .>= zero(val)))
+    return nothing
 end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
@@ -81,7 +91,8 @@ function JuMPOptimiser(;
                                    <:PhilogenyConstraintResult} = nothing,
                        cplg::Union{Nothing, <:PhilogenyConstraintEstimator,
                                    <:PhilogenyConstraintResult} = nothing,
-                       bit::Union{Nothing, <:BuyInThreshold} = nothing,
+                       lt::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                       st::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                        tn::Union{Nothing, <:Turnover} = nothing,
                        te::Union{Nothing, <:TrackingError} = nothing,
                        nea::Union{Nothing, <:Real} = nothing,
@@ -125,28 +136,56 @@ function JuMPOptimiser(;
        isa(gcard, AbstractVector{<:CardinalityConstraint})
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
-    if isa(slv, AbstractVector)
-        @smart_assert(!isempty(slv))
+    if !isnothing(lt)
+        assert_finite_nonnegative_real_or_vec(lt)
+    end
+    if !isnothing(st)
+        assert_finite_nonnegative_real_or_vec(st)
     end
     if !isnothing(nea)
         @smart_assert(nea > zero(nea))
     end
+    if isa(slv, AbstractVector)
+        @smart_assert(!isempty(slv))
+    end
     return JuMPOptimiser{typeof(pe), typeof(wi), typeof(wb), typeof(bgt), typeof(sbgt),
                          typeof(lcs), typeof(lcm), typeof(cent), typeof(card),
                          typeof(gcard), typeof(sets), typeof(nplg), typeof(cplg),
-                         typeof(bit), typeof(tn), typeof(te), typeof(nea), typeof(l1),
-                         typeof(l2), typeof(fees), typeof(sce), typeof(ret), typeof(ccnt),
-                         typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(slv),
-                         typeof(str_names), typeof(save), typeof(strict)}(pe, wi, wb, bgt,
-                                                                          sbgt, lcs, lcm,
-                                                                          cent, card, gcard,
-                                                                          sets, nplg, cplg,
-                                                                          bit, tn, te, nea,
-                                                                          l1, l2, fees, sce,
-                                                                          ret, ccnt, cobj,
-                                                                          sc, so, ss, slv,
-                                                                          str_names, save,
-                                                                          strict)
+                         typeof(lt), typeof(st), typeof(tn), typeof(te), typeof(nea),
+                         typeof(l1), typeof(l2), typeof(fees), typeof(sce), typeof(ret),
+                         typeof(ccnt), typeof(cobj), typeof(sc), typeof(so), typeof(ss),
+                         typeof(slv), typeof(str_names), typeof(save), typeof(strict)}(pe,
+                                                                                       wi,
+                                                                                       wb,
+                                                                                       bgt,
+                                                                                       sbgt,
+                                                                                       lcs,
+                                                                                       lcm,
+                                                                                       cent,
+                                                                                       card,
+                                                                                       gcard,
+                                                                                       sets,
+                                                                                       nplg,
+                                                                                       cplg,
+                                                                                       lt,
+                                                                                       st,
+                                                                                       tn,
+                                                                                       te,
+                                                                                       nea,
+                                                                                       l1,
+                                                                                       l2,
+                                                                                       fees,
+                                                                                       sce,
+                                                                                       ret,
+                                                                                       ccnt,
+                                                                                       cobj,
+                                                                                       sc,
+                                                                                       so,
+                                                                                       ss,
+                                                                                       slv,
+                                                                                       str_names,
+                                                                                       save,
+                                                                                       strict)
 end
 
 export JuMPOptimiser
