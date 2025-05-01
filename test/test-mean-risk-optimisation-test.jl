@@ -347,4 +347,48 @@
         @test all(w[w .< 0] .+ 0.2 .<= sqrt(eps()))
         @test all(w[w .>= 0] .- 0.15 .>= -sqrt(eps()))
     end
+    @testset "L1 and L2 penalties" begin
+        rng = StableRNG(987456321)
+        X = randn(rng, 100, 10)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+        pr = prior(EmpiricalPriorEstimator(), rd)
+        rf = 4.34 / 100 / 252
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+        opt = JuMPOptimiser(; pe = pr, slv = slv, l1 = 1.3385776e-1,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+        mre = MeanRiskEstimator(; obj = MaximumReturn(), opt = opt)
+        res = optimise!(mre, rd)
+        @test isapprox(res.w,
+                       [-7.1115844550380404e-9, -0.6749708655857565, 2.095004012843859e-9,
+                        0.9999999850136296, -1.005847682601429e-9, -1.8002229418234852e-7,
+                        -2.203591023452724e-8, 1.3831254223699182e-9, 0.6749710887962451,
+                        -1.526611091533063e-9])
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, l1 = 1,
+                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), sbgt = 0.2)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf, ohf = 1), opt = opt)
+        res = optimise!(mre, rd)
+        @test isapprox(res.w,
+                       [-1.0686731420715847e-8, -0.10052767446696687, 0.21768831645458886,
+                        0.44774450409664784, -3.6781525080429386e-9, -0.05620134434165095,
+                        -0.043270941710922294, 0.1250365510849717, 0.40953061881510255,
+                        -1.5566886983763398e-8])
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, l2 = 1.5,
+                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), sbgt = 0.2)
+        objs = (MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf), MaximumReturn())
+        l2s = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk_L2.csv"), DataFrame)
+        for (i, obj) ∈ enumerate(objs)
+            mre = MeanRiskEstimator(; obj = MaximumReturn(), opt = opt)
+            w = optimise!(mre, rd).w
+            res = isapprox(w, l2s[!, i])
+            if !res
+                println("Iteration $i failed.")
+                find_tol(w, l2s[!, i]; name1 = :w, name2 = :l2s)
+            end
+            @test res
+        end
+    end
 end

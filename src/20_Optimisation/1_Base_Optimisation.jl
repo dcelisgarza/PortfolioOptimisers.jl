@@ -5,13 +5,13 @@ struct OptimisationSuccess{T1} <: OptimisationReturnCode
     res::T1
 end
 function OptimisationSuccess(; res = nothing)
-    return OptimisationSuccess(res)
+    return OptimisationSuccess{typeof(res)}(res)
 end
 struct OptimisationFailure{T1} <: OptimisationReturnCode
     res::T1
 end
 function OptimisationFailure(; res = nothing)
-    return OptimisationFailure(res)
+    return OptimisationFailure{typeof(res)}(res)
 end
 abstract type OptimisationModelResult <: AbstractResult end
 

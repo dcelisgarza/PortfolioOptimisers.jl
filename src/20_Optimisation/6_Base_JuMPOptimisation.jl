@@ -184,7 +184,11 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
               name => Dict(:objective_val => objective_value(model),
                            :err => solution_summary(model), :settings => settings))
     end
-    retcode = success ? OptimisationSuccess(trials) : OptimisationFailure(trials)
+    retcode = if success
+        OptimisationSuccess(; res = trials)
+    else
+        OptimisationFailure(; res = trials)
+    end
     return retcode, process_model(model, opt)
 end
 function set_portfolio_returns!(model::JuMP.Model, X::AbstractMatrix)
