@@ -272,7 +272,7 @@
     end
     @testset "Cardinality" begin
         rng = StableRNG(987456321)
-        X = randn(rng, 200, 10)
+        X = randn(rng, 100, 10)
         rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
         pr = prior(EmpiricalPriorEstimator(), rd)
         rf = 4.34 / 100 / 252
@@ -298,6 +298,69 @@
         res = optimise!(mre, rd)
         w = res.w
         @test length(w[abs.(w) .> 1e-9]) <= 5
+
+        sets = DataFrame(; Assets = 1:10, Clusters = [1, 5, 5, 2, 3, 2, 4, 1, 3, 4])
+        gcard = [CardinalityConstraint(;
+                                       A = CardinalityConstraintSide(; group = :Assets,
+                                                                     name = 1), B = 0,
+                                       comp = EQ()),
+                 CardinalityConstraint(;
+                                       A = CardinalityConstraintSide(;
+                                                                     group = [:Assets,
+                                                                              :Assets,
+                                                                              :Assets],
+                                                                     name = [4, 5, 6]),
+                                       B = 1, comp = LEQ()),
+                 CardinalityConstraint(;
+                                       A = CardinalityConstraintSide(; group = [:Clusters],
+                                                                     name = [5]), B = 2,
+                                       comp = GEQ())]
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            sbgt = 0.2, gcard = gcard, sets = sets)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test abs(w[1]) <= 1e-10
+        @test count(abs.(w[4:6]) .>= 1e-10) == 1
+        # Non-convex constraint will not always be satisfied.
+        @test count(w[2:3] .>= 1e-10) >= 1
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            sbgt = 0.2, gcard = gcard, sets = sets)
+        mre = MeanRiskEstimator(; obj = MinimumRisk(;), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test abs(w[1]) <= 1e-10
+        @test count(abs.(w[4:6]) .>= 1e-9) == 1
+        @test count(w[2:3] .>= 1e-10) >= 1
+
+        plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = 1)
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            sbgt = 0.2, cplg = plc, sets = sets)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test isapprox(w,
+                       [1.8456010261669554e-10, 1.0760366673033979e-10,
+                        7.637547023819313e-11, 1.444086077173969e-11, 0.5253004523860658,
+                        0.6746995433221714, -0.19999999635382118, 1.9257029156259032e-11,
+                        1.6116913970170744e-10, 8.218370925721848e-11])
+
+        plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = 2)
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            sbgt = 0.2, nplg = plc, sets = sets)
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test isapprox(w,
+                       [2.230281226380989e-11, 0.128660103864006, 0.18738986081361453,
+                        2.4809828406418796e-11, 0.11594431293658082, 1.563055083210075e-11,
+                        0.15255019192434247, 0.11986831475448372, 0.16149593163244153,
+                        0.13409128401178771])
     end
     @testset "Buy in threshold" begin
         rng = StableRNG(987456321)

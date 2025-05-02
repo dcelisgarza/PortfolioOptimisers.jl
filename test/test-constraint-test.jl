@@ -137,8 +137,6 @@
     @testset "Cardinality Constraints" begin
         assets = 1:10
         sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-        loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
-                             QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         constr = [CardinalityConstraint(;
                                         A = CardinalityConstraintSide(; group = :Assets,
                                                                       name = 1),
@@ -261,8 +259,6 @@
     @testset "Weight Bounds constraints" begin
         assets = 1:10
         sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-        loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
-                             QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
 
         hcc_1 = WeightBoundsConstraint(; group = :Assets, name = 1, lb = 0.7, ub = 0.8)
         wb_result = weight_bounds_constraints(hcc_1, sets)

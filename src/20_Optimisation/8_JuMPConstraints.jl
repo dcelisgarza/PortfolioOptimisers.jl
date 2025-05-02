@@ -393,23 +393,23 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
         if !isnothing(gcard.ineq)
             A = gcard.ineq.A
             B = gcard.ineq.B
-            @constraint(model, gcard_ineq, sc * (A * ib - B) <= 0)
+            @constraint(model, gcard_ineq, sc * (A * ib ⊖ B) <= 0)
         end
         if !isnothing(gcard.eq)
             A = gcard.eq.A
             B = gcard.eq.B
-            @constraint(model, gcard_eq, sc * (A * ib - B) == 0)
+            @constraint(model, gcard_eq, sc * (A * ib ⊖ B) == 0)
         end
     end
     if n_flag
         A = nplg.A
         B = nplg.B
-        @constraint(model, card_nplg, sc * (A * ib - B) <= 0)
+        @constraint(model, card_nplg, sc * (A * ib ⊖ B) <= 0)
     end
     if c_flag
         A = cplg.A
         B = cplg.B
-        @constraint(model, card_cplg, sc * (A * ib - B) <= 0)
+        @constraint(model, card_cplg, sc * (A * ib ⊖ B) <= 0)
     end
     return nothing
 end
