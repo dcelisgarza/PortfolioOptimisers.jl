@@ -64,7 +64,6 @@ function sdp_rc_variance_flag!(::JuMP.Model, ::MeanRiskEstimator, ::Nothing)
 end
 function sdp_rc_variance_flag!(model::JuMP.Model, ::MeanRiskEstimator,
                                ::LinearConstraintResult)
-    set_sdp_constraints!(model)
     return true
 end
 function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
@@ -92,7 +91,7 @@ function set_variance_risk!(model::JuMP.Model, i::Integer, r::Variance,
 end
 function set_sdp_variance_risk!(model::JuMP.Model, i::Integer, r::Variance,
                                 pr::AbstractPriorResult, key::Symbol)
-    W = model[:W]
+    W = set_sdp_constraints!(model)
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     sigma_W = model[Symbol(:sigma_W_, i)] = @expression(model, sigma * W)
     model[key] = @expression(model, tr(sigma_W))

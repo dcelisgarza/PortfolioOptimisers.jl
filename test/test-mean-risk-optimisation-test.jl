@@ -317,7 +317,7 @@
                                        comp = GEQ())]
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
-                            sbgt = 0.2, gcard = gcard, sets = sets)
+                            sbgt = 0.2, gcard = cardinality_constraints(gcard, sets))
         mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
@@ -326,9 +326,10 @@
         # Non-convex constraint will not always be satisfied.
         @test count(w[2:3] .>= 1e-10) >= 1
 
+        gcard = cardinality_constraints(gcard, sets)
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
-                            sbgt = 0.2, gcard = gcard, sets = sets)
+                            sbgt = 0.2, gcard = gcard)
         mre = MeanRiskEstimator(; obj = MinimumRisk(;), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
@@ -339,10 +340,9 @@
         plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = 1)
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
-                            sbgt = 0.2, cplg = plc, sets = sets)
+                            sbgt = 0.2, cplg = plc)
         mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise!(mre, rd)
-        w = res.w
+        w = optimise!(mre, rd).w
         @test isapprox(w,
                        [6.565615791643085e-11, -0.19999999121989026, 1.1785997032846193e-10,
                         0.6290623048410415, 5.669382582540041e-11, 4.528644817343074e-11,
@@ -352,10 +352,9 @@
         plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = 2)
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
-                            sbgt = 0.2, nplg = plc, sets = sets)
+                            sbgt = 0.2, nplg = philogeny_constraints(plc, pr.X))
         mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
-        res = optimise!(mre, rd)
-        w = res.w
+        w = optimise!(mre, rd).w
         @test isapprox(w,
                        [0.15616982467766627, 2.2656841976377252e-11, 0.19557380334333288,
                         0.19944892242638101, 2.4922670956199834e-11, 0.16450406834316814,
@@ -588,5 +587,128 @@
                         0.04315766900162179, 0.1603321007671644, 0.20317327390515688,
                         0.04447891409165531])
         @test isapprox(norm((pr.X * (w - wt)), 2) / sqrt(99), 2e-1)
+    end
+    @testset "Linear constraints" begin
+        rng = StableRNG(987456321)
+        X = randn(rng, 100, 10)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+        pr = prior(EmpiricalPriorEstimator(), rd)
+        rf = 4.34 / 100 / 252
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+        sets = DataFrame(; Assets = 1:10, Clusters = [1, 2, 2, 2, 3, 2, 2, 1, 3, 3])
+        lcs = [LinearConstraint(;
+                                A = LinearConstraintSide(; group = :Assets, name = 1,
+                                                         coef = 2), B = 0.35, comp = EQ()),
+               LinearConstraint(;
+                                A = LinearConstraintSide(; group = [:Assets, :Assets],
+                                                         name = [2, 3], coef = [1, 1]),
+                                B = 0.25, comp = LEQ()),
+               LinearConstraint(;
+                                A = LinearConstraintSide(; group = [:Clusters, :Clusters],
+                                                         name = [3, 1], coef = [1, -1]),
+                                comp = GEQ())]
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            lcs = lcs, sets = sets)
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [0.17500000000000002, 0.056672594169432, 0.134827864713012,
+                        0.15636840063051952, 0.08839444606352834, 0.13072388756495892,
+                        0.04259248972643833, 0.0631899465817782, 0.09698710536878327,
+                        0.055243265181549386])
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            lcs = linear_constraints(lcs, sets))
+        mre = MeanRiskEstimator(; obj = MaximumRatio(), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [0.17500000000000002, -0.3143311484128232, 0.38867530770094716,
+                        0.6157211170767352, -0.04825857427255002, -0.2511230567831435,
+                        -0.23502985400500326, 0.223043813600885, 0.5975597311692123,
+                        -0.15125733607425962])
+    end
+    @testset "SDP philogeny constraints" begin
+        rng = StableRNG(987456321)
+        X = randn(rng, 100, 10)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+        pr = prior(EmpiricalPriorEstimator(), rd)
+        rf = 4.34 / 100 / 252
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+        plc = SemiDefinitePhilogenyConstraintEstimator(; pe = NetworkEstimator())
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            sbgt = 0.2, cplg = plc)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [3.6953960918389623e-9, -8.116671904662005e-9, 0.2529401621399866,
+                        0.30736755157747137, 4.027173732707104e-9, -0.03550309450567128,
+                        2.239215818086039e-10, 0.17572599777864328, 0.29946938098042336,
+                        2.199327227941719e-9])
+
+        mre = MeanRiskEstimator(; r = ConditionalValueatRisk(),
+                                obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [-2.1268204115045244e-9, -0.06023046002084164, 0.2601463681020507,
+                        0.4010094500291993, -1.499386434008056e-10, -0.13976952342299712,
+                        -1.5207511190183943e-8, 0.23777409644795705, 0.3010700864415278,
+                        -9.263056126010764e-11])
+
+        plc = SemiDefinitePhilogenyConstraintEstimator(; pe = NetworkEstimator(), p = 6)
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            sbgt = 0.2, nplg = philogeny_constraints(plc, pr.X))
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [0.17673380727204593, 0.08326966052061112, 0.18709669597510795,
+                        0.2002577978297424, 1.7210353823224098e-9, 0.1880798483747277,
+                        4.962867905046867e-10, 1.8582805470739734e-9, 0.164562183610663,
+                        2.3415015323949065e-9])
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            sbgt = 0.2, nplg = philogeny_constraints(plc, pr.X))
+        mre = MeanRiskEstimator(; r = ConditionalValueatRisk(), obj = MinimumRisk(),
+                                opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [0.11737108484659549, 0.10295832275488781, 0.2060267151861739,
+                        0.1681680133217313, 0.1284711629412345, 0.04031284721307575,
+                        5.723402852388069e-10, 0.0559632024752181, 0.045584246951029764,
+                        0.13514440373771314])
+
+        mre = MeanRiskEstimator(;
+                                r = UncertaintySetVariance(;
+                                                           ucs = NormalUncertaintySetEstimator(;
+                                                                                               pe = EmpiricalPriorEstimator(),
+                                                                                               rng = rng,
+                                                                                               alg = BoxUncertaintySetAlgorithm(),
+                                                                                               seed = 987654321)),
+                                obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre, rd)
+        @test !haskey(res.model, :sdp_nplg_p)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            sbgt = 0.2, cplg = philogeny_constraints(plc, pr.X))
+        mre = MeanRiskEstimator(;
+                                r = UncertaintySetVariance(;
+                                                           ucs = sigma_ucs(NormalUncertaintySetEstimator(;
+                                                                                                         pe = EmpiricalPriorEstimator(),
+                                                                                                         rng = rng,
+                                                                                                         alg = BoxUncertaintySetAlgorithm(),
+                                                                                                         seed = 987654321),
+                                                                           pr.X)),
+                                obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre, rd)
+        @test !haskey(res.model, :sdp_cplg_p)
     end
 end
