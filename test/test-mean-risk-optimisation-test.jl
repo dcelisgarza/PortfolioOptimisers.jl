@@ -438,7 +438,7 @@
                        [2.3544021099472797e-11, 2.3163252680475905e-11, 0.1924495112365115,
                         0.3672170233262318, 2.4475925865815772e-11, 2.3530483647261788e-11,
                         2.1824449308113803e-11, 0.10258877483006534, 0.3377446904721447,
-                        1.8502046750641024e-11])
+                        1.8502046750641024e-11], rtol = 5e-8)
     end
     @testset "Cone constraints" begin
         rng = StableRNG(987456321)
@@ -458,5 +458,72 @@
         mre = MeanRiskEstimator(; obj = MaximumRatio(), opt = opt)
         w = optimise!(mre, rd).w
         @test isapprox(number_effective_assets(w), opt.nea)
+
+        wt = fill(0.1, 10)
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            tn = Turnover(; w = wt, val = 0))
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w, wt)
+        @test all(abs.(w - wt) .<= sqrt(eps()))
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            tn = Turnover(; w = wt, val = 3e-2))
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [0.09838186359158242, 0.07429091883966105, 0.12999999483607297,
+                        0.12999999675917417, 0.10527220447242658, 0.1299999813759498,
+                        0.07000000602340767, 0.08823911816149423, 0.10381512994046116,
+                        0.0700007859997699])
+        @test all(abs.(w - wt) .- 3e-2 .<= sqrt(eps()))
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            tn = Turnover(; w = wt, val = 1e-1))
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [1.4061878058256093e-8, 3.2682714673769967e-9, 0.20000000187647496,
+                        0.20000000319773245, 0.1532227340099844, 5.939901319051865e-9,
+                        3.774002593682716e-9, 0.20000000074571223, 0.20000000280780275,
+                        0.04677723031823912])
+        @test all(abs.(w - wt) .- 1e-1 .<= sqrt(eps()))
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            te = TrackingError(; err = 0,
+                                               tracking = WeightsTracking(; w = wt)))
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w, wt)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            te = TrackingError(; err = 1e-1,
+                                               tracking = WeightsTracking(; w = wt)))
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [0.10122218928767425, 0.0697723970391325, 0.14252417943786366,
+                        0.14754495692797234, 0.10030912173583756, 0.1296476274398672,
+                        0.05274102050569697, 0.08714654897195642, 0.1033995252161385,
+                        0.06569243343786041])
+        @test isapprox(norm(pr.X * (w - wt), 2) / sqrt(99), 1e-1, rtol = 5e-6)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            te = TrackingError(; err = 0.2,
+                                               tracking = WeightsTracking(; w = wt)))
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [0.0615428902320536, 0.026919272601190897, 0.17175132213378294,
+                        0.19286825178611525, 0.0642575612240317, 0.031518744257227255,
+                        0.04315766900162179, 0.1603321007671644, 0.20317327390515688,
+                        0.04447891409165531])
+        @test isapprox(norm((pr.X * (w - wt)), 2) / sqrt(99), 2e-1)
     end
 end

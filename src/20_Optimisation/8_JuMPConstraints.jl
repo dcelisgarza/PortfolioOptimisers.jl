@@ -466,17 +466,18 @@ function set_tracking_error_constraints!(args...)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, X::AbstractMatrix,
-                                         tr::TrackingError)
+                                         tre::TrackingError)
     k = model[:k]
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, X)
-    wb = tracking_benchmark(tr.tracking, X)
-    err = tr.err
+    wb = tracking_benchmark(tre.tracking, X)
+    err = tre.err
+    f = err * sqrt(size(X, 1) - 1)
     @variable(model, t_tr)
-    @expression(model, tr, net_X - wb * k)
+    @expression(model, te, net_X - wb * k)
     @constraints(model, begin
-                     ctr_soc, [sc * t_tr; sc * tr] ∈ SecondOrderCone()
-                     ctr, sc * (t_tr - err * k * sqrt(size(X, 1) - 1)) <= 0
+                     ctr_soc, [sc * t_tr; sc * te] ∈ SecondOrderCone()
+                     ctr, sc * (t_tr - f * k) <= 0
                  end)
     return nothing
 end

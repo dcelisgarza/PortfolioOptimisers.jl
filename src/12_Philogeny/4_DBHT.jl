@@ -108,13 +108,13 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
         if length(ou_v) == 1  # Special case for the last vertex
             ve = ou_v[1]
             v = 1
-            tr = argmax(vec(gain[ou_v, :]))
+            agm = argmax(vec(gain[ou_v, :]))
         else
             gij, v = findmax(gain[ou_v, :]; dims = 1)
             v = vec(getindex.(v, 1))
-            tr = argmax(vec(gij))
-            ve = ou_v[v[tr]]
-            v = v[tr]
+            agm = argmax(vec(gij))
+            ve = ou_v[v[agm]]
+            v = v[agm]
         end
 
         # Update vertex lists
@@ -123,19 +123,19 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
         in_v[k] = ve
 
         # Update adjacency matrix
-        A[ve, tri[tr, :]] .= 1
+        A[ve, tri[agm, :]] .= 1
 
         # Update 3-clique list
-        clique3[k - 4, :] .= tri[tr, :]
+        clique3[k - 4, :] .= tri[agm, :]
 
         # Update triangle list replacing 1 and adding 2 triangles
-        tri[kk + 1, :] .= vcat(tri[tr, [1, 3]], ve) # add
-        tri[kk + 2, :] .= vcat(tri[tr, [2, 3]], ve) # add
-        tri[tr, :] .= vcat(tri[tr, [1, 2]], ve)     # replace
+        tri[kk + 1, :] .= vcat(tri[agm, [1, 3]], ve) # add
+        tri[kk + 2, :] .= vcat(tri[agm, [2, 3]], ve) # add
+        tri[agm, :] .= vcat(tri[agm, [1, 2]], ve)     # replace
 
         # # Update gain table
         gain[ve, :] .= 0
-        gain[ou_v, tr] .= sum(W[ou_v, tri[tr, :]]; dims = 2)
+        gain[ou_v, agm] .= sum(W[ou_v, tri[agm, :]]; dims = 2)
         gain[ou_v, kk + 1] .= sum(W[ou_v, tri[kk + 1, :]]; dims = 2)
         gain[ou_v, kk + 2] .= sum(W[ou_v, tri[kk + 2, :]]; dims = 2)
 
