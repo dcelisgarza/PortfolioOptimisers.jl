@@ -192,7 +192,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::Variance,
                                            <:IntegerPhilogenyResult},
                                nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                            <:IntegerPhilogenyResult})
-    if !haskey(model, :variance_flag) && r.settings.rke
+    if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
@@ -282,6 +282,9 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Integer,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer, r::UncertaintySetVariance,
                                opt::MeanRiskEstimator, pr::AbstractPriorResult, args...)
+    if !haskey(model, :variance_flag)
+        @expression(model, variance_flag, true)
+    end
     set_sdp_constraints!(model)
     ucs = r.ucs
     r_sigma = r.sigma

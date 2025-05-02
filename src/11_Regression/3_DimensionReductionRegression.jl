@@ -44,7 +44,7 @@ function regression(y::AbstractVector, mu::AbstractVector, sigma::AbstractVector
                     x1::AbstractMatrix, Vp::AbstractMatrix)
     fit_result = GLM.lm(x1, y)
     beta_pc = coef(fit_result)[2:end]
-    beta = Vp * beta_pc ⊘ sigma
+    beta = Vp * beta_pc ./ sigma
     beta0 = mean(y) - dot(beta, mu)
     pushfirst!(beta, beta0)
     return beta
@@ -61,7 +61,10 @@ function regression(method::DimensionReductionRegression, X::AbstractMatrix,
     for i ∈ axes(loadings, 1)
         loadings[i, :] .= regression(view(X, :, i), mu, sigma, f1, Vp)
     end
-    return RegressionResult(; b = view(loadings, :, 1), M = view(loadings, :, 2:cols))
+    b = view(loadings, :, 1)
+    M = view(loadings, :, 2:cols)
+    L = transpose(pinv(Vp) * transpose(M .* transpose(sigma)))
+    return RegressionResult(; b = b, M = M, L = L)
 end
 
 export PCA, PPCA, DimensionReductionRegression
