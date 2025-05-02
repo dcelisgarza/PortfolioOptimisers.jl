@@ -231,6 +231,15 @@ end
 function mip_wb(args...)
     return nothing
 end
+function add_to_fees!(model::JuMP.Model, expr::AbstractJuMPScalar)
+    if !haskey(model, :fees)
+        @expression(model, fees, expr)
+    else
+        fees = model[:fees]
+        add_to_expression!(fees, expr)
+    end
+    return nothing
+end
 function mip_wb(model::JuMP.Model, wb::WeightBoundsResult, il::AbstractVector,
                 is::AbstractVector)
     sc = model[:sc]
@@ -242,15 +251,6 @@ function mip_wb(model::JuMP.Model, wb::WeightBoundsResult, il::AbstractVector,
     ub = wb.ub
     if !isnothing(ub) && w_finite_flag(ub)
         @constraint(model, w_mip_ub, sc * (w - il ⊙ ub) <= 0)
-    end
-    return nothing
-end
-function add_to_fees!(model::JuMP.Model, expr::AbstractJuMPScalar)
-    if !haskey(model, :fees)
-        @expression(model, fees, expr)
-    else
-        fees = model[:fees]
-        add_to_expression!(fees, expr)
     end
     return nothing
 end

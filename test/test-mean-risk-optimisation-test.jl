@@ -429,5 +429,34 @@
                         0.7342589044174791, -6.514989170965486e-12, -0.32364912840303894,
                         -0.23167510459270654, 0.2357615905399629, 0.6815286210524997,
                         -0.06625627604226367])
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            fees = PortfolioOptimisers.Fees(; fixed_long = 0.001))
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [2.3544021099472797e-11, 2.3163252680475905e-11, 0.1924495112365115,
+                        0.3672170233262318, 2.4475925865815772e-11, 2.3530483647261788e-11,
+                        2.1824449308113803e-11, 0.10258877483006534, 0.3377446904721447,
+                        1.8502046750641024e-11])
+    end
+    @testset "Cone constraints" begin
+        rng = StableRNG(987456321)
+        X = randn(rng, 100, 10)
+        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+        pr = prior(EmpiricalPriorEstimator(), rd)
+        rf = 4.34 / 100 / 252
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+        opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 7.5,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+        mre = MeanRiskEstimator(; obj = MaximumReturn(), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(number_effective_assets(w), opt.nea)
+
+        mre = MeanRiskEstimator(; obj = MaximumRatio(), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(number_effective_assets(w), opt.nea)
     end
 end

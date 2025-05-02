@@ -28,6 +28,9 @@ function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,
                                 <:EqualRiskMeasure}, w::AbstractVector, args...; kwargs...)
     return r(w)
 end
+function number_effective_assets(w::AbstractVector)
+    return inv(dot(w, w))
+end
 #=
 function expected_risk(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
                        w::AbstractVector, X::AbstractMatrix,
@@ -61,4 +64,4 @@ function expected_risk(sc::LogSumExpScalariser, rs::AbstractVector{<:RiskMeasure
 end
 =#
 
-export expected_risk
+export expected_risk, number_effective_assets
