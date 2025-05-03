@@ -714,4 +714,35 @@
         res = optimise!(mre, rd)
         @test !haskey(res.model, :sdp_cplg_p)
     end
+    @testset "Centrality" begin
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+        ce = CentralityConstraintEstimator(; A = CentralityEstimator(), B = MinValue(),
+                                           comp = LEQ())
+        sets = DataFrame(; Assets = 1:10, Clusters = [1, 2, 2, 2, 3, 2, 2, 1, 3, 3])
+        opt = JuMPOptimiser(; pe = pr, slv = slv, cent = ce, sets = sets)
+        mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test all(abs.(res.cent.A_ineq * w .- res.cent.B_ineq) .<= sqrt(eps()))
+        @test isapprox(w,
+                       [0.22435864236807318, 0.11900511795941895, 0.2042024901056272,
+                        0.21713501321050613, -1.1594442746740814e-10, 0.23529873506572008,
+                        -1.461171082669015e-10, -1.3517306778692135e-10,
+                        1.1400266353179912e-9, 5.478625248874811e-10])
+
+        ce = [CentralityConstraintEstimator(; A = CentralityEstimator(), B = MedianValue(),
+                                            comp = EQ())]
+        opt = JuMPOptimiser(; pe = pr, slv = slv, cent = ce, sets = sets)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test all(abs.(res.cent.A_eq * w .- res.cent.B_eq) .<= sqrt(eps()))
+        @test isapprox(w,
+                       [1.5080697736395485e-9, 1.0676961354967205e-10, 0.20143237340958933,
+                        0.37944774611460697, 2.08976824723604e-9, 4.915607815862469e-10,
+                        3.260477423319088e-10, 0.08088011921478026, 0.3382397556825816,
+                        1.0562258217209712e-9])
+    end
 end
