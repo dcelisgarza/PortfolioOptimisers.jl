@@ -18,28 +18,25 @@ function BudgetRange(; lb::Union{Nothing, <:Real} = 1.0, ub::Union{Nothing, <:Re
     end
     return BudgetRange{typeof(lb), typeof(ub)}(lb, ub)
 end
-function set_budget_constraints!(args...; kwargs...)
+function set_budget_constraints!(args...)
     return nothing
 end
-function set_budget_constraints!(model::JuMP.Model, val::Real, w::AbstractVector;
-                                 key::Symbol = :bgt, kwargs...)
+function set_budget_constraints!(model::JuMP.Model, val::Real, w::AbstractVector)
     k = model[:k]
     sc = model[:sc]
-    model[key] = @constraint(model, sc * (sum(w) - k * val) == 0)
+    @constraint(model, bgt, sc * (sum(w) - k * val) == 0)
     return nothing
 end
-function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::AbstractVector;
-                                 key_lb::Symbol = :bgt_lb, key_ub::Symbol = :bgt_ub,
-                                 kwargs...)
+function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::AbstractVector)
     k = model[:k]
     sc = model[:sc]
     lb = bgt.lb
     ub = bgt.ub
     if !isnothing(lb)
-        model[key_lb] = @constraint(model, sc * (sum(w) - k * lb) >= 0)
+        @constraint(model, bgt_lb, sc * (sum(w) - k * lb) >= 0)
     end
     if !isnothing(ub)
-        model[key_ub] = @constraint(model, sc * (sum(w) - k * ub) <= 0)
+        @constraint(model, bgt_ub, sc * (sum(w) - k * ub) <= 0)
     end
     return nothing
 end
@@ -181,7 +178,7 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     if !isnothing(ub) && w_finite_flag(ub)
         @constraint(model, w_ub, sc * (w - k * ub) <= 0)
     end
-    set_budget_constraints!(model, bgt, w; key = :bgt, key_lb = :bgt_lb, key_ub = :bgt_ub)
+    set_budget_constraints!(model, bgt, w)
     if flag
         @variables(model, begin
                        lw[1:N] >= 0
@@ -191,8 +188,6 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
                          w_lw, sc * (w - lw) <= 0
                          w_sw, sc * (w + sw) >= 0
                      end)
-        set_budget_constraints!(model, sbgt, sw; key = :sbgt, key_lb = :sbgt_lb,
-                                key_ub = :sbgt_ub)
         set_long_short_budget_constraints!(model, bgt, sbgt)
     else
         @expression(model, lw, w)
