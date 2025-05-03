@@ -12,6 +12,7 @@
             end
         end
     end
+    rf = 4.34 / 100 / 252
     @testset "MeanRisk measures" begin
         rng = StableRNG(987456321)
         X = randn(rng, 200, 10)
@@ -22,7 +23,6 @@
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
         ew = eweights(1:size(X, 1), inv(size(X, 1)); scale = true)
         w1 = fill(inv(10), 10)
-        rf = 4.34 / 100 / 252
         sigma = cov(GerberCovariance(), X)
         mu = vec(mean(ShrunkExpectedReturns(; ce = GerberCovariance()), X))
         kt = cokurtosis(Cokurtosis(; alg = Semi()), X; mean = transpose(mu))
@@ -152,15 +152,14 @@
             end
         end
     end
+    rng = StableRNG(987456321)
+    X = randn(rng, 200, 10)
+    rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+    pr = prior(EmpiricalPriorEstimator(), rd)
     @testset "Returns lower bounds" begin
-        rng = StableRNG(987456321)
-        X = randn(rng, 200, 10)
-        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-        pr = prior(EmpiricalPriorEstimator(), rd)
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
-        rf = 4.34 / 100 / 252
         ucs1 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
                                                     rng = rng,
                                                     alg = BoxUncertaintySetAlgorithm(),
@@ -230,11 +229,6 @@
             end
         end
     end
-    rng = StableRNG(987456321)
-    X = randn(rng, 100, 10)
-    rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-    pr = prior(EmpiricalPriorEstimator(), rd)
-    rf = 4.34 / 100 / 252
     @testset "Budget range" begin
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
@@ -270,6 +264,10 @@
         @test 0.6 + 0.1 - sqrt(eps()) <= sum(w[w .> 0]) <= 0.8 + 0.3 + sqrt(eps())
         @test 0.6 - sqrt(eps()) <= sum(w) <= 0.8 + sqrt(eps())
     end
+    rng = StableRNG(987456321)
+    X = randn(rng, 100, 10)
+    rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+    pr = prior(EmpiricalPriorEstimator(), rd)
     @testset "Cardinality" begin
         slv = Solver(; name = :clarabel,
                      solver = solver = optimizer_with_attributes(Pajarito.Optimizer,
