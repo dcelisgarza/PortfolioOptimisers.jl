@@ -123,6 +123,7 @@ end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
                                             sbgt::BudgetRange)
     lw = model[:lw]
+    sw = model[:sw]
     k = model[:k]
     sc = model[:sc]
     lb = bgt.lb
@@ -133,6 +134,8 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
         @constraint(model, lbgt_lb, sc * (sum(lw) - k * (lb + slb)) >= 0)
     elseif !lb_flag && slb_flag
         @constraint(model, lbgt_lb, sc * (sum(lw) - k * lb) >= 0)
+    elseif lb_flag && !slb_flag
+        @constraint(model, sbgt_lb, sc * (sum(sw) - k * slb) >= 0)
     end
     ub = bgt.ub
     sub = sbgt.ub
@@ -142,6 +145,8 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
         @constraint(model, lbgt_ub, sc * (sum(lw) - k * (ub + sub)) <= 0)
     elseif !ub_flag && sub_flag
         @constraint(model, lbgt_ub, sc * (sum(lw) - k * ub) <= 0)
+    elseif ub_flag && !sub_flag
+        @constraint(model, sbgt_ub, sc * (sum(sw) - k * sub) <= 0)
     end
     return nothing
 end

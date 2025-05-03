@@ -229,7 +229,7 @@
             end
         end
     end
-    @testset "Budget range" begin
+    @testset "Budget" begin
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
@@ -318,6 +318,24 @@
         w = optimise!(mre, rd).w
         @test isapprox(sum(w), 1)
         @test isapprox(sum(w[w .< 0]), -1)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1),
+                            bgt = BudgetRange(; lb = 0.6, ub = nothing),
+                            sbgt = BudgetRange(; lb = nothing, ub = 0.3))
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test sum(w) >= 0.6
+        @test sum(w[w .< 0]) >= -0.3
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1),
+                            bgt = BudgetRange(; lb = nothing, ub = 0.8),
+                            sbgt = BudgetRange(; lb = 0.1, ub = nothing))
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test sum(w) <= 0.8
+        @test sum(w[w .< 0]) <= -0.1
     end
     rng = StableRNG(987456321)
     X = randn(rng, 100, 10)
