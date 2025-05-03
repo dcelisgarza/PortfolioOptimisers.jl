@@ -317,7 +317,7 @@
                                        comp = GEQ())]
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
-                            sbgt = 0.2, gcard = cardinality_constraints(gcard, sets))
+                            sbgt = 0.2, gcard = gcard)
         mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
