@@ -123,6 +123,7 @@ include("./20_Optimisation/9_JuMPOptimiser.jl")
 include("./20_Optimisation/10_MeanRisk.jl")
 include("./20_Optimisation/11_FactorRiskContribution.jl")
 include("./20_Optimisation/12_RiskConstraints.jl")
+include("./20_Optimisation/13_NearOptimalCentering.jl")
 
 include("./21_Expected_Returns.jl")
 

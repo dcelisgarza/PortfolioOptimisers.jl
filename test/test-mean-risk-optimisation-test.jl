@@ -450,8 +450,8 @@
         w = res.w
         @test all(w[abs.(w) .> 1e-9] .- 0.2 .>= -sqrt(eps()))
 
-        opt = JuMPOptimiser(; str_names = true, pe = pr, slv = slv, lt = 0.5, st = 0.15,
-                            sbgt = 1, bgt = 0.7, wb = WeightBoundsResult(; lb = -1, ub = 1))
+        opt = JuMPOptimiser(; pe = pr, slv = slv, lt = 0.5, st = 0.15, sbgt = 1, bgt = 0.7,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1))
         mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
@@ -459,8 +459,7 @@
         @test all(w[w .< 0] .+ 0.15 .<= sqrt(eps()))
         @test all(w[w .>= 0] .- 0.5 .>= -sqrt(eps()))
 
-        opt = JuMPOptimiser(; str_names = true, pe = pr, slv = slv, lt = 0.15, st = 0.2,
-                            sbgt = 0.5, bgt = 1,
+        opt = JuMPOptimiser(; pe = pr, slv = slv, lt = 0.15, st = 0.2, sbgt = 0.5, bgt = 1,
                             wb = WeightBoundsResult(; lb = -0.5, ub = 1))
         mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
@@ -544,7 +543,9 @@
                         -0.06625626344612386])
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            fees = PortfolioOptimisers.Fees(; fixed_long = 0.001))
+                            fees = PortfolioOptimisers.Fees(; short = 0.003,
+                                                            fixed_short = 0.004,
+                                                            fixed_long = 0.001))
         mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
         @test isapprox(w,

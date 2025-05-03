@@ -1,9 +1,11 @@
 struct MeanRiskEstimator{T1 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                         T2 <: ObjectiveFunction, T3 <: JuMPOptimiser} <:
+                         T2 <: ObjectiveFunction, T3 <: JuMPOptimiser,
+                         T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
        JuMPOptimisationEstimator
     r::T1
     obj::T2
     opt::T3
+    wi::T4
 end
 function MeanRiskEstimator(;
                            r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
@@ -20,7 +22,7 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
     pr = prior(mr.opt.pe, rd.X, rd.F)
     datatype = eltype(pr.X)
-    set_w!(model, pr.X, mr.opt.wi)
+    set_w!(model, pr.X, mr.wi)
     set_maximum_ratio_factor_variables!(model, pr.mu, mr.obj)
     wb = weight_bounds_constraints(mr.opt.wb, mr.opt.sets; N = size(pr.X, 2),
                                    strict = mr.opt.strict)
