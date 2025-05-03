@@ -153,6 +153,57 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     end
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F)
 end
+function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
+                             asset_classes::DataFrame, col, date0 = nothing,
+                             date1 = nothing)
+    #! Make this efficient with filter.
+    idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
+        timestamps = timestamp(X)
+        idx = DateTime(date0) .<= timestamps .<= DateTime(date1)
+        findfirst(idx), findlast(idx)
+    else
+        1, length(X)
+    end
+
+    ret = vec(values(X[idx2]) ./ values(X[idx1]) .- 1)
+
+    # ret_w = dot(ret, w)
+    ret_b = dot(ret, wb)
+
+    classes = asset_classes[!, col]
+    unique_classes = unique(classes)
+
+    df = DataFrame(;
+                   index = ["Asset Allocation", "Security Selection", "Interaction",
+                            "Total Excess Return"])
+
+    for class_i ∈ unique_classes
+        sets_i = BitVector(undef, 0)
+        for class_j ∈ classes
+            push!(sets_i, class_i == class_j)
+        end
+
+        w_i = dot(sets_i, w)
+        wb_i = dot(sets_i, wb)
+
+        ret_i = dot(ret .* sets_i, w) / w_i
+        ret_b_i = dot(ret .* sets_i, wb) / wb_i
+
+        w_diff_i = w_i - wb_i
+        ret_diff_i = ret_i - ret_b_i
+
+        AA_i = w_diff_i * (ret_b_i - ret_b)
+        SS_i = wb_i * ret_diff_i
+        I_i = w_diff_i * ret_diff_i
+        TER_i = AA_i + SS_i + I_i
+
+        df[!, class_i] = [AA_i, SS_i, I_i, TER_i]
+    end
+
+    df[!, "Total"] = sum(eachcol(df[!, 2:end]))
+
+    return df
+end
 ⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
 outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
 ⊙(A::AbstractArray, B::AbstractArray) = A .* B

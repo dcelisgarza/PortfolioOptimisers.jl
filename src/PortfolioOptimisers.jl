@@ -124,4 +124,6 @@ include("./20_Optimisation/10_MeanRisk.jl")
 include("./20_Optimisation/11_FactorRiskContribution.jl")
 include("./20_Optimisation/12_RiskConstraints.jl")
 
+include("./21_Expected_Returns.jl")
+
 end

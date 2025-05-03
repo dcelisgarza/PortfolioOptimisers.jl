@@ -22,18 +22,18 @@ const FourthPowerRiskMeasures = Union{<:HighOrderMoment{<:Any, <:FourthLowerMome
                                                         <:HighOrderDeviation{<:FourthCentralMoment,
                                                                              <:Any}, <:Any,
                                                         <:Any}}
-function adjust_risk_contribution(::Any, val, args...)
+function adjust_risk_contribution(::Any, val::Real, args...)
     return val
 end
-function adjust_risk_contribution(::SquaredRiskMeasures, val, args...)
+function adjust_risk_contribution(::SquaredRiskMeasures, val::Real, args...)
     return val * 0.5
 end
-function adjust_risk_contribution(::CubedRiskMeasures, val, args...)
+function adjust_risk_contribution(::CubedRiskMeasures, val::Real, args...)
     return val / 3
 end
-function adjust_risk_contribution(::FourthPowerRiskMeasures, val, args...)
+function adjust_risk_contribution(::FourthPowerRiskMeasures, val::Real, args...)
     return val * 0.25
 end
-function adjust_risk_contributions(::EqualRiskMeasure, val, delta::Real = 0.0)
+function adjust_risk_contributions(::EqualRiskMeasure, val::Real, delta::Real = 0.0)
     return val + delta
 end

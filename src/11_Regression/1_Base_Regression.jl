@@ -19,6 +19,13 @@ function RegressionResult(; b::Union{Nothing, <:AbstractVector}, M::AbstractMatr
     end
     return RegressionResult{typeof(b), typeof(M), typeof(L)}(b, M, L)
 end
+function Base.getproperty(r::RegressionResult, sym::Symbol)
+    return if sym == :frc
+        isnothing(r.L) ? r.M : r.L
+    else
+        getfield(r, sym)
+    end
+end
 function regression_view(r::RegressionResult, i::AbstractVector)
     return RegressionResult(; b = view(r.b, i), M = view(r.M, i, :),
                             L = isnothing(r.L) ? nothing : view(r.L, i, :))
