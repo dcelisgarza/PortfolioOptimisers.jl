@@ -230,12 +230,12 @@
             end
         end
     end
+    rng = StableRNG(987456321)
+    X = randn(rng, 100, 10)
+    rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+    pr = prior(EmpiricalPriorEstimator(), rd)
+    rf = 4.34 / 100 / 252
     @testset "Budget range" begin
-        rng = StableRNG(987456321)
-        X = randn(rng, 200, 10)
-        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-        pr = prior(EmpiricalPriorEstimator(), rd)
-        rf = 4.34 / 100 / 252
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
@@ -271,11 +271,6 @@
         @test 0.6 - sqrt(eps()) <= sum(w) <= 0.8 + sqrt(eps())
     end
     @testset "Cardinality" begin
-        rng = StableRNG(987456321)
-        X = randn(rng, 100, 10)
-        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-        pr = prior(EmpiricalPriorEstimator(), rd)
-        rf = 4.34 / 100 / 252
         slv = Solver(; name = :clarabel,
                      solver = solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                                  "verbose" => false,
@@ -315,9 +310,9 @@
                                        A = CardinalityConstraintSide(; group = [:Clusters],
                                                                      name = [5]), B = 2,
                                        comp = GEQ())]
-        opt = JuMPOptimiser(; pe = pr, slv = slv,
+        opt = JuMPOptimiser(; pe = pr, slv = [slv],
                             wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
-                            sbgt = 0.2, gcard = gcard)
+                            sbgt = 0.2, gcard = gcard, sets = sets)
         mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
@@ -362,11 +357,6 @@
                         1.738849860013668e-11])
     end
     @testset "Buy in threshold" begin
-        rng = StableRNG(987456321)
-        X = randn(rng, 100, 10)
-        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-        pr = prior(EmpiricalPriorEstimator(), rd)
-        rf = 4.34 / 100 / 252
         slv = Solver(; name = :clarabel,
                      solver = solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                                  "verbose" => false,
@@ -409,11 +399,6 @@
         @test all(w[w .>= 0] .- 0.15 .>= -sqrt(eps()))
     end
     @testset "L1 and L2 penalties" begin
-        rng = StableRNG(987456321)
-        X = randn(rng, 100, 10)
-        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-        pr = prior(EmpiricalPriorEstimator(), rd)
-        rf = 4.34 / 100 / 252
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
@@ -453,11 +438,6 @@
         end
     end
     @testset "Fees" begin
-        rng = StableRNG(987456321)
-        X = randn(rng, 100, 10)
-        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-        pr = prior(EmpiricalPriorEstimator(), rd)
-        rf = 4.34 / 100 / 252
         slv = Solver(; name = :clarabel,
                      solver = solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                                  "verbose" => false,
@@ -501,13 +481,46 @@
                         0.3672170233262318, 2.4475925865815772e-11, 2.3530483647261788e-11,
                         2.1824449308113803e-11, 0.10258877483006534, 0.3377446904721447,
                         1.8502046750641024e-11], rtol = 5e-8)
+
+        wt = fill(0.1, 10)
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            fees = PortfolioOptimisers.Fees(;
+                                                            turnover = Turnover(; val = 0,
+                                                                                w = wt)))
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [6.552764846148974e-10, -5.943828279758435e-10, 0.1924493325202225,
+                        0.36721740046202517, 1.9025635276565066e-9, -2.416288675840526e-10,
+                        -2.7273148636586244e-10, 0.10258830140535145, 0.33774496373243884,
+                        4.308652823762546e-10])
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            fees = PortfolioOptimisers.Fees(;
+                                                            turnover = Turnover(; val = 0.1,
+                                                                                w = wt)))
+        mre = MeanRiskEstimator(; obj = MaximumUtility(), opt = opt)
+        w = optimise!(mre, rd).w
+        @test isapprox(w,
+                       [0.09835896556148706, 0.05746450961233853, 0.13960277264399099,
+                        0.1656987569996019, 0.09999999890747412, 0.0999999994456413,
+                        0.04960190697319207, 0.10000000057420562, 0.11555792325996056,
+                        0.07371516602210967])
+
+        opt1 = JuMPOptimiser(; pe = pr, slv = slv,
+                             fees = PortfolioOptimisers.Fees(;
+                                                             turnover = Turnover(;
+                                                                                 val = 100,
+                                                                                 w = wt)))
+        opt2 = JuMPOptimiser(; pe = pr, slv = slv,
+                             fees = PortfolioOptimisers.Fees(;
+                                                             turnover = Turnover(; val = 0,
+                                                                                 w = wt)))
+        mre1 = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt1)
+        mre2 = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt2)
+        @test isapprox(optimise!(mre1, rd).w, optimise!(mre2, rd).w)
     end
     @testset "Cone constraints" begin
-        rng = StableRNG(987456321)
-        X = randn(rng, 100, 10)
-        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-        pr = prior(EmpiricalPriorEstimator(), rd)
-        rf = 4.34 / 100 / 252
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
@@ -589,11 +602,6 @@
         @test isapprox(norm((pr.X * (w - wt)), 2) / sqrt(99), 2e-1)
     end
     @testset "Linear constraints" begin
-        rng = StableRNG(987456321)
-        X = randn(rng, 100, 10)
-        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-        pr = prior(EmpiricalPriorEstimator(), rd)
-        rf = 4.34 / 100 / 252
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
@@ -632,11 +640,6 @@
                         -0.15125733607425962])
     end
     @testset "SDP philogeny constraints" begin
-        rng = StableRNG(987456321)
-        X = randn(rng, 100, 10)
-        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-        pr = prior(EmpiricalPriorEstimator(), rd)
-        rf = 4.34 / 100 / 252
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
