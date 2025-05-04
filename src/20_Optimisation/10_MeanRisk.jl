@@ -10,11 +10,15 @@ end
 function MeanRiskEstimator(;
                            r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                            obj::ObjectiveFunction = MinimumRisk(),
-                           opt::JuMPOptimiser = JuMPOptimiser())
+                           opt::JuMPOptimiser = JuMPOptimiser(),
+                           wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
     end
-    return MeanRiskEstimator{typeof(r), typeof(obj), typeof(opt)}(r, obj, opt)
+    if isa(wi, AbstractVector)
+        @smart_assert(!isempty(wi))
+    end
+    return MeanRiskEstimator{typeof(r), typeof(obj), typeof(opt), typeof(wi)}(r, obj, opt, wi)
 end
 function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     model = JuMP.Model()
