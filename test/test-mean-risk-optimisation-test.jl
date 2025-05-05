@@ -343,13 +343,13 @@
     pr = prior(EmpiricalPriorEstimator(), rd)
     @testset "Cardinality" begin
         slv = Solver(; name = :clarabel,
-                     solver =  solver = optimizer_with_attributes(Pajarito.Optimizer,
-                                                                  "verbose" => false,
-                                                                  "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                           MOI.Silent() => true),
-                                                                  "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                              "verbose" => false,
-                                                                                                              "max_step_fraction" => 0.75)) ,
+                     solver = solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                                 "verbose" => false,
+                                                                 "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                          MOI.Silent() => true),
+                                                                 "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                             "verbose" => false,
+                                                                                                             "max_step_fraction" => 0.75)),
                      check_sol = (; allow_local = true, allow_almost = true))
         opt = JuMPOptimiser(; pe = pr, slv = slv, card = 3)
         mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
@@ -429,13 +429,13 @@
     end
     @testset "Buy in threshold" begin
         slv = Solver(; name = :clarabel,
-                     solver =  solver = optimizer_with_attributes(Pajarito.Optimizer,
-                                                                  "verbose" => false,
-                                                                  "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                           MOI.Silent() => true),
-                                                                  "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                              "verbose" => false,
-                                                                                                              "max_step_fraction" => 0.75)) ,
+                     solver = solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                                 "verbose" => false,
+                                                                 "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                          MOI.Silent() => true),
+                                                                 "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                             "verbose" => false,
+                                                                                                             "max_step_fraction" => 0.75)),
                      check_sol = (; allow_local = true, allow_almost = true))
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, lt = 0.2)
@@ -509,13 +509,13 @@
     end
     @testset "Fees" begin
         slv = Solver(; name = :clarabel,
-                     solver =  solver = optimizer_with_attributes(Pajarito.Optimizer,
-                                                                  "verbose" => false,
-                                                                  "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                           MOI.Silent() => true),
-                                                                  "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                              "verbose" => false,
-                                                                                                              "max_step_fraction" => 0.75)) ,
+                     solver = solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                                 "verbose" => false,
+                                                                 "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                          MOI.Silent() => true),
+                                                                 "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                             "verbose" => false,
+                                                                                                             "max_step_fraction" => 0.75)),
                      check_sol = (; allow_local = true, allow_almost = true))
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             fees = PortfolioOptimisers.Fees(; long = 0.05, short = 0.03,
