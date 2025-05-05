@@ -1,9 +1,9 @@
 module PortfolioOptimisers
 
-using AverageShiftedHistograms, Clustering, Distances, Distributions, GLM, Impute, JuMP,
-      LinearAlgebra, MultivariateStats, NearestCorrelationMatrix, Optim, Graphs,
-      SimpleWeightedGraphs, PythonCall, Random, SmartAsserts, SparseArrays, Statistics,
-      StatsBase, DataFrames, TimeSeries
+using AverageShiftedHistograms, Clustering, Distances, Distributions, GLM, Impute,
+      InteractiveUtils, JuMP, LinearAlgebra, MultivariateStats, NearestCorrelationMatrix,
+      Optim, Graphs, SimpleWeightedGraphs, PythonCall, Random, SmartAsserts, SparseArrays,
+      Statistics, StatsBase, DataFrames, TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let
@@ -122,8 +122,8 @@ include("./20_Optimisation/8_JuMPConstraints.jl")
 include("./20_Optimisation/9_JuMPOptimiser.jl")
 include("./20_Optimisation/10_MeanRisk.jl")
 include("./20_Optimisation/11_FactorRiskContribution.jl")
-include("./20_Optimisation/12_RiskConstraints.jl")
-include("./20_Optimisation/13_NearOptimalCentering.jl")
+include("./20_Optimisation/12_NearOptimalCentering.jl")
+include("./20_Optimisation/13_RiskConstraints.jl")
 
 include("./21_Expected_Returns.jl")
 

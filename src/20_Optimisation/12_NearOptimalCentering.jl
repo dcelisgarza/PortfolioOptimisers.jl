@@ -1,0 +1,305 @@
+struct NearOptimalCenteringEstimator{T1 <:
+                                     Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+                                     T2 <: ObjectiveFunction, T3 <: JuMPOptimiser,
+                                     T4 <: Real, T5 <: Union{Nothing, <:AbstractVector},
+                                     T6 <: Union{Nothing, <:AbstractVector},
+                                     T7 <: Union{Nothing, <:AbstractVector},
+                                     T8 <: Union{Nothing, <:AbstractVector},
+                                     T9 <: Union{Nothing, <:AbstractVector},
+                                     T10 <: Union{Nothing, <:AbstractVector}, T11 <: Bool,
+                                     T12 <: Bool} <: JuMPOptimisationEstimator
+    r::T1
+    obj::T2
+    opt::T3
+    bins::T4
+    w_min::T5
+    w_min_ini::T6
+    w_opt::T7
+    w_opt_ini::T8
+    w_max::T9
+    w_max_ini::T10
+    str_names::T11
+    save::T12
+end
+function NearOptimalCenteringEstimator(;
+                                       r::Union{<:RiskMeasure,
+                                                <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
+                                       obj::ObjectiveFunction = MinimumRisk(),
+                                       opt::JuMPOptimiser = JuMPOptimiser(),
+                                       bins::Real = 20,
+                                       w_min::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                                       w_min_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                                       w_opt::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                                       w_opt_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                                       w_max::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                                       w_max_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                                       str_names::Bool = false, save::Bool = true)
+    if isa(r, AbstractVector)
+        @smart_assert(!isempty(r))
+        @smart_assert(!any(isa.(r, Ref(SquaredRiskMeasures))))
+    else
+        @smart_assert(!isa(r, SquaredRiskMeasures))
+    end
+    if isa(w_min, AbstractVector)
+        @smart_assert(!isempty(w_min))
+    end
+    if isa(w_min_ini, AbstractVector)
+        @smart_assert(!isempty(w_min_ini))
+    end
+    if isa(w_opt, AbstractVector)
+        @smart_assert(!isempty(w_opt))
+    end
+    if isa(w_opt_ini, AbstractVector)
+        @smart_assert(!isempty(w_opt_ini))
+    end
+    if isa(w_max, AbstractVector)
+        @smart_assert(!isempty(w_max))
+    end
+    if isa(w_max_ini, AbstractVector)
+        @smart_assert(!isempty(w_max_ini))
+    end
+    @smart_assert(isfinite(bins) && bins > 0)
+    return NearOptimalCenteringEstimator{typeof(r), typeof(obj), typeof(opt), typeof(bins),
+                                         typeof(w_min), typeof(w_min_ini), typeof(w_opt),
+                                         typeof(w_opt_ini), typeof(w_max),
+                                         typeof(w_max_ini), typeof(str_names),
+                                         typeof(save)}(r, obj, opt, bins, w_min, w_min_ini,
+                                                       w_opt, w_opt_ini, w_max, w_max_ini,
+                                                       str_names, save)
+end
+for r ∈ traverse_subtypes(RiskMeasure)
+    eval(quote
+             function no_bounds_risk_measure(r::$(r))
+                 pnames = setdiff(propertynames(r), (:settings,))
+                 settings = r.settings
+                 settings = RiskMeasureSettings(; rke = settings.rke,
+                                                scale = settings.scale)
+                 return if isempty(pnames)
+                     $(r)(settings)
+                 else
+                     $(r)(settings, getproperty.(Ref(r), pnames)...)
+                 end
+             end
+         end)
+end
+function no_bounds_risk_measure(r::AbstractVector{<:RiskMeasure})
+    return no_bounds_risk_measure.(r)
+end
+for r ∈ traverse_subtypes(JuMPReturnsEstimator)
+    eval(quote
+             function no_bounds_returns_estimator(r::$(r))
+                 pnames = setdiff(propertynames(r), (:lb,))
+                 return if isempty(pnames)
+                     $(r)
+                 else
+                     p = getproperty.(Ref(r), pnames)
+                     $(r)(nothing, p...)
+                 end
+             end
+         end)
+end
+function no_bounds_optimiser(opt::JuMPOptimiser)
+    pnames = propertynames(opt)
+    idx = findfirst(x -> x == :ret, pnames)
+    p = getproperty.(Ref(opt), pnames)
+    return JuMPOptimiser(p[1:(idx - 1)]..., no_bounds_returns_estimator(p[idx]),
+                         p[(idx + 1):end]...)
+end
+function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult)
+    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(opt, rd)
+    return JuMPOptimiser(pr, wb, opt.bgt, opt.sbgt, lcs, opt.lcm, cent, opt.card, gcard,
+                         opt.sets, nplg, cplg, opt.lt, opt.st, opt.tn, opt.te, opt.nea,
+                         opt.l1, opt.l2, opt.fees, opt.sce, opt.ret, opt.ccnt, opt.cobj,
+                         opt.sc, opt.so, opt.ss, opt.slv, opt.strict)
+end
+function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
+                                      fees::Union{Nothing, <:Fees},
+                                      slv::Union{Nothing, <:Solver,
+                                                 <:AbstractVector{<:Solver}},
+                                      w_min::AbstractVector, w_opt::AbstractVector,
+                                      w_max::AbstractVector)
+    X = pr.X
+    r = risk_measure_factory(r, pr, slv)
+    scale = r.settings.scale
+    risk_min = expected_risk(r, w_min, X, fees) * scale
+    risk_opt = expected_risk(r, w_opt, X, fees) * scale
+    risk_max = expected_risk(r, w_max, X, fees) * scale
+    return risk_min, risk_opt, risk_max
+end
+function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
+                                      pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                                      slv::Union{Nothing, <:Solver,
+                                                 <:AbstractVector{<:Solver}},
+                                      w_min::AbstractVector, w_opt::AbstractVector,
+                                      w_max::AbstractVector)
+    X = pr.X
+    rs = risk_measure_factory(rs, Ref(pr), Ref(slv))
+    datatype = eltype(X)
+    risk_min = zero(datatype)
+    risk_opt = zero(datatype)
+    risk_max = zero(datatype)
+    for r ∈ rs
+        scale = r.settings.scale
+        risk_min += expected_risk(r, w_min, X, fees) * scale
+        risk_opt += expected_risk(r, w_opt, X, fees) * scale
+        risk_max += expected_risk(r, w_max, X, fees) * scale
+    end
+    return risk_min, risk_opt, risk_max
+end
+function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
+                                      rs::AbstractVector{<:RiskMeasure},
+                                      pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                                      slv::Union{Nothing, <:Solver,
+                                                 <:AbstractVector{<:Solver}},
+                                      w_min::AbstractVector, w_opt::AbstractVector,
+                                      w_max::AbstractVector)
+    X = pr.X
+    rs = risk_measure_factory(rs, Ref(pr), Ref(slv))
+    datatype = eltype(X)
+    risk_min = zero(datatype)
+    risk_opt = zero(datatype)
+    risk_max = zero(datatype)
+    gamma = scalarisation.gamma
+    for r ∈ rs
+        scale = r.settings.scale * gamma
+        risk_min += exp(expected_risk(r, w_min, X, fees) * scale)
+        risk_opt += exp(expected_risk(r, w_opt, X, fees) * scale)
+        risk_max += exp(expected_risk(r, w_max, X, fees) * scale)
+    end
+    igamma = inv(gamma)
+    risk_min = log(risk_min) * igamma
+    risk_opt = log(risk_opt) * igamma
+    risk_max = log(risk_max) * igamma
+    return risk_min, risk_opt, risk_max
+end
+function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:RiskMeasure},
+                                      pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                                      slv::Union{Nothing, <:Solver,
+                                                 <:AbstractVector{<:Solver}},
+                                      w_min::AbstractVector, w_opt::AbstractVector,
+                                      w_max::AbstractVector)
+    X = pr.X
+    rs = risk_measure_factory(rs, Ref(pr), Ref(slv))
+    datatype = eltype(X)
+    risk_min = typemin(datatype)
+    risk_opt = typemin(datatype)
+    risk_max = typemin(datatype)
+    for r ∈ rs
+        scale = r.settings.scale
+        risk_min_i = expected_risk(r, w_min, X, fees) * scale
+        risk_opt_i = expected_risk(r, w_opt, X, fees) * scale
+        risk_max_i = expected_risk(r, w_max, X, fees) * scale
+        if risk_min_i >= risk_min
+            risk_min = risk_min_i
+        end
+        if risk_opt_i >= risk_opt
+            risk_opt = risk_opt_i
+        end
+        if risk_max_i >= risk_max
+            risk_max = risk_max_i
+        end
+    end
+    return risk_min, risk_opt, risk_max
+end
+function near_optimal_centering_setup(noc::NearOptimalCenteringEstimator, rd::ReturnsResult)
+    w_min = noc.w_min
+    w_opt = noc.w_opt
+    w_max = noc.w_max
+    w_min_flag = isnothing(w_min)
+    w_opt_flag = isnothing(w_opt)
+    w_max_flag = isnothing(w_max)
+    r = noc.r
+    opt = processed_jump_optimiser(noc.opt, rd)
+    nb_r = no_bounds_risk_measure(r)
+    nb_opt = no_bounds_optimiser(opt)
+    if w_min_flag
+        res_min = optimise!(MeanRiskEstimator(; r = nb_r, obj = MinimumRisk(), opt = nb_opt,
+                                              wi = noc.w_min_ini, save = false), rd)
+        if isa(res_min.retcode, OptimisationFailure)
+            throw(ErrorException("MinimumRisk optimisation failed.\n$(res_min.retcode)"))
+        end
+        w_min = res_min.w
+    end
+    if w_opt_flag
+        res_opt = optimise!(MeanRiskEstimator(; r = r, obj = noc.obj, opt = opt,
+                                              wi = noc.w_opt_ini, save = false), rd)
+        if isa(res_opt.retcode, OptimisationFailure)
+            throw(ErrorException("MeanRisk optimisation failed.\n$(res_opt.retcode)"))
+        end
+        w_opt = res_opt.w
+    end
+    if w_max_flag
+        res_max = optimise!(MeanRiskEstimator(; r = nb_r, obj = MaximumReturn(),
+                                              opt = nb_opt, wi = noc.w_max_ini,
+                                              save = false), rd)
+        if isa(res_max.retcode, OptimisationFailure)
+            throw(ErrorException("MaximumReturn optimisation failed.\n$(res_max.retcode)"))
+        end
+        w_max = res_max.w
+    end
+    pr = opt.pe
+    fees = opt.fees
+    ret = opt.ret
+    rk_min, rk_opt, rk_max = near_optimal_centering_risks(opt.sce, r, pr, fees, opt.slv,
+                                                          w_min, w_opt, w_max)
+    rt_min = expected_returns(ret, w_min, pr, fees)
+    rt_opt = expected_returns(ret, w_opt, pr, fees)
+    rt_max = expected_returns(ret, w_max, pr, fees)
+    ibins = inv(noc.bins)
+    rk_delta = (rk_max - rk_min) * ibins
+    rt_delta = (rt_max - rt_min) * ibins
+    rk_opt += rk_delta
+    rt_opt -= rt_delta
+    return w_opt, rk_opt, rt_opt, nb_r, nb_opt
+end
+function set_near_optimal_objective_function!(model::JuMP.Model, rk::Real, rt::Real,
+                                              wb::WeightBoundsResult)
+    w = model[:w]
+    sc = model[:sc]
+    so = model[:so]
+    w_ub = wb.ub
+    risk = model[:risk]
+    ret = model[:ret]
+    N = length(w)
+    @variables(model, begin
+                   log_ret
+                   log_risk
+                   log_w[1:N]
+                   log_delta_w[1:N]
+               end)
+    @constraints(model,
+                 begin
+                     clog_risk,
+                     [sc * log_risk, sc, sc * (rk - risk)] in MOI.ExponentialCone()
+                     clog_ret, [sc * log_ret, sc, sc * (ret - rt)] in MOI.ExponentialCone()
+                     clog_w[i = 1:N],
+                     [sc * log_w[i], sc, sc * w[i]] ∈ MOI.ExponentialCone()
+                     clog_delta_w[i = 1:N],
+                     [sc * log_delta_w[i], sc, sc * (w_ub[i] - w[i])] ∈
+                     MOI.ExponentialCone()
+                 end)
+    @expression(model, obj_expr, -(log_ret + log_risk + sum(log_w + log_delta_w)))
+    @objective(model, Min, so * obj_expr)
+    return nothing
+end
+function optimise!(noc::NearOptimalCenteringEstimator, rd::ReturnsResult = ReturnsResult())
+    w_opt, rk_opt, rt_opt, nb_r, nb_opt = near_optimal_centering_setup(noc, rd)
+    model = JuMP.Model()
+    set_string_names_on_creation(model, noc.str_names)
+    set_model_scales!(model, nb_opt.sc, nb_opt.so)
+    @expression(model, k, 1)
+    set_w!(model, nb_opt.pe.X, w_opt)
+    set_weight_constraints!(model, nb_opt.wb, nb_opt.bgt, nothing, true)
+    set_risk_constraints!(model, nb_r, noc, nb_opt.pe, nothing, nothing)
+    scalarise_risk_expression!(model, nb_opt.sce)
+    ret = jump_returns_factory(nb_opt.ret, nb_opt.pe)
+    set_return_constraints!(model, ret, MinimumRisk(), nb_opt.pe)
+    set_near_optimal_objective_function!(model, rk_opt, rt_opt, nb_opt.wb)
+    retcode, sol = optimise_JuMP_model!(model, noc, eltype(nb_opt.pe.X))
+    return JuMPOptimisationResult(Type{NearOptimalCenteringEstimator}, nb_opt.pe, nb_opt.wb,
+                                  nb_opt.lcs, nb_opt.cent, nb_opt.gcard, nb_opt.nplg,
+                                  nb_opt.cplg, retcode, sol,
+                                  ifelse(noc.save, model, nothing))
+end
+
+export NearOptimalCenteringEstimator

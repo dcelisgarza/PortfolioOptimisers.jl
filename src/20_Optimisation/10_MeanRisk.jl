@@ -1,42 +1,37 @@
 struct MeanRiskEstimator{T1 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                          T2 <: ObjectiveFunction, T3 <: JuMPOptimiser,
-                         T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
-       JuMPOptimisationEstimator
+                         T4 <: Union{Nothing, <:AbstractVector{<:Real}}, T5 <: Bool,
+                         T6 <: Bool} <: JuMPOptimisationEstimator
     r::T1
     obj::T2
     opt::T3
     wi::T4
+    str_names::T5
+    save::T6
 end
 function MeanRiskEstimator(;
                            r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                            obj::ObjectiveFunction = MinimumRisk(),
                            opt::JuMPOptimiser = JuMPOptimiser(),
-                           wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+                           wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                           str_names::Bool = false, save::Bool = true)
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
     end
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
-    return MeanRiskEstimator{typeof(r), typeof(obj), typeof(opt), typeof(wi)}(r, obj, opt, wi)
+    return MeanRiskEstimator{typeof(r), typeof(obj), typeof(opt), typeof(wi),
+                             typeof(str_names), typeof(save)}(r, obj, opt, wi, str_names,
+                                                              save)
 end
 function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     model = JuMP.Model()
-    set_string_names_on_creation(model, mr.opt.str_names)
+    set_string_names_on_creation(model, mr.str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
-    pr = prior(mr.opt.pe, rd.X, rd.F)
-    datatype = eltype(pr.X)
+    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(mr.opt, rd)
     set_w!(model, pr.X, mr.wi)
     set_maximum_ratio_factor_variables!(model, pr.mu, mr.obj)
-    wb = weight_bounds_constraints(mr.opt.wb, mr.opt.sets; N = size(pr.X, 2),
-                                   strict = mr.opt.strict)
-    lcs = linear_constraints(mr.opt.lcs, mr.opt.sets; datatype = datatype,
-                             strict = mr.opt.strict)
-    cent = centrality_constraints(mr.opt.cent, pr.X)
-    gcard = cardinality_constraints(mr.opt.gcard, mr.opt.sets; datatype = datatype,
-                                    strict = mr.opt.strict)
-    nplg = philogeny_constraints(mr.opt.nplg, pr.X)
-    cplg = philogeny_constraints(mr.opt.cplg, pr.X)
     set_weight_constraints!(model, wb, mr.opt.bgt, mr.opt.sbgt)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
@@ -57,9 +52,9 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
     set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
-    retcode, sol = optimise_JuMP_model!(model, mr, datatype)
+    retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
     return JuMPOptimisationResult(Type{MeanRiskEstimator}, pr, wb, lcs, cent, gcard, nplg,
-                                  cplg, retcode, sol, model)
+                                  cplg, retcode, sol, ifelse(mr.save, model, nothing))
 end
 
 export MeanRiskEstimator

@@ -43,3 +43,6 @@ function expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEsti
                                                 kwargs...)
     return rk, rt, sr - N / (T * sr)
 end
+
+export expected_returns, expected_sharpe_ratio, expected_risk_ret_sharpe_ratio,
+       expected_sric, expected_risk_ret_sric

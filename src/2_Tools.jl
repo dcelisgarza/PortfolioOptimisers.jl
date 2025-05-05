@@ -259,5 +259,19 @@ function fourth_moment_index_factory(N::Integer, i)
     end
     return idx
 end
+function traverse_subtypes(types, ctarr = nothing)
+    if isnothing(ctarr)
+        ctarr = []
+    end
+    stypes = subtypes(types)
+    for stype ∈ stypes
+        if !isstructtype(stype)
+            traverse_subtypes(stype, ctarr)
+        else
+            push!(ctarr, stype)
+        end
+    end
+    return ctarr
+end
 
 export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns

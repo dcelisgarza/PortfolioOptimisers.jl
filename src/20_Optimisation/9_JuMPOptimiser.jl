@@ -1,3 +1,31 @@
+struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
+                              T3 <: Union{Nothing, WeightBoundsResult},
+                              T4 <: Union{Nothing, <:LinearConstraintResult},
+                              T5 <: Union{Nothing, <:LinearConstraintResult},
+                              T6 <: Union{Nothing, <:LinearConstraintResult},
+                              T7 <: Union{Nothing, <:PhilogenyConstraintResult},
+                              T8 <: Union{Nothing, <:PhilogenyConstraintResult},
+                              T9 <: OptimisationReturnCode, T10 <: JuMPOptimisationSolution,
+                              T11 <: Union{Nothing, JuMP.Model}} <: OptimisationResult
+    oe::T1
+    pr::T2
+    wb::T3
+    lcs::T4
+    cent::T5
+    gcard::T6
+    nplg::T7
+    cplg::T8
+    retcode::T9
+    sol::T10
+    model::T11
+end
+function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
+    return if sym == :w
+        r.sol.w
+    else
+        getfield(r, sym)
+    end
+end
 struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                      T2 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
                      T3 <: Union{Nothing, <:Real, <:BudgetRange},
@@ -25,8 +53,8 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T22 <: JuMPReturnsEstimator, T23 <: Union{Nothing, <:CustomConstraint},
                      T24 <: Union{Nothing, <:CustomObjective}, T25 <: Real, T26 <: Real,
                      T27 <: Union{Nothing, <:Real},
-                     T28 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T29 <: Bool,
-                     T30 <: Bool, T31 <: Bool} <: JuMPOptimisationEstimator
+                     T28 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T29 <: Bool} <:
+       JuMPOptimisationEstimator
     pe::T1 # PriorEstimator
     wb::T2 # WeightBoundsResult
     bgt::T3 # BudgetRange
@@ -55,9 +83,7 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
     so::T26
     ss::T27
     slv::T28
-    str_names::T29
-    save::T30
-    strict::T31
+    strict::T29
 end
 function assert_finite_nonnegative_real_or_vec(val::Real)
     @smart_assert(isfinite(val) && val > zero(val))
@@ -102,7 +128,7 @@ function JuMPOptimiser(;
                        cobj::Union{Nothing, <:CustomObjective} = nothing, sc::Real = 1,
                        so::Real = 1, ss::Union{Nothing, <:Real} = nothing,
                        slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                       str_names::Bool = false, save::Bool = false, strict::Bool = false)
+                       strict::Bool = false)
     if isa(bgt, Real)
         @smart_assert(isfinite(bgt) && bgt >= 0)
     end
@@ -147,12 +173,47 @@ function JuMPOptimiser(;
                          typeof(sets), typeof(nplg), typeof(cplg), typeof(lt), typeof(st),
                          typeof(tn), typeof(te), typeof(nea), typeof(l1), typeof(l2),
                          typeof(fees), typeof(sce), typeof(ret), typeof(ccnt), typeof(cobj),
-                         typeof(sc), typeof(so), typeof(ss), typeof(slv), typeof(str_names),
-                         typeof(save), typeof(strict)}(pe, wb, bgt, sbgt, lcs, lcm, cent,
-                                                       card, gcard, sets, nplg, cplg, lt,
-                                                       st, tn, te, nea, l1, l2, fees, sce,
-                                                       ret, ccnt, cobj, sc, so, ss, slv,
-                                                       str_names, save, strict)
+                         typeof(sc), typeof(so), typeof(ss), typeof(slv), typeof(strict)}(pe,
+                                                                                          wb,
+                                                                                          bgt,
+                                                                                          sbgt,
+                                                                                          lcs,
+                                                                                          lcm,
+                                                                                          cent,
+                                                                                          card,
+                                                                                          gcard,
+                                                                                          sets,
+                                                                                          nplg,
+                                                                                          cplg,
+                                                                                          lt,
+                                                                                          st,
+                                                                                          tn,
+                                                                                          te,
+                                                                                          nea,
+                                                                                          l1,
+                                                                                          l2,
+                                                                                          fees,
+                                                                                          sce,
+                                                                                          ret,
+                                                                                          ccnt,
+                                                                                          cobj,
+                                                                                          sc,
+                                                                                          so,
+                                                                                          ss,
+                                                                                          slv,
+                                                                                          strict)
+end
+function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult)
+    pr = prior(opt.pe, rd.X, rd.F)
+    datatype = eltype(pr.X)
+    wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(pr.X, 2), strict = opt.strict)
+    lcs = linear_constraints(opt.lcs, opt.sets; datatype = datatype, strict = opt.strict)
+    cent = centrality_constraints(opt.cent, pr.X)
+    gcard = cardinality_constraints(opt.gcard, opt.sets; datatype = datatype,
+                                    strict = opt.strict)
+    nplg = philogeny_constraints(opt.nplg, pr.X)
+    cplg = philogeny_constraints(opt.cplg, pr.X)
+    return pr, wb, lcs, cent, gcard, nplg, cplg
 end
 
-export JuMPOptimiser
+export JuMPOptimisationResult, JuMPOptimiser

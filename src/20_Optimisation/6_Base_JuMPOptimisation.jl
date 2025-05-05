@@ -22,34 +22,6 @@ end
 function JuMPOptimisationSolution(; w::AbstractVector)
     return JuMPOptimisationSolution{typeof(w)}(w)
 end
-struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
-                              T3 <: WeightBoundsResult,
-                              T4 <: Union{Nothing, <:LinearConstraintResult},
-                              T5 <: Union{Nothing, <:LinearConstraintResult},
-                              T6 <: Union{Nothing, <:LinearConstraintResult},
-                              T7 <: Union{Nothing, <:PhilogenyConstraintResult},
-                              T8 <: Union{Nothing, <:PhilogenyConstraintResult},
-                              T9 <: OptimisationReturnCode, T10 <: JuMPOptimisationSolution,
-                              T11 <: JuMP.Model} <: OptimisationResult
-    oe::T1
-    pr::T2
-    wb::T3
-    lcs::T4
-    cent::T5
-    gcard::T6
-    nplg::T7
-    cplg::T8
-    retcode::T9
-    sol::T10
-    model::T11
-end
-function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
-    return if sym == :w
-        r.sol.w
-    else
-        getfield(r, sym)
-    end
-end
 function add_to_objective_penalty!(model::JuMP.Model, expr)
     op = if !haskey(model, :op)
         @expression(model, op, zero(AffExpr))
@@ -86,8 +58,8 @@ function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
     else
         @expression(model, risk, zero(AffExpr))
     end
-    for r_risk ∈ risk_vec
-        add_to_expression!(risk, r_risk)
+    for risk_i ∈ risk_vec
+        add_to_expression!(risk, risk_i)
     end
     return nothing
 end
@@ -139,6 +111,9 @@ function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasu
     return nothing
 end
 function process_model(model::JuMP.Model, ::JuMPOptimisationEstimator)
+    if termination_status(model) == JuMP.OPTIMIZE_NOT_CALLED
+        return JuMPOptimisationSolution(; w = fill(NaN, length(model[:w])))
+    end
     ik = inv(value(model[:k]))
     w = value.(model[:w]) * ik
     return JuMPOptimisationSolution(; w = w)
@@ -219,5 +194,3 @@ function set_portfolio_returns_plus_one!(model::JuMP.Model, X::AbstractMatrix)
     @expression(model, Xap1, one(eltype(X)) .+ X)
     return Xap1
 end
-
-export JuMPOptimisationResult
