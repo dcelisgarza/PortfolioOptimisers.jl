@@ -262,12 +262,10 @@ function near_optimal_centering_setup(noc::NearOptimalCenteringEstimator, rd::Re
     end
     return w_opt, rk_opt, rt_opt, r, opt
 end
-function set_unconstrainted_near_optimal_objective_function!(model::JuMP.Model, rk::Real,
-                                                             rt::Real,
-                                                             wb::WeightBoundsResult)
+function set_near_optimal_centering_constraints!(model::JuMP.Model, rk::Real, rt::Real,
+                                                 wb::WeightBoundsResult)
     w = model[:w]
     sc = model[:sc]
-    so = model[:so]
     w_ub = wb.ub
     risk = model[:risk]
     ret = model[:ret]
@@ -290,6 +288,27 @@ function set_unconstrainted_near_optimal_objective_function!(model::JuMP.Model, 
                      MOI.ExponentialCone()
                  end)
     @expression(model, obj_expr, -(log_ret + log_risk + sum(log_w + log_delta_w)))
+    return obj_expr
+end
+function set_unconstrainted_near_optimal_objective_function!(model::JuMP.Model, rk::Real,
+                                                             rt::Real,
+                                                             wb::WeightBoundsResult)
+    so = model[:so]
+    obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, wb)
+    @objective(model, Min, so * obj_expr)
+    return nothing
+end
+function set_constrained_near_optimal_objective_function!(model::JuMP.Model, rk::Real,
+                                                          rt::Real, wb::WeightBoundsResult,
+                                                          pret::JuMPReturnsEstimator,
+                                                          cobj::Union{Nothing,
+                                                                      <:CustomObjective},
+                                                          opt::JuMPOptimisationEstimator,
+                                                          pr::AbstractPriorResult)
+    so = model[:so]
+    obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, wb)
+    add_penalty_to_objective!(model, 1, obj_expr)
+    add_custom_objective_term!(model, pret, cobj, obj_expr, opt, pr)
     @objective(model, Min, so * obj_expr)
     return nothing
 end
@@ -314,43 +333,6 @@ function optimise!(noc::NearOptimalCenteringEstimator{<:UnconstrainedNearOptimal
     return JuMPOptimisationResult(typeof(noc), nb_opt.pe, nb_opt.wb, nb_opt.lcs,
                                   nb_opt.cent, nb_opt.gcard, nb_opt.nplg, nb_opt.cplg,
                                   retcode, sol, ifelse(noc.save, model, nothing))
-end
-function set_constrained_near_optimal_objective_function!(model::JuMP.Model, rk::Real,
-                                                          rt::Real, wb::WeightBoundsResult,
-                                                          pret::JuMPReturnsEstimator,
-                                                          cobj::Union{Nothing,
-                                                                      <:CustomObjective},
-                                                          opt::JuMPOptimisationEstimator,
-                                                          pr::AbstractPriorResult)
-    w = model[:w]
-    sc = model[:sc]
-    so = model[:so]
-    w_ub = wb.ub
-    risk = model[:risk]
-    ret = model[:ret]
-    N = length(w)
-    @variables(model, begin
-                   log_ret
-                   log_risk
-                   log_w[1:N]
-                   log_delta_w[1:N]
-               end)
-    @constraints(model,
-                 begin
-                     clog_risk,
-                     [sc * log_risk, sc, sc * (rk - risk)] in MOI.ExponentialCone()
-                     clog_ret, [sc * log_ret, sc, sc * (ret - rt)] in MOI.ExponentialCone()
-                     clog_w[i = 1:N],
-                     [sc * log_w[i], sc, sc * w[i]] ∈ MOI.ExponentialCone()
-                     clog_delta_w[i = 1:N],
-                     [sc * log_delta_w[i], sc, sc * (w_ub[i] - w[i])] ∈
-                     MOI.ExponentialCone()
-                 end)
-    @expression(model, obj_expr, -(log_ret + log_risk + sum(log_w + log_delta_w)))
-    add_penalty_to_objective!(model, 1, obj_expr)
-    add_custom_objective_term!(model, pret, cobj, obj_expr, opt, pr)
-    @objective(model, Min, so * obj_expr)
-    return nothing
 end
 function optimise!(noc::NearOptimalCenteringEstimator{<:ConstrainedNearOptimalCenteringAlgorithm,
                                                       <:Any, <:Any, <:Any, <:Any, <:Any,
