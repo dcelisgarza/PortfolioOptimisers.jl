@@ -76,9 +76,10 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
                                           rb::RiskBudgettingEstimator{<:AssetRiskBudgettingAlgorithm,
                                                                       <:Any, <:Any, <:Any,
                                                                       <:Any, <:Any},
-                                          pr::AbstractPriorResult)
+                                          pr::AbstractPriorResult, wb::WeightBoundsResult)
     set_w!(model, pr.X, rb.wi)
     _set_risk_budgetting_constraints!(model, rb, model[:w])
+    set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
     return nothing
 end
 function set_risk_budgetting_constraints!(model::JuMP.Model,
@@ -86,7 +87,8 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
                                                                       <:Any, <:Any, <:Any,
                                                                       <:Any, <:Any},
                                           pr::Union{<:FactorPriorResult,
-                                                    <:EmpiricalPartialFactorPriorResult})
+                                                    <:EmpiricalPartialFactorPriorResult},
+                                          wb::WeightBoundsResult)
     B = pr.loadings.frc
     b1 = pinv(transpose(B))
     Nf = size(b1, 2)
@@ -104,6 +106,7 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
     end
     set_initial_w!(w1, rb.wi)
     _set_risk_budgetting_constraints!(model, rb, w1)
+    set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return nothing
 end
 function optimise!(rb::RiskBudgettingEstimator, rd::ReturnsResult = ReturnsResult())
@@ -111,8 +114,7 @@ function optimise!(rb::RiskBudgettingEstimator, rd::ReturnsResult = ReturnsResul
     model = JuMP.Model()
     set_string_names_on_creation(model, rb.str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
-    set_risk_budgetting_constraints!(model, rb, pr)
-    set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
+    set_risk_budgetting_constraints!(model, rb, pr, wb)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, rb.opt.lcm, :lcm_ineq, :lcm_eq)
