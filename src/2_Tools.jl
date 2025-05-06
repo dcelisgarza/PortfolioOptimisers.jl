@@ -78,6 +78,11 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                                                                                    nf, F,
                                                                                    ts)
 end
+function returns_result_view(rd::ReturnsResult, i::AbstractVector)
+    nx = nothing_scalar_array_view(rd.nx, i)
+    X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
+    return ReturnsResult(nx, X, rd.nf, rd.F, rd.ts)
+end
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                            ret_method::Symbol = :simple, padding::Bool = false,
                            missing_col_percent::Real = 1.0, missing_row_percent::Real = 1.0,
@@ -248,7 +253,7 @@ end
 function nothing_scalar_array_getindex(::Nothing, i, j)
     return nothing
 end
-function nothing_scalar_array_getindex(x::AbstractArray, i, j)
+function nothing_scalar_array_getindex(x::AbstractMatrix, i, j)
     return x[i, j]
 end
 function fourth_moment_index_factory(N::Integer, i)

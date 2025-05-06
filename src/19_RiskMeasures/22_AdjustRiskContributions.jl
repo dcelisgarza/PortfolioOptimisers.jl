@@ -34,6 +34,6 @@ end
 function adjust_risk_contribution(::FourthPowerRiskMeasures, val::Real, args...)
     return val * 0.25
 end
-function adjust_risk_contributions(::EqualRiskMeasure, val::Real, delta::Real = 0.0)
+function adjust_risk_contribution(::EqualRiskMeasure, val::Real, delta::Real = 0.0)
     return val + delta
 end

@@ -87,7 +87,7 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
                                                                       <:Any, <:Any},
                                           pr::Union{<:FactorPriorResult,
                                                     <:EmpiricalPartialFactorPriorResult})
-    B = loadings.frc
+    B = pr.loadings.frc
     b1 = pinv(transpose(B))
     Nf = size(b1, 2)
     if rb.alg.flag
@@ -107,10 +107,10 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
     return nothing
 end
 function optimise!(rb::RiskBudgettingEstimator, rd::ReturnsResult = ReturnsResult())
+    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(rb.opt, rd)
     model = JuMP.Model()
     set_string_names_on_creation(model, rb.str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
-    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(rb.opt, rd)
     set_risk_budgetting_constraints!(model, rb, pr)
     set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)

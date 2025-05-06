@@ -26,10 +26,10 @@ function MeanRiskEstimator(;
                                                               save)
 end
 function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult())
+    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(mr.opt, rd)
     model = JuMP.Model()
     set_string_names_on_creation(model, mr.str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
-    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(mr.opt, rd)
     set_w!(model, pr.X, mr.wi)
     set_maximum_ratio_factor_variables!(model, pr.mu, mr.obj)
     set_weight_constraints!(model, wb, mr.opt.bgt, mr.opt.sbgt)

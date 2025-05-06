@@ -50,8 +50,8 @@ function risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector, X::Abs
         ws[i, 2] -= delta
         r1, r2 = risk_bounds(r, view(ws, :, 1), view(ws, :, 2), X, fees; delta = delta,
                              kwargs...)
-        r1 = adjust_risk_contributions(r, r1, delta)
-        r2 = adjust_risk_contributions(r, r2, delta)
+        r1 = adjust_risk_contribution(r, r1, delta)
+        r2 = adjust_risk_contribution(r, r2, delta)
         rci = (r1 - r2) * id2
         rc[i] = rci
         ws[i, 1] = w[i]
