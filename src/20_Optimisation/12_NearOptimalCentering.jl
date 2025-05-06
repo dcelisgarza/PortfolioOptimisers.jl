@@ -121,8 +121,7 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult)
 end
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
                                       fees::Union{Nothing, <:Fees},
-                                      slv::Union{Nothing, <:Solver,
-                                                 <:AbstractVector{<:Solver}},
+                                      slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                                       w_min::AbstractVector, w_opt::AbstractVector,
                                       w_max::AbstractVector)
     X = pr.X
@@ -135,8 +134,7 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
 end
 function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                                      slv::Union{Nothing, <:Solver,
-                                                 <:AbstractVector{<:Solver}},
+                                      slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                                       w_min::AbstractVector, w_opt::AbstractVector,
                                       w_max::AbstractVector)
     X = pr.X
@@ -156,8 +154,7 @@ end
 function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
                                       rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
-                                      slv::Union{Nothing, <:Solver,
-                                                 <:AbstractVector{<:Solver}},
+                                      slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                                       w_min::AbstractVector, w_opt::AbstractVector,
                                       w_max::AbstractVector)
     X = pr.X
@@ -372,5 +369,5 @@ function optimise!(noc::NearOptimalCenteringEstimator{<:ConstrainedNearOptimalCe
                                   ifelse(noc.save, model, nothing))
 end
 
-export NearOptimalCenteringEstimator, ConstrainedNearOptimalCenteringAlgorithm,
-       UnconstrainedNearOptimalCenteringAlgorithm
+export ConstrainedNearOptimalCenteringAlgorithm, UnconstrainedNearOptimalCenteringAlgorithm,
+       NearOptimalCenteringEstimator
