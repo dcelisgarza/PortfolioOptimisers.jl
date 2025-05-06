@@ -1,4 +1,5 @@
 abstract type OptimisationEstimator <: AbstractEstimator end
+abstract type OptimisationAlgorithm <: AbstractAlgorithm end
 abstract type OptimisationResult <: AbstractResult end
 abstract type OptimisationReturnCode <: AbstractResult end
 struct OptimisationSuccess{T1} <: OptimisationReturnCode
