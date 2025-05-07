@@ -1,25 +1,25 @@
 abstract type RiskBudgettingAlgorithm <: OptimisationAlgorithm end
 struct AssetRiskBudgettingAlgorithm{T1 <: Union{Nothing, <:AbstractVector}} <:
        RiskBudgettingAlgorithm
-    w::T1
+    rkb::T1
 end
-function AssetRiskBudgettingAlgorithm(; w::Union{Nothing, <:AbstractVector} = nothing)
-    if isa(w, AbstractVector)
-        @smart_assert(!isempty(w))
+function AssetRiskBudgettingAlgorithm(; rkb::Union{Nothing, <:AbstractVector} = nothing)
+    if isa(rkb, AbstractVector)
+        @smart_assert(!isempty(rkb))
     end
-    return AssetRiskBudgettingAlgorithm{typeof(w)}(w)
+    return AssetRiskBudgettingAlgorithm{typeof(rkb)}(rkb)
 end
 struct FactorRiskBudgettingAlgorithm{T1 <: Bool, T2 <: Union{Nothing, <:AbstractVector}} <:
        RiskBudgettingAlgorithm
     flag::T1
-    w::T2
+    rkb::T2
 end
 function FactorRiskBudgettingAlgorithm(; flag::Bool = true,
-                                       w::Union{Nothing, <:AbstractVector} = nothing)
-    if isa(w, AbstractVector)
-        @smart_assert(!isempty(w))
+                                       rkb::Union{Nothing, <:AbstractVector} = nothing)
+    if isa(rkb, AbstractVector)
+        @smart_assert(!isempty(rkb))
     end
-    return FactorRiskBudgettingAlgorithm{typeof(flag), typeof(w)}(flag, w)
+    return FactorRiskBudgettingAlgorithm{typeof(flag), typeof(rkb)}(flag, rkb)
 end
 struct RiskBudgettingEstimator{T1 <: RiskBudgettingAlgorithm,
                                T2 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
@@ -52,7 +52,7 @@ end
 function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgettingEstimator,
                                            w)
     N = length(w)
-    rkb = rb.alg.w
+    rkb = rb.alg.rkb
     if isnothing(rkb)
         rkb = range(; start = inv(N), stop = inv(N), length = N)
     else
