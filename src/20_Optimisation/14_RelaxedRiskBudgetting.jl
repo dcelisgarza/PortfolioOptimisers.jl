@@ -5,7 +5,7 @@ struct RegularisationPenaltyRelaxedRiskBudgettingAlgorithm{T1 <: Real} <:
        RelaxedRiskBudgettingAlgorithm
     p::T1
 end
-function RegularisationPenaltyRelaxedRiskBudgettingAlgorithm(p::Real = 1.0)
+function RegularisationPenaltyRelaxedRiskBudgettingAlgorithm(; p::Real = 1.0)
     @smart_assert(isfinite(p))
     return RegularisationPenaltyRelaxedRiskBudgettingAlgorithm{typeof(p)}(p)
 end
