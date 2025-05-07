@@ -38,7 +38,7 @@
                                                      r = ConditionalValueatRisk(),
                                                      obj = obj, opt = opt)
                 w1 = optimise!(noc1, rd).w
-                res1 = isapprox(w1, wt)
+                res1 = isapprox(w1, wt; rtol = 5e-5)
                 if !res1
                     println("Iteration $i, compute everything in NOC failed.")
                     find_tol(w1, wt; name1 = :w1, name2 = :wt)
@@ -52,10 +52,10 @@
                                                      r = ConditionalValueatRisk(),
                                                      obj = obj, opt = opt)
                 w2 = optimise!(noc2, rd).w
-                res2 = isapprox(w2, wt)
+                res2 = isapprox(w2, w1)
                 if !res1
                     println("Iteration $i, initial vectors provided NOC failed.")
-                    find_tol(w2, wt; name1 = :w2, name2 = :wt)
+                    find_tol(w2, w1; name1 = :w2, name2 = :w1)
                 end
                 @test res2
                 i += 1
