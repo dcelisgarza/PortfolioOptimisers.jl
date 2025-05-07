@@ -84,4 +84,81 @@
         w4 = optimise!(noc3, rd).w
         @test isapprox(w2, w4, rtol = 5e-5)
     end
+    @testset "Constrainted NearOptimalCentering" begin
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+        pr = prior(EmpiricalPriorEstimator(), rd)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(), MaximumReturn()]
+        bins = [1, 5, 10, 20, nothing, 50]
+        w_min = optimise!(MeanRiskEstimator(; r = ConditionalValueatRisk(),
+                                            obj = MinimumRisk(), opt = opt), rd).w
+        w_max = optimise!(MeanRiskEstimator(; r = ConditionalValueatRisk(),
+                                            obj = MaximumReturn(), opt = opt), rd).w
+        df = CSV.read(joinpath(@__DIR__, "./assets/Unconstrained-NearOptimalCentering.csv"),
+                      DataFrame)
+        i = 1
+        for obj ∈ objs
+            for bin ∈ bins
+                wt = df[!, i]
+                noc1 = NearOptimalCenteringEstimator(;
+                                                     alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                                     bins = bin,
+                                                     r = ConditionalValueatRisk(),
+                                                     obj = obj, opt = opt)
+                w1 = optimise!(noc1, rd).w
+                res1 = isapprox(w1, wt; rtol = 5e-5)
+                if !res1
+                    println("Iteration $i, compute everything in NOC failed.")
+                    find_tol(w1, wt; name1 = :w1, name2 = :wt)
+                end
+                @test res1
+
+                w_opt = optimise!(MeanRiskEstimator(; r = ConditionalValueatRisk(),
+                                                    obj = obj, opt = opt), rd).w
+                noc2 = NearOptimalCenteringEstimator(;
+                                                     alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                                     w_min = w_min, w_max = w_max,
+                                                     w_opt = w_opt, bins = bin,
+                                                     r = ConditionalValueatRisk(),
+                                                     obj = obj, opt = opt)
+                w2 = optimise!(noc2, rd).w
+                res2 = isapprox(w2, w1)
+                if !res1
+                    println("Iteration $i, initial vectors provided NOC failed.")
+                    find_tol(w2, w1; name1 = :w2, name2 = :w1)
+                end
+                @test res2
+                i += 1
+            end
+        end
+        r = ConditionalValueatRisk()
+        mr = MeanRiskEstimator(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        w1 = optimise!(mr, rd).w
+        ub = expected_risk(r, w1, rd.X)
+        lb = expected_returns(ArithmeticReturn(), w1, pr)
+
+        noc1 = NearOptimalCenteringEstimator(;
+                                             alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                             r = r, obj = MaximumRatio(; rf = rf),
+                                             opt = opt)
+        w2 = optimise!(noc1, rd).w
+
+        noc2 = NearOptimalCenteringEstimator(;
+                                             alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                             r = ConditionalValueatRisk(;
+                                                                        settings = RiskMeasureSettings(;
+                                                                                                       ub = ub)),
+                                             obj = MaximumReturn(), opt = opt)
+        w3 = optimise!(noc2, rd).w
+        @test expected_risk(r, w3, rd.X) <= ub + sqrt(eps())
+
+        opt = JuMPOptimiser(; ret = ArithmeticReturn(; lb = lb), pe = pr, slv = slv)
+        noc3 = NearOptimalCenteringEstimator(;
+                                             alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                             r = r, obj = MinimumRisk(), opt = opt)
+        w4 = optimise!(noc3, rd).w
+        @test expected_returns(ArithmeticReturn(), w4, pr) >= lb - sqrt(eps())
+    end
 end

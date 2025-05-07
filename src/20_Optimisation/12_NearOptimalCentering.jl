@@ -1,46 +1,37 @@
 abstract type NearOptimalCenteringAlgorithm <: OptimisationAlgorithm end
-struct ConstrainedNearOptimalCenteringAlgorithm{T1 <: Bool} <: NearOptimalCenteringAlgorithm
-    ucs::T1
-end
-function ConstrainedNearOptimalCenteringAlgorithm(; ucs::Bool = true)
-    return ConstrainedNearOptimalCenteringAlgorithm{typeof(ucs)}(ucs)
-end
-struct UnconstrainedNearOptimalCenteringAlgorithm{T1 <: Bool} <:
-       NearOptimalCenteringAlgorithm
-    ucs::T1
-end
-function UnconstrainedNearOptimalCenteringAlgorithm(; ucs::Bool = true)
-    return UnconstrainedNearOptimalCenteringAlgorithm{typeof(ucs)}(ucs)
-end
-struct NearOptimalCenteringEstimator{T1 <: NearOptimalCenteringAlgorithm,
-                                     T2 <:
+struct ConstrainedNearOptimalCenteringAlgorithm <: NearOptimalCenteringAlgorithm end
+struct UnconstrainedNearOptimalCenteringAlgorithm <: NearOptimalCenteringAlgorithm end
+struct NearOptimalCenteringEstimator{T1 <: NearOptimalCenteringAlgorithm, T2 <: Bool,
+                                     T3 <:
                                      Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                                     T3 <: ObjectiveFunction,
-                                     T4 <: Union{Nothing, <:JuMPOptimiser},
-                                     T5 <: Union{Nothing, <:Real},
-                                     T6 <: Union{Nothing, <:AbstractVector},
+                                     T4 <: ObjectiveFunction,
+                                     T5 <: Union{Nothing, <:JuMPOptimiser},
+                                     T6 <: Union{Nothing, <:Real},
                                      T7 <: Union{Nothing, <:AbstractVector},
                                      T8 <: Union{Nothing, <:AbstractVector},
                                      T9 <: Union{Nothing, <:AbstractVector},
                                      T10 <: Union{Nothing, <:AbstractVector},
-                                     T11 <: Union{Nothing, <:AbstractVector}, T12 <: Bool,
-                                     T13 <: Bool} <: JuMPOptimisationEstimator
+                                     T11 <: Union{Nothing, <:AbstractVector},
+                                     T12 <: Union{Nothing, <:AbstractVector}, T13 <: Bool,
+                                     T14 <: Bool} <: JuMPOptimisationEstimator
     alg::T1
-    r::T2
-    obj::T3
-    opt::T4
-    bins::T5
-    w_min::T6
-    w_min_ini::T7
-    w_opt::T8
-    w_opt_ini::T9
-    w_max::T10
-    w_max_ini::T11
-    str_names::T12
-    save::T13
+    ucs_flag::T2
+    r::T3
+    obj::T4
+    opt::T5
+    bins::T6
+    w_min::T7
+    w_min_ini::T8
+    w_opt::T9
+    w_opt_ini::T10
+    w_max::T11
+    w_max_ini::T12
+    str_names::T13
+    save::T14
 end
 function NearOptimalCenteringEstimator(;
                                        alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCenteringAlgorithm(),
+                                       ucs_flag::Bool = true,
                                        r::Union{<:RiskMeasure,
                                                 <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
                                        obj::ObjectiveFunction = MinimumRisk(),
@@ -80,13 +71,14 @@ function NearOptimalCenteringEstimator(;
     if isa(bins, Real)
         @smart_assert(isfinite(bins) && bins > 0)
     end
-    return NearOptimalCenteringEstimator{typeof(alg), typeof(r), typeof(obj), typeof(opt),
-                                         typeof(bins), typeof(w_min), typeof(w_min_ini),
-                                         typeof(w_opt), typeof(w_opt_ini), typeof(w_max),
+    return NearOptimalCenteringEstimator{typeof(alg), typeof(ucs_flag), typeof(r),
+                                         typeof(obj), typeof(opt), typeof(bins),
+                                         typeof(w_min), typeof(w_min_ini), typeof(w_opt),
+                                         typeof(w_opt_ini), typeof(w_max),
                                          typeof(w_max_ini), typeof(str_names),
-                                         typeof(save)}(alg, r, obj, opt, bins, w_min,
-                                                       w_min_ini, w_opt, w_opt_ini, w_max,
-                                                       w_max_ini, str_names, save)
+                                         typeof(save)}(alg, ucs_flag, r, obj, opt, bins,
+                                                       w_min, w_min_ini, w_opt, w_opt_ini,
+                                                       w_max, w_max_ini, str_names, save)
 end
 for r ∈ setdiff(traverse_subtypes(RiskMeasure), (UncertaintySetVariance,))
     eval(quote
@@ -217,8 +209,8 @@ function near_optimal_centering_setup(noc::NearOptimalCenteringEstimator, rd::Re
     r = noc.r
     opt = processed_jump_optimiser(noc.opt, rd)
     if w_min_flag || w_max_flag || unconstrained_flag
-        nb_r = no_bounds_risk_measure(r, noc.alg.ucs)
-        nb_opt = no_bounds_optimiser(opt, noc.alg.ucs)
+        nb_r = no_bounds_risk_measure(r, noc.ucs_flag)
+        nb_opt = no_bounds_optimiser(opt, noc.ucs_flag)
     end
     if w_min_flag
         res_min = optimise!(MeanRiskEstimator(; r = nb_r, obj = MinimumRisk(), opt = nb_opt,
@@ -315,7 +307,7 @@ end
 function optimise!(noc::NearOptimalCenteringEstimator{<:UnconstrainedNearOptimalCenteringAlgorithm,
                                                       <:Any, <:Any, <:Any, <:Any, <:Any,
                                                       <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                      <:Any, <:Any},
+                                                      <:Any, <:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult())
     w_opt, rk_opt, rt_opt, nb_r, nb_opt = near_optimal_centering_setup(noc, rd)
     model = JuMP.Model()
@@ -337,7 +329,7 @@ end
 function optimise!(noc::NearOptimalCenteringEstimator{<:ConstrainedNearOptimalCenteringAlgorithm,
                                                       <:Any, <:Any, <:Any, <:Any, <:Any,
                                                       <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                      <:Any, <:Any},
+                                                      <:Any, <:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult())
     w_opt, rk_opt, rt_opt, r, opt = near_optimal_centering_setup(noc, rd)
     model = JuMP.Model()
