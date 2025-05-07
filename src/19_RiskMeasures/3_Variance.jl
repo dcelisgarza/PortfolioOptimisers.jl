@@ -90,6 +90,17 @@ end
 function (r::UncertaintySetVariance)(w::AbstractVector)
     return dot(w, r.sigma, w)
 end
+function no_bounds_risk_measure(r::UncertaintySetVariance, flag::Bool = true)
+    return if flag
+        UncertaintySetVariance(RiskMeasureSettings(; rke = r.settings.rke,
+                                                   scale = r.settings.scale), r.ucs,
+                               r.sigma)
+    else
+        UncertaintySetVariance(RiskMeasureSettings(; rke = r.settings.rke,
+                                                   scale = r.settings.scale), nothing,
+                               r.sigma)
+    end
+end
 function risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
                               ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                          <:AbstractUncertaintySetEstimator} = nothing,

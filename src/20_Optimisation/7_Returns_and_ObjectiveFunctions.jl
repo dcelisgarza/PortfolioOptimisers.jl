@@ -24,6 +24,9 @@ function jump_returns_view(r::ArithmeticReturn, i::AbstractVector,
     uset = ucs_view(r.ucs, ucs, i)
     return ArithmeticReturn(; lb = r.lb, ucs = uset)
 end
+function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
+    return flag ? ArithmeticReturn(; ucs = r.ucs) : ArithmeticReturn()
+end
 struct KellyReturn{T1 <: Union{Nothing, <:Real}, T2 <: Union{Nothing, <:AbstractWeights}} <:
        JuMPReturnsEstimator
     lb::T1
@@ -35,6 +38,9 @@ function KellyReturn(; lb::Union{Nothing, <:Real} = nothing,
         @smart_assert(!isempty(w))
     end
     return KellyReturn{typeof(lb), typeof(w)}(lb, w)
+end
+function no_bounds_returns_estimator(r::KellyReturn, args...)
+    return KellyReturn(; w = r.w)
 end
 function jump_returns_factory(r::KellyReturn, pr::EntropyPoolingPriorResult; kwargs...)
     return KellyReturn(; lb = r.lb,

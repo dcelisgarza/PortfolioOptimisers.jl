@@ -1,6 +1,17 @@
 abstract type NearOptimalCenteringAlgorithm <: OptimisationAlgorithm end
-struct ConstrainedNearOptimalCenteringAlgorithm <: NearOptimalCenteringAlgorithm end
-struct UnconstrainedNearOptimalCenteringAlgorithm <: NearOptimalCenteringAlgorithm end
+struct ConstrainedNearOptimalCenteringAlgorithm{T1 <: Bool} <: NearOptimalCenteringAlgorithm
+    ucs::T1
+end
+function ConstrainedNearOptimalCenteringAlgorithm(; ucs::Bool = true)
+    return ConstrainedNearOptimalCenteringAlgorithm{typeof(ucs)}(ucs)
+end
+struct UnconstrainedNearOptimalCenteringAlgorithm{T1 <: Bool} <:
+       NearOptimalCenteringAlgorithm
+    ucs::T1
+end
+function UnconstrainedNearOptimalCenteringAlgorithm(; ucs::Bool = true)
+    return UnconstrainedNearOptimalCenteringAlgorithm{typeof(ucs)}(ucs)
+end
 struct NearOptimalCenteringEstimator{T1 <: NearOptimalCenteringAlgorithm,
                                      T2 <:
                                      Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
@@ -74,9 +85,9 @@ function NearOptimalCenteringEstimator(;
                                                        w_min_ini, w_opt, w_opt_ini, w_max,
                                                        w_max_ini, str_names, save)
 end
-for r ∈ traverse_subtypes(RiskMeasure)
+for r ∈ setdiff(traverse_subtypes(RiskMeasure), (UncertaintySetVariance,))
     eval(quote
-             function no_bounds_risk_measure(r::$(r))
+             function no_bounds_risk_measure(r::$(r), args...)
                  pnames = setdiff(propertynames(r), (:settings,))
                  settings = r.settings
                  settings = RiskMeasureSettings(; rke = settings.rke,
@@ -89,27 +100,14 @@ for r ∈ traverse_subtypes(RiskMeasure)
              end
          end)
 end
-function no_bounds_risk_measure(r::AbstractVector{<:RiskMeasure})
-    return no_bounds_risk_measure.(r)
+function no_bounds_risk_measure(r::AbstractVector{<:RiskMeasure}, args...)
+    return no_bounds_risk_measure.(r, Ref(args)...)
 end
-for r ∈ traverse_subtypes(JuMPReturnsEstimator)
-    eval(quote
-             function no_bounds_returns_estimator(r::$(r))
-                 pnames = setdiff(propertynames(r), (:lb,))
-                 return if isempty(pnames)
-                     $(r)
-                 else
-                     p = getproperty.(Ref(r), pnames)
-                     $(r)(nothing, p...)
-                 end
-             end
-         end)
-end
-function no_bounds_optimiser(opt::JuMPOptimiser)
+function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = propertynames(opt)
     idx = findfirst(x -> x == :ret, pnames)
     p = getproperty.(Ref(opt), pnames)
-    return JuMPOptimiser(p[1:(idx - 1)]..., no_bounds_returns_estimator(p[idx]),
+    return JuMPOptimiser(p[1:(idx - 1)]..., no_bounds_returns_estimator(p[idx], args...),
                          p[(idx + 1):end]...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult)
@@ -215,7 +213,7 @@ function near_optimal_centering_setup(noc::NearOptimalCenteringEstimator, rd::Re
     r = noc.r
     opt = processed_jump_optimiser(noc.opt, rd)
     nb_r = no_bounds_risk_measure(r)
-    nb_opt = no_bounds_optimiser(opt)
+    nb_opt = no_bounds_optimiser(opt, noc.alg.ucs)
     if w_min_flag
         res_min = optimise!(MeanRiskEstimator(; r = nb_r, obj = MinimumRisk(), opt = nb_opt,
                                               wi = noc.w_min_ini, save = false), rd)
