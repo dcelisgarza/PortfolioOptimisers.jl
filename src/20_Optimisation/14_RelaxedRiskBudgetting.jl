@@ -116,3 +116,36 @@ function set_relaxed_risk_budgetting_constraints!(model::JuMP.Model,
     set_relaxed_risk_budgetting_alg_constraints!(rkb.alg, model, sigma)
     return nothing
 end
+function optimise!(rb::RiskBudgettingEstimator, rd::ReturnsResult = ReturnsResult())
+    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(rb.opt, rd)
+    model = JuMP.Model()
+    set_string_names_on_creation(model, rb.str_names)
+    set_model_scales!(model, rb.opt.sc, rb.opt.so)
+    @expression(model, k, 1)
+    set_w!(model, pr.X, rb.wi)
+    set_weight_constraints!(model, wb, rb.opt.bgt, nothing, false)
+    set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
+    set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
+    set_linear_weight_constraints!(model, rb.opt.lcm, :lcm_ineq, :lcm_eq)
+    set_mip_constraints!(model, wb, rb.opt.card, gcard, nplg, cplg, rb.opt.lt, rb.opt.st,
+                         rb.opt.fees, rb.opt.ss)
+    set_turnover_constraints!(model, rb.opt.tn)
+    set_tracking_error_constraints!(model, pr.X, rb.opt.te)
+    set_number_effective_assets!(model, rb.opt.nea)
+    set_l1_regularisation!(model, rb.opt.l1)
+    set_l2_regularisation!(model, rb.opt.l2)
+    set_non_fixed_fees!(model, rb.opt.fees)
+    set_relaxed_risk_budgetting_constraints!(model, rb, pr.sigma)
+    ret = jump_returns_factory(rb.opt.ret, pr)
+    set_return_constraints!(model, ret, MinimumRisk(), pr)
+    set_sdp_philogeny_constraints!(model, nplg, :sdp_nplg)
+    set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
+    add_custom_constraint!(model, rb.opt.ccnt, rb, pr)
+    set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
+    retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
+    return JuMPOptimisationResult(typeof(rb), pr, wb, lcs, cent, gcard, nplg, cplg, retcode,
+                                  sol, ifelse(rb.save, model, nothing))
+end
+
+export BasicRelaxedRiskBudgettingAlgorithm, RegularisationRelaxedRiskBudgettingAlgorithm,
+       RegularisationPenaltyRelaxedRiskBudgettingAlgorithm, RelaxedRiskBudgettingEstimator

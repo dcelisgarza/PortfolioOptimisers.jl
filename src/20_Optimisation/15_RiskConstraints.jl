@@ -206,7 +206,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::Variance,
                                cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                            <:IntegerPhilogenyResult},
                                nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult})
+                                           <:IntegerPhilogenyResult}, args...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
@@ -224,16 +224,26 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::Variance,
                                              variance_risk, r.settings)
     return nothing
 end
-function set_risk_constraints!(model::JuMP.Model, i::Integer, r::Variance,
-                               opt::FactorRiskContribution, pr::AbstractPriorResult,
-                               M::AbstractMatrix)
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::Variance{<:Any, <:Any, <:Any,
+                                           <:Union{<:LinearConstraint,
+                                                   <:AbstractVector{<:LinearConstraint},
+                                                   <:LinearConstraintResult}},
+                               opt::FactorRiskContribution,
+                               pr::Union{<:FactorPriorResult,
+                                         <:EmpiricalPartialFactorPriorResult}, ::Any, ::Any,
+                               b1::AbstractMatrix)
+    if !haskey(model, :variance_flag)
+        @expression(model, variance_flag, true)
+    end
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
     key = Symbol(:variance_risk_, i)
     set_sdp_frc_constraints!(model)
     W = model[:W]
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
-    sigma_W = model[Symbol(:sigma_W_, i)] = @expression(model, transpose(M) * sigma * M * W)
+    sigma_W = model[Symbol(:sigma_W_, i)] = @expression(model,
+                                                        transpose(b1) * sigma * b1 * W)
     variance_risk = model[key] = @expression(model, tr(sigma_W))
     rc_variance_constraints!(model, i, rc, variance_risk)
     var_bound_expr, var_bound_key = variance_risk_bounds_expr(model, i, true)

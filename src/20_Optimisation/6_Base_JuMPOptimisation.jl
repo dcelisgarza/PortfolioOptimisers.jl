@@ -95,8 +95,8 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
                                cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                            <:IntegerPhilogenyResult},
                                nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult})
-    set_risk_constraints!(model, 1, r, opt, pr, cplg, nplg)
+                                           <:IntegerPhilogenyResult}, args...)
+    set_risk_constraints!(model, 1, r, opt, pr, cplg, nplg, args...)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasure},
@@ -104,9 +104,9 @@ function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasu
                                cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                            <:IntegerPhilogenyResult},
                                nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult})
+                                           <:IntegerPhilogenyResult}, args...)
     for (i, r) ∈ enumerate(rs)
-        set_risk_constraints!(model, i, r, opt, pr, cplg, nplg)
+        set_risk_constraints!(model, i, r, opt, pr, cplg, nplg, args...)
     end
     return nothing
 end
