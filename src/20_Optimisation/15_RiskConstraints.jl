@@ -224,11 +224,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::Variance,
                                              variance_risk, r.settings)
     return nothing
 end
-function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::Variance{<:Any, <:Any, <:Any,
-                                           <:Union{<:LinearConstraint,
-                                                   <:AbstractVector{<:LinearConstraint},
-                                                   <:LinearConstraintResult}},
+function set_risk_constraints!(model::JuMP.Model, i::Integer, r::Variance,
                                opt::FactorRiskContribution,
                                pr::Union{<:FactorPriorResult,
                                          <:EmpiricalPartialFactorPriorResult}, ::Any, ::Any,
