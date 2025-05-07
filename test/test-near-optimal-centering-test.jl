@@ -61,5 +61,27 @@
                 i += 1
             end
         end
+        r = ConditionalValueatRisk()
+        mr = MeanRiskEstimator(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        w1 = optimise!(mr, rd).w
+        ub = expected_risk(r, w1, rd.X)
+        lb = expected_returns(ArithmeticReturn(), w1, pr)
+
+        noc1 = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; rf = rf),
+                                             opt = opt)
+        w2 = optimise!(noc1, rd).w
+
+        noc2 = NearOptimalCenteringEstimator(;
+                                             r = ConditionalValueatRisk(;
+                                                                        settings = RiskMeasureSettings(;
+                                                                                                       ub = ub)),
+                                             obj = MaximumReturn(), opt = opt)
+        w3 = optimise!(noc2, rd).w
+        @test isapprox(w2, w3, rtol = 5e-5)
+
+        opt = JuMPOptimiser(; ret = ArithmeticReturn(; lb = lb), pe = pr, slv = slv)
+        noc3 = NearOptimalCenteringEstimator(; r = r, obj = MinimumRisk(), opt = opt)
+        w4 = optimise!(noc3, rd).w
+        @test isapprox(w2, w4, rtol = 5e-5)
     end
 end
