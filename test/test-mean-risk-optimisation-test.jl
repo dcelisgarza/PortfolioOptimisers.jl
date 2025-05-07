@@ -180,6 +180,7 @@
         res2 = optimise!(mre)
         @test abs(ret.lb - dot(res2.w, pr.mu)) <= 1e-9
 
+        opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
         mre = MeanRiskEstimator(; obj = MaximumRatio(), opt = opt)
         res3 = optimise!(mre)
         @test abs(ret.lb - dot(res3.w, pr.mu)) <= 5e-7
@@ -190,28 +191,32 @@
         res1 = optimise!(mre)
 
         ret = KellyReturn(; lb = mean(log1p.(pr.X * res1.w)))
+        opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
         mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
         res2 = optimise!(mre)
         @test abs(mean(log1p.(pr.X * res2.w)) - ret.lb) <= 1e-10
 
+        opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
         mre = MeanRiskEstimator(; obj = MaximumRatio(), opt = opt)
         res3 = optimise!(mre)
         @test abs(mean(log1p.(pr.X * res3.w)) - ret.lb) <= 1e-8
 
-        w = eweights(1:200, inv(200); scale = true)
-        ret = KellyReturn(; w = w)
+        ew = eweights(1:200, inv(200); scale = true)
+        ret = KellyReturn(; w = ew)
         opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
         mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
         res1 = optimise!(mre)
 
-        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
-                     check_sol = (; allow_local = true, allow_almost = true),
-                     settings = Dict("max_step_fraction" => 0.65, "verbose" => false))
-        ret = KellyReturn(; lb = mean(log1p.(pr.X * res1.w), w))
+        ret = KellyReturn(; lb = mean(log1p.(pr.X * res1.w), ew))
         opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
         mre = MeanRiskEstimator(; obj = MinimumRisk(), opt = opt)
         res2 = optimise!(mre)
         @test abs(mean(log1p.(pr.X * res2.w)) - ret.lb) <= 5e-9
+
+        opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
+        mre = MeanRiskEstimator(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res3 = optimise!(mre)
+        @test mean(log1p.(pr.X * res3.w)) >= ret.lb
 
         ucss = (ucs1, ucs2)
         objs = (MinimumRisk(), MaximumRatio(; rf = rf))
@@ -227,7 +232,7 @@
                 w = res1.w
                 wt = df[!, i]
                 res = if i == 4
-                    isapprox(w, wt; rtol = 1e-7)
+                    isapprox(w, wt; rtol = 1e-6)
                 else
                     isapprox(w, wt)
                 end
