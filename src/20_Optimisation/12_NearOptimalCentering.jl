@@ -16,7 +16,8 @@ struct NearOptimalCenteringEstimator{T1 <: NearOptimalCenteringAlgorithm,
                                      T2 <:
                                      Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                                      T3 <: ObjectiveFunction,
-                                     T4 <: Union{Nothing, <:JuMPOptimiser}, T5 <: Real,
+                                     T4 <: Union{Nothing, <:JuMPOptimiser},
+                                     T5 <: Union{Nothing, <:Real},
                                      T6 <: Union{Nothing, <:AbstractVector},
                                      T7 <: Union{Nothing, <:AbstractVector},
                                      T8 <: Union{Nothing, <:AbstractVector},
@@ -44,7 +45,7 @@ function NearOptimalCenteringEstimator(;
                                                 <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
                                        obj::ObjectiveFunction = MinimumRisk(),
                                        opt::JuMPOptimiser = JuMPOptimiser(),
-                                       bins::Real = 20,
+                                       bins::Union{Nothing, <:Real} = nothing,
                                        w_min::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                        w_min_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                        w_opt::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
@@ -76,7 +77,9 @@ function NearOptimalCenteringEstimator(;
     if isa(w_max_ini, AbstractVector)
         @smart_assert(!isempty(w_max_ini))
     end
-    @smart_assert(isfinite(bins) && bins > 0)
+    if isa(bins, Real)
+        @smart_assert(isfinite(bins) && bins > 0)
+    end
     return NearOptimalCenteringEstimator{typeof(alg), typeof(r), typeof(obj), typeof(opt),
                                          typeof(bins), typeof(w_min), typeof(w_min_ini),
                                          typeof(w_opt), typeof(w_opt_ini), typeof(w_max),
@@ -210,33 +213,30 @@ function near_optimal_centering_setup(noc::NearOptimalCenteringEstimator, rd::Re
     w_min_flag = isnothing(w_min)
     w_opt_flag = isnothing(w_opt)
     w_max_flag = isnothing(w_max)
+    unconstrained_flag = isa(noc.alg, UnconstrainedNearOptimalCenteringAlgorithm)
     r = noc.r
     opt = processed_jump_optimiser(noc.opt, rd)
-    nb_r = no_bounds_risk_measure(r)
-    nb_opt = no_bounds_optimiser(opt, noc.alg.ucs)
+    if w_min_flag || w_max_flag || unconstrained_flag
+        nb_r = no_bounds_risk_measure(r, noc.alg.ucs)
+        nb_opt = no_bounds_optimiser(opt, noc.alg.ucs)
+    end
     if w_min_flag
         res_min = optimise!(MeanRiskEstimator(; r = nb_r, obj = MinimumRisk(), opt = nb_opt,
                                               wi = noc.w_min_ini, save = false), rd)
-        if isa(res_min.retcode, OptimisationFailure)
-            throw(ErrorException("MinimumRisk optimisation failed.\n$(res_min.retcode)"))
-        end
+        @smart_assert(isa(res_min.retcode, OptimisationSuccess))
         w_min = res_min.w
     end
     if w_opt_flag
         res_opt = optimise!(MeanRiskEstimator(; r = r, obj = noc.obj, opt = opt,
                                               wi = noc.w_opt_ini, save = false), rd)
-        if isa(res_opt.retcode, OptimisationFailure)
-            throw(ErrorException("MeanRisk optimisation failed.\n$(res_opt.retcode)"))
-        end
+        @smart_assert(isa(res_opt.retcode, OptimisationSuccess))
         w_opt = res_opt.w
     end
     if w_max_flag
         res_max = optimise!(MeanRiskEstimator(; r = nb_r, obj = MaximumReturn(),
                                               opt = nb_opt, wi = noc.w_max_ini,
                                               save = false), rd)
-        if isa(res_max.retcode, OptimisationFailure)
-            throw(ErrorException("MaximumReturn optimisation failed.\n$(res_max.retcode)"))
-        end
+        @smart_assert(isa(res_max.retcode, OptimisationSuccess))
         w_max = res_max.w
     end
     pr = opt.pe
@@ -247,12 +247,17 @@ function near_optimal_centering_setup(noc::NearOptimalCenteringEstimator, rd::Re
     rt_min = expected_returns(ret, w_min, pr, fees)
     rt_opt = expected_returns(ret, w_opt, pr, fees)
     rt_max = expected_returns(ret, w_max, pr, fees)
-    ibins = inv(noc.bins)
+    ibins = if isnothing(noc.bins)
+        T, N = size(pr.X)
+        N / T
+    else
+        inv(noc.bins)
+    end
     rk_delta = (rk_max - rk_min) * ibins
     rt_delta = (rt_max - rt_min) * ibins
     rk_opt += rk_delta
     rt_opt -= rt_delta
-    if isa(noc.alg, UnconstrainedNearOptimalCenteringAlgorithm)
+    if unconstrained_flag
         r, opt = nb_r, nb_opt
     end
     return w_opt, rk_opt, rt_opt, r, opt
