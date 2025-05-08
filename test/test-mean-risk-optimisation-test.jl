@@ -141,7 +141,7 @@
                         isapprox(w1, wt; rtol = 1e-4)
                     elseif i == 726
                         isapprox(w1, wt; rtol = 5e-4)
-                    elseif Sys.isapple() && i ∈ (154, 488, 536) ||
+                    elseif Sys.isapple() && i ∈ (154, 488) ||
                            Sys.iswindows() && i ∈ (138, 888, 904)
                         isapprox(w1, wt; rtol = 1e-4)
                     elseif Sys.isapple() && i == 536
