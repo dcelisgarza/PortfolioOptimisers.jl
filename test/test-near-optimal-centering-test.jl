@@ -83,6 +83,49 @@
         noc3 = NearOptimalCenteringEstimator(; r = r, obj = MinimumRisk(), opt = opt)
         w4 = optimise!(noc3, rd).w
         @test isapprox(w2, w4, rtol = 5e-5)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        r = ConditionalValueatRisk()
+        mr = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; rf = rf),
+                                           opt = opt)
+        w1 = optimise!(mr, rd).w
+
+        r = ConditionalDrawdownatRisk()
+        mr = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; rf = rf),
+                                           opt = opt)
+        w2 = optimise!(mr, rd).w
+
+        r = [ConditionalValueatRisk(), ConditionalDrawdownatRisk()]
+        mr = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; rf = rf),
+                                           opt = opt)
+        w3 = optimise!(mr, rd).w
+        @test isapprox(w3,
+                       [0.010979049616329416, 0.06713140531624666, 0.010067267106669109,
+                        0.02597915950737006, 0.04689117684508539, 0.022555523572993657,
+                        0.1348099741676934, 0.33312912809740247, 0.13265356880003143,
+                        0.21580374073920855])
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sce = MaxScalariser())
+        r = [ConditionalValueatRisk(), ConditionalDrawdownatRisk()]
+        mr = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; rf = rf),
+                                           opt = opt)
+        w4 = optimise!(mr, rd).w
+        @test isapprox(w4,
+                       [0.00869185402031569, 0.04623619488036266, 0.007213865019645758,
+                        0.022358056550848663, 0.037789152899705504, 0.015153983822462731,
+                        0.12982686774260818, 0.32681802094007506, 0.16569729359555802,
+                        0.24021470319896132])
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser())
+        r = [ConditionalValueatRisk(), ConditionalDrawdownatRisk()]
+        mr = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; ohf = 1, rf = rf),
+                                           opt = opt)
+        w5 = optimise!(mr, rd).w
+        @test isapprox(w5,
+                       [0.009242527297389894, 0.054648908748791185, 0.008140831454820764,
+                        0.02311630047119653, 0.038861917666119045, 0.017052336573436123,
+                        0.13494612519443497, 0.33875402175662866, 0.15563480930705087,
+                        0.21960221598910773])
     end
     @testset "Constrainted NearOptimalCentering" begin
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
