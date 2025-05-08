@@ -23,7 +23,7 @@ function split_factor_weight_constraints(alpha::Real, wb::WeightBoundsResult,
                             max(sum(view(lb, rc)) / w[rc[1]], one(alpha) - alpha))
 end
 function optimise!(hc::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1)
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hc.opt.pe, rd.X, rd.F; dims = dims)
     clm = clusterise(hc.opt.cle, pr.X; dims = dims)
     r = risk_measure_factory(hc.r, pr, hc.opt.slv)
@@ -124,7 +124,7 @@ function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::AbstractMatrix,
 end
 function optimise!(hc::HierarchicalRiskParity{<:Any,
                                               <:AbstractVector{<:OptimisationRiskMeasure}},
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1)
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hc.opt.pe, rd.X, rd.F; dims = dims)
     clm = clusterise(hc.opt.cle, pr.X; dims = dims)
     r = risk_measure_factory(hc.r, Ref(pr), Ref(hc.opt.slv))

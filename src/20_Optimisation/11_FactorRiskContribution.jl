@@ -1,22 +1,19 @@
 struct FactorRiskContribution{T1 <: Bool,
                               T2 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                               T3 <: ObjectiveFunction, T4 <: JuMPOptimiser,
-                              T5 <: Union{Nothing, <:AbstractVector{<:Real}}, T6 <: Bool,
-                              T7 <: Bool} <: JuMPOptimisationEstimator
+                              T5 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+       JuMPOptimisationEstimator
     flag::T1
     r::T2
     obj::T3
     opt::T4
     wi::T5
-    str_names::T6
-    save::T7
 end
 function FactorRiskContribution(; flag::Bool = true,
                                 r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                                 obj::ObjectiveFunction = MinimumRisk(),
                                 opt::JuMPOptimiser = JuMPOptimiser(),
-                                wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                                str_names::Bool = false, save::Bool = true)
+                                wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
     end
@@ -24,10 +21,7 @@ function FactorRiskContribution(; flag::Bool = true,
         @smart_assert(!isempty(wi))
     end
     return FactorRiskContribution{typeof(flag), typeof(r), typeof(obj), typeof(opt),
-                                  typeof(wi), typeof(str_names), typeof(save)}(flag, r, obj,
-                                                                               opt, wi,
-                                                                               str_names,
-                                                                               save)
+                                  typeof(wi)}(flag, r, obj, opt, wi)
 end
 function set_risk_budgetting_constraints!(model::JuMP.Model, frc::FactorRiskContribution,
                                           pr::Union{<:FactorPriorResult,
@@ -50,10 +44,12 @@ function set_risk_budgetting_constraints!(model::JuMP.Model, frc::FactorRiskCont
     set_initial_w!(w1, frc.wi)
     return b1
 end
-function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult())
-    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(frc.opt, rd)
+function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
+                   dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(frc.opt, rd;
+                                                                               dims = dims)
     model = JuMP.Model()
-    set_string_names_on_creation(model, frc.str_names)
+    set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
     set_maximum_ratio_factor_variables!(model, pr.mu, frc.obj)
     b1 = set_risk_budgetting_constraints!(model, frc, pr)
@@ -79,7 +75,7 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_portfolio_objective_function!(model, frc.obj, ret, frc.opt.cobj, frc, pr)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(pr.X))
     return JuMPOptimisationResult(typeof(frc), pr, wb, lcs, cent, gcard, nplg, cplg,
-                                  retcode, sol, ifelse(frc.save, model, nothing))
+                                  retcode, sol, ifelse(save, model, nothing))
 end
 
 export FactorRiskContribution

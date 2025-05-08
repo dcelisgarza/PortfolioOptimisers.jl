@@ -12,8 +12,8 @@ struct NearOptimalCenteringEstimator{T1 <: NearOptimalCenteringAlgorithm, T2 <: 
                                      T9 <: Union{Nothing, <:AbstractVector},
                                      T10 <: Union{Nothing, <:AbstractVector},
                                      T11 <: Union{Nothing, <:AbstractVector},
-                                     T12 <: Union{Nothing, <:AbstractVector}, T13 <: Bool,
-                                     T14 <: Bool} <: JuMPOptimisationEstimator
+                                     T12 <: Union{Nothing, <:AbstractVector}} <:
+       JuMPOptimisationEstimator
     alg::T1
     ucs_flag::T2
     r::T3
@@ -26,8 +26,6 @@ struct NearOptimalCenteringEstimator{T1 <: NearOptimalCenteringAlgorithm, T2 <: 
     w_opt_ini::T10
     w_max::T11
     w_max_ini::T12
-    str_names::T13
-    save::T14
 end
 function NearOptimalCenteringEstimator(;
                                        alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCenteringAlgorithm(),
@@ -42,8 +40,7 @@ function NearOptimalCenteringEstimator(;
                                        w_opt::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                        w_opt_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                        w_max::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                                       w_max_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                                       str_names::Bool = false, save::Bool = true)
+                                       w_max_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
         @smart_assert(!any(isa.(r, Ref(SquaredRiskMeasures))))
@@ -75,10 +72,9 @@ function NearOptimalCenteringEstimator(;
                                          typeof(obj), typeof(opt), typeof(bins),
                                          typeof(w_min), typeof(w_min_ini), typeof(w_opt),
                                          typeof(w_opt_ini), typeof(w_max),
-                                         typeof(w_max_ini), typeof(str_names),
-                                         typeof(save)}(alg, ucs_flag, r, obj, opt, bins,
-                                                       w_min, w_min_ini, w_opt, w_opt_ini,
-                                                       w_max, w_max_ini, str_names, save)
+                                         typeof(w_max_ini)}(alg, ucs_flag, r, obj, opt,
+                                                            bins, w_min, w_min_ini, w_opt,
+                                                            w_opt_ini, w_max, w_max_ini)
 end
 for r ∈ setdiff(traverse_subtypes(RiskMeasure), (UncertaintySetVariance,))
     eval(quote
@@ -105,8 +101,9 @@ function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     return JuMPOptimiser(p[1:(idx - 1)]..., no_bounds_returns_estimator(p[idx], args...),
                          p[(idx + 1):end]...)
 end
-function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult)
-    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(opt, rd)
+function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
+    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(opt, rd;
+                                                                               dims = dims)
     return JuMPOptimiser(pr, wb, opt.bgt, opt.sbgt, lcs, opt.lcm, cent, opt.card, gcard,
                          opt.sets, nplg, cplg, opt.lt, opt.st, opt.tn, opt.te, opt.nea,
                          opt.l1, opt.l2, opt.fees, opt.sce, opt.ret, opt.ccnt, opt.cobj,
@@ -198,7 +195,8 @@ function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:Risk
     end
     return risk_min, risk_opt, risk_max
 end
-function near_optimal_centering_setup(noc::NearOptimalCenteringEstimator, rd::ReturnsResult)
+function near_optimal_centering_setup(noc::NearOptimalCenteringEstimator, rd::ReturnsResult;
+                                      dims::Int = 1)
     w_min = noc.w_min
     w_opt = noc.w_opt
     w_max = noc.w_max
@@ -207,27 +205,27 @@ function near_optimal_centering_setup(noc::NearOptimalCenteringEstimator, rd::Re
     w_max_flag = isnothing(w_max)
     unconstrained_flag = isa(noc.alg, UnconstrainedNearOptimalCenteringAlgorithm)
     r = noc.r
-    opt = processed_jump_optimiser(noc.opt, rd)
+    opt = processed_jump_optimiser(noc.opt, rd; dims = dims)
     if w_min_flag || w_max_flag || unconstrained_flag
         nb_r = no_bounds_risk_measure(r, noc.ucs_flag)
         nb_opt = no_bounds_optimiser(opt, noc.ucs_flag)
     end
     if w_min_flag
         res_min = optimise!(MeanRiskEstimator(; r = nb_r, obj = MinimumRisk(), opt = nb_opt,
-                                              wi = noc.w_min_ini, save = false), rd)
+                                              wi = noc.w_min_ini), rd; save = false)
         @smart_assert(isa(res_min.retcode, OptimisationSuccess))
         w_min = res_min.w
     end
     if w_opt_flag
         res_opt = optimise!(MeanRiskEstimator(; r = r, obj = noc.obj, opt = opt,
-                                              wi = noc.w_opt_ini, save = false), rd)
+                                              wi = noc.w_opt_ini), rd; save = false)
         @smart_assert(isa(res_opt.retcode, OptimisationSuccess))
         w_opt = res_opt.w
     end
     if w_max_flag
         res_max = optimise!(MeanRiskEstimator(; r = nb_r, obj = MaximumReturn(),
-                                              opt = nb_opt, wi = noc.w_max_ini,
-                                              save = false), rd)
+                                              opt = nb_opt, wi = noc.w_max_ini), rd;
+                            save = false)
         @smart_assert(isa(res_max.retcode, OptimisationSuccess))
         w_max = res_max.w
     end
@@ -307,11 +305,12 @@ end
 function optimise!(noc::NearOptimalCenteringEstimator{<:UnconstrainedNearOptimalCenteringAlgorithm,
                                                       <:Any, <:Any, <:Any, <:Any, <:Any,
                                                       <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                      <:Any, <:Any, <:Any},
-                   rd::ReturnsResult = ReturnsResult())
-    w_opt, rk_opt, rt_opt, nb_r, nb_opt = near_optimal_centering_setup(noc, rd)
+                                                      <:Any},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
+    w_opt, rk_opt, rt_opt, nb_r, nb_opt = near_optimal_centering_setup(noc, rd; dims = dims)
     model = JuMP.Model()
-    set_string_names_on_creation(model, noc.str_names)
+    set_string_names_on_creation(model, str_names)
     set_model_scales!(model, nb_opt.sc, nb_opt.so)
     @expression(model, k, 1)
     set_w!(model, nb_opt.pe.X, w_opt)
@@ -324,16 +323,17 @@ function optimise!(noc::NearOptimalCenteringEstimator{<:UnconstrainedNearOptimal
     retcode, sol = optimise_JuMP_model!(model, noc, eltype(nb_opt.pe.X))
     return JuMPOptimisationResult(typeof(noc), nb_opt.pe, nb_opt.wb, nb_opt.lcs,
                                   nb_opt.cent, nb_opt.gcard, nb_opt.nplg, nb_opt.cplg,
-                                  retcode, sol, ifelse(noc.save, model, nothing))
+                                  retcode, sol, ifelse(save, model, nothing))
 end
 function optimise!(noc::NearOptimalCenteringEstimator{<:ConstrainedNearOptimalCenteringAlgorithm,
                                                       <:Any, <:Any, <:Any, <:Any, <:Any,
                                                       <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                      <:Any, <:Any, <:Any},
-                   rd::ReturnsResult = ReturnsResult())
-    w_opt, rk_opt, rt_opt, r, opt = near_optimal_centering_setup(noc, rd)
+                                                      <:Any},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
+    w_opt, rk_opt, rt_opt, r, opt = near_optimal_centering_setup(noc, rd; dims = dims)
     model = JuMP.Model()
-    set_string_names_on_creation(model, noc.str_names)
+    set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
     @expression(model, k, 1)
     set_w!(model, opt.pe.X, w_opt)
@@ -361,7 +361,7 @@ function optimise!(noc::NearOptimalCenteringEstimator{<:ConstrainedNearOptimalCe
     retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
     return JuMPOptimisationResult(typeof(noc), opt.pe, opt.wb, opt.lcs, opt.cent, opt.gcard,
                                   opt.nplg, opt.cplg, retcode, sol,
-                                  ifelse(noc.save, model, nothing))
+                                  ifelse(save, model, nothing))
 end
 
 export ConstrainedNearOptimalCenteringAlgorithm, UnconstrainedNearOptimalCenteringAlgorithm,

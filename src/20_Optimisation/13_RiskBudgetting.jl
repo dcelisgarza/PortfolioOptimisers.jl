@@ -24,30 +24,26 @@ end
 struct RiskBudgettingEstimator{T1 <: RiskBudgettingAlgorithm,
                                T2 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                                T3 <: JuMPOptimiser,
-                               T4 <: Union{Nothing, <:AbstractVector{<:Real}}, T5 <: Bool,
-                               T6 <: Bool} <: JuMPOptimisationEstimator
+                               T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+       JuMPOptimisationEstimator
     alg::T1
     r::T2
     opt::T3
     wi::T4
-    str_names::T5
-    save::T6
 end
 function RiskBudgettingEstimator(;
                                  alg::RiskBudgettingAlgorithm = AssetRiskBudgettingAlgorithm(),
                                  r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                                  opt::JuMPOptimiser = JuMPOptimiser(),
-                                 wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                                 str_names::Bool = false, save::Bool = true)
+                                 wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
     end
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
-    return RiskBudgettingEstimator{typeof(alg), typeof(r), typeof(opt), typeof(wi),
-                                   typeof(str_names), typeof(save)}(alg, r, opt, wi,
-                                                                    str_names, save)
+    return RiskBudgettingEstimator{typeof(alg), typeof(r), typeof(opt), typeof(wi)}(alg, r,
+                                                                                    opt, wi)
 end
 function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgettingEstimator,
                                            w)
@@ -74,8 +70,7 @@ function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgetting
 end
 function set_risk_budgetting_constraints!(model::JuMP.Model,
                                           rb::RiskBudgettingEstimator{<:AssetRiskBudgettingAlgorithm,
-                                                                      <:Any, <:Any, <:Any,
-                                                                      <:Any, <:Any},
+                                                                      <:Any, <:Any, <:Any},
                                           pr::AbstractPriorResult, wb::WeightBoundsResult)
     set_w!(model, pr.X, rb.wi)
     _set_risk_budgetting_constraints!(model, rb, model[:w])
@@ -84,8 +79,7 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
 end
 function set_risk_budgetting_constraints!(model::JuMP.Model,
                                           rb::RiskBudgettingEstimator{<:FactorRiskBudgettingAlgorithm,
-                                                                      <:Any, <:Any, <:Any,
-                                                                      <:Any, <:Any},
+                                                                      <:Any, <:Any, <:Any},
                                           pr::Union{<:FactorPriorResult,
                                                     <:EmpiricalPartialFactorPriorResult},
                                           wb::WeightBoundsResult)
@@ -109,10 +103,12 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return nothing
 end
-function optimise!(rb::RiskBudgettingEstimator, rd::ReturnsResult = ReturnsResult())
-    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(rb.opt, rd)
+function optimise!(rb::RiskBudgettingEstimator, rd::ReturnsResult = ReturnsResult();
+                   dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(rb.opt, rd;
+                                                                               dims = dims)
     model = JuMP.Model()
-    set_string_names_on_creation(model, rb.str_names)
+    set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     set_risk_budgetting_constraints!(model, rb, pr, wb)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
@@ -136,7 +132,7 @@ function optimise!(rb::RiskBudgettingEstimator, rd::ReturnsResult = ReturnsResul
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
     return JuMPOptimisationResult(typeof(rb), pr, wb, lcs, cent, gcard, nplg, cplg, retcode,
-                                  sol, ifelse(rb.save, model, nothing))
+                                  sol, ifelse(save, model, nothing))
 end
 
 export AssetRiskBudgettingAlgorithm, FactorRiskBudgettingAlgorithm, RiskBudgettingEstimator
