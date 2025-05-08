@@ -108,7 +108,7 @@ function set_relaxed_risk_budgetting_constraints!(model::JuMP.Model,
                       sc * (2 * gamma * sqrt(rkb[i]))
                       sc * (w[i] - zeta[i])] ∈ SecondOrderCone()
                  end)
-    set_relaxed_risk_budgetting_alg_constraints!(rkb.alg, model, sigma)
+    set_relaxed_risk_budgetting_alg_constraints!(rrb.alg, model, sigma)
     return nothing
 end
 function optimise!(rrb::RelaxedRiskBudgettingEstimator, rd::ReturnsResult = ReturnsResult();
