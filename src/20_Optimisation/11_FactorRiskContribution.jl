@@ -1,15 +1,20 @@
 struct FactorRiskContribution{T1 <: Bool,
-                              T2 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                              T3 <: ObjectiveFunction, T4 <: JuMPOptimiser,
-                              T5 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+                              T2 <:
+                              Union{<:RegressionResult, <:AbstractRegressionEstimator},
+                              T3 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+                              T4 <: ObjectiveFunction, T5 <: JuMPOptimiser,
+                              T6 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
        JuMPOptimisationEstimator
     flag::T1
-    r::T2
-    obj::T3
-    opt::T4
-    wi::T5
+    re::T2
+    r::T3
+    obj::T4
+    opt::T5
+    wi::T6
 end
 function FactorRiskContribution(; flag::Bool = true,
+                                re::Union{<:RegressionResult,
+                                          <:AbstractRegressionEstimator} = StepwiseRegression(),
                                 r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                                 obj::ObjectiveFunction = MinimumRisk(),
                                 opt::JuMPOptimiser = JuMPOptimiser(),
@@ -20,18 +25,21 @@ function FactorRiskContribution(; flag::Bool = true,
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
-    return FactorRiskContribution{typeof(flag), typeof(r), typeof(obj), typeof(opt),
-                                  typeof(wi)}(flag, r, obj, opt, wi)
+    return FactorRiskContribution{typeof(flag), typeof(re), typeof(r), typeof(obj),
+                                  typeof(opt), typeof(wi)}(flag, re, r, obj, opt, wi)
 end
-function set_risk_budgetting_constraints!(model::JuMP.Model, frc::FactorRiskContribution,
-                                          pr::Union{<:FactorPriorResult,
-                                                    <:EmpiricalPartialFactorPriorResult})
-    B = pr.loadings.frc
-    b1 = pinv(transpose(B))
+function set_factor_risk_contribution_constraints!(model::JuMP.Model,
+                                                   re::Union{<:RegressionResult,
+                                                             <:AbstractRegressionEstimator},
+                                                   rd::ReturnsResult, flag::Bool,
+                                                   wi::Union{Nothing, AbstractVector})
+    loadings = regression(re, rd.X, rd.F)
+    Bt = transpose(loadings.frc)
+    b1 = pinv(Bt)
     Nf = size(b1, 2)
-    if frc.flag
-        b2 = pinv(transpose(nullspace(B)))
-        N = size(pr.X, 2)
+    if flag
+        b2 = pinv(transpose(nullspace(Bt)))
+        N = size(loadings.M, 1)
         @variables(model, begin
                        w1[1:Nf]
                        w2[1:(N - Nf)]
@@ -41,7 +49,7 @@ function set_risk_budgetting_constraints!(model::JuMP.Model, frc::FactorRiskCont
         @variable(model, w1[1:Nf])
         @expression(model, w, b1 * w1)
     end
-    set_initial_w!(w1, frc.wi)
+    set_initial_w!(w1, wi)
     return b1
 end
 function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
@@ -52,7 +60,7 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
     set_maximum_ratio_factor_variables!(model, pr.mu, frc.obj)
-    b1 = set_risk_budgetting_constraints!(model, frc, pr)
+    b1 = set_risk_budgetting_constraints!(model, frc.re, rd, frc.flag, frc.wi)
     set_weight_constraints!(model, wb, frc.opt.bgt, frc.opt.sbgt)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)

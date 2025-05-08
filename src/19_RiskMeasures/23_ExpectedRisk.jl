@@ -63,10 +63,13 @@ function risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector, X::Abs
     return rc
 end
 function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector,
-                                  X::AbstractMatrix, loadings::RegressionResult,
-                                  fees::Union{Nothing, <:Fees} = nothing;
-                                  delta::Real = 1e-6, kwargs...)
+                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing;
+                                  re::Union{<:RegressionResult,
+                                            <:AbstractRegressionEstimator} = StepwiseRegression(),
+                                  rd::ReturnsResult = ReturnsResult(), delta::Real = 1e-6,
+                                  kwargs...)
     mr = risk_contribution(r, w, X, fees; delta = delta, marginal = true, kwargs...)
+    loadings = regression(re, rd.X, rd.F)
     Bt = transpose(loadings.frc)
     b2t = transpose(pinv(transpose(nullspace(Bt))))
     b3t = transpose(pinv(b2t))

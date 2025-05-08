@@ -33,6 +33,8 @@ end
 function regression_view(r::AbstractRegressionEstimator, args...)
     return r
 end
-function regression end
+function regression(re::RegressionResult, args...)
+    return re
+end
 
 export regression, RegressionResult

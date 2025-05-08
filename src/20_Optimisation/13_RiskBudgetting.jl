@@ -9,17 +9,23 @@ function AssetRiskBudgettingAlgorithm(; rkb::Union{Nothing, <:AbstractVector} = 
     end
     return AssetRiskBudgettingAlgorithm{typeof(rkb)}(rkb)
 end
-struct FactorRiskBudgettingAlgorithm{T1 <: Bool, T2 <: Union{Nothing, <:AbstractVector}} <:
+struct FactorRiskBudgettingAlgorithm{T1 <: Bool, T2 <: Union{Nothing, <:AbstractVector},
+                                     T3 <: Union{<:RegressionResult,
+                                                 <:AbstractRegressionEstimator}} <:
        RiskBudgettingAlgorithm
     flag::T1
     rkb::T2
+    re::T3
 end
 function FactorRiskBudgettingAlgorithm(; flag::Bool = true,
-                                       rkb::Union{Nothing, <:AbstractVector} = nothing)
+                                       rkb::Union{Nothing, <:AbstractVector} = nothing,
+                                       re::Union{<:RegressionResult,
+                                                 <:AbstractRegressionEstimator} = StepwiseRegression())
     if isa(rkb, AbstractVector)
         @smart_assert(!isempty(rkb))
     end
-    return FactorRiskBudgettingAlgorithm{typeof(flag), typeof(rkb)}(flag, rkb)
+    return FactorRiskBudgettingAlgorithm{typeof(flag), typeof(rkb), typeof(re)}(flag, rkb,
+                                                                                re)
 end
 struct RiskBudgettingEstimator{T1 <: RiskBudgettingAlgorithm,
                                T2 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
@@ -71,7 +77,8 @@ end
 function set_risk_budgetting_constraints!(model::JuMP.Model,
                                           rb::RiskBudgettingEstimator{<:AssetRiskBudgettingAlgorithm,
                                                                       <:Any, <:Any, <:Any},
-                                          pr::AbstractPriorResult, wb::WeightBoundsResult)
+                                          pr::AbstractPriorResult, wb::WeightBoundsResult,
+                                          args...)
     set_w!(model, pr.X, rb.wi)
     _set_risk_budgetting_constraints!(model, rb, model[:w])
     set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
@@ -80,26 +87,26 @@ end
 function set_risk_budgetting_constraints!(model::JuMP.Model,
                                           rb::RiskBudgettingEstimator{<:FactorRiskBudgettingAlgorithm,
                                                                       <:Any, <:Any, <:Any},
-                                          pr::Union{<:FactorPriorResult,
-                                                    <:EmpiricalPartialFactorPriorResult},
-                                          wb::WeightBoundsResult)
-    B = pr.loadings.frc
-    b1 = pinv(transpose(B))
-    Nf = size(b1, 2)
-    if rb.alg.flag
-        b2 = pinv(transpose(nullspace(B)))
-        N = size(pr.X, 2)
-        @variables(model, begin
-                       w1[1:Nf]
-                       w2[1:(N - Nf)]
-                   end)
-        @expression(model, w, b1 * w1 + b2 * w2)
-    else
-        @variable(model, w1[1:Nf])
-        @expression(model, w, b1 * w1)
-    end
-    set_initial_w!(w1, rb.wi)
-    _set_risk_budgetting_constraints!(model, rb, w1)
+                                          ::Any, wb::WeightBoundsResult, rd::ReturnsResult)
+    # loadings = regression(rb.alg.re, rd.X, rd.F)
+    # Bt = transpose(loadings)
+    # b1 = pinv(Bt)
+    # Nf = size(b1, 2)
+    # if rb.alg.flag
+    #     b2 = pinv(transpose(nullspace(Bt)))
+    #     N = size(pr.X, 2)
+    #     @variables(model, begin
+    #                    w1[1:Nf]
+    #                    w2[1:(N - Nf)]
+    #                end)
+    #     @expression(model, w, b1 * w1 + b2 * w2)
+    # else
+    #     @variable(model, w1[1:Nf])
+    #     @expression(model, w, b1 * w1)
+    # end
+    # set_initial_w!(w1, rb.wi)
+    set_factor_risk_contribution_constraints!(model, rb.alg.re, rd, rb.alg.flag, rb.wi)
+    _set_risk_budgetting_constraints!(model, rb, model[:w1])
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return nothing
 end
@@ -110,7 +117,7 @@ function optimise!(rb::RiskBudgettingEstimator, rd::ReturnsResult = ReturnsResul
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
-    set_risk_budgetting_constraints!(model, rb, pr, wb)
+    set_risk_budgetting_constraints!(model, rb, pr, wb, rd)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, rb.opt.lcm, :lcm_ineq, :lcm_eq)
