@@ -3,14 +3,22 @@ struct FactorRiskContribution{T1 <: Bool,
                               Union{<:RegressionResult, <:AbstractRegressionEstimator},
                               T3 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                               T4 <: ObjectiveFunction, T5 <: JuMPOptimiser,
-                              T6 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+                              T6 <:
+                              Union{Nothing, <:SemiDefinitePhilogenyConstraintEstimator,
+                                    <:SemiDefinitePhilogenyResult},
+                              T7 <:
+                              Union{Nothing, <:SemiDefinitePhilogenyConstraintEstimator,
+                                    <:SemiDefinitePhilogenyResult},
+                              T8 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
        JuMPOptimisationEstimator
     flag::T1
     re::T2
     r::T3
     obj::T4
     opt::T5
-    wi::T6
+    nplg::T6
+    cplg::T7
+    wi::T8
 end
 function FactorRiskContribution(; flag::Bool = true,
                                 re::Union{<:RegressionResult,
@@ -18,6 +26,12 @@ function FactorRiskContribution(; flag::Bool = true,
                                 r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                                 obj::ObjectiveFunction = MinimumRisk(),
                                 opt::JuMPOptimiser = JuMPOptimiser(),
+                                nplg::Union{Nothing,
+                                            <:SemiDefinitePhilogenyConstraintEstimator,
+                                            <:SemiDefinitePhilogenyResult} = nothing,
+                                cplg::Union{Nothing,
+                                            <:SemiDefinitePhilogenyConstraintEstimator,
+                                            <:SemiDefinitePhilogenyResult} = nothing,
                                 wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
@@ -25,8 +39,21 @@ function FactorRiskContribution(; flag::Bool = true,
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
+    @smart_assert(!isa(opt.nplg,
+                       Union{<:SemiDefinitePhilogenyConstraintEstimator,
+                             <:SemiDefinitePhilogenyResult}))
+    @smart_assert(!isa(opt.cplg,
+                       Union{<:SemiDefinitePhilogenyConstraintEstimator,
+                             <:SemiDefinitePhilogenyResult}))
     return FactorRiskContribution{typeof(flag), typeof(re), typeof(r), typeof(obj),
-                                  typeof(opt), typeof(wi)}(flag, re, r, obj, opt, wi)
+                                  typeof(opt), typeof(nplg), typeof(cplg), typeof(wi)}(flag,
+                                                                                       re,
+                                                                                       r,
+                                                                                       obj,
+                                                                                       opt,
+                                                                                       nplg,
+                                                                                       cplg,
+                                                                                       wi)
 end
 function set_factor_risk_contribution_constraints!(model::JuMP.Model,
                                                    re::Union{<:RegressionResult,
@@ -77,13 +104,17 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     scalarise_risk_expression!(model, frc.opt.sce)
     ret = jump_returns_factory(frc.opt.ret, pr)
     set_return_constraints!(model, ret, frc.obj, pr)
-    set_sdp_frc_philogeny_constraints!(model, nplg, :sdp_nplg)
-    set_sdp_frc_philogeny_constraints!(model, cplg, :sdp_cplg)
+    frc_nplg = philogeny_constraints(frc.nplg, rd.F)
+    frc_cplg = philogeny_constraints(frc.cplg, rd.F)
+    set_sdp_frc_philogeny_constraints!(model, frc_nplg, :sdp_frc_nplg)
+    set_sdp_frc_philogeny_constraints!(model, frc_cplg, :sdp_frc_cplg)
     add_custom_constraint!(model, frc.opt.ccnt, frc, pr)
     set_portfolio_objective_function!(model, frc.obj, ret, frc.opt.cobj, frc, pr)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(pr.X))
-    return JuMPOptimisationResult(typeof(frc), pr, wb, lcs, cent, gcard, nplg, cplg,
-                                  retcode, sol, ifelse(save, model, nothing))
+    return JuMPOptimisationFactorRiskContributionResult(typeof(frc), pr, wb, lcs, cent,
+                                                        gcard, nplg, cplg, frc_nplg,
+                                                        frc_cplg, retcode, sol,
+                                                        ifelse(save, model, nothing))
 end
 
 export FactorRiskContribution

@@ -88,23 +88,6 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
                                           rb::RiskBudgettingEstimator{<:FactorRiskBudgettingAlgorithm,
                                                                       <:Any, <:Any, <:Any},
                                           ::Any, wb::WeightBoundsResult, rd::ReturnsResult)
-    # loadings = regression(rb.alg.re, rd.X, rd.F)
-    # Bt = transpose(loadings)
-    # b1 = pinv(Bt)
-    # Nf = size(b1, 2)
-    # if rb.alg.flag
-    #     b2 = pinv(transpose(nullspace(Bt)))
-    #     N = size(pr.X, 2)
-    #     @variables(model, begin
-    #                    w1[1:Nf]
-    #                    w2[1:(N - Nf)]
-    #                end)
-    #     @expression(model, w, b1 * w1 + b2 * w2)
-    # else
-    #     @variable(model, w1[1:Nf])
-    #     @expression(model, w, b1 * w1)
-    # end
-    # set_initial_w!(w1, rb.wi)
     set_factor_risk_contribution_constraints!(model, rb.alg.re, rd, rb.alg.flag, rb.wi)
     _set_risk_budgetting_constraints!(model, rb, model[:w1])
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)

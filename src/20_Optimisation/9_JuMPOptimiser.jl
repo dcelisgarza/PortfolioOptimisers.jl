@@ -26,6 +26,48 @@ function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
         getfield(r, sym)
     end
 end
+struct JuMPOptimisationFactorRiskContributionResult{T1 <: Type, T2 <: AbstractPriorResult,
+                                                    T3 <:
+                                                    Union{Nothing, WeightBoundsResult},
+                                                    T4 <: Union{Nothing,
+                                                                <:LinearConstraintResult},
+                                                    T5 <: Union{Nothing,
+                                                                <:LinearConstraintResult},
+                                                    T6 <: Union{Nothing,
+                                                                <:LinearConstraintResult},
+                                                    T7 <: Union{Nothing,
+                                                                <:IntegerPhilogenyResult},
+                                                    T8 <: Union{Nothing,
+                                                                <:IntegerPhilogenyResult},
+                                                    T9 <: Union{Nothing,
+                                                                <:SemiDefinitePhilogenyResult},
+                                                    T10 <: Union{Nothing,
+                                                                 <:SemiDefinitePhilogenyResult},
+                                                    T11 <: OptimisationReturnCode,
+                                                    T12 <: JuMPOptimisationSolution,
+                                                    T13 <: Union{Nothing, JuMP.Model}} <:
+       OptimisationResult
+    oe::T1
+    pr::T2
+    wb::T3
+    lcs::T4
+    cent::T5
+    gcard::T6
+    nplg::T7
+    cplg::T8
+    frc_nplg::T9
+    frc_cplg::T10
+    retcode::T11
+    sol::T12
+    model::T13
+end
+function Base.getproperty(r::JuMPOptimisationFactorRiskContributionResult, sym::Symbol)
+    return if sym == :w
+        r.sol.w
+    else
+        getfield(r, sym)
+    end
+end
 struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                      T2 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
                      T3 <: Union{Nothing, <:Real, <:BudgetRange},
