@@ -76,6 +76,21 @@ function NearOptimalCenteringEstimator(;
                                                             bins, w_min, w_min_ini, w_opt,
                                                             w_opt_ini, w_max, w_max_ini)
 end
+function opt_view(noc::NearOptimalCenteringEstimator, i::AbstractVector)
+    r = risk_measure_view(noc.r, wrap_in_ref(noc.r, i))
+    opt = opt_view(noc.opt, i)
+    w_min = nothing_scalar_array_view(noc.w_min, i)
+    w_min_ini = nothing_scalar_array_view(noc.w_min_ini, i)
+    w_opt = nothing_scalar_array_view(noc.w_opt, i)
+    w_opt_ini = nothing_scalar_array_view(noc.w_opt_ini, i)
+    w_max = nothing_scalar_array_view(noc.w_max, i)
+    w_max_ini = nothing_scalar_array_view(noc.w_max_ini, i)
+    return NearOptimalCenteringEstimator(; alg = noc.alg, ucs_flag = noc.ucs_flag, r = r,
+                                         obj = noc.obj, opt = opt, bins = noc.bins,
+                                         w_min = w_min, w_min_ini = w_min_ini,
+                                         w_opt = w_opt, w_opt_ini = w_opt_ini,
+                                         w_max = w_max, w_max_ini = w_max_ini)
+end
 for r ∈ setdiff(traverse_subtypes(RiskMeasure), (UncertaintySetVariance,))
     eval(quote
              function no_bounds_risk_measure(r::$(r), args...)

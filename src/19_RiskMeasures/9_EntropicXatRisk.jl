@@ -75,7 +75,7 @@ end
 function risk_measure_view(r::EntropicValueatRiskRange, ::Any, ::Any,
                            slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                            args...; kwargs...)
-    return risk_measure_factory(r, nothing, nothing, slv, args...; kwargs...)
+    return risk_measure_factory(r, nothing, slv, args...; kwargs...)
 end
 struct EntropicDrawdownatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
                               T3 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}} <:

@@ -18,6 +18,15 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
     sets::T8
     strict::T9
 end
+function opt_view(hco::HierarchicalOptimiser, i::AbstractVector)
+    pe = prior_view(hco.pe, i)
+    fees = fees_view(hco.fees, i)
+    wb = weight_bounds_view(hco.wb, i)
+    sets = nothing_dataframe_view(hco.sets, i)
+    return HierarchicalOptimiser(; pe = pe, cle = hco.cle, fees = fees, slv = hco.slv,
+                                 sce = hco.sce, wb = wb, cwf = hco.cwf, sets = sets,
+                                 strict = hco.strict)
+end
 struct HierarchicalOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
                                       T3 <: Union{Nothing, <:WeightBoundsResult},
                                       T4 <: AbstractClusteringResult,

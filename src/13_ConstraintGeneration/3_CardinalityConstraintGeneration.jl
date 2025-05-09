@@ -12,6 +12,17 @@ function CardinalityConstraintSide(; group, name)
     end
     return CardinalityConstraintSide{typeof(group), typeof(name)}(group, name)
 end
+function cardinality_constraint_side_view(lc::CardinalityConstraintSide{<:Any, <:Any},
+                                          ::Any)
+    return lc
+end
+function cardinality_constraint_side_view(lc::CardinalityConstraintSide{<:AbstractVector,
+                                                                        <:AbstractVector},
+                                          i::AbstractVector)
+    group = nothing_scalar_array_view(lc.group, i)
+    name = nothing_scalar_array_view(lc.name, i)
+    return LinearConstraintSide(; group = group, name = name)
+end
 struct CardinalityConstraint{T1 <: CardinalityConstraintSide, T2 <: Integer,
                              T3 <: ComparisonOperators}
     A::T1
@@ -21,6 +32,17 @@ end
 function CardinalityConstraint(; A::CardinalityConstraintSide, B::Integer = 1,
                                comp::ComparisonOperators = LEQ())
     return CardinalityConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
+end
+function cardinality_constraint_view(::Nothing, ::Any)
+    return nothing
+end
+function cardinality_constraint_view(cc::CardinalityConstraint, i::AbstractVector)
+    A = cardinality_constraint_side_view(cc.A, i)
+    return CardinalityConstraint(; A = A, B = cc.B, comp = cc.comp)
+end
+function cardinality_constraint_view(cc::AbstractVector{<:CardinalityConstraint},
+                                     i::AbstractVector)
+    return cardinality_constraint_view.(cc, Ref(i))
 end
 function Base.iterate(S::Union{<:CardinalityConstraintSide, <:CardinalityConstraint},
                       state = 1)

@@ -4,6 +4,14 @@ struct WeightBoundsResult{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}
     lb::T1
     ub::T2
 end
+function weight_bounds_view(::Nothing, ::Any)
+    return nothing
+end
+function weight_bounds_view(wb::WeightBoundsResult, i::AbstractVector)
+    lb = nothing_scalar_array_view(wb.lb, i)
+    ub = nothing_scalar_array_view(wb.ub, i)
+    return WeightBoundsResult(; lb = lb, ub = ub)
+end
 function validate_bounds(lb::Real, ub::Real)
     @smart_assert(lb <= ub)
     return nothing
@@ -66,6 +74,20 @@ function WeightBoundsConstraint(; group, name,
                                                                                        name,
                                                                                        lb,
                                                                                        ub)
+end
+function weight_bounds_view(wb::WeightBoundsConstraint{<:Any, <:Any,
+                                                       <:Union{Nothing, <:Real},
+                                                       <:Union{Nothing, <:Real}}, ::Any)
+    return wb
+end
+function weight_bounds_view(wb::WeightBoundsConstraint{<:AbstractVector, <:AbstractVector,
+                                                       <:AbstractVector, <:AbstractVector},
+                            i::AbstractVector)
+    group = nothing_scalar_array_view(wb.group, i)
+    name = nothing_scalar_array_view(wb.group, i)
+    lb = nothing_scalar_array_view(wb.lb, i)
+    ub = nothing_scalar_array_view(wb.ub, i)
+    return WeightBoundsConstraint(; group = group, name = name, lb = lb, ub = ub)
 end
 function weight_bounds_constraints(hcc::WeightBoundsConstraint{<:Any, <:Any,
                                                                <:Union{Nothing, <:Real},

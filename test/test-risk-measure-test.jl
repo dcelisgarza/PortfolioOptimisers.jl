@@ -30,8 +30,8 @@
         ucs2 = NormalUncertaintySetEstimator(;)
         settings = RiskMeasureSettings(; rke = false, scale = -1, ub = 3)
         formulation = RSOC()
-        ucs1view = ucs_view(ucs1, ucs2, i)
-        ucs2view = ucs_view(nothing, ucs2, i)
+        ucs1view = ucs_view(ucs1, i)
+        ucs2view = ucs_view(ucs2, i)
         rc = LinearConstraint(; A = LinearConstraintSide(; group = :A, name = :B), B = 0)
 
         rs = BrownianDistanceVariance(; settings = settings,
@@ -423,8 +423,8 @@
         ucs2 = NormalUncertaintySetEstimator(;)
         settings = RiskMeasureSettings(; rke = false, scale = -1, ub = 3)
         formulation = RSOC()
-        ucs1view = ucs_view(ucs1, ucs2, i)
-        ucs2view = ucs_view(nothing, ucs2, i)
+        ucs1view = ucs_view(ucs1, i)
+        ucs2view = ucs_view(ucs2, i)
         rc = LinearConstraint(; A = LinearConstraintSide(; group = :A, name = :B), B = 0)
 
         views = [EntropyPoolingViewEstimator(;

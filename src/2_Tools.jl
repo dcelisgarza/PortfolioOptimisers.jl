@@ -256,6 +256,18 @@ end
 function nothing_scalar_array_getindex(x::AbstractMatrix, i, j)
     return x[i, j]
 end
+function nothing_dataframe_view(::Nothing, ::Any)
+    return nothing
+end
+function nothing_dataframe_view(x::AbstractDataFrame, i)
+    return view(x, i, :)
+end
+function nothing_dataframe_getindex(::Nothing, i)
+    return nothing
+end
+function nothing_dataframe_getindex(x::AbstractDataFrame, i)
+    return x[i, :]
+end
 function fourth_moment_index_factory(N::Integer, i)
     idx = Vector{Int}(undef, 0)
     sizehint!(idx, length(i)^2)
@@ -263,6 +275,12 @@ function fourth_moment_index_factory(N::Integer, i)
         append!(idx, (((c - 1) * N + 1):(c * N))[i])
     end
     return idx
+end
+function wrap_in_ref(::AbstractVector, i)
+    return Ref(i)
+end
+function wrap_in_ref(::Any, i)
+    return i
 end
 function traverse_subtypes(types, ctarr = nothing)
     if isnothing(ctarr)

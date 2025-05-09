@@ -23,6 +23,18 @@ function HierarchicalEqualRiskContribution(;
     return HierarchicalEqualRiskContribution{typeof(opt), typeof(ri), typeof(ro)}(opt, ri,
                                                                                   ro)
 end
+function opt_view(hc::HierarchicalEqualRiskContribution, i::AbstractVector)
+    ri = hc.ri
+    ro = hc.ro
+    if ri === ro
+        ri, ro = risk_measure_view(ri, wrap_in_ref(ri, i))
+    else
+        ri = risk_measure_view(ri, i)
+        ro = risk_measure_view(ro, i)
+    end
+    opt = opt_view(hc.opt, i)
+    return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt)
+end
 function herc_scalarised_risk_o!(::SumScalariser, wk::AbstractVector, roku::AbstractVector,
                                  rkbo::AbstractVector, cl::AbstractVector,
                                  ros::AbstractVector{<:OptimisationRiskMeasure},

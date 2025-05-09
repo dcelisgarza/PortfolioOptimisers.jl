@@ -55,6 +55,14 @@ function FactorRiskContribution(; flag::Bool = true,
                                                                                        cplg,
                                                                                        wi)
 end
+function opt_view(frc::FactorRiskContribution, i::AbstractVector)
+    re = regression_view(frc.re, i)
+    r = risk_measure_view(frc.r, wrap_in_ref(frc.r, i))
+    opt = opt_view(frc.opt, i)
+    wi = nothing_scalar_array_view(frc.wi, i)
+    return FactorRiskContribution(; flag = frc.flag, re = re, r = r, obj = frc.obj,
+                                  opt = opt, nplg = frc.nplg, cplg = frc.cplg, wi = wi)
+end
 function set_factor_risk_contribution_constraints!(model::JuMP.Model,
                                                    re::Union{<:RegressionResult,
                                                              <:AbstractRegressionEstimator},

@@ -17,6 +17,18 @@ function LinearConstraintSide(; group, name,
     return LinearConstraintSide{typeof(group), typeof(name), typeof(coef)}(group, name,
                                                                            coef)
 end
+function linear_constraint_side_view(lc::LinearConstraintSide{<:Any, <:Any, <:Any}, ::Any)
+    return lc
+end
+function linear_constraint_side_view(lc::LinearConstraintSide{<:AbstractVector,
+                                                              <:AbstractVector,
+                                                              <:AbstractVector},
+                                     i::AbstractVector)
+    group = nothing_scalar_array_view(lc.group, i)
+    name = nothing_scalar_array_view(lc.name, i)
+    coef = nothing_scalar_array_view(lc.coef, i)
+    return LinearConstraintSide(; group = group, name = name, coef = coef)
+end
 struct LinearConstraint{T1 <: LinearConstraintSide, T2 <: Real,
                         T3 <: ComparisonOperators} <: AbstractConstraint
     A::T1
@@ -26,6 +38,16 @@ end
 function LinearConstraint(; A::LinearConstraintSide, B::Real = 0.0,
                           comp::ComparisonOperators = LEQ())
     return LinearConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
+end
+function linear_constraint_view(::Nothing, ::Any)
+    return nothing
+end
+function linear_constraint_view(lc::LinearConstraint, i::AbstractVector)
+    A = linear_constraint_side_view(lc.A, i)
+    return LinearConstraint(; A = A, B = lc.B, comp = lc.comp)
+end
+function linear_constraint_view(lc::AbstractVector{<:LinearConstraint}, i::AbstractVector)
+    return linear_constraint_view.(lc, Ref(i))
 end
 struct PartialLinearConstraintResult{T1 <: AbstractMatrix, T2 <: AbstractVector} <:
        AbstractConstraintResult

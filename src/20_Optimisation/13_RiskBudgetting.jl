@@ -9,6 +9,10 @@ function AssetRiskBudgettingAlgorithm(; rkb::Union{Nothing, <:AbstractVector} = 
     end
     return AssetRiskBudgettingAlgorithm{typeof(rkb)}(rkb)
 end
+function risk_budgetting_algorithm_view(r::AssetRiskBudgettingAlgorithm, i::AbstractVector)
+    rkb = nothing_scalar_array_view(r.rkb, i)
+    return AssetRiskBudgettingAlgorithm(; rkb = rkb)
+end
 struct FactorRiskBudgettingAlgorithm{T1 <: Bool, T2 <: Union{Nothing, <:AbstractVector},
                                      T3 <: Union{<:RegressionResult,
                                                  <:AbstractRegressionEstimator}} <:
@@ -26,6 +30,10 @@ function FactorRiskBudgettingAlgorithm(; flag::Bool = true,
     end
     return FactorRiskBudgettingAlgorithm{typeof(flag), typeof(rkb), typeof(re)}(flag, rkb,
                                                                                 re)
+end
+function risk_budgetting_algorithm_view(r::FactorRiskBudgettingAlgorithm, i::AbstractVector)
+    re = regression_view(r.re, i)
+    return FactorRiskBudgettingAlgorithm(; flag = r.flag, rkb = r.rkb, re = re)
 end
 struct RiskBudgettingEstimator{T1 <: RiskBudgettingAlgorithm,
                                T2 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
@@ -50,6 +58,13 @@ function RiskBudgettingEstimator(;
     end
     return RiskBudgettingEstimator{typeof(alg), typeof(r), typeof(opt), typeof(wi)}(alg, r,
                                                                                     opt, wi)
+end
+function opt_view(rb::RiskBudgettingEstimator, i::AbstractVector)
+    alg = risk_budgetting_algorithm_view(rb.alg, i)
+    r = risk_measure_view(rb.r, wrap_in_ref(rb.r, i))
+    opt = opt_view(rb.opt, i)
+    wi = nothing_scalar_array_view(rb.wi, i)
+    return RiskBudgettingEstimator(; alg = alg, r = r, opt = opt, wi = wi)
 end
 function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgettingEstimator,
                                            w)

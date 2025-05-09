@@ -33,6 +33,12 @@ function RelaxedRiskBudgettingEstimator(;
     return RelaxedRiskBudgettingEstimator{typeof(alg), typeof(opt), typeof(rkb),
                                           typeof(wi)}(alg, opt, rkb, wi)
 end
+function opt_view(rrb::RelaxedRiskBudgettingEstimator, i::AbstractVector)
+    opt = opt_view(rrb.opt, i)
+    rkb = nothing_scalar_array_view(rrb.rkb, i)
+    wi = nothing_scalar_array_view(rrb.wi, i)
+    return RelaxedRiskBudgettingEstimator(; alg = rrb.alg, opt = opt, rkb = rkb, wi = wi)
+end
 function set_relaxed_risk_budgetting_alg_constraints!(::BasicRelaxedRiskBudgettingAlgorithm,
                                                       model::JuMP.Model,
                                                       sigma::AbstractMatrix)

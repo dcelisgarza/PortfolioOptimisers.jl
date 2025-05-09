@@ -128,7 +128,7 @@ end
 function risk_measure_view(r::RelativisticValueatRiskRange, ::Any, ::Any,
                            slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                            args...; kwargs...)
-    return risk_measure_factory(r, nothing, nothing, slv, args...; kwargs...)
+    return risk_measure_factory(r, nothing, slv, args...; kwargs...)
 end
 struct RelativisticDrawdownatRisk{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
                                   T4 <:

@@ -21,6 +21,12 @@ function MeanRiskEstimator(;
     return MeanRiskEstimator{typeof(r), typeof(obj), typeof(opt), typeof(wi)}(r, obj, opt,
                                                                               wi)
 end
+function opt_view(mr::MeanRiskEstimator, i::AbstractVector)
+    r = risk_measure_view(mr.r, wrap_in_ref(mr.r, i))
+    opt = opt_view(mr.opt, i)
+    wi = nothing_scalar_array_view(mr.wi, i)
+    return MeanRiskEstimator(; r = r, obj = mr.obj, opt = opt, wi = wi)
+end
 function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(mr.opt, rd;

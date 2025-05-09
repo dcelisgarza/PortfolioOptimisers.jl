@@ -13,6 +13,11 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
     end
     return HierarchicalRiskParity{typeof(opt), typeof(r)}(opt, r)
 end
+function opt_view(hc::HierarchicalRiskParity, i::AbstractVector)
+    r = risk_measure_view(hc.r, wrap_in_ref(hc.r, i))
+    opt = opt_view(hc.opt, i)
+    return HierarchicalRiskParity(; r = r, opt = opt)
+end
 function split_factor_weight_constraints(alpha::Real, wb::WeightBoundsResult,
                                          w::AbstractVector, lc::AbstractVector,
                                          rc::AbstractVector)

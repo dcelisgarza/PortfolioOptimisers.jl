@@ -11,7 +11,7 @@ end
 function (r::TurnoverRiskMeasure)(w::AbstractVector)
     return norm(r.w - w, 1)
 end
-function risk_measure_view(r::TurnoverRiskMeasure, ::Any, i::AbstractVector, args...;
+function risk_measure_view(r::TurnoverRiskMeasure, i::AbstractVector, ::Any, args...;
                            kwargs...)
     w = view(r.w, i)
     return TurnoverRiskMeasure(; settings = r.settings, w = w)

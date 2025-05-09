@@ -18,10 +18,8 @@ function ArithmeticReturn(; lb::Union{Nothing, <:Real} = nothing,
     end
     return ArithmeticReturn{typeof(lb), typeof(ucs)}(lb, ucs)
 end
-function jump_returns_view(r::ArithmeticReturn, i::AbstractVector,
-                           ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                      <:AbstractUncertaintySetEstimator}, args...)
-    uset = ucs_view(r.ucs, ucs, i)
+function jump_returns_view(r::ArithmeticReturn, i::AbstractVector, args...)
+    uset = ucs_view(r.ucs, i)
     return ArithmeticReturn(; lb = r.lb, ucs = uset)
 end
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)

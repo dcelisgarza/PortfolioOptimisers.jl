@@ -49,26 +49,41 @@ function risk_measure_factory(r::NegativeSkewness, ::AbstractLowOrderPriorResult
     V = risk_measure_nothing_real_array_factory(r.V, nothing)
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
+function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:Any},
+                           i::AbstractVector, args...; kwargs...)
+    return r
+end
+function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:AbstractMatrix,
+                                               <:AbstractMatrix}, i::AbstractVector,
+                           X::AbstractMatrix, args...; kwargs...)
+    sk = r.sk
+    idx = fourth_moment_index_factory(size(sk, 1), i)
+    sk = view(r.sk, i, idx)
+    V = __coskewness(sk, view(X, :, i), r.mp)
+    return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
+end
 function risk_measure_view(::NegativeSkewness{<:Any, <:Any, <:Any, Nothing, <:Any},
-                           prior::Union{Nothing, <:AbstractLowOrderPriorResult,
-                                        <:HighOrderPriorResult{<:Any, <:Any, Nothing, <:Any,
-                                                               <:Any}}, i::AbstractVector,
+                           i::AbstractVector,
+                           prior::Union{<:AbstractLowOrderPriorResult,
+                                        <:HighOrderPriorResult{<:Any, <:Any, <:Any, <:Any,
+                                                               Nothing, <:Any, <:Any}},
                            args...; kwargs...)
     throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
 end
 function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:AbstractMatrix,
-                                               <:Any}, prior::AbstractPriorResult,
-                           i::AbstractVector, args...; kwargs...)
+                                               <:Any}, i::AbstractVector,
+                           prior::AbstractPriorResult, args...; kwargs...)
     idx = fourth_moment_index_factory(size(prior.X, 2), i)
     sk = view(r.sk, i, idx)
     V = __coskewness(sk, view(prior.X, :, i), r.mp)
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
 function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, Nothing, <:Any},
+                           i::AbstractVector,
                            prior::HighOrderPriorResult{<:Any, <:Any, <:AbstractMatrix,
                                                        <:AbstractMatrix,
                                                        <:AbstractMatrixProcessingEstimator},
-                           i::AbstractVector, args...; kwargs...)
+                           args...; kwargs...)
     idx = fourth_moment_index_factory(size(prior.X, 2), i)
     sk = view(prior.sk, i, idx)
     V = __coskewness(sk, view(prior.X, :, i), prior.skmp)
