@@ -24,7 +24,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         r = PortfolioOptimisers.risk_measure_factory(StandardDeviation(), pr)
 
-        rbe = RiskBudgettingEstimator(; r = r, opt = opt)
+        rbe = RiskBudgetting(; r = r, opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
                        [0.09649877977932793, 0.10231012728204829, 0.0999953050117097,
@@ -35,8 +35,8 @@
         lo, hi = extrema(rkc)
         @test isapprox(hi / lo, 1, rtol = 5e-4)
 
-        rbe = RiskBudgettingEstimator(; alg = AssetRiskBudgettingAlgorithm(; rkb = 1:10),
-                                      r = r, opt = opt)
+        rbe = RiskBudgetting(; alg = AssetRiskBudgettingAlgorithm(; rkb = 1:10), r = r,
+                             opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
                        [0.04184999027515667, 0.06053084151206798, 0.07442610546167501,
@@ -53,8 +53,8 @@
         @test argmin(rkc) == 1
         @test argmax(rkc) == 10
 
-        rbe = RiskBudgettingEstimator(; alg = AssetRiskBudgettingAlgorithm(; rkb = 20:-2:2),
-                                      r = r, opt = opt)
+        rbe = RiskBudgetting(; alg = AssetRiskBudgettingAlgorithm(; rkb = 20:-2:2), r = r,
+                             opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
                        [0.1344025967977924, 0.13916273306889104, 0.12912481639960144,
@@ -74,8 +74,7 @@
                             pe = pr, slv = slv)
         r = PortfolioOptimisers.risk_measure_factory(StandardDeviation(), pr)
 
-        rbe = RiskBudgettingEstimator(; alg = FactorRiskBudgettingAlgorithm(;), r = r,
-                                      opt = opt)
+        rbe = RiskBudgetting(; alg = FactorRiskBudgettingAlgorithm(;), r = r, opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
                        [-0.002429290248856789, 0.016703717820814843, 0.3301898270479341,
@@ -91,8 +90,8 @@
         end
         @test isapprox(hi / lo, 1, rtol = rtol)
 
-        rbe = RiskBudgettingEstimator(; alg = FactorRiskBudgettingAlgorithm(; rkb = 1:3),
-                                      r = r, opt = opt)
+        rbe = RiskBudgetting(; alg = FactorRiskBudgettingAlgorithm(; rkb = 1:3), r = r,
+                             opt = opt)
         w = optimise!(rbe, rd).w
         rtol = if Sys.islinux()
             1e-5
@@ -110,8 +109,8 @@
         @test argmin(rkc[1:3]) == 1
         @test argmax(rkc[1:3]) == 3
 
-        rbe = RiskBudgettingEstimator(; alg = FactorRiskBudgettingAlgorithm(; rkb = 3:-1:1),
-                                      r = r, opt = opt)
+        rbe = RiskBudgetting(; alg = FactorRiskBudgettingAlgorithm(; rkb = 3:-1:1), r = r,
+                             opt = opt)
         w = optimise!(rbe, rd).w
         rtol = if Sys.iswindows()
             1e-4
@@ -134,11 +133,10 @@
         @test argmin(rkc[1:3]) == 3
         @test argmax(rkc[1:3]) == 1
 
-        rbe = RiskBudgettingEstimator(;
-                                      alg = FactorRiskBudgettingAlgorithm(;
-                                                                          re = pr1.loadings,
-                                                                          flag = false),
-                                      r = r, opt = opt)
+        rbe = RiskBudgetting(;
+                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                                                                 flag = false), r = r,
+                             opt = opt)
         w = optimise!(rbe, rd).w
 
         @test isapprox(w,
@@ -150,12 +148,10 @@
         lo, hi = extrema(rkc[1:3])
         @test isapprox(hi / lo, 1, rtol = 1e-4)
 
-        rbe = RiskBudgettingEstimator(;
-                                      alg = FactorRiskBudgettingAlgorithm(;
-                                                                          re = pr1.loadings,
-                                                                          flag = false,
-                                                                          rkb = 1:3), r = r,
-                                      opt = opt)
+        rbe = RiskBudgetting(;
+                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                                                                 flag = false, rkb = 1:3),
+                             r = r, opt = opt)
         w = optimise!(rbe, rd).w
         rtol = if Sys.iswindows()
             5e-5
@@ -178,12 +174,11 @@
         @test argmin(rkc[1:3]) == 1
         @test argmax(rkc[1:3]) == 3
 
-        rbe = RiskBudgettingEstimator(;
-                                      alg = FactorRiskBudgettingAlgorithm(;
-                                                                          re = pr1.loadings,
-                                                                          flag = false,
-                                                                          rkb = 3:-1:1),
-                                      r = r, opt = opt)
+        rbe = RiskBudgetting(;
+                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                                                                 flag = false,
+                                                                 rkb = 3:-1:1), r = r,
+                             opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
                        [0.021932937302796402, 0.03337253920355779, 0.3813063381330762,
@@ -201,11 +196,10 @@
                             pe = pr, slv = slv)
         r = PortfolioOptimisers.risk_measure_factory(StandardDeviation(), pr)
 
-        rbe = RiskBudgettingEstimator(;
-                                      alg = FactorRiskBudgettingAlgorithm(;
-                                                                          re = pr1.loadings,
-                                                                          flag = true),
-                                      r = r, opt = opt)
+        rbe = RiskBudgetting(;
+                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                                                                 flag = true), r = r,
+                             opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
                        [0.2430091043789357, 0.27949606219933204, -0.6807262742678152,
@@ -216,12 +210,10 @@
         lo, hi = extrema(rkc[1:3])
         @test isapprox(hi / lo, 2, rtol = 5e-3)
 
-        rbe = RiskBudgettingEstimator(;
-                                      alg = FactorRiskBudgettingAlgorithm(;
-                                                                          re = pr1.loadings,
-                                                                          flag = true,
-                                                                          rkb = 1:3), r = r,
-                                      opt = opt)
+        rbe = RiskBudgetting(;
+                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                                                                 flag = true, rkb = 1:3),
+                             r = r, opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
                        [0.21801307545615856, 0.25074697795599155, -0.6895968221557025,
@@ -234,12 +226,10 @@
         @test argmin(rkc[1:3]) == 1
         @test argmax(rkc[1:3]) == 3
 
-        rbe = RiskBudgettingEstimator(;
-                                      alg = FactorRiskBudgettingAlgorithm(;
-                                                                          re = pr1.loadings,
-                                                                          rkb = 3:-1:1,
-                                                                          flag = true),
-                                      r = r, opt = opt)
+        rbe = RiskBudgetting(;
+                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                                                                 rkb = 3:-1:1, flag = true),
+                             r = r, opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
                        [0.26953851489929054, 0.310008760379444, -0.6509260338445255,

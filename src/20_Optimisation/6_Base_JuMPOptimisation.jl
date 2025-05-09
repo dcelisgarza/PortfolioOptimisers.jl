@@ -10,7 +10,13 @@ end
 abstract type JuMPConstraintEstimator <: AbstractEstimator end
 abstract type CustomConstraint <: JuMPConstraintEstimator end
 abstract type CustomObjective <: JuMPConstraintEstimator end
+function custom_constraint_view(::Nothing, args...; kwargs...)
+    return nothing
+end
 function custom_constraint_view(::CustomConstraint, args...; kwargs...)
+    return nothing
+end
+function custom_objective_view(::Nothing, args...; kwargs...)
     return nothing
 end
 function custom_objective_view(::CustomObjective, args...; kwargs...)

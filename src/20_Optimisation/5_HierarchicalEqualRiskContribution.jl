@@ -27,7 +27,7 @@ function opt_view(hc::HierarchicalEqualRiskContribution, i::AbstractVector)
     ri = hc.ri
     ro = hc.ro
     if ri === ro
-        ri, ro = risk_measure_view(ri, wrap_in_ref(ri, i))
+        ri, ro = risk_measure_view(ri, i)
     else
         ri = risk_measure_view(ri, i)
         ro = risk_measure_view(ro, i)
@@ -302,18 +302,18 @@ function optimise!(hc::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, kwargs...)
     pr = prior(hc.opt.pe, rd.X, rd.F; dims = dims)
-    clm = clusterise(hc.opt.cle, pr.X; dims = dims, branchorder = branchorder)
-    idx = cutree(clm.clustering; k = clm.k)
-    cls = [findall(x -> x == i, idx) for i ∈ 1:(clm.k)]
+    clr = clusterise(hc.opt.cle, pr.X; dims = dims, branchorder = branchorder)
+    idx = cutree(clr.clustering; k = clr.k)
+    cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
     w, rkcl = herc_risk(hc, pr, cls)
-    nd = to_tree(clm.clustering)[2]
+    nd = to_tree(clr.clustering)[2]
     hs = [i.height for i ∈ nd]
     nd = nd[sortperm(hs; rev = true)]
     # Treat each cluster as its own portfolio and optimise each one individually.
     # Calculate the weight of each cluster relative to the other clusters.
     lc = Vector{Int}(undef, 0)
     rc = Vector{Int}(undef, 0)
-    @inbounds for i ∈ nd[1:(clm.k - 1)]
+    @inbounds for i ∈ nd[1:(clr.k - 1)]
         if is_leaf(i)
             continue
         end
@@ -333,8 +333,8 @@ function optimise!(hc::HierarchicalEqualRiskContribution,
         # Allocate weight to clusters.
         alpha = one(lrisk) - lrisk / risk
         # This implicitly multiplies the asset risks by the cluster risk. We eliminate the allocation of a vector of cluster weights, and a loop at the end.
-        # wcl = ones(eltype(pr.X), clm.k)
-        # for i ∈ nd[1:(clm.k - 1)]
+        # wcl = ones(eltype(pr.X), clr.k)
+        # for i ∈ nd[1:(clr.k - 1)]
         #     ...
         #     <this loop>
         #     ...
@@ -353,8 +353,8 @@ function optimise!(hc::HierarchicalEqualRiskContribution,
     wb = weight_bounds_constraints(hc.opt.wb, hc.opt.sets; N = length(w),
                                    strict = hc.opt.strict)
     retcode, w = clustering_optimisation_result(hc.opt.cwf, wb, w / sum(w))
-    return HierarchicalOptimisationResult(Type{HierarchicalEqualRiskContribution}, pr, wb,
-                                          clm, retcode, w)
+    return HierarchicalOptimisationResult(typeof(HierarchicalEqualRiskContribution), pr, wb,
+                                          clr, retcode, w)
 end
 
 export HierarchicalEqualRiskContribution

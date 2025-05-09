@@ -30,7 +30,7 @@
     i = 1
     for alg ∈ algs
         for rkb ∈ rkbs
-            rbe = RelaxedRiskBudgettingEstimator(; rkb = rkb, alg = alg, opt = opt)
+            rbe = RelaxedRiskBudgetting(; rkb = rkb, alg = alg, opt = opt)
             w = optimise!(rbe, rd).w
             wt = df[!, "$i"]
             res = isapprox(w, wt)

@@ -1,34 +1,31 @@
-struct MeanRiskEstimator{T1 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                         T2 <: ObjectiveFunction, T3 <: JuMPOptimiser,
-                         T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
-       JuMPOptimisationEstimator
+struct MeanRisk{T1 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+                T2 <: ObjectiveFunction, T3 <: JuMPOptimiser,
+                T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <: JuMPOptimisationEstimator
     r::T1
     obj::T2
     opt::T3
     wi::T4
 end
-function MeanRiskEstimator(;
-                           r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
-                           obj::ObjectiveFunction = MinimumRisk(),
-                           opt::JuMPOptimiser = JuMPOptimiser(),
-                           wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+function MeanRisk(; r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
+                  obj::ObjectiveFunction = MinimumRisk(),
+                  opt::JuMPOptimiser = JuMPOptimiser(),
+                  wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
     end
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
-    return MeanRiskEstimator{typeof(r), typeof(obj), typeof(opt), typeof(wi)}(r, obj, opt,
-                                                                              wi)
+    return MeanRisk{typeof(r), typeof(obj), typeof(opt), typeof(wi)}(r, obj, opt, wi)
 end
-function opt_view(mr::MeanRiskEstimator, i::AbstractVector)
-    r = risk_measure_view(mr.r, wrap_in_ref(mr.r, i))
+function opt_view(mr::MeanRisk, i::AbstractVector)
+    r = risk_measure_view(mr.r, i)
     opt = opt_view(mr.opt, i)
     wi = nothing_scalar_array_view(mr.wi, i)
-    return MeanRiskEstimator(; r = r, obj = mr.obj, opt = opt, wi = wi)
+    return MeanRisk(; r = r, obj = mr.obj, opt = opt, wi = wi)
 end
-function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult();
-                   dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(mr.opt, rd;
                                                                                dims = dims)
     model = JuMP.Model()
@@ -61,4 +58,4 @@ function optimise!(mr::MeanRiskEstimator, rd::ReturnsResult = ReturnsResult();
                                   sol, ifelse(save, model, nothing))
 end
 
-export MeanRiskEstimator
+export MeanRisk

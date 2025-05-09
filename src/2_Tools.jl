@@ -276,12 +276,6 @@ function fourth_moment_index_factory(N::Integer, i)
     end
     return idx
 end
-function wrap_in_ref(::AbstractVector, i)
-    return Ref(i)
-end
-function wrap_in_ref(::Any, i)
-    return i
-end
 function traverse_subtypes(types, ctarr = nothing)
     if isnothing(ctarr)
         ctarr = []

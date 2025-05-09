@@ -17,11 +17,11 @@
         X = randn(rng, 500, 10)
         rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
         pr = prior(HighOrderPriorEstimator(), rd)
-        clm = clusterise(ClusteringEstimator(), pr.X)
+        clr = clusterise(ClusteringEstimator(), pr.X)
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
-        opt = HierarchicalOptimiser(; pe = pr, cle = clm, slv = slv)
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
         ew = eweights(1:size(X, 1), inv(size(X, 1)); scale = true)
         w1 = fill(inv(10), 10)
         rf = 4.34 / 100 / 252
@@ -175,14 +175,14 @@
         rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
 
         pr = prior(EmpiricalPriorEstimator(), rd)
-        clm = clusterise(ClusteringEstimator(), pr.X)
-        opts = [HierarchicalOptimiser(; pe = pr, cle = clm, sce = SumScalariser(),
+        clr = clusterise(ClusteringEstimator(), pr.X)
+        opts = [HierarchicalOptimiser(; pe = pr, cle = clr, sce = SumScalariser(),
                                       slv = slv),
-                HierarchicalOptimiser(; pe = pr, cle = clm, sce = MaxScalariser(),
+                HierarchicalOptimiser(; pe = pr, cle = clr, sce = MaxScalariser(),
                                       slv = slv),
-                HierarchicalOptimiser(; pe = pr, cle = clm,
+                HierarchicalOptimiser(; pe = pr, cle = clr,
                                       sce = LogSumExpScalariser(; gamma = 1e-3), slv = slv),
-                HierarchicalOptimiser(; pe = pr, cle = clm,
+                HierarchicalOptimiser(; pe = pr, cle = clr,
                                       sce = LogSumExpScalariser(; gamma = 3), slv = slv)]
         df = CSV.read(joinpath(@__DIR__, "./assets/HRP_vector_rm.csv"), DataFrame)
         risk = [LowOrderMoment(; alg = MeanAbsoluteDeviation(),
@@ -204,11 +204,11 @@
         X = randn(rng, 500, 10)
         rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
         pr = prior(HighOrderPriorEstimator(), rd)
-        clm = clusterise(ClusteringEstimator(), pr.X)
+        clr = clusterise(ClusteringEstimator(), pr.X)
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
-        opt = HierarchicalOptimiser(; pe = pr, cle = clm,
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr,
                                     cwf = JuMP_ClusteringWeightFiniliser(; slv = slv),
                                     slv = slv)
         ew = eweights(1:size(X, 1), inv(size(X, 1)); scale = true)
@@ -364,8 +364,8 @@
         X = randn(rng, 1000, 15)
         rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
         pr = prior(HighOrderPriorEstimator(), rd)
-        clm = clusterise(ClusteringEstimator(), pr.X)
-        opt = HierarchicalOptimiser(; pe = pr, cle = clm, slv = slv)
+        clr = clusterise(ClusteringEstimator(), pr.X)
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
         sces = [SumScalariser(), MaxScalariser(), LogSumExpScalariser(; gamma = 1e-3),
                 LogSumExpScalariser(; gamma = 3)]
         base = [LowOrderMoment(; alg = MeanAbsoluteDeviation(),
@@ -386,7 +386,7 @@
                  (r1 = base[1], r2 = base[2])]
         df = CSV.read(joinpath(@__DIR__, "./assets/HERC_vector_rm.csv"), DataFrame)
         for (idx, sce) ∈ zip(1:5:20, sces)
-            opt = HierarchicalOptimiser(; pe = pr, cle = clm, sce = sce, slv = slv)
+            opt = HierarchicalOptimiser(; pe = pr, cle = clr, sce = sce, slv = slv)
             for (i, rs) ∈ enumerate(risks)
                 w = optimise!(HierarchicalEqualRiskContribution(; ri = rs.r1, ro = rs.r2,
                                                                 opt = opt)).w
@@ -404,13 +404,13 @@
         X = randn(rng, 500, 10)
         rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
         pr = prior(HighOrderPriorEstimator(), rd)
-        clm = clusterise(ClusteringEstimator(), pr.X)
+        clr = clusterise(ClusteringEstimator(), pr.X)
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
         lb = [0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         ub = [0.2, 1, 1, 1, 1, 1, 1, 1, 0.05, 0]
-        opt = HierarchicalOptimiser(; pe = pr, cle = clm,
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr,
                                     wb = WeightBoundsResult(; lb = lb, ub = ub), slv = slv)
         r = [Variance(), ConditionalValueatRisk()]
         w = optimise!(HierarchicalRiskParity(; r = r, opt = opt)).w
@@ -438,7 +438,7 @@
                                                alg = SquareAbsoluteErrorClusteringWeightFiniliser(),
                                                slv = [slv])]
         for cwf ∈ cwfs
-            opt = HierarchicalOptimiser(; pe = pr, cle = clm, cwf = cwf,
+            opt = HierarchicalOptimiser(; pe = pr, cle = clr, cwf = cwf,
                                         wb = WeightBoundsResult(; lb = lb, ub = ub),
                                         slv = [slv])
             w = optimise!(HierarchicalEqualRiskContribution(; ri = r, opt = opt)).w

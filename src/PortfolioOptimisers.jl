@@ -125,8 +125,9 @@ include("./20_Optimisation/11_FactorRiskContribution.jl")
 include("./20_Optimisation/12_NearOptimalCentering.jl")
 include("./20_Optimisation/13_RiskBudgetting.jl")
 include("./20_Optimisation/14_RelaxedRiskBudgetting.jl")
-include("./20_Optimisation/15_NestedClusteringOptimisation.jl")
-include("./20_Optimisation/16_RiskConstraints.jl")
+include("./20_Optimisation/15_NestedClustering.jl")
+include("./20_Optimisation/16_Stacking.jl")
+include("./20_Optimisation/17_RiskConstraints.jl")
 
 include("./21_Expected_Returns.jl")
 

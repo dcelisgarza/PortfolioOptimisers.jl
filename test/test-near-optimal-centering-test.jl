@@ -23,19 +23,18 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(), MaximumReturn()]
         bins = [1, 5, 10, 20, nothing, 50]
-        w_min = optimise!(MeanRiskEstimator(; r = ConditionalValueatRisk(),
-                                            obj = MinimumRisk(), opt = opt), rd).w
-        w_max = optimise!(MeanRiskEstimator(; r = ConditionalValueatRisk(),
-                                            obj = MaximumReturn(), opt = opt), rd).w
+        w_min = optimise!(MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(),
+                                   opt = opt), rd).w
+        w_max = optimise!(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumReturn(),
+                                   opt = opt), rd).w
         df = CSV.read(joinpath(@__DIR__, "./assets/Unconstrained-NearOptimalCentering.csv"),
                       DataFrame)
         i = 1
         for obj ∈ objs
             for bin ∈ bins
                 wt = df[!, i]
-                noc1 = NearOptimalCenteringEstimator(; bins = bin,
-                                                     r = ConditionalValueatRisk(),
-                                                     obj = obj, opt = opt)
+                noc1 = NearOptimalCentering(; bins = bin, r = ConditionalValueatRisk(),
+                                            obj = obj, opt = opt)
                 w1 = optimise!(noc1, rd).w
                 res1 = if Sys.isapple() && i ∈ (6, 12)
                     isapprox(w1, wt; rtol = 1e-4)
@@ -48,12 +47,11 @@
                 end
                 @test res1
 
-                w_opt = optimise!(MeanRiskEstimator(; r = ConditionalValueatRisk(),
-                                                    obj = obj, opt = opt), rd).w
-                noc2 = NearOptimalCenteringEstimator(; w_min = w_min, w_max = w_max,
-                                                     w_opt = w_opt, bins = bin,
-                                                     r = ConditionalValueatRisk(),
-                                                     obj = obj, opt = opt)
+                w_opt = optimise!(MeanRisk(; r = ConditionalValueatRisk(), obj = obj,
+                                           opt = opt), rd).w
+                noc2 = NearOptimalCentering(; w_min = w_min, w_max = w_max, w_opt = w_opt,
+                                            bins = bin, r = ConditionalValueatRisk(),
+                                            obj = obj, opt = opt)
                 w2 = optimise!(noc2, rd).w
                 res2 = if Sys.isapple() && i ∈ (6, 12)
                     isapprox(w2, w1; rtol = 1e-10)
@@ -69,42 +67,38 @@
             end
         end
         r = ConditionalValueatRisk()
-        mr = MeanRiskEstimator(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w1 = optimise!(mr, rd).w
         ub = expected_risk(r, w1, rd.X)
         lb = expected_returns(ArithmeticReturn(), w1, pr)
 
-        noc1 = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; rf = rf),
-                                             opt = opt)
+        noc1 = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w2 = optimise!(noc1, rd).w
 
-        noc2 = NearOptimalCenteringEstimator(;
-                                             r = ConditionalValueatRisk(;
-                                                                        settings = RiskMeasureSettings(;
-                                                                                                       ub = ub)),
-                                             obj = MaximumReturn(), opt = opt)
+        noc2 = NearOptimalCentering(;
+                                    r = ConditionalValueatRisk(;
+                                                               settings = RiskMeasureSettings(;
+                                                                                              ub = ub)),
+                                    obj = MaximumReturn(), opt = opt)
         w3 = optimise!(noc2, rd).w
         @test isapprox(w2, w3, rtol = 5e-5)
 
         opt = JuMPOptimiser(; ret = ArithmeticReturn(; lb = lb), pe = pr, slv = slv)
-        noc3 = NearOptimalCenteringEstimator(; r = r, obj = MinimumRisk(), opt = opt)
+        noc3 = NearOptimalCentering(; r = r, obj = MinimumRisk(), opt = opt)
         w4 = optimise!(noc3, rd).w
         @test isapprox(w2, w4, rtol = 5e-5)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         r = ConditionalValueatRisk()
-        mr = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; rf = rf),
-                                           opt = opt)
+        mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w1 = optimise!(mr, rd).w
 
         r = ConditionalDrawdownatRisk()
-        mr = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; rf = rf),
-                                           opt = opt)
+        mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w2 = optimise!(mr, rd).w
 
         r = [ConditionalValueatRisk(), ConditionalDrawdownatRisk()]
-        mr = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; rf = rf),
-                                           opt = opt)
+        mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w3 = optimise!(mr, rd).w
         @test isapprox(w3,
                        [0.010979049616329416, 0.06713140531624666, 0.010067267106669109,
@@ -114,8 +108,7 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, sce = MaxScalariser())
         r = [ConditionalValueatRisk(), ConditionalDrawdownatRisk()]
-        mr = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; rf = rf),
-                                           opt = opt)
+        mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w4 = optimise!(mr, rd).w
         @test isapprox(w4,
                        [0.00869185402031569, 0.04623619488036266, 0.007213865019645758,
@@ -125,8 +118,8 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser())
         r = [ConditionalValueatRisk(), ConditionalDrawdownatRisk()]
-        mr = NearOptimalCenteringEstimator(; r = r, obj = MaximumRatio(; ohf = 1, rf = rf),
-                                           opt = opt)
+        mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; ohf = 1, rf = rf),
+                                  opt = opt)
         w5 = optimise!(mr, rd).w
         @test isapprox(w5,
                        [0.009242527297389894, 0.054648908748791185, 0.008140831454820764,
@@ -142,21 +135,20 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(), MaximumReturn()]
         bins = [1, 5, 10, 20, nothing, 50]
-        w_min = optimise!(MeanRiskEstimator(; r = ConditionalValueatRisk(),
-                                            obj = MinimumRisk(), opt = opt), rd).w
-        w_max = optimise!(MeanRiskEstimator(; r = ConditionalValueatRisk(),
-                                            obj = MaximumReturn(), opt = opt), rd).w
+        w_min = optimise!(MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(),
+                                   opt = opt), rd).w
+        w_max = optimise!(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumReturn(),
+                                   opt = opt), rd).w
         df = CSV.read(joinpath(@__DIR__, "./assets/Unconstrained-NearOptimalCentering.csv"),
                       DataFrame)
         i = 1
         for obj ∈ objs
             for bin ∈ bins
                 wt = df[!, i]
-                noc1 = NearOptimalCenteringEstimator(;
-                                                     alg = ConstrainedNearOptimalCenteringAlgorithm(),
-                                                     bins = bin,
-                                                     r = ConditionalValueatRisk(),
-                                                     obj = obj, opt = opt)
+                noc1 = NearOptimalCentering(;
+                                            alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                            bins = bin, r = ConditionalValueatRisk(),
+                                            obj = obj, opt = opt)
                 w1 = optimise!(noc1, rd).w
                 res1 = if Sys.isapple() && i ∈ (6, 12)
                     isapprox(w1, wt; rtol = 1e-4)
@@ -169,14 +161,13 @@
                 end
                 @test res1
 
-                w_opt = optimise!(MeanRiskEstimator(; r = ConditionalValueatRisk(),
-                                                    obj = obj, opt = opt), rd).w
-                noc2 = NearOptimalCenteringEstimator(;
-                                                     alg = ConstrainedNearOptimalCenteringAlgorithm(),
-                                                     w_min = w_min, w_max = w_max,
-                                                     w_opt = w_opt, bins = bin,
-                                                     r = ConditionalValueatRisk(),
-                                                     obj = obj, opt = opt)
+                w_opt = optimise!(MeanRisk(; r = ConditionalValueatRisk(), obj = obj,
+                                           opt = opt), rd).w
+                noc2 = NearOptimalCentering(;
+                                            alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                            w_min = w_min, w_max = w_max, w_opt = w_opt,
+                                            bins = bin, r = ConditionalValueatRisk(),
+                                            obj = obj, opt = opt)
                 w2 = optimise!(noc2, rd).w
                 res2 = if Sys.isapple() && i ∈ (6, 12)
                     isapprox(w2, w1; rtol = 1e-10)
@@ -192,30 +183,26 @@
             end
         end
         r = ConditionalValueatRisk()
-        mr = MeanRiskEstimator(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w1 = optimise!(mr, rd).w
         ub = expected_risk(r, w1, rd.X)
         lb = expected_returns(ArithmeticReturn(), w1, pr)
 
-        noc1 = NearOptimalCenteringEstimator(;
-                                             alg = ConstrainedNearOptimalCenteringAlgorithm(),
-                                             r = r, obj = MaximumRatio(; rf = rf),
-                                             opt = opt)
+        noc1 = NearOptimalCentering(; alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                    r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w2 = optimise!(noc1, rd).w
 
-        noc2 = NearOptimalCenteringEstimator(;
-                                             alg = ConstrainedNearOptimalCenteringAlgorithm(),
-                                             r = ConditionalValueatRisk(;
-                                                                        settings = RiskMeasureSettings(;
-                                                                                                       ub = ub)),
-                                             obj = MaximumReturn(), opt = opt)
+        noc2 = NearOptimalCentering(; alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                    r = ConditionalValueatRisk(;
+                                                               settings = RiskMeasureSettings(;
+                                                                                              ub = ub)),
+                                    obj = MaximumReturn(), opt = opt)
         w3 = optimise!(noc2, rd).w
         @test expected_risk(r, w3, rd.X) <= ub + sqrt(eps())
 
         opt = JuMPOptimiser(; ret = ArithmeticReturn(; lb = lb), pe = pr, slv = slv)
-        noc3 = NearOptimalCenteringEstimator(;
-                                             alg = ConstrainedNearOptimalCenteringAlgorithm(),
-                                             r = r, obj = MinimumRisk(), opt = opt)
+        noc3 = NearOptimalCentering(; alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                    r = r, obj = MinimumRisk(), opt = opt)
         w4 = optimise!(noc3, rd).w
         @test expected_returns(ArithmeticReturn(), w4, pr) >= lb - sqrt(eps())
     end

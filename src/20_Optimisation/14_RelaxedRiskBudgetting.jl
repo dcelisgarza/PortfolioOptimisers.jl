@@ -9,35 +9,35 @@ function RegularisationPenaltyRelaxedRiskBudgettingAlgorithm(; p::Real = 1.0)
     @smart_assert(isfinite(p))
     return RegularisationPenaltyRelaxedRiskBudgettingAlgorithm{typeof(p)}(p)
 end
-struct RelaxedRiskBudgettingEstimator{T1 <: RelaxedRiskBudgettingAlgorithm,
-                                      T2 <: JuMPOptimiser,
-                                      T3 <: Union{Nothing, <:AbstractVector{<:Real}},
-                                      T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+struct RelaxedRiskBudgetting{T1 <: RelaxedRiskBudgettingAlgorithm, T2 <: JuMPOptimiser,
+                             T3 <: Union{Nothing, <:AbstractVector{<:Real}},
+                             T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
        JuMPOptimisationEstimator
     alg::T1
     opt::T2
     rkb::T3
     wi::T4
 end
-function RelaxedRiskBudgettingEstimator(;
-                                        alg::RelaxedRiskBudgettingAlgorithm = BasicRelaxedRiskBudgettingAlgorithm(),
-                                        opt::JuMPOptimiser = JuMPOptimiser(),
-                                        rkb::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                                        wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+function RelaxedRiskBudgetting(;
+                               alg::RelaxedRiskBudgettingAlgorithm = BasicRelaxedRiskBudgettingAlgorithm(),
+                               opt::JuMPOptimiser = JuMPOptimiser(),
+                               rkb::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                               wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(rkb, AbstractVector)
         @smart_assert(!isempty(rkb))
     end
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
-    return RelaxedRiskBudgettingEstimator{typeof(alg), typeof(opt), typeof(rkb),
-                                          typeof(wi)}(alg, opt, rkb, wi)
+    return RelaxedRiskBudgetting{typeof(alg), typeof(opt), typeof(rkb), typeof(wi)}(alg,
+                                                                                    opt,
+                                                                                    rkb, wi)
 end
-function opt_view(rrb::RelaxedRiskBudgettingEstimator, i::AbstractVector)
+function opt_view(rrb::RelaxedRiskBudgetting, i::AbstractVector)
     opt = opt_view(rrb.opt, i)
     rkb = nothing_scalar_array_view(rrb.rkb, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
-    return RelaxedRiskBudgettingEstimator(; alg = rrb.alg, opt = opt, rkb = rkb, wi = wi)
+    return RelaxedRiskBudgetting(; alg = rrb.alg, opt = opt, rkb = rkb, wi = wi)
 end
 function set_relaxed_risk_budgetting_alg_constraints!(::BasicRelaxedRiskBudgettingAlgorithm,
                                                       model::JuMP.Model,
@@ -88,7 +88,7 @@ function set_relaxed_risk_budgetting_alg_constraints!(alg::RegularisationPenalty
     return nothing
 end
 function set_relaxed_risk_budgetting_constraints!(model::JuMP.Model,
-                                                  rrb::RelaxedRiskBudgettingEstimator,
+                                                  rrb::RelaxedRiskBudgetting,
                                                   sigma::AbstractMatrix)
     w = model[:w]
     N = length(w)
@@ -117,7 +117,7 @@ function set_relaxed_risk_budgetting_constraints!(model::JuMP.Model,
     set_relaxed_risk_budgetting_alg_constraints!(rrb.alg, model, sigma)
     return nothing
 end
-function optimise!(rrb::RelaxedRiskBudgettingEstimator, rd::ReturnsResult = ReturnsResult();
+function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(rrb.opt, rd;
                                                                                dims = dims)
@@ -151,4 +151,4 @@ function optimise!(rrb::RelaxedRiskBudgettingEstimator, rd::ReturnsResult = Retu
 end
 
 export BasicRelaxedRiskBudgettingAlgorithm, RegularisationRelaxedRiskBudgettingAlgorithm,
-       RegularisationPenaltyRelaxedRiskBudgettingAlgorithm, RelaxedRiskBudgettingEstimator
+       RegularisationPenaltyRelaxedRiskBudgettingAlgorithm, RelaxedRiskBudgetting

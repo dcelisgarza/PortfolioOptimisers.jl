@@ -35,7 +35,7 @@ struct HierarchicalOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
     oe::T1
     pr::T2
     wb::T3
-    clm::T4
+    clr::T4
     retcode::T5
     w::T6
 end

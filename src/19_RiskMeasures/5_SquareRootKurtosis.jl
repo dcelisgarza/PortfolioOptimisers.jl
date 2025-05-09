@@ -122,6 +122,7 @@ function risk_measure_view(r::SquareRootKurtosis, i::AbstractVector, args...; kw
     return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = r.w, mu = mu,
                               kt = kt, N = r.N)
 end
+#=
 function risk_measure_view(::SquareRootKurtosis{<:Any, <:Any, <:Any, Nothing, <:Any},
                            i::AbstractVector,
                            prior::Union{<:AbstractLowOrderPriorResult,
@@ -171,5 +172,6 @@ function risk_measure_view(r::SquareRootKurtosis, i::AbstractVector,
     return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = w, mu = mu, kt = kt,
                               N = r.N)
 end
+=#
 
 export SquareRootKurtosis

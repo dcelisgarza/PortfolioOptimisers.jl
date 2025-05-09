@@ -141,7 +141,11 @@ end
 function clustering_optimisation_result(cwf::ClusteringWeightFinaliser,
                                         wb::WeightBoundsResult, w::AbstractVector)
     w = opt_weight_bounds(cwf, wb, w)
-    retcode = any(!isfinite, w) ? OptimisationSuccess() : OptimisationFailure()
+    retcode = if !any(!isfinite, w)
+        OptimisationSuccess()
+    else
+        OptimisationFailure(; res = "Failure to set bounds\n$cwf\n$wb.")
+    end
     return retcode, w
 end
 
