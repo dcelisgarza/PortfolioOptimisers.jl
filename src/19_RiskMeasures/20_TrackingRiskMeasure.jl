@@ -11,7 +11,7 @@ function (r::TrackingRiskMeasure)(w::AbstractVector, X::AbstractMatrix,
     benchmark = tracking_benchmark(r.tracking, X)
     return norm(calc_net_returns(w, X, fees) - benchmark) / sqrt(size(X, 1) - 1)
 end
-function risk_measure_view(r::TrackingRiskMeasure, i::AbstractVector, args...; kwargs...)
+function risk_measure_view(r::TrackingRiskMeasure, i::AbstractVector, args...)
     tracking = tracking_view(r.tracking, i)
     return TrackingRiskMeasure(; settings = r.settings, tracking = tracking)
 end

@@ -125,11 +125,6 @@ function risk_measure_factory(r::RelativisticValueatRiskRange, ::Any,
                                         kappa_a = r.kappa_a, beta = r.beta,
                                         kappa_b = r.kappa_b, slv = slv)
 end
-function risk_measure_view(r::RelativisticValueatRiskRange, ::Any, ::Any,
-                           slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                           args...; kwargs...)
-    return risk_measure_factory(r, nothing, slv, args...; kwargs...)
-end
 struct RelativisticDrawdownatRisk{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
                                   T4 <:
                                   Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}} <:
@@ -214,12 +209,6 @@ for r ∈ (RelativisticValueatRisk, RelativisticDrawdownatRisk,
                  slv = risk_measure_solver_factory(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
                              slv = slv)
-             end
-             function risk_measure_view(r::$(r), ::Any, ::Any,
-                                        slv::Union{Nothing, <:Solver,
-                                                   <:AbstractVector{<:Solver}}, args...;
-                                        kwargs...)
-                 return risk_measure_factory(r, nothing, slv, args...; kwargs...)
              end
          end)
 end

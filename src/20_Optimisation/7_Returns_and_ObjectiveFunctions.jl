@@ -42,14 +42,14 @@ function no_bounds_returns_estimator(r::KellyReturn, args...)
 end
 function jump_returns_factory(r::KellyReturn, pr::EntropyPoolingPriorResult; kwargs...)
     return KellyReturn(; lb = r.lb,
-                       w = risk_measure_nothing_real_array_factory(r.w, prior.w))
+                       w = risk_measure_nothing_scalar_array_factory(r.w, prior.w))
 end
 function jump_returns_factory(r::KellyReturn,
                               prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
                                                           <:Any, <:Any, <:Any, <:Any},
                               args...; kwargs...)
     return KellyReturn(; lb = r.lb,
-                       w = risk_measure_nothing_real_array_factory(r.w, prior.pr.w))
+                       w = risk_measure_nothing_scalar_array_factory(r.w, prior.pr.w))
 end
 struct MinimumRisk <: ObjectiveFunction end
 struct MaximumUtility{T1 <: Real} <: ObjectiveFunction

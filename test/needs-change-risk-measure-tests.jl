@@ -37,8 +37,7 @@
         rs = BrownianDistanceVariance(; settings = settings,
                                       formulation = IneqBrownianDistanceVariance())
         r = risk_measure_factory(rs)
-        rv = risk_measure_view(rs)
-        @test r === rs === rv
+        @test r === rs
         @test isapprox(expected_risk(r, w, X), 0.2018426182783387)
 
         views = [EntropyPoolingViewEstimator(;
@@ -74,62 +73,40 @@
             rs = [Variance(; settings = settings, formulation = formulation, sigma = sigma,
                            rc = rc), Variance(;)]
             r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
-            rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].formulation === formulation
             @test r[1].sigma === sigma
             @test r[1].rc === rc
             @test isapprox(expected_risk(r[1], w, X), dot(w, sigma, w))
-            @test rv[1].settings === settings
-            @test rv[1].formulation === formulation
-            @test rv[1].sigma === sigmav
-            @test rv[1].rc === rc
-            @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, sigmav, wv))
 
             @test r[2].sigma === pr1.sigma
             @test isapprox(expected_risk(r[2], w, X), dot(w, pr1.sigma, w))
-            @test rv[2].sigma === prv.sigma
-            @test isapprox(expected_risk(rv[2], wv, prv.X), dot(wv, prv.sigma, wv))
 
             sigma = pr1.sigma * 2
             sigmav = nothing_scalar_array_view(sigma, i)
             rs = [StandardDeviation(; settings = settings, sigma = sigma),
                   StandardDeviation(;)]
             r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
-            rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].sigma === sigma
             @test isapprox(expected_risk(r[1], w, X), sqrt(dot(w, sigma, w)))
-            @test rv[1].settings === settings
-            @test rv[1].sigma === sigmav
-            @test isapprox(expected_risk(rv[1], wv, prv.X), sqrt(dot(wv, sigmav, wv)))
 
             @test r[2].sigma === pr1.sigma
             @test isapprox(expected_risk(r[2], w, X), sqrt(dot(w, pr1.sigma, w)))
-            @test rv[2].sigma === prv.sigma
-            @test isapprox(expected_risk(rv[2], wv, prv.X), sqrt(dot(wv, prv.sigma, wv)))
 
             sigma = pr1.sigma * 2.5
             sigmav = nothing_scalar_array_view(sigma, i)
             rs = [UncertaintySetVariance(; settings = settings, ucs = ucs1, sigma = sigma),
                   UncertaintySetVariance(;)]
             r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
-            rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].ucs === ucs1
             @test r[1].sigma === sigma
             @test isapprox(expected_risk(r[1], w, X), dot(w, sigma, w))
-            @test rv[1].settings === settings
-            @test rv[1].ucs === ucs1view
-            @test rv[1].sigma === sigmav
-            @test isapprox(expected_risk(rv[1], wv, prv.X), dot(wv, sigmav, wv))
 
             @test r[2].sigma === pr1.sigma
             @test r[2].ucs === ucs2
             @test isapprox(expected_risk(r[2], w, X), dot(w, pr1.sigma, w))
-            @test rv[2].sigma === prv.sigma
-            @test rv[2].ucs === ucs2view
-            @test isapprox(expected_risk(rv[2], wv, prv.X), dot(wv, prv.sigma, wv))
 
             formulation = Quad()
             rs = [LowOrderMoment(; settings = settings, w = ew, mu = mu),
@@ -140,38 +117,29 @@
                   LowOrderMoment(; alg = MeanAbsoluteDeviation()),
                   LowOrderMoment(; alg = MeanAbsoluteDeviation(; w = ew))]
             r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
-            rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].w === ew
             @test r[1].mu === mu
             val = X * w .- dot(w, mu)
             val = val[val .<= zero(eltype(val))]
             @test isapprox(expected_risk(r[1], w, X), -sum(val) / size(X, 1))
-            @test rv[1].settings === settings
-            @test rv[1].w === ew
-            @test rv[1].mu === muv
             val = prv.X * wv .- dot(wv, muv)
             val = val[val .<= zero(eltype(val))]
-            @test isapprox(expected_risk(rv[1], wv, prv.X), -sum(val) / size(prv.X, 1))
 
             @test r[2].mu == 0
             val = X * w
             val = val[val .<= zero(eltype(val))]
             @test isapprox(expected_risk(r[2], w, X), -sum(val) / size(X, 1))
-            @test rv[2].mu == 0
             val = prv.X * wv
             val = val[val .<= zero(eltype(val))]
-            @test isapprox(expected_risk(rv[2], wv, prv.X), -sum(val) / size(prv.X, 1))
 
             @test isa(r[3].alg, FirstLowerMoment)
             @test r[3].mu === zerovec
             val = X * w .- dot(w, zerovec)
             val = val[val .<= zero(eltype(val))]
             @test isapprox(expected_risk(r[3], w, X), -sum(val) / size(X, 1))
-            @test rv[3].mu === zerovecv
             val = prv.X * wv .- dot(wv, zerovecv)
             val = val[val .<= zero(eltype(val))]
-            @test isapprox(expected_risk(rv[3], wv, prv.X), -sum(val) / size(prv.X, 1))
 
             @test r[4].alg.ddof == 2
             @test r[4].mu === pr1.mu
@@ -179,13 +147,8 @@
             val = val[val .<= zero(eltype(val))]
             @test isapprox(expected_risk(r[4], w, X),
                            sqrt(dot(val, val) / (size(X, 1) - r[4].alg.ddof)))
-            @test isa(rv[4].alg, SemiDeviation)
-            @test rv[4].alg.ddof == 2
-            @test rv[4].mu === prv.mu
             val = prv.X * wv .- dot(wv, prv.mu)
             val = val[val .<= zero(eltype(val))]
-            @test isapprox(expected_risk(rv[4], wv, prv.X),
-                           sqrt(dot(val, val) / (size(prv.X, 1) - rv[4].alg.ddof)))
 
             @test r[5].alg.ddof == 3
             @test r[5].alg.formulation === formulation
@@ -194,14 +157,8 @@
             val = val[val .<= zero(eltype(val))]
             @test isapprox(expected_risk(r[5], w, X),
                            dot(val, val) / (size(X, 1) - r[5].alg.ddof))
-            @test isa(rv[5].alg, SemiVariance)
-            @test rv[5].alg.ddof == 3
-            @test rv[5].alg.formulation === formulation
-            @test rv[5].mu === prv.mu
             val = prv.X * wv .- dot(wv, prv.mu)
             val = val[val .<= zero(eltype(val))]
-            @test isapprox(expected_risk(rv[5], wv, prv.X),
-                           dot(val, val) / (size(prv.X, 1) - rv[5].alg.ddof))
 
             if isa(pr1,
                    HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
@@ -214,19 +171,7 @@
             @test r[6].mu === pr1.mu
             val = X * w .- dot(w, pr1.mu)
             @test isapprox(expected_risk(r[6], w, X), mean(abs.(val)))
-            if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
-                @test isnothing(rv[6].alg.w)
-            elseif isa(pr1,
-                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
-                                            <:Any, <:Any})
-                @test rv[6].alg.w === prv.pr.w
-            else
-                @test rv[6].alg.w === prv.w
-            end
-            @test rv[6].mu === prv.mu
             val = prv.X * wv .- dot(wv, prv.mu)
-            @test isapprox(expected_risk(rv[6], wv, prv.X), mean(abs.(val)))
 
             if isa(pr1,
                    HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
@@ -253,31 +198,7 @@
                                 else
                                     pr1.w
                                 end))
-            if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
-                @test rv[7].alg.w === ew
-            elseif isa(pr1,
-                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
-                                            <:Any, <:Any})
-                @test rv[7].alg.w === prv.pr.w
-            else
-                @test rv[7].alg.w === prv.w
-            end
-            @test rv[7].mu === prv.mu
             val = prv.X * wv .- dot(wv, prv.mu)
-            @test isapprox(expected_risk(rv[7], wv, prv.X),
-                           mean(abs.(val),
-                                if isa(pr1,
-                                       HighOrderPriorResult{<:EmpiricalPriorResult, <:Any,
-                                                            <:Any, <:Any, <:Any})
-                                    ew
-                                elseif isa(pr1,
-                                           HighOrderPriorResult{<:EntropyPoolingPriorResult,
-                                                                <:Any, <:Any, <:Any, <:Any})
-                                    prv.pr.w
-                                else
-                                    prv.w
-                                end))
 
             rs = [HighOrderMoment(; settings = settings, w = ew, mu = mu),
                   HighOrderMoment(; alg = FourthLowerMoment(), mu = 0),
@@ -292,49 +213,35 @@
                   HighOrderMoment(;
                                   alg = HighOrderDeviation(; alg = FourthCentralMoment()))]
             r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
-            rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].w === ew
             @test r[1].mu === mu
             val = X * w .- dot(w, mu)
             val = val[val .<= zero(eltype(val))]
             @test isapprox(expected_risk(r[1], w, X), -sum(val .^ 3) / size(X, 1))
-            @test rv[1].settings === settings
-            @test rv[1].w === ew
-            @test rv[1].mu === muv
             val = prv.X * wv .- dot(wv, muv)
             val = val[val .<= zero(eltype(val))]
-            @test isapprox(expected_risk(rv[1], wv, prv.X), -sum(val .^ 3) / size(prv.X, 1))
 
             @test r[2].mu === 0
             val = X * w
             val = val[val .<= zero(eltype(val))]
             @test isapprox(expected_risk(r[2], w, X), sum(val .^ 4) / size(X, 1))
-            @test rv[2].mu === 0
             val = prv.X * wv
             val = val[val .<= zero(eltype(val))]
-            @test isapprox(expected_risk(rv[2], wv, prv.X), sum(val .^ 4) / size(X, 1))
 
             @test isa(r[3].alg, FourthCentralMoment)
             @test r[3].mu === zerovec
             val = X * w .- dot(w, zerovec)
             @test isapprox(expected_risk(r[3], w, X), sum(val .^ 4) / size(X, 1))
-            @test isa(rv[3].alg, FourthCentralMoment)
-            @test rv[3].mu === zerovecv
             val = prv.X * wv .- dot(wv, zerovecv)
-            @test isapprox(expected_risk(rv[3], wv, prv.X), sum(val .^ 4) / size(prv.X, 1))
 
             @test r[4].mu === pr1.mu
             val = X * w .- dot(w, pr1.mu)
             val = val[val .<= zero(eltype(val))]
             s = std(r[4].alg.ve, val; mean = zero(eltype(val)))
             @test isapprox(expected_risk(r[4], w, X), -sum(val .^ 3) / size(X, 1) / s^3)
-            @test rv[4].mu === prv.mu
             val = prv.X * wv .- dot(wv, prv.mu)
             val = val[val .<= zero(eltype(val))]
-            s = std(rv[4].alg.ve, val; mean = zero(eltype(val)))
-            @test isapprox(expected_risk(rv[4], wv, prv.X),
-                           -sum(val .^ 3) / size(prv.X, 1) / s^3)
 
             @test r[5].mu === pr1.mu
             if isa(pr1,
@@ -353,24 +260,8 @@
             val = val[val .<= zero(eltype(val))]
             s = std(r[5].alg.ve, val; mean = zero(eltype(val)))
             @test isapprox(expected_risk(r[5], w, X), sum(val .^ 4) / size(X, 1) / s^4)
-            @test rv[5].mu === prv.mu
-            if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
-                @test rv[5].alg.ve.w === ew
-            elseif isa(pr1,
-                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
-                                            <:Any, <:Any})
-                @test rv[5].alg.ve.w === prv.pr.w
-            else
-                @test rv[5].alg.ve.w === prv.w
-            end
-            @test isa(rv[5].alg, HighOrderDeviation)
-            @test isa(rv[5].alg.alg, FourthLowerMoment)
             val = prv.X * wv .- dot(wv, prv.mu)
             val = val[val .<= zero(eltype(val))]
-            s = std(rv[5].alg.ve, val; mean = zero(eltype(val)))
-            @test isapprox(expected_risk(rv[5], wv, prv.X),
-                           sum(val .^ 4) / size(prv.X, 1) / s^4)
 
             @test r[6].mu === pr1.mu
             if isa(pr1,
@@ -389,24 +280,8 @@
             val = x .- dot(w, pr1.mu)
             s = std(r[6].alg.ve, x)
             @test isapprox(expected_risk(r[6], w, X), sum(val .^ 4) / size(X, 1) / s^4)
-            @test rv[6].mu === prv.mu
-            if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
-                @test isnothing(rv[6].alg.ve.w)
-            elseif isa(pr1,
-                       HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
-                                            <:Any, <:Any})
-                @test rv[6].alg.ve.w === prv.pr.w
-            else
-                @test rv[6].alg.ve.w === prv.w
-            end
-            @test isa(rv[6].alg, HighOrderDeviation)
-            @test isa(rv[6].alg.alg, FourthCentralMoment)
             x = prv.X * wv
             val = x .- dot(wv, prv.mu)
-            s = std(rv[6].alg.ve, x)
-            @test isapprox(expected_risk(rv[6], wv, prv.X),
-                           sum(val .^ 4) / size(prv.X, 1) / s^4)
         end
     end
     @testset "Square root kurtosis and negative skewness" begin
@@ -485,7 +360,6 @@
                                          kt
                                      end)]
             r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
-            rv = risk_measure_view(rs, Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].w === ew
             @test r[1].mu === mu
@@ -634,7 +508,6 @@
                                        V
                                    end), NegativeSkewness(;)]
             r = risk_measure_factory(rs[1:2], Ref(pr1), Ref(slv), Ref(ucs2))
-            rv = risk_measure_view(rs[1:2], Ref(pr1), Ref(i), Ref(slv), Ref(ucs2))
 
             @test r[1].settings === settings
             @test r[1].alg === QuadraticNegativeSkewness()
@@ -678,7 +551,6 @@
             end
             if isa(pr1, HighOrderPriorResult)
                 r = risk_measure_factory(rs[3], pr1, slv, ucs2)
-                rv = risk_measure_view(rs[3], pr1, i, slv, ucs2)
                 @test r.sk === pr1.sk
                 @test r.V === pr1.V
             else
@@ -700,7 +572,6 @@
                DrawdownatRisk(; settings = settings, alpha = 0.4),
                RelativeDrawdownatRisk(; settings = settings, alpha = 0.5)]
         r1 = risk_measure_factory(rs1)
-        rv1 = risk_measure_view(rs1)
         @test all(rs1 .=== r1)
         @test all(rs1 .=== rv1)
         er1 = expected_risk.(r1, Ref(w), Ref(X))
@@ -722,7 +593,6 @@
                ConditionalDrawdownatRisk(; settings = settings, alpha = 0.4),
                RelativeConditionalDrawdownatRisk(; settings = hcsettings, alpha = 0.5)]
         r2 = risk_measure_factory(rs2)
-        rv2 = risk_measure_view(rs2)
         @test all(rs2 .=== r2)
         @test all(rs2 .=== rv2)
         er2 = expected_risk.(r2, Ref(w), Ref(X))
@@ -743,7 +613,6 @@
                EntropicDrawdownatRisk(; settings = settings, alpha = 0.4),
                RelativeEntropicDrawdownatRisk(; settings = hcsettings, alpha = 0.5)]
         r3 = risk_measure_factory(rs3, nothing, Ref(slv))
-        rv3 = risk_measure_view(rs3, nothing, nothing, Ref(slv))
         @test all(rs3[1:2] .=== r3[1:2])
         @test r3[3].slv === slv
         @test r3[4].slv === slv
@@ -768,7 +637,6 @@
                RelativeRelativisticDrawdownatRisk(; settings = hcsettings, alpha = 0.5,
                                                   kappa = 0.25)]
         r4 = risk_measure_factory(rs4, nothing, Ref(slv))
-        rv4 = risk_measure_view(rs4, nothing, nothing, Ref(slv))
         @test all(rs4[1:2] .=== r4[1:2])
         @test r4[3].slv === slv
         @test r4[4].slv === slv
@@ -799,7 +667,6 @@
                                               a_sim = 70)),
                OrderedWeightsArray(; w = owa_tgrg(500))]
         r1 = risk_measure_factory(rs1)
-        rv1 = risk_measure_view(rs1)
         @test all(rs1 .=== r1)
         @test all(rs1 .=== rv1)
         er1 = expected_risk.(r1, Ref(w), Ref(X))
@@ -837,7 +704,6 @@
             rs = [AverageDrawdown(; settings = settings), RelativeAverageDrawdown(;),
                   AverageDrawdown(; w = ew), RelativeAverageDrawdown(; w = ew)]
             r = risk_measure_factory(rs, Ref(pr1))
-            rv = risk_measure_view(rs, Ref(pr1), nothing)
             if isa(pr1, EmpiricalPriorResult)
                 @test all(r .=== rs)
                 @test all(rv .=== rs)
@@ -880,7 +746,6 @@
               RelativeUlcerIndex(; settings = hcsettings), MaximumDrawdown(),
               RelativeMaximumDrawdown(), WorstRealisation(), Range(), EqualRiskMeasure()]
         r = risk_measure_factory(rs)
-        rv = risk_measure_view(rs)
         @test all(rs .=== r)
         @test all(rs .=== rv)
         x = X * w
@@ -906,7 +771,6 @@
               TrackingRiskMeasure(; settings = settings,
                                   tracking = ReturnsTracking(; w = X * w2))]
         r = risk_measure_factory(rs)
-        rv = risk_measure_view(rs, nothing, Ref(i))
 
         @test all(rs .=== r)
         @test rv[1].w == rv[2].tracking.w == view(w2, i)
@@ -966,7 +830,6 @@
                                                w = ew), w = ew, mu = mu),
                   ThirdCentralMoment(; mu = 0), Skewness(; mu = 0)]
             r = risk_measure_factory(rs, Ref(pr1))
-            rv = risk_measure_view(rs, Ref(pr1), Ref(i))
             er = expected_risk.(r, Ref(w), Ref(X))
             if isa(pr1, EmpiricalPriorResult)
                 @test isnothing(r[1].w)

@@ -1,12 +1,12 @@
-function risk_measure_nothing_real_array_factory(::Nothing, ::Nothing)
+function risk_measure_nothing_scalar_array_factory(::Nothing, ::Nothing)
     throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
 end
-function risk_measure_nothing_real_array_factory(risk_variable::Union{<:Real,
-                                                                      <:AbstractArray},
-                                                 ::Any)
+function risk_measure_nothing_scalar_array_factory(risk_variable::Union{<:Real,
+                                                                        <:AbstractArray},
+                                                   ::Any)
     return risk_variable
 end
-function risk_measure_nothing_real_array_factory(::Nothing, prior_variable::AbstractArray)
+function risk_measure_nothing_scalar_array_factory(::Nothing, prior_variable::AbstractArray)
     return prior_variable
 end
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i::AbstractVector)

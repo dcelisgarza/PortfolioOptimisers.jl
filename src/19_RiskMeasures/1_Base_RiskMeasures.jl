@@ -51,12 +51,12 @@ const SolverRiskMeasures = Union{SolverRiskMeasure, SolverHierarchicalRiskMeasur
 function risk_measure_factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
     return rs
 end
-function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any)
-    return rs
-end
 function risk_measure_factory(rs::AbstractVector{<:AbstractBaseRiskMeasure}, args...;
                               kwargs...)
     return risk_measure_factory.(rs, args...; kwargs...)
+end
+function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any)
+    return rs
 end
 function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i::AbstractVector)
     return risk_measure_view.(rs, Ref(i))

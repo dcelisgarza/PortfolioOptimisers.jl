@@ -30,21 +30,12 @@ function (r::Variance)(w::AbstractVector)
     return dot(w, r.sigma, w)
 end
 function risk_measure_factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
-    sigma = risk_measure_nothing_real_array_factory(r.sigma, prior.sigma)
+    sigma = risk_measure_nothing_scalar_array_factory(r.sigma, prior.sigma)
     return Variance(; settings = r.settings, formulation = r.formulation, sigma = sigma,
                     rc = r.rc)
 end
-function risk_measure_view(r::Variance, i::AbstractVector, args...; kwargs...)
+function risk_measure_view(r::Variance, i::AbstractVector)
     sigma = nothing_scalar_array_view(r.sigma, i)
-    @smart_assert(!isa(r.rc, LinearConstraintResult),
-                  "`rc` cannot be a `LinearConstraintResult` because there is no way to only consider items from a specific cluster.")
-    rc = linear_constraint_view(r.rc, i)
-    return Variance(; settings = r.settings, formulation = r.formulation, sigma = sigma,
-                    rc = rc)
-end
-function risk_measure_view(r::Variance, i::AbstractVector, prior::AbstractPriorResult,
-                           args...; kwargs...)
-    sigma = risk_measure_nothing_scalar_array_view(r.sigma, prior.sigma, i)
     @smart_assert(!isa(r.rc, LinearConstraintResult),
                   "`rc` cannot be a `LinearConstraintResult` because there is no way to only consider items from a specific cluster.")
     rc = linear_constraint_view(r.rc, i)
@@ -69,16 +60,11 @@ function (r::StandardDeviation)(w::AbstractVector)
 end
 function risk_measure_factory(r::StandardDeviation, prior::AbstractPriorResult, args...;
                               kwargs...)
-    sigma = risk_measure_nothing_real_array_factory(r.sigma, prior.sigma)
+    sigma = risk_measure_nothing_scalar_array_factory(r.sigma, prior.sigma)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
-function risk_measure_view(r::StandardDeviation, i::AbstractVector, args...; kwargs...)
+function risk_measure_view(r::StandardDeviation, i::AbstractVector)
     sigma = nothing_scalar_array_view(r.sigma, i)
-    return StandardDeviation(; settings = r.settings, sigma = sigma)
-end
-function risk_measure_view(r::StandardDeviation, i::AbstractVector,
-                           prior::AbstractPriorResult, args...; kwargs...)
-    sigma = risk_measure_nothing_scalar_array_view(r.sigma, prior.sigma, i)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
 struct UncertaintySetVariance{T1 <: RiskMeasureSettings,
@@ -119,18 +105,12 @@ function risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorRes
                                          <:AbstractUncertaintySetEstimator} = nothing,
                               args...; kwargs...)
     ucs = ucs_factory(r.ucs, ucs)
-    sigma = risk_measure_nothing_real_array_factory(r.sigma, prior.sigma)
+    sigma = risk_measure_nothing_scalar_array_factory(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
-function risk_measure_view(r::UncertaintySetVariance, i::AbstractVector, args...; kwargs...)
+function risk_measure_view(r::UncertaintySetVariance, i::AbstractVector)
     ucs = ucs_view(r.ucs, i)
     sigma = nothing_scalar_array_view(r.sigma, i)
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
-end
-function risk_measure_view(r::UncertaintySetVariance, i::AbstractVector,
-                           prior::AbstractPriorResult, args...; kwargs...)
-    ucs = ucs_view(r.ucs, i)
-    sigma = risk_measure_nothing_scalar_array_view(r.sigma, prior.sigma, i)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
 

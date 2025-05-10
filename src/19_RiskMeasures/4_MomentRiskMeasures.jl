@@ -221,13 +221,13 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
     eval(quote
              function risk_measure_factory(r::$(rt), prior::AbstractPriorResult, args...;
                                            kwargs...)
-                 mu = risk_measure_nothing_real_array_factory(r.mu, prior.mu)
+                 mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
                  return $(rt)(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
              end
              function risk_measure_factory(r::$(rt), prior::EntropyPoolingPriorResult,
                                            args...; kwargs...)
-                 w = risk_measure_nothing_real_array_factory(r.w, prior.w)
-                 mu = risk_measure_nothing_real_array_factory(r.mu, prior.mu)
+                 w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
+                 mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
                  alg = risk_moment_algorithm_factory(r.alg, prior.w)
                  return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
              end
@@ -236,37 +236,14 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any}, args...;
                                            kwargs...)
-                 w = risk_measure_nothing_real_array_factory(r.w, prior.pr.w)
-                 mu = risk_measure_nothing_real_array_factory(r.mu, prior.mu)
+                 w = risk_measure_nothing_scalar_array_factory(r.w, prior.pr.w)
+                 mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
                  alg = risk_moment_algorithm_factory(r.alg, prior.pr.w)
                  return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
              end
-             function risk_measure_view(r::$(rt), i::AbstractVector, args...; kwargs...)
+             function risk_measure_view(r::$(rt), i::AbstractVector)
                  mu = nothing_scalar_array_view(r.mu, i)
                  return $(rt)(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
-             end
-             function risk_measure_view(r::$(rt), i::AbstractVector,
-                                        prior::AbstractPriorResult, args...; kwargs...)
-                 mu = risk_measure_nothing_scalar_array_view(r.mu, prior.mu, i)
-                 return $(rt)(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
-             end
-             function risk_measure_view(r::$(rt), i::AbstractVector,
-                                        prior::EntropyPoolingPriorResult, args...;
-                                        kwargs...)
-                 w = risk_measure_nothing_real_array_factory(r.w, prior.w)
-                 mu = risk_measure_nothing_scalar_array_view(r.mu, prior.mu, i)
-                 alg = risk_moment_algorithm_factory(r.alg, prior.w)
-                 return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
-             end
-             function risk_measure_view(r::$(rt), i::AbstractVector,
-                                        prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
-                                                                    <:Any, <:Any, <:Any,
-                                                                    <:Any}, args...;
-                                        kwargs...)
-                 w = risk_measure_nothing_real_array_factory(r.w, prior.pr.w)
-                 mu = risk_measure_nothing_scalar_array_view(r.mu, prior.mu, i)
-                 alg = risk_moment_algorithm_factory(r.alg, prior.pr.w)
-                 return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
              end
          end)
 end
