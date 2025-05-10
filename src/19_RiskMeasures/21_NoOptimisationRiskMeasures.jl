@@ -18,7 +18,7 @@ function risk_measure_factory(r::MeanReturn,
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.pr.w)
     return MeanReturn(; w = w)
 end
-function risk_measure_view(r::MeanReturn, ::Any, args...)
+function risk_measure_view(r::MeanReturn, ::Any)
     return r
 end
 struct ThirdCentralMoment{T1 <: Union{Nothing, <:AbstractWeights},
@@ -87,7 +87,7 @@ function risk_measure_factory(r::ThirdCentralMoment,
     mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
     return ThirdCentralMoment(; w = w, mu = mu)
 end
-function risk_measure_view(r::ThirdCentralMoment, i::AbstractVector, args...)
+function risk_measure_view(r::ThirdCentralMoment, i::AbstractVector)
     mu = nothing_scalar_array_view(r.mu, i)
     return ThirdCentralMoment(; w = r.w, mu = mu)
 end
@@ -114,7 +114,7 @@ function risk_measure_factory(r::Skewness,
     mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
     return Skewness(; ve = factory(r.ve, w), w = w, mu = mu)
 end
-function risk_measure_view(r::Skewness, i::AbstractVector, args...)
+function risk_measure_view(r::Skewness, i::AbstractVector)
     mu = nothing_scalar_array_view(r.mu, i)
     return Skewness(; ve = r.ve, w = r.w, mu = mu)
 end
