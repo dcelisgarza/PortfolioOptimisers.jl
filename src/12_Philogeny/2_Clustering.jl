@@ -38,19 +38,18 @@ function StandardisedSilhouetteScore(;
                                      metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
     return StandardisedSilhouetteScore{typeof(metric)}(metric)
 end
-struct OptimalNumberClusters{T1 <: AbstractOptimalNumberClustersAlgorithm,
-                             T2 <: Union{Nothing, <:Integer}} <:
+struct OptimalNumberClusters{T1 <: Union{Nothing, <:Integer},
+                             T2 <: AbstractOptimalNumberClustersAlgorithm} <:
        AbstractOptimalNumberClustersEstimator
-    alg::T1
-    max_k::T2
+    max_k::T1
+    alg::T2
 end
-function OptimalNumberClusters(;
-                               alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference(),
-                               max_k::Union{Nothing, <:Integer} = nothing)
+function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
+                               alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
     if !isnothing(max_k)
         @smart_assert(max_k >= one(max_k))
     end
-    return OptimalNumberClusters{typeof(alg), typeof(max_k)}(alg, max_k)
+    return OptimalNumberClusters{typeof(max_k), typeof(alg)}(max_k, alg)
 end
 struct HierarchicalClustering{T1 <: Symbol} <: AbstractClusteringAlgorithm
     linkage::T1

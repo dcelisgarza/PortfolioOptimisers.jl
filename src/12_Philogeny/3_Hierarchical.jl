@@ -119,9 +119,9 @@ function valid_k_clusters(clustering::Hclust, arr::AbstractVector)
         arr[k] = typemin(eltype(arr))
     end
 end
-function optimal_number_clusters(onc::OptimalNumberClusters{<:PredefinedNumberClusters,
-                                                            <:Any}, clustering::Hclust,
-                                 args...)
+function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
+                                                            <:PredefinedNumberClusters},
+                                 clustering::Hclust, args...)
     k = onc.alg.k
     max_k = onc.max_k
     N = length(clustering.order)
@@ -177,7 +177,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:PredefinedNumberCl
     end
     return k
 end
-function optimal_number_clusters(onc::OptimalNumberClusters{<:SecondOrderDifference, <:Any},
+function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
                                  clustering::Hclust, dist::AbstractMatrix)
     max_k = onc.max_k
     N = size(dist, 1)
@@ -217,9 +217,9 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:SecondOrderDiffere
     end
     return valid_k_clusters(clustering, gaps)
 end
-function optimal_number_clusters(onc::OptimalNumberClusters{<:StandardisedSilhouetteScore,
-                                                            <:Any}, clustering::Hclust,
-                                 dist::AbstractMatrix)
+function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
+                                                            <:StandardisedSilhouetteScore},
+                                 clustering::Hclust, dist::AbstractMatrix)
     max_k = onc.max_k
     N = size(dist, 1)
     if isnothing(max_k)

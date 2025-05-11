@@ -18,15 +18,15 @@ function PValue(; threshold::Real = 0.05)
 end
 struct Forward <: AbstractStepwiseRegressionAlgorithm end
 struct Backward <: AbstractStepwiseRegressionAlgorithm end
-struct StepwiseRegression{T1 <: AbstractStepwiseRegressionAlgorithm,
-                          T2 <: AbstractStepwiseRegressionCriterion} <:
+struct StepwiseRegression{T1 <: AbstractStepwiseRegressionCriterion,
+                          T2 <: AbstractStepwiseRegressionAlgorithm} <:
        AbstractRegressionEstimator
-    alg::T1
-    crit::T2
+    crit::T1
+    alg::T2
 end
-function StepwiseRegression(; alg::AbstractStepwiseRegressionAlgorithm = Forward(),
-                            crit::AbstractStepwiseRegressionCriterion = PValue())
-    return StepwiseRegression{typeof(alg), typeof(crit)}(alg, crit)
+function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
+                            alg::AbstractStepwiseRegressionAlgorithm = Forward())
+    return StepwiseRegression{typeof(crit), typeof(alg)}(crit, alg)
 end
 function regression_criterion_func(::AIC)
     return GLM.aic
