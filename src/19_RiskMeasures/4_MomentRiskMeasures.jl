@@ -194,7 +194,7 @@ function (r::HighOrderMoment{<:Any, <:FourthCentralMoment, <:Any, <:Any})(w::Abs
     val = calc_moment_val(r, w, X, fees)
     return sum(val .^ 4) / size(X, 1)
 end
-function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:ThirdLowerMoment, <:Any}, <:Any,
+function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:Any, <:ThirdLowerMoment}, <:Any,
                              <:Any})(w::AbstractVector, X::AbstractMatrix,
                                      fees::Union{Nothing, <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
@@ -202,7 +202,7 @@ function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:ThirdLowerMoment, <:A
     sigma = StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
     return -sum(val .^ 3) / size(X, 1) / sigma^3
 end
-function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:FourthLowerMoment, <:Any}, <:Any,
+function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:Any, <:FourthLowerMoment}, <:Any,
                              <:Any})(w::AbstractVector, X::AbstractMatrix,
                                      fees::Union{Nothing, <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
@@ -210,7 +210,7 @@ function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:FourthLowerMoment, <:
     sigma = StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
     return sum(val .^ 4) / size(X, 1) / sigma^4
 end
-function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:FourthCentralMoment, <:Any},
+function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:Any, <:FourthCentralMoment},
                              <:Any, <:Any})(w::AbstractVector, X::AbstractMatrix,
                                             fees::Union{Nothing, <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
