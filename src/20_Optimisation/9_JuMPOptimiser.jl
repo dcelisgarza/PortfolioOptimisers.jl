@@ -109,7 +109,7 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
     sets::T10
     nplg::T11
     cplg::T12
-    lt::T13 # long threshold
+    lt::T13 # l threshold
     st::T14
     tn::T15 # Turnover
     te::T16 # TrackingError

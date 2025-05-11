@@ -364,8 +364,7 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
     ffl_flag, ffs_flag, ffl, ffs = if !isnothing(fees)
-        non_zero_real_or_vec(fees.fixed_long), non_zero_real_or_vec(fees.fixed_short),
-        fees.fixed_long, fees.fixed_short
+        non_zero_real_or_vec(fees.fl), non_zero_real_or_vec(fees.fs), fees.fl, fees.fs
     else
         false, false, nothing, nothing
     end
@@ -416,13 +415,13 @@ end
 function set_turnover_fees!(args...)
     return nothing
 end
-function set_turnover_fees!(model::JuMP.Model, turnover::Turnover)
+function set_turnover_fees!(model::JuMP.Model, tn::Turnover)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
     N = length(w)
-    wt = turnover.w
-    val = turnover.val
+    wt = tn.w
+    val = tn.val
     @variable(model, t_ftn[1:N])
     @expressions(model, begin
                      x_ftn, w - wt * k
@@ -457,9 +456,9 @@ function set_short_non_fixed_fees!(model::JuMP.Model, fs::Union{<:Real, <:Abstra
     return nothing
 end
 function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
-    set_long_non_fixed_fees!(model, fees.long)
-    set_short_non_fixed_fees!(model, fees.short)
-    set_turnover_fees!(model, fees.turnover)
+    set_long_non_fixed_fees!(model, fees.l)
+    set_short_non_fixed_fees!(model, fees.s)
+    set_turnover_fees!(model, fees.tn)
     return nothing
 end
 function set_tracking_error_constraints!(args...)

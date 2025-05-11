@@ -1,61 +1,59 @@
-struct Fees{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+struct Fees{T1 <: Union{Nothing, <:Turnover},
             T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
             T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
             T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-            T5 <: Union{Nothing, <:Turnover}, T6 <: NamedTuple} <: AbstractEstimator
-    long::T1
-    short::T2
-    fixed_long::T3
-    fixed_short::T4
-    turnover::T5
+            T5 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}, T6 <: NamedTuple} <:
+       AbstractEstimator
+    tn::T1
+    l::T2
+    s::T3
+    fl::T4
+    fs::T5
     tol_kwargs::T6
 end
-function Fees(; long::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-              short::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-              fixed_long::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-              fixed_short::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-              turnover::Union{Nothing, <:Turnover} = nothing,
+function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
+              l::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+              s::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+              fl::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+              fs::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
               tol_kwargs::NamedTuple = (; atol = 1e-8))
-    if isa(long, AbstractVector)
-        @smart_assert(!isempty(long))
+    if isa(l, AbstractVector)
+        @smart_assert(!isempty(l))
     end
-    if isa(short, AbstractVector)
-        @smart_assert(!isempty(short))
+    if isa(s, AbstractVector)
+        @smart_assert(!isempty(s))
     end
-    if isa(fixed_long, AbstractVector)
-        @smart_assert(!isempty(fixed_long))
+    if isa(fl, AbstractVector)
+        @smart_assert(!isempty(fl))
     end
-    if isa(fixed_short, AbstractVector)
-        @smart_assert(!isempty(fixed_short))
+    if isa(fs, AbstractVector)
+        @smart_assert(!isempty(fs))
     end
-    if !isnothing(long)
-        @smart_assert(all(long .> zero(long)))
+    if !isnothing(l)
+        @smart_assert(all(l .> zero(l)))
     end
-    if !isnothing(short)
-        @smart_assert(all(short .> zero(short)))
+    if !isnothing(s)
+        @smart_assert(all(s .> zero(s)))
     end
-    if !isnothing(fixed_long)
-        @smart_assert(all(fixed_long .> zero(fixed_long)))
+    if !isnothing(fl)
+        @smart_assert(all(fl .> zero(fl)))
     end
-    if !isnothing(fixed_short)
-        @smart_assert(all(fixed_short .> zero(fixed_short)))
+    if !isnothing(fs)
+        @smart_assert(all(fs .> zero(fs)))
     end
-    return Fees{typeof(long), typeof(short), typeof(fixed_long), typeof(fixed_short),
-                typeof(turnover), typeof(tol_kwargs)}(long, short, fixed_long, fixed_short,
-                                                      turnover, tol_kwargs)
+    return Fees{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
+                typeof(tol_kwargs)}(tn, l, s, fl, fs, tol_kwargs)
 end
 function fees_view(::Nothing, ::Any)
     return nothing
 end
 function fees_view(fees::Fees, i::AbstractVector)
-    long = nothing_scalar_array_view(fees.long, i)
-    short = nothing_scalar_array_view(fees.short, i)
-    fixed_long = nothing_scalar_array_view(fees.fixed_long, i)
-    fixed_short = nothing_scalar_array_view(fees.fixed_short, i)
-    turnover = turnover_view(fees.turnover, i)
-    return Fees(; long = long, short = short, fixed_long = fixed_long,
-                fixed_short = fixed_short, turnover = turnover,
-                tol_kwargs = fees.tol_kwargs)
+    tn = turnover_view(fees.tn, i)
+    l = nothing_scalar_array_view(fees.l, i)
+    s = nothing_scalar_array_view(fees.s, i)
+    fl = nothing_scalar_array_view(fees.fl, i)
+    fs = nothing_scalar_array_view(fees.fs, i)
+    return Fees(; tn = tn, l = l, s = s, fl = fl, fs = fs, tol_kwargs = fees.tol_kwargs)
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector, ::Nothing, ::Function)
     return zero(promote_type(eltype(w), eltype(latest_prices)))
@@ -74,19 +72,19 @@ function calc_fees(w::AbstractVector, latest_prices::AbstractVector, ::Nothing)
     return zero(promote_type(eltype(w), eltype(latest_prices)))
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
-                   turnover::Turnover{<:Any, <:Real})
-    return sum(turnover.val * abs.(w - turnover.w) ⊙ latest_prices)
+                   tn::Turnover{<:Any, <:Real})
+    return sum(tn.val * abs.(w - tn.w) ⊙ latest_prices)
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
-                   turnover::Turnover{<:Any, <:AbstractVector})
-    return dot(turnover.val, abs.(w - turnover.w) ⊙ latest_prices)
+                   tn::Turnover{<:Any, <:AbstractVector})
+    return dot(tn.val, abs.(w - tn.w) ⊙ latest_prices)
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Fees)
-    fees_long = calc_fees(w, latest_prices, fees.long, .>=)
-    fees_short = -calc_fees(w, latest_prices, fees.short, .<)
-    fees_fixed_long = calc_fixed_fees(w, fees.fixed_long, fees.tol_kwargs, .>=)
-    fees_fixed_short = calc_fixed_fees(w, fees.fixed_short, fees.tol_kwargs, .<)
-    fees_turnover = calc_fees(w, latest_prices, fees.turnover)
+    fees_long = calc_fees(w, latest_prices, fees.l, .>=)
+    fees_short = -calc_fees(w, latest_prices, fees.s, .<)
+    fees_fixed_long = calc_fixed_fees(w, fees.fl, fees.tol_kwargs, .>=)
+    fees_fixed_short = calc_fixed_fees(w, fees.fs, fees.tol_kwargs, .<)
+    fees_turnover = calc_fees(w, latest_prices, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 function calc_fees(w::AbstractVector, ::Nothing, ::Function)
@@ -100,11 +98,11 @@ function calc_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
     return dot(fees[idx], w[idx])
 end
-function calc_fees(w::AbstractVector, turnover::Turnover{<:Any, <:Real})
-    return sum(turnover.val * abs.(w - turnover.w))
+function calc_fees(w::AbstractVector, tn::Turnover{<:Any, <:Real})
+    return sum(tn.val * abs.(w - tn.w))
 end
-function calc_fees(w::AbstractVector, turnover::Turnover{<:Any, <:AbstractVector})
-    return dot(turnover.val, abs.(w - turnover.w))
+function calc_fees(w::AbstractVector, tn::Turnover{<:Any, <:AbstractVector})
+    return dot(tn.val, abs.(w - tn.w))
 end
 function calc_fees(w::AbstractVector, ::Nothing)
     return zero(eltype(w))
@@ -125,11 +123,11 @@ function calc_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
     return sum(fees[idx1][idx2])
 end
 function calc_fees(w::AbstractVector, fees::Fees)
-    fees_long = calc_fees(w, fees.long, .>=)
-    fees_short = -calc_fees(w, fees.short, .<)
-    fees_fixed_long = calc_fixed_fees(w, fees.fixed_long, fees.tol_kwargs, .>=)
-    fees_fixed_short = calc_fixed_fees(w, fees.fixed_short, fees.tol_kwargs, .<)
-    fees_turnover = calc_fees(w, fees.turnover)
+    fees_long = calc_fees(w, fees.l, .>=)
+    fees_short = -calc_fees(w, fees.s, .<)
+    fees_fixed_long = calc_fixed_fees(w, fees.fl, fees.tol_kwargs, .>=)
+    fees_fixed_short = calc_fixed_fees(w, fees.fs, fees.tol_kwargs, .<)
+    fees_turnover = calc_fees(w, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 function calc_asset_fees(w::AbstractVector, ::Nothing, ::Function)
@@ -150,11 +148,11 @@ end
 function calc_asset_fees(w::AbstractVector, ::Nothing)
     return zeros(eltype(w), length(w))
 end
-function calc_asset_fees(w::AbstractVector, turnover::Turnover{<:Any, <:Real})
-    return turnover.val * abs.(w - turnover.w)
+function calc_asset_fees(w::AbstractVector, tn::Turnover{<:Any, <:Real})
+    return tn.val * abs.(w - tn.w)
 end
-function calc_asset_fees(w::AbstractVector, turnover::Turnover{<:Any, <:AbstractVector})
-    return turnover.val ⊙ abs.(w - turnover.w)
+function calc_asset_fees(w::AbstractVector, tn::Turnover{<:Any, <:AbstractVector})
+    return tn.val ⊙ abs.(w - tn.w)
 end
 function calc_asset_fixed_fees(w::AbstractVector, ::Nothing, ::NamedTuple, ::Function)
     return zeros(eltype(w), length(w))
@@ -176,11 +174,11 @@ function calc_asset_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, fees::Fees)
-    fees_long = calc_asset_fees(w, fees.long, .>=)
-    fees_short = -calc_asset_fees(w, fees.short, .<)
-    fees_fixed_long = calc_asset_fixed_fees(w, fees.fixed_long, fees.tol_kwargs, .>=)
-    fees_fixed_short = calc_asset_fixed_fees(w, fees.fixed_short, fees.tol_kwargs, .<)
-    fees_turnover = calc_asset_fees(w, fees.turnover)
+    fees_long = calc_asset_fees(w, fees.l, .>=)
+    fees_short = -calc_asset_fees(w, fees.s, .<)
+    fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.tol_kwargs, .>=)
+    fees_fixed_short = calc_asset_fixed_fees(w, fees.fs, fees.tol_kwargs, .<)
+    fees_turnover = calc_asset_fees(w, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector, ::Nothing,
@@ -202,22 +200,22 @@ function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
-                         turnover::Turnover{<:Any, <:Real})
-    return turnover.val * abs.(w - turnover.w) ⊙ latest_prices
+                         tn::Turnover{<:Any, <:Real})
+    return tn.val * abs.(w - tn.w) ⊙ latest_prices
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector, ::Nothing)
     return zeros(promote_type(eltype(w), eltype(latest_prices)), length(w))
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector,
-                         turnover::Turnover{<:Any, <:AbstractVector})
-    return turnover.val ⊙ abs.(w - turnover.w) ⊙ latest_prices
+                         tn::Turnover{<:Any, <:AbstractVector})
+    return tn.val ⊙ abs.(w - tn.w) ⊙ latest_prices
 end
 function calc_asset_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Fees)
-    fees_long = calc_asset_fees(w, latest_prices, fees.long, .>=)
-    fees_short = -calc_asset_fees(w, latest_prices, fees.short, .<)
-    fees_fixed_long = calc_asset_fixed_fees(w, fees.fixed_long, fees.tol_kwargs, .>=)
-    fees_fixed_short = calc_asset_fixed_fees(w, fees.fixed_short, fees.tol_kwargs, .<)
-    fees_turnover = calc_asset_fees(w, latest_prices, fees.turnover)
+    fees_long = calc_asset_fees(w, latest_prices, fees.l, .>=)
+    fees_short = -calc_asset_fees(w, latest_prices, fees.s, .<)
+    fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.tol_kwargs, .>=)
+    fees_fixed_short = calc_asset_fixed_fees(w, fees.fs, fees.tol_kwargs, .<)
+    fees_turnover = calc_asset_fees(w, latest_prices, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
 function calc_net_returns(w::AbstractVector, X::AbstractMatrix, args...)

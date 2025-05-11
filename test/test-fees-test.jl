@@ -22,11 +22,11 @@
         slw = rand(rng, 20)
         tv = rand(rng, 20)
         P = randn(rng, 20)
-        fes = [Fees(; long = 0.01, short = 0.02, fixed_long = 0.05, fixed_short = 0.07,
-                    turnover = Turnover(; val = 0.11, w = w2)), Fees(;),
-               Fees(; long = 0.01, short = 0.02, fixed_long = 0.05, fixed_short = 0.07),
-               Fees(; long = lw, short = sw, fixed_long = flw, fixed_short = slw,
-                    turnover = Turnover(; val = tv, w = w2)), Fees(;), Fees(;), Fees(;)]
+        fes = [Fees(; l = 0.01, s = 0.02, fl = 0.05, fs = 0.07,
+                    tn = Turnover(; val = 0.11, w = w2)), Fees(;),
+               Fees(; l = 0.01, s = 0.02, fl = 0.05, fs = 0.07),
+               Fees(; l = lw, s = sw, fl = flw, fs = slw,
+                    tn = Turnover(; val = tv, w = w2)), Fees(;), Fees(;), Fees(;)]
         f1_t = CSV.read(joinpath(@__DIR__, "assets/Fees.csv"), DataFrame)
         f2_t = CSV.read(joinpath(@__DIR__, "assets/Asset-Fees.csv"), DataFrame)
 
@@ -78,40 +78,40 @@
 
         @test isnothing(fees_view(nothing, 3))
         fer1 = fees_view(fes[1], [3, 7])
-        @test fer1.long == 0.01
-        @test fer1.fixed_long == 0.05
-        @test fer1.short == 0.02
-        @test fer1.fixed_short == 0.07
-        @test fer1.turnover.val == 0.11
-        @test fer1.turnover.w == view(w2, [3, 7])
+        @test fer1.l == 0.01
+        @test fer1.fl == 0.05
+        @test fer1.s == 0.02
+        @test fer1.fs == 0.07
+        @test fer1.tn.val == 0.11
+        @test fer1.tn.w == view(w2, [3, 7])
         fer2 = fees_view(fer1, [1])
-        @test fer2.long == 0.01
-        @test fer2.fixed_long == 0.05
-        @test fer2.short == 0.02
-        @test fer2.fixed_short == 0.07
-        @test fer2.turnover.val == 0.11
-        @test fer2.turnover.w == view(w2, [3])
+        @test fer2.l == 0.01
+        @test fer2.fl == 0.05
+        @test fer2.s == 0.02
+        @test fer2.fs == 0.07
+        @test fer2.tn.val == 0.11
+        @test fer2.tn.w == view(w2, [3])
 
         fer3 = fees_view(fes[3], [9, 8])
-        @test fer3.long == 0.01
-        @test fer3.fixed_long == 0.05
-        @test fer3.short == 0.02
-        @test fer3.fixed_short == 0.07
-        @test isnothing(fer3.turnover)
+        @test fer3.l == 0.01
+        @test fer3.fl == 0.05
+        @test fer3.s == 0.02
+        @test fer3.fs == 0.07
+        @test isnothing(fer3.tn)
 
         fer1 = fees_view(fes[4], [5, 2])
-        @test fer1.long == view(lw, [5, 2])
-        @test fer1.fixed_long == view(flw, [5, 2])
-        @test fer1.short == view(sw, [5, 2])
-        @test fer1.fixed_short == view(slw, [5, 2])
-        @test fer1.turnover.val == view(tv, [5, 2])
-        @test fer1.turnover.w == view(w2, [5, 2])
+        @test fer1.l == view(lw, [5, 2])
+        @test fer1.fl == view(flw, [5, 2])
+        @test fer1.s == view(sw, [5, 2])
+        @test fer1.fs == view(slw, [5, 2])
+        @test fer1.tn.val == view(tv, [5, 2])
+        @test fer1.tn.w == view(w2, [5, 2])
         fer2 = fees_view(fer1, [2])
-        @test fer2.long == view(lw, [2])
-        @test fer2.fixed_long == view(flw, [2])
-        @test fer2.short == view(sw, [2])
-        @test fer2.fixed_short == view(slw, [2])
-        @test fer2.turnover.val == view(tv, [2])
-        @test fer2.turnover.w == view(w2, [2])
+        @test fer2.l == view(lw, [2])
+        @test fer2.fl == view(flw, [2])
+        @test fer2.s == view(sw, [2])
+        @test fer2.fs == view(slw, [2])
+        @test fer2.tn.val == view(tv, [2])
+        @test fer2.tn.w == view(w2, [2])
     end
 end

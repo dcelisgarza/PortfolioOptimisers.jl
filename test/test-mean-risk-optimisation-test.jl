@@ -549,9 +549,8 @@
                                                                                                              "max_step_fraction" => 0.75)),
                      check_sol = (; allow_local = true, allow_almost = true))
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            fees = PortfolioOptimisers.Fees(; long = 0.05, short = 0.03,
-                                                            fixed_long = 0.002,
-                                                            fixed_short = 0.0006),
+                            fees = PortfolioOptimisers.Fees(; l = 0.05, s = 0.03,
+                                                            fl = 0.002, fs = 0.0006),
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
@@ -562,8 +561,8 @@
                         -4.327434616371575e-11])
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            fees = PortfolioOptimisers.Fees(; long = 0.05, short = 0.03,
-                                                            fixed_long = 0.002),
+                            fees = PortfolioOptimisers.Fees(; l = 0.05, s = 0.03,
+                                                            fl = 0.002),
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
@@ -574,9 +573,8 @@
                         -0.06625626344612386])
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            fees = PortfolioOptimisers.Fees(; short = 0.003,
-                                                            fixed_short = 0.004,
-                                                            fixed_long = 0.001))
+                            fees = PortfolioOptimisers.Fees(; s = 0.003, fs = 0.004,
+                                                            fl = 0.001))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
         @test isapprox(w,
@@ -588,8 +586,8 @@
         wt = fill(0.1, 10)
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             fees = PortfolioOptimisers.Fees(;
-                                                            turnover = Turnover(; val = 0,
-                                                                                w = wt)))
+                                                            tn = Turnover(; val = 0,
+                                                                          w = wt)))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
         @test isapprox(w,
@@ -600,8 +598,8 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             fees = PortfolioOptimisers.Fees(;
-                                                            turnover = Turnover(; val = 0.1,
-                                                                                w = wt)))
+                                                            tn = Turnover(; val = 0.1,
+                                                                          w = wt)))
         mre = MeanRisk(; obj = MaximumUtility(), opt = opt)
         w = optimise!(mre, rd).w
         @test isapprox(w,
@@ -612,13 +610,12 @@
 
         opt1 = JuMPOptimiser(; pe = pr, slv = slv,
                              fees = PortfolioOptimisers.Fees(;
-                                                             turnover = Turnover(;
-                                                                                 val = 100,
-                                                                                 w = wt)))
+                                                             tn = Turnover(; val = 100,
+                                                                           w = wt)))
         opt2 = JuMPOptimiser(; pe = pr, slv = slv,
                              fees = PortfolioOptimisers.Fees(;
-                                                             turnover = Turnover(; val = 0,
-                                                                                 w = wt)))
+                                                             tn = Turnover(; val = 0,
+                                                                           w = wt)))
         mre1 = MeanRisk(; obj = MinimumRisk(), opt = opt1)
         mre2 = MeanRisk(; obj = MinimumRisk(), opt = opt2)
         @test isapprox(optimise!(mre1, rd).w, optimise!(mre2, rd).w)

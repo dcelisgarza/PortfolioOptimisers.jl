@@ -754,7 +754,7 @@
                        [4.729197396913109, 0.9852613709401206, 10.012825798312244,
                         1.0000278890665872, -lb, ub - lb, inv(length(w))])
     end
-    @testset "Tracking and turnover" begin
+    @testset "Tracking and tn" begin
         rng = StableRNG(123456789)
         X = randn(rng, 500, 10)
         w1 = 1:10
