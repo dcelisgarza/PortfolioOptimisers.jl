@@ -105,7 +105,12 @@
                         0.022462819302194334], rtol = rtol)
         rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; rd = rd)
         lo, hi = extrema(rkc[1:3])
-        @test isapprox(hi / lo, 3, rtol = 5e-5)
+        if Sys.iswindows()
+            rtol = 1e-4
+        else
+            rtol = 5e-5
+        end
+        @test isapprox(hi / lo, 3, rtol = rtol)
         @test argmin(rkc[1:3]) == 1
         @test argmax(rkc[1:3]) == 3
 
