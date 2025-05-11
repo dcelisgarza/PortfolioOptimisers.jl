@@ -1134,7 +1134,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::RelativisticDra
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Real, <:Any,
+                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Real,
                                                      <:Any},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::HighOrderPriorResult,
@@ -1179,7 +1179,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, Nothing, <:Any,
+                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, Nothing,
                                                      <:Any},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::HighOrderPriorResult,
