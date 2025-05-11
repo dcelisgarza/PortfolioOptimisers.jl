@@ -302,7 +302,7 @@ function set_constrained_near_optimal_objective_function!(model::JuMP.Model, rk:
                                                           pret::JuMPReturnsEstimator,
                                                           cobj::Union{Nothing,
                                                                       <:CustomObjective},
-                                                          opt::JuMPOptimisationEstimator,
+                                                          opt::BaseJuMPOptimisationEstimator,
                                                           pr::AbstractPriorResult)
     so = model[:so]
     obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, wb)

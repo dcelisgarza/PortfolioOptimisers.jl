@@ -17,17 +17,17 @@
         X = randn(rng, 1000, 20)
         F = X[:, [3, 8, 14, 19, 10]]
         res = [StepwiseRegression(; alg = Forward()),
-               StepwiseRegression(; alg = Forward(), criterion = AIC()),
-               StepwiseRegression(; alg = Forward(), criterion = AICC()),
-               StepwiseRegression(; alg = Forward(), criterion = BIC()),
-               StepwiseRegression(; alg = Forward(), criterion = RSquared()),
-               StepwiseRegression(; alg = Forward(), criterion = AdjustedRSquared()),
+               StepwiseRegression(; alg = Forward(), crit = AIC()),
+               StepwiseRegression(; alg = Forward(), crit = AICC()),
+               StepwiseRegression(; alg = Forward(), crit = BIC()),
+               StepwiseRegression(; alg = Forward(), crit = RSquared()),
+               StepwiseRegression(; alg = Forward(), crit = AdjustedRSquared()),
                StepwiseRegression(; alg = Backward()),
-               StepwiseRegression(; alg = Backward(), criterion = AIC()),
-               StepwiseRegression(; alg = Backward(), criterion = AICC()),
-               StepwiseRegression(; alg = Backward(), criterion = BIC()),
-               StepwiseRegression(; alg = Backward(), criterion = RSquared()),
-               StepwiseRegression(; alg = Backward(), criterion = AdjustedRSquared()),
+               StepwiseRegression(; alg = Backward(), crit = AIC()),
+               StepwiseRegression(; alg = Backward(), crit = AICC()),
+               StepwiseRegression(; alg = Backward(), crit = BIC()),
+               StepwiseRegression(; alg = Backward(), crit = RSquared()),
+               StepwiseRegression(; alg = Backward(), crit = AdjustedRSquared()),
                DimensionReductionRegression(), DimensionReductionRegression(; alg = PPCA())]
         res_t = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv"), DataFrame)
         for i ∈ eachindex(res)

@@ -1,13 +1,15 @@
 abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
-abstract type AbstractStepwiseRegressionCriteria <: AbstractRegressionAlgorithm end
-abstract type AbstractMinValStepwiseRegressionCriteria <: AbstractStepwiseRegressionCriteria end
-abstract type AbstractMaxValStepwiseRegressionCriteria <: AbstractStepwiseRegressionCriteria end
-struct AIC <: AbstractMinValStepwiseRegressionCriteria end
-struct AICC <: AbstractMinValStepwiseRegressionCriteria end
-struct BIC <: AbstractMinValStepwiseRegressionCriteria end
+abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
+abstract type AbstractMinValStepwiseRegressionCriterion <:
+              AbstractStepwiseRegressionCriterion end
+abstract type AbstractMaxValStepwiseRegressionCriteria <:
+              AbstractStepwiseRegressionCriterion end
+struct AIC <: AbstractMinValStepwiseRegressionCriterion end
+struct AICC <: AbstractMinValStepwiseRegressionCriterion end
+struct BIC <: AbstractMinValStepwiseRegressionCriterion end
 struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
 struct AdjustedRSquared <: AbstractMaxValStepwiseRegressionCriteria end
-struct PValue{T1 <: Real} <: AbstractStepwiseRegressionCriteria
+struct PValue{T1 <: Real} <: AbstractStepwiseRegressionCriterion
     threshold::T1
 end
 function PValue(; threshold::Real = 0.05)
@@ -17,14 +19,14 @@ end
 struct Forward <: AbstractStepwiseRegressionAlgorithm end
 struct Backward <: AbstractStepwiseRegressionAlgorithm end
 struct StepwiseRegression{T1 <: AbstractStepwiseRegressionAlgorithm,
-                          T2 <: AbstractStepwiseRegressionCriteria} <:
+                          T2 <: AbstractStepwiseRegressionCriterion} <:
        AbstractRegressionEstimator
     alg::T1
-    criterion::T2
+    crit::T2
 end
 function StepwiseRegression(; alg::AbstractStepwiseRegressionAlgorithm = Forward(),
-                            criterion::AbstractStepwiseRegressionCriteria = PValue())
-    return StepwiseRegression{typeof(alg), typeof(criterion)}(alg, criterion)
+                            crit::AbstractStepwiseRegressionCriterion = PValue())
+    return StepwiseRegression{typeof(alg), typeof(crit)}(alg, crit)
 end
 function regression_criterion_func(::AIC)
     return GLM.aic
@@ -41,7 +43,7 @@ end
 function regression_criterion_func(::AdjustedRSquared)
     return GLM.adjr2
 end
-function regression_threshold(::AbstractMinValStepwiseRegressionCriteria)
+function regression_threshold(::AbstractMinValStepwiseRegressionCriterion)
     return Inf
 end
 function regression_threshold(::AbstractMaxValStepwiseRegressionCriteria)
@@ -81,7 +83,7 @@ function regression(re::StepwiseRegression{<:Forward, <:PValue}, x::AbstractVect
     included = Vector{eltype(indices)}(undef, 0)
     pvals = Vector{promote_type(eltype(F), eltype(x))}(undef, 0)
     val = zero(promote_type(eltype(F), eltype(x)))
-    while val <= re.criterion.threshold
+    while val <= re.crit.threshold
         excluded = setdiff(indices, included)
         best_pval = typemax(eltype(x))
         new_feature = 0
@@ -92,7 +94,7 @@ function regression(re::StepwiseRegression{<:Forward, <:PValue}, x::AbstractVect
             new_pvals = coeftable(fit_result).cols[4][2:end]
             idx = findfirst(x -> x == i, factors)
             test_pval = new_pvals[idx]
-            if best_pval > test_pval && maximum(new_pvals) <= re.criterion.threshold
+            if best_pval > test_pval && maximum(new_pvals) <= re.crit.threshold
                 best_pval = test_pval
                 new_feature = i
                 pvals = copy(new_pvals)
@@ -106,7 +108,7 @@ function regression(re::StepwiseRegression{<:Forward, <:PValue}, x::AbstractVect
     add_best_asset_after_failure_pval!(included, F, x)
     return included
 end
-function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriteria, value,
+function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion, value,
                                     excluded, included, threshold)
     val, key = findmin(value)
     idx = findfirst(x -> x == key, excluded)
@@ -127,14 +129,14 @@ function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria, 
     return threshold
 end
 function regression(re::StepwiseRegression{<:Forward,
-                                           <:Union{<:AbstractMinValStepwiseRegressionCriteria,
+                                           <:Union{<:AbstractMinValStepwiseRegressionCriterion,
                                                    <:AbstractMaxValStepwiseRegressionCriteria}},
                     x::AbstractVector, F::AbstractMatrix)
     T, N = size(F)
     ovec = range(; start = 1, stop = 1, length = T)
     indices = 1:N
-    criterion_func = regression_criterion_func(re.criterion)
-    threshold = regression_threshold(re.criterion)
+    criterion_func = regression_criterion_func(re.crit)
+    threshold = regression_threshold(re.crit)
     included = Vector{eltype(indices)}(undef, 0)
     excluded = collect(indices)
     value = Vector{promote_type(eltype(F), eltype(x))}(undef, N)
@@ -150,7 +152,7 @@ function regression(re::StepwiseRegression{<:Forward,
         if isempty(value)
             break
         end
-        threshold = get_forward_reg_incl_excl!(re.criterion, value, excluded, included,
+        threshold = get_forward_reg_incl_excl!(re.crit, value, excluded, included,
                                                threshold)
         if ni == length(excluded)
             break
@@ -167,7 +169,7 @@ function regression(re::StepwiseRegression{<:Backward, <:PValue}, x::AbstractVec
     excluded = Vector{eltype(indices)}(undef, 0)
     pvals = coeftable(fit_result).cols[4][2:end]
     val = maximum(pvals)
-    while val > re.criterion.threshold
+    while val > re.crit.threshold
         factors = setdiff(indices, excluded)
         included = factors
         if isempty(factors)
@@ -182,8 +184,8 @@ function regression(re::StepwiseRegression{<:Backward, <:PValue}, x::AbstractVec
     add_best_asset_after_failure_pval!(included, F, x)
     return included
 end
-function get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriteria, value, included,
-                                threshold)
+function get_backward_reg_incl!(::AbstractMinValStepwiseRegressionCriterion, value,
+                                included, threshold)
     val, idx = findmin(value)
     if val < threshold
         i = findfirst(x -> x == idx, included)
@@ -203,14 +205,14 @@ function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, valu
     return threshold
 end
 function regression(re::StepwiseRegression{<:Backward,
-                                           <:Union{<:AbstractMinValStepwiseRegressionCriteria,
+                                           <:Union{<:AbstractMinValStepwiseRegressionCriterion,
                                                    <:AbstractMaxValStepwiseRegressionCriteria}},
                     x::AbstractVector, F::AbstractMatrix)
     T, N = size(F)
     ovec = range(; start = 1, stop = 1, length = T)
     included = collect(1:N)
     fit_result = GLM.lm([ovec F], x)
-    criterion_func = regression_criterion_func(re.criterion)
+    criterion_func = regression_criterion_func(re.crit)
     threshold = criterion_func(fit_result)
     value = Vector{promote_type(eltype(F), eltype(x))}(undef, N)
     for _ ∈ eachindex(x)
@@ -229,7 +231,7 @@ function regression(re::StepwiseRegression{<:Backward,
         if isempty(value)
             break
         end
-        threshold = get_backward_reg_incl!(re.criterion, value, included, threshold)
+        threshold = get_backward_reg_incl!(re.crit, value, included, threshold)
         if ni == length(included)
             break
         end
