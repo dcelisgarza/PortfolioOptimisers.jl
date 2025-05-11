@@ -108,7 +108,7 @@ function set_sdp_variance_risk!(model::JuMP.Model, i::Integer, r::Variance,
     return nothing
 end
 function set_variance_risk!(model::JuMP.Model, i::Integer,
-                            r::Variance{<:Any, <:SOC, <:Any, <:Any},
+                            r::Variance{<:Any, <:Any, <:Any, <:SOC},
                             pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
     w = model[:w]
@@ -121,7 +121,7 @@ function set_variance_risk!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_variance_risk!(model::JuMP.Model, i::Integer,
-                            r::Variance{<:Any, <:Quad, <:Any, <:Any},
+                            r::Variance{<:Any, <:Any, <:Any, <:Quad},
                             pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
     w = model[:w]
@@ -135,7 +135,7 @@ function set_variance_risk!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_variance_risk!(model::JuMP.Model, i::Integer,
-                            r::Variance{<:Any, <:RSOC, <:Any, <:Any},
+                            r::Variance{<:Any, <:Any, <:Any, <:RSOC},
                             pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
     w = model[:w]
@@ -1134,8 +1134,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::RelativisticDra
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                     <:Real},
+                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Real,
+                                                     <:Any},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::HighOrderPriorResult,
                                args...)
@@ -1179,8 +1179,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                     Nothing},
+                               r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, Nothing,
+                                                     <:Any},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::HighOrderPriorResult,
                                args...)

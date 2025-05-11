@@ -40,23 +40,23 @@ struct ThirdLowerMoment <: AbstractHighOrderMomentMeasureAlgorithm end
 struct FourthLowerMoment <: AbstractHighOrderMomentMeasureAlgorithm end
 struct FourthCentralMoment <: AbstractHighOrderMomentMeasureAlgorithm end
 abstract type AbstractHighOrderDeviationAlgorithm <: AbstractHighOrderMomentMeasureAlgorithm end
-struct HighOrderDeviation{T1 <: AbstractHighOrderMomentMeasureAlgorithm,
-                          T2 <: AbstractVarianceEstimator} <:
+struct HighOrderDeviation{T1 <: AbstractVarianceEstimator,
+                          T2 <: AbstractHighOrderMomentMeasureAlgorithm} <:
        AbstractHighOrderDeviationAlgorithm
-    alg::T1
-    ve::T2
+    ve::T1
+    alg::T2
 end
 function HighOrderDeviation(;
-                            alg::AbstractHighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
-                            ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing))
+                            ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
+                            alg::AbstractHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     if hasproperty(ve, :me)
         @smart_assert(isnothing(ve.me))
     end
-    return HighOrderDeviation{typeof(alg), typeof(ve)}(alg, ve)
+    return HighOrderDeviation{typeof(ve), typeof(alg)}(ve, alg)
 end
 function risk_moment_algorithm_factory(alg::HighOrderDeviation,
                                        w::Union{<:Nothing, <:AbstractWeights}; kwargs...)
-    return HighOrderDeviation(; alg = alg.alg, ve = factory(alg.ve, w))
+    return HighOrderDeviation(; ve = factory(alg.ve, w), alg = alg.alg)
 end
 struct LowOrderMoment{T1 <: RiskMeasureSettings,
                       T2 <: AbstractLowOrderMomentMeasureAlgorithm,

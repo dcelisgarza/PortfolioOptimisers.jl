@@ -13,32 +13,33 @@ function bootstrap_func(::MovingBootstrap, block_size, X, seed)
     return pyimport("arch.bootstrap").MovingBlockBootstrap(block_size, X; seed = seed)
 end
 struct ARCHUncertaintySetEstimator{T1 <: AbstractPriorEstimator,
-                                   T2 <: AbstractUncertaintySetAlgorithm,
-                                   T3 <: ARCHBootstrapSet, T4 <: Integer, T5 <: Integer,
-                                   T6 <: Real, T7 <: Union{Nothing, <:Integer}} <:
+                                   T2 <: AbstractUncertaintySetAlgorithm, T3 <: Integer,
+                                   T4 <: Integer, T5 <: Real,
+                                   T6 <: Union{Nothing, <:Integer},
+                                   T7 <: ARCHBootstrapSet} <:
        BootsrapUncertaintySetEstimator
     pe::T1
     alg::T2
-    bootstrap::T3
-    n_sim::T4
-    block_size::T5
-    q::T6
-    seed::T7
+    n_sim::T3
+    block_size::T4
+    q::T5
+    seed::T6
+    bootstrap::T7
 end
 function ARCHUncertaintySetEstimator(;
                                      pe::AbstractPriorEstimator = EmpiricalPriorEstimator(),
                                      alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
-                                     bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
                                      n_sim::Integer = 3_000, block_size::Integer = 3,
                                      q::Real = 0.05,
-                                     seed::Union{Nothing, <:Integer} = nothing)
+                                     seed::Union{Nothing, <:Integer} = nothing,
+                                     bootstrap::ARCHBootstrapSet = StationaryBootstrap())
     @smart_assert(n_sim > zero(n_sim))
     @smart_assert(block_size > zero(block_size))
     @smart_assert(zero(q) < q < one(q))
-    return ARCHUncertaintySetEstimator{typeof(pe), typeof(alg), typeof(bootstrap),
-                                       typeof(n_sim), typeof(block_size), typeof(q),
-                                       typeof(seed)}(pe, alg, bootstrap, n_sim, block_size,
-                                                     q, seed)
+    return ARCHUncertaintySetEstimator{typeof(pe), typeof(alg), typeof(n_sim),
+                                       typeof(block_size), typeof(q), typeof(seed),
+                                       typeof(bootstrap)}(pe, alg, n_sim, block_size, q,
+                                                          seed, bootstrap)
 end
 function bootstrap_generator(ue::ARCHUncertaintySetEstimator, X::AbstractMatrix)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)

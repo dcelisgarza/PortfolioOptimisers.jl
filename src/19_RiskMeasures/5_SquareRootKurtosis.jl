@@ -1,21 +1,22 @@
-struct SquareRootKurtosis{T1 <: RiskMeasureSettings, T2 <: AbstractMomentAlgorithm,
-                          T3 <: Union{Nothing, <:AbstractWeights},
-                          T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                          T5 <: Union{Nothing, <:AbstractMatrix},
-                          T6 <: Union{Nothing, Integer}} <: SquareRootKurtosisRiskMeasure
+struct SquareRootKurtosis{T1 <: RiskMeasureSettings,
+                          T2 <: Union{Nothing, <:AbstractWeights},
+                          T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                          T4 <: Union{Nothing, <:AbstractMatrix},
+                          T5 <: Union{Nothing, <:Integer}, T6 <: AbstractMomentAlgorithm} <:
+       SquareRootKurtosisRiskMeasure
     settings::T1
-    alg::T2
-    w::T3
-    mu::T4
-    kt::T5
-    N::T6
+    w::T2
+    mu::T3
+    kt::T4
+    N::T5
+    alg::T6
 end
 function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                            alg::AbstractMomentAlgorithm = Full(),
                             w::Union{Nothing, <:AbstractWeights} = nothing,
                             mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                             kt::Union{Nothing, <:AbstractMatrix} = nothing,
-                            N::Union{Nothing, <:Integer} = nothing)
+                            N::Union{Nothing, <:Integer} = nothing,
+                            alg::AbstractMomentAlgorithm = Full())
     mu_flag = isa(mu, AbstractVector)
     kt_flag = isa(kt, AbstractMatrix)
     if mu_flag
@@ -31,8 +32,8 @@ function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSetting
     if !isnothing(N)
         @smart_assert(N > zero(N))
     end
-    return SquareRootKurtosis{typeof(settings), typeof(alg), typeof(w), typeof(mu),
-                              typeof(kt), typeof(N)}(settings, alg, w, mu, kt, N)
+    return SquareRootKurtosis{typeof(settings), typeof(w), typeof(mu), typeof(kt),
+                              typeof(N), typeof(alg)}(settings, w, mu, kt, N, alg)
 end
 function calc_moment_target(::SquareRootKurtosis{<:Any, <:Any, Nothing, Nothing, <:Any,
                                                  <:Any}, ::Any, x::AbstractVector)
@@ -56,14 +57,14 @@ function calc_moment_val(r::SquareRootKurtosis, w::AbstractVector, X::AbstractMa
     target = calc_moment_target(r, w, x)
     return x ⊖ target
 end
-function (r::SquareRootKurtosis{<:Any, <:Full, <:Any, <:Any, <:Any, <:Any})(w::AbstractVector,
+function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full})(w::AbstractVector,
                                                                             X::AbstractMatrix,
                                                                             fees::Union{Nothing,
                                                                                         <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     return sqrt(sum(val .^ 4) / size(X, 1))
 end
-function (r::SquareRootKurtosis{<:Any, <:Semi, <:Any, <:Any, <:Any, <:Any})(w::AbstractVector,
+function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi})(w::AbstractVector,
                                                                             X::AbstractMatrix,
                                                                             fees::Union{Nothing,
                                                                                         <:Fees} = nothing)
@@ -76,8 +77,8 @@ function risk_measure_factory(r::SquareRootKurtosis,
                                                           <:Any}, args...; kwargs...)
     mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
     kt = risk_measure_nothing_scalar_array_factory(r.kt, prior.kt)
-    return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = r.w, mu = mu,
-                              kt = kt, N = r.N)
+    return SquareRootKurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt, N = r.N,
+                              alg = r.alg)
 end
 function risk_measure_factory(r::SquareRootKurtosis,
                               prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,

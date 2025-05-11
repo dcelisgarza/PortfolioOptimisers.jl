@@ -21,19 +21,19 @@ abstract type MuHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
 abstract type AbstractMomentHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
 
 abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
-struct RiskMeasureSettings{T1 <: Bool, T2 <: Real, T3 <: Union{Nothing, <:Real}} <:
+struct RiskMeasureSettings{T1 <: Real, T2 <: Union{Nothing, <:Real}, T3 <: Bool} <:
        AbstractRiskMeasureSettings
-    rke::T1
-    scale::T2
-    ub::T3
+    scale::T1
+    ub::T2
+    rke::T3
 end
-function RiskMeasureSettings(; rke::Bool = true, scale::Real = 1.0,
-                             ub::Union{Nothing, <:Real} = nothing)
+function RiskMeasureSettings(; scale::Real = 1.0, ub::Union{Nothing, <:Real} = nothing,
+                             rke::Bool = true)
     if isa(ub, Real)
         @smart_assert(isfinite(ub) && ub > zero(ub))
     end
     @smart_assert(isfinite(scale))
-    return RiskMeasureSettings{typeof(rke), typeof(scale), typeof(ub)}(rke, scale, ub)
+    return RiskMeasureSettings{typeof(scale), typeof(ub), typeof(rke)}(scale, ub, rke)
 end
 struct HierarchicalRiskMeasureSettings{T1 <: Real} <: AbstractRiskMeasureSettings
     scale::T1

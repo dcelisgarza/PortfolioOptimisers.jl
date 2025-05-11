@@ -2,45 +2,45 @@ abstract type VarianceFormulation <: AbstractAlgorithm end
 struct Quad <: VarianceFormulation end
 struct SOC <: VarianceFormulation end
 struct RSOC <: VarianceFormulation end
-struct Variance{T1 <: RiskMeasureSettings, T2 <: VarianceFormulation,
-                T3 <: Union{Nothing, <:AbstractMatrix},
-                T4 <:
+struct Variance{T1 <: RiskMeasureSettings, T2 <: Union{Nothing, <:AbstractMatrix},
+                T3 <:
                 Union{Nothing, <:LinearConstraint, <:AbstractVector{<:LinearConstraint},
-                      <:LinearConstraintResult}} <: JuMPRiskContributionSigmaRiskMeasure
+                      <:LinearConstraintResult}, T4 <: VarianceFormulation} <:
+       JuMPRiskContributionSigmaRiskMeasure
     settings::T1
-    formulation::T2
-    sigma::T3
-    rc::T4
+    sigma::T2
+    rc::T3
+    formulation::T4
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                  formulation::VarianceFormulation = SOC(),
                   sigma::Union{Nothing, <:AbstractMatrix} = nothing,
                   rc::Union{Nothing, <:LinearConstraint,
-                            <:AbstractVector{<:LinearConstraint}, <:LinearConstraintResult} = nothing)
+                            <:AbstractVector{<:LinearConstraint}, <:LinearConstraintResult} = nothing,
+                  formulation::VarianceFormulation = SOC())
     if isa(sigma, AbstractMatrix)
         @smart_assert(!isempty(sigma))
         issquare(sigma)
     end
-    return Variance{typeof(settings), typeof(formulation), typeof(sigma), typeof(rc)}(settings,
-                                                                                      formulation,
+    return Variance{typeof(settings), typeof(sigma), typeof(rc), typeof(formulation)}(settings,
                                                                                       sigma,
-                                                                                      rc)
+                                                                                      rc,
+                                                                                      formulation)
 end
 function (r::Variance)(w::AbstractVector)
     return dot(w, r.sigma, w)
 end
 function risk_measure_factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
     sigma = risk_measure_nothing_scalar_array_factory(r.sigma, prior.sigma)
-    return Variance(; settings = r.settings, formulation = r.formulation, sigma = sigma,
-                    rc = r.rc)
+    return Variance(; settings = r.settings, sigma = sigma, rc = r.rc,
+                    formulation = r.formulation)
 end
 function risk_measure_view(r::Variance, i::AbstractVector, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     @smart_assert(!isa(r.rc, LinearConstraintResult),
                   "`rc` cannot be a `LinearConstraintResult` because there is no way to only consider items from a specific cluster.")
     rc = linear_constraint_view(r.rc, i)
-    return Variance(; settings = r.settings, formulation = r.formulation, sigma = sigma,
-                    rc = rc)
+    return Variance(; settings = r.settings, sigma = sigma, rc = rc,
+                    formulation = r.formulation)
 end
 struct StandardDeviation{T1 <: RiskMeasureSettings,
                          T2 <: Union{Nothing, <:AbstractMatrix}} <: SigmaRiskMeasure

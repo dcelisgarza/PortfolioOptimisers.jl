@@ -63,29 +63,29 @@ end
 function k_ucs(type::Real, args...)
     return type
 end
-struct EllipseUncertaintySetAlgorithm{T1 <: Bool,
-                                      T2 <: Union{<:AbstractUncertaintyKAlgorithm, <:Real}} <:
-       AbstractUncertaintySetAlgorithm
-    diagonal::T1
-    method::T2
+struct EllipseUncertaintySetAlgorithm{T1 <: Union{<:AbstractUncertaintyKAlgorithm, <:Real},
+                                      T2 <: Bool} <: AbstractUncertaintySetAlgorithm
+    method::T1
+    diagonal::T2
 end
-function EllipseUncertaintySetAlgorithm(; diagonal::Bool = true,
+function EllipseUncertaintySetAlgorithm(;
                                         method::Union{<:AbstractUncertaintyKAlgorithm,
-                                                      <:Real} = ChiSqKUncertaintyAlgorithm())
-    return EllipseUncertaintySetAlgorithm{typeof(diagonal), typeof(method)}(diagonal,
-                                                                            method)
+                                                      <:Real} = ChiSqKUncertaintyAlgorithm(),
+                                        diagonal::Bool = true,)
+    return EllipseUncertaintySetAlgorithm{typeof(method), typeof(diagonal)}(method,
+                                                                            diagonal)
 end
 abstract type AbstractEllipseUncertaintySetResultClass <: AbstractUncertaintySetResult end
 struct MuEllipseUncertaintySetResult <: AbstractEllipseUncertaintySetResultClass end
 struct SigmaEllipseUncertaintySetResult <: AbstractEllipseUncertaintySetResultClass end
-struct EllipseUncertaintySetResult{T1 <: AbstractArray, T2 <: Real,
+struct EllipseUncertaintySetResult{T1 <: AbstractMatrix, T2 <: Real,
                                    T3 <: AbstractEllipseUncertaintySetResultClass} <:
        AbstractUncertaintySetResult
     sigma::T1
     k::T2
     class::T3
 end
-function EllipseUncertaintySetResult(; sigma::AbstractArray, k::Real,
+function EllipseUncertaintySetResult(; sigma::AbstractMatrix, k::Real,
                                      class::AbstractEllipseUncertaintySetResultClass)
     @smart_assert(!isempty(sigma))
     issquare(sigma)
