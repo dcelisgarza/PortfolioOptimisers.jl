@@ -35,19 +35,19 @@ function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSetting
     return SquareRootKurtosis{typeof(settings), typeof(w), typeof(mu), typeof(kt),
                               typeof(N), typeof(alg)}(settings, w, mu, kt, N, alg)
 end
-function calc_moment_target(::SquareRootKurtosis{<:Any, <:Any, Nothing, Nothing, <:Any,
+function calc_moment_target(::SquareRootKurtosis{<:Any, Nothing, Nothing, <:Any, <:Any,
                                                  <:Any}, ::Any, x::AbstractVector)
     return mean(x)
 end
-function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:AbstractWeights, Nothing,
+function calc_moment_target(r::SquareRootKurtosis{<:Any, <:AbstractWeights, Nothing, <:Any,
                                                   <:Any, <:Any}, ::Any, x::AbstractVector)
     return mean(x, r.w)
 end
-function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:AbstractVector,
+function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:AbstractVector, <:Any,
                                                   <:Any, <:Any}, w::AbstractVector, ::Any)
     return dot(w, r.mu)
 end
-function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Real, <:Any,
+function calc_moment_target(r::SquareRootKurtosis{<:Any, <:Any, <:Real, <:Any, <:Any,
                                                   <:Any}, ::Any, ::Any)
     return r.mu
 end
