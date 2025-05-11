@@ -9,41 +9,42 @@ function ApproxOrderedWeightsArray(; p::AbstractVector{<:Real} = Float64[2, 3, 4
     @smart_assert(all(p .> zero(eltype(p))))
     return ApproxOrderedWeightsArray{typeof(p)}(p)
 end
-struct OrderedWeightsArray{T1 <: RiskMeasureSettings, T2 <: OrderedWeightsArrayFormulation,
-                           T3 <: Union{Nothing, <:AbstractVector}} <:
+struct OrderedWeightsArray{T1 <: RiskMeasureSettings,
+                           T2 <: Union{Nothing, <:AbstractVector},
+                           T3 <: OrderedWeightsArrayFormulation} <:
        OrderedWeightsArrayRiskMeasure
     settings::T1
-    formulation::T2
-    w::T3
+    w::T2
+    formulation::T3
 end
 function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                             formulation::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
-                             w::Union{Nothing, <:AbstractVector} = nothing)
+                             w::Union{Nothing, <:AbstractVector} = nothing,
+                             formulation::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
     if isa(w, AbstractVector)
         @smart_assert(!isempty(w))
     end
-    return OrderedWeightsArray{typeof(settings), typeof(formulation), typeof(w)}(settings,
-                                                                                 formulation,
-                                                                                 w)
+    return OrderedWeightsArray{typeof(settings), typeof(w), typeof(formulation)}(settings,
+                                                                                 w,
+                                                                                 formulation)
 end
 function (r::OrderedWeightsArray)(x::AbstractVector)
     w = isnothing(r.w) ? owa_gmd(length(x)) : r.w
     return dot(w, sort!(x))
 end
 struct OrderedWeightsArrayRange{T1 <: RiskMeasureSettings,
-                                T2 <: OrderedWeightsArrayFormulation,
+                                T2 <: Union{Nothing, <:AbstractVector},
                                 T3 <: Union{Nothing, <:AbstractVector},
-                                T4 <: Union{Nothing, <:AbstractVector}} <:
+                                T4 <: OrderedWeightsArrayFormulation} <:
        OrderedWeightsArrayRiskMeasure
     settings::T1
-    formulation::T2
-    w1::T3
-    w2::T4
+    w1::T2
+    w2::T3
+    formulation::T4
 end
 function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                  formulation::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
                                   w1::Union{Nothing, <:AbstractVector} = nothing,
                                   w2::Union{Nothing, <:AbstractVector} = nothing,
+                                  formulation::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
                                   reversed::Bool = false)
     w1_flag = isa(w1, AbstractVector)
     w2_flag = isa(w2, AbstractVector)
@@ -59,8 +60,8 @@ function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureS
     if w1_flag && w2_flag
         @smart_assert(length(w1) == length(w2))
     end
-    return OrderedWeightsArrayRange{typeof(settings), typeof(formulation), typeof(w1),
-                                    typeof(w2)}(settings, formulation, w1, w2)
+    return OrderedWeightsArrayRange{typeof(settings), typeof(w1), typeof(w2),
+                                    typeof(formulation)}(settings, w1, w2, formulation)
 end
 function (r::OrderedWeightsArrayRange)(x::AbstractVector)
     w1 = isnothing(r.w1) ? owa_tg(length(x)) : r.w1

@@ -15,28 +15,27 @@ struct SquareRelativeErrorClusteringWeightFiniliser <:
 struct AbsoluteErrorClusteringWeightFiniliser <: JuMP_ClusteringWeightFiniliserFormulation end
 struct SquareAbsoluteErrorClusteringWeightFiniliser <:
        JuMP_ClusteringWeightFiniliserFormulation end
-struct JuMP_ClusteringWeightFiniliser{T1 <: JuMP_ClusteringWeightFiniliserFormulation,
+struct JuMP_ClusteringWeightFiniliser{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}},
                                       T2 <: Real, T3 <: Real,
-                                      T4 <: Union{<:Solver, <:AbstractVector{<:Solver}}} <:
+                                      T4 <: JuMP_ClusteringWeightFiniliserFormulation} <:
        ClusteringWeightFinaliser
-    alg::T1
+    slv::T1
     sc::T2
     so::T3
-    slv::T4
+    alg::T4
 end
-function JuMP_ClusteringWeightFiniliser(;
-                                        alg::JuMP_ClusteringWeightFiniliserFormulation = RelativeErrorClusteringWeightFiniliser(),
+function JuMP_ClusteringWeightFiniliser(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                                         sc::Real = 1.0, so::Real = 1.0,
-                                        slv::Union{<:Solver, <:AbstractVector{<:Solver}})
+                                        alg::JuMP_ClusteringWeightFiniliserFormulation = RelativeErrorClusteringWeightFiniliser())
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
     @smart_assert(sc > zero(sc))
     @smart_assert(so > zero(so))
-    return JuMP_ClusteringWeightFiniliser{typeof(alg), typeof(sc), typeof(so), typeof(slv)}(alg,
+    return JuMP_ClusteringWeightFiniliser{typeof(slv), typeof(sc), typeof(so), typeof(alg)}(slv,
                                                                                             sc,
                                                                                             so,
-                                                                                            slv)
+                                                                                            alg)
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
                                               ::RelativeErrorClusteringWeightFiniliser,
