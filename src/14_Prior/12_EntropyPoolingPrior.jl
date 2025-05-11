@@ -211,8 +211,8 @@ function Base.getproperty(obj::EntropyPoolingPriorResult, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:H0_EntropyPooling,
-                                                <:Any, <:Any}, X::AbstractMatrix,
+function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                <:H0_EntropyPooling}, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
     @smart_assert(dims ∈ (1, 2))
@@ -244,9 +244,9 @@ end
 function _get_epw(::H2_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return wi
 end
-function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any,
+function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                 <:Union{<:H1_EntropyPooling,
-                                                        <:H2_EntropyPooling}, <:Any, <:Any},
+                                                        <:H2_EntropyPooling}},
                X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
     @smart_assert(dims ∈ (1, 2))
