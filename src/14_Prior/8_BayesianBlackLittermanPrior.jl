@@ -2,16 +2,16 @@ struct BayesianBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimator
                                             T2 <: AbstractMatrixProcessingEstimator,
                                             T3 <: Union{<:BlackLittermanViewsEstimator,
                                                         <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                            T4 <: DataFrame, T5 <: Real,
-                                            T6 <: Union{Nothing, <:AbstractVector},
-                                            T7 <: Union{Nothing, <:Real}} <:
+                                            T4 <: DataFrame,
+                                            T5 <: Union{Nothing, <:AbstractVector},
+                                            T6 <: Real, T7 <: Union{Nothing, <:Real}} <:
        AbstractLowOrderPriorEstimator_2_2
     pe::T1
     mp::T2
     views::T3
     sets::T4
-    rf::T5
-    views_conf::T6
+    views_conf::T5
+    rf::T6
     tau::T7
 end
 function BayesianBlackLittermanPriorEstimator(;
@@ -21,8 +21,9 @@ function BayesianBlackLittermanPriorEstimator(;
                                               mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                               views::Union{<:BlackLittermanViewsEstimator,
                                                            <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                              sets::DataFrame = DataFrame(), rf::Real = 0.0,
+                                              sets::DataFrame = DataFrame(),
                                               views_conf::Union{Nothing, <:AbstractVector} = nothing,
+                                              rf::Real = 0.0,
                                               tau::Union{Nothing, <:Real} = nothing)
     if isa(views_conf, AbstractVector)
         @smart_assert(isa(views, AbstractVector))
@@ -39,18 +40,16 @@ function BayesianBlackLittermanPriorEstimator(;
         @smart_assert(tau > zero(tau))
     end
     return BayesianBlackLittermanPriorEstimator{typeof(pe), typeof(mp), typeof(views),
-                                                typeof(sets), typeof(rf),
-                                                typeof(views_conf), typeof(tau)}(pe, mp,
-                                                                                 views,
-                                                                                 sets, rf,
-                                                                                 views_conf,
-                                                                                 tau)
+                                                typeof(sets), typeof(views_conf),
+                                                typeof(rf), typeof(tau)}(pe, mp, views,
+                                                                         sets, views_conf,
+                                                                         rf, tau)
 end
 function factory(pe::BayesianBlackLittermanPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return BayesianBlackLittermanPriorEstimator(; pe = factory(pe.pe, w), mp = pe.mp,
                                                 views = pe.views, sets = pe.sets,
-                                                rf = pe.rf, views_conf = pe.views_conf,
+                                                views_conf = pe.views_conf, rf = pe.rf,
                                                 tau = pe.tau)
 end
 function Base.getproperty(obj::BayesianBlackLittermanPriorEstimator, sym::Symbol)

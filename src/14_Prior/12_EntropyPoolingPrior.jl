@@ -3,34 +3,34 @@ abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
 struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
-struct OptimEntropyPoolingEstimator{T1 <: Real, T2 <: Tuple, T3 <: NamedTuple} <:
+struct OptimEntropyPoolingEstimator{T1 <: Tuple, T2 <: NamedTuple, T3 <: Real} <:
        AbstractEntropyPoolingEstimator
-    scale::T1
-    args::T2
-    kwargs::T3
+    args::T1
+    kwargs::T2
+    scale::T3
 end
-function OptimEntropyPoolingEstimator(; scale::Real = 1, args::Tuple = (),
-                                      kwargs::NamedTuple = (;))
+function OptimEntropyPoolingEstimator(; args::Tuple = (), kwargs::NamedTuple = (;),
+                                      scale::Real = 1,)
     @smart_assert(scale >= zero(scale))
-    return OptimEntropyPoolingEstimator{typeof(scale), typeof(args), typeof(kwargs)}(scale,
-                                                                                     args,
-                                                                                     kwargs)
+    return OptimEntropyPoolingEstimator{typeof(args), typeof(kwargs), typeof(scale)}(args,
+                                                                                     kwargs,
+                                                                                     scale)
 end
-struct JuMPEntropyPoolingEstimator{T1 <: Real, T2 <: Real,
-                                   T3 <: Union{<:Solver, <:AbstractVector{<:Solver}}} <:
+struct JuMPEntropyPoolingEstimator{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}},
+                                   T2 <: Real, T3 <: Real} <:
        AbstractEntropyPoolingEstimator
-    sc::T1
-    so::T2
-    slv::T3
+    slv::T1
+    sc::T2
+    so::T3
 end
 function JuMPEntropyPoolingEstimator(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                                     sc::Real = 1, so::Real = 1)
+                                     sc::Real = 1, so::Real = 1,)
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
     @smart_assert(sc >= zero(sc))
     @smart_assert(so >= zero(so))
-    return JuMPEntropyPoolingEstimator{typeof(sc), typeof(so), typeof(slv)}(sc, so, slv)
+    return JuMPEntropyPoolingEstimator{typeof(slv), typeof(sc), typeof(so)}(slv, sc, so)
 end
 function entropy_pooling(w::AbstractVector, ::Nothing, ::Any)
     return w
@@ -134,25 +134,25 @@ end
 struct EntropyPoolingPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
                                     T2 <: Union{<:EntropyPoolingViewEstimator,
                                                 <:AbstractVector{<:EntropyPoolingViewEstimator}},
-                                    T3 <: DataFrame, T4 <: AbstractEntropyPoolingAlgorithm,
-                                    T5 <: AbstractEntropyPoolingEstimator,
-                                    T6 <: Union{Nothing, <:AbstractVector}} <:
+                                    T3 <: DataFrame, T4 <: AbstractEntropyPoolingEstimator,
+                                    T5 <: Union{Nothing, <:AbstractVector},
+                                    T6 <: AbstractEntropyPoolingAlgorithm} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
     pe::T1
     views::T2
     sets::T3
-    alg::T4
-    opt::T5
-    w::T6
+    opt::T4
+    w::T5
+    alg::T6
 end
 function EntropyPoolingPriorEstimator(;
                                       pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
                                       views::Union{<:EntropyPoolingViewEstimator,
                                                    <:AbstractVector{<:EntropyPoolingViewEstimator}},
                                       sets::DataFrame = DataFrame(),
-                                      alg::AbstractEntropyPoolingAlgorithm = H0_EntropyPooling(),
                                       opt::AbstractEntropyPoolingEstimator = OptimEntropyPoolingEstimator(),
-                                      w::Union{Nothing, <:AbstractWeights} = nothing)
+                                      w::Union{Nothing, <:AbstractWeights} = nothing,
+                                      alg::AbstractEntropyPoolingAlgorithm = H0_EntropyPooling())
     if isa(views, AbstractVector)
         @smart_assert(!isempty(views))
     end
@@ -160,9 +160,9 @@ function EntropyPoolingPriorEstimator(;
         @smart_assert(!isempty(w))
     end
     return EntropyPoolingPriorEstimator{typeof(pe), typeof(views), typeof(sets),
-                                        typeof(alg), typeof(opt), typeof(w)}(pe, views,
-                                                                             sets, alg, opt,
-                                                                             w)
+                                        typeof(opt), typeof(w), typeof(alg)}(pe, views,
+                                                                             sets, opt, w,
+                                                                             alg)
 end
 function Base.getproperty(obj::EntropyPoolingPriorEstimator, sym::Symbol)
     return if sym == :me

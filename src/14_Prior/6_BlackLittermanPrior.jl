@@ -2,16 +2,15 @@ struct BlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_
                                     T2 <: AbstractMatrixProcessingEstimator,
                                     T3 <: Union{<:BlackLittermanViewsEstimator,
                                                 <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                    T4 <: DataFrame, T5 <: Real,
-                                    T6 <: Union{Nothing, <:AbstractVector},
-                                    T7 <: Union{Nothing, <:Real}} <:
+                                    T4 <: DataFrame, T5 <: Union{Nothing, <:AbstractVector},
+                                    T6 <: Real, T7 <: Union{Nothing, <:Real}} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
     pe::T1
     mp::T2
     views::T3
     sets::T4
-    rf::T5
-    views_conf::T6
+    views_conf::T5
+    rf::T6
     tau::T7
 end
 function Base.getproperty(obj::BlackLittermanPriorEstimator, sym::Symbol)
@@ -29,9 +28,9 @@ function BlackLittermanPriorEstimator(;
                                       mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                       views::Union{<:BlackLittermanViewsEstimator,
                                                    <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                      sets::DataFrame = DataFrame(), rf::Real = 0.0,
+                                      sets::DataFrame = DataFrame(),
                                       views_conf::Union{Nothing, <:AbstractVector} = nothing,
-                                      tau::Union{Nothing, <:Real} = nothing)
+                                      rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
     if isa(views_conf, AbstractVector)
         @smart_assert(isa(views, AbstractVector))
         @smart_assert(!isempty(views))
@@ -47,18 +46,19 @@ function BlackLittermanPriorEstimator(;
         @smart_assert(tau > zero(tau))
     end
     return BlackLittermanPriorEstimator{typeof(pe), typeof(mp), typeof(views), typeof(sets),
-                                        typeof(rf), typeof(views_conf), typeof(tau)}(pe, mp,
+                                        typeof(views_conf), typeof(rf), typeof(tau)}(pe, mp,
                                                                                      views,
                                                                                      sets,
-                                                                                     rf,
                                                                                      views_conf,
+                                                                                     rf,
                                                                                      tau)
 end
 function factory(pe::BlackLittermanPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return BlackLittermanPriorEstimator(; pe = factory(pe.pe, w), mp = pe.mp,
-                                        views = pe.views, sets = pe.sets, rf = pe.rf,
-                                        views_conf = pe.views_conf, tau = pe.tau)
+                                        views = pe.views, sets = pe.sets,
+                                        views_conf = pe.views_conf, rf = pe.rf,
+                                        tau = pe.tau)
 end
 function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
@@ -75,9 +75,8 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
 
-    (; P, Q) = views = black_litterman_views(pe.views, pe.sets;
-                                             datatype = eltype(posterior_X),
-                                             strict = strict)
+    (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
+                                     strict = strict)
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
     views_conf = pe.views_conf
     omega = tau * Diagonal(if isnothing(views_conf)
@@ -88,7 +87,6 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
                                alphas = inv.(views_conf) .- 1
                                alphas ⊙ P * prior_sigma * transpose(P)
                            end)
-
     v1 = tau * prior_sigma * transpose(P)
     v2 = P * v1 + omega
     v3 = Q - P * prior_mu

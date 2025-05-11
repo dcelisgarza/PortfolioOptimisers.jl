@@ -5,11 +5,11 @@ struct FactorBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMa
                                           T5 <: AbstractVarianceEstimator,
                                           T6 <: Union{<:BlackLittermanViewsEstimator,
                                                       <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                          T7 <: DataFrame, T8 <: Real, T9 <: Bool,
-                                          T10 <: Union{Nothing, <:AbstractVector},
-                                          T11 <: Union{Nothing, <:AbstractVector},
-                                          T12 <: Union{Nothing, <:Real},
-                                          T13 <: Union{Nothing, <:Real}} <:
+                                          T7 <: DataFrame,
+                                          T8 <: Union{Nothing, <:AbstractVector},
+                                          T9 <: Union{Nothing, <:AbstractVector},
+                                          T10 <: Real, T11 <: Union{Nothing, <:Real},
+                                          T12 <: Union{Nothing, <:Real}, T13 <: Bool} <:
        AbstractLowOrderPriorEstimator_2_1
     pe::T1
     f_mp::T2
@@ -18,12 +18,12 @@ struct FactorBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMa
     ve::T5
     views::T6
     sets::T7
-    rf::T8
-    rsd::T9
-    views_conf::T10
-    w::T11
-    l::T12
-    tau::T13
+    views_conf::T8
+    w::T9
+    rf::T10
+    l::T11
+    tau::T12
+    rsd::T13
 end
 function FactorBlackLittermanPriorEstimator(;
                                             pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
@@ -33,12 +33,13 @@ function FactorBlackLittermanPriorEstimator(;
                                             ve::AbstractVarianceEstimator = SimpleVariance(),
                                             views::Union{<:BlackLittermanViewsEstimator,
                                                          <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                            sets::DataFrame = DataFrame(), rf::Real = 0.0,
-                                            rsd::Bool = true,
+                                            sets::DataFrame = DataFrame(),
                                             views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                             w::Union{Nothing, <:AbstractVector} = nothing,
+                                            rf::Real = 0.0,
                                             l::Union{Nothing, <:Real} = nothing,
-                                            tau::Union{Nothing, <:Real} = nothing)
+                                            tau::Union{Nothing, <:Real} = nothing,
+                                            rsd::Bool = true)
     if isa(views_conf, AbstractVector)
         @smart_assert(isa(views, AbstractVector))
         @smart_assert(!isempty(views))
@@ -55,20 +56,20 @@ function FactorBlackLittermanPriorEstimator(;
     end
     return FactorBlackLittermanPriorEstimator{typeof(pe), typeof(f_mp), typeof(mp),
                                               typeof(re), typeof(ve), typeof(views),
-                                              typeof(sets), typeof(rf), typeof(rsd),
-                                              typeof(views_conf), typeof(w), typeof(l),
-                                              typeof(tau)}(pe, f_mp, mp, re, ve, views,
-                                                           sets, rf, rsd, views_conf, w, l,
-                                                           tau)
+                                              typeof(sets), typeof(views_conf), typeof(w),
+                                              typeof(rf), typeof(l), typeof(tau),
+                                              typeof(rsd)}(pe, f_mp, mp, re, ve, views,
+                                                           sets, views_conf, w, rf, l, tau,
+                                                           rsd)
 end
 function factory(pe::FactorBlackLittermanPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return FactorBlackLittermanPriorEstimator(; pe = factory(pe.pe, w), f_mp = pe.f_mp,
                                               mp = pe.mp, re = pe.re,
                                               ve = factory(pe.ve, w), views = pe.views,
-                                              sets = pe.sets, rf = pe.rf, rsd = pe.rsd,
-                                              views_conf = pe.views_conf, w = pe.w,
-                                              l = pe.l, tau = pe.tau)
+                                              sets = pe.sets, views_conf = pe.views_conf,
+                                              w = pe.w, rf = pe.rf, l = pe.l, tau = pe.tau,
+                                              rsd = pe.rsd)
 end
 function Base.getproperty(obj::FactorBlackLittermanPriorEstimator, sym::Symbol)
     return if sym == :me

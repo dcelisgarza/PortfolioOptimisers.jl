@@ -7,11 +7,11 @@ struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimato
                                                          <:AbstractVector{<:BlackLittermanViewsEstimator}},
                                              T7 <: Union{<:BlackLittermanViewsEstimator,
                                                          <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                             T8 <: DataFrame, T9 <: DataFrame, T10 <: Real,
+                                             T8 <: DataFrame, T9 <: DataFrame,
+                                             T10 <: Union{Nothing, <:AbstractVector},
                                              T11 <: Union{Nothing, <:AbstractVector},
                                              T12 <: Union{Nothing, <:AbstractVector},
-                                             T13 <: Union{Nothing, <:AbstractVector},
-                                             T14 <: Union{Nothing, <:Real},
+                                             T13 <: Real, T14 <: Union{Nothing, <:Real},
                                              T15 <: Union{Nothing, <:Real}} <:
        AbstractLowOrderPriorEstimator_2_1
     a_pe::T1
@@ -23,10 +23,10 @@ struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimato
     f_views::T7
     a_sets::T8
     f_sets::T9
-    rf::T10
-    a_views_conf::T11
-    f_views_conf::T12
-    w::T13
+    a_views_conf::T10
+    f_views_conf::T11
+    w::T12
+    rf::T13
     l::T14
     tau::T15
 end
@@ -42,12 +42,12 @@ function AugmentedBlackLittermanPriorEstimator(;
                                                               <:AbstractVector{<:BlackLittermanViewsEstimator}},
                                                a_sets::DataFrame = DataFrame(),
                                                f_sets::DataFrame = DataFrame(),
-                                               rf::Real = 0.0,
                                                a_views_conf::Union{Nothing,
                                                                    <:AbstractVector} = nothing,
                                                f_views_conf::Union{Nothing,
                                                                    <:AbstractVector} = nothing,
                                                w::Union{Nothing, <:AbstractVector} = nothing,
+                                               rf::Real = 0.0,
                                                l::Union{Nothing, <:Real} = nothing,
                                                tau::Union{Nothing, <:Real} = nothing)
     if isa(w, AbstractVector)
@@ -85,21 +85,20 @@ function AugmentedBlackLittermanPriorEstimator(;
     return AugmentedBlackLittermanPriorEstimator{typeof(a_pe), typeof(f_pe), typeof(mp),
                                                  typeof(re), typeof(ve), typeof(a_views),
                                                  typeof(f_views), typeof(a_sets),
-                                                 typeof(f_sets), typeof(rf),
-                                                 typeof(a_views_conf), typeof(f_views_conf),
-                                                 typeof(w), typeof(l), typeof(tau)}(a_pe,
-                                                                                    f_pe,
-                                                                                    mp, re,
-                                                                                    ve,
-                                                                                    a_views,
-                                                                                    f_views,
-                                                                                    a_sets,
-                                                                                    f_sets,
-                                                                                    rf,
-                                                                                    a_views_conf,
-                                                                                    f_views_conf,
-                                                                                    w, l,
-                                                                                    tau)
+                                                 typeof(f_sets), typeof(a_views_conf),
+                                                 typeof(f_views_conf), typeof(w),
+                                                 typeof(rf), typeof(l), typeof(tau)}(a_pe,
+                                                                                     f_pe,
+                                                                                     mp, re,
+                                                                                     ve,
+                                                                                     a_views,
+                                                                                     f_views,
+                                                                                     a_sets,
+                                                                                     f_sets,
+                                                                                     a_views_conf,
+                                                                                     f_views_conf,
+                                                                                     w, rf,
+                                                                                     l, tau)
 end
 function factory(pe::AugmentedBlackLittermanPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
@@ -108,9 +107,9 @@ function factory(pe::AugmentedBlackLittermanPriorEstimator,
                                                  re = pe.re, ve = factory(pe.ve, w),
                                                  a_views = pe.a_views, f_views = pe.f_views,
                                                  a_sets = pe.a_sets, f_sets = pe.f_sets,
-                                                 rf = pe.rf, a_views_conf = pe.a_views_conf,
+                                                 a_views_conf = pe.a_views_conf,
                                                  f_views_conf = pe.f_views_conf, w = pe.w,
-                                                 l = pe.l, tau = pe.tau)
+                                                 rf = pe.rf, l = pe.l, tau = pe.tau)
 end
 function Base.getproperty(obj::AugmentedBlackLittermanPriorEstimator, sym::Symbol)
     return if sym == :me

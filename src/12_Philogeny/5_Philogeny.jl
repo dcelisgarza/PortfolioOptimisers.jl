@@ -28,16 +28,16 @@ end
 function KatzCentrality(; alpha::Real = 0.3)
     return KatzCentrality{typeof(alpha)}(alpha)
 end
-struct Pagerank{T1 <: Real, T2 <: Integer, T3 <: Real} <: AbstractCentralityAlgorithm
-    alpha::T1
-    n::T2
+struct Pagerank{T1 <: Integer, T2 <: Real, T3 <: Real} <: AbstractCentralityAlgorithm
+    n::T1
+    alpha::T2
     epsilon::T3
 end
 function Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
-    @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(n > 0)
+    @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(epsilon > zero(epsilon))
-    return Pagerank{typeof(alpha), typeof(n), typeof(epsilon)}(alpha, n, epsilon)
+    return Pagerank{typeof(n), typeof(alpha), typeof(epsilon)}(n, alpha, epsilon)
 end
 struct RadialityCentrality <: AbstractCentralityAlgorithm end
 struct StressCentrality{T1 <: Tuple, T2 <: NamedTuple} <: AbstractCentralityAlgorithm

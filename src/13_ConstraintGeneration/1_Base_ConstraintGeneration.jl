@@ -197,21 +197,20 @@ function parse_side(side::AbstractString, strict::Bool = true)
 
     return variable_terms, constant_value
 end
-struct EquationParsingResult{T1 <: AbstractString, T2 <: AbstractVector{<:AbstractString},
-                             T3 <: AbstractVector{<:Real}, T4 <: AbstractString,
-                             T5 <: Real} <: AbstractResult
-    eqn::T1
-    vars::T2
-    coef::T3
+struct EquationParsingResult{T1 <: AbstractVector{<:AbstractString},
+                             T2 <: AbstractVector{<:Real}, T3 <: AbstractString,
+                             T4 <: AbstractString, T5 <: Real} <: AbstractResult
+    vars::T1
+    coef::T2
+    eqn::T3
     comp::T4
     cnst::T5
 end
-function EquationParsingResult(; eqn::AbstractString,
-                               vars::AbstractVector{<:AbstractString},
-                               coef::AbstractVector{<:Real}, comp::AbstractString,
-                               cnst::Real)
-    return EquationParsingResult{typeof(eqn), typeof(vars), typeof(coef), typeof(comp),
-                                 typeof(cnst)}(eqn, vars, coef, comp, cnst)
+function EquationParsingResult(; vars::AbstractVector{<:AbstractString},
+                               coef::AbstractVector{<:Real}, eqn::AbstractString,
+                               comp::AbstractString, cnst::Real)
+    return EquationParsingResult{typeof(vars), typeof(coef), typeof(eqn), typeof(comp),
+                                 typeof(cnst)}(vars, coef, eqn, comp, cnst)
 end
 function parse_constraint_equation(equation_str::AbstractString, strict::Bool = true)
     # Split the equation using the existing function
@@ -291,7 +290,7 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
     # Create the final equation
     equation = "$left_str $comp $right_const"
 
-    return EquationParsingResult(; eqn = equation, vars = vars, coef = coefs, comp = comp,
+    return EquationParsingResult(; vars = vars, coef = coefs, eqn = equation, comp = comp,
                                  cnst = right_const)
 end
 

@@ -131,21 +131,21 @@ function C4_LinearEntropyPoolingConstraintEstimator(; group1, name1, group2, nam
                                                       typeof(coef)}(group1, group2, name1,
                                                                     name2, coef)
 end
-struct EntropyPoolingViewEstimator{T1 <:
-                                   AbstractNonConstantEntropyPoolingConstraintEstimator,
-                                   T2 <: Union{<:EntropyPoolingConstraintEstimator,
+struct EntropyPoolingViewEstimator{T1 <: Union{<:EntropyPoolingConstraintEstimator,
                                                <:AbstractVector{<:EntropyPoolingConstraintEstimator}},
+                                   T2 <:
+                                   AbstractNonConstantEntropyPoolingConstraintEstimator,
                                    T3 <: ComparisonOperators}
-    A::T1
-    B::T2
+    B::T1
+    A::T2
     comp::T3
 end
 function EntropyPoolingViewEstimator(;
-                                     A::AbstractNonConstantEntropyPoolingConstraintEstimator,
                                      B::Union{<:EntropyPoolingConstraintEstimator,
                                               <:AbstractVector{<:EntropyPoolingConstraintEstimator}},
+                                     A::AbstractNonConstantEntropyPoolingConstraintEstimator,
                                      comp::ComparisonOperators = LEQ())
-    return EntropyPoolingViewEstimator{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
+    return EntropyPoolingViewEstimator{typeof(B), typeof(A), typeof(comp)}(B, A, comp)
 end
 function Base.setindex!(obj::EntropyPoolingViewEstimator, args...)
     return obj
@@ -441,20 +441,24 @@ function freeze_B_view(pr::AbstractPriorResult,
                                                          zero(eltype(pr.X))
                                                      end)
 end
-function get_view_level(::EntropyPoolingViewEstimator{<:C0_LinearEntropyPoolingConstraintEstimator,
-                                                      <:Any, <:Any})
+function get_view_level(::EntropyPoolingViewEstimator{<:Any,
+                                                      <:C0_LinearEntropyPoolingConstraintEstimator,
+                                                      <:Any})
     return 0
 end
-function get_view_level(::EntropyPoolingViewEstimator{<:C1_LinearEntropyPoolingConstraintEstimator,
-                                                      <:Any, <:Any})
+function get_view_level(::EntropyPoolingViewEstimator{<:Any,
+                                                      <:C1_LinearEntropyPoolingConstraintEstimator,
+                                                      <:Any})
     return 1
 end
-function get_view_level(::EntropyPoolingViewEstimator{<:C2_LinearEntropyPoolingConstraintEstimator,
-                                                      <:Any, <:Any})
+function get_view_level(::EntropyPoolingViewEstimator{<:Any,
+                                                      <:C2_LinearEntropyPoolingConstraintEstimator,
+                                                      <:Any})
     return 2
 end
-function get_view_level(::EntropyPoolingViewEstimator{<:C4_LinearEntropyPoolingConstraintEstimator,
-                                                      <:Any, <:Any})
+function get_view_level(::EntropyPoolingViewEstimator{<:Any,
+                                                      <:C4_LinearEntropyPoolingConstraintEstimator,
+                                                      <:Any})
     return 4
 end
 function Base.isless(a::EntropyPoolingViewEstimator, b::EntropyPoolingViewEstimator)

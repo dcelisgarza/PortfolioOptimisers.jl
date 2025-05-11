@@ -15,19 +15,19 @@ function prior_view(pr::EmpiricalPriorResult, i::AbstractVector)
     return EmpiricalPriorResult(; X = view(pr.X, :, i), mu = view(pr.mu, i),
                                 sigma = view(pr.sigma, i, i))
 end
-struct EmpiricalPriorEstimator{T1 <: AbstractExpectedReturnsEstimator,
-                               T2 <: StatsBase.CovarianceEstimator,
+struct EmpiricalPriorEstimator{T1 <: StatsBase.CovarianceEstimator,
+                               T2 <: AbstractExpectedReturnsEstimator,
                                T3 <: Union{Nothing, <:Real}} <:
        AbstractLowOrderPriorEstimator_1_0
-    me::T1
-    ce::T2
+    ce::T1
+    me::T2
     horizon::T3
 end
 function EmpiricalPriorEstimator(;
-                                 me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                  ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                                 me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                  horizon::Union{Nothing, <:Real} = nothing)
-    return EmpiricalPriorEstimator{typeof(me), typeof(ce), typeof(horizon)}(me, ce, horizon)
+    return EmpiricalPriorEstimator{typeof(ce), typeof(me), typeof(horizon)}(ce, me, horizon)
 end
 function factory(pe::EmpiricalPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)

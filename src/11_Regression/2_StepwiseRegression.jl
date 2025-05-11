@@ -76,7 +76,7 @@ function add_best_asset_after_failure_pval!(included::AbstractVector, F::Abstrac
     push!(included, new_feature)
     return nothing
 end
-function regression(re::StepwiseRegression{<:Forward, <:PValue}, x::AbstractVector,
+function regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector,
                     F::AbstractMatrix)
     ovec = range(; start = 1, stop = 1, length = length(x))
     indices = 1:size(F, 2)
@@ -128,10 +128,9 @@ function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria, 
     end
     return threshold
 end
-function regression(re::StepwiseRegression{<:Forward,
-                                           <:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                                   <:AbstractMaxValStepwiseRegressionCriteria}},
-                    x::AbstractVector, F::AbstractMatrix)
+function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
+                                                   <:AbstractMaxValStepwiseRegressionCriteria},
+                                           <:Forward}, x::AbstractVector, F::AbstractMatrix)
     T, N = size(F)
     ovec = range(; start = 1, stop = 1, length = T)
     indices = 1:N
@@ -160,7 +159,7 @@ function regression(re::StepwiseRegression{<:Forward,
     end
     return included
 end
-function regression(re::StepwiseRegression{<:Backward, <:PValue}, x::AbstractVector,
+function regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVector,
                     F::AbstractMatrix)
     ovec = range(; start = 1, stop = 1, length = length(x))
     fit_result = GLM.lm([ovec F], x)
@@ -204,10 +203,10 @@ function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, valu
     end
     return threshold
 end
-function regression(re::StepwiseRegression{<:Backward,
-                                           <:Union{<:AbstractMinValStepwiseRegressionCriterion,
-                                                   <:AbstractMaxValStepwiseRegressionCriteria}},
-                    x::AbstractVector, F::AbstractMatrix)
+function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion,
+                                                   <:AbstractMaxValStepwiseRegressionCriteria},
+                                           <:Backward}, x::AbstractVector,
+                    F::AbstractMatrix)
     T, N = size(F)
     ovec = range(; start = 1, stop = 1, length = T)
     included = collect(1:N)
