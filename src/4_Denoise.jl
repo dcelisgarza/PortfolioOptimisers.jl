@@ -9,20 +9,20 @@ function ShrunkDenoise(; alpha::Real = 0.0)
     @smart_assert(zero(alpha) <= alpha <= one(alpha))
     return ShrunkDenoise{typeof(alpha)}(alpha)
 end
-struct Denoise{T1 <: AbstractDenoiseAlgorithm, T2 <: Integer, T3 <: Integer, T4,
-               T5 <: Tuple, T6 <: NamedTuple} <: AbstractDenoiseEstimator
-    alg::T1
-    m::T2
-    n::T3
-    kernel::T4
-    args::T5
-    kwargs::T6
+struct Denoise{T1, T2 <: Tuple, T3 <: NamedTuple, T4 <: AbstractDenoiseAlgorithm,
+               T5 <: Integer, T6 <: Integer} <: AbstractDenoiseEstimator
+    kernel::T1
+    args::T2
+    kwargs::T3
+    alg::T4
+    m::T5
+    n::T6
 end
 function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), m::Integer = 10,
                  n::Integer = 1000, kernel = AverageShiftedHistograms.Kernels.gaussian,
                  args::Tuple = (), kwargs::NamedTuple = (;))
-    return Denoise{typeof(alg), typeof(m), typeof(n), typeof(kernel), typeof(args),
-                   typeof(kwargs)}(alg, m, n, kernel, args, kwargs)
+    return Denoise{typeof(kernel), typeof(args), typeof(kwargs), typeof(alg), typeof(m),
+                   typeof(n)}(kernel, args, kwargs, alg, m, n)
 end
 function denoise!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
                   vecs::AbstractMatrix, num_factors::Integer)

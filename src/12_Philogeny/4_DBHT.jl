@@ -1245,7 +1245,7 @@ struct LoGo{T1 <: AbstractDistanceEstimator, T2 <: AbstractSimilarityMatrixAlgor
     dist::T1
     sim::T2
 end
-function LoGo(; dist::AbstractDistanceEstimator = CanonicalDistance(),
+function LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
               sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
     return LoGo{typeof(dist), typeof(sim)}(dist, sim)
 end
