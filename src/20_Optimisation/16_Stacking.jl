@@ -58,13 +58,12 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     opti = st.opti
     Ni = length(opti)
     wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)
-    resi = OptimisationResult[]
-    sizehint!(resi, Ni)
+    resi = Vector{OptimisationResult}(undef, Ni)
     for (i, opt) ∈ enumerate(opti)
         res = optimise!(opt, rd; dims = dims, branchorder = branchorder,
                         str_names = str_names, save = save, kwargs...)
         wi[:, i] = res.w
-        push!(resi, res)
+        resi[i] = res
     end
     rdo = ReturnsResult(; nx = 1:Ni, X = pr.X * wi, nf = rd.nf, F = rd.F)
     res = optimise!(st.opto, rdo; dims = dims, branchorder = branchorder,

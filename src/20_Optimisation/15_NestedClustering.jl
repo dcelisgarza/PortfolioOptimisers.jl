@@ -111,8 +111,7 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
     cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
     wi = zeros(eltype(pr.X), size(pr.X, 2), clr.k)
     opti = nco.opti
-    resi = OptimisationResult[]
-    sizehint!(resi, clr.k)
+    resi = Vector{OptimisationResult}(undef, clr.k)
     for (i, c) ∈ enumerate(cls)
         if length(c) == 1
             wi[c[1], i] = 1
@@ -122,7 +121,7 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
             res = optimise!(optic, rdc; dims = dims, branchorder = branchorder,
                             str_names = str_names, save = save, kwargs...)
             wi[c, i] = res.w
-            push!(resi, res)
+            resi[i] = res
         end
     end
     rdo = ReturnsResult(; nx = 1:(clr.k), X = pr.X * wi, nf = rd.nf, F = rd.F)
