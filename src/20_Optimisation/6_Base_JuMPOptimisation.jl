@@ -1,3 +1,4 @@
+abstract type BaseJuMPOptimisationEstimator <: BaseOptimisationEstimator end
 abstract type JuMPOptimisationEstimator <: OptimisationEstimator end
 abstract type ObjectiveFunction <: AbstractEstimator end
 abstract type JuMPReturnsEstimator <: AbstractEstimator end

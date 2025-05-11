@@ -57,9 +57,9 @@ function RiskBudgetting(; alg::RiskBudgettingAlgorithm = AssetRiskBudgettingAlgo
     end
     return RiskBudgetting{typeof(alg), typeof(r), typeof(opt), typeof(wi)}(alg, r, opt, wi)
 end
-function opt_view(rb::RiskBudgetting, i::AbstractVector)
+function opt_view(rb::RiskBudgetting, i::AbstractVector, X::AbstractMatrix)
     alg = risk_budgetting_algorithm_view(rb.alg, i)
-    r = risk_measure_view(rb.r, i)
+    r = risk_measure_view(rb.r, i, X)
     opt = opt_view(rb.opt, i)
     wi = nothing_scalar_array_view(rb.wi, i)
     return RiskBudgetting(; alg = alg, r = r, opt = opt, wi = wi)

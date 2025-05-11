@@ -96,7 +96,7 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T24 <: Union{Nothing, <:CustomObjective}, T25 <: Real, T26 <: Real,
                      T27 <: Union{Nothing, <:Real},
                      T28 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T29 <: Bool} <:
-       JuMPOptimisationEstimator
+       BaseJuMPOptimisationEstimator
     pe::T1 # PriorEstimator
     wb::T2 # WeightBoundsResult
     bgt::T3 # BudgetRange

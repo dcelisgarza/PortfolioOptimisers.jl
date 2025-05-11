@@ -1,3 +1,4 @@
+abstract type BaseStackingOptimisationEstimator <: OptimisationEstimator end
 struct StackingResult{T1 <: Type, T2 <: AbstractPriorResult,
                       T3 <: AbstractVector{<:OptimisationResult}, T4 <: OptimisationResult,
                       T5 <: Union{Nothing, WeightBoundsResult},
@@ -17,7 +18,7 @@ struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                 T3 <: OptimisationEstimator,
                 T4 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
                 T5 <: Union{Nothing, <:DataFrame}, T6 <: ClusteringWeightFinaliser,
-                T7 <: Bool} <: OptimisationEstimator
+                T7 <: Bool} <: BaseStackingOptimisationEstimator
     pe::T1
     opti::T2
     opto::T3
@@ -42,10 +43,10 @@ function Stacking(;
     return Stacking{typeof(pe), typeof(opti), typeof(opto), typeof(wb), typeof(sets),
                     typeof(cwf), typeof(strict)}(pe, opti, opto, wb, sets, cwf, strict)
 end
-function opt_view(st::Stacking, i::AbstractVector)
+function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
     pe = prior_view(st.pe, i)
-    opti = opt_view(st.opti, i)
-    opto = opt_view(st.opto, i)
+    opti = opt_view(st.opti, i, X)
+    opto = opt_view(st.opto, i, X)
     wb = weight_bounds_view(st.wb, i)
     sets = nothing_dataframe_view(st.sets, i)
     return Stacking(; pe = pe, opti = opti, opto = opto, wb = wb, cwf = st.cwf, sets = sets,

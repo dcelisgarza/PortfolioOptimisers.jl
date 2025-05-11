@@ -1,5 +1,5 @@
-abstract type BaseClusteringOptimisationEstimator <: OptimisationEstimator end
-abstract type ClusteringOptimisationEstimator <: BaseClusteringOptimisationEstimator end
+abstract type BaseClusteringOptimisationEstimator <: BaseOptimisationEstimator end
+abstract type ClusteringOptimisationEstimator <: OptimisationEstimator end
 abstract type ClusteringWeightFinaliser <: AbstractAlgorithm end
 struct HeuristicClusteringWeightFiniliser{T1 <: Integer} <: ClusteringWeightFinaliser
     iter::T1

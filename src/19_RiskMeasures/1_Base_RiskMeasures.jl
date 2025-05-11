@@ -55,11 +55,12 @@ function risk_measure_factory(rs::AbstractVector{<:AbstractBaseRiskMeasure}, arg
                               kwargs...)
     return risk_measure_factory.(rs, args...; kwargs...)
 end
-function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any)
+function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
     return rs
 end
-function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i::AbstractVector)
-    return risk_measure_view.(rs, Ref(i))
+function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i::AbstractVector,
+                           X::AbstractMatrix)
+    return risk_measure_view.(rs, Ref(i), Ref(X))
 end
 abstract type Scalariser end
 struct SumScalariser <: Scalariser end

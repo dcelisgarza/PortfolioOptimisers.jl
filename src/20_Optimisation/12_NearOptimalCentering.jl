@@ -72,8 +72,8 @@ function NearOptimalCentering(;
                                                    w_min_ini, w_opt, w_opt_ini, w_max,
                                                    w_max_ini)
 end
-function opt_view(noc::NearOptimalCentering, i::AbstractVector)
-    r = risk_measure_view(noc.r, i)
+function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatrix)
+    r = risk_measure_view(noc.r, i, X)
     opt = opt_view(noc.opt, i)
     w_min = nothing_scalar_array_view(noc.w_min, i)
     w_min_ini = nothing_scalar_array_view(noc.w_min_ini, i)

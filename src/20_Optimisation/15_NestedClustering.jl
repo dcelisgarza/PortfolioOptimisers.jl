@@ -20,7 +20,7 @@ struct NestedClustering{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorRes
                         T5 <:
                         Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
                         T6 <: Union{Nothing, <:DataFrame}, T7 <: ClusteringWeightFinaliser,
-                        T8 <: Bool} <: OptimisationEstimator
+                        T8 <: Bool} <: ClusteringOptimisationEstimator
     pe::T1
     cle::T2
     opti::T3
@@ -68,10 +68,10 @@ function NestedClustering(;
                                                                        wb, sets, cwf,
                                                                        strict)
 end
-function opt_view(nco::NestedClustering, i::AbstractVector)
+function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
     pe = prior_view(nco.pe, i)
-    opti = opt_view(nco.opti, i)
-    opto = opt_view(nco.opto, i)
+    opti = opt_view(nco.opti, i, X)
+    opto = opt_view(nco.opto, i, X)
     wb = weight_bounds_view(nco.wb, i)
     sets = nothing_dataframe_view(nco.sets, i)
     return NestedClustering(; pe = pe, cle = nco.cle, opti = opti, opto = opto, wb = wb,
@@ -116,7 +116,7 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
         if length(c) == 1
             wi[c[1], i] = 1
         else
-            optic = opt_view(opti, c)
+            optic = opt_view(opti, c, pr.X)
             rdc = returns_result_view(rd, c)
             res = optimise!(optic, rdc; dims = dims, branchorder = branchorder,
                             str_names = str_names, save = save, kwargs...)

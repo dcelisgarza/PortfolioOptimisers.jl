@@ -18,8 +18,8 @@ function MeanRisk(; r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = V
     end
     return MeanRisk{typeof(r), typeof(obj), typeof(opt), typeof(wi)}(r, obj, opt, wi)
 end
-function opt_view(mr::MeanRisk, i::AbstractVector)
-    r = risk_measure_view(mr.r, i)
+function opt_view(mr::MeanRisk, i::AbstractVector, X::AbstractMatrix)
+    r = risk_measure_view(mr.r, i, X)
     opt = opt_view(mr.opt, i)
     wi = nothing_scalar_array_view(mr.wi, i)
     return MeanRisk(; r = r, obj = mr.obj, opt = opt, wi = wi)

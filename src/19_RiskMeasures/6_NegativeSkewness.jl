@@ -47,15 +47,17 @@ function risk_measure_factory(r::NegativeSkewness, ::AbstractLowOrderPriorResult
                               kwargs...)
     return r
 end
-function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:Any}, ::Any)
+function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:Any}, ::Any,
+                           args...)
     return r
 end
 function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:AbstractMatrix,
-                                               <:AbstractMatrix}, i::AbstractVector)
+                                               <:AbstractMatrix}, i::AbstractVector,
+                           X::AbstractMatrix)
     sk = r.sk
     idx = fourth_moment_index_factory(size(sk, 1), i)
     sk = view(r.sk, i, idx)
-    V = __coskewness(sk, nothing, nothing)
+    V = __coskewness(sk, view(X, :, i), r.mp)
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
 

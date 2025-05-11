@@ -241,7 +241,7 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
                  alg = risk_moment_algorithm_factory(r.alg, prior.pr.w)
                  return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
              end
-             function risk_measure_view(r::$(rt), i::AbstractVector)
+             function risk_measure_view(r::$(rt), i::AbstractVector, args...)
                  mu = nothing_scalar_array_view(r.mu, i)
                  return $(rt)(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
              end

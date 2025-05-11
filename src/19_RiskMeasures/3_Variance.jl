@@ -34,7 +34,7 @@ function risk_measure_factory(r::Variance, prior::AbstractPriorResult, args...; 
     return Variance(; settings = r.settings, formulation = r.formulation, sigma = sigma,
                     rc = r.rc)
 end
-function risk_measure_view(r::Variance, i::AbstractVector)
+function risk_measure_view(r::Variance, i::AbstractVector, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     @smart_assert(!isa(r.rc, LinearConstraintResult),
                   "`rc` cannot be a `LinearConstraintResult` because there is no way to only consider items from a specific cluster.")
@@ -63,7 +63,7 @@ function risk_measure_factory(r::StandardDeviation, prior::AbstractPriorResult, 
     sigma = risk_measure_nothing_scalar_array_factory(r.sigma, prior.sigma)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
-function risk_measure_view(r::StandardDeviation, i::AbstractVector)
+function risk_measure_view(r::StandardDeviation, i::AbstractVector, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
@@ -108,7 +108,7 @@ function risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorRes
     sigma = risk_measure_nothing_scalar_array_factory(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
-function risk_measure_view(r::UncertaintySetVariance, i::AbstractVector)
+function risk_measure_view(r::UncertaintySetVariance, i::AbstractVector, args...)
     ucs = ucs_view(r.ucs, i)
     sigma = nothing_scalar_array_view(r.sigma, i)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)

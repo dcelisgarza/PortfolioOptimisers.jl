@@ -52,9 +52,9 @@ function FactorRiskContribution(; flag::Bool = true,
                                   typeof(opt), typeof(nplg), typeof(cplg), typeof(sets),
                                   typeof(wi)}(flag, re, r, obj, opt, nplg, cplg, sets, wi)
 end
-function opt_view(frc::FactorRiskContribution, i::AbstractVector)
+function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMatrix)
     re = regression_view(frc.re, i)
-    r = risk_measure_view(frc.r, i)
+    r = risk_measure_view(frc.r, i, X)
     opt = opt_view(frc.opt, i)
     sets = nothing_dataframe_view(frc.sets, i)
 

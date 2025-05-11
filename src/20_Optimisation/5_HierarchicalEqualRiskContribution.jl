@@ -23,14 +23,15 @@ function HierarchicalEqualRiskContribution(;
     return HierarchicalEqualRiskContribution{typeof(opt), typeof(ri), typeof(ro)}(opt, ri,
                                                                                   ro)
 end
-function opt_view(hc::HierarchicalEqualRiskContribution, i::AbstractVector)
+function opt_view(hc::HierarchicalEqualRiskContribution, i::AbstractVector,
+                  X::AbstractMatrix)
     ri = hc.ri
     ro = hc.ro
     if ri === ro
-        ri, ro = risk_measure_view(ri, i)
+        ri, ro = risk_measure_view(ri, i, X)
     else
-        ri = risk_measure_view(ri, i)
-        ro = risk_measure_view(ro, i)
+        ri = risk_measure_view(ri, i, X)
+        ro = risk_measure_view(ro, i, X)
     end
     opt = opt_view(hc.opt, i)
     return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt)
