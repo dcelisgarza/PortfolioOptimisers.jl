@@ -1218,8 +1218,8 @@ function set_owa_constraints!(model::JuMP.Model, X::AbstractMatrix)
     return owa
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::OrderedWeightsArray{<:Any, <:ExactOrderedWeightsArray,
-                                                      <:Any},
+                               r::OrderedWeightsArray{<:Any, <:Any,
+                                                      <:ExactOrderedWeightsArray},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
@@ -1243,9 +1243,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::OrderedWeightsArrayRange{<:Any,
-                                                           <:ExactOrderedWeightsArray,
-                                                           <:Any},
+                               r::OrderedWeightsArrayRange{<:Any, <:Any,
+                                                           <:ExactOrderedWeightsArray},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
@@ -1272,8 +1271,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::OrderedWeightsArray{<:Any, <:ApproxOrderedWeightsArray,
-                                                      <:Any},
+                               r::OrderedWeightsArray{<:Any, <:Any,
+                                                      <:ApproxOrderedWeightsArray},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
@@ -1352,9 +1351,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::OrderedWeightsArrayRange{<:Any,
-                                                           <:ApproxOrderedWeightsArray,
-                                                           <:Any},
+                               r::OrderedWeightsArrayRange{<:Any, <:Any,
+                                                           <:ApproxOrderedWeightsArray},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
