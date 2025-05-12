@@ -1,14 +1,15 @@
-struct MeanRisk{T1 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                T2 <: ObjectiveFunction, T3 <: JuMPOptimiser,
-                T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <: JuMPOptimisationEstimator
-    r::T1
-    obj::T2
-    opt::T3
+struct MeanRisk{T1 <: JuMPOptimiser,
+                T2 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+                T3 <: ObjectiveFunction, T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+       JuMPOptimisationEstimator
+    opt::T1
+    r::T2
+    obj::T3
     wi::T4
 end
-function MeanRisk(; r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
+function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(),
+                  r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(),
-                  opt::JuMPOptimiser = JuMPOptimiser(),
                   wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
@@ -16,13 +17,13 @@ function MeanRisk(; r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = V
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
-    return MeanRisk{typeof(r), typeof(obj), typeof(opt), typeof(wi)}(r, obj, opt, wi)
+    return MeanRisk{typeof(opt), typeof(r), typeof(obj), typeof(wi)}(opt, r, obj, wi)
 end
 function opt_view(mr::MeanRisk, i::AbstractVector, X::AbstractMatrix)
-    r = risk_measure_view(mr.r, i, X)
     opt = opt_view(mr.opt, i)
+    r = risk_measure_view(mr.r, i, X)
     wi = nothing_scalar_array_view(mr.wi, i)
-    return MeanRisk(; r = r, obj = mr.obj, opt = opt, wi = wi)
+    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi)
 end
 function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)

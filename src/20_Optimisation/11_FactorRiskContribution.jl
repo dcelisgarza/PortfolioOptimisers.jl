@@ -1,33 +1,32 @@
-struct FactorRiskContribution{T1 <: Bool,
+struct FactorRiskContribution{T1 <: JuMPOptimiser,
                               T2 <:
                               Union{<:RegressionResult, <:AbstractRegressionEstimator},
                               T3 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                              T4 <: ObjectiveFunction, T5 <: JuMPOptimiser,
+                              T4 <: ObjectiveFunction,
+                              T5 <:
+                              Union{Nothing, <:SemiDefinitePhilogenyConstraintEstimator,
+                                    <:SemiDefinitePhilogenyResult},
                               T6 <:
                               Union{Nothing, <:SemiDefinitePhilogenyConstraintEstimator,
                                     <:SemiDefinitePhilogenyResult},
-                              T7 <:
-                              Union{Nothing, <:SemiDefinitePhilogenyConstraintEstimator,
-                                    <:SemiDefinitePhilogenyResult},
-                              T8 <: Union{Nothing, <:DataFrame},
-                              T9 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+                              T7 <: Union{Nothing, <:DataFrame},
+                              T8 <: Union{Nothing, <:AbstractVector{<:Real}}, T9 <: Bool} <:
        JuMPOptimisationEstimator
-    flag::T1
+    opt::T1
     re::T2
     r::T3
     obj::T4
-    opt::T5
-    nplg::T6
-    cplg::T7
-    sets::T8
-    wi::T9
+    nplg::T5
+    cplg::T6
+    sets::T7
+    wi::T8
+    flag::T9
 end
-function FactorRiskContribution(; flag::Bool = true,
+function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 re::Union{<:RegressionResult,
                                           <:AbstractRegressionEstimator} = StepwiseRegression(),
                                 r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                                 obj::ObjectiveFunction = MinimumRisk(),
-                                opt::JuMPOptimiser = JuMPOptimiser(),
                                 nplg::Union{Nothing,
                                             <:SemiDefinitePhilogenyConstraintEstimator,
                                             <:SemiDefinitePhilogenyResult} = nothing,
@@ -35,7 +34,8 @@ function FactorRiskContribution(; flag::Bool = true,
                                             <:SemiDefinitePhilogenyConstraintEstimator,
                                             <:SemiDefinitePhilogenyResult} = nothing,
                                 sets::Union{Nothing, <:DataFrame} = nothing,
-                                wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+                                wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                                flag::Bool = true)
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
     end
@@ -48,20 +48,19 @@ function FactorRiskContribution(; flag::Bool = true,
     @smart_assert(!isa(opt.cplg,
                        Union{<:SemiDefinitePhilogenyConstraintEstimator,
                              <:SemiDefinitePhilogenyResult}))
-    return FactorRiskContribution{typeof(flag), typeof(re), typeof(r), typeof(obj),
-                                  typeof(opt), typeof(nplg), typeof(cplg), typeof(sets),
-                                  typeof(wi)}(flag, re, r, obj, opt, nplg, cplg, sets, wi)
+    return FactorRiskContribution{typeof(opt), typeof(re), typeof(r), typeof(obj),
+                                  typeof(nplg), typeof(cplg), typeof(sets), typeof(wi),
+                                  typeof(flag)}(opt, re, r, obj, nplg, cplg, sets, wi, flag)
 end
 function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMatrix)
+    opt = opt_view(frc.opt, i)
     re = regression_view(frc.re, i)
     r = risk_measure_view(frc.r, i, X)
-    opt = opt_view(frc.opt, i)
     sets = nothing_dataframe_view(frc.sets, i)
-
     wi = nothing_scalar_array_view(frc.wi, i)
-    return FactorRiskContribution(; flag = frc.flag, re = re, r = r, obj = frc.obj,
-                                  opt = opt, nplg = frc.nplg, cplg = frc.cplg, sets = sets,
-                                  wi = wi)
+    return FactorRiskContribution(; opt = opt, re = re, r = r, obj = frc.obj,
+                                  nplg = frc.nplg, cplg = frc.cplg, sets = sets, wi = wi,
+                                  flag = frc.flag,)
 end
 function set_factor_risk_contribution_constraints!(model::JuMP.Model,
                                                    re::Union{<:RegressionResult,

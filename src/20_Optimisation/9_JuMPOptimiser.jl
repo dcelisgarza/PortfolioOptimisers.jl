@@ -248,21 +248,24 @@ end
 function opt_view(opt::JuMPOptimiser, i::AbstractVector)
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
+    lt = nothing_scalar_array_view(opt.lt, i)
+    st = nothing_scalar_array_view(opt.lt, i)
     lcs = linear_constraint_view(opt.lcs, i)
     gcard = cardinality_constraint_view(opt.gcard, i)
     sets = nothing_dataframe_view(opt.sets, i)
-    lt = nothing_scalar_array_view(opt.lt, i)
-    st = nothing_scalar_array_view(opt.lt, i)
     tn = turnover_view(opt.tn, i)
     te = tracking_view(opt.te, i)
     fees = fees_view(opt.fees, i)
     ret = jump_returns_view(opt.ret, i)
     ccnt = custom_constraint_view(opt.ccnt, i)
     cobj = custom_objective_view(opt.cobj, i)
-    return JuMPOptimiser(pe, wb, opt.bgt, opt.sbgt, lcs, opt.lcm, opt.cent, opt.card, gcard,
-                         sets, opt.nplg, opt.cplg, lt, st, tn, te, opt.nea, opt.l1, opt.l2,
-                         fees, opt.sce, ret, ccnt, cobj, opt.sc, opt.so, opt.ss, opt.slv,
-                         opt.strict)
+    return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
+                         lt = lt, st = st, lcs = lcs, lcm = lcm, cent = opt.cent,
+                         gcard = gcard, sets = sets, nplg = opt.nplg, cplg = opt.cplg,
+                         tn = tn, te = te, fees = fees, ret = ret, sce = opt.sce,
+                         ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
+                         card = opt.card, nea = opt.nea, l1 = opt.l1, l2 = opt.l2,
+                         ss = opt.ss, strict = opt.strict)
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)

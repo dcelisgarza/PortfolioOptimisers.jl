@@ -1,43 +1,43 @@
 abstract type NearOptimalCenteringAlgorithm <: OptimisationAlgorithm end
 struct ConstrainedNearOptimalCenteringAlgorithm <: NearOptimalCenteringAlgorithm end
 struct UnconstrainedNearOptimalCenteringAlgorithm <: NearOptimalCenteringAlgorithm end
-struct NearOptimalCentering{T1 <: NearOptimalCenteringAlgorithm, T2 <: Bool,
-                            T3 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                            T4 <: ObjectiveFunction, T5 <: Union{Nothing, <:JuMPOptimiser},
-                            T6 <: Union{Nothing, <:Real},
+struct NearOptimalCentering{T1 <: JuMPOptimiser,
+                            T2 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+                            T3 <: Union{Nothing, <:ObjectiveFunction},
+                            T4 <: Union{Nothing, <:Real},
+                            T5 <: Union{Nothing, <:AbstractVector},
+                            T6 <: Union{Nothing, <:AbstractVector},
                             T7 <: Union{Nothing, <:AbstractVector},
                             T8 <: Union{Nothing, <:AbstractVector},
                             T9 <: Union{Nothing, <:AbstractVector},
-                            T10 <: Union{Nothing, <:AbstractVector},
-                            T11 <: Union{Nothing, <:AbstractVector},
-                            T12 <: Union{Nothing, <:AbstractVector}} <:
+                            T10 <: Union{Nothing, <:AbstractVector}, T11 <: Bool,
+                            T12 <: NearOptimalCenteringAlgorithm} <:
        JuMPOptimisationEstimator
-    alg::T1
-    ucs_flag::T2
-    r::T3
-    obj::T4
-    opt::T5
-    bins::T6
-    w_min::T7
-    w_min_ini::T8
-    w_opt::T9
-    w_opt_ini::T10
-    w_max::T11
-    w_max_ini::T12
+    opt::T1
+    r::T2
+    obj::T3
+    bins::T4
+    w_min::T5
+    w_min_ini::T6
+    w_opt::T7
+    w_opt_ini::T8
+    w_max::T9
+    w_max_ini::T10
+    ucs_flag::T11
+    alg::T12
 end
-function NearOptimalCentering(;
-                              alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCenteringAlgorithm(),
-                              ucs_flag::Bool = true,
+function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
-                              obj::ObjectiveFunction = MinimumRisk(),
-                              opt::JuMPOptimiser = JuMPOptimiser(),
+                              obj::Union{Nothing, <:ObjectiveFunction} = MinimumRisk(),
                               bins::Union{Nothing, <:Real} = nothing,
                               w_min::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               w_min_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               w_opt::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               w_opt_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               w_max::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                              w_max_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+                              w_max_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                              ucs_flag::Bool = true,
+                              alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCenteringAlgorithm())
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
         @smart_assert(!any(isa.(r, Ref(SquaredRiskMeasures))))
@@ -65,12 +65,13 @@ function NearOptimalCentering(;
     if isa(bins, Real)
         @smart_assert(isfinite(bins) && bins > 0)
     end
-    return NearOptimalCentering{typeof(alg), typeof(ucs_flag), typeof(r), typeof(obj),
-                                typeof(opt), typeof(bins), typeof(w_min), typeof(w_min_ini),
-                                typeof(w_opt), typeof(w_opt_ini), typeof(w_max),
-                                typeof(w_max_ini)}(alg, ucs_flag, r, obj, opt, bins, w_min,
-                                                   w_min_ini, w_opt, w_opt_ini, w_max,
-                                                   w_max_ini)
+    return NearOptimalCentering{typeof(opt), typeof(r), typeof(obj), typeof(bins),
+                                typeof(w_min), typeof(w_min_ini), typeof(w_opt),
+                                typeof(w_opt_ini), typeof(w_max), typeof(w_max_ini),
+                                typeof(ucs_flag), typeof(alg)}(opt, r, obj, bins, w_min,
+                                                               w_min_ini, w_opt, w_opt_ini,
+                                                               w_max, w_max_ini, ucs_flag,
+                                                               alg)
 end
 function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatrix)
     r = risk_measure_view(noc.r, i, X)
@@ -114,10 +115,13 @@ end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
     pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(opt, rd;
                                                                                dims = dims)
-    return JuMPOptimiser(pr, wb, opt.bgt, opt.sbgt, lcs, opt.lcm, cent, opt.card, gcard,
-                         opt.sets, nplg, cplg, opt.lt, opt.st, opt.tn, opt.te, opt.nea,
-                         opt.l1, opt.l2, opt.fees, opt.sce, opt.ret, opt.ccnt, opt.cobj,
-                         opt.sc, opt.so, opt.ss, opt.slv, opt.strict)
+    return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
+                         lt = opt.lt, st = opt.st, lcs = lcs, lcm = opt.lcm, cent = cent,
+                         gcard = gcard, sets = opt.sets, nplg = nplg, cplg = cplg,
+                         tn = opt.tn, te = opt.te, fees = opt.fees, ret = opt.ret,
+                         sce = opt.sce, ccnt = opt.ccnt, cobj = opt.cobj, sc = opt.sc,
+                         so = opt.so, card = opt.card, nea = opt.nea, l1 = opt.l1,
+                         l2 = opt.l2, ss = opt.ss, strict = opt.strict)
 end
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
                                       fees::Union{Nothing, <:Fees},
@@ -311,9 +315,9 @@ function set_constrained_near_optimal_objective_function!(model::JuMP.Model, rk:
     @objective(model, Min, so * obj_expr)
     return nothing
 end
-function optimise!(noc::NearOptimalCentering{<:UnconstrainedNearOptimalCenteringAlgorithm,
-                                             <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:Any, <:Any, <:Any},
+function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                             <:Any, <:Any, <:Any, <:Any, <:Any,
+                                             <:UnconstrainedNearOptimalCenteringAlgorithm},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     w_opt, rk_opt, rt_opt, nb_r, nb_opt = near_optimal_centering_setup(noc, rd; dims = dims)
@@ -333,9 +337,9 @@ function optimise!(noc::NearOptimalCentering{<:UnconstrainedNearOptimalCentering
                                   nb_opt.cent, nb_opt.gcard, nb_opt.nplg, nb_opt.cplg,
                                   retcode, sol, ifelse(save, model, nothing))
 end
-function optimise!(noc::NearOptimalCentering{<:ConstrainedNearOptimalCenteringAlgorithm,
-                                             <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:Any, <:Any, <:Any},
+function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                             <:Any, <:Any, <:Any, <:Any, <:Any,
+                                             <:ConstrainedNearOptimalCenteringAlgorithm},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     w_opt, rk_opt, rt_opt, r, opt = near_optimal_centering_setup(noc, rd; dims = dims)
