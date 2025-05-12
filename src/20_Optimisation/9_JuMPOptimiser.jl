@@ -69,62 +69,63 @@ function Base.getproperty(r::JuMPOptimisationFactorRiskContributionResult, sym::
     end
 end
 struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                     T2 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
-                     T3 <: Union{Nothing, <:Real, <:BudgetRange},
+                     T2 <: Union{<:Solver, <:AbstractVector{<:Solver}},
+                     T3 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
                      T4 <: Union{Nothing, <:Real, <:BudgetRange},
-                     T5 <: Union{Nothing, <:LinearConstraint,
+                     T5 <: Union{Nothing, <:Real, <:BudgetRange},
+                     T6 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                     T7 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                     T8 <: Union{Nothing, <:LinearConstraint,
                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintResult},
-                     T6 <: Union{Nothing, <:LinearConstraintResult},
-                     T7 <: Union{Nothing, <:CentralityConstraintEstimator,
-                                 <:AbstractVector{<:CentralityConstraintEstimator},
-                                 <:LinearConstraintResult}, T8 <: Union{Nothing, <:Integer},
-                     T9 <: Union{Nothing, <:CardinalityConstraint,
-                                 <:AbstractVector{<:CardinalityConstraint},
-                                 <:LinearConstraintResult},
-                     T10 <: Union{Nothing, <:DataFrame},
-                     T11 <: Union{Nothing, <:PhilogenyConstraintEstimator,
+                     T9 <: Union{Nothing, <:LinearConstraintResult},
+                     T10 <: Union{Nothing, <:CentralityConstraintEstimator,
+                                  <:AbstractVector{<:CentralityConstraintEstimator},
+                                  <:LinearConstraintResult},
+                     T11 <: Union{Nothing, <:CardinalityConstraint,
+                                  <:AbstractVector{<:CardinalityConstraint},
+                                  <:LinearConstraintResult},
+                     T12 <: Union{Nothing, <:DataFrame},
+                     T13 <: Union{Nothing, <:PhilogenyConstraintEstimator,
                                   <:PhilogenyConstraintResult},
-                     T12 <: Union{Nothing, <:PhilogenyConstraintEstimator,
+                     T14 <: Union{Nothing, <:PhilogenyConstraintEstimator,
                                   <:PhilogenyConstraintResult},
-                     T13 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                     T14 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                      T15 <: Union{Nothing, <:Turnover},
-                     T16 <: Union{Nothing, <:TrackingError}, T17 <: Union{Nothing, <:Real},
-                     T18 <: Union{Nothing, <:Real}, T19 <: Union{Nothing, <:Real},
-                     T20 <: Union{Nothing, <:Fees}, T21 <: Scalariser,
-                     T22 <: JuMPReturnsEstimator, T23 <: Union{Nothing, <:CustomConstraint},
-                     T24 <: Union{Nothing, <:CustomObjective}, T25 <: Real, T26 <: Real,
-                     T27 <: Union{Nothing, <:Real},
-                     T28 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T29 <: Bool} <:
+                     T16 <: Union{Nothing, <:TrackingError}, T17 <: Union{Nothing, <:Fees},
+                     T18 <: JuMPReturnsEstimator, T19 <: Scalariser,
+                     T20 <: Union{Nothing, <:CustomConstraint},
+                     T21 <: Union{Nothing, <:CustomObjective}, T22 <: Real, T23 <: Real,
+                     T24 <: Union{Nothing, <:Integer}, T25 <: Union{Nothing, <:Real},
+                     T26 <: Union{Nothing, <:Real}, T27 <: Union{Nothing, <:Real},
+                     T28 <: Union{Nothing, <:Real}, T29 <: Bool} <:
        BaseJuMPOptimisationEstimator
     pe::T1 # PriorEstimator
-    wb::T2 # WeightBoundsResult
-    bgt::T3 # BudgetRange
-    sbgt::T4 # LongShortSum
-    lcs::T5
-    lcm::T6
-    cent::T7
-    card::T8
-    gcard::T9
-    sets::T10
-    nplg::T11
-    cplg::T12
-    lt::T13 # l threshold
-    st::T14
+    slv::T2
+    wb::T3 # WeightBoundsResult
+    bgt::T4 # BudgetRange
+    sbgt::T5 # LongShortSum
+    lt::T6 # l threshold
+    st::T7
+    lcs::T8
+    lcm::T9
+    cent::T10
+    gcard::T11
+    sets::T12
+    nplg::T13
+    cplg::T14
     tn::T15 # Turnover
     te::T16 # TrackingError
-    nea::T17
-    l1::T18
-    l2::T19
-    fees::T20
-    sce::T21
-    ret::T22
-    ccnt::T23
-    cobj::T24
-    sc::T25
-    so::T26
-    ss::T27
-    slv::T28
+    fees::T17
+    ret::T18
+    sce::T19
+    ccnt::T20
+    cobj::T21
+    sc::T22
+    so::T23
+    card::T24
+    nea::T25
+    l1::T26
+    l2::T27
+    ss::T28
     strict::T29
 end
 function assert_finite_nonnegative_real_or_vec(val::Real)
@@ -137,9 +138,12 @@ function assert_finite_nonnegative_real_or_vec(val::AbstractVector{<:Real})
 end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
+                       slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                        wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = WeightBoundsResult(),
                        bgt::Union{Nothing, <:Real, <:BudgetRange} = 1.0,
                        sbgt::Union{Nothing, <:Real, <:BudgetRange} = nothing,
+                       lt::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                       st::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                        lcs::Union{Nothing, <:LinearConstraint,
                                   <:AbstractVector{<:LinearConstraint},
                                   <:LinearConstraintResult} = nothing,
@@ -147,7 +151,6 @@ function JuMPOptimiser(;
                        cent::Union{Nothing, <:CentralityConstraintEstimator,
                                    <:AbstractVector{<:CentralityConstraintEstimator},
                                    <:LinearConstraintResult} = nothing,
-                       card::Union{Nothing, <:Integer} = nothing,
                        gcard::Union{Nothing, <:CardinalityConstraint,
                                     <:AbstractVector{<:CardinalityConstraint},
                                     <:LinearConstraintResult} = nothing,
@@ -156,21 +159,18 @@ function JuMPOptimiser(;
                                    <:PhilogenyConstraintResult} = nothing,
                        cplg::Union{Nothing, <:PhilogenyConstraintEstimator,
                                    <:PhilogenyConstraintResult} = nothing,
-                       lt::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                       st::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                        tn::Union{Nothing, <:Turnover} = nothing,
                        te::Union{Nothing, <:TrackingError} = nothing,
+                       fees::Union{Nothing, <:Fees} = nothing,
+                       ret::JuMPReturnsEstimator = ArithmeticReturn(),
+                       sce::Scalariser = SumScalariser(),
+                       ccnt::Union{Nothing, <:CustomConstraint} = nothing,
+                       cobj::Union{Nothing, <:CustomObjective} = nothing, sc::Real = 1,
+                       so::Real = 1, card::Union{Nothing, <:Integer} = nothing,
                        nea::Union{Nothing, <:Real} = nothing,
                        l1::Union{Nothing, <:Real} = nothing,
                        l2::Union{Nothing, <:Real} = nothing,
-                       fees::Union{Nothing, <:Fees} = nothing,
-                       sce::Scalariser = SumScalariser(),
-                       ret::JuMPReturnsEstimator = ArithmeticReturn(),
-                       ccnt::Union{Nothing, <:CustomConstraint} = nothing,
-                       cobj::Union{Nothing, <:CustomObjective} = nothing, sc::Real = 1,
-                       so::Real = 1, ss::Union{Nothing, <:Real} = nothing,
-                       slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                       strict::Bool = false)
+                       ss::Union{Nothing, <:Real} = nothing, strict::Bool = false)
     if isa(bgt, Real)
         @smart_assert(isfinite(bgt) && bgt >= 0)
     end
@@ -210,39 +210,39 @@ function JuMPOptimiser(;
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
-    return JuMPOptimiser{typeof(pe), typeof(wb), typeof(bgt), typeof(sbgt), typeof(lcs),
-                         typeof(lcm), typeof(cent), typeof(card), typeof(gcard),
-                         typeof(sets), typeof(nplg), typeof(cplg), typeof(lt), typeof(st),
-                         typeof(tn), typeof(te), typeof(nea), typeof(l1), typeof(l2),
-                         typeof(fees), typeof(sce), typeof(ret), typeof(ccnt), typeof(cobj),
-                         typeof(sc), typeof(so), typeof(ss), typeof(slv), typeof(strict)}(pe,
+    return JuMPOptimiser{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
+                         typeof(lt), typeof(st), typeof(lcs), typeof(lcm), typeof(cent),
+                         typeof(gcard), typeof(sets), typeof(nplg), typeof(cplg),
+                         typeof(tn), typeof(te), typeof(fees), typeof(ret), typeof(sce),
+                         typeof(ccnt), typeof(cobj), typeof(sc), typeof(so), typeof(card),
+                         typeof(nea), typeof(l1), typeof(l2), typeof(ss), typeof(strict)}(pe,
+                                                                                          slv,
                                                                                           wb,
                                                                                           bgt,
                                                                                           sbgt,
+                                                                                          lt,
+                                                                                          st,
                                                                                           lcs,
                                                                                           lcm,
                                                                                           cent,
-                                                                                          card,
                                                                                           gcard,
                                                                                           sets,
                                                                                           nplg,
                                                                                           cplg,
-                                                                                          lt,
-                                                                                          st,
                                                                                           tn,
                                                                                           te,
-                                                                                          nea,
-                                                                                          l1,
-                                                                                          l2,
                                                                                           fees,
-                                                                                          sce,
                                                                                           ret,
+                                                                                          sce,
                                                                                           ccnt,
                                                                                           cobj,
                                                                                           sc,
                                                                                           so,
+                                                                                          card,
+                                                                                          nea,
+                                                                                          l1,
+                                                                                          l2,
                                                                                           ss,
-                                                                                          slv,
                                                                                           strict)
 end
 function opt_view(opt::JuMPOptimiser, i::AbstractVector)
