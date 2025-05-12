@@ -1,18 +1,18 @@
-struct EquilibriumExpectedReturns{T1 <: StatsBase.CovarianceEstimator, T2 <: Real,
-                                  T3 <: Union{Nothing, <:AbstractVector}} <:
+struct EquilibriumExpectedReturns{T1 <: StatsBase.CovarianceEstimator,
+                                  T2 <: Union{Nothing, <:AbstractVector}, T3 <: Real} <:
        AbstractShrunkExpectedReturnsEstimator
     ce::T1
-    l::T2
-    w::T3
+    w::T2
+    l::T3
 end
 function EquilibriumExpectedReturns(;
                                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                    l::Real = 1.0,
-                                    w::Union{Nothing, <:AbstractVector} = nothing)
+                                    w::Union{Nothing, <:AbstractVector} = nothing,
+                                    l::Real = 1.0)
     if isa(w, AbstractVector)
         @smart_assert(!isempty(w))
     end
-    return EquilibriumExpectedReturns{typeof(ce), typeof(l), typeof(w)}(ce, l, w)
+    return EquilibriumExpectedReturns{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
 end
 function StatsBase.mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1)
     sigma = cov(me.ce, X; dims = dims)

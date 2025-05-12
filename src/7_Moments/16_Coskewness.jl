@@ -2,19 +2,20 @@ abstract type CoskewnessEstimator end
 function coskewness(::Nothing, args...; kwargs...)
     return nothing, nothing
 end
-struct Coskewness{T1 <: AbstractMomentAlgorithm, T2 <: AbstractExpectedReturnsEstimator,
-                  T3 <: AbstractMatrixProcessingEstimator} <: CoskewnessEstimator
-    alg::T1
-    me::T2
-    mp::T3
+struct Coskewness{T1 <: AbstractExpectedReturnsEstimator,
+                  T2 <: AbstractMatrixProcessingEstimator, T3 <: AbstractMomentAlgorithm} <:
+       CoskewnessEstimator
+    me::T1
+    mp::T2
+    alg::T3
 end
-function Coskewness(; alg::AbstractMomentAlgorithm = Full(),
-                    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                    mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing())
-    return Coskewness{typeof(alg), typeof(me), typeof(mp)}(alg, me, mp)
+function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                    mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
+                    alg::AbstractMomentAlgorithm = Full())
+    return Coskewness{typeof(me), typeof(mp), typeof(alg)}(me, mp, alg)
 end
 function factory(ce::Coskewness, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return Coskewness(; alg = ce.alg, me = factory(ce.me, w), mp = ce.mp)
+    return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 function __coskewness(cskew, X, mp)
     N = size(cskew, 1)
@@ -39,7 +40,7 @@ function _coskewness(y, X, mp)
     V = __coskewness(cskew, X, mp)
     return cskew, V
 end
-function coskewness(ske::Coskewness{<:Full, <:Any, <:Any}, X::AbstractMatrix; dims::Int = 1,
+function coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1,
                     mean = nothing)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
@@ -49,7 +50,7 @@ function coskewness(ske::Coskewness{<:Full, <:Any, <:Any}, X::AbstractMatrix; di
     y = X .- mu
     return _coskewness(y, X, ske.mp)
 end
-function coskewness(ske::Coskewness{<:Semi, <:Any, <:Any}, X::AbstractMatrix; dims::Int = 1,
+function coskewness(ske::Coskewness{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1,
                     mean = nothing)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2

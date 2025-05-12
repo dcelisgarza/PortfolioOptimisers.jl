@@ -2,19 +2,20 @@ abstract type CokurtosisEstimator end
 function cokurtosis(::Nothing, args...; kwargs...)
     return nothing
 end
-struct Cokurtosis{T1 <: AbstractMomentAlgorithm, T2 <: AbstractExpectedReturnsEstimator,
-                  T3 <: AbstractMatrixProcessingEstimator} <: CokurtosisEstimator
-    alg::T1
-    me::T2
-    mp::T3
+struct Cokurtosis{T1 <: AbstractExpectedReturnsEstimator,
+                  T2 <: AbstractMatrixProcessingEstimator, T3 <: AbstractMomentAlgorithm} <:
+       CokurtosisEstimator
+    me::T1
+    mp::T2
+    alg::T3
 end
-function Cokurtosis(; alg::AbstractMomentAlgorithm = Full(),
-                    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
-    return Cokurtosis{typeof(alg), typeof(me), typeof(mp)}(alg, me, mp)
+function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                    alg::AbstractMomentAlgorithm = Full())
+    return Cokurtosis{typeof(me), typeof(mp), typeof(alg)}(me, mp, alg)
 end
 function factory(ce::Cokurtosis, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return Cokurtosis(; alg = ce.alg, me = factory(ce.me, w), mp = ce.mp)
+    return Cokurtosis(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 function _cokurosis(X, mp)
     T, N = size(X)
@@ -24,7 +25,7 @@ function _cokurosis(X, mp)
     matrix_processing!(mp, ckurt, X)
     return ckurt
 end
-function cokurtosis(ke::Cokurtosis{<:Full, <:Any, <:Any}, X::AbstractMatrix; dims::Int = 1,
+function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1,
                     mean = nothing)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
@@ -34,7 +35,7 @@ function cokurtosis(ke::Cokurtosis{<:Full, <:Any, <:Any}, X::AbstractMatrix; dim
     X = X .- mu
     return _cokurosis(X, ke.mp)
 end
-function cokurtosis(ke::Cokurtosis{<:Semi, <:Any, <:Any}, X::AbstractMatrix; dims::Int = 1,
+function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1,
                     mean = nothing)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2

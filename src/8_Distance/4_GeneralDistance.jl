@@ -1,20 +1,20 @@
-struct GeneralDistance{T1 <: AbstractDistanceAlgorithm, T2 <: Integer} <:
+struct GeneralDistance{T1 <: Integer, T2 <: AbstractDistanceAlgorithm} <:
        AbstractDistanceEstimator
-    alg::T1
-    power::T2
+    power::T1
+    alg::T2
 end
-function GeneralDistance(; alg::AbstractDistanceAlgorithm = SimpleDistance(),
-                         power::Integer = 1)
+function GeneralDistance(; power::Integer = 1,
+                         alg::AbstractDistanceAlgorithm = SimpleDistance(),)
     @smart_assert(power >= one(power))
-    return GeneralDistance{typeof(alg), typeof(power)}(alg, power)
+    return GeneralDistance{typeof(power), typeof(alg)}(power, alg)
 end
-function distance(de::GeneralDistance{<:SimpleDistance, <:Any},
+function distance(de::GeneralDistance{<:Any, <:SimpleDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1)
     scale = isodd(de.power) ? 0.5 : 1.0
     rho = robust_cor(ce, X; dims = dims) .^ de.power
     return sqrt.(clamp!((one(eltype(X)) .- rho) * scale, zero(eltype(X)), one(eltype(X))))
 end
-function distance(de::GeneralDistance{<:SimpleDistance, <:Any}, rho::AbstractMatrix,
+function distance(de::GeneralDistance{<:Any, <:SimpleDistance}, rho::AbstractMatrix,
                   args...; kwargs...)
     s = diag(rho)
     iscov = any(!isone, s)
@@ -26,12 +26,12 @@ function distance(de::GeneralDistance{<:SimpleDistance, <:Any}, rho::AbstractMat
     return sqrt.(clamp!((one(eltype(rho)) .- rho .^ de.power) * scale, zero(eltype(rho)),
                         one(eltype(rho))))
 end
-function distance(de::GeneralDistance{<:SimpleAbsoluteDistance, <:Any},
+function distance(de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1)
     rho = abs.(robust_cor(ce, X; dims = dims)) .^ de.power
     return sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
 end
-function distance(de::GeneralDistance{<:SimpleAbsoluteDistance, <:Any}, rho::AbstractMatrix,
+function distance(de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance}, rho::AbstractMatrix,
                   args...; kwargs...)
     s = diag(rho)
     iscov = any(!isone, s)
@@ -42,17 +42,17 @@ function distance(de::GeneralDistance{<:SimpleAbsoluteDistance, <:Any}, rho::Abs
     return sqrt.(clamp!(one(eltype(rho)) .- abs.(rho) .^ de.power, zero(eltype(rho)),
                         one(eltype(rho))))
 end
-function distance(de::GeneralDistance{<:LogDistance, <:Any},
+function distance(de::GeneralDistance{<:Any, <:LogDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1)
     rho = abs.(robust_cor(ce, X; dims = dims)) .^ de.power
     return -log.(rho)
 end
-function distance(de::GeneralDistance{<:LogDistance, <:Any}, ce::LTDCovariance,
+function distance(de::GeneralDistance{<:Any, <:LogDistance}, ce::LTDCovariance,
                   X::AbstractMatrix; dims::Int = 1)
     rho = robust_cor(ce, X; dims = dims) .^ de.power
     return -log.(rho)
 end
-function distance(de::GeneralDistance{<:LogDistance, <:Any}, rho::AbstractMatrix, args...;
+function distance(de::GeneralDistance{<:Any, <:LogDistance}, rho::AbstractMatrix, args...;
                   kwargs...)
     s = diag(rho)
     iscov = any(!isone, s)
@@ -62,7 +62,7 @@ function distance(de::GeneralDistance{<:LogDistance, <:Any}, rho::AbstractMatrix
     end
     return -log.(abs.(rho) .^ de.power)
 end
-function distance(de::GeneralDistance{<:VariationInfoDistance, <:Any}, ::Any,
+function distance(de::GeneralDistance{<:Any, <:VariationInfoDistance}, ::Any,
                   X::AbstractMatrix; dims::Int = 1)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
@@ -70,12 +70,12 @@ function distance(de::GeneralDistance{<:VariationInfoDistance, <:Any}, ::Any,
     end
     return variation_info(X, de.alg.bins, de.alg.normalise) .^ de.power
 end
-function distance(de::GeneralDistance{<:CorrelationDistance, <:Any},
+function distance(de::GeneralDistance{<:Any, <:CorrelationDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1)
     rho = robust_cor(ce, X; dims = dims) .^ de.power
     return sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
 end
-function distance(de::GeneralDistance{<:CorrelationDistance, <:Any}, rho::AbstractMatrix,
+function distance(de::GeneralDistance{<:Any, <:CorrelationDistance}, rho::AbstractMatrix,
                   args...; kwargs...)
     issquare(rho)
     s = diag(rho)
@@ -87,31 +87,31 @@ function distance(de::GeneralDistance{<:CorrelationDistance, <:Any}, rho::Abstra
     return sqrt.(clamp!(one(eltype(rho)) .- rho .^ de.power, zero(eltype(rho)),
                         one(eltype(rho))))
 end
-function distance(de::GeneralDistance{<:CanonicalDistance, <:Any}, ce::MutualInfoCovariance,
+function distance(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance,
                   X::AbstractMatrix; dims::Int = 1)
-    return distance(GeneralDistance(;
+    return distance(GeneralDistance(; power = de.power,
                                     alg = VariationInfoDistance(; bins = ce.bins,
-                                                                normalise = ce.normalise),
-                                    power = de.power), ce, X; dims = dims)
+                                                                normalise = ce.normalise)),
+                    ce, X; dims = dims)
 end
-function distance(de::GeneralDistance{<:CanonicalDistance, <:Any}, ce::LTDCovariance,
+function distance(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::LTDCovariance,
                   X::AbstractMatrix; dims::Int = 1)
-    return distance(GeneralDistance(; alg = LogDistance(), power = de.power), ce, X;
+    return distance(GeneralDistance(; power = de.power, alg = LogDistance()), ce, X;
                     dims = dims)
 end
-function distance(de::GeneralDistance{<:CanonicalDistance, <:Any}, ce::DistanceCovariance,
+function distance(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::DistanceCovariance,
                   X::AbstractMatrix; dims::Int = 1)
-    return distance(GeneralDistance(; alg = CorrelationDistance(), power = de.power), ce, X;
+    return distance(GeneralDistance(; power = de.power, alg = CorrelationDistance()), ce, X;
                     dims = dims)
 end
-function distance(de::GeneralDistance{<:CanonicalDistance, <:Any},
+function distance(de::GeneralDistance{<:Any, <:CanonicalDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1)
-    return distance(GeneralDistance(; alg = SimpleDistance(), power = de.power), ce, X;
+    return distance(GeneralDistance(; power = de.power, alg = SimpleDistance()), ce, X;
                     dims = dims)
 end
-function distance(de::GeneralDistance{<:CanonicalDistance, <:Any}, rho::AbstractMatrix,
+function distance(de::GeneralDistance{<:Any, <:CanonicalDistance}, rho::AbstractMatrix,
                   args...; kwargs...)
-    return distance(GeneralDistance(; alg = SimpleDistance(), power = de.power), rho)
+    return distance(GeneralDistance(; power = de.power, alg = SimpleDistance()), rho)
 end
 
 export GeneralDistance
