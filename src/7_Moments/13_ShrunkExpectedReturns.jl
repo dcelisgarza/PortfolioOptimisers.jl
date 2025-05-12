@@ -8,23 +8,24 @@ struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
 struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
 struct MeanSquareError <: AbstractShrunkExpectedReturnsTarget end
 
-struct ShrunkExpectedReturns{T1 <: AbstractShrunkExpectedReturnsAlgorithm,
-                             T2 <: AbstractExpectedReturnsEstimator,
-                             T3 <: StatsBase.CovarianceEstimator,
+struct ShrunkExpectedReturns{T1 <: AbstractExpectedReturnsEstimator,
+                             T2 <: StatsBase.CovarianceEstimator,
+                             T3 <: AbstractShrunkExpectedReturnsAlgorithm,
                              T4 <: AbstractShrunkExpectedReturnsTarget} <:
        AbstractShrunkExpectedReturnsEstimator
-    alg::T1
-    me::T2
-    ce::T3
+    me::T1
+    ce::T2
+    alg::T3
     target::T4
 end
-function ShrunkExpectedReturns(; alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein(),
+function ShrunkExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                               alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein(),
                                target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-    return ShrunkExpectedReturns{typeof(alg), typeof(me), typeof(ce), typeof(target)}(alg,
-                                                                                      me,
+    return ShrunkExpectedReturns{typeof(me), typeof(ce), typeof(alg), typeof(target)}(me,
                                                                                       ce,
+                                                                                      alg,
                                                                                       target)
 end
 function target_mean(::GrandMean, mu::AbstractArray, sigma::AbstractMatrix; kwargs...)
@@ -41,7 +42,7 @@ function target_mean(::MeanSquareError, mu::AbstractArray, sigma::AbstractMatrix
                      T::Integer, kwargs...)
     return fill(tr(sigma) / T, length(mu))
 end
-function StatsBase.mean(me::ShrunkExpectedReturns{<:JamesStein, <:Any, <:Any, <:Any},
+function StatsBase.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein, <:Any},
                         X::AbstractMatrix; dims::Int = 1)
     mu = mean(me.me, X; dims = dims)
     sigma = cov(me.ce, X; dims = dims)
@@ -56,7 +57,7 @@ function StatsBase.mean(me::ShrunkExpectedReturns{<:JamesStein, <:Any, <:Any, <:
     alpha = (N * mean(evals) - 2 * maximum(evals)) / dot(mb, mb) / T
     return (one(alpha) - alpha) * mu + alpha * b
 end
-function StatsBase.mean(me::ShrunkExpectedReturns{<:BayesStein, <:Any, <:Any, <:Any},
+function StatsBase.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein, <:Any},
                         X::AbstractMatrix; dims::Int = 1)
     mu = mean(me.me, X; dims = dims)
     sigma = cov(me.ce, X; dims = dims)
@@ -71,7 +72,7 @@ function StatsBase.mean(me::ShrunkExpectedReturns{<:BayesStein, <:Any, <:Any, <:
     alpha = (N + 2) / ((N + 2) + T * dot(mb, isigma, mb))
     return (one(alpha) - alpha) * mu + alpha * b
 end
-function StatsBase.mean(me::ShrunkExpectedReturns{<:BodnarOkhrinParolya, <:Any, <:Any,
+function StatsBase.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya,
                                                   <:Any}, X::AbstractMatrix; dims::Int = 1)
     mu = mean(me.me, X; dims = dims)
     sigma = cov(me.ce, X; dims = dims)
