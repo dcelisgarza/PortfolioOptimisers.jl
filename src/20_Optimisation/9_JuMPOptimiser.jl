@@ -1,5 +1,5 @@
 struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
-                              T3 <: Union{Nothing, WeightBoundsResult},
+                              T3 <: Union{Nothing, <:WeightBoundsResult},
                               T4 <: Union{Nothing, <:LinearConstraintResult},
                               T5 <: Union{Nothing, <:LinearConstraintResult},
                               T6 <: Union{Nothing, <:LinearConstraintResult},
@@ -28,7 +28,7 @@ function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
 end
 struct JuMPOptimisationFactorRiskContributionResult{T1 <: Type, T2 <: AbstractPriorResult,
                                                     T3 <:
-                                                    Union{Nothing, WeightBoundsResult},
+                                                    Union{Nothing, <:WeightBoundsResult},
                                                     T4 <: Union{Nothing,
                                                                 <:LinearConstraintResult},
                                                     T5 <: Union{Nothing,

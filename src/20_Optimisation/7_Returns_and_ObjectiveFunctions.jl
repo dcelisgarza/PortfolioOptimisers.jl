@@ -1,55 +1,55 @@
-struct ArithmeticReturn{T1 <: Union{Nothing, <:Real},
-                        T2 <: Union{Nothing, <:AbstractUncertaintySetResult,
-                                    <:AbstractUncertaintySetEstimator}} <:
-       JuMPReturnsEstimator
-    lb::T1
-    ucs::T2
+struct ArithmeticReturn{T1 <: Union{Nothing, <:AbstractUncertaintySetResult,
+                                    <:AbstractUncertaintySetEstimator},
+                        T2 <: Union{Nothing, <:Real}} <: JuMPReturnsEstimator
+    ucs::T1
+    lb::T2
 end
-function ArithmeticReturn(; lb::Union{Nothing, <:Real} = nothing,
+function ArithmeticReturn(;
                           ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                     <:AbstractUncertaintySetEstimator} = nothing)
-    if isa(lb, Real)
-        @smart_assert(isfinite(lb))
-    end
+                                     <:AbstractUncertaintySetEstimator} = nothing,
+                          lb::Union{Nothing, <:Real} = nothing)
     if isa(ucs, EllipseUncertaintySetResult)
         @smart_assert(isa(ucs,
                           EllipseUncertaintySetResult{<:Any, <:Any,
                                                       <:MuEllipseUncertaintySetResult}))
     end
-    return ArithmeticReturn{typeof(lb), typeof(ucs)}(lb, ucs)
+    if isa(lb, Real)
+        @smart_assert(isfinite(lb))
+    end
+    return ArithmeticReturn{typeof(ucs), typeof(lb)}(ucs, lb)
 end
 function jump_returns_view(r::ArithmeticReturn, i::AbstractVector, args...)
     uset = ucs_view(r.ucs, i)
-    return ArithmeticReturn(; lb = r.lb, ucs = uset)
+    return ArithmeticReturn(; ucs = uset, lb = r.lb,)
 end
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
     return flag ? ArithmeticReturn(; ucs = r.ucs) : ArithmeticReturn()
 end
-struct KellyReturn{T1 <: Union{Nothing, <:Real}, T2 <: Union{Nothing, <:AbstractWeights}} <:
+struct KellyReturn{T1 <: Union{Nothing, <:AbstractWeights}, T2 <: Union{Nothing, <:Real}} <:
        JuMPReturnsEstimator
-    lb::T1
-    w::T2
+    w::T1
+    lb::T2
 end
-function KellyReturn(; lb::Union{Nothing, <:Real} = nothing,
-                     w::Union{Nothing, <:AbstractWeights} = nothing)
+function KellyReturn(; w::Union{Nothing, <:AbstractWeights} = nothing,
+                     lb::Union{Nothing, <:Real} = nothing)
     if isa(w, AbstractVector)
         @smart_assert(!isempty(w))
     end
-    return KellyReturn{typeof(lb), typeof(w)}(lb, w)
+    return KellyReturn{typeof(w), typeof(lb)}(w, lb)
 end
 function no_bounds_returns_estimator(r::KellyReturn, args...)
     return KellyReturn(; w = r.w)
 end
 function jump_returns_factory(r::KellyReturn, pr::EntropyPoolingPriorResult; kwargs...)
-    return KellyReturn(; lb = r.lb,
-                       w = risk_measure_nothing_scalar_array_factory(r.w, prior.w))
+    return KellyReturn(; w = risk_measure_nothing_scalar_array_factory(r.w, prior.w),
+                       lb = r.lb,)
 end
 function jump_returns_factory(r::KellyReturn,
                               prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
                                                           <:Any, <:Any, <:Any, <:Any},
                               args...; kwargs...)
-    return KellyReturn(; lb = r.lb,
-                       w = risk_measure_nothing_scalar_array_factory(r.w, prior.pr.w))
+    return KellyReturn(; w = risk_measure_nothing_scalar_array_factory(r.w, prior.pr.w),
+                       lb = r.lb,)
 end
 struct MinimumRisk <: ObjectiveFunction end
 struct MaximumUtility{T1 <: Real} <: ObjectiveFunction
@@ -121,7 +121,7 @@ function add_fees_to_ret!(model::JuMP.Model, ret)
     add_to_expression!(ret, -fees)
     return nothing
 end
-function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{<:Any, Nothing},
+function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{Nothing, <:Any},
                                  obj::ObjectiveFunction, pr::AbstractPriorResult)
     w = model[:w]
     lb = pret.lb
@@ -158,10 +158,10 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintyS
     return nothing
 end
 function set_return_constraints!(model::JuMP.Model,
-                                 pret::ArithmeticReturn{<:Any,
-                                                        <:Union{<:AbstractUncertaintySetResult,
-                                                                <:AbstractUncertaintySetEstimator}},
-                                 obj::ObjectiveFunction, pr::AbstractPriorResult)
+                                 pret::ArithmeticReturn{<:Union{<:AbstractUncertaintySetResult,
+                                                                <:AbstractUncertaintySetEstimator},
+                                                        <:Any}, obj::ObjectiveFunction,
+                                 pr::AbstractPriorResult)
     lb = pret.lb
     ucs = pret.ucs
     X = pr.X
