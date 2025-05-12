@@ -45,23 +45,23 @@ end
 function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
-function StatsBase.cov(ce::Covariance{<:Full, <:Any, <:Any}, X::AbstractMatrix;
+function StatsBase.cov(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims) : mean
     return cov(ce.ce, X; dims = dims, mean = mu)
 end
-function StatsBase.cor(ce::Covariance{<:Full, <:Any, <:Any}, X::AbstractMatrix;
+function StatsBase.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims) : mean
     return robust_cor(ce.ce, X; dims = dims, mean = mu)
 end
-function StatsBase.cov(ce::Covariance{<:Semi, <:Any, <:Any}, X::AbstractMatrix;
+function StatsBase.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims) : mean
     X = min.(X .- mu, zero(eltype(X)))
     return cov(ce.ce, X; dims = dims, mean = zero(eltype(X)))
 end
-function StatsBase.cor(ce::Covariance{<:Semi, <:Any, <:Any}, X::AbstractMatrix;
+function StatsBase.cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims) : mean
     X = min.(X .- mu, zero(eltype(X)))

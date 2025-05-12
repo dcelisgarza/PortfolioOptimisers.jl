@@ -1,14 +1,15 @@
-struct SimpleVariance{T1 <: Union{Nothing, <:AbstractExpectedReturnsEstimator}, T2 <: Bool,
-                      T3 <: Union{Nothing, <:AbstractWeights}} <: AbstractVarianceEstimator
+struct SimpleVariance{T1 <: Union{Nothing, <:AbstractExpectedReturnsEstimator},
+                      T2 <: Union{Nothing, <:AbstractWeights}, T3 <: Bool} <:
+       AbstractVarianceEstimator
     me::T1
-    corrected::T2
-    w::T3
+    w::T2
+    corrected::T3
 end
 function SimpleVariance(;
                         me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                        corrected::Bool = true,
-                        w::Union{Nothing, <:AbstractWeights} = nothing)
-    return SimpleVariance{typeof(me), typeof(corrected), typeof(w)}(me, corrected, w)
+                        w::Union{Nothing, <:AbstractWeights} = nothing,
+                        corrected::Bool = true)
+    return SimpleVariance{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
 end
 function StatsBase.std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing)
     mu = isnothing(mean) ? StatsBase.mean(ve.me, X; dims = dims) : mean
@@ -41,8 +42,8 @@ function StatsBase.var(ve::SimpleVariance, X::AbstractVector; mean = nothing)
     end
 end
 function factory(ve::SimpleVariance, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return SimpleVariance(; me = factory(ve.me, w), corrected = ve.corrected,
-                          w = isnothing(w) ? ve.w : w)
+    return SimpleVariance(; me = factory(ve.me, w), w = isnothing(w) ? ve.w : w,
+                          corrected = ve.corrected,)
 end
 
 export SimpleVariance
