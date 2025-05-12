@@ -9,35 +9,35 @@ function RegularisationPenaltyRelaxedRiskBudgettingAlgorithm(; p::Real = 1.0)
     @smart_assert(isfinite(p))
     return RegularisationPenaltyRelaxedRiskBudgettingAlgorithm{typeof(p)}(p)
 end
-struct RelaxedRiskBudgetting{T1 <: RelaxedRiskBudgettingAlgorithm, T2 <: JuMPOptimiser,
+struct RelaxedRiskBudgetting{T1 <: JuMPOptimiser,
+                             T2 <: Union{Nothing, <:AbstractVector{<:Real}},
                              T3 <: Union{Nothing, <:AbstractVector{<:Real}},
-                             T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
+                             T4 <: RelaxedRiskBudgettingAlgorithm} <:
        JuMPOptimisationEstimator
-    alg::T1
-    opt::T2
-    rkb::T3
-    wi::T4
+    opt::T1
+    rkb::T2
+    wi::T3
+    alg::T4
 end
-function RelaxedRiskBudgetting(;
-                               alg::RelaxedRiskBudgettingAlgorithm = BasicRelaxedRiskBudgettingAlgorithm(),
-                               opt::JuMPOptimiser = JuMPOptimiser(),
+function RelaxedRiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
                                rkb::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                               wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+                               wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                               alg::RelaxedRiskBudgettingAlgorithm = BasicRelaxedRiskBudgettingAlgorithm())
     if isa(rkb, AbstractVector)
         @smart_assert(!isempty(rkb))
     end
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
-    return RelaxedRiskBudgetting{typeof(alg), typeof(opt), typeof(rkb), typeof(wi)}(alg,
-                                                                                    opt,
-                                                                                    rkb, wi)
+    return RelaxedRiskBudgetting{typeof(opt), typeof(rkb), typeof(wi), typeof(alg)}(opt,
+                                                                                    rkb, wi,
+                                                                                    alg)
 end
 function opt_view(rrb::RelaxedRiskBudgetting, i::AbstractVector)
     opt = opt_view(rrb.opt, i)
     rkb = nothing_scalar_array_view(rrb.rkb, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
-    return RelaxedRiskBudgetting(; alg = rrb.alg, opt = opt, rkb = rkb, wi = wi)
+    return RelaxedRiskBudgetting(; opt = opt, rkb = rkb, wi = wi, alg = rrb.alg,)
 end
 function set_relaxed_risk_budgetting_alg_constraints!(::BasicRelaxedRiskBudgettingAlgorithm,
                                                       model::JuMP.Model,

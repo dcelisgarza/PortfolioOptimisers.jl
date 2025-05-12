@@ -73,7 +73,6 @@
         opt = JuMPOptimiser(; bgt = 1, sbgt = 1, wb = WeightBoundsResult(; lb = -1, ub = 1),
                             pe = pr, slv = slv)
         r = PortfolioOptimisers.risk_measure_factory(StandardDeviation(), pr)
-
         rbe = RiskBudgetting(; alg = FactorRiskBudgettingAlgorithm(;), r = r, opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,

@@ -13,41 +13,42 @@ function risk_budgetting_algorithm_view(r::AssetRiskBudgettingAlgorithm, i::Abst
     rkb = nothing_scalar_array_view(r.rkb, i)
     return AssetRiskBudgettingAlgorithm(; rkb = rkb)
 end
-struct FactorRiskBudgettingAlgorithm{T1 <: Bool, T2 <: Union{Nothing, <:AbstractVector},
-                                     T3 <: Union{<:RegressionResult,
-                                                 <:AbstractRegressionEstimator}} <:
+struct FactorRiskBudgettingAlgorithm{T1 <: Union{<:RegressionResult,
+                                                 <:AbstractRegressionEstimator},
+                                     T2 <: Union{Nothing, <:AbstractVector}, T3 <: Bool} <:
        RiskBudgettingAlgorithm
-    flag::T1
+    re::T1
     rkb::T2
-    re::T3
+    flag::T3
 end
-function FactorRiskBudgettingAlgorithm(; flag::Bool = true,
-                                       rkb::Union{Nothing, <:AbstractVector} = nothing,
+function FactorRiskBudgettingAlgorithm(;
                                        re::Union{<:RegressionResult,
-                                                 <:AbstractRegressionEstimator} = StepwiseRegression())
+                                                 <:AbstractRegressionEstimator} = StepwiseRegression(),
+                                       rkb::Union{Nothing, <:AbstractVector} = nothing,
+                                       flag::Bool = true)
     if isa(rkb, AbstractVector)
         @smart_assert(!isempty(rkb))
     end
-    return FactorRiskBudgettingAlgorithm{typeof(flag), typeof(rkb), typeof(re)}(flag, rkb,
-                                                                                re)
+    return FactorRiskBudgettingAlgorithm{typeof(re), typeof(rkb), typeof(flag)}(re, rkb,
+                                                                                flag)
 end
 function risk_budgetting_algorithm_view(r::FactorRiskBudgettingAlgorithm, i::AbstractVector)
     re = regression_view(r.re, i)
-    return FactorRiskBudgettingAlgorithm(; flag = r.flag, rkb = r.rkb, re = re)
+    return FactorRiskBudgettingAlgorithm(; re = re, rkb = r.rkb, flag = r.flag)
 end
-struct RiskBudgetting{T1 <: RiskBudgettingAlgorithm,
+struct RiskBudgetting{T1 <: JuMPOptimiser,
                       T2 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                      T3 <: JuMPOptimiser,
+                      T3 <: RiskBudgettingAlgorithm,
                       T4 <: Union{Nothing, <:AbstractVector{<:Real}}} <:
        JuMPOptimisationEstimator
-    alg::T1
+    opt::T1
     r::T2
-    opt::T3
+    alg::T3
     wi::T4
 end
-function RiskBudgetting(; alg::RiskBudgettingAlgorithm = AssetRiskBudgettingAlgorithm(),
+function RiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
                         r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
-                        opt::JuMPOptimiser = JuMPOptimiser(),
+                        alg::RiskBudgettingAlgorithm = AssetRiskBudgettingAlgorithm(),
                         wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
@@ -55,14 +56,14 @@ function RiskBudgetting(; alg::RiskBudgettingAlgorithm = AssetRiskBudgettingAlgo
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
-    return RiskBudgetting{typeof(alg), typeof(r), typeof(opt), typeof(wi)}(alg, r, opt, wi)
+    return RiskBudgetting{typeof(opt), typeof(r), typeof(alg), typeof(wi)}(opt, r, alg, wi)
 end
 function opt_view(rb::RiskBudgetting, i::AbstractVector, X::AbstractMatrix)
-    alg = risk_budgetting_algorithm_view(rb.alg, i)
-    r = risk_measure_view(rb.r, i, X)
     opt = opt_view(rb.opt, i)
+    r = risk_measure_view(rb.r, i, X)
+    alg = risk_budgetting_algorithm_view(rb.alg, i)
     wi = nothing_scalar_array_view(rb.wi, i)
-    return RiskBudgetting(; alg = alg, r = r, opt = opt, wi = wi)
+    return RiskBudgetting(; opt = opt, r = r, alg = alg, wi = wi)
 end
 function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgetting, w)
     N = length(w)
@@ -87,8 +88,9 @@ function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgetting
     return nothing
 end
 function set_risk_budgetting_constraints!(model::JuMP.Model,
-                                          rb::RiskBudgetting{<:AssetRiskBudgettingAlgorithm,
-                                                             <:Any, <:Any, <:Any},
+                                          rb::RiskBudgetting{<:Any, <:Any,
+                                                             <:AssetRiskBudgettingAlgorithm,
+                                                             <:Any},
                                           pr::AbstractPriorResult, wb::WeightBoundsResult,
                                           args...)
     set_w!(model, pr.X, rb.wi)
@@ -97,8 +99,9 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
     return nothing
 end
 function set_risk_budgetting_constraints!(model::JuMP.Model,
-                                          rb::RiskBudgetting{<:FactorRiskBudgettingAlgorithm,
-                                                             <:Any, <:Any, <:Any}, ::Any,
+                                          rb::RiskBudgetting{<:Any, <:Any,
+                                                             <:FactorRiskBudgettingAlgorithm,
+                                                             <:Any}, ::Any,
                                           wb::WeightBoundsResult, rd::ReturnsResult)
     set_factor_risk_contribution_constraints!(model, rb.alg.re, rd, rb.alg.flag, rb.wi)
     _set_risk_budgetting_constraints!(model, rb, model[:w1])
