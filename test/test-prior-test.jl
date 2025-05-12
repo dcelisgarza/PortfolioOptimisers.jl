@@ -91,10 +91,10 @@
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
         @test pr1.chol == pr2.chol
-        @test pr1.fpr.mu == pr2.fpr.mu
-        @test pr1.fpr.sigma == pr2.fpr.sigma
-        @test pr1.fpr.loadings.b == pr2.fpr.loadings.b
-        @test pr1.fpr.loadings.M == pr2.fpr.loadings.M
+        @test pr1.f_mu == pr2.f_mu
+        @test pr1.f_sigma == pr2.f_sigma
+        @test pr1.loadings.b == pr2.loadings.b
+        @test pr1.loadings.M == pr2.loadings.M
 
         pe1 = FactorPriorEstimator(; rsd = false)
         ew = eweights(1:10, 0.3)
@@ -113,10 +113,10 @@
         @test pv1.mu == view(pr1.mu, i)
         @test pv1.sigma == view(pr1.sigma, i, i)
         @test pv1.X == view(pr1.X, :, i)
-        @test pv1.fpr.mu == pr1.fpr.mu
-        @test pv1.fpr.sigma == pr1.fpr.sigma
-        @test pv1.fpr.loadings.b == view(pr1.fpr.loadings.b, i)
-        @test pv1.fpr.loadings.M == view(pr1.fpr.loadings.M, i, :)
+        @test pv1.f_mu == pr1.f_mu
+        @test pv1.f_sigma == pr1.f_sigma
+        @test pv1.loadings.b == view(pr1.loadings.b, i)
+        @test pv1.loadings.M == view(pr1.loadings.M, i, :)
         @test pv1.chol == view(pr1.chol, :, i)
     end
     @testset "High Order Prior" begin
@@ -845,10 +845,10 @@
         @test pr1.X == pr2.X
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
-        @test pr1.fpr.mu == pr2.fpr.mu
-        @test pr1.fpr.sigma == pr2.fpr.sigma
-        @test pr1.fpr.loadings.b == pr2.fpr.loadings.b
-        @test pr1.fpr.loadings.M == pr2.fpr.loadings.M
+        @test pr1.f_mu == pr2.f_mu
+        @test pr1.f_sigma == pr2.f_sigma
+        @test pr1.loadings.b == pr2.loadings.b
+        @test pr1.loadings.M == pr2.loadings.M
 
         i = [10, 5, 9]
         pes[1] === prior_view(pes[1], i)
@@ -856,10 +856,10 @@
         @test pv1.mu == view(pr1.mu, i)
         @test pv1.sigma == view(pr1.sigma, i, i)
         @test pv1.X == view(pr1.X, :, i)
-        @test pv1.f_mu == pr1.fpr.mu
-        @test pv1.f_sigma == pr1.fpr.sigma
-        @test pv1.loadings.b == view(pr1.fpr.loadings.b, i)
-        @test pv1.loadings.M == view(pr1.fpr.loadings.M, i, :)
+        @test pv1.f_mu == pr1.f_mu
+        @test pv1.f_sigma == pr1.f_sigma
+        @test pv1.loadings.b == view(pr1.loadings.b, i)
+        @test pv1.loadings.M == view(pr1.loadings.M, i, :)
     end
     @testset "Factor Black Litterman Prior" begin
         rng = StableRNG(123456789)
@@ -897,28 +897,28 @@
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   rsd = false),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = false,
-                                                  views_conf = fill(eps(), length(views)),),
+                                                  views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   rsd = false,
-                                                  views_conf = fill(eps(), length(views)),),
+                                                  views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, rsd = false,
-                                                  views_conf = fill(eps(), length(views)),),
+                                                  views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   rsd = false,
-                                                  views_conf = fill(eps(), length(views)),),
+                                                  views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = false,
                                                   views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views)),),
+                                                                    length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   rsd = false,
                                                   views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views)),),
+                                                                    length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, rsd = false,
                                                   views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views)),),
+                                                                    length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   rsd = false,
@@ -996,27 +996,27 @@
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   rsd = true),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = true,
-                                                  views_conf = fill(eps(), length(views)),),
+                                                  views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   rsd = true,
-                                                  views_conf = fill(eps(), length(views)),),
+                                                  views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, rsd = true,
-                                                  views_conf = fill(eps(), length(views)),),
+                                                  views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10), rsd = true,
-                                                  views_conf = fill(eps(), length(views)),),
+                                                  views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views)),),
+                                                                    length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views)),),
+                                                                    length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views)),),
+                                                                    length(views))),
                FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10), rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
@@ -1236,10 +1236,10 @@
         @test pr1.X == pr2.X
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
-        @test pr1.f_mu == pr2.fpr.mu
-        @test pr1.f_sigma == pr2.fpr.sigma
-        @test pr1.loadings.b == pr2.fpr.loadings.b
-        @test pr1.loadings.M == pr2.fpr.loadings.M
+        @test pr1.f_mu == pr2.f_mu
+        @test pr1.f_sigma == pr2.f_sigma
+        @test pr1.loadings.b == pr2.loadings.b
+        @test pr1.loadings.M == pr2.loadings.M
     end
     @testset "Entropy Pooling Prior" begin
         rng = StableRNG(123456789)
@@ -1572,7 +1572,7 @@
         w = pweights(range(; start = inv(size(X, 1)), stop = inv(size(X, 1)),
                            length = size(X, 1)))
         pm0 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets, w = w), X)
-        pr1 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets,), X)
+        pr1 = prior(EntropyPoolingPriorEstimator(; views = views, sets = sets), X)
         @test isapprox(pm0.mu, pr1.mu)
         @test isapprox(pm0.sigma, pr1.sigma)
 
@@ -1742,9 +1742,9 @@
         @test pv1.sigma == view(pr1.sigma, i, i)
         @test pv1.X == view(pr1.X, :, i)
         @test pv1.f_mu == pr1.f_mu
-        @test pv1.f_sigma == pr1.pr.fpr.sigma
-        @test pv1.loadings.b == view(pr1.pr.fpr.loadings.b, i)
-        @test pv1.loadings.M == view(pr1.pr.fpr.loadings.M, i, :)
+        @test pv1.f_sigma == pr1.f_sigma
+        @test pv1.loadings.b == view(pr1.loadings.b, i)
+        @test pv1.loadings.M == view(pr1.loadings.M, i, :)
         @test pv1.chol == view(pr1.chol, :, i)
     end
 end

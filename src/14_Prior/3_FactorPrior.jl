@@ -1,53 +1,3 @@
-struct PartialFactorPriorResult{T1 <: AbstractVector, T2 <: AbstractMatrix,
-                                T3 <: RegressionResult} <: AbstractPriorResult_PF
-    mu::T1
-    sigma::T2
-    loadings::T3
-end
-function PartialFactorPriorResult(; mu::AbstractVector, sigma::AbstractMatrix,
-                                  loadings::RegressionResult)
-    @smart_assert(!isempty(mu) && !isempty(sigma))
-    @smart_assert(length(mu) == size(sigma, 1) == size(sigma, 2) == size(loadings.M, 2))
-    return PartialFactorPriorResult{typeof(mu), typeof(sigma), typeof(loadings)}(mu, sigma,
-                                                                                 loadings)
-end
-function prior_view(pr::PartialFactorPriorResult, i::AbstractVector)
-    return PartialFactorPriorResult(; mu = pr.mu, sigma = pr.sigma,
-                                    loadings = regression_view(pr.loadings, i))
-end
-struct FactorPriorResult{T1 <: EmpiricalPriorResult, T2 <: PartialFactorPriorResult,
-                         T3 <: AbstractMatrix} <: AbstractPriorResult_AFC
-    pr::T1
-    fpr::T2
-    chol::T3
-end
-function FactorPriorResult(; pr::EmpiricalPriorResult, fpr::PartialFactorPriorResult,
-                           chol::AbstractMatrix)
-    @smart_assert(!isempty(chol))
-    @smart_assert(size(pr.X, 2) == size(chol, 2) == size(fpr.loadings.M, 1))
-    return FactorPriorResult{typeof(pr), typeof(fpr), typeof(chol)}(pr, fpr, chol)
-end
-function prior_view(pr::FactorPriorResult, i::AbstractVector)
-    return FactorPriorResult(; pr = prior_view(pr.pr, i), fpr = prior_view(pr.fpr, i),
-                             chol = view(pr.chol, :, i))
-end
-function Base.getproperty(obj::FactorPriorResult, sym::Symbol)
-    return if sym == :X
-        obj.pr.X
-    elseif sym == :mu
-        obj.pr.mu
-    elseif sym == :sigma
-        obj.pr.sigma
-    elseif sym == :f_mu
-        obj.fpr.mu
-    elseif sym == :f_sigma
-        obj.fpr.sigma
-    elseif sym == :loadings
-        obj.fpr.loadings
-    else
-        getfield(obj, sym)
-    end
-end
 struct FactorPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_2_1,
                             T2 <: AbstractMatrixProcessingEstimator,
                             T3 <: AbstractRegressionEstimator,
@@ -103,13 +53,12 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    return FactorPriorResult(;
-                             pr = EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,
-                                                       sigma = posterior_sigma),
-                             fpr = PartialFactorPriorResult(; mu = f_mu, sigma = f_sigma,
-                                                            loadings = loadings),
-                             chol = transpose(reshape(posterior_csigma,
-                                                      length(posterior_mu), :)))
+    return LowOrderPriorResult(; X = posterior_X, mu = posterior_mu,
+                               sigma = posterior_sigma,
+                               chol = transpose(reshape(posterior_csigma,
+                                                        length(posterior_mu), :)),
+                               w = f_prior.w, loadings = loadings, f_mu = f_mu,
+                               f_sigma = f_sigma, f_w = f_prior.w)
 end
 
-export FactorPriorResult, FactorPriorEstimator
+export FactorPriorEstimator

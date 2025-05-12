@@ -71,10 +71,8 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
         end
     end
     @smart_assert(nrow(pe.sets) == size(X, 2))
-
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
-
     (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
                                      strict = strict)
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
@@ -93,8 +91,8 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_mu = (prior_mu + v1 * (v2 \ v3)) .+ pe.rf
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
-    return EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,
-                                sigma = posterior_sigma)
+    return LowOrderPriorResult(; X = posterior_X, mu = posterior_mu,
+                               sigma = posterior_sigma)
 end
 
 export BlackLittermanPriorEstimator

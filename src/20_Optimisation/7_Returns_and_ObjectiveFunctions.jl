@@ -20,7 +20,7 @@ function ArithmeticReturn(;
 end
 function jump_returns_view(r::ArithmeticReturn, i::AbstractVector, args...)
     uset = ucs_view(r.ucs, i)
-    return ArithmeticReturn(; ucs = uset, lb = r.lb,)
+    return ArithmeticReturn(; ucs = uset, lb = r.lb)
 end
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
     return flag ? ArithmeticReturn(; ucs = r.ucs) : ArithmeticReturn()
@@ -40,16 +40,9 @@ end
 function no_bounds_returns_estimator(r::KellyReturn, args...)
     return KellyReturn(; w = r.w)
 end
-function jump_returns_factory(r::KellyReturn, pr::EntropyPoolingPriorResult; kwargs...)
-    return KellyReturn(; w = risk_measure_nothing_scalar_array_factory(r.w, prior.w),
-                       lb = r.lb,)
-end
-function jump_returns_factory(r::KellyReturn,
-                              prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
-                                                          <:Any, <:Any, <:Any, <:Any},
-                              args...; kwargs...)
-    return KellyReturn(; w = risk_measure_nothing_scalar_array_factory(r.w, prior.pr.w),
-                       lb = r.lb,)
+function jump_returns_factory(r::KellyReturn, pr::AbstractPriorResult; kwargs...)
+    return KellyReturn(; w = risk_measure_nothing_scalar_array_factory(r.w, pr.w),
+                       lb = r.lb)
 end
 struct MinimumRisk <: ObjectiveFunction end
 struct MaximumUtility{T1 <: Real} <: ObjectiveFunction

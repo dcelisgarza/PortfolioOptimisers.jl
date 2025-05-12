@@ -73,34 +73,18 @@ function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi})(w::A
     return sqrt(sum(val .^ 4) / size(X, 1))
 end
 function risk_measure_factory(r::SquareRootKurtosis,
-                              prior::HighOrderPriorResult{<:Any, <:Any, <:Any, <:Any,
-                                                          <:Any}, args...; kwargs...)
-    mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
-    kt = risk_measure_nothing_scalar_array_factory(r.kt, prior.kt)
-    return SquareRootKurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt, N = r.N,
-                              alg = r.alg)
-end
-function risk_measure_factory(r::SquareRootKurtosis,
-                              prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
-                                                          <:Any, <:Any, <:Any, <:Any},
-                              args...; kwargs...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.pr.w)
-    mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
-    kt = risk_measure_nothing_scalar_array_factory(r.kt, prior.kt)
+                              pr::HighOrderPriorResult{<:LowOrderPriorResult, <:Any, <:Any,
+                                                       <:Any, <:Any}, args...; kwargs...)
+    w = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    mu = risk_measure_nothing_scalar_array_factory(r.mu, pr.mu)
+    kt = risk_measure_nothing_scalar_array_factory(r.kt, pr.kt)
     return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = w, mu = mu, kt = kt,
                               N = r.N)
 end
-function risk_measure_factory(r::SquareRootKurtosis, prior::AbstractLowOrderPriorResult,
-                              args...; kwargs...)
-    mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
-    kt = risk_measure_nothing_scalar_array_factory(r.kt, nothing)
-    return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = r.w, mu = mu,
-                              kt = kt, N = r.N)
-end
-function risk_measure_factory(r::SquareRootKurtosis, prior::EntropyPoolingPriorResult,
-                              args...; kwargs...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
-    mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
+function risk_measure_factory(r::SquareRootKurtosis, pr::LowOrderPriorResult, args...;
+                              kwargs...)
+    w = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    mu = risk_measure_nothing_scalar_array_factory(r.mu, pr.mu)
     kt = risk_measure_nothing_scalar_array_factory(r.kt, nothing)
     return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = w, mu = mu, kt = kt,
                               N = r.N)

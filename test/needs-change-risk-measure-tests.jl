@@ -161,7 +161,7 @@
             val = val[val .<= zero(eltype(val))]
 
             if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                   HighOrderPriorResult{<:LowOrderPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test isnothing(r[6].alg.w)
             elseif isa(pr1,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -174,7 +174,7 @@
             val = prv.X * wv .- dot(wv, prv.mu)
 
             if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                   HighOrderPriorResult{<:LowOrderPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test r[7].alg.w === ew
             elseif isa(pr1,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -188,7 +188,7 @@
             @test isapprox(expected_risk(r[7], w, X),
                            mean(abs.(val),
                                 if isa(pr1,
-                                       HighOrderPriorResult{<:EmpiricalPriorResult, <:Any,
+                                       HighOrderPriorResult{<:LowOrderPriorResult, <:Any,
                                                             <:Any, <:Any, <:Any})
                                     ew
                                 elseif isa(pr1,
@@ -245,7 +245,7 @@
 
             @test r[5].mu === pr1.mu
             if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                   HighOrderPriorResult{<:LowOrderPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test r[5].alg.ve.w === ew
             elseif isa(pr1,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -265,7 +265,7 @@
 
             @test r[6].mu === pr1.mu
             if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any})
+                   HighOrderPriorResult{<:LowOrderPriorResult, <:Any, <:Any, <:Any, <:Any})
                 @test isnothing(r[6].alg.ve.w)
             elseif isa(pr1,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -383,8 +383,8 @@
                            sqrt(sum(val .^ 4) / size(X, 1)))
 
             if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
-               isa(pr1, EmpiricalPriorResult)
+                   HighOrderPriorResult{<:LowOrderPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
+               isa(pr1, LowOrderPriorResult)
                 @test isnothing(r[2].w)
             elseif isa(pr1,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -402,8 +402,8 @@
             val = X * w
             @test isapprox(expected_risk(r[2], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
             if isa(prv,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
-               isa(pr1, EmpiricalPriorResult)
+                   HighOrderPriorResult{<:LowOrderPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
+               isa(pr1, LowOrderPriorResult)
                 @test isnothing(rv[2].w)
             elseif isa(prv,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -423,8 +423,8 @@
                            sqrt(sum(val .^ 4) / size(X, 1)))
 
             if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
-               isa(pr1, EmpiricalPriorResult)
+                   HighOrderPriorResult{<:LowOrderPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
+               isa(pr1, LowOrderPriorResult)
                 @test isnothing(r[3].w)
             elseif isa(pr1,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -442,8 +442,8 @@
             val = X * w .- dot(w, zerovec)
             @test isapprox(expected_risk(r[3], w, X), sqrt(sum(val .^ 4) / size(X, 1)))
             if isa(pr1,
-                   HighOrderPriorResult{<:EmpiricalPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
-               isa(pr1, EmpiricalPriorResult)
+                   HighOrderPriorResult{<:LowOrderPriorResult, <:Any, <:Any, <:Any, <:Any}) ||
+               isa(pr1, LowOrderPriorResult)
                 @test isnothing(rv[3].w)
             elseif isa(pr1,
                        HighOrderPriorResult{<:EntropyPoolingPriorResult, <:Any, <:Any,
@@ -704,7 +704,7 @@
             rs = [AverageDrawdown(; settings = settings), RelativeAverageDrawdown(;),
                   AverageDrawdown(; w = ew), RelativeAverageDrawdown(; w = ew)]
             r = risk_measure_factory(rs, Ref(pr1))
-            if isa(pr1, EmpiricalPriorResult)
+            if isa(pr1, LowOrderPriorResult)
                 @test all(r .=== rs)
                 @test all(rv .=== rs)
                 @test isapprox(expected_risk.(r, Ref(w), Ref(X)),
@@ -831,7 +831,7 @@
                   ThirdCentralMoment(; mu = 0), Skewness(; mu = 0)]
             r = risk_measure_factory(rs, Ref(pr1))
             er = expected_risk.(r, Ref(w), Ref(X))
-            if isa(pr1, EmpiricalPriorResult)
+            if isa(pr1, LowOrderPriorResult)
                 @test isnothing(r[1].w)
                 @test isnothing(rv[1].w)
                 @test isnothing(r[3].w)

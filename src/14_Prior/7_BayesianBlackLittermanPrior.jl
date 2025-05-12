@@ -69,11 +69,11 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
         F = transpose(F)
     end
     @smart_assert(nrow(pe.sets) == size(F, 2))
-    prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
-    posterior_X, prior_sigma, f_mu, f_sigma, loadings = prior_model.X, prior_model.sigma,
-                                                        prior_model.f_mu,
-                                                        prior_model.f_sigma,
-                                                        prior_model.loadings
+    prior_result = prior(pe.pe, X, F; strict = strict, kwargs...)
+    posterior_X, prior_sigma, f_mu, f_sigma, loadings = prior_result.X, prior_result.sigma,
+                                                        prior_result.f_mu,
+                                                        prior_result.f_sigma,
+                                                        prior_result.loadings
     f_views = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
                                     strict = strict)
     f_P, f_Q = f_views.P, f_views.Q
@@ -96,13 +96,9 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_sigma = inv(v3 - v1 * (v2 \ transpose(M)) * v3)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b) .+ pe.rf
-    return EmpiricalPartialFactorPriorResult(;
-                                             pr = EmpiricalPriorResult(; X = posterior_X,
-                                                                       mu = posterior_mu,
-                                                                       sigma = posterior_sigma),
-                                             fpr = PartialFactorPriorResult(; mu = f_mu,
-                                                                            sigma = f_sigma,
-                                                                            loadings = loadings))
+    return LowOrderPriorResult(; X = posterior_X, mu = posterior_mu,
+                               sigma = posterior_sigma, loadings = loadings, f_mu = f_mu,
+                               f_sigma = f_sigma)
 end
 
 export BayesianBlackLittermanPriorEstimator

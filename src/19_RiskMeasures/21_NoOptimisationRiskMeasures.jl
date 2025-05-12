@@ -7,15 +7,8 @@ end
 function (r::MeanReturn)(x::AbstractVector)
     return isnothing(r.w) ? mean(x) : mean(x, r.w)
 end
-function risk_measure_factory(r::MeanReturn, prior::EntropyPoolingPriorResult, args...)
+function risk_measure_factory(r::MeanReturn, prior::AbstractPriorResult, args...)
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
-    return MeanReturn(; w = w)
-end
-function risk_measure_factory(r::MeanReturn,
-                              prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
-                                                          <:Any, <:Any, <:Any, <:Any},
-                              args...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.pr.w)
     return MeanReturn(; w = w)
 end
 function risk_measure_view(r::MeanReturn, ::Any, args...)
@@ -70,20 +63,7 @@ function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:Real},
 end
 function risk_measure_factory(r::ThirdCentralMoment, prior::AbstractPriorResult, args...;
                               kwargs...)
-    mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
-    return ThirdCentralMoment(; w = r.w, mu = mu)
-end
-function risk_measure_factory(r::ThirdCentralMoment, prior::EntropyPoolingPriorResult,
-                              args...; kwargs...)
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
-    mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
-    return ThirdCentralMoment(; w = w, mu = mu)
-end
-function risk_measure_factory(r::ThirdCentralMoment,
-                              prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
-                                                          <:Any, <:Any, <:Any, <:Any},
-                              args...; kwargs...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.pr.w)
     mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
     return ThirdCentralMoment(; w = w, mu = mu)
 end
@@ -97,20 +77,7 @@ function (r::ThirdCentralMoment)(w::AbstractVector, X::AbstractMatrix,
     return sum(val .^ 3) / size(X, 1)
 end
 function risk_measure_factory(r::Skewness, prior::AbstractPriorResult, args...; kwargs...)
-    mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
-    return Skewness(; ve = r.ve, w = r.w, mu = mu)
-end
-function risk_measure_factory(r::Skewness, prior::EntropyPoolingPriorResult, args...;
-                              kwargs...)
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
-    mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
-    return Skewness(; ve = factory(r.ve, w), w = w, mu = mu)
-end
-function risk_measure_factory(r::Skewness,
-                              prior::HighOrderPriorResult{<:EntropyPoolingPriorResult,
-                                                          <:Any, <:Any, <:Any, <:Any},
-                              args...; kwargs...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.pr.w)
     mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
     return Skewness(; ve = factory(r.ve, w), w = w, mu = mu)
 end
