@@ -1,32 +1,31 @@
 struct NestedClusteringResult{T1 <: Type, T2 <: AbstractPriorResult,
-                              T3 <: AbstractClusteringResult,
-                              T4 <: AbstractVector{<:OptimisationResult},
-                              T5 <: OptimisationResult,
-                              T6 <: Union{Nothing, WeightBoundsResult},
-                              T7 <: OptimisationReturnCode, T8 <: AbstractVector} <:
-       OptimisationResult
+                              T3 <: Union{Nothing, <:WeightBoundsResult},
+                              T4 <: AbstractClusteringResult,
+                              T5 <: AbstractVector{<:OptimisationResult},
+                              T6 <: OptimisationResult, T7 <: OptimisationReturnCode,
+                              T8 <: AbstractVector} <: OptimisationResult
     oe::T1
     pr::T2
-    clr::T3
-    resi::T4
-    reso::T5
-    wb::T6
+    wb::T3
+    clr::T4
+    resi::T5
+    reso::T6
     retcode::T7
     w::T8
 end
 struct NestedClustering{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                         T2 <: Union{<:ClusteringEstimator, <:AbstractClusteringResult},
-                        T3 <: OptimisationEstimator, T4 <: OptimisationEstimator,
-                        T5 <:
+                        T3 <:
                         Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
-                        T6 <: Union{Nothing, <:DataFrame}, T7 <: ClusteringWeightFinaliser,
+                        T4 <: Union{Nothing, <:DataFrame}, T5 <: OptimisationEstimator,
+                        T6 <: OptimisationEstimator, T7 <: ClusteringWeightFinaliser,
                         T8 <: Bool} <: ClusteringOptimisationEstimator
     pe::T1
     cle::T2
-    opti::T3
-    opto::T4
-    wb::T5
-    sets::T6
+    wb::T3
+    sets::T4
+    opti::T5
+    opto::T6
     cwf::T7
     strict::T8
 end
@@ -48,11 +47,11 @@ end
 function NestedClustering(;
                           pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                           cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult} = ClusteringEstimator(),
-                          opti::OptimisationEstimator = MeanRisk(),
-                          opto::OptimisationEstimator = opti,
                           wb::Union{Nothing, <:WeightBoundsResult,
                                     <:WeightBoundsConstraint} = nothing,
                           sets::Union{Nothing, <:DataFrame} = nothing,
+                          opti::OptimisationEstimator = MeanRisk(),
+                          opto::OptimisationEstimator = opti,
                           cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
                           strict::Bool = false)
     assert_nested_clustering_optimiser(opti)
@@ -63,19 +62,19 @@ function NestedClustering(;
     if isa(wb, WeightBoundsConstraint)
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
-    return NestedClustering{typeof(pe), typeof(cle), typeof(opti), typeof(opto), typeof(wb),
-                            typeof(sets), typeof(cwf), typeof(strict)}(pe, cle, opti, opto,
-                                                                       wb, sets, cwf,
+    return NestedClustering{typeof(pe), typeof(cle), typeof(wb), typeof(sets), typeof(opti),
+                            typeof(opto), typeof(cwf), typeof(strict)}(pe, cle, wb, sets,
+                                                                       opti, opto, cwf,
                                                                        strict)
 end
 function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
     pe = prior_view(nco.pe, i)
-    opti = opt_view(nco.opti, i, X)
-    opto = opt_view(nco.opto, i, X)
     wb = weight_bounds_view(nco.wb, i)
     sets = nothing_dataframe_view(nco.sets, i)
-    return NestedClustering(; pe = pe, cle = nco.cle, opti = opti, opto = opto, wb = wb,
-                            cwf = nco.cwf, sets = sets, strict = nco.strict)
+    opti = opt_view(nco.opti, i, X)
+    opto = opt_view(nco.opto, i, X)
+    return NestedClustering(; pe = pe, cle = nco.cle, wb = wb, sets = sets, opti = opti,
+                            opto = opto, cwf = nco.cwf, strict = nco.strict)
 end
 function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsResult,
                                                <:WeightBoundsConstraint},
@@ -129,7 +128,7 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.cwf, nco.strict,
                                                  resi, res, wi * res.w)
-    return NestedClusteringResult(typeof(nco), pr, clr, resi, res, wb, retcode, w)
+    return NestedClusteringResult(typeof(nco), pr, wb, clr, resi, res, retcode, w)
 end
 
 export NestedClusteringResult, NestedClustering

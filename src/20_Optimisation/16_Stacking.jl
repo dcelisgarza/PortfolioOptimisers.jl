@@ -1,47 +1,47 @@
 abstract type BaseStackingOptimisationEstimator <: OptimisationEstimator end
 struct StackingResult{T1 <: Type, T2 <: AbstractPriorResult,
-                      T3 <: AbstractVector{<:OptimisationResult}, T4 <: OptimisationResult,
-                      T5 <: Union{Nothing, WeightBoundsResult},
+                      T3 <: Union{Nothing, <:WeightBoundsResult},
+                      T4 <: AbstractVector{<:OptimisationResult}, T5 <: OptimisationResult,
                       T6 <: OptimisationReturnCode, T7 <: AbstractVector} <:
        OptimisationResult
     oe::T1
     pr::T2
-    resi::T3
-    reso::T4
-    wb::T5
+    wb::T3
+    resi::T4
+    reso::T5
     retcode::T6
     w::T7
 end
 struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                T2 <:
+                T2 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
+                T3 <: Union{Nothing, <:DataFrame},
+                T4 <:
                 Union{<:OptimisationEstimator, <:AbstractVector{<:OptimisationEstimator}},
-                T3 <: OptimisationEstimator,
-                T4 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
-                T5 <: Union{Nothing, <:DataFrame}, T6 <: ClusteringWeightFinaliser,
-                T7 <: Bool} <: BaseStackingOptimisationEstimator
+                T5 <: OptimisationEstimator, T6 <: ClusteringWeightFinaliser, T7 <: Bool} <:
+       BaseStackingOptimisationEstimator
     pe::T1
-    opti::T2
-    opto::T3
-    wb::T4
-    sets::T5
+    wb::T2
+    sets::T3
+    opti::T4
+    opto::T5
     cwf::T6
     strict::T7
 end
 function Stacking(;
                   pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
+                  wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = nothing,
+                  sets::Union{Nothing, <:DataFrame} = nothing,
                   opti::Union{<:OptimisationEstimator,
                               <:AbstractVector{<:OptimisationEstimator}} = MeanRisk(),
                   opto::OptimisationEstimator = MeanRisk(),
-                  wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = nothing,
-                  sets::Union{Nothing, <:DataFrame} = nothing,
                   cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
                   strict::Bool = false)
     assert_nested_clustering_optimiser(opto)
     if isa(wb, WeightBoundsConstraint)
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
-    return Stacking{typeof(pe), typeof(opti), typeof(opto), typeof(wb), typeof(sets),
-                    typeof(cwf), typeof(strict)}(pe, opti, opto, wb, sets, cwf, strict)
+    return Stacking{typeof(pe), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
+                    typeof(cwf), typeof(strict)}(pe, wb, sets, opti, opto, cwf, strict)
 end
 function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
     pe = prior_view(st.pe, i)
@@ -71,7 +71,7 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.cwf, st.strict, resi,
                                                  res, wi * res.w)
-    return StackingResult(typeof(st), pr, resi, res, wb, retcode, w)
+    return StackingResult(typeof(st), pr, wb, resi, res, retcode, w)
 end
 
 export StackingResult, Stacking

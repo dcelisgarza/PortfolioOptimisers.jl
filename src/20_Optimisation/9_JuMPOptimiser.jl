@@ -260,7 +260,7 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector)
     ccnt = custom_constraint_view(opt.ccnt, i)
     cobj = custom_objective_view(opt.cobj, i)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
-                         lt = lt, st = st, lcs = lcs, lcm = lcm, cent = opt.cent,
+                         lt = lt, st = st, lcs = lcs, lcm = opt.lcm, cent = opt.cent,
                          gcard = gcard, sets = sets, nplg = opt.nplg, cplg = opt.cplg,
                          tn = tn, te = te, fees = fees, ret = ret, sce = opt.sce,
                          ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,

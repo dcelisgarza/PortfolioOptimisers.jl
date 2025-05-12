@@ -30,19 +30,20 @@ function factory(ce::GeneralWeightedCovariance,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return GeneralWeightedCovariance(; ce = ce.ce, w = isnothing(w) ? ce.w : w)
 end
-struct Covariance{T1 <: AbstractMomentAlgorithm, T2 <: AbstractExpectedReturnsEstimator,
-                  T3 <: StatsBase.CovarianceEstimator} <: AbstractCovarianceEstimator
-    alg::T1
-    me::T2
-    ce::T3
+struct Covariance{T1 <: AbstractExpectedReturnsEstimator,
+                  T2 <: StatsBase.CovarianceEstimator, T3 <: AbstractMomentAlgorithm} <:
+       AbstractCovarianceEstimator
+    me::T1
+    ce::T2
+    alg::T3
 end
-function Covariance(; alg::AbstractMomentAlgorithm = Full(),
-                    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                    ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance())
-    return Covariance{typeof(alg), typeof(me), typeof(ce)}(alg, me, ce)
+function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                    ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance(),
+                    alg::AbstractMomentAlgorithm = Full())
+    return Covariance{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)
 end
 function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return Covariance(; alg = ce.alg, me = factory(ce.me, w), ce = factory(ce.ce, w))
+    return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
 function StatsBase.cov(ce::Covariance{<:Full, <:Any, <:Any}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
