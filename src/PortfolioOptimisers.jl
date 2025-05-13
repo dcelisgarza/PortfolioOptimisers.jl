@@ -1,9 +1,9 @@
 module PortfolioOptimisers
 
 using AverageShiftedHistograms, Clustering, Distances, Distributions, GLM, Impute,
-      InteractiveUtils, JuMP, LinearAlgebra, MultivariateStats, NearestCorrelationMatrix,
-      Optim, Graphs, SimpleWeightedGraphs, PythonCall, Random, SmartAsserts, SparseArrays,
-      Statistics, StatsBase, DataFrames, TimeSeries
+      InteractiveUtils, JuMP, LinearAlgebra, LogExpFunctions, MultivariateStats,
+      NearestCorrelationMatrix, Optim, Graphs, SimpleWeightedGraphs, PythonCall, Random,
+      SmartAsserts, SparseArrays, Statistics, StatsBase, DataFrames, TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let
@@ -75,6 +75,7 @@ include("./14_Prior/8_FactorBlackLittermanPrior.jl")
 include("./14_Prior/9_AugmentedBlackLittermanPrior.jl")
 include("./14_Prior/10_EntropyPoolingViewsGeneration.jl")
 include("./14_Prior/11_EntropyPoolingPrior.jl")
+include("./14_Prior/12_OpinionPoolingPrior.jl")
 
 include("./15_UncertaintySets/1_Base_UncertaintySets.jl")
 include("./15_UncertaintySets/2_DeltaUncertaintySets.jl")

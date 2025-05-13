@@ -201,12 +201,14 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
     pe = factory(pe, w)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     views = entropy_pooling_views(pr, pe.views, pe.sets; strict = strict)
+    #! TODO: We can add cvar entropy pooling views here. We need another field for cvar views and another entropy pooling function that dispatches on the views and cvar views.
     w = entropy_pooling(w, views, pe.opt)
     pe = factory(pe, w)
     (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = prior(pe.pe, X, F; strict = strict,
                                                             kwargs...)
     return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma, chol = chol, w = w,
-                               loadings = loadings, f_mu = f_mu, f_sigma = f_sigma, f_w = w)
+                               loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
+                               f_w = !isnothing(loadings) ? w : nothing)
 end
 function _get_epw(::H1_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return w0
@@ -263,6 +265,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
         v = views[included]
         # Equality and inequality constraints for the views.
         V_i = entropy_pooling_views(pr, v, pe.sets; w = w0, strict = strict)
+        #! TODO: We can add cvar entropy pooling views here. We need another field for cvar views and another entropy pooling function that dispatches on the views and cvar views.
         # Compute the posterior observations.
         wi = entropy_pooling(_get_epw(pe.alg, w0, wi), V_i, pe.opt)
         pe = factory(pe, wi)
