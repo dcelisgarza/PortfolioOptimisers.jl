@@ -19,7 +19,6 @@ function ConstantEntropyPoolingConstraintEstimator(; coef::Real = 0.0)
 end
 abstract type AbstractDiscontinuousEntropyPoolingConstraintEstimator <:
               EntropyPoolingConstraintEstimator end
-
 abstract type C0_EntropyPoolingAlgorithm <: AbstractEntropyPoolingConstraintAlgorithm end
 struct MeanEntropyPoolingViewAlgorithm <: C0_EntropyPoolingAlgorithm end
 struct ValueatRiskEntropyPoolingAlgorithm{T1 <: Real} <: C0_EntropyPoolingAlgorithm
@@ -548,7 +547,22 @@ function DiscontinuousEntropyPoolingViewEstimator(;
                                                            <:ConstantEntropyPoolingConstraintEstimator,
                                                            <:AbstractVector{<:AbstractDiscontinuousEntropyPoolingConstraintEstimator},
                                                            <:AbstractVector{<:ConstantEntropyPoolingConstraintEstimator}})
+    if isa(B, AbstractVector)
+        @smart_assert(!isempty(B))
+        idx = isa.(B, AbstractDiscontinuousEntropyPoolingConstraintEstimator)
+        @smart_assert(all(getproperty.(B[idx], :alpha) .== A.alpha))
+    else
+        @smart_assert(A.alpha == B.alpha)
+    end
     return DiscontinuousEntropyPoolingViewEstimator{typeof(A), typeof(B), EQ}(A, B, EQ())
+end
+function Base.length(::Union{<:ContinuousEntropyPoolingViewEstimator,
+                             <:DiscontinuousEntropyPoolingViewEstimator})
+    return 1
+end
+function Base.iterate(S::Union{<:ContinuousEntropyPoolingViewEstimator,
+                               <:DiscontinuousEntropyPoolingViewEstimator}, state = 1)
+    return state > 1 ? nothing : (S, state + 1)
 end
 function cvar(x::AbstractVector, alpha::Real)
     aT = alpha * length(x)
@@ -597,7 +611,6 @@ function set_var_cvar_A_B(epv::C0_LinearEntropyPoolingConstraintEstimator{<:Any,
 end
 function set_var_cvar_A_B(epv::ConditionalValueatRiskPoolingConstraintEstimator,
                           A::AbstractVector, B::Real)
-    min_ret = -minimum(A)
     @smart_assert(B < -minimum(A),
                   "Conditional value at risk view too extreme, please increase `alpha`, lower the value of the view, or use a prior that accounts that includes more extreme loss values.")
     return A, B
@@ -759,7 +772,8 @@ end
 function get_B_entropy_pooling_view_data(pr::AbstractPriorResult,
                                          epv::Union{<:C0_LinearEntropyPoolingConstraintEstimator{<:Any,
                                                                                                  <:Any,
-                                                                                                 <:Real},
+                                                                                                 <:Real,
+                                                                                                 <:Any},
                                                     <:C1_LinearEntropyPoolingConstraintEstimator{<:Any,
                                                                                                  <:Any,
                                                                                                  <:Real},
@@ -891,7 +905,8 @@ function get_B_entropy_pooling_view_data(pr::AbstractPriorResult,
     end
     return B
 end
-function _get_A_entropy_pooling_view_data(::C0_LinearEntropyPoolingConstraintEstimator,
+function _get_A_entropy_pooling_view_data(::Union{<:C0_LinearEntropyPoolingConstraintEstimator,
+                                                  <:ConditionalValueatRiskPoolingConstraintEstimator},
                                           pr::AbstractPriorResult, idx::AbstractVector,
                                           coef::Real)
     X = view(pr.X, :, idx)
@@ -1017,7 +1032,8 @@ function get_A_entropy_pooling_view_data(pr::AbstractPriorResult,
                                                     <:C2_LinearEntropyPoolingConstraintEstimator{<:Any,
                                                                                                  <:Any,
                                                                                                  <:Real,
-                                                                                                 <:Any}},
+                                                                                                 <:Any},
+                                                    <:ConditionalValueatRiskPoolingConstraintEstimator},
                                          sets::DataFrame, strict::Bool = false)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
@@ -1082,7 +1098,9 @@ function get_A_entropy_pooling_view_data(pr::AbstractPriorResult,
 end
 function entropy_pooling_views(pr::AbstractPriorResult,
                                epvs::Union{<:ContinuousEntropyPoolingViewEstimator,
-                                           <:AbstractVector{<:ContinuousEntropyPoolingViewEstimator}},
+                                           <:DiscontinuousEntropyPoolingViewEstimator,
+                                           <:AbstractVector{<:ContinuousEntropyPoolingViewEstimator},
+                                           <:AbstractVector{<:DiscontinuousEntropyPoolingViewEstimator}},
                                sets::DataFrame; strict::Bool = false,
                                w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                                    length = size(pr.X, 1))))
@@ -1141,6 +1159,9 @@ end
 function entropy_pooling_views(pr::AbstractPriorResult, epvs::LinearConstraintResult,
                                args...; kwargs...)
     return lcm
+end
+function entropy_pooling_views(pr::AbstractPriorResult, ::Nothing, args...; kwargs...)
+    return nothing
 end
 
 export entropy_pooling_views, ConstantEntropyPoolingConstraintEstimator,
