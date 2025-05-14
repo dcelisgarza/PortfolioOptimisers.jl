@@ -195,7 +195,7 @@ function constant_entropy_pooling_constraint!(pr::AbstractPriorResult, cache::Ab
         if i ∈ cache
             continue
         end
-        # Value at risk views are frozen in set_var_A_B from the start.
+        # Value at risk views are frozen in set_var_cvar_A_B from the start.
         if !isa(epv,
                 C0_LinearEntropyPoolingConstraintEstimator{<:AbstractVector,
                                                            <:AbstractVector,
@@ -568,15 +568,6 @@ function _get_B_entropy_pooling_view_data(epv::ConditionalValueatRiskPoolingCons
     cv = [cvar(view(X, :, i), alpha) for i ∈ idx]
     return coef * sum(cv)
 end
-function _get_A_entropy_pooling_view_data(::C0_LinearEntropyPoolingConstraintEstimator{<:Any,
-                                                                                       <:Any,
-                                                                                       <:Any,
-                                                                                       <:ValueatRiskEntropyPoolingAlgorithm},
-                                          pr::AbstractPriorResult, idx::AbstractVector,
-                                          coef::Real)
-    X = view(pr.X, :, idx)
-    return coef * X
-end
 function _get_B_entropy_pooling_view_data(epv::C0_LinearEntropyPoolingConstraintEstimator{<:Any,
                                                                                           <:Any,
                                                                                           <:Any,
@@ -589,12 +580,13 @@ function _get_B_entropy_pooling_view_data(epv::C0_LinearEntropyPoolingConstraint
     @smart_assert(var > 0)
     return coef * var
 end
-function set_var_A_B(::Any, A, B)
+function set_var_cvar_A_B(::Any, A, B)
     return A, B
 end
-function set_var_A_B(epv::C0_LinearEntropyPoolingConstraintEstimator{<:Any, <:Any, <:Any,
-                                                                     <:ValueatRiskEntropyPoolingAlgorithm},
-                     A::AbstractVector, B::Real)
+function set_var_cvar_A_B(epv::C0_LinearEntropyPoolingConstraintEstimator{<:Any, <:Any,
+                                                                          <:Any,
+                                                                          <:ValueatRiskEntropyPoolingAlgorithm},
+                          A::AbstractVector, B::Real)
     idx = A .<= -abs(B)
     @smart_assert(count(idx) > 0,
                   "Value at risk view too extreme, please increase `alpha`, lower the value of the view, or use a prior that accounts that includes more extreme loss values.")
@@ -602,6 +594,13 @@ function set_var_A_B(epv::C0_LinearEntropyPoolingConstraintEstimator{<:Any, <:An
     A = zeros(ea, length(idx))
     A[idx] .= one(ea)
     return A, epv.kind.alpha
+end
+function set_var_cvar_A_B(epv::ConditionalValueatRiskPoolingConstraintEstimator,
+                          A::AbstractVector, B::Real)
+    min_ret = -minimum(A)
+    @smart_assert(B < -minimum(A),
+                  "Conditional value at risk view too extreme, please increase `alpha`, lower the value of the view, or use a prior that accounts that includes more extreme loss values.")
+    return A, B
 end
 #########
 function _get_B_entropy_pooling_view_data(::C0_LinearEntropyPoolingConstraintEstimator{<:Any,
@@ -1101,7 +1100,7 @@ function entropy_pooling_views(pr::AbstractPriorResult,
             continue
         end
         B = get_B_entropy_pooling_view_data(pr, epv.B, sets, strict; w = w)
-        A, B = set_var_A_B(epv, A, B)
+        A, B = set_var_cvar_A_B(epv, A, B)
         d, flag_ineq = comparison_sign_ineq_flag(epv.comp)
         A = d * A
         B = d * B
