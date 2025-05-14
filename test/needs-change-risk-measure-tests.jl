@@ -40,19 +40,19 @@
         @test r === rs
         @test isapprox(expected_risk(r, w, X), 0.2018426182783387)
 
-        views = [EntropyPoolingViewEstimator(;
-                                             A = C4_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group1 = :Assets,
-                                                                                            group2 = :Assets,
-                                                                                            name1 = 10,
-                                                                                            name2 = 3),
-                                             B = C4_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group1 = :Assets,
-                                                                                            group2 = :Assets,
-                                                                                            name1 = 10,
-                                                                                            name2 = 3,
-                                                                                            coef = 0.217),
-                                             comp = LEQ())]
+        views = [ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group1 = :Assets,
+                                                                                                      group2 = :Assets,
+                                                                                                      name1 = 10,
+                                                                                                      name2 = 3),
+                                                       B = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group1 = :Assets,
+                                                                                                      group2 = :Assets,
+                                                                                                      name1 = 10,
+                                                                                                      name2 = 3,
+                                                                                                      coef = 0.217),
+                                                       comp = LEQ())]
         sets = DataFrame(:Assets => 1:20)
         pes = [HighOrderPriorEstimator(),
                HighOrderPriorEstimator(;
@@ -302,19 +302,19 @@
         ucs2view = ucs_view(ucs2, i)
         rc = LinearConstraint(; A = LinearConstraintSide(; group = :A, name = :B), B = 0)
 
-        views = [EntropyPoolingViewEstimator(;
-                                             A = C4_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group1 = :Assets,
-                                                                                            group2 = :Assets,
-                                                                                            name1 = 10,
-                                                                                            name2 = 3),
-                                             B = C4_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group1 = :Assets,
-                                                                                            group2 = :Assets,
-                                                                                            name1 = 10,
-                                                                                            name2 = 3,
-                                                                                            coef = 0.217),
-                                             comp = LEQ())]
+        views = [ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group1 = :Assets,
+                                                                                                      group2 = :Assets,
+                                                                                                      name1 = 10,
+                                                                                                      name2 = 3),
+                                                       B = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group1 = :Assets,
+                                                                                                      group2 = :Assets,
+                                                                                                      name1 = 10,
+                                                                                                      name2 = 3,
+                                                                                                      coef = 0.217),
+                                                       comp = LEQ())]
         sets = DataFrame(:Assets => 1:20)
         pes = [HighOrderPriorEstimator(),
                HighOrderPriorEstimator(;
@@ -682,14 +682,14 @@
         ew = eweights(1:500, 1 / 500; scale = true)
         w = rand(rng, 10)
         w ./= sum(w)
-        views = [EntropyPoolingViewEstimator(;
-                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            coef = 1,
-                                                                                            name = 1),
-                                             B = ConstantEntropyPoolingConstraintEstimator(;
-                                                                                           coef = 0.02),
-                                             comp = EQ())]
+        views = [ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      coef = 1,
+                                                                                                      name = 1),
+                                                       B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                                     coef = 0.02),
+                                                       comp = EQ())]
         sets = DataFrame(:Assets => 1:10)
         pes = [EmpiricalPriorEstimator(),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
@@ -802,14 +802,14 @@
         w ./= sum(w)
         i = [20, 3, 9]
         wv = nothing_scalar_array_view(w, i)
-        views = [EntropyPoolingViewEstimator(;
-                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            coef = 1,
-                                                                                            name = 1),
-                                             B = ConstantEntropyPoolingConstraintEstimator(;
-                                                                                           coef = 0.02),
-                                             comp = EQ())]
+        views = [ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      coef = 1,
+                                                                                                      name = 1),
+                                                       B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                                     coef = 0.02),
+                                                       comp = EQ())]
         sets = DataFrame(:Assets => 1:20)
         pes = [EmpiricalPriorEstimator(),
                HighOrderPriorEstimator(;

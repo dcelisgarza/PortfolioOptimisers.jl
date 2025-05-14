@@ -1245,84 +1245,84 @@
         rng = StableRNG(123456789)
         X = randn(rng, 100, 10)
         sets = DataFrame(:Assets => 1:10, :Clusters => [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-        views = [EntropyPoolingViewEstimator(;
-                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 1),
-                                             B = ConstantEntropyPoolingConstraintEstimator(;
-                                                                                           coef = 0.1),
-                                             comp = EQ()),
-                 EntropyPoolingViewEstimator(;
-                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 2),
-                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 2)),
-                 EntropyPoolingViewEstimator(;
-                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 2),
-                                             B = ConstantEntropyPoolingConstraintEstimator(;
-                                                                                           coef = 0.95),
-                                             comp = LEQ()),
-                 EntropyPoolingViewEstimator(;
-                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 3),
-                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 3)),
-                 EntropyPoolingViewEstimator(;
-                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 3),
-                                             B = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 3)),
-                 EntropyPoolingViewEstimator(;
-                                             A = C2_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 3,
-                                                                                            kind = SkewnessEntropyPoolingViewAlgorithm()),
-                                             B = ConstantEntropyPoolingConstraintEstimator(;
-                                                                                           coef = -0.25),
-                                             comp = GEQ()),
-                 EntropyPoolingViewEstimator(;
-                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 4),
-                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 4)),
-                 EntropyPoolingViewEstimator(;
-                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 4),
-                                             B = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 4)),
-                 EntropyPoolingViewEstimator(;
-                                             A = C2_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = :Assets,
-                                                                                            name = 4,
-                                                                                            kind = KurtosisEntropyPoolingAlgorithm()),
-                                             B = ConstantEntropyPoolingConstraintEstimator(;
-                                                                                           coef = 5.1),
-                                             comp = LEQ()),
-                 EntropyPoolingViewEstimator(;
-                                             A = C4_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group1 = :Assets,
-                                                                                            group2 = :Assets,
-                                                                                            name1 = 10,
-                                                                                            name2 = 3),
-                                             B = C4_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group1 = :Assets,
-                                                                                            group2 = :Assets,
-                                                                                            name1 = 10,
-                                                                                            name2 = 3,
-                                                                                            coef = 0.22),
-                                             comp = GEQ())]
+        views = [ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 1),
+                                                       B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                                     coef = 0.1),
+                                                       comp = EQ()),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 2),
+                                                       B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 2)),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 2),
+                                                       B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                                     coef = 0.95),
+                                                       comp = LEQ()),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 3),
+                                                       B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 3)),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 3),
+                                                       B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 3)),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C2_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 3,
+                                                                                                      kind = SkewnessEntropyPoolingViewAlgorithm()),
+                                                       B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                                     coef = -0.25),
+                                                       comp = GEQ()),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 4),
+                                                       B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 4)),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 4),
+                                                       B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 4)),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C2_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = :Assets,
+                                                                                                      name = 4,
+                                                                                                      kind = KurtosisEntropyPoolingAlgorithm()),
+                                                       B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                                     coef = 5.1),
+                                                       comp = LEQ()),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group1 = :Assets,
+                                                                                                      group2 = :Assets,
+                                                                                                      name1 = 10,
+                                                                                                      name2 = 3),
+                                                       B = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group1 = :Assets,
+                                                                                                      group2 = :Assets,
+                                                                                                      name1 = 10,
+                                                                                                      name2 = 3,
+                                                                                                      coef = 0.22),
+                                                       comp = GEQ())]
         pes = [EntropyPoolingPriorEstimator(; views = views, sets = sets),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H1_EntropyPooling()),
@@ -1417,99 +1417,99 @@
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
 
-        views = [EntropyPoolingViewEstimator(;
-                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [1]),
-                                             B = ConstantEntropyPoolingConstraintEstimator(;
-                                                                                           coef = 0.1),
-                                             comp = EQ()),
-                 EntropyPoolingViewEstimator(;
-                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [2]),
-                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [2])),
-                 EntropyPoolingViewEstimator(;
-                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [2]),
-                                             B = ConstantEntropyPoolingConstraintEstimator(;
-                                                                                           coef = 0.95),
-                                             comp = LEQ()),
-                 EntropyPoolingViewEstimator(;
-                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [3]),
-                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [3])),
-                 EntropyPoolingViewEstimator(;
-                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [3]),
-                                             B = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [3])),
-                 EntropyPoolingViewEstimator(;
-                                             A = C2_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            name = [3],
-                                                                                            coef = [1],
-                                                                                            kind = SkewnessEntropyPoolingViewAlgorithm()),
-                                             B = ConstantEntropyPoolingConstraintEstimator(;
-                                                                                           coef = -0.2),
-                                             comp = GEQ()),
-                 EntropyPoolingViewEstimator(;
-                                             A = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [4]),
-                                             B = C0_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [4])),
-                 EntropyPoolingViewEstimator(;
-                                             A = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [4]),
-                                             B = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            coef = [1],
-                                                                                            name = [4])),
-                 EntropyPoolingViewEstimator(;
-                                             A = C2_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group = [:Assets],
-                                                                                            name = [4],
-                                                                                            coef = [1],
-                                                                                            kind = KurtosisEntropyPoolingAlgorithm()),
-                                             B = ConstantEntropyPoolingConstraintEstimator(;
-                                                                                           coef = 5.1),
-                                             comp = LEQ()),
-                 EntropyPoolingViewEstimator(;
-                                             A = C4_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group1 = [:Assets],
-                                                                                            group2 = [:Assets],
-                                                                                            name1 = [3],
-                                                                                            name2 = [10],
-                                                                                            coef = [1]),
-                                             B = C4_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group1 = [:Assets],
-                                                                                            group2 = [:Assets],
-                                                                                            name1 = [3],
-                                                                                            name2 = [1],
-                                                                                            coef = [0.22]),
-                                             comp = GEQ())]
+        views = [ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [1]),
+                                                       B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                                     coef = 0.1),
+                                                       comp = EQ()),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [2]),
+                                                       B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [2])),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [2]),
+                                                       B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                                     coef = 0.95),
+                                                       comp = LEQ()),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [3]),
+                                                       B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [3])),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [3]),
+                                                       B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [3])),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C2_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      name = [3],
+                                                                                                      coef = [1],
+                                                                                                      kind = SkewnessEntropyPoolingViewAlgorithm()),
+                                                       B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                                     coef = -0.2),
+                                                       comp = GEQ()),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [4]),
+                                                       B = C0_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [4])),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [4]),
+                                                       B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      coef = [1],
+                                                                                                      name = [4])),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C2_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group = [:Assets],
+                                                                                                      name = [4],
+                                                                                                      coef = [1],
+                                                                                                      kind = KurtosisEntropyPoolingAlgorithm()),
+                                                       B = ConstantEntropyPoolingConstraintEstimator(;
+                                                                                                     coef = 5.1),
+                                                       comp = LEQ()),
+                 ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group1 = [:Assets],
+                                                                                                      group2 = [:Assets],
+                                                                                                      name1 = [3],
+                                                                                                      name2 = [10],
+                                                                                                      coef = [1]),
+                                                       B = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group1 = [:Assets],
+                                                                                                      group2 = [:Assets],
+                                                                                                      name1 = [3],
+                                                                                                      name2 = [1],
+                                                                                                      coef = [0.22]),
+                                                       comp = GEQ())]
 
         ress = (0.03270155949442489, 0.030586876690884276, 0.03058687450109127,
                 0.032701560391104334, 0.03058687741491548, 0.030586877801521424)
@@ -1652,30 +1652,30 @@
         d = PortfolioOptimisers.freeze_A_view(c)
         @test d.coef == -1
 
-        c = EntropyPoolingViewEstimator(;
-                                        A = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                       group = nothing,
-                                                                                       name = nothing,
-                                                                                       coef = -6),
-                                        B = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                       group = nothing,
-                                                                                       name = nothing,
-                                                                                       coef = -6))
+        c = ContinuousEntropyPoolingViewEstimator(;
+                                                  A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                 group = nothing,
+                                                                                                 name = nothing,
+                                                                                                 coef = -6),
+                                                  B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                 group = nothing,
+                                                                                                 name = nothing,
+                                                                                                 coef = -6))
         @test c == (c[5] = c)
         @test sort(c) == c
         @test sort!(c) == c
 
         @test_throws AssertionError JuMPEntropyPoolingEstimator(; slv = Solver[])
         pe = EntropyPoolingPriorEstimator(;
-                                          views = EntropyPoolingViewEstimator(;
-                                                                              A = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                                                             group = nothing,
-                                                                                                                             name = nothing,
-                                                                                                                             coef = -6),
-                                                                              B = C1_LinearEntropyPoolingConstraintEstimator(;
-                                                                                                                             group = nothing,
-                                                                                                                             name = nothing,
-                                                                                                                             coef = -6)))
+                                          views = ContinuousEntropyPoolingViewEstimator(;
+                                                                                        A = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                                                       group = nothing,
+                                                                                                                                       name = nothing,
+                                                                                                                                       coef = -6),
+                                                                                        B = C1_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                                                       group = nothing,
+                                                                                                                                       name = nothing,
+                                                                                                                                       coef = -6)))
         @test isa(pe.ce, PortfolioOptimisersCovariance)
         @test isa(pe.me, SimpleExpectedReturns)
     end
@@ -1684,19 +1684,19 @@
         X = randn(rng, 100, 10)
         F = X[:, [3, 8]] + randn(rng, 100, 2) * 0.0001
         sets = DataFrame(:Assets => 1:10)
-        views = [EntropyPoolingViewEstimator(;
-                                             A = C4_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group1 = :Assets,
-                                                                                            group2 = :Assets,
-                                                                                            name1 = 10,
-                                                                                            name2 = 3),
-                                             B = C4_LinearEntropyPoolingConstraintEstimator(;
-                                                                                            group1 = :Assets,
-                                                                                            group2 = :Assets,
-                                                                                            name1 = 10,
-                                                                                            name2 = 3,
-                                                                                            coef = 0.217),
-                                             comp = LEQ())]
+        views = [ContinuousEntropyPoolingViewEstimator(;
+                                                       A = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group1 = :Assets,
+                                                                                                      group2 = :Assets,
+                                                                                                      name1 = 10,
+                                                                                                      name2 = 3),
+                                                       B = C4_LinearEntropyPoolingConstraintEstimator(;
+                                                                                                      group1 = :Assets,
+                                                                                                      group2 = :Assets,
+                                                                                                      name1 = 10,
+                                                                                                      name2 = 3,
+                                                                                                      coef = 0.217),
+                                                       comp = LEQ())]
         pes = [EntropyPoolingPriorEstimator(; pe = FactorPriorEstimator(;), views = views,
                                             sets = sets),
                EntropyPoolingPriorEstimator(; pe = FactorPriorEstimator(;), views = views,
