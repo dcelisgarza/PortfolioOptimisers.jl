@@ -60,7 +60,7 @@ function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMat
     wi = nothing_scalar_array_view(frc.wi, i)
     return FactorRiskContribution(; opt = opt, re = re, r = r, obj = frc.obj,
                                   nplg = frc.nplg, cplg = frc.cplg, sets = sets, wi = wi,
-                                  flag = frc.flag,)
+                                  flag = frc.flag)
 end
 function set_factor_risk_contribution_constraints!(model::JuMP.Model,
                                                    re::Union{<:RegressionResult,

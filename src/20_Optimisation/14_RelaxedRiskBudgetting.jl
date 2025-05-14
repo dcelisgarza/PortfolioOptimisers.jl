@@ -37,7 +37,7 @@ function opt_view(rrb::RelaxedRiskBudgetting, i::AbstractVector)
     opt = opt_view(rrb.opt, i)
     rkb = nothing_scalar_array_view(rrb.rkb, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
-    return RelaxedRiskBudgetting(; opt = opt, rkb = rkb, wi = wi, alg = rrb.alg,)
+    return RelaxedRiskBudgetting(; opt = opt, rkb = rkb, wi = wi, alg = rrb.alg)
 end
 function set_relaxed_risk_budgetting_alg_constraints!(::BasicRelaxedRiskBudgettingAlgorithm,
                                                       model::JuMP.Model,

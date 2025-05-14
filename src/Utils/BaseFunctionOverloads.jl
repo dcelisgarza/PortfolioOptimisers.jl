@@ -19,9 +19,8 @@ for (op, name) ∈
          C0_LinearEntropyPoolingConstraintEstimator,
          C1_LinearEntropyPoolingConstraintEstimator, SkewnessEntropyPoolingViewAlgorithm,
          KurtosisEntropyPoolingAlgorithm, C2_LinearEntropyPoolingConstraintEstimator,
-         C4_LinearEntropyPoolingConstraintEstimator, EntropyPoolingViewEstimator,
-         EmpiricalPriorResult, HighOrderPriorResult, EqualRiskMeasure,
-         CentralityConstraint),
+         C4_LinearEntropyPoolingConstraintEstimator, ContinuousEntropyPoolingViewEstimator,
+         LowOrderPriorResult, HighOrderPriorResult, EqualRiskMeasure, CentralityConstraint),
         ("Solver", "LinearConstraintSide", "BlackLittermanViewsEstimator",
          "LinearConstraint", "MeanReturn", "Skewness", "ThirdCentralMoment",
          "FourthLowerMoment", "SemiKurtosis", "SemiSkewness", "ThirdLowerMoment",
@@ -46,9 +45,9 @@ for (op, name) ∈
          "C1_LinearEntropyPoolingConstraintEstimator",
          "SkewnessEntropyPoolingViewAlgorithm", "KurtosisEntropyPoolingAlgorithm",
          "C2_LinearEntropyPoolingConstraintEstimator",
-         "C4_LinearEntropyPoolingConstraintEstimator", "EntropyPoolingViewEstimator",
-         "EmpiricalPriorResult", "HighOrderPriorResult", "EqualRiskMeasure",
-         "CentralityConstraint"))
+         "C4_LinearEntropyPoolingConstraintEstimator",
+         "ContinuousEntropyPoolingViewEstimator", "LowOrderPriorResult",
+         "HighOrderPriorResult", "EqualRiskMeasure", "CentralityConstraint"))
     eval(quote
              Base.iterate(S::$op, state = 1) = state > 1 ? nothing : (S, state + 1)
              function Base.String(s::$op)

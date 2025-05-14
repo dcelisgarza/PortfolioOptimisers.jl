@@ -1,19 +1,63 @@
-struct EmpiricalPriorResult{T1 <: AbstractMatrix, T2 <: AbstractVector,
-                            T3 <: AbstractMatrix} <: AbstractPriorResult_A
+struct LowOrderPriorResult{T1 <: AbstractMatrix, T2 <: AbstractVector, T3 <: AbstractMatrix,
+                           T4 <: Union{Nothing, <:AbstractMatrix},
+                           T5 <: Union{Nothing, <:AbstractVector},
+                           T6 <: Union{Nothing, <:RegressionResult},
+                           T7 <: Union{Nothing, <:AbstractVector},
+                           T8 <: Union{Nothing, <:AbstractMatrix},
+                           T9 <: Union{Nothing, <:AbstractVector}} <: AbstractPriorResult
     X::T1
     mu::T2
     sigma::T3
+    chol::T4
+    w::T5
+    loadings::T6
+    f_mu::T7
+    f_sigma::T8
+    f_w::T9
 end
-function EmpiricalPriorResult(; X::AbstractMatrix, mu::AbstractVector,
-                              sigma::AbstractMatrix)
+function LowOrderPriorResult(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
+                             chol::Union{Nothing, <:AbstractMatrix} = nothing,
+                             w::Union{Nothing, <:AbstractVector} = nothing,
+                             loadings::Union{Nothing, <:RegressionResult} = nothing,
+                             f_mu::Union{Nothing, <:AbstractVector} = nothing,
+                             f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
+                             f_w::Union{Nothing, <:AbstractVector} = nothing)
     @smart_assert(!isempty(X) && !isempty(mu) && !isempty(sigma))
     @smart_assert(size(X, 2) == length(mu))
     issquare(sigma)
-    return EmpiricalPriorResult{typeof(X), typeof(mu), typeof(sigma)}(X, mu, sigma)
+    if !isnothing(w)
+        @smart_assert(!isempty(w))
+        @smart_assert(length(w) == size(X, 1))
+    end
+    loadings_flag = !isnothing(loadings)
+    f_mu_flag = !isnothing(f_mu)
+    f_sigma_flag = !isnothing(f_sigma)
+    if loadings_flag || f_mu_flag || f_sigma_flag
+        @smart_assert(loadings_flag && f_mu_flag && f_sigma_flag)
+        @smart_assert(!isempty(f_mu) && !isempty(f_sigma))
+        issquare(f_sigma)
+        @smart_assert(size(loadings.M, 2) == length(f_mu) == size(f_sigma, 1))
+        @smart_assert(size(loadings.M, 1) == length(mu))
+        if !isnothing(chol)
+            @smart_assert(!isempty(chol))
+            @smart_assert(length(mu) == size(chol, 2))
+        end
+        if !isnothing(f_w)
+            @smart_assert(!isempty(f_w))
+            @smart_assert(length(f_w) == size(X, 1))
+        end
+    end
+    return LowOrderPriorResult{typeof(X), typeof(mu), typeof(sigma), typeof(chol),
+                               typeof(w), typeof(loadings), typeof(f_mu), typeof(f_sigma),
+                               typeof(f_w)}(X, mu, sigma, chol, w, loadings, f_mu, f_sigma,
+                                            f_w)
 end
-function prior_view(pr::EmpiricalPriorResult, i::AbstractVector)
-    return EmpiricalPriorResult(; X = view(pr.X, :, i), mu = view(pr.mu, i),
-                                sigma = view(pr.sigma, i, i))
+function prior_view(pr::LowOrderPriorResult, i::AbstractVector)
+    chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
+    return LowOrderPriorResult(; X = view(pr.X, :, i), mu = view(pr.mu, i),
+                               sigma = view(pr.sigma, i, i), chol = chol, w = pr.w,
+                               loadings = regression_view(pr.loadings, i), f_mu = pr.f_mu,
+                               f_sigma = pr.f_sigma, f_w = pr.f_w)
 end
 struct EmpiricalPriorEstimator{T1 <: StatsBase.CovarianceEstimator,
                                T2 <: AbstractExpectedReturnsEstimator,
@@ -42,7 +86,7 @@ function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, Nothing}, X::AbstractMa
     end
     mu = vec(mean(pe.me, X))
     sigma = cov(pe.ce, X)
-    return EmpiricalPriorResult(; X = X, mu = mu, sigma = sigma)
+    return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma)
 end
 function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMatrix,
                args...; dims::Int = 1, kwargs...)
@@ -57,7 +101,7 @@ function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMat
     sigma .*= pe.horizon
     mu .= exp.(mu + 0.5 * diag(sigma))
     sigma .= (mu ⊗ mu) ⊙ (exp.(sigma) .- one(eltype(sigma)))
-    return EmpiricalPriorResult(; X = X, mu = mu, sigma = sigma)
+    return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma)
 end
 
-export EmpiricalPriorEstimator, EmpiricalPriorResult
+export EmpiricalPriorEstimator, LowOrderPriorResult

@@ -5,7 +5,21 @@ function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     end
     return model[:G]
 end
-function get_chol_or_sigma_pm(model::JuMP.Model, pr::FactorPriorResult)
+function get_chol_or_sigma_pm(model::JuMP.Model,
+                              pr::Union{<:LowOrderPriorResult{<:Any, <:Any, <:Any,
+                                                              <:AbstractMatrix, <:Any,
+                                                              <:Any, <:Any, <:Any, <:Any},
+                                        <:HighOrderPriorResult{<:LowOrderPriorResult{<:Any,
+                                                                                     <:Any,
+                                                                                     <:Any,
+                                                                                     <:AbstractMatrix,
+                                                                                     <:Any,
+                                                                                     <:Any,
+                                                                                     <:Any,
+                                                                                     <:Any,
+                                                                                     <:Any},
+                                                               <:Any, <:Any, <:Any, <:Any,
+                                                               <:Any, <:Any}})
     if !haskey(model, :G)
         G = pr.chol
         @expression(model, G, G)
@@ -221,9 +235,21 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::Variance,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer, r::Variance,
                                opt::FactorRiskContribution,
-                               pr::Union{<:FactorPriorResult,
-                                         <:EmpiricalPartialFactorPriorResult}, ::Any, ::Any,
-                               b1::AbstractMatrix, sets::Union{Nothing, <:DataFrame})
+                               pr::Union{<:LowOrderPriorResult{<:Any, <:Any, <:Any, <:Any,
+                                                               <:Any, <:RegressionResult,
+                                                               <:Any, <:Any, <:Any},
+                                         <:HighOrderPriorResult{<:LowOrderPriorResult{<:Any,
+                                                                                      <:Any,
+                                                                                      <:Any,
+                                                                                      <:Any,
+                                                                                      <:Any,
+                                                                                      <:RegressionResult,
+                                                                                      <:Any,
+                                                                                      <:Any,
+                                                                                      <:Any},
+                                                                <:Any, <:Any, <:Any, <:Any,
+                                                                <:Any, <:Any}}, ::Any,
+                               ::Any, b1::AbstractMatrix, sets::Union{Nothing, <:DataFrame})
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
@@ -1202,8 +1228,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_risk_constraints!(::JuMP.Model, ::Integer, ::SquareRootKurtosis,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
-                                       <:RiskBudgetting}, pr::AbstractLowOrderPriorResult,
-                               args...)
+                                       <:RiskBudgetting}, pr::LowOrderPriorResult, args...)
     throw(ArgumentError("SquareRootKurtosis requires a HighOrderPriorResult, not a $(typeof(pr))."))
 end
 function set_owa_constraints!(model::JuMP.Model, X::AbstractMatrix)
@@ -1568,8 +1593,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_risk_constraints!(::JuMP.Model, ::Integer, ::NegativeSkewness,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
-                                       <:RiskBudgetting}, pr::AbstractLowOrderPriorResult,
-                               args...)
+                                       <:RiskBudgetting}, pr::LowOrderPriorResult, args...)
     throw(ArgumentError("NegativeSkewness requires a HighOrderPriorResult, not a $(typeof(pr))."))
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer, r::TrackingRiskMeasure,

@@ -32,6 +32,9 @@ function regression_view(r::RegressionResult, i::AbstractVector)
                             L = isnothing(r.L) ? nothing : view(r.L, i, :),
                             b = view(r.b, i))
 end
+function regression_view(::Nothing, args...)
+    return nothing
+end
 function regression_view(r::AbstractRegressionEstimator, args...)
     return r
 end

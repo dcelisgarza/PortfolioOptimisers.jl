@@ -135,14 +135,12 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    return FactorPriorResult(;
-                             pr = EmpiricalPriorResult(; X = posterior_X, mu = posterior_mu,
-                                                       sigma = posterior_sigma),
-                             fpr = PartialFactorPriorResult(; mu = f_posterior_mu,
-                                                            sigma = f_posterior_sigma,
-                                                            loadings = loadings),
-                             chol = transpose(reshape(posterior_csigma,
-                                                      length(posterior_mu), :)))
+    return LowOrderPriorResult(; X = posterior_X, mu = posterior_mu,
+                               sigma = posterior_sigma,
+                               chol = transpose(reshape(posterior_csigma,
+                                                        length(posterior_mu), :)),
+                               w = f_prior.w, loadings = loadings, f_mu = f_posterior_mu,
+                               f_sigma = f_posterior_sigma, f_w = f_prior.w)
 end
 
 export FactorBlackLittermanPriorEstimator

@@ -181,14 +181,14 @@ function dup_elim_sum_matrices(n::Int)
 
     return d, l, s
 end
-struct HighOrderPriorResult{T1 <: AbstractLowOrderPriorResult,
+struct HighOrderPriorResult{T1 <: AbstractPriorResult,
                             T2 <: Union{Nothing, <:AbstractMatrix},
                             T3 <: Union{Nothing, <:AbstractMatrix},
                             T4 <: Union{Nothing, <:AbstractMatrix},
                             T5 <: Union{Nothing, <:AbstractMatrix},
                             T6 <: Union{Nothing, <:AbstractMatrix},
                             T7 <: Union{Nothing, <:AbstractMatrixProcessingEstimator}} <:
-       AbstractHighOrderPriorResult
+       AbstractPriorResult
     pr::T1
     kt::T2
     L2::T3
@@ -197,7 +197,7 @@ struct HighOrderPriorResult{T1 <: AbstractLowOrderPriorResult,
     V::T6
     skmp::T7
 end
-function HighOrderPriorResult(; pr::AbstractLowOrderPriorResult,
+function HighOrderPriorResult(; pr::AbstractPriorResult,
                               kt::Union{Nothing, <:AbstractMatrix},
                               L2::Union{Nothing, <:AbstractMatrix},
                               S2::Union{Nothing, <:AbstractMatrix},
@@ -257,14 +257,18 @@ function Base.getproperty(obj::HighOrderPriorResult, sym::Symbol)
         obj.pr.mu
     elseif sym == :sigma
         obj.pr.sigma
-    elseif sym == :f_mu
-        obj.pr.fpr.mu
-    elseif sym == :f_sigma
-        obj.pr.fpr.sigma
-    elseif sym == :loadings
-        obj.pr.fpr.loadings
     elseif sym == :chol
         obj.pr.chol
+    elseif sym == :w
+        obj.pr.w
+    elseif sym == :loadings
+        obj.pr.loadings
+    elseif sym == :f_mu
+        obj.pr.f_mu
+    elseif sym == :f_sigma
+        obj.pr.f_sigma
+    elseif sym == :f_w
+        obj.pr.f_w
     else
         getfield(obj, sym)
     end

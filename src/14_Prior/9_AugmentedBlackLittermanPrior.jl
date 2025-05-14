@@ -196,14 +196,9 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
     posterior_mu = (aug_posterior_mu[1:size(X, 2)] + b) .+ pe.rf
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
-    return EmpiricalPartialFactorPriorResult(;
-                                             pr = EmpiricalPriorResult(; X = posterior_X,
-                                                                       mu = posterior_mu,
-                                                                       sigma = posterior_sigma),
-                                             fpr = PartialFactorPriorResult(;
-                                                                            mu = f_prior_mu,
-                                                                            sigma = f_prior_sigma,
-                                                                            loadings = loadings))
+    return LowOrderPriorResult(; X = posterior_X, mu = posterior_mu,
+                               sigma = posterior_sigma, loadings = loadings,
+                               f_mu = f_prior_mu, f_sigma = f_prior_sigma, f_w = f_prior.w)
 end
 
 export AugmentedBlackLittermanPriorEstimator

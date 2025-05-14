@@ -43,7 +43,7 @@ function risk_measure_factory(r::NegativeSkewness, prior::HighOrderPriorResult, 
     V = risk_measure_nothing_scalar_array_factory(r.V, prior.V)
     return NegativeSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V, alg = r.alg)
 end
-function risk_measure_factory(r::NegativeSkewness, ::AbstractLowOrderPriorResult, args...;
+function risk_measure_factory(r::NegativeSkewness, ::LowOrderPriorResult, args...;
                               kwargs...)
     return r
 end

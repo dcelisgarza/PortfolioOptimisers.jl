@@ -132,8 +132,8 @@ function effective_number_scenarios(x::AbstractVector, y::AbstractVector)
     return exp(-relative_entropy(x, y))
 end
 struct EntropyPoolingPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
-                                    T2 <: Union{<:EntropyPoolingViewEstimator,
-                                                <:AbstractVector{<:EntropyPoolingViewEstimator}},
+                                    T2 <: Union{<:ContinuousEntropyPoolingViewEstimator,
+                                                <:AbstractVector{<:ContinuousEntropyPoolingViewEstimator}},
                                     T3 <: DataFrame, T4 <: AbstractEntropyPoolingEstimator,
                                     T5 <: Union{Nothing, <:AbstractVector},
                                     T6 <: AbstractEntropyPoolingAlgorithm} <:
@@ -147,8 +147,8 @@ struct EntropyPoolingPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_
 end
 function EntropyPoolingPriorEstimator(;
                                       pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
-                                      views::Union{<:EntropyPoolingViewEstimator,
-                                                   <:AbstractVector{<:EntropyPoolingViewEstimator}},
+                                      views::Union{<:ContinuousEntropyPoolingViewEstimator,
+                                                   <:AbstractVector{<:ContinuousEntropyPoolingViewEstimator}},
                                       sets::DataFrame = DataFrame(),
                                       opt::AbstractEntropyPoolingEstimator = OptimEntropyPoolingEstimator(),
                                       w::Union{Nothing, <:AbstractWeights} = nothing,
@@ -173,43 +173,11 @@ function Base.getproperty(obj::EntropyPoolingPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
-struct EntropyPoolingPriorResult{T1 <: AbstractPriorResult, T2 <: AbstractWeights} <:
-       AbstractEntropyPoolingPriorResult
-    pr::T1
-    w::T2
-end
-function EntropyPoolingPriorResult(; pr::AbstractPriorResult, w::AbstractWeights)
-    @smart_assert(!isempty(w))
-    @smart_assert(size(pr.X, 1) == length(w))
-    return EntropyPoolingPriorResult{typeof(pr), typeof(w)}(pr, w)
-end
 function factory(pe::EntropyPoolingPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return EntropyPoolingPriorEstimator(; pe = factory(pe.pe, w), views = pe.views,
                                         sets = pe.sets, alg = pe.alg, opt = pe.opt,
                                         w = isnothing(w) ? pe.w : w)
-end
-function prior_view(pr::EntropyPoolingPriorResult, i::AbstractVector)
-    return EntropyPoolingPriorResult(; pr = prior_view(pr.pr, i), w = pr.w)
-end
-function Base.getproperty(obj::EntropyPoolingPriorResult, sym::Symbol)
-    return if sym == :X
-        obj.pr.X
-    elseif sym == :mu
-        obj.pr.mu
-    elseif sym == :sigma
-        obj.pr.sigma
-    elseif sym == :f_mu
-        obj.pr.fpr.mu
-    elseif sym == :f_sigma
-        obj.pr.fpr.sigma
-    elseif sym == :loadings
-        obj.pr.fpr.loadings
-    elseif sym == :chol
-        obj.pr.chol
-    else
-        getfield(obj, sym)
-    end
 end
 function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                 <:H0_EntropyPooling}, X::AbstractMatrix,
@@ -233,10 +201,14 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
     pe = factory(pe, w)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     views = entropy_pooling_views(pr, pe.views, pe.sets; strict = strict)
+    #! TODO: We can add cvar entropy pooling views here. We need another field for cvar views and another entropy pooling function that dispatches on the views and cvar views.
     w = entropy_pooling(w, views, pe.opt)
     pe = factory(pe, w)
-    return EntropyPoolingPriorResult(; pr = prior(pe.pe, X, F; strict = strict, kwargs...),
-                                     w = w)
+    (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = prior(pe.pe, X, F; strict = strict,
+                                                            kwargs...)
+    return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma, chol = chol, w = w,
+                               loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
+                               f_w = !isnothing(loadings) ? w : nothing)
 end
 function _get_epw(::H1_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return w0
@@ -293,15 +265,18 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
         v = views[included]
         # Equality and inequality constraints for the views.
         V_i = entropy_pooling_views(pr, v, pe.sets; w = w0, strict = strict)
+        #! TODO: We can add cvar entropy pooling views here. We need another field for cvar views and another entropy pooling function that dispatches on the views and cvar views.
         # Compute the posterior observations.
         wi = entropy_pooling(_get_epw(pe.alg, w0, wi), V_i, pe.opt)
         pe = factory(pe, wi)
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
-    return EntropyPoolingPriorResult(; pr = pr, w = wi)
+    (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = pr
+    return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma, chol = chol, w = wi,
+                               loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
+                               f_w = wi)
 end
 
 export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling,
        OptimEntropyPoolingEstimator, JuMPEntropyPoolingEstimator, entropy_pooling,
-       EntropyPoolingPriorEstimator, EntropyPoolingPriorResult, relative_entropy,
-       effective_number_scenarios
+       EntropyPoolingPriorEstimator, relative_entropy, effective_number_scenarios

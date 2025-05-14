@@ -39,7 +39,7 @@
                ShrunkExpectedReturns(; alg = BodnarOkhrinParolya()),
                ShrunkExpectedReturns(;
                                      alg = BodnarOkhrinParolya(;
-                                                               target = VolatilityWeighted()),),
+                                                               target = VolatilityWeighted())),
                ShrunkExpectedReturns(;
                                      alg = BodnarOkhrinParolya(;
                                                                target = MeanSquareError())),
@@ -48,7 +48,7 @@
                ShrunkExpectedReturns(;
                                      alg = BodnarOkhrinParolya(;
                                                                target = VolatilityWeighted()),
-                                     me = SimpleExpectedReturns(; w = ew),),
+                                     me = SimpleExpectedReturns(; w = ew)),
                ShrunkExpectedReturns(;
                                      alg = BodnarOkhrinParolya(;
                                                                target = MeanSquareError()),

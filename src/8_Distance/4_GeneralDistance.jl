@@ -4,7 +4,7 @@ struct GeneralDistance{T1 <: Integer, T2 <: AbstractDistanceAlgorithm} <:
     alg::T2
 end
 function GeneralDistance(; power::Integer = 1,
-                         alg::AbstractDistanceAlgorithm = SimpleDistance(),)
+                         alg::AbstractDistanceAlgorithm = SimpleDistance())
     @smart_assert(power >= one(power))
     return GeneralDistance{typeof(power), typeof(alg)}(power, alg)
 end

@@ -43,7 +43,7 @@ function StatsBase.var(ve::SimpleVariance, X::AbstractVector; mean = nothing)
 end
 function factory(ve::SimpleVariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return SimpleVariance(; me = factory(ve.me, w), w = isnothing(w) ? ve.w : w,
-                          corrected = ve.corrected,)
+                          corrected = ve.corrected)
 end
 
 export SimpleVariance

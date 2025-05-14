@@ -71,7 +71,7 @@ end
 function EllipseUncertaintySetAlgorithm(;
                                         method::Union{<:AbstractUncertaintyKAlgorithm,
                                                       <:Real} = ChiSqKUncertaintyAlgorithm(),
-                                        diagonal::Bool = true,)
+                                        diagonal::Bool = true)
     return EllipseUncertaintySetAlgorithm{typeof(method), typeof(diagonal)}(method,
                                                                             diagonal)
 end

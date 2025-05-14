@@ -1,5 +1,5 @@
 function risk_measure_nothing_scalar_array_factory(::Nothing, ::Nothing)
-    throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
+    return nothing
 end
 function risk_measure_nothing_scalar_array_factory(risk_variable::Union{<:Real,
                                                                         <:AbstractArray},
