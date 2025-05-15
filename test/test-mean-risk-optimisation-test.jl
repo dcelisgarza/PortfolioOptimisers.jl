@@ -55,20 +55,26 @@
                  LowOrderMoment(; w = ew),#
                  LowOrderMoment(),# 12
                  ###
-                 LowOrderMoment(; alg = SemiDeviation(), mu = mu),#
-                 LowOrderMoment(; alg = SemiDeviation(), mu = rf),#
-                 LowOrderMoment(; alg = SemiDeviation(), w = ew),#
-                 LowOrderMoment(; alg = SemiDeviation()),# 16
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                                mu = mu),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                                mu = rf),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                                w = ew),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment())),# 16
                  ###
-                 LowOrderMoment(; alg = SemiVariance(), mu = mu),#
-                 LowOrderMoment(; alg = SemiVariance(), mu = rf),#
-                 LowOrderMoment(; alg = SemiVariance(), w = ew),#
-                 LowOrderMoment(; alg = SemiVariance()),# 20
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                mu = mu),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                mu = rf),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                w = ew),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),# 20
                  ###
                  LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),#
                  LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),#
                  LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),#
-                 LowOrderMoment(; alg = MeanAbsoluteDeviation(; w = ew)),#
+                 LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),#
                  LowOrderMoment(; alg = MeanAbsoluteDeviation(;)),# 25
                  ###
                  SquareRootKurtosis(),#

@@ -366,7 +366,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     T = length(net_X)
     mad = model[Symbol(:mad_, i)] = @variable(model, [1:T], lower_bound = 0)
     mar_mad = model[Symbol(:mar_mad_, i)] = @expression(model, (net_X + mad) .- target)
-    w = r.alg.w
+    w = r.w
     mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(w)
         @expression(model, mean(mad + mar_mad))
     else
@@ -395,7 +395,10 @@ function set_semi_variance_risk!(model::JuMP.Model, ::SOC, i::Integer, iTm1::Rea
     return model[key] = @expression(model, iTm1 * semi_dev^2)
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::LowOrderMoment{<:Any, <:SemiVariance, <:Any, <:Any},
+                               r::LowOrderMoment{<:Any,
+                                                 <:LowOrderDeviation{<:Any,
+                                                                     <:SecondLowerMoment},
+                                                 <:Any, <:Any},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
@@ -409,27 +412,40 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     semi_variance = model[Symbol(:semi_variance_, i)] = @variable(model, [1:T],
                                                                   lower_bound = 0)
     semi_dev = model[Symbol(:semi_dev_, i)] = @variable(model)
-    factor = T - r.alg.ddof
-    semi_variance_risk = set_semi_variance_risk!(model, r.alg.formulation, i, inv(factor),
-                                                 semi_variance, semi_dev, key)
-    model[Symbol(:csemi_variance_mar_, i)], model[Symbol(:csemi_variance_soc_, i)] = @constraints(model,
-                                                                                                  begin
-                                                                                                      sc *
-                                                                                                      ((net_X +
-                                                                                                        semi_variance) .-
-                                                                                                       target) >=
-                                                                                                      0
-                                                                                                      [sc *
-                                                                                                       semi_dev
-                                                                                                       sc *
-                                                                                                       semi_variance] ∈
-                                                                                                      SecondOrderCone()
-                                                                                                  end)
+    semi_variance_risk = if isnothing(r.w)
+        factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
+        model[Symbol(:csemi_variance_soc_, i)] = @constraint(model,
+                                                             [sc * semi_dev
+                                                              sc * semi_variance] ∈
+                                                             SecondOrderCone())
+        set_semi_variance_risk!(model, r.alg.alg.formulation, i, factor, semi_variance,
+                                semi_dev, key)
+    else
+        wi = r.w
+        factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
+        wi = sqrt.(wi)
+        scaled_semi_variance = model[Symbol(:scaled_semi_variance_, i)] = @expression(model,
+                                                                                      wi .*
+                                                                                      semi_variance)
+        model[Symbol(:csemi_variance_soc_, i)] = @constraint(model,
+                                                             [sc * semi_dev
+                                                              sc * scaled_semi_variance] ∈
+                                                             SecondOrderCone())
+        set_semi_variance_risk!(model, r.alg.alg.formulation, i, factor,
+                                scaled_semi_variance, semi_dev, key)
+    end
+    model[Symbol(:csemi_variance_mar_, i)] = @constraint(model,
+                                                         sc *
+                                                         ((net_X + semi_variance) .- target) >=
+                                                         0)
     set_risk_bounds_and_expression!(model, opt, semi_variance_risk, r.settings, key)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::LowOrderMoment{<:Any, <:SemiDeviation, <:Any, <:Any},
+                               r::LowOrderMoment{<:Any,
+                                                 <:LowOrderDeviation{<:Any,
+                                                                     <:FirstLowerMoment},
+                                                 <:Any, <:Any},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
@@ -440,27 +456,34 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     target = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
-    semi_sd, tsemi_sd = model[Symbol(:tsemi_sd_, i)], model[Symbol(:semi_sd_, i)] = @variables(model,
+    semi_sd, tsemi_sd = model[Symbol(:semi_sd_, i)], model[Symbol(:tsemi_sd_, i)] = @variables(model,
                                                                                                begin
                                                                                                    ()
                                                                                                    [1:T],
                                                                                                    (lower_bound = 0)
                                                                                                end)
-    factor = T - r.alg.ddof
-    semi_sd_risk = model[key] = @expression(model, semi_sd / sqrt(factor))
-    model[Symbol(:csemi_variance_mar_, i)], model[Symbol(:csemi_variance_soc_, i)] = @constraints(model,
-                                                                                                  begin
-                                                                                                      sc *
-                                                                                                      ((net_X +
-                                                                                                        tsemi_sd) .-
-                                                                                                       target) >=
-                                                                                                      0
-                                                                                                      [sc *
-                                                                                                       semi_sd
-                                                                                                       sc *
-                                                                                                       tsemi_sd] ∈
-                                                                                                      SecondOrderCone()
-                                                                                                  end)
+    semi_sd_risk = if isnothing(r.w)
+        factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
+        model[Symbol(:csemi_variance_soc_, i)] = @constraint(model,
+                                                             [sc * semi_sd
+                                                              sc * tsemi_sd] ∈
+                                                             SecondOrderCone())
+        model[key] = @expression(model, semi_sd * sqrt(factor))
+    else
+        wi = r.w
+        factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
+        wi = sqrt.(wi)
+        model[Symbol(:csemi_variance_soc_, i)] = @constraint(model,
+                                                             [sc * semi_sd
+                                                              sc * wi .* tsemi_sd] ∈
+                                                             SecondOrderCone())
+        model[key] = @expression(model, semi_sd * sqrt(factor))
+    end
+
+    model[Symbol(:csemi_variance_mar_, i)] = @constraint(model,
+                                                         sc *
+                                                         ((net_X + tsemi_sd) .- target) >=
+                                                         0)
 
     set_risk_bounds_and_expression!(model, opt, semi_sd_risk, r.settings, key)
     return nothing

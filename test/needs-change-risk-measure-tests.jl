@@ -113,7 +113,8 @@
                   LowOrderMoment(; mu = 0), LowOrderMoment(; mu = zerovec),
                   LowOrderMoment(; alg = SemiDeviation(; ddof = 2)),
                   LowOrderMoment(;
-                                 alg = SemiVariance(; ddof = 3, formulation = formulation)),
+                                 alg = SecondLowerMoment(; ddof = 3,
+                                                         formulation = formulation)),
                   LowOrderMoment(; alg = MeanAbsoluteDeviation()),
                   LowOrderMoment(; alg = MeanAbsoluteDeviation(; w = ew))]
             r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))

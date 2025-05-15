@@ -45,15 +45,21 @@
                  LowOrderMoment(; w = ew),#
                  LowOrderMoment(),# 11
                  ###
-                 LowOrderMoment(; alg = SemiDeviation(), mu = mu),#
-                 LowOrderMoment(; alg = SemiDeviation(), mu = rf),#
-                 LowOrderMoment(; alg = SemiDeviation(), w = ew),#
-                 LowOrderMoment(; alg = SemiDeviation()),# 15
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                                mu = mu),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                                mu = rf),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                                w = ew),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment())),# 15
                  ###
-                 LowOrderMoment(; alg = SemiVariance(), mu = mu),#
-                 LowOrderMoment(; alg = SemiVariance(), mu = rf),#
-                 LowOrderMoment(; alg = SemiVariance(), w = ew),#
-                 LowOrderMoment(; alg = SemiVariance()),# 19
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                mu = mu),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                mu = rf),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                w = ew),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),# 19
                  ###
                  LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),#
                  LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),#
@@ -234,15 +240,21 @@
                  LowOrderMoment(; w = ew),#
                  LowOrderMoment(),# 11
                  ###
-                 LowOrderMoment(; alg = SemiDeviation(), mu = mu),#
-                 LowOrderMoment(; alg = SemiDeviation(), mu = rf),#
-                 LowOrderMoment(; alg = SemiDeviation(), w = ew),#
-                 LowOrderMoment(; alg = SemiDeviation()),# 15
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                                mu = mu),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                                mu = rf),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                                w = ew),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment())),# 15
                  ###
-                 LowOrderMoment(; alg = SemiVariance(), mu = mu),#
-                 LowOrderMoment(; alg = SemiVariance(), mu = rf),#
-                 LowOrderMoment(; alg = SemiVariance(), w = ew),#
-                 LowOrderMoment(; alg = SemiVariance()),# 19
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                mu = mu),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                mu = rf),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                w = ew),#
+                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),# 19
                  ###
                  LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),#
                  LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),#
