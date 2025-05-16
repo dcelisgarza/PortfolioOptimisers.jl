@@ -526,7 +526,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     flm = model[Symbol(:flm_, i)] = @variable(model, [1:T], lower_bound = 0)
-    flm_risk = model[key] = @expression(model, sum(flm) / T)
+    flm_risk = model[key] = if isnothing(r.w)
+        @expression(model, mean(flm))
+    else
+        @expression(model, mean(flm, r.w))
+    end
     model[Symbol(:cflm_mar_, i)] = @constraint(model, sc * ((net_X + flm) .- target) >= 0)
     set_risk_bounds_and_expression!(model, opt, flm_risk, r.settings, key)
     return nothing
@@ -568,6 +572,7 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::Range,
     set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, :range_risk)
     return nothing
 end
+#! TODO check this
 function set_risk_constraints!(model::JuMP.Model, i::Integer, r::ConditionalValueatRisk,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
@@ -583,7 +588,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::ConditionalValu
                                                                                        [1:T],
                                                                                        (lower_bound = 0)
                                                                                    end)
-    cvar_risk = model[key] = @expression(model, var + sum(z_cvar) * iat)
+    cvar_risk = model[key] = if isnothing(r.w)
+        @expression(model, var + sum(z_cvar) * iat)
+    else
+        @expression(model, var + sum(r.w .* z_cvar) * iat)
+    end
     model[Symbol(:ccvar_, i)] = @constraint(model, sc * ((z_cvar + net_X) .+ var) >= 0)
     set_risk_bounds_and_expression!(model, opt, cvar_risk, r.settings, key)
     return nothing

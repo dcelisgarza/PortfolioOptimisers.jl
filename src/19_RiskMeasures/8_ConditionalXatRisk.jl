@@ -1,12 +1,26 @@
-struct ConditionalValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real} <: RiskMeasure
+struct ConditionalValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
+                              T3 <: Union{Nothing, <:AbstractVector}} <: RiskMeasure
     settings::T1
     alpha::T2
+    w::T3
 end
 function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                alpha::Real = 0.05)
+                                alpha::Real = 0.05,
+                                w::Union{Nothing, <:AbstractVector} = nothing)
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    return ConditionalValueatRisk{typeof(settings), typeof(alpha)}(settings, alpha)
+    if isa(w, AbstractVector)
+        @smart_assert(!isempty(w))
+    end
+    return ConditionalValueatRisk{typeof(settings), typeof(alpha), typeof(w)}(settings,
+                                                                              alpha, w)
 end
+#! TODO check this
+function risk_measure_factory(r::ConditionalValueatRisk, prior::AbstractPriorResult,
+                              args...; kwargs...)
+    w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
+    return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha, w = r.w)
+end
+#! TODO add version of this that uses weights
 function (r::ConditionalValueatRisk)(x::AbstractVector)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
