@@ -74,7 +74,8 @@ end
 function (r::ThirdCentralMoment)(w::AbstractVector, X::AbstractMatrix,
                                  fees::Union{Nothing, <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
-    return sum(val .^ 3) / size(X, 1)
+    val .= val .^ 3
+    return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
 function risk_measure_factory(r::Skewness, prior::AbstractPriorResult, args...; kwargs...)
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
@@ -89,7 +90,9 @@ function (r::Skewness)(w::AbstractVector, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     sigma = StatsBase.std(r.ve, val; mean = zero(eltype(val)))
-    return sum(val .^ 3) / size(X, 1) / sigma^3
+    val .= val .^ 3
+    res = isnothing(r.w) ? mean(val) : mean(val, r.w)
+    return res / sigma^3
 end
 
 export MeanReturn, ThirdCentralMoment, Skewness

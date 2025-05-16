@@ -41,8 +41,8 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk.csv"), DataFrame)
         risks = [Variance(; sigma = sigma),#
                  Variance(),#
-                 Variance(; formulation = Quad()),#
-                 Variance(; formulation = RSOC()),# 4
+                 Variance(; formulation = QuadRiskExpr()),#
+                 Variance(; formulation = RSOCRiskExpr()),# 4
                  ###
                  UncertaintySetVariance(; sigma = sigma, ucs = ucs1),#
                  UncertaintySetVariance(; ucs = ucs2),# 6

@@ -122,7 +122,7 @@ function set_sdp_variance_risk!(model::JuMP.Model, i::Integer, r::Variance,
     return nothing
 end
 function set_variance_risk!(model::JuMP.Model, i::Integer,
-                            r::Variance{<:Any, <:Any, <:Any, <:SOC},
+                            r::Variance{<:Any, <:Any, <:Any, <:SOCRiskExpr},
                             pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
     w = model[:w]
@@ -135,7 +135,7 @@ function set_variance_risk!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_variance_risk!(model::JuMP.Model, i::Integer,
-                            r::Variance{<:Any, <:Any, <:Any, <:Quad},
+                            r::Variance{<:Any, <:Any, <:Any, <:QuadRiskExpr},
                             pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
     w = model[:w]
@@ -146,27 +146,6 @@ function set_variance_risk!(model::JuMP.Model, i::Integer,
     dev = model[key_dev] = @variable(model)
     model[Symbol(key_dev, :_soc)] = @constraint(model,
                                                 [sc * dev; sc * G * w] ∈ SecondOrderCone())
-    return nothing
-end
-function set_variance_risk!(model::JuMP.Model, i::Integer,
-                            r::Variance{<:Any, <:Any, <:Any, <:RSOC},
-                            pr::AbstractPriorResult, key::Symbol)
-    sc = model[:sc]
-    w = model[:w]
-    net_X = set_net_portfolio_returns!(model, pr.X)
-    T = length(net_X)
-    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
-    key_dev = Symbol(:dev_, i)
-    t_variance = model[Symbol(:t_variance_, i)] = @variable(model)
-    dev = model[key_dev] = @variable(model)
-    mu = pr.mu
-    variance = model[Symbol(:variance_, i)] = @expression(model, net_X .- dot(mu, w))
-    model[key] = @expression(model, t_variance / (T - one(T)))
-    model[Symbol(key_dev, :_soc)] = @constraint(model,
-                                                [sc * dev; sc * G * w] ∈ SecondOrderCone())
-    model[Symbol(key, :_rsoc)] = @constraint(model,
-                                             [sc * t_variance; 0.5;
-                                              sc * variance] in RotatedSecondOrderCone())
     return nothing
 end
 function variance_risk_bounds_expr(model::JuMP.Model, i::Integer, flag::Bool)
@@ -376,23 +355,69 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
     return nothing
 end
-function set_semi_variance_risk!(model::JuMP.Model, ::Quad, i::Integer, iTm1::Real,
-                                 semi_variance, semi_dev, key::Symbol)
-    return model[key] = @expression(model, iTm1 * dot(semi_variance, semi_variance))
+function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, i::Integer,
+                                 factor::Real, second_moment, ::Any, key::Symbol, args...)
+    return model[key] = @expression(model, factor * dot(second_moment, second_moment))
 end
-function set_semi_variance_risk!(model::JuMP.Model, ::RSOC, i::Integer, iTm1::Real,
-                                 semi_variance, semi_dev, key::Symbol)
+function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Integer,
+                                 factor::Real, second_moment, ::Any, key::Symbol,
+                                 keyt::Symbol, keyc::Symbol)
     sc = model[:sc]
-    tsemi_variance = model[Symbol(:tsemi_variance_, i)] = @variable(model)
-    model[Symbol(:csemi_variance_rsoc_, i)] = @constraint(model,
-                                                          [sc * tsemi_variance; 0.5;
-                                                           sc * semi_variance] in
-                                                          RotatedSecondOrderCone())
-    return model[key] = @expression(model, iTm1 * tsemi_variance)
+    tsecond_moment = model[Symbol(keyt, i)] = @variable(model)
+    model[Symbol(keyc, i)] = @constraint(model,
+                                         [sc * tsecond_moment; 0.5;
+                                          sc * second_moment] in RotatedSecondOrderCone())
+    return model[key] = @expression(model, factor * tsecond_moment)
 end
-function set_semi_variance_risk!(model::JuMP.Model, ::SOC, i::Integer, iTm1::Real,
-                                 semi_variance, semi_dev, key::Symbol)
-    return model[key] = @expression(model, iTm1 * semi_dev^2)
+function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Integer, factor::Real,
+                                 second_moment, second_central_dev, key::Symbol, args...)
+    return model[key] = @expression(model, factor * second_central_dev^2)
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::LowOrderMoment{<:Any,
+                                                 <:LowOrderDeviation{<:Any,
+                                                                     <:SecondCentralMoment},
+                                                 <:Any, <:Any},
+                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                          <:RiskBudgetting}, pr::AbstractPriorResult,
+                               args...)
+    key = Symbol(:second_central_moment_risk_, i)
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    second_central_moment = model[Symbol(:second_central_moment_, i)] = @variable(model,
+                                                                                  [1:T],
+                                                                                  lower_bound = 0)
+    second_central_dev = model[Symbol(:second_central_dev_, i)] = @variable(model)
+    second_central_moment_risk = if isnothing(r.w)
+        factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
+        model[Symbol(:csecond_central_moment_soc_, i)] = @constraint(model,
+                                                                     [sc *
+                                                                      second_central_dev
+                                                                      sc *
+                                                                      second_central_moment] ∈
+                                                                     SecondOrderCone())
+        set_second_moment_risk!(model, r.alg.alg.formulation, i, factor,
+                                second_central_moment, second_central_dev, key,
+                                :tsecond_central_moment_, :csecond_central_moment_rsoc_)
+    else
+        wi = r.w
+        factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
+        wi = sqrt.(wi)
+        scaled_second_central_moment = model[Symbol(:scaled_second_central_moment_, i)] = @expression(model,
+                                                                                                      wi .*
+                                                                                                      second_central_moment)
+        model[Symbol(:csecond_central_moment_soc_, i)] = @constraint(model,
+                                                                     [sc *
+                                                                      second_central_dev
+                                                                      sc *
+                                                                      scaled_second_central_moment] ∈
+                                                                     SecondOrderCone())
+        set_second_moment_risk!(model, r.alg.alg.formulation, i, factor,
+                                scaled_second_central_moment, second_central_dev, key)
+    end
+    set_risk_bounds_and_expression!(model, opt, second_central_moment_risk, r.settings, key)
+    return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                r::LowOrderMoment{<:Any,
@@ -418,8 +443,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                                              [sc * semi_dev
                                                               sc * semi_variance] ∈
                                                              SecondOrderCone())
-        set_semi_variance_risk!(model, r.alg.alg.formulation, i, factor, semi_variance,
-                                semi_dev, key)
+        set_second_moment_risk!(model, r.alg.alg.formulation, i, factor, semi_variance,
+                                semi_dev, key, :tsemi_variance_, :csemi_variance_rsoc_)
     else
         wi = r.w
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
@@ -431,7 +456,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                                              [sc * semi_dev
                                                               sc * scaled_semi_variance] ∈
                                                              SecondOrderCone())
-        set_semi_variance_risk!(model, r.alg.alg.formulation, i, factor,
+        set_second_moment_risk!(model, r.alg.alg.formulation, i, factor,
                                 scaled_semi_variance, semi_dev, key)
     end
     model[Symbol(:csemi_variance_mar_, i)] = @constraint(model,

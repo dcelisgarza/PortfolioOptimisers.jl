@@ -29,7 +29,7 @@
         ucs1 = DeltaUncertaintySetEstimator(;)
         ucs2 = NormalUncertaintySetEstimator(;)
         settings = RiskMeasureSettings(; rke = false, scale = -1, ub = 3)
-        formulation = RSOC()
+        formulation = RSOCRiskExpr()
         ucs1view = ucs_view(ucs1, i)
         ucs2view = ucs_view(ucs2, i)
         rc = LinearConstraint(; A = LinearConstraintSide(; group = :A, name = :B), B = 0)
@@ -108,7 +108,7 @@
             @test r[2].ucs === ucs2
             @test isapprox(expected_risk(r[2], w, X), dot(w, pr1.sigma, w))
 
-            formulation = Quad()
+            formulation = QuadRiskExpr()
             rs = [LowOrderMoment(; settings = settings, w = ew, mu = mu),
                   LowOrderMoment(; mu = 0), LowOrderMoment(; mu = zerovec),
                   LowOrderMoment(; alg = SemiDeviation(; ddof = 2)),
@@ -298,7 +298,7 @@
         ucs1 = DeltaUncertaintySetEstimator(;)
         ucs2 = NormalUncertaintySetEstimator(;)
         settings = RiskMeasureSettings(; rke = false, scale = -1, ub = 3)
-        formulation = RSOC()
+        formulation = RSOCRiskExpr()
         ucs1view = ucs_view(ucs1, i)
         ucs2view = ucs_view(ucs2, i)
         rc = LinearConstraint(; A = LinearConstraintSide(; group = :A, name = :B), B = 0)
