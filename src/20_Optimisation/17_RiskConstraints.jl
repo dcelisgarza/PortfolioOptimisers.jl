@@ -345,23 +345,23 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     T = length(net_X)
     mad = model[Symbol(:mad_, i)] = @variable(model, [1:T], lower_bound = 0)
     mar_mad = model[Symbol(:mar_mad_, i)] = @expression(model, (net_X + mad) .- target)
-    w = r.w
-    mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(w)
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(wi)
         @expression(model, mean(mad + mar_mad))
     else
-        @expression(model, mean(mad + mar_mad, w))
+        @expression(model, mean(mad + mar_mad, wi))
     end
     model[Symbol(:cmar_mad_, i)] = @constraint(model, sc * mar_mad >= 0)
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
     return nothing
 end
 function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, i::Integer,
-                                 factor::Real, second_moment, ::Any, key::Symbol, args...)
+                                 factor::Real, second_moment, key::Symbol, args...)
     return model[key] = @expression(model, factor * dot(second_moment, second_moment))
 end
 function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Integer,
-                                 factor::Real, second_moment, ::Any, key::Symbol,
-                                 keyt::Symbol, keyc::Symbol)
+                                 factor::Real, second_moment, key::Symbol, keyt::Symbol,
+                                 keyc::Symbol)
     sc = model[:sc]
     tsecond_moment = model[Symbol(keyt, i)] = @variable(model)
     model[Symbol(keyc, i)] = @constraint(model,
@@ -370,8 +370,13 @@ function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Integer,
     return model[key] = @expression(model, factor * tsecond_moment)
 end
 function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Integer, factor::Real,
-                                 second_moment, second_central_dev, key::Symbol, args...)
-    return model[key] = @expression(model, factor * second_central_dev^2)
+                                 second_moment, key::Symbol, keyt::Symbol, keyc::Symbol)
+    sc = model[:sc]
+    tsecond_moment = model[Symbol(keyt, i)] = @variable(model)
+    model[Symbol(keyc, i)] = @constraint(model,
+                                         [sc * tsecond_moment
+                                          sc * second_moment] ∈ SecondOrderCone())
+    return model[key] = @expression(model, factor * tsecond_moment^2)
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                r::LowOrderMoment{<:Any,
@@ -382,39 +387,27 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
     key = Symbol(:second_central_moment_risk_, i)
-    sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     second_central_moment = model[Symbol(:second_central_moment_, i)] = @variable(model,
                                                                                   [1:T],
                                                                                   lower_bound = 0)
-    second_central_dev = model[Symbol(:second_central_dev_, i)] = @variable(model)
-    second_central_moment_risk = if isnothing(r.w)
+
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    second_central_moment_risk = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
-        model[Symbol(:csecond_central_moment_soc_, i)] = @constraint(model,
-                                                                     [sc *
-                                                                      second_central_dev
-                                                                      sc *
-                                                                      second_central_moment] ∈
-                                                                     SecondOrderCone())
         set_second_moment_risk!(model, r.alg.alg.formulation, i, factor,
-                                second_central_moment, second_central_dev, key,
-                                :tsecond_central_moment_, :csecond_central_moment_rsoc_)
+                                second_central_moment, key, :tsecond_central_moment_,
+                                :csecond_central_moment_rsoc_)
     else
-        wi = r.w
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
-        wi = sqrt.(wi)
+        wi .= sqrt.(wi)
         scaled_second_central_moment = model[Symbol(:scaled_second_central_moment_, i)] = @expression(model,
                                                                                                       wi .*
                                                                                                       second_central_moment)
-        model[Symbol(:csecond_central_moment_soc_, i)] = @constraint(model,
-                                                                     [sc *
-                                                                      second_central_dev
-                                                                      sc *
-                                                                      scaled_second_central_moment] ∈
-                                                                     SecondOrderCone())
         set_second_moment_risk!(model, r.alg.alg.formulation, i, factor,
-                                scaled_second_central_moment, second_central_dev, key)
+                                scaled_second_central_moment, key, :tsecond_central_moment_,
+                                :csecond_central_moment_rsoc_)
     end
     set_risk_bounds_and_expression!(model, opt, second_central_moment_risk, r.settings, key)
     return nothing
@@ -436,28 +429,20 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     T = length(net_X)
     semi_variance = model[Symbol(:semi_variance_, i)] = @variable(model, [1:T],
                                                                   lower_bound = 0)
-    semi_dev = model[Symbol(:semi_dev_, i)] = @variable(model)
-    semi_variance_risk = if isnothing(r.w)
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    semi_variance_risk = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
-        model[Symbol(:csemi_variance_soc_, i)] = @constraint(model,
-                                                             [sc * semi_dev
-                                                              sc * semi_variance] ∈
-                                                             SecondOrderCone())
-        set_second_moment_risk!(model, r.alg.alg.formulation, i, factor, semi_variance,
-                                semi_dev, key, :tsemi_variance_, :csemi_variance_rsoc_)
+        set_second_moment_risk!(model, r.alg.alg.formulation, i, factor, semi_variance, key,
+                                :tsemi_variance_, :csemi_variance_rsoc_)
     else
-        wi = r.w
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
-        wi = sqrt.(wi)
+        wi .= sqrt.(wi)
         scaled_semi_variance = model[Symbol(:scaled_semi_variance_, i)] = @expression(model,
                                                                                       wi .*
                                                                                       semi_variance)
-        model[Symbol(:csemi_variance_soc_, i)] = @constraint(model,
-                                                             [sc * semi_dev
-                                                              sc * scaled_semi_variance] ∈
-                                                             SecondOrderCone())
         set_second_moment_risk!(model, r.alg.alg.formulation, i, factor,
-                                scaled_semi_variance, semi_dev, key)
+                                scaled_semi_variance, key, :tsemi_variance_,
+                                :csemi_variance_rsoc_)
     end
     model[Symbol(:csemi_variance_mar_, i)] = @constraint(model,
                                                          sc *
@@ -487,29 +472,25 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                                                                                    [1:T],
                                                                                                    (lower_bound = 0)
                                                                                                end)
-    semi_sd_risk = if isnothing(r.w)
-        factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    factor = if isnothing(wi)
         model[Symbol(:csemi_variance_soc_, i)] = @constraint(model,
                                                              [sc * semi_sd
                                                               sc * tsemi_sd] ∈
                                                              SecondOrderCone())
-        model[key] = @expression(model, semi_sd * sqrt(factor))
+        StatsBase.varcorrection(T, r.alg.ve.corrected)
     else
-        wi = r.w
-        factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
-        wi = sqrt.(wi)
         model[Symbol(:csemi_variance_soc_, i)] = @constraint(model,
                                                              [sc * semi_sd
-                                                              sc * wi .* tsemi_sd] ∈
+                                                              sc * sqrt.(wi) .* tsemi_sd] ∈
                                                              SecondOrderCone())
-        model[key] = @expression(model, semi_sd * sqrt(factor))
+        StatsBase.varcorrection(wi, r.alg.ve.corrected)
     end
-
+    semi_sd_risk = model[key] = @expression(model, semi_sd * sqrt(factor))
     model[Symbol(:csemi_variance_mar_, i)] = @constraint(model,
                                                          sc *
                                                          ((net_X + tsemi_sd) .- target) >=
                                                          0)
-
     set_risk_bounds_and_expression!(model, opt, semi_sd_risk, r.settings, key)
     return nothing
 end
@@ -526,10 +507,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     flm = model[Symbol(:flm_, i)] = @variable(model, [1:T], lower_bound = 0)
-    flm_risk = model[key] = if isnothing(r.w)
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    flm_risk = model[key] = if isnothing(wi)
         @expression(model, mean(flm))
     else
-        @expression(model, mean(flm, r.w))
+        @expression(model, mean(flm, wi))
     end
     model[Symbol(:cflm_mar_, i)] = @constraint(model, sc * ((net_X + flm) .- target) >= 0)
     set_risk_bounds_and_expression!(model, opt, flm_risk, r.settings, key)
@@ -572,7 +554,6 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::Range,
     set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, :range_risk)
     return nothing
 end
-#! TODO check this
 function set_risk_constraints!(model::JuMP.Model, i::Integer, r::ConditionalValueatRisk,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
@@ -581,17 +562,19 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::ConditionalValu
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
-    iat = inv(r.alpha * T)
     var, z_cvar = model[Symbol(:z_cvar_, i)], model[Symbol(:var_, i)] = @variables(model,
                                                                                    begin
                                                                                        ()
                                                                                        [1:T],
                                                                                        (lower_bound = 0)
                                                                                    end)
-    cvar_risk = model[key] = if isnothing(r.w)
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    cvar_risk = model[key] = if isnothing(wi)
+        iat = inv(r.alpha * T)
         @expression(model, var + sum(z_cvar) * iat)
     else
-        @expression(model, var + sum(r.w .* z_cvar) * iat)
+        iat = inv(r.alpha * sum(wi))
+        @expression(model, var + sum(wi .* z_cvar) * iat)
     end
     model[Symbol(:ccvar_, i)] = @constraint(model, sc * ((z_cvar + net_X) .+ var) >= 0)
     set_risk_bounds_and_expression!(model, opt, cvar_risk, r.settings, key)
@@ -606,8 +589,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
-    iat = inv(r.alpha * T)
-    ibt = inv(r.beta * T)
     var_l, z_cvar_l, var_h, z_cvar_h = model[Symbol(:var_l_, i)], model[Symbol(:z_cvar_l_, i)], model[Symbol(:var_h_, i)], model[Symbol(:z_cvar_h_, i)] = @variables(model,
                                                                                                                                                                      begin
                                                                                                                                                                          ()
@@ -617,15 +598,35 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                                                                                                                                                          [1:T],
                                                                                                                                                                          (upper_bound = 0)
                                                                                                                                                                      end)
-    cvar_risk_l, cvar_risk_h = model[Symbol(:cvar_risk_l_, i)], model[Symbol(:cvar_risk_h_, i)] = @expressions(model,
-                                                                                                               begin
-                                                                                                                   var_l +
-                                                                                                                   sum(z_cvar_l) *
-                                                                                                                   iat
-                                                                                                                   var_h +
-                                                                                                                   sum(z_cvar_h) *
-                                                                                                                   ibt
-                                                                                                               end)
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    cvar_risk_l, cvar_risk_h = if isnothing(wi)
+        iat = inv(r.alpha * T)
+        ibt = inv(r.beta * T)
+        model[Symbol(:cvar_risk_l_, i)], model[Symbol(:cvar_risk_h_, i)] = @expressions(model,
+                                                                                        begin
+                                                                                            var_l +
+                                                                                            sum(z_cvar_l) *
+                                                                                            iat
+                                                                                            var_h +
+                                                                                            sum(z_cvar_h) *
+                                                                                            ibt
+                                                                                        end)
+    else
+        swi = sum(wi)
+        iat = inv(r.alpha * swi)
+        ibt = inv(r.beta * swi)
+        model[Symbol(:cvar_risk_l_, i)], model[Symbol(:cvar_risk_h_, i)] = @expressions(model,
+                                                                                        begin
+                                                                                            var_l +
+                                                                                            sum(wi .*
+                                                                                                z_cvar_l) *
+                                                                                            iat
+                                                                                            var_h +
+                                                                                            sum(wi .*
+                                                                                                z_cvar_h) *
+                                                                                            ibt
+                                                                                        end)
+    end
     cvar_range_risk = model[key] = @expression(model, cvar_risk_l - cvar_risk_h)
     model[Symbol(:ccvar_l_, i)], model[Symbol(:ccvar_h_, i)] = @constraints(model,
                                                                             begin
@@ -729,7 +730,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                                                                                                                                                                                                                                                                                                                 lb) <=
                                                                                                                                                                                                                                                                                                                                0
                                                                                                                                                                                                                                                                                                                            end)
-    drcvar_risk = model[key] = @expression(model, radius * lb + mean(s))
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    drcvar_risk = model[key] = if isnothing(wi)
+        @expression(model, radius * lb + mean(s))
+    else
+        @expression(model, radius * lb + mean(s, wi))
+    end
     set_risk_bounds_and_expression!(model, opt, drcvar_risk, r.settings, key)
     return nothing
 end
@@ -741,7 +747,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
-    at = r.alpha * T
     t_evar, z_evar, u_evar = model[Symbol(:t_evar_, i)], model[Symbol(:z_evar_, i)], model[Symbol(:u_evar_, i)] = @variables(model,
                                                                                                                              begin
                                                                                                                                  ()
@@ -749,24 +754,21 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
                                                                                                                                  (lower_bound = 0)
                                                                                                                                  [1:T]
                                                                                                                              end)
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    at = if isnothing(wi)
+        model[Symbol(:cevar_, i)] = @constraint(model, sc * (sum(u_evar) - z_evar) <= 0)
+        r.alpha * T
+    else
+        model[Symbol(:cevar_, i)] = @constraint(model,
+                                                sc * (sum(wi[i] .* u_evar) - z_evar) <= 0)
+        r.alpha * sum(wi)
+    end
+    model[Symbol(:cevar_exp_cone_, i)] = @constraint(model, [i = 1:T],
+                                                     [sc * (-net_X[i] - t_evar),
+                                                      sc * z_evar, sc * u_evar[i]] ∈
+                                                     MOI.ExponentialCone())
     evar_risk = model[Symbol(:evar_risk_, i)] = @expression(model,
                                                             t_evar - z_evar * log(at))
-    model[Symbol(:cevar_, i)], model[Symbol(:cevar_exp_cone_, i)] = @constraints(model,
-                                                                                 begin
-                                                                                     sc *
-                                                                                     (sum(u_evar) -
-                                                                                      z_evar) <=
-                                                                                     0
-                                                                                     [i = 1:T],
-                                                                                     [sc *
-                                                                                      (-net_X[i] -
-                                                                                       t_evar),
-                                                                                      sc *
-                                                                                      z_evar,
-                                                                                      sc *
-                                                                                      u_evar[i]] ∈
-                                                                                     MOI.ExponentialCone()
-                                                                                 end)
     set_risk_bounds_and_expression!(model, opt, evar_risk, r.settings, key)
     return nothing
 end
@@ -778,8 +780,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
-    at = r.alpha * T
-    bt = r.beta * T
     t_evar_l, z_evar_l, u_evar_l, t_evar_h, z_evar_h, u_evar_h = model[Symbol(:t_evar_l_, i)], model[Symbol(:z_evar_l_, i)], model[Symbol(:u_evar_l_, i)], model[Symbol(:t_evar_h_, i)], model[Symbol(:z_evar_h_, i)], model[Symbol(:u_evar_h_, i)] = @variables(model,
                                                                                                                                                                                                                                                                  begin
                                                                                                                                                                                                                                                                      ()
@@ -791,6 +791,58 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
                                                                                                                                                                                                                                                                      (upper_bound = 0)
                                                                                                                                                                                                                                                                      [1:T]
                                                                                                                                                                                                                                                                  end)
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    at, bt = if isnothing(wi)
+        model[Symbol(:cevar_l_, i)], model[Symbol(:cevar_h_, i)] = @constraints(model,
+                                                                                begin
+                                                                                    sc *
+                                                                                    (sum(u_evar_l) -
+                                                                                     z_evar_l) <=
+                                                                                    0
+                                                                                    sc *
+                                                                                    (sum(u_evar_h) -
+                                                                                     z_evar_h) >=
+                                                                                    0
+                                                                                end)
+        r.alpha * T, r.beta * T
+    else
+        model[Symbol(:cevar_l_, i)], model[Symbol(:cevar_h_, i)] = @constraints(model,
+                                                                                begin
+                                                                                    sc *
+                                                                                    (sum(wi .*
+                                                                                         u_evar_l) -
+                                                                                     z_evar_l) <=
+                                                                                    0
+                                                                                    sc *
+                                                                                    (sum(wi .*
+                                                                                         u_evar_h) -
+                                                                                     z_evar_h) >=
+                                                                                    0
+                                                                                end)
+        swi = sum(wi)
+        r.alpha * swi, r.beta * swi
+    end
+    model[Symbol(:cevar_exp_cone_l_, i)], model[Symbol(:cevar_exp_cone_h_, i)] = @constraints(model,
+                                                                                              begin
+                                                                                                  [i = 1:T],
+                                                                                                  [sc *
+                                                                                                   (-net_X[i] -
+                                                                                                    t_evar_l),
+                                                                                                   sc *
+                                                                                                   z_evar_l,
+                                                                                                   sc *
+                                                                                                   u_evar_l[i]] ∈
+                                                                                                  MOI.ExponentialCone()
+                                                                                                  [i = 1:T],
+                                                                                                  [sc *
+                                                                                                   (net_X[i] +
+                                                                                                    t_evar_h),
+                                                                                                   -sc *
+                                                                                                   z_evar_h,
+                                                                                                   -sc *
+                                                                                                   u_evar_h[i]] ∈
+                                                                                                  MOI.ExponentialCone()
+                                                                                              end)
     evar_risk_l, evar_risk_h = model[Symbol(:evar_risk_l_, i)], model[Symbol(:evar_risk_h_, i)] = @expressions(model,
                                                                                                                begin
                                                                                                                    t_evar_l -
@@ -801,35 +853,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
                                                                                                                    log(bt)
                                                                                                                end)
     evar_risk_range = model[key] = @expression(model, evar_risk_l - evar_risk_h)
-    model[Symbol(:cevar_l_, i)], model[Symbol(:cevar_exp_cone_l_, i)], model[Symbol(:cevar_h_, i)], model[Symbol(:cevar_exp_cone_h_, i)] = @constraints(model,
-                                                                                                                                                        begin
-                                                                                                                                                            sc *
-                                                                                                                                                            (sum(u_evar_l) -
-                                                                                                                                                             z_evar_l) <=
-                                                                                                                                                            0
-                                                                                                                                                            [i = 1:T],
-                                                                                                                                                            [sc *
-                                                                                                                                                             (-net_X[i] -
-                                                                                                                                                              t_evar_l),
-                                                                                                                                                             sc *
-                                                                                                                                                             z_evar_l,
-                                                                                                                                                             sc *
-                                                                                                                                                             u_evar_l[i]] ∈
-                                                                                                                                                            MOI.ExponentialCone()
-                                                                                                                                                            sc *
-                                                                                                                                                            (sum(u_evar_h) -
-                                                                                                                                                             z_evar_h) >=
-                                                                                                                                                            0
-                                                                                                                                                            [i = 1:T],
-                                                                                                                                                            [sc *
-                                                                                                                                                             (net_X[i] +
-                                                                                                                                                              t_evar_h),
-                                                                                                                                                             -sc *
-                                                                                                                                                             z_evar_h,
-                                                                                                                                                             -sc *
-                                                                                                                                                             u_evar_h[i]] ∈
-                                                                                                                                                            MOI.ExponentialCone()
-                                                                                                                                                        end)
     set_risk_bounds_and_expression!(model, opt, evar_risk_range, r.settings, key)
     return nothing
 end
@@ -843,14 +866,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::RelativisticVal
     T = length(net_X)
     alpha = r.alpha
     kappa = r.kappa
-    iat = inv(alpha * T)
-    ik2 = inv(2 * kappa)
-    lnk = (iat^kappa - iat^(-kappa)) * ik2
-    opk = one(kappa) + kappa
-    omk = one(kappa) - kappa
-    ik = inv(kappa)
-    iopk = inv(opk)
-    iomk = inv(omk)
     t_rlvar, z_rlvar, omega_rlvar, psi_rlvar, theta_rlvar, epsilon_rlvar = model[Symbol(:t_rlvar_, i)], model[Symbol(:z_rlvar_, i)], model[Symbol(:omega_rlvar_, i)], model[Symbol(:psi_rlvar_, i)], model[Symbol(:theta_rlvar_, i)], model[Symbol(:epsilon_rlvar_, i)] = @variables(model,
                                                                                                                                                                                                                                                                                      begin
                                                                                                                                                                                                                                                                                          ()
@@ -861,10 +876,22 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::RelativisticVal
                                                                                                                                                                                                                                                                                          [1:T]
                                                                                                                                                                                                                                                                                          [1:T]
                                                                                                                                                                                                                                                                                      end)
-    rlvar_risk = model[key] = @expression(model,
-                                          t_rlvar +
-                                          lnk * z_rlvar +
-                                          sum(psi_rlvar + theta_rlvar))
+    ik2 = inv(2 * kappa)
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    rlvar_risk = model[key] = if isnothing(wi)
+        iat = inv(alpha * T)
+        lnk = (iat^kappa - iat^(-kappa)) * ik2
+        @expression(model, t_rlvar + lnk * z_rlvar + sum(psi_rlvar + theta_rlvar))
+    else
+        iat = inv(alpha * sum(wi))
+        lnk = (iat^kappa - iat^(-kappa)) * ik2
+        @expression(model, t_rlvar + lnk * z_rlvar + sum(wi .* (psi_rlvar + theta_rlvar)))
+    end
+    opk = one(kappa) + kappa
+    omk = one(kappa) - kappa
+    ik = inv(kappa)
+    iopk = inv(opk)
+    iomk = inv(omk)
     model[Symbol(:crlvar_pcone_a_, i)], model[Symbol(:crlvar_pcone_b_, i)], model[Symbol(:crlvar_, i)] = @constraints(model,
                                                                                                                       begin
                                                                                                                           [i = 1:T],
@@ -911,25 +938,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     T = length(net_X)
     alpha = r.alpha
     kappa_a = r.kappa_a
-    iat = inv(alpha * T)
-    ik2_a = inv(2 * kappa_a)
-    lnk_a = (iat^kappa_a - iat^(-kappa_a)) * ik2_a
-    opk_a = one(kappa_a) + kappa_a
-    omk_a = one(kappa_a) - kappa_a
-    ik_a = inv(kappa_a)
-    iopk_a = inv(opk_a)
-    iomk_a = inv(omk_a)
     beta = r.beta
     kappa_b = r.kappa_b
-    ibt = inv(beta * T)
-    ik2_b = inv(2 * kappa_b)
-    lnk_b = (ibt^kappa_b - ibt^(-kappa_b)) * ik2_b
-    opk_b = one(kappa_b) + kappa_b
-    omk_b = one(kappa_b) - kappa_b
-    ik_b = inv(kappa_b)
-    iopk_b = inv(opk_b)
-    iomk_b = inv(omk_b)
-
     t_rlvar_l, z_rlvar_l, omega_rlvar_l, psi_rlvar_l, theta_rlvar_l, epsilon_rlvar_l, t_rlvar_h, z_rlvar_h, omega_rlvar_h, psi_rlvar_h, theta_rlvar_h, epsilon_rlvar_h = model[Symbol(:t_rlvar_l_, i)], model[Symbol(:z_rlvar_l_, i)], model[Symbol(:omega_rlvar_l_, i)], model[Symbol(:psi_rlvar_l_, i)], model[Symbol(:theta_rlvar_l_, i)], model[Symbol(:epsilon_rlvar_l_, i)], model[Symbol(:t_rlvar_h_, i)], model[Symbol(:z_rlvar_h_, i)], model[Symbol(:omega_rlvar_h_, i)], model[Symbol(:psi_rlvar_h_, i)], model[Symbol(:theta_rlvar_h_, i)], model[Symbol(:epsilon_rlvar_h_, i)] = @variables(model,
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          begin
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ()
@@ -947,19 +957,44 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              [1:T]
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              [1:T]
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          end)
-    rlvar_risk_l, rlvar_risk_h = model[Symbol(:rlvar_risk_l_, i)], model[Symbol(:rlvar_risk_h_, i)] = @expressions(model,
-                                                                                                                   begin
-                                                                                                                       t_rlvar_l +
-                                                                                                                       lnk_a *
-                                                                                                                       z_rlvar_l +
-                                                                                                                       sum(psi_rlvar_l +
-                                                                                                                           theta_rlvar_l)
-                                                                                                                       t_rlvar_h +
-                                                                                                                       lnk_b *
-                                                                                                                       z_rlvar_h +
-                                                                                                                       sum(psi_rlvar_h +
-                                                                                                                           theta_rlvar_h)
-                                                                                                                   end)
+    ik2_a = inv(2 * kappa_a)
+    ik2_b = inv(2 * kappa_b)
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    rlvar_risk_l, rlvar_risk_h = model[Symbol(:rlvar_risk_l_, i)], model[Symbol(:rlvar_risk_h_, i)] = if isnothing(wi)
+        iat = inv(alpha * T)
+        ibt = inv(beta * T)
+        lnk_a = (iat^kappa_a - iat^(-kappa_a)) * ik2_a
+        lnk_b = (ibt^kappa_b - ibt^(-kappa_b)) * ik2_b
+        @expressions(model,
+                     begin
+                         t_rlvar_l + lnk_a * z_rlvar_l + sum(psi_rlvar_l + theta_rlvar_l)
+                         t_rlvar_h + lnk_b * z_rlvar_h + sum(psi_rlvar_h + theta_rlvar_h)
+                     end)
+    else
+        iat = inv(alpha * sum(wi))
+        ibt = inv(beta * sum(wi))
+        lnk_a = (iat^kappa_a - iat^(-kappa_a)) * ik2_a
+        lnk_b = (ibt^kappa_b - ibt^(-kappa_b)) * ik2_b
+        @expressions(model,
+                     begin
+                         t_rlvar_l +
+                         lnk_a * z_rlvar_l +
+                         sum(wi .* (psi_rlvar_l + theta_rlvar_l))
+                         t_rlvar_h +
+                         lnk_b * z_rlvar_h +
+                         sum(wi .* (psi_rlvar_h + theta_rlvar_h))
+                     end)
+    end
+    opk_a = one(kappa_a) + kappa_a
+    omk_a = one(kappa_a) - kappa_a
+    ik_a = inv(kappa_a)
+    iopk_a = inv(opk_a)
+    iomk_a = inv(omk_a)
+    opk_b = one(kappa_b) + kappa_b
+    omk_b = one(kappa_b) - kappa_b
+    ik_b = inv(kappa_b)
+    iopk_b = inv(opk_b)
+    iomk_b = inv(omk_b)
     rlvar_range_risk = model[Symbol(:rlvar_range_risk_, i)] = @expression(model,
                                                                           rlvar_risk_l -
                                                                           rlvar_risk_h)
@@ -1062,14 +1097,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::AverageDrawdown
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
     key = Symbol(:add_risk_, i)
-    sc = model[:sc]
     dd = set_drawdown_constraints!(model, pr.X)
     T = length(dd) - 1
-    w = r.w
-    add_risk = model[Symbol(key)] = if isnothing(w)
+    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    add_risk = model[Symbol(key)] = if isnothing(wi)
         @expression(model, mean(view(dd, 2:(T + 1))))
     else
-        @expression(model, mean(view(dd, 2:(T + 1)), w))
+        @expression(model, mean(view(dd, 2:(T + 1)), wi))
     end
     set_risk_bounds_and_expression!(model, opt, add_risk, r.settings, key)
     return nothing

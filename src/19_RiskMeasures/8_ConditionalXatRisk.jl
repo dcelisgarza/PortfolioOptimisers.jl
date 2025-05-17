@@ -14,14 +14,13 @@ function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
     return ConditionalValueatRisk{typeof(settings), typeof(alpha), typeof(w)}(settings,
                                                                               alpha, w)
 end
-#! TODO check this
 function risk_measure_factory(r::ConditionalValueatRisk, prior::AbstractPriorResult,
                               args...; kwargs...)
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
     return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha, w = r.w)
 end
 #! TODO add version of this that uses weights
-function (r::ConditionalValueatRisk)(x::AbstractVector)
+function (r::ConditionalValueatRisk{<:Any, <:Any, <:Nothing})(x::AbstractVector)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
     var = -partialsort!(x, idx)
