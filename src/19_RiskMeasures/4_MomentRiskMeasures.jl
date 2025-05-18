@@ -137,39 +137,45 @@ function calc_moment_val(r::Union{<:AbstractMomentRiskMeasure,
     target = calc_moment_target(r, w, x)
     return x .- target
 end
-function (r::LowOrderMoment{<:Any, <:FirstLowerMoment, <:Any, <:Any})(w::AbstractVector,
+function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(w::AbstractVector,
                                                                       X::AbstractMatrix,
                                                                       fees::Union{Nothing,
                                                                                   <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     return isnothing(r.w) ? -mean(val) : -mean(val, r.w)
 end
-function (r::LowOrderMoment{<:Any, <:LowOrderDeviation{<:Any, <:FirstLowerMoment}, <:Any,
-                            <:Any})(w::AbstractVector, X::AbstractMatrix,
-                                    fees::Union{Nothing, <:Fees} = nothing)
+function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+                            <:LowOrderDeviation{<:Any, <:FirstLowerMoment}})(w::AbstractVector,
+                                                                             X::AbstractMatrix,
+                                                                             fees::Union{Nothing,
+                                                                                         <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     return StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
-function (r::LowOrderMoment{<:Any, <:LowOrderDeviation{<:Any, <:SecondLowerMoment}, <:Any,
-                            <:Any})(w::AbstractVector, X::AbstractMatrix,
-                                    fees::Union{Nothing, <:Fees} = nothing)
+function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+                            <:LowOrderDeviation{<:Any, <:SecondLowerMoment}})(w::AbstractVector,
+                                                                              X::AbstractMatrix,
+                                                                              fees::Union{Nothing,
+                                                                                          <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     return StatsBase.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
-function (r::LowOrderMoment{<:Any, <:LowOrderDeviation{<:Any, <:SecondCentralMoment}, <:Any,
-                            <:Any})(w::AbstractVector, X::AbstractMatrix,
-                                    fees::Union{Nothing, <:Fees} = nothing)
+function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+                            <:LowOrderDeviation{<:Any, <:SecondCentralMoment}})(w::AbstractVector,
+                                                                                X::AbstractMatrix,
+                                                                                fees::Union{Nothing,
+                                                                                            <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     return StatsBase.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
-function (r::LowOrderMoment{<:Any, <:MeanAbsoluteDeviation, <:Any, <:Any})(w::AbstractVector,
+function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation})(w::AbstractVector,
                                                                            X::AbstractMatrix,
                                                                            fees::Union{Nothing,
                                                                                        <:Fees} = nothing)
     val = abs.(calc_moment_val(r, w, X, fees))
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
-function (r::HighOrderMoment{<:Any, <:ThirdLowerMoment, <:Any, <:Any})(w::AbstractVector,
+function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment})(w::AbstractVector,
                                                                        X::AbstractMatrix,
                                                                        fees::Union{Nothing,
                                                                                    <:Fees} = nothing)
@@ -177,7 +183,7 @@ function (r::HighOrderMoment{<:Any, <:ThirdLowerMoment, <:Any, <:Any})(w::Abstra
     val .= val .^ 3
     return isnothing(r.w) ? -mean(val) : -mean(val, r.w)
 end
-function (r::HighOrderMoment{<:Any, <:FourthLowerMoment, <:Any, <:Any})(w::AbstractVector,
+function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthLowerMoment})(w::AbstractVector,
                                                                         X::AbstractMatrix,
                                                                         fees::Union{Nothing,
                                                                                     <:Fees} = nothing)
@@ -185,7 +191,7 @@ function (r::HighOrderMoment{<:Any, <:FourthLowerMoment, <:Any, <:Any})(w::Abstr
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
-function (r::HighOrderMoment{<:Any, <:FourthCentralMoment, <:Any, <:Any})(w::AbstractVector,
+function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthCentralMoment})(w::AbstractVector,
                                                                           X::AbstractMatrix,
                                                                           fees::Union{Nothing,
                                                                                       <:Fees} = nothing)
@@ -193,27 +199,33 @@ function (r::HighOrderMoment{<:Any, <:FourthCentralMoment, <:Any, <:Any})(w::Abs
     val .= val .^ 4
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
-function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:Any, <:ThirdLowerMoment}, <:Any,
-                             <:Any})(w::AbstractVector, X::AbstractMatrix,
-                                     fees::Union{Nothing, <:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:Any, <:Any,
+                             <:HighOrderDeviation{<:Any, <:ThirdLowerMoment}})(w::AbstractVector,
+                                                                               X::AbstractMatrix,
+                                                                               fees::Union{Nothing,
+                                                                                           <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     sigma = StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3
     res = isnothing(r.w) ? -mean(val) : -mean(val, r.w)
     return res / sigma^3
 end
-function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:Any, <:FourthLowerMoment}, <:Any,
-                             <:Any})(w::AbstractVector, X::AbstractMatrix,
-                                     fees::Union{Nothing, <:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:Any, <:Any,
+                             <:HighOrderDeviation{<:Any, <:FourthLowerMoment}})(w::AbstractVector,
+                                                                                X::AbstractMatrix,
+                                                                                fees::Union{Nothing,
+                                                                                            <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     sigma = StatsBase.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)
     return res / sigma^2
 end
-function (r::HighOrderMoment{<:Any, <:HighOrderDeviation{<:Any, <:FourthCentralMoment},
-                             <:Any, <:Any})(w::AbstractVector, X::AbstractMatrix,
-                                            fees::Union{Nothing, <:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:Any, <:Any,
+                             <:HighOrderDeviation{<:Any, <:FourthCentralMoment}})(w::AbstractVector,
+                                                                                  X::AbstractMatrix,
+                                                                                  fees::Union{Nothing,
+                                                                                              <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
     sigma = StatsBase.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
