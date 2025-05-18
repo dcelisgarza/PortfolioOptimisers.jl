@@ -574,7 +574,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::ConditionalValu
         @expression(model, var + sum(z_cvar) * iat)
     else
         iat = inv(r.alpha * sum(wi))
-        @expression(model, var + sum(wi .* z_cvar) * iat)
+        @expression(model, var + dot(wi, z_cvar) * iat)
     end
     model[Symbol(:ccvar_, i)] = @constraint(model, sc * ((z_cvar + net_X) .+ var) >= 0)
     set_risk_bounds_and_expression!(model, opt, cvar_risk, r.settings, key)
@@ -618,11 +618,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
         model[Symbol(:cvar_risk_l_, i)], model[Symbol(:cvar_risk_h_, i)] = @expressions(model,
                                                                                         begin
                                                                                             var_l +
-                                                                                            sum(wi .*
+                                                                                            dot(wi,
                                                                                                 z_cvar_l) *
                                                                                             iat
                                                                                             var_h +
-                                                                                            sum(wi .*
+                                                                                            dot(wi,
                                                                                                 z_cvar_h) *
                                                                                             ibt
                                                                                         end)
@@ -759,8 +759,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
         model[Symbol(:cevar_, i)] = @constraint(model, sc * (sum(u_evar) - z_evar) <= 0)
         r.alpha * T
     else
-        model[Symbol(:cevar_, i)] = @constraint(model,
-                                                sc * (sum(wi[i] .* u_evar) - z_evar) <= 0)
+        model[Symbol(:cevar_, i)] = @constraint(model, sc * (dot(wi, u_evar) - z_evar) <= 0)
         r.alpha * sum(wi)
     end
     model[Symbol(:cevar_exp_cone_, i)] = @constraint(model, [i = 1:T],
@@ -809,12 +808,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
         model[Symbol(:cevar_l_, i)], model[Symbol(:cevar_h_, i)] = @constraints(model,
                                                                                 begin
                                                                                     sc *
-                                                                                    (sum(wi .*
+                                                                                    (dot(wi,
                                                                                          u_evar_l) -
                                                                                      z_evar_l) <=
                                                                                     0
                                                                                     sc *
-                                                                                    (sum(wi .*
+                                                                                    (dot(wi,
                                                                                          u_evar_h) -
                                                                                      z_evar_h) >=
                                                                                     0
@@ -885,7 +884,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::RelativisticVal
     else
         iat = inv(alpha * sum(wi))
         lnk = (iat^kappa - iat^(-kappa)) * ik2
-        @expression(model, t_rlvar + lnk * z_rlvar + sum(wi .* (psi_rlvar + theta_rlvar)))
+        @expression(model, t_rlvar + lnk * z_rlvar + dot(wi, psi_rlvar + theta_rlvar))
     end
     opk = one(kappa) + kappa
     omk = one(kappa) - kappa
@@ -979,10 +978,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                      begin
                          t_rlvar_l +
                          lnk_a * z_rlvar_l +
-                         sum(wi .* (psi_rlvar_l + theta_rlvar_l))
+                         dot(wi, psi_rlvar_l + theta_rlvar_l)
                          t_rlvar_h +
                          lnk_b * z_rlvar_h +
-                         sum(wi .* (psi_rlvar_h + theta_rlvar_h))
+                         dot(wi, psi_rlvar_h + theta_rlvar_h)
                      end)
     end
     opk_a = one(kappa_a) + kappa_a
