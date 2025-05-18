@@ -76,6 +76,9 @@ function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
     elseif isa(mu, Real)
         @smart_assert(isfinite(mu))
     end
+    if isa(w, AbstractWeights)
+        @smart_assert(!isempty(w))
+    end
     return LowOrderMoment{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w,
                                                                                 mu, alg)
 end
@@ -97,29 +100,31 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
     elseif isa(mu, Real)
         @smart_assert(isfinite(mu))
     end
+    if isa(w, AbstractWeights)
+        @smart_assert(!isempty(w))
+    end
     return HighOrderMoment{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings,
                                                                                  w, mu, alg)
 end
-function calc_moment_target(::Union{<:LowOrderMoment{<:Any, <:Any, Nothing, Nothing},
-                                    <:HighOrderMoment{<:Any, <:Any, Nothing, Nothing}},
+function calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
+                                    <:HighOrderMoment{<:Any, Nothing, Nothing, <:Any}},
                             ::Any, x::AbstractVector)
     return mean(x)
 end
-function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:AbstractWeights,
-                                                      Nothing},
-                                     <:HighOrderMoment{<:Any, <:Any, <:AbstractWeights,
-                                                       Nothing}}, ::Any, x::AbstractVector)
+function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:AbstractWeights, Nothing,
+                                                      <:Any},
+                                     <:HighOrderMoment{<:Any, <:AbstractWeights, Nothing,
+                                                       <:Any}}, ::Any, x::AbstractVector)
     return mean(x, r.w)
 end
-function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Any,
-                                                      <:AbstractVector},
-                                     <:HighOrderMoment{<:Any, <:Any, <:Any,
-                                                       <:AbstractVector}},
-                            w::AbstractVector, ::Any)
+function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:AbstractVector,
+                                                      <:Any},
+                                     <:HighOrderMoment{<:Any, <:Any, <:AbstractVector,
+                                                       <:Any}}, w::AbstractVector, ::Any)
     return dot(w, r.mu)
 end
-function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Any, <:Real},
-                                     <:HighOrderMoment{<:Any, <:Any, <:Any, <:Real}}, ::Any,
+function calc_moment_target(r::Union{<:LowOrderMoment{<:Any, <:Any, <:Real, <:Any},
+                                     <:HighOrderMoment{<:Any, <:Any, <:Real, <:Any}}, ::Any,
                             ::Any)
     return r.mu
 end

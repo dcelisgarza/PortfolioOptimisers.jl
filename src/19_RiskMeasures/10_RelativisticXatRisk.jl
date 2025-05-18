@@ -195,10 +195,11 @@ function RelativisticValueatRiskRange(;
                                         typeof(w)}(settings, slv, alpha, kappa_a, beta,
                                                    kappa_b, w)
 end
-function (r::RelativisticValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
+function (r::RelativisticValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                          Nothing})(x::AbstractVector)
     return RRM(x, r.slv, r.alpha, r.kappa_a) + RRM(-x, r.slv, r.beta, r.kappa_b)
 end
-function (r::RelativisticValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:Any,
+function (r::RelativisticValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                           <:AbstractWeights})(x::AbstractVector)
     return RRM(x, r.slv, r.w, r.alpha, r.kappa_a) + RRM(-x, r.slv, r.w, r.beta, r.kappa_b)
 end

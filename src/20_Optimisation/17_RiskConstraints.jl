@@ -317,22 +317,21 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::UncertaintySetV
     set_risk_bounds_and_expression!(model, opt, ucs_variance_risk, r.settings, key)
     return nothing
 end
-function calc_risk_constraint_target(::LowOrderMoment{<:Any, <:Any, <:Any, Nothing},
+function calc_risk_constraint_target(::LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
                                      w::AbstractVector, mu::AbstractVector, args...)
     return dot(w, mu)
 end
-function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:Any,
-                                                       <:AbstractVector}, w::AbstractVector,
-                                     args...)
+function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:AbstractVector,
+                                                       <:Any}, w::AbstractVector, args...)
     return dot(w, r.mu)
 end
-function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:Any, <:Real}, ::Any,
+function calc_risk_constraint_target(r::LowOrderMoment{<:Any, <:Any, <:Real, <:Any}, ::Any,
                                      ::Any, k)
     return r.mu * k
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::LowOrderMoment{<:Any, <:MeanAbsoluteDeviation, <:Any,
-                                                 <:Any},
+                               r::LowOrderMoment{<:Any, <:Any, <:Any,
+                                                 <:MeanAbsoluteDeviation},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
@@ -379,10 +378,9 @@ function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Integer, f
     return model[key] = @expression(model, factor * tsecond_moment^2)
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::LowOrderMoment{<:Any,
+                               r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                  <:LowOrderDeviation{<:Any,
-                                                                     <:SecondCentralMoment},
-                                                 <:Any, <:Any},
+                                                                     <:SecondCentralMoment}},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
@@ -413,10 +411,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::LowOrderMoment{<:Any,
+                               r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                  <:LowOrderDeviation{<:Any,
-                                                                     <:SecondLowerMoment},
-                                                 <:Any, <:Any},
+                                                                     <:SecondLowerMoment}},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
@@ -452,10 +449,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::LowOrderMoment{<:Any,
+                               r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                  <:LowOrderDeviation{<:Any,
-                                                                     <:FirstLowerMoment},
-                                                 <:Any, <:Any},
+                                                                     <:FirstLowerMoment}},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
@@ -495,7 +491,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::LowOrderMoment{<:Any, <:FirstLowerMoment, <:Any, <:Any},
+                               r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
