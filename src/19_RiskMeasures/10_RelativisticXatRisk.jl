@@ -133,7 +133,7 @@ end
 function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
                                  alpha::Real = 0.05, kappa::Real = 0.3,
-                                 w::AbstractWeights = nothing)
+                                 w::Union{Nothing, AbstractWeights} = nothing)
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
