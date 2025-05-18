@@ -145,7 +145,7 @@ function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSe
     return RelativisticValueatRisk{typeof(settings), typeof(slv), typeof(alpha),
                                    typeof(kappa), typeof(w)}(settings, slv, alpha, kappa, w)
 end
-function risk_measure_factory(r::RelativisticValueatRisk, ::Any,
+function risk_measure_factory(r::RelativisticValueatRisk, prior::AbstractPriorResult,
                               slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                               args...; kwargs...)
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
@@ -203,7 +203,7 @@ function (r::RelativisticValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
                                           <:AbstractWeights})(x::AbstractVector)
     return RRM(x, r.slv, r.w, r.alpha, r.kappa_a) + RRM(-x, r.slv, r.w, r.beta, r.kappa_b)
 end
-function risk_measure_factory(r::RelativisticValueatRiskRange, ::Any,
+function risk_measure_factory(r::RelativisticValueatRiskRange, prior::AbstractPriorResult,
                               slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                               args...; kwargs...)
     slv = risk_measure_solver_factory(r.slv, slv)

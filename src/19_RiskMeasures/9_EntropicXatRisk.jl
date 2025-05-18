@@ -79,7 +79,7 @@ end
 function (r::EntropicValueatRisk{<:Any, <:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
     return ERM(x, r.slv, r.w, r.alpha)
 end
-function risk_measure_factory(r::EntropicValueatRisk, ::Any,
+function risk_measure_factory(r::EntropicValueatRisk, prior::AbstractPriorResult,
                               slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                               args...; kwargs...)
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
@@ -118,7 +118,7 @@ end
 function (r::EntropicValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
     return ERM(x, r.slv, r.w, r.alpha) + ERM(-x, r.slv, r.w, r.beta)
 end
-function risk_measure_factory(r::EntropicValueatRiskRange, ::Any,
+function risk_measure_factory(r::EntropicValueatRiskRange, prior::AbstractPriorResult,
                               slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                               args...; kwargs...)
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
