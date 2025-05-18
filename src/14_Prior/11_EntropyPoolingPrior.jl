@@ -152,24 +152,26 @@ function entropy_pooling(w::AbstractVector, epcs::Union{Nothing, <:LinearConstra
     B = d_epcs.B_eq
     scale = d_opt.scale
     N = length(B)
+    ialpha = inv(alpha)
     function g(x)
-        pos_ret = max.(A .- x, eltype(x))
-        A_eq = vcat(epcs.A_eq, pos_ret ⊘ alpha)
-        B_eq = vcat(epcs.B_eq, B .- x)
+        @smart_assert(all(zero(eltype(x)) .< x .<= B))
+        pos_part = max.(-A .- Ref(x), eltype(x))
+        A_eq = vcat(epcs.A_eq, pos_part * ialpha)
+        B_eq = vcat(epcs.B_eq, B .- Ref(x))
         epcs2 = LinearConstraintResult(; ineq = epcs.ineq,
                                        eq = PartialLinearConstraintResult(; A = A_eq,
                                                                           B = B_eq))
-        return pos_ret, entropy_pooling(w, epcs2, optim)
+        return pos_part, entropy_pooling(w, epcs2, optim)
     end
-    function h(::Val{1}, A, B, w, pos_ret, alpha)
-        return scale * (sum(w[.!iszero.(pos_ret)]) - alpha)
+    function h(::Val{1}, _A, _B, _w, _pos_part)
+        return scale * (sum(_w[.!iszero.(_pos_part)]) - alpha)
     end
-    function h(::Any, A, B, w, pos_ret, alpha)
-        return scale * norm([cvar(view(A, i, :), alpha) for i ∈ axes(A, 1)] - B) / sqrt(N)
+    function h(::Any, _A, _B, _w, _pos_part)
+        return scale * norm(cvar(transpose(_A), alpha, _w) - _B) / sqrt(N)
     end
     function f(x)
-        pos_ret, w = g(x)
-        return h(VN, A, B, w, pos_ret, alpha)
+        pos_part, w = g(x)
+        return h(VN, A, B, w, pos_part)
     end
     result = if N == 1
         Optim.optimize(f, zero(eltype(B)), B[1], d_opt.args...; d_opt.kwargs...)

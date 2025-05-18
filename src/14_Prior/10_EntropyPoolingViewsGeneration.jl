@@ -564,22 +564,47 @@ function Base.iterate(S::Union{<:ContinuousEntropyPoolingViewEstimator,
                                <:DiscontinuousEntropyPoolingViewEstimator}, state = 1)
     return state > 1 ? nothing : (S, state + 1)
 end
-function cvar(x::AbstractVector, alpha::Real)
-    aT = alpha * length(x)
-    idx = ceil(Int, aT)
-    var = -partialsort(x, idx)
-    sum_var = zero(eltype(x))
-    for i ∈ 1:(idx - 1)
-        sum_var += x[i] + var
+function cvar(x::AbstractVector, alpha::Real, w::AbstractWeights)
+    idx = sortperm(x)
+    w = w[idx] / sum(w)
+    cw = cumsum(w)
+    i = findlast(x -> x <= alpha, cw)
+    x = view(x, idx)
+    return -if isone(i)
+        x[1]
+    else
+        dot(view(x, 1, i), view(w, 1, i)) + x[i] * (one(eltype(cw)) - cw[i - 1] / alpha)
     end
-    return var - sum_var / aT
+end
+function cvar(x::AbstractMatrix, alpha::Real, w::AbstractWeights)
+    idx = sortperm(x; dims = 1)
+    sw = sum(w)
+    w = [w[idx[i]] / sw for i ∈ axes(idx, 2)]
+    cw = cumsum(w; dims = 1)
+    i = [findlast(x -> x <= alpha, cwi) for cwi ∈ axes(idx, 2)]
+    x = view(x, idx)
+    ialpha = inv(alpha)
+    function f(_x, _i, _w, _cw)
+        return -if isone(_i)
+            _x[1]
+        else
+            dot(view(_x, 1, _i), view(_w, 1, _i)) +
+            _x[_i] * (one(eltype(_cw)) - _cw[_i - 1] * ialpha)
+        end
+    end
+    return [f(view(x, :, i), i, view(w, :, i), view(cw, :, i)) for i ∈ axes(idx, 2)]
 end
 function _get_B_entropy_pooling_view_data(epv::ConditionalValueatRiskPoolingConstraintEstimator,
                                           pr::AbstractPriorResult, idx::AbstractVector,
-                                          coef::Real, args...; kwargs...)
+                                          coef::Real, args...;
+                                          w::AbstractWeights = pweights(range(; start = 1,
+                                                                              stop = 1,
+                                                                              length = size(pr.X,
+                                                                                            1))),
+                                          kwargs...)
     alpha = epv.alpha
     X = pr.X
-    cv = [cvar(view(X, :, i), alpha) for i ∈ idx]
+    cv = cvar(X, alpha, w)
     return coef * sum(cv)
 end
 function _get_B_entropy_pooling_view_data(epv::C0_LinearEntropyPoolingConstraintEstimator{<:Any,
@@ -590,8 +615,9 @@ function _get_B_entropy_pooling_view_data(epv::C0_LinearEntropyPoolingConstraint
                                           coef::Real, args...; kwargs...)
     alpha = epv.kind.alpha
     X = view(pr.X, :, idx)
-    var = sum([-partialsort(view(X, :, i), ceil(Int, alpha * size(X, 1))) for i ∈ idx])
-    @smart_assert(var > 0)
+    j = ceil(Int, alpha * size(X, 1))
+    var = sum([-partialsort(view(X, :, i), j) for i ∈ idx])
+    @smart_assert(all(var .>= zero(eltype(var))))
     return coef * var
 end
 function set_var_cvar_A_B(::Any, A, B)
@@ -609,9 +635,9 @@ function set_var_cvar_A_B(epv::C0_LinearEntropyPoolingConstraintEstimator{<:Any,
     A[idx] .= one(ea)
     return A, epv.kind.alpha
 end
-function set_var_cvar_A_B(epv::ConditionalValueatRiskPoolingConstraintEstimator,
+function set_var_cvar_A_B(::ConditionalValueatRiskPoolingConstraintEstimator,
                           A::AbstractVector, B::Real)
-    @smart_assert(B < -minimum(A),
+    @smart_assert(B >= -minimum(A),
                   "Conditional value at risk view too extreme, please increase `alpha`, lower the value of the view, or use a prior that accounts that includes more extreme loss values.")
     return A, B
 end

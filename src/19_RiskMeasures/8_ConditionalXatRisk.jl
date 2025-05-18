@@ -17,10 +17,9 @@ end
 function risk_measure_factory(r::ConditionalValueatRisk, prior::AbstractPriorResult,
                               args...; kwargs...)
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
-    return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha, w = r.w)
+    return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
-#! TODO add version of this that uses weights
-function (r::ConditionalValueatRisk{<:Any, <:Any, <:Nothing})(x::AbstractVector)
+function (r::ConditionalValueatRisk{<:Any, <:Any, Nothing})(x::AbstractVector)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
     var = -partialsort!(x, idx)
@@ -30,23 +29,53 @@ function (r::ConditionalValueatRisk{<:Any, <:Any, <:Nothing})(x::AbstractVector)
     end
     return var - sum_var / aT
 end
+function (r::ConditionalValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
+    idx = sortperm(x)
+    w = r.w[idx] / sum(r.w)
+    cw = cumsum(w)
+    i = findlast(x -> x <= r.alpha, cw)
+    x .= view(x, idx)
+    return -if isone(i)
+        x[1]
+    else
+        dot(view(x, 1, i), view(w, 1, i)) + x[i] * (one(eltype(cw)) - cw[i - 1] / r.alpha)
+    end
+end
 struct DistributionallyRobustConditionalValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
-                                                    T3 <: Real, T4 <: Real} <: RiskMeasure
+                                                    T3 <: Real, T4 <: Real,
+                                                    T5 <: Union{Nothing, <:AbstractWeights}} <:
+       RiskMeasure
     settings::T1
     alpha::T2
     l::T3
     r::T4
+    w::T5
 end
 function DistributionallyRobustConditionalValueatRisk(;
                                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                       l::Real = 1.0, alpha::Real = 0.05,
-                                                      r::Real = 0.02)
+                                                      r::Real = 0.02,
+                                                      w::Union{Nothing, <:AbstractWeights} = nothing)
     @smart_assert(zero(alpha) < alpha < one(alpha))
+    if isa(w, AbstractVector)
+        @smart_assert(!isempty(w))
+    end
     return DistributionallyRobustConditionalValueatRisk{typeof(settings), typeof(alpha),
-                                                        typeof(l), typeof(r)}(settings,
-                                                                              alpha, l, r)
+                                                        typeof(l), typeof(r), typeof(w)}(settings,
+                                                                                         alpha,
+                                                                                         l,
+                                                                                         r,
+                                                                                         w)
 end
-function (r::DistributionallyRobustConditionalValueatRisk)(x::AbstractVector)
+function risk_measure_factory(r::DistributionallyRobustConditionalValueatRisk,
+                              prior::AbstractPriorResult, args...; kwargs...)
+    w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
+    return DistributionallyRobustConditionalValueatRisk(; settings = r.settings,
+                                                        alpha = r.alpha, l = r.l, r = r.r,
+                                                        w = w)
+end
+function (r::DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any, <:Any,
+                                                          Nothing})(x::AbstractVector)
     aT = r.alpha * length(x)
     idx = ceil(Int, aT)
     var = -partialsort!(x, idx)
@@ -56,22 +85,39 @@ function (r::DistributionallyRobustConditionalValueatRisk)(x::AbstractVector)
     end
     return var - sum_var / aT
 end
-struct ConditionalValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real} <:
-       RiskMeasure
+function (r::DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any, <:Any,
+                                                          <:AbstractWeights})(x::AbstractVector)
+    idx = sortperm(x)
+    w = r.w[idx] / sum(r.w)
+    cw = cumsum(w)
+    i = findlast(x -> x <= r.alpha, cw)
+    x .= view(x, idx)
+    return -if isone(i)
+        x[1]
+    else
+        dot(view(x, 1, i), view(w, 1, i)) + x[i] * (one(eltype(cw)) - cw[i - 1] / r.alpha)
+    end
+end
+struct ConditionalValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
+                                   T4 <: Union{Nothing, <:AbstractWeights}} <: RiskMeasure
     settings::T1
     alpha::T2
     beta::T3
+    w::T4
 end
 function ConditionalValueatRiskRange(;
                                      settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                     alpha::Real = 0.05, beta::Real = 0.05)
+                                     alpha::Real = 0.05, beta::Real = 0.05,
+                                     w::Union{Nothing, <:AbstractWeights} = nothing)
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(beta) < beta < one(beta))
-    return ConditionalValueatRiskRange{typeof(settings), typeof(alpha), typeof(beta)}(settings,
-                                                                                      alpha,
-                                                                                      beta)
+    if isa(w, AbstractVector)
+        @smart_assert(!isempty(w))
+    end
+    return ConditionalValueatRiskRange{typeof(settings), typeof(alpha), typeof(beta),
+                                       typeof(w)}(settings, alpha, beta, w)
 end
-function (r::ConditionalValueatRiskRange)(x::AbstractVector)
+function (r::ConditionalValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
     aT = r.alpha * length(x)
     idx1 = ceil(Int, aT)
     var1 = -partialsort!(x, idx1)
@@ -89,6 +135,32 @@ function (r::ConditionalValueatRiskRange)(x::AbstractVector)
         sum_var2 += x[i] + var2
     end
     gain = var2 - sum_var2 / bT
+
+    return loss - gain
+end
+function (r::ConditionalValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
+    idx = sortperm(x)
+    w = r.w[idx] / sum(r.w)
+    cwa = cumsum(w)
+    cwb = cumsum(reverse(w))
+    alpha = r.alpha
+    beta = r.beta
+    ia = findlast(x -> x <= alpha, cwa)
+    ib = findlast(x -> x <= beta, cwb)
+    xa = view(x, idx)
+    xb = view(x, reverse(idx))
+    loss = -if isone(ia)
+        xa[1]
+    else
+        dot(view(xa, 1, ia), view(w, 1, ia)) +
+        xa[ia] * (one(eltype(cwa)) - cwa[ia - 1] / alpha)
+    end
+    gain = -if isone(ib)
+        xb[1]
+    else
+        dot(view(xb, 1, ib), view(w, 1, ib)) +
+        xb[ib] * (one(eltype(cwb)) - cwb[ib - 1] / beta)
+    end
 
     return loss - gain
 end

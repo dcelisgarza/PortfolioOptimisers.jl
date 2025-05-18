@@ -18,9 +18,15 @@ function risk_measure_factory(r::ValueatRisk, prior::AbstractPriorResult, args..
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
-#TODO: do this for weighted version.
-function (r::ValueatRisk)(x::AbstractVector)
+function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::AbstractVector)
     return -partialsort!(x, ceil(Int, r.alpha * length(x)))
+end
+function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
+    idx = sortperm(x)
+    w = r.w[idx] / sum(r.w)
+    cw = cumsum(w)
+    i = findlast(x -> x <= r.alpha, cw)
+    return -view(x, idx)[i]
 end
 struct ValueatRiskRange{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real, T3 <: Real,
                         T4 <: Union{Nothing, <:AbstractWeights}} <: HierarchicalRiskMeasure
@@ -31,9 +37,13 @@ struct ValueatRiskRange{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real, T3 <:
 end
 function ValueatRiskRange(;
                           settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                          alpha::Real = 0.05, beta::Real = 0.05)
+                          alpha::Real = 0.05, beta::Real = 0.05,
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(beta) < beta < one(beta))
+    if isa(w, AbstractVector)
+        @smart_assert(!isempty(w))
+    end
     return ValueatRiskRange{typeof(settings), typeof(alpha), typeof(beta), typeof(w)}(settings,
                                                                                       alpha,
                                                                                       beta,
@@ -44,10 +54,20 @@ function risk_measure_factory(r::ValueatRiskRange, prior::AbstractPriorResult, a
     w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w)
 end
-#TODO: do this for weighted version.
-function (r::ValueatRiskRange)(x::AbstractVector)
+function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
     loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))
     gain = partialsort!(x, ceil(Int, r.beta * length(x)); rev = true)
+    return loss + gain
+end
+function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
+    idx = sortperm(x)
+    w = r.w[idx] / sum(r.w)
+    cwa = cumsum(w)
+    cwb = cumsum(reverse(w))
+    ia = findlast(x -> x <= r.alpha, cwa)
+    ib = findlast(x -> x <= r.beta, cwb)
+    loss = -view(x, idx)[ia]
+    gain = view(x, reverse(idx))[ib]
     return loss + gain
 end
 struct DrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real} <:
