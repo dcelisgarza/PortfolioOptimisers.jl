@@ -129,7 +129,7 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
                                       w_min::AbstractVector, w_opt::AbstractVector,
                                       w_max::AbstractVector)
     X = pr.X
-    r = risk_measure_factory(r, pr, slv)
+    r = factory(r, pr, slv)
     scale = r.settings.scale
     risk_min = expected_risk(r, w_min, X, fees) * scale
     risk_opt = expected_risk(r, w_opt, X, fees) * scale
@@ -142,7 +142,7 @@ function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:Risk
                                       w_min::AbstractVector, w_opt::AbstractVector,
                                       w_max::AbstractVector)
     X = pr.X
-    rs = risk_measure_factory(rs, Ref(pr), Ref(slv))
+    rs = factory(rs, Ref(pr), Ref(slv))
     datatype = eltype(X)
     risk_min = zero(datatype)
     risk_opt = zero(datatype)
@@ -162,7 +162,7 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
                                       w_min::AbstractVector, w_opt::AbstractVector,
                                       w_max::AbstractVector)
     X = pr.X
-    rs = risk_measure_factory(rs, Ref(pr), Ref(slv))
+    rs = factory(rs, Ref(pr), Ref(slv))
     datatype = eltype(X)
     risk_min = zero(datatype)
     risk_opt = zero(datatype)
@@ -187,7 +187,7 @@ function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:Risk
                                       w_min::AbstractVector, w_opt::AbstractVector,
                                       w_max::AbstractVector)
     X = pr.X
-    rs = risk_measure_factory(rs, Ref(pr), Ref(slv))
+    rs = factory(rs, Ref(pr), Ref(slv))
     datatype = eltype(X)
     risk_min = typemin(datatype)
     risk_opt = typemin(datatype)

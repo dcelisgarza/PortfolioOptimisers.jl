@@ -4,8 +4,7 @@ abstract type AbstractLowOrderMomentMeasureAlgorithm <:
               AbstractUnionLowOrderMomentMeasureAlgorithm end
 abstract type AbstractLowOrderDeviationMeasureAlgorithm <:
               AbstractUnionLowOrderMomentMeasureAlgorithm end
-function risk_moment_algorithm_factory(alg::AbstractMomentMeasureAlgorithm, args...;
-                                       kwargs...)
+function factory(alg::AbstractMomentMeasureAlgorithm, args...; kwargs...)
     return alg
 end
 struct FirstLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
@@ -244,11 +243,10 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
 end
 for rt ∈ (LowOrderMoment, HighOrderMoment)
     eval(quote
-             function risk_measure_factory(r::$(rt), prior::AbstractPriorResult, args...;
-                                           kwargs...)
-                 w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
-                 mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
-                 alg = risk_moment_algorithm_factory(r.alg, prior.w)
+             function factory(r::$(rt), prior::AbstractPriorResult, args...; kwargs...)
+                 w = nothing_scalar_array_factory(r.w, prior.w)
+                 mu = nothing_scalar_array_factory(r.mu, prior.mu)
+                 alg = factory(r.alg, w)
                  return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
              end
              function risk_measure_view(r::$(rt), i::AbstractVector, args...)

@@ -7,8 +7,8 @@ end
 function (r::MeanReturn)(x::AbstractVector)
     return isnothing(r.w) ? mean(x) : mean(x, r.w)
 end
-function risk_measure_factory(r::MeanReturn, prior::AbstractPriorResult, args...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
+function factory(r::MeanReturn, prior::AbstractPriorResult, args...)
+    w = nothing_scalar_array_factory(r.w, prior.w)
     return MeanReturn(; w = w)
 end
 function risk_measure_view(r::MeanReturn, ::Any, args...)
@@ -61,10 +61,9 @@ function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:Real},
                                      <:Skewness{<:Any, <:Any, <:Real}}, ::Any, ::Any)
     return r.mu
 end
-function risk_measure_factory(r::ThirdCentralMoment, prior::AbstractPriorResult, args...;
-                              kwargs...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
-    mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
+function factory(r::ThirdCentralMoment, prior::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_factory(r.w, prior.w)
+    mu = nothing_scalar_array_factory(r.mu, prior.mu)
     return ThirdCentralMoment(; w = w, mu = mu)
 end
 function risk_measure_view(r::ThirdCentralMoment, i::AbstractVector, args...)
@@ -77,9 +76,9 @@ function (r::ThirdCentralMoment)(w::AbstractVector, X::AbstractMatrix,
     val .= val .^ 3
     return isnothing(r.w) ? mean(val) : mean(val, r.w)
 end
-function risk_measure_factory(r::Skewness, prior::AbstractPriorResult, args...; kwargs...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
-    mu = risk_measure_nothing_scalar_array_factory(r.mu, prior.mu)
+function factory(r::Skewness, prior::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_factory(r.w, prior.w)
+    mu = nothing_scalar_array_factory(r.mu, prior.mu)
     return Skewness(; ve = factory(r.ve, w), w = w, mu = mu)
 end
 function risk_measure_view(r::Skewness, i::AbstractVector, args...)

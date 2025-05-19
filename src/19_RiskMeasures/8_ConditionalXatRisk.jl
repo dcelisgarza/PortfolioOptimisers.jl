@@ -14,9 +14,8 @@ function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
     return ConditionalValueatRisk{typeof(settings), typeof(alpha), typeof(w)}(settings,
                                                                               alpha, w)
 end
-function risk_measure_factory(r::ConditionalValueatRisk, prior::AbstractPriorResult,
-                              args...; kwargs...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
+function factory(r::ConditionalValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_factory(r.w, prior.w)
     return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
 function (r::ConditionalValueatRisk{<:Any, <:Any, Nothing})(x::AbstractVector)
@@ -67,9 +66,9 @@ function DistributionallyRobustConditionalValueatRisk(;
                                                                                          r,
                                                                                          w)
 end
-function risk_measure_factory(r::DistributionallyRobustConditionalValueatRisk,
-                              prior::AbstractPriorResult, args...; kwargs...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
+function factory(r::DistributionallyRobustConditionalValueatRisk,
+                 prior::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_factory(r.w, prior.w)
     return DistributionallyRobustConditionalValueatRisk(; settings = r.settings,
                                                         alpha = r.alpha, l = r.l, r = r.r,
                                                         w = w)

@@ -22,7 +22,7 @@
     @testset "Asset Risk Budgetting" begin
         pr = prior(EmpiricalPriorEstimator(), rd)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
-        r = PortfolioOptimisers.risk_measure_factory(StandardDeviation(), pr)
+        r = PortfolioOptimisers.factory(StandardDeviation(), pr)
 
         rbe = RiskBudgetting(; r = r, opt = opt)
         w = optimise!(rbe, rd).w
@@ -72,7 +72,7 @@
         pr1 = prior(FactorPriorEstimator(), rd)
         opt = JuMPOptimiser(; bgt = 1, sbgt = 1, wb = WeightBoundsResult(; lb = -1, ub = 1),
                             pe = pr, slv = slv)
-        r = PortfolioOptimisers.risk_measure_factory(StandardDeviation(), pr)
+        r = PortfolioOptimisers.factory(StandardDeviation(), pr)
         rbe = RiskBudgetting(; alg = FactorRiskBudgettingAlgorithm(;), r = r, opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
@@ -198,7 +198,7 @@
         pr1 = prior(FactorPriorEstimator(; re = DimensionReductionRegression()), rd)
         opt = JuMPOptimiser(; bgt = 1, sbgt = 1, wb = WeightBoundsResult(; lb = -1, ub = 1),
                             pe = pr, slv = slv)
-        r = PortfolioOptimisers.risk_measure_factory(StandardDeviation(), pr)
+        r = PortfolioOptimisers.factory(StandardDeviation(), pr)
 
         rbe = RiskBudgetting(;
                              alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,

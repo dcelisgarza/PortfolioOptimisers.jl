@@ -13,9 +13,8 @@ function ValueatRisk(;
     end
     return ValueatRisk{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
 end
-function risk_measure_factory(r::ValueatRisk, prior::AbstractPriorResult, args...;
-                              kwargs...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
+function factory(r::ValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_factory(r.w, prior.w)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
 function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::AbstractVector)
@@ -49,9 +48,8 @@ function ValueatRiskRange(;
                                                                                       beta,
                                                                                       w)
 end
-function risk_measure_factory(r::ValueatRiskRange, prior::AbstractPriorResult, args...;
-                              kwargs...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
+function factory(r::ValueatRiskRange, prior::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_factory(r.w, prior.w)
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w)
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::AbstractVector)

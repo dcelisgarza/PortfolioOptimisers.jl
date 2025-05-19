@@ -1,7 +1,7 @@
 @safetestset "Risk Measure Tests" begin
     using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames, StatsBase,
           Clarabel, LinearAlgebra
-    import PortfolioOptimisers: risk_measure_factory, risk_measure_view, ucs_view,
+    import PortfolioOptimisers: factory, risk_measure_view, ucs_view,
                                 nothing_scalar_array_view, prior_view,
                                 fourth_moment_index_factory,
                                 nothing_scalar_array_view_odd_order, __coskewness
@@ -36,7 +36,7 @@
 
         rs = BrownianDistanceVariance(; settings = settings,
                                       formulation = IneqBrownianDistanceVariance())
-        r = risk_measure_factory(rs)
+        r = factory(rs)
         @test r === rs
         @test isapprox(expected_risk(r, w, X), 0.2018426182783387)
 
@@ -72,7 +72,7 @@
             sigmav = nothing_scalar_array_view(sigma, i)
             rs = [Variance(; settings = settings, formulation = formulation, sigma = sigma,
                            rc = rc), Variance(;)]
-            r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
+            r = factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].formulation === formulation
             @test r[1].sigma === sigma
@@ -86,7 +86,7 @@
             sigmav = nothing_scalar_array_view(sigma, i)
             rs = [StandardDeviation(; settings = settings, sigma = sigma),
                   StandardDeviation(;)]
-            r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
+            r = factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].sigma === sigma
             @test isapprox(expected_risk(r[1], w, X), sqrt(dot(w, sigma, w)))
@@ -98,7 +98,7 @@
             sigmav = nothing_scalar_array_view(sigma, i)
             rs = [UncertaintySetVariance(; settings = settings, ucs = ucs1, sigma = sigma),
                   UncertaintySetVariance(;)]
-            r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
+            r = factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].ucs === ucs1
             @test r[1].sigma === sigma
@@ -117,7 +117,7 @@
                                                          formulation = formulation)),
                   LowOrderMoment(; alg = MeanAbsoluteDeviation()),
                   LowOrderMoment(; alg = MeanAbsoluteDeviation(; w = ew))]
-            r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
+            r = factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].w === ew
             @test r[1].mu === mu
@@ -213,7 +213,7 @@
                                                                                w = ew))),
                   HighOrderMoment(;
                                   alg = HighOrderDeviation(; alg = FourthCentralMoment()))]
-            r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
+            r = factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].w === ew
             @test r[1].mu === mu
@@ -360,7 +360,7 @@
                                      else
                                          kt
                                      end)]
-            r = risk_measure_factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
+            r = factory(rs, Ref(pr1), Ref(slv), Ref(ucs2))
             @test r[1].settings === settings
             @test r[1].w === ew
             @test r[1].mu === mu
@@ -508,7 +508,7 @@
                                    else
                                        V
                                    end), NegativeSkewness(;)]
-            r = risk_measure_factory(rs[1:2], Ref(pr1), Ref(slv), Ref(ucs2))
+            r = factory(rs[1:2], Ref(pr1), Ref(slv), Ref(ucs2))
 
             @test r[1].settings === settings
             @test r[1].alg === QuadraticNegativeSkewness()
@@ -551,11 +551,11 @@
                 @test isapprox(expected_risk(rv[2], wv, prv.X), sqrt(dot(wv, Vv, wv)))
             end
             if isa(pr1, HighOrderPriorResult)
-                r = risk_measure_factory(rs[3], pr1, slv, ucs2)
+                r = factory(rs[3], pr1, slv, ucs2)
                 @test r.sk === pr1.sk
                 @test r.V === pr1.V
             else
-                @test_throws ArgumentError risk_measure_factory(rs[3], pr1, slv, ucs2)
+                @test_throws ArgumentError factory(rs[3], pr1, slv, ucs2)
                 @test_throws ArgumentError risk_measure_view(rs[3], pr1, i, slv, ucs2)
             end
         end
@@ -572,7 +572,7 @@
                ValueatRiskRange(; settings = settings, alpha = 0.2, beta = 0.3),
                DrawdownatRisk(; settings = settings, alpha = 0.4),
                RelativeDrawdownatRisk(; settings = settings, alpha = 0.5)]
-        r1 = risk_measure_factory(rs1)
+        r1 = factory(rs1)
         @test all(rs1 .=== r1)
         @test all(rs1 .=== rv1)
         er1 = expected_risk.(r1, Ref(w), Ref(X))
@@ -593,7 +593,7 @@
                ConditionalValueatRiskRange(; settings = settings, alpha = 0.2, beta = 0.3),
                ConditionalDrawdownatRisk(; settings = settings, alpha = 0.4),
                RelativeConditionalDrawdownatRisk(; settings = hcsettings, alpha = 0.5)]
-        r2 = risk_measure_factory(rs2)
+        r2 = factory(rs2)
         @test all(rs2 .=== r2)
         @test all(rs2 .=== rv2)
         er2 = expected_risk.(r2, Ref(w), Ref(X))
@@ -613,7 +613,7 @@
                                         slv = slv),
                EntropicDrawdownatRisk(; settings = settings, alpha = 0.4),
                RelativeEntropicDrawdownatRisk(; settings = hcsettings, alpha = 0.5)]
-        r3 = risk_measure_factory(rs3, nothing, Ref(slv))
+        r3 = factory(rs3, nothing, Ref(slv))
         @test all(rs3[1:2] .=== r3[1:2])
         @test r3[3].slv === slv
         @test r3[4].slv === slv
@@ -637,7 +637,7 @@
                RelativisticDrawdownatRisk(; settings = settings, alpha = 0.4, kappa = 0.35),
                RelativeRelativisticDrawdownatRisk(; settings = hcsettings, alpha = 0.5,
                                                   kappa = 0.25)]
-        r4 = risk_measure_factory(rs4, nothing, Ref(slv))
+        r4 = factory(rs4, nothing, Ref(slv))
         @test all(rs4[1:2] .=== r4[1:2])
         @test r4[3].slv === slv
         @test r4[4].slv === slv
@@ -667,7 +667,7 @@
                                    w = owa_tg(500; alpha_i = 0.001, alpha = 0.06,
                                               a_sim = 70)),
                OrderedWeightsArray(; w = owa_tgrg(500))]
-        r1 = risk_measure_factory(rs1)
+        r1 = factory(rs1)
         @test all(rs1 .=== r1)
         @test all(rs1 .=== rv1)
         er1 = expected_risk.(r1, Ref(w), Ref(X))
@@ -704,7 +704,7 @@
             pr1 = prior(pe, X)
             rs = [AverageDrawdown(; settings = settings), RelativeAverageDrawdown(;),
                   AverageDrawdown(; w = ew), RelativeAverageDrawdown(; w = ew)]
-            r = risk_measure_factory(rs, Ref(pr1))
+            r = factory(rs, Ref(pr1))
             if isa(pr1, LowOrderPriorResult)
                 @test all(r .=== rs)
                 @test all(rv .=== rs)
@@ -746,7 +746,7 @@
         rs = [UlcerIndex(; settings = settings),
               RelativeUlcerIndex(; settings = hcsettings), MaximumDrawdown(),
               RelativeMaximumDrawdown(), WorstRealisation(), Range(), EqualRiskMeasure()]
-        r = risk_measure_factory(rs)
+        r = factory(rs)
         @test all(rs .=== r)
         @test all(rs .=== rv)
         x = X * w
@@ -771,7 +771,7 @@
               TrackingRiskMeasure(; tracking = WeightsTracking(; w = w2)),
               TrackingRiskMeasure(; settings = settings,
                                   tracking = ReturnsTracking(; w = X * w2))]
-        r = risk_measure_factory(rs)
+        r = factory(rs)
 
         @test all(rs .=== r)
         @test rv[1].w == rv[2].tracking.w == view(w2, i)
@@ -830,7 +830,7 @@
                                                me = SimpleExpectedReturns(; w = ew),
                                                w = ew), w = ew, mu = mu),
                   ThirdCentralMoment(; mu = 0), Skewness(; mu = 0)]
-            r = risk_measure_factory(rs, Ref(pr1))
+            r = factory(rs, Ref(pr1))
             er = expected_risk.(r, Ref(w), Ref(X))
             if isa(pr1, LowOrderPriorResult)
                 @test isnothing(r[1].w)

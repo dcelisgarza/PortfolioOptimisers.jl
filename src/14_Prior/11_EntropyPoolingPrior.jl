@@ -267,7 +267,7 @@ function factory(pe::EntropyPoolingPriorEstimator,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return EntropyPoolingPriorEstimator(; pe = factory(pe.pe, w), views = pe.views,
                                         sets = pe.sets, alg = pe.alg, opt = pe.opt,
-                                        w = isnothing(w) ? pe.w : w)
+                                        w = nothing_scalar_array_factory(pe.w, w))
 end
 function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                 <:Any, <:Any, <:H0_EntropyPooling},

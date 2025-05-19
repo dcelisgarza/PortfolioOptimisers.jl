@@ -20,7 +20,7 @@
 
     pr = prior(EmpiricalPriorEstimator(), rd)
     opt = JuMPOptimiser(; pe = pr, slv = slv)
-    r = PortfolioOptimisers.risk_measure_factory(StandardDeviation(), pr)
+    r = PortfolioOptimisers.factory(StandardDeviation(), pr)
     algs = (BasicRelaxedRiskBudgettingAlgorithm(),
             RegularisationRelaxedRiskBudgettingAlgorithm(),
             RegularisationPenaltyRelaxedRiskBudgettingAlgorithm(),

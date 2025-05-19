@@ -37,14 +37,12 @@ end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:QuadraticNegativeSkewness})(w::AbstractVector)
     return dot(w, r.V, w)
 end
-function risk_measure_factory(r::NegativeSkewness, prior::HighOrderPriorResult, args...;
-                              kwargs...)
-    sk = risk_measure_nothing_scalar_array_factory(r.sk, prior.sk)
-    V = risk_measure_nothing_scalar_array_factory(r.V, prior.V)
+function factory(r::NegativeSkewness, prior::HighOrderPriorResult, args...; kwargs...)
+    sk = nothing_scalar_array_factory(r.sk, prior.sk)
+    V = nothing_scalar_array_factory(r.V, prior.V)
     return NegativeSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V, alg = r.alg)
 end
-function risk_measure_factory(r::NegativeSkewness, ::LowOrderPriorResult, args...;
-                              kwargs...)
+function factory(r::NegativeSkewness, ::LowOrderPriorResult, args...; kwargs...)
     return r
 end
 function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:Any}, ::Any,

@@ -31,8 +31,8 @@ end
 function (r::Variance)(w::AbstractVector)
     return dot(w, r.sigma, w)
 end
-function risk_measure_factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
-    sigma = risk_measure_nothing_scalar_array_factory(r.sigma, prior.sigma)
+function factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
+    sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
     return Variance(; settings = r.settings, sigma = sigma, rc = r.rc,
                     formulation = r.formulation)
 end
@@ -60,9 +60,8 @@ end
 function (r::StandardDeviation)(w::AbstractVector)
     return sqrt(dot(w, r.sigma, w))
 end
-function risk_measure_factory(r::StandardDeviation, prior::AbstractPriorResult, args...;
-                              kwargs...)
-    sigma = risk_measure_nothing_scalar_array_factory(r.sigma, prior.sigma)
+function factory(r::StandardDeviation, prior::AbstractPriorResult, args...; kwargs...)
+    sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
 function risk_measure_view(r::StandardDeviation, i::AbstractVector, args...)
@@ -102,12 +101,12 @@ function no_bounds_risk_measure(r::UncertaintySetVariance, flag::Bool = true)
                                r.sigma)
     end
 end
-function risk_measure_factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
-                              ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                         <:AbstractUncertaintySetEstimator} = nothing,
-                              args...; kwargs...)
+function factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,
+                 ucs::Union{Nothing, <:AbstractUncertaintySetResult,
+                            <:AbstractUncertaintySetEstimator} = nothing, args...;
+                 kwargs...)
     ucs = ucs_factory(r.ucs, ucs)
-    sigma = risk_measure_nothing_scalar_array_factory(r.sigma, prior.sigma)
+    sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
 function risk_measure_view(r::UncertaintySetVariance, i::AbstractVector, args...)

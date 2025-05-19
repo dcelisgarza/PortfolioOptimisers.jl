@@ -145,11 +145,11 @@ function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSe
     return RelativisticValueatRisk{typeof(settings), typeof(slv), typeof(alpha),
                                    typeof(kappa), typeof(w)}(settings, slv, alpha, kappa, w)
 end
-function risk_measure_factory(r::RelativisticValueatRisk, prior::AbstractPriorResult,
-                              slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                              args...; kwargs...)
-    w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
-    slv = risk_measure_solver_factory(r.slv, slv)
+function factory(r::RelativisticValueatRisk, prior::AbstractPriorResult,
+                 slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}, args...;
+                 kwargs...)
+    w = nothing_scalar_array_factory(r.w, prior.w)
+    slv = solver_factory(r.slv, slv)
     return RelativisticValueatRisk(; settings = r.settings, alpha = r.alpha,
                                    kappa = r.kappa, slv = slv, w = w)
 end
@@ -203,10 +203,10 @@ function (r::RelativisticValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
                                           <:AbstractWeights})(x::AbstractVector)
     return RRM(x, r.slv, r.w, r.alpha, r.kappa_a) + RRM(-x, r.slv, r.w, r.beta, r.kappa_b)
 end
-function risk_measure_factory(r::RelativisticValueatRiskRange, prior::AbstractPriorResult,
-                              slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                              args...; kwargs...)
-    slv = risk_measure_solver_factory(r.slv, slv)
+function factory(r::RelativisticValueatRiskRange, prior::AbstractPriorResult,
+                 slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}, args...;
+                 kwargs...)
+    slv = solver_factory(r.slv, slv)
     return RelativisticValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                         kappa_a = r.kappa_a, beta = r.beta,
                                         kappa_b = r.kappa_b, slv = slv)
@@ -286,11 +286,10 @@ function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
 end
 for r ∈ (RelativisticDrawdownatRisk, RelativeRelativisticDrawdownatRisk)
     eval(quote
-             function risk_measure_factory(r::$(r), ::Any,
-                                           slv::Union{Nothing, <:Solver,
-                                                      <:AbstractVector{<:Solver}}, args...;
-                                           kwargs...)
-                 slv = risk_measure_solver_factory(r.slv, slv)
+             function factory(r::$(r), ::Any,
+                              slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
+                              args...; kwargs...)
+                 slv = solver_factory(r.slv, slv)
                  return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
                              slv = slv)
              end

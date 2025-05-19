@@ -345,7 +345,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     T = length(net_X)
     mad = model[Symbol(:mad_, i)] = @variable(model, [1:T], lower_bound = 0)
     mar_mad = model[Symbol(:mar_mad_, i)] = @expression(model, (net_X + mad) .- target)
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(wi)
         @expression(model, mean(mad + mar_mad))
     else
@@ -402,7 +402,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                                                                   [1:T],
                                                                                   lower_bound = 0)
 
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     second_central_moment_risk = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
         set_second_moment_risk!(model, r.alg.alg.formulation, i, factor,
@@ -437,7 +437,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     T = length(net_X)
     second_lower_moment = model[Symbol(:second_lower_moment_, i)] = @variable(model, [1:T],
                                                                               lower_bound = 0)
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     second_lower_moment_risk = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
         set_second_moment_risk!(model, r.alg.alg.formulation, i, factor,
@@ -473,7 +473,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     flm = model[Symbol(:flm_, i)] = @variable(model, [1:T], lower_bound = 0)
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     flm_risk = model[key] = if isnothing(wi)
         @expression(model, mean(flm))
     else
@@ -534,7 +534,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::ConditionalValu
                                                                                        [1:T],
                                                                                        (lower_bound = 0)
                                                                                    end)
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     cvar_risk = model[key] = if isnothing(wi)
         iat = inv(r.alpha * T)
         @expression(model, var + sum(z_cvar) * iat)
@@ -564,7 +564,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                                                                                                                                                          [1:T],
                                                                                                                                                                          (upper_bound = 0)
                                                                                                                                                                      end)
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     cvar_risk_l, cvar_risk_h = if isnothing(wi)
         iat = inv(r.alpha * T)
         ibt = inv(r.beta * T)
@@ -696,7 +696,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                                                                                                                                                                                                                                                                                                                 lb) <=
                                                                                                                                                                                                                                                                                                                                0
                                                                                                                                                                                                                                                                                                                            end)
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     drcvar_risk = model[key] = if isnothing(wi)
         @expression(model, radius * lb + mean(s))
     else
@@ -720,7 +720,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
                                                                                                                                  (lower_bound = 0)
                                                                                                                                  [1:T]
                                                                                                                              end)
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     at = if isnothing(wi)
         model[Symbol(:cevar_, i)] = @constraint(model, sc * (sum(u_evar) - z_evar) <= 0)
         r.alpha * T
@@ -756,7 +756,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
                                                                                                                                                                                                                                                                      (upper_bound = 0)
                                                                                                                                                                                                                                                                      [1:T]
                                                                                                                                                                                                                                                                  end)
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     at, bt = if isnothing(wi)
         model[Symbol(:cevar_l_, i)], model[Symbol(:cevar_h_, i)] = @constraints(model,
                                                                                 begin
@@ -842,7 +842,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::RelativisticVal
                                                                                                                                                                                                                                                                                          [1:T]
                                                                                                                                                                                                                                                                                      end)
     ik2 = inv(2 * kappa)
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     rlvar_risk = model[key] = if isnothing(wi)
         iat = inv(alpha * T)
         lnk = (iat^kappa - iat^(-kappa)) * ik2
@@ -924,7 +924,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          end)
     ik2_a = inv(2 * kappa_a)
     ik2_b = inv(2 * kappa_b)
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     rlvar_risk_l, rlvar_risk_h = model[Symbol(:rlvar_risk_l_, i)], model[Symbol(:rlvar_risk_h_, i)] = if isnothing(wi)
         iat = inv(alpha * T)
         ibt = inv(beta * T)
@@ -1064,7 +1064,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::AverageDrawdown
     key = Symbol(:add_risk_, i)
     dd = set_drawdown_constraints!(model, pr.X)
     T = length(dd) - 1
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
+    wi = nothing_scalar_array_factory(r.w, pr.w)
     add_risk = model[Symbol(key)] = if isnothing(wi)
         @expression(model, mean(view(dd, 2:(T + 1))))
     else

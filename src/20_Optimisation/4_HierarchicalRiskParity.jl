@@ -31,7 +31,7 @@ function optimise!(hc::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hc.opt.pe, rd.X, rd.F; dims = dims)
     clr = clusterise(hc.opt.cle, pr.X; dims = dims)
-    r = risk_measure_factory(hc.r, pr, hc.opt.slv)
+    r = factory(hc.r, pr, hc.opt.slv)
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     rku = unitary_expected_risks(r, pr.X, hc.opt.fees)
     wb = weight_bounds_constraints(hc.opt.wb, hc.opt.sets; N = size(pr.X, 2),
@@ -132,7 +132,7 @@ function optimise!(hc::HierarchicalRiskParity{<:Any,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hc.opt.pe, rd.X, rd.F; dims = dims)
     clr = clusterise(hc.opt.cle, pr.X; dims = dims)
-    r = risk_measure_factory(hc.r, Ref(pr), Ref(hc.opt.slv))
+    r = factory(hc.r, Ref(pr), Ref(hc.opt.slv))
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     wk = zeros(eltype(pr.X), size(pr.X, 2))
     rku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))

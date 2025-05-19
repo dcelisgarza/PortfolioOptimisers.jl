@@ -48,12 +48,11 @@ const MomentRiskMeasures = Union{AbstractMomentRiskMeasure,
                                  AbstractMomentNoOptimisationRiskMeasure}
 
 const SolverRiskMeasures = Union{SolverRiskMeasure, SolverHierarchicalRiskMeasure}
-function risk_measure_factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
+function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
     return rs
 end
-function risk_measure_factory(rs::AbstractVector{<:AbstractBaseRiskMeasure}, args...;
-                              kwargs...)
-    return risk_measure_factory.(rs, args...; kwargs...)
+function factory(rs::AbstractVector{<:AbstractBaseRiskMeasure}, args...; kwargs...)
+    return factory.(rs, args...; kwargs...)
 end
 function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
     return rs

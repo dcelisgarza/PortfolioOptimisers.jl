@@ -92,9 +92,8 @@ function (r::RelativeAverageDrawdown{<:Any, <:AbstractWeights})(x::AbstractVecto
 end
 for r ∈ (AverageDrawdown, RelativeAverageDrawdown)
     eval(quote
-             function risk_measure_factory(r::$(r), prior::AbstractPriorResult, args...;
-                                           kwargs...)
-                 w = risk_measure_nothing_scalar_array_factory(r.w, prior.w)
+             function factory(r::$(r), prior::AbstractPriorResult, args...; kwargs...)
+                 w = nothing_scalar_array_factory(r.w, prior.w)
                  return $(r)(; settings = r.settings, w = w)
              end
          end)
