@@ -55,21 +55,23 @@ function calc_moment_val(r::SquareRootKurtosis, w::AbstractVector, X::AbstractMa
                          fees::Union{Nothing, <:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     target = calc_moment_target(r, w, x)
-    return x ⊖ target
+    return x .- target
 end
 function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Full})(w::AbstractVector,
                                                                             X::AbstractMatrix,
                                                                             fees::Union{Nothing,
                                                                                         <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
-    return sqrt(isnothing(r.w) ? mean(val .^ 4) : mean(val .^ 4, r.w))
+    val .= val .^ 4
+    return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
 function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi})(w::AbstractVector,
                                                                             X::AbstractMatrix,
                                                                             fees::Union{Nothing,
                                                                                         <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
-    return sqrt(isnothing(r.w) ? mean(val .^ 4) : mean(val .^ 4, r.w))
+    val .= val .^ 4
+    return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
 function factory(r::SquareRootKurtosis,
                  pr::HighOrderPriorResult{<:LowOrderPriorResult, <:Any, <:Any, <:Any,

@@ -1146,8 +1146,9 @@ function entropy_pooling_views(pr::AbstractPriorResult,
         B = get_B_entropy_pooling_view_data(pr, epv.B, sets, strict; w = w)
         A, B = set_var_cvar_A_B(epv, A, B)
         d, flag_ineq = comparison_sign_ineq_flag(epv.comp)
-        A = d * A
-        B = d * B
+        scale = norm(A)
+        A = d * A / scale
+        B = d * B / scale
         if flag_ineq
             append!(A_ineq, A)
             append!(B_ineq, B)
