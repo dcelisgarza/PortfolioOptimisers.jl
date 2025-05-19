@@ -20,9 +20,16 @@ function RegressionResult(; M::AbstractMatrix,
     end
     return RegressionResult{typeof(M), typeof(L), typeof(b)}(M, L, b)
 end
-function Base.getproperty(r::RegressionResult, sym::Symbol)
-    return if sym == :frc
-        isnothing(r.L) ? r.M : r.L
+function Base.getproperty(r::RegressionResult{<:Any, Nothing, <:Any}, sym::Symbol)
+    return if sym == :L
+        getfield(r, :M)
+    else
+        getfield(r, sym)
+    end
+end
+function Base.getproperty(r::RegressionResult{<:Any, <:AbstractMatrix, <:Any}, sym::Symbol)
+    return if sym == :L
+        getfield(r, :L)
     else
         getfield(r, sym)
     end

@@ -3,6 +3,7 @@ abstract type VarianceFormulation <: SecondMomentFormulation end
 struct QuadRiskExpr <: VarianceFormulation end
 struct SOCRiskExpr <: VarianceFormulation end
 struct RSOCRiskExpr <: SecondMomentFormulation end
+struct SqrtRiskExpr <: SecondMomentFormulation end
 struct Variance{T1 <: RiskMeasureSettings, T2 <: Union{Nothing, <:AbstractMatrix},
                 T3 <:
                 Union{Nothing, <:LinearConstraint, <:AbstractVector{<:LinearConstraint},

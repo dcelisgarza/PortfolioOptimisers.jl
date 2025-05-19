@@ -68,7 +68,7 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
                                                    rd::ReturnsResult, flag::Bool,
                                                    wi::Union{Nothing, AbstractVector})
     loadings = regression(re, rd.X, rd.F)
-    Bt = transpose(loadings.frc)
+    Bt = transpose(loadings.L)
     b1 = pinv(Bt)
     Nf = size(b1, 2)
     if flag

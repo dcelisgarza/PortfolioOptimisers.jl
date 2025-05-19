@@ -70,7 +70,7 @@ function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector,
                                   kwargs...)
     mr = risk_contribution(r, w, X, fees; delta = delta, marginal = true, kwargs...)
     loadings = regression(re, rd.X, rd.F)
-    Bt = transpose(loadings.frc)
+    Bt = transpose(loadings.L)
     b2t = transpose(pinv(transpose(nullspace(Bt))))
     b3t = transpose(pinv(b2t))
     rc_f = (Bt * w) .* (transpose(pinv(Bt)) * mr)

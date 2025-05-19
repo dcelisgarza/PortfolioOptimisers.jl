@@ -75,8 +75,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::StandardDeviati
     w = model[:w]
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     sd_risk = model[key] = @variable(model)
-    model[Symbol(key, :_soc)] = @constraint(model,
-                                            [sc * sd_risk; sc * G * w] ∈ SecondOrderCone())
+    model[Symbol(:csd_risk_soc, i)] = @constraint(model,
+                                                  [sc * sd_risk; sc * G * w] ∈
+                                                  SecondOrderCone())
     set_risk_bounds_and_expression!(model, opt, sd_risk, r.settings, key)
     return nothing
 end
@@ -377,6 +378,16 @@ function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Integer, f
                                           sc * second_moment] ∈ SecondOrderCone())
     return model[key] = @expression(model, factor * tsecond_moment^2)
 end
+function set_second_moment_risk!(model::JuMP.Model, ::SqrtRiskExpr, i::Integer,
+                                 factor::Real, second_moment, key::Symbol, keyt::Symbol,
+                                 keyc::Symbol)
+    sc = model[:sc]
+    tsecond_moment = model[Symbol(keyt, i)] = @variable(model)
+    model[Symbol(keyc, i)] = @constraint(model,
+                                         [sc * tsecond_moment
+                                          sc * second_moment] ∈ SecondOrderCone())
+    return model[key] = @expression(model, sqrt(factor) * tsecond_moment)
+end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                  <:LowOrderDeviation{<:Any,
@@ -401,8 +412,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
         wi .= sqrt.(wi)
         scaled_second_central_moment = model[Symbol(:scaled_second_central_moment_, i)] = @expression(model,
-                                                                                                      wi .*
-                                                                                                      second_central_moment)
+                                                                                                      dot(wi,
+                                                                                                          second_central_moment))
         set_second_moment_risk!(model, r.alg.alg.formulation, i, factor,
                                 scaled_second_central_moment, key, :tsecond_central_moment_,
                                 :csecond_central_moment_rsoc_)
@@ -417,77 +428,36 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
-    key = Symbol(:semi_variance_risk_, i)
+    key = Symbol(:second_lower_moment_risk_, i)
     sc = model[:sc]
     w = model[:w]
     k = model[:k]
     target = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
-    semi_variance = model[Symbol(:semi_variance_, i)] = @variable(model, [1:T],
-                                                                  lower_bound = 0)
+    second_lower_moment = model[Symbol(:second_lower_moment_, i)] = @variable(model, [1:T],
+                                                                              lower_bound = 0)
     wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
-    semi_variance_risk = if isnothing(wi)
+    second_lower_moment_risk = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
-        set_second_moment_risk!(model, r.alg.alg.formulation, i, factor, semi_variance, key,
-                                :tsemi_variance_, :csemi_variance_rsoc_)
+        set_second_moment_risk!(model, r.alg.alg.formulation, i, factor,
+                                second_lower_moment, key, :tsecond_lower_moment_,
+                                :csecond_lower_moment_rsoc_)
     else
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
         wi .= sqrt.(wi)
-        scaled_semi_variance = model[Symbol(:scaled_semi_variance_, i)] = @expression(model,
-                                                                                      wi .*
-                                                                                      semi_variance)
+        scaled_second_lower_moment = model[Symbol(:scaled_second_lower_moment_, i)] = @expression(model,
+                                                                                                  dot(wi,
+                                                                                                      second_lower_moment))
         set_second_moment_risk!(model, r.alg.alg.formulation, i, factor,
-                                scaled_semi_variance, key, :tsemi_variance_,
-                                :csemi_variance_rsoc_)
+                                scaled_second_lower_moment, key, :tsecond_lower_moment_,
+                                :csecond_lower_moment_rsoc_)
     end
-    model[Symbol(:csemi_variance_mar_, i)] = @constraint(model,
-                                                         sc *
-                                                         ((net_X + semi_variance) .- target) >=
-                                                         0)
-    set_risk_bounds_and_expression!(model, opt, semi_variance_risk, r.settings, key)
-    return nothing
-end
-function set_risk_constraints!(model::JuMP.Model, i::Integer,
-                               r::LowOrderMoment{<:Any, <:Any, <:Any,
-                                                 <:LowOrderDeviation{<:Any,
-                                                                     <:FirstLowerMoment}},
-                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
-    key = Symbol(:semi_sd_risk_, i)
-    sc = model[:sc]
-    w = model[:w]
-    k = model[:k]
-    target = calc_risk_constraint_target(r, w, pr.mu, k)
-    net_X = set_net_portfolio_returns!(model, pr.X)
-    T = length(net_X)
-    semi_sd, tsemi_sd = model[Symbol(:semi_sd_, i)], model[Symbol(:tsemi_sd_, i)] = @variables(model,
-                                                                                               begin
-                                                                                                   ()
-                                                                                                   [1:T],
-                                                                                                   (lower_bound = 0)
-                                                                                               end)
-    wi = risk_measure_nothing_scalar_array_factory(r.w, pr.w)
-    factor = if isnothing(wi)
-        model[Symbol(:csemi_variance_soc_, i)] = @constraint(model,
-                                                             [sc * semi_sd
-                                                              sc * tsemi_sd] ∈
-                                                             SecondOrderCone())
-        StatsBase.varcorrection(T, r.alg.ve.corrected)
-    else
-        model[Symbol(:csemi_variance_soc_, i)] = @constraint(model,
-                                                             [sc * semi_sd
-                                                              sc * sqrt.(wi) .* tsemi_sd] ∈
-                                                             SecondOrderCone())
-        StatsBase.varcorrection(wi, r.alg.ve.corrected)
-    end
-    semi_sd_risk = model[key] = @expression(model, semi_sd * sqrt(factor))
-    model[Symbol(:csemi_variance_mar_, i)] = @constraint(model,
-                                                         sc *
-                                                         ((net_X + tsemi_sd) .- target) >=
-                                                         0)
-    set_risk_bounds_and_expression!(model, opt, semi_sd_risk, r.settings, key)
+    model[Symbol(:csecond_lower_moment_mar_, i)] = @constraint(model,
+                                                               sc * ((net_X +
+                                                                      second_lower_moment) .-
+                                                                     target) >= 0)
+    set_risk_bounds_and_expression!(model, opt, second_lower_moment_risk, r.settings, key)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,

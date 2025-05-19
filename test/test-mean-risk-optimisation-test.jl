@@ -55,13 +55,25 @@
                  LowOrderMoment(; w = ew),#
                  LowOrderMoment(),# 12
                  ###
-                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                 LowOrderMoment(;
+                                alg = LowOrderDeviation(;
+                                                        alg = SecondLowerMoment(;
+                                                                                formulation = SqrtRiskExpr())),
                                 mu = mu),#
-                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                 LowOrderMoment(;
+                                alg = LowOrderDeviation(;
+                                                        alg = SecondLowerMoment(;
+                                                                                formulation = SqrtRiskExpr())),
                                 mu = rf),#
-                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment()),
+                 LowOrderMoment(;
+                                alg = LowOrderDeviation(;
+                                                        alg = SecondLowerMoment(;
+                                                                                formulation = SqrtRiskExpr())),
                                 w = ew),#
-                 LowOrderMoment(; alg = LowOrderDeviation(; alg = FirstLowerMoment())),# 16
+                 LowOrderMoment(;
+                                alg = LowOrderDeviation(;
+                                                        alg = SecondLowerMoment(;
+                                                                                formulation = SqrtRiskExpr()))),# 16
                  ###
                  LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
                                 mu = mu),#

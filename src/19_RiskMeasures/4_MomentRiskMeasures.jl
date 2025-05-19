@@ -9,26 +9,27 @@ function risk_moment_algorithm_factory(alg::AbstractMomentMeasureAlgorithm, args
     return alg
 end
 struct FirstLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
-struct SecondLowerMoment{T1 <: SecondMomentFormulation} <:
-       AbstractLowOrderMomentMeasureAlgorithm
+abstract type DeviationLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
+struct SecondLowerMoment{T1 <: SecondMomentFormulation} <: DeviationLowerMoment
     formulation::T1
 end
 function SecondLowerMoment(; formulation::SecondMomentFormulation = SOCRiskExpr())
     return SecondLowerMoment{typeof(formulation)}(formulation)
 end
-struct SecondCentralMoment{T1 <: SecondMomentFormulation} <:
-       AbstractLowOrderMomentMeasureAlgorithm
+struct SecondCentralMoment{T1 <: SecondMomentFormulation} <: DeviationLowerMoment
     formulation::T1
 end
-struct MeanAbsoluteDeviation <: AbstractLowOrderMomentMeasureAlgorithm end
-struct LowOrderDeviation{T1 <: AbstractVarianceEstimator,
-                         T2 <: AbstractLowOrderMomentMeasureAlgorithm} <:
+function SecondCentralMoment(; formulation::SecondMomentFormulation = SOCRiskExpr())
+    return SecondCentralMoment{typeof(formulation)}(formulation)
+end
+struct MeanAbsoluteDeviation <: DeviationLowerMoment end
+struct LowOrderDeviation{T1 <: AbstractVarianceEstimator, T2 <: DeviationLowerMoment} <:
        AbstractLowOrderDeviationMeasureAlgorithm
     ve::T1
     alg::T2
 end
 function LowOrderDeviation(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
-                           alg::AbstractLowOrderMomentMeasureAlgorithm = FirstLowerMoment())
+                           alg::DeviationLowerMoment = SecondLowerMoment())
     @smart_assert(!isa(alg, MeanAbsoluteDeviation))
     return LowOrderDeviation{typeof(ve), typeof(alg)}(ve, alg)
 end
@@ -145,10 +146,10 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(w::Abstrac
     return isnothing(r.w) ? -mean(val) : -mean(val, r.w)
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
-                            <:LowOrderDeviation{<:Any, <:FirstLowerMoment}})(w::AbstractVector,
-                                                                             X::AbstractMatrix,
-                                                                             fees::Union{Nothing,
-                                                                                         <:Fees} = nothing)
+                            <:LowOrderDeviation{<:Any, <:SecondLowerMoment{<:SqrtRiskExpr}}})(w::AbstractVector,
+                                                                                              X::AbstractMatrix,
+                                                                                              fees::Union{Nothing,
+                                                                                                          <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     return StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
@@ -159,6 +160,15 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                                                           <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
     return StatsBase.var(r.alg.ve, val; mean = zero(eltype(val)))
+end
+function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+                            <:LowOrderDeviation{<:Any,
+                                                <:SecondCentralMoment{<:SqrtRiskExpr}}})(w::AbstractVector,
+                                                                                         X::AbstractMatrix,
+                                                                                         fees::Union{Nothing,
+                                                                                                     <:Fees} = nothing)
+    val = calc_moment_val(r, w, X, fees)
+    return StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:LowOrderDeviation{<:Any, <:SecondCentralMoment}})(w::AbstractVector,
@@ -248,6 +258,6 @@ for rt ∈ (LowOrderMoment, HighOrderMoment)
          end)
 end
 
-export FirstLowerMoment, SecondLowerMoment, MeanAbsoluteDeviation, ThirdLowerMoment,
-       FourthLowerMoment, FourthCentralMoment, LowOrderDeviation, HighOrderDeviation,
-       LowOrderMoment, HighOrderMoment
+export FirstLowerMoment, SecondLowerMoment, SecondCentralMoment, MeanAbsoluteDeviation,
+       ThirdLowerMoment, FourthLowerMoment, FourthCentralMoment, LowOrderDeviation,
+       HighOrderDeviation, LowOrderMoment, HighOrderMoment, SqrtRiskExpr
