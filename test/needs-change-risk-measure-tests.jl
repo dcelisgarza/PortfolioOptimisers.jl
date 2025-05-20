@@ -489,7 +489,7 @@
             sk, V = coskewness(Coskewness(), X)
             skv = nothing_scalar_array_view_odd_order(sk, i, idx)
             Vv = __coskewness(skv, view(pr1.X, :, i), ske.mp)
-            rs = [NegativeSkewness(; settings = settings, alg = QuadraticNegativeSkewness(),
+            rs = [NegativeSkewness(; settings = settings, alg = QuadRiskExpr(),
                                    sk = if isa(pr1, HighOrderPriorEstimator)
                                        pr1.sk
                                    else
@@ -511,7 +511,7 @@
             r = factory(rs[1:2], Ref(pr1), Ref(slv), Ref(ucs2))
 
             @test r[1].settings === settings
-            @test r[1].alg === QuadraticNegativeSkewness()
+            @test r[1].alg === QuadRiskExpr()
             if isa(pr1, HighOrderPriorEstimator)
                 @test r[1].sk === pr1.sk
                 @test r[1].V === pr1.V
@@ -522,7 +522,7 @@
                 @test isapprox(expected_risk(r[1], w, X), dot(w, V, w))
             end
             @test rv[1].settings === settings
-            @test rv[1].alg === QuadraticNegativeSkewness()
+            @test rv[1].alg === QuadRiskExpr()
             if isa(pr1, HighOrderPriorEstimator)
                 @test rv[1].sk == prv.sk
                 @test rv[1].V == prv.V

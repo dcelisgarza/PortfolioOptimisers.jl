@@ -94,9 +94,9 @@
                  SquareRootKurtosis(; N = 2),# 28
                  ###
                  NegativeSkewness(),#
-                 NegativeSkewness(; alg = QuadraticNegativeSkewness()),#
+                 NegativeSkewness(; alg = QuadRiskExpr()),#
                  NegativeSkewness(; sk = sk, V = V),#
-                 NegativeSkewness(; alg = QuadraticNegativeSkewness(), sk = sk, V = V),# 32
+                 NegativeSkewness(; alg = QuadRiskExpr(), sk = sk, V = V),# 32
                  ###
                  ConditionalValueatRisk(),#
                  DistributionallyRobustConditionalValueatRisk(; l = 2.5, r = 0.85),#

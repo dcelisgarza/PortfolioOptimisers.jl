@@ -1610,7 +1610,7 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVari
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                                                   <:LinearNegativeSkewness},
+                                                   <:SqrtRiskExpr},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::HighOrderPriorResult,
                                args...)
@@ -1628,7 +1628,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                                                   <:QuadraticNegativeSkewness},
+                                                   <:QuadRiskExpr},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::HighOrderPriorResult,
                                args...)

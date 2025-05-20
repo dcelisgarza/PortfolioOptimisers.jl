@@ -214,10 +214,10 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
                                                                                fees::Union{Nothing,
                                                                                            <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
-    sigma = StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
+    sigma = StatsBase.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3
     res = isnothing(r.w) ? -mean(val) : -mean(val, r.w)
-    return res / sigma^3
+    return res / (sigma * sqrt(sigma))
 end
 function (r::HighOrderMoment{<:Any, <:Any, <:Any,
                              <:HighOrderDeviation{<:Any, <:FourthLowerMoment}})(w::AbstractVector,

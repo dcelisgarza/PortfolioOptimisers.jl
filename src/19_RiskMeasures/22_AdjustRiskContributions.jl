@@ -5,7 +5,7 @@ const SquaredRiskMeasures = Union{<:Variance,
                                                    <:Any, <:Any}, <:SquareRootKurtosis,
                                   <:BrownianDistanceVariance,
                                   <:NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
-                                                     <:QuadraticNegativeSkewness},
+                                                     <:QuadRiskExpr},
                                   <:UncertaintySetVariance}
 const CubedRiskMeasures = Union{<:ThirdCentralMoment, <:Skewness,
                                 <:HighOrderMoment{<:Any, <:ThirdLowerMoment, <:Any, <:Any},

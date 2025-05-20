@@ -1,11 +1,8 @@
-abstract type AbstractNegativeSkewnessAlgorithm <: AbstractAlgorithm end
-struct LinearNegativeSkewness <: AbstractNegativeSkewnessAlgorithm end
-struct QuadraticNegativeSkewness <: AbstractNegativeSkewnessAlgorithm end
+const NegativeSkewnessAlgorithm = Union{<:SqrtRiskExpr, <:QuadRiskExpr}
 struct NegativeSkewness{T1 <: RiskMeasureSettings, T2 <: AbstractMatrixProcessingEstimator,
                         T3 <: Union{Nothing, <:AbstractMatrix},
                         T4 <: Union{Nothing, <:AbstractMatrix},
-                        T5 <: AbstractNegativeSkewnessAlgorithm} <:
-       AbstractNegativeSkewRiskMeasure
+                        T5 <: NegativeSkewnessAlgorithm} <: AbstractNegativeSkewRiskMeasure
     settings::T1
     mp::T2
     sk::T3
@@ -16,7 +13,7 @@ function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
                           sk::Union{Nothing, <:AbstractMatrix} = nothing,
                           V::Union{Nothing, <:AbstractMatrix} = nothing,
-                          alg::AbstractNegativeSkewnessAlgorithm = LinearNegativeSkewness())
+                          alg::NegativeSkewnessAlgorithm = SqrtRiskExpr())
     sk_flag = isnothing(sk)
     V_flag = isnothing(V)
     if sk_flag || V_flag
@@ -31,10 +28,10 @@ function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(
     return NegativeSkewness{typeof(settings), typeof(mp), typeof(sk), typeof(V),
                             typeof(alg)}(settings, mp, sk, V, alg)
 end
-function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:LinearNegativeSkewness})(w::AbstractVector)
+function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SqrtRiskExpr})(w::AbstractVector)
     return sqrt(dot(w, r.V, w))
 end
-function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:QuadraticNegativeSkewness})(w::AbstractVector)
+function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:QuadRiskExpr})(w::AbstractVector)
     return dot(w, r.V, w)
 end
 function factory(r::NegativeSkewness, prior::HighOrderPriorResult, args...; kwargs...)
@@ -59,4 +56,4 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:AbstractMatrix,
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V)
 end
 
-export LinearNegativeSkewness, QuadraticNegativeSkewness, NegativeSkewness
+export SqrtRiskExpr, QuadRiskExpr, NegativeSkewness

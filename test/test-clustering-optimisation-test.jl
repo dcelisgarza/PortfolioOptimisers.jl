@@ -120,9 +120,9 @@
                  SquareRootKurtosis(; alg = Semi(), mu = mu),# 51
                  ###
                  NegativeSkewness(),#
-                 NegativeSkewness(; alg = QuadraticNegativeSkewness()),#
+                 NegativeSkewness(; alg = QuadRiskExpr()),#
                  NegativeSkewness(; sk = sk, V = V),#
-                 NegativeSkewness(; alg = QuadraticNegativeSkewness(), sk = sk, V = V),# 55
+                 NegativeSkewness(; alg = QuadRiskExpr(), sk = sk, V = V),# 55
                  ###
                  ValueatRisk(),#
                  ValueatRiskRange(),#
@@ -327,9 +327,9 @@
                  SquareRootKurtosis(; alg = Semi(), mu = mu),# 51
                  ###
                  NegativeSkewness(),#
-                 NegativeSkewness(; alg = QuadraticNegativeSkewness()),#
+                 NegativeSkewness(; alg = QuadRiskExpr()),#
                  NegativeSkewness(; sk = sk, V = V),#
-                 NegativeSkewness(; alg = QuadraticNegativeSkewness(), sk = sk, V = V),# 55
+                 NegativeSkewness(; alg = QuadRiskExpr(), sk = sk, V = V),# 55
                  ###
                  ValueatRisk(),#
                  ValueatRiskRange(),#
