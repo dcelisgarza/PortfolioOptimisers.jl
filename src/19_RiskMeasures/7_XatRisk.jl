@@ -24,8 +24,11 @@ function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
     idx = sortperm(x)
     w = r.w[idx] / sum(r.w)
     cw = cumsum(w)
-    i = findlast(x -> x <= r.alpha, cw)
-    return -view(x, idx)[i]
+    i = findfirst(x -> x > r.alpha, cw)
+    if isnothing(i)
+        i = length(x)
+    end
+    return -x[idx[i]]
 end
 struct ValueatRiskRange{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real, T3 <: Real,
                         T4 <: Union{Nothing, <:AbstractWeights}} <: HierarchicalRiskMeasure
@@ -62,10 +65,16 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::Abstra
     w = r.w[idx] / sum(r.w)
     cwa = cumsum(w)
     cwb = cumsum(reverse(w))
-    ia = findlast(x -> x <= r.alpha, cwa)
-    ib = findlast(x -> x <= r.beta, cwb)
-    loss = -view(x, idx)[ia]
-    gain = view(x, reverse(idx))[ib]
+    ia = findfirst(x -> x > r.alpha, cwa)
+    if isnothing(ia)
+        ia = length(x)
+    end
+    ib = findfirst(x -> x > r.beta, cwb)
+    if isnothing(ib)
+        ib = length(x)
+    end
+    loss = -x[idx[ia]]
+    gain = x[reverse(idx)[ib]]
     return loss + gain
 end
 struct DrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real} <:

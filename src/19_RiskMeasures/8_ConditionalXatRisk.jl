@@ -32,12 +32,16 @@ function (r::ConditionalValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::Abstrac
     idx = sortperm(x)
     w = r.w[idx] / sum(r.w)
     cw = cumsum(w)
-    i = findlast(x -> x <= r.alpha, cw)
+    alpha = r.alpha
+    i = findfirst(x -> x > alpha, cw)
+    if isnothing(i)
+        i = length(x)
+    end
     x .= view(x, idx)
     return -if isone(i)
         x[1]
     else
-        dot(view(x, 1, i), view(w, 1, i)) + x[i] * (one(eltype(cw)) - cw[i - 1] / r.alpha)
+        (dot(view(x, 1:(i - 1)), view(w, 1:(i - 1))) + x[i] * (alpha - cw[i - 1])) / alpha
     end
 end
 struct DistributionallyRobustConditionalValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
@@ -89,12 +93,16 @@ function (r::DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any, <
     idx = sortperm(x)
     w = r.w[idx] / sum(r.w)
     cw = cumsum(w)
-    i = findlast(x -> x <= r.alpha, cw)
+    alpha = r.alpha
+    i = findfirst(x -> x > alpha, cw)
+    if isnothing(i)
+        i = length(x)
+    end
     x .= view(x, idx)
     return -if isone(i)
         x[1]
     else
-        dot(view(x, 1, i), view(w, 1, i)) + x[i] * (one(eltype(cw)) - cw[i - 1] / r.alpha)
+        (dot(view(x, 1:(i - 1)), view(w, 1:(i - 1))) + x[i] * (alpha - cw[i - 1])) / alpha
     end
 end
 struct ConditionalValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
@@ -144,21 +152,27 @@ function (r::ConditionalValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights}
     cwb = cumsum(reverse(w))
     alpha = r.alpha
     beta = r.beta
-    ia = findlast(x -> x <= alpha, cwa)
-    ib = findlast(x -> x <= beta, cwb)
+    ia = findlast(x -> x > alpha, cwa)
+    if isnothing(ia)
+        ia = length(x)
+    end
+    ib = findlast(x -> x > beta, cwb)
+    if isnothing(ib)
+        ib = length(x)
+    end
     xa = view(x, idx)
     xb = view(x, reverse(idx))
     loss = -if isone(ia)
         xa[1]
     else
-        dot(view(xa, 1, ia), view(w, 1, ia)) +
-        xa[ia] * (one(eltype(cwa)) - cwa[ia - 1] / alpha)
+        (dot(view(xa, 1:(ia - 1)), view(w, 1:(ia - 1))) + xa[ia] * (alpha - cwa[ia - 1])) /
+        alpha
     end
     gain = -if isone(ib)
         xb[1]
     else
-        dot(view(xb, 1, ib), view(w, 1, ib)) +
-        xb[ib] * (one(eltype(cwb)) - cwb[ib - 1] / beta)
+        (dot(view(xb, 1:(ib - 1)), view(w, 1:(ib - 1))) + xb[ib] * (beta - cwb[ib - 1])) /
+        beta
     end
 
     return loss - gain

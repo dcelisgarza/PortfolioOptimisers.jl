@@ -183,14 +183,8 @@ function entropy_pooling(w::AbstractVector, epcs::Union{Nothing, <:LinearConstra
     end
     return g(x)
 end
-function relative_entropy(x::AbstractVector, y::AbstractVector)
-    @smart_assert(all(x .>= 0))
-    @smart_assert(all(y .>= 0))
-    @smart_assert(length(x) == length(y))
-    return dot(x, log.(x) - log.(y))
-end
 function effective_number_scenarios(x::AbstractVector, y::AbstractVector)
-    return exp(-relative_entropy(x, y))
+    return exp(-kldivergence(x, y))
 end
 struct EntropyPoolingPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
                                     T2 <: Union{<:ContinuousEntropyPoolingViewEstimator,
@@ -368,4 +362,4 @@ end
 
 export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling,
        OptimEntropyPoolingEstimator, JuMPEntropyPoolingEstimator, entropy_pooling,
-       EntropyPoolingPriorEstimator, relative_entropy, effective_number_scenarios
+       EntropyPoolingPriorEstimator, effective_number_scenarios

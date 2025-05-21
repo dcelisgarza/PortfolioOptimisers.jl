@@ -568,12 +568,12 @@ function cvar(x::AbstractVector, alpha::Real, w::AbstractWeights)
     idx = sortperm(x)
     w = w[idx] / sum(w)
     cw = cumsum(w)
-    i = findlast(x -> x <= alpha, cw)
+    i = findfirst(x -> x > alpha, cw)
     x = view(x, idx)
     return -if isone(i)
         x[1]
     else
-        dot(view(x, 1, i), view(w, 1, i)) + x[i] * (one(eltype(cw)) - cw[i - 1] / alpha)
+        (dot(view(x, 1:(i - 1)), view(w, 1:(i - 1))) + x[i] * (alpha - cw[i - 1])) / alpha
     end
 end
 function cvar(x::AbstractMatrix, alpha::Real, w::AbstractWeights)
@@ -581,15 +581,15 @@ function cvar(x::AbstractMatrix, alpha::Real, w::AbstractWeights)
     sw = sum(w)
     w = [w[idx[i]] / sw for i ∈ axes(idx, 2)]
     cw = cumsum(w; dims = 1)
-    i = [findlast(x -> x <= alpha, cwi) for cwi ∈ axes(idx, 2)]
+    i = [findfirst(x -> x > alpha, cwi) for cwi ∈ axes(idx, 2)]
+    i[isnothing.(i)] .= length(w)
     x = view(x, idx)
-    ialpha = inv(alpha)
     function f(_x, _i, _w, _cw)
         return -if isone(_i)
             _x[1]
         else
-            dot(view(_x, 1, _i), view(_w, 1, _i)) +
-            _x[_i] * (one(eltype(_cw)) - _cw[_i - 1] * ialpha)
+            (dot(view(_x, 1:(_i - 1)), view(_w, 1:(_i - 1))) +
+             _x[_i] * (alpha - _cw[_i - 1])) / alpha
         end
     end
     return [f(view(x, :, i), i, view(w, :, i), view(cw, :, i)) for i ∈ axes(idx, 2)]
@@ -612,13 +612,25 @@ function _get_B_entropy_pooling_view_data(epv::C0_LinearEntropyPoolingConstraint
                                                                                           <:Any,
                                                                                           <:ValueatRiskEntropyPoolingAlgorithm},
                                           pr::AbstractPriorResult, idx::AbstractVector,
-                                          coef::Real, args...; kwargs...)
+                                          coef::Real, args...;
+                                          w::AbstractWeights = pweights(range(; start = 1,
+                                                                              stop = 1,
+                                                                              length = size(pr.X,
+                                                                                            1))),
+                                          kwargs...)
     alpha = epv.kind.alpha
-    X = view(pr.X, :, idx)
-    j = ceil(Int, alpha * size(X, 1))
-    var = sum([-partialsort(view(X, :, i), j) for i ∈ idx])
-    @smart_assert(all(var .>= zero(eltype(var))))
-    return coef * var
+    # X = view(pr.X, :, idx)
+    # j = ceil(Int, alpha * size(X, 1))
+    # var = sum([-partialsort(view(X, :, i), j) for i ∈ idx])
+    # @smart_assert(all(var .>= zero(eltype(var))))
+    X = pr.X
+    idx = [sortperm(view(X, :, i)) for i ∈ axes(X, 2)]
+    isw = inv(sum(w))
+    ws = [view(w, i) * isw for i ∈ idx]
+    cw = cumsum.(ws)
+    js = [findfirst(x -> x > alpha, i) for i ∈ cw]
+    js[isnothing.(js)] .= length(w)
+    return coef * sum([-view(X, idx[i], i)[j] for (i, j) ∈ zip(eachindex(idx), js)])
 end
 function set_var_cvar_A_B(::Any, A, B)
     return A, B

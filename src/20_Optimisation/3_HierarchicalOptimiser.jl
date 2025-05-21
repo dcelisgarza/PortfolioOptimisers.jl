@@ -36,7 +36,7 @@ function HierarchicalOptimiser(;
                                slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
                                fees::Union{Nothing, <:Fees} = nothing,
                                wb::Union{Nothing, <:WeightBoundsResult,
-                                         <:WeightBoundsConstraint} = nothing,
+                                         <:WeightBoundsConstraint} = WeightBoundsResult(),
                                sets::Union{Nothing, <:DataFrame} = nothing,
                                cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
                                sce::Scalariser = SumScalariser(), strict::Bool = false)

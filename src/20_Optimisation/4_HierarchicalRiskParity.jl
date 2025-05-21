@@ -23,9 +23,17 @@ function split_factor_weight_constraints(alpha::Real, wb::WeightBoundsResult,
                                          rc::AbstractVector)
     lb = wb.lb
     ub = wb.ub
-    alpha = min(sum(view(ub, lc)) / w[lc[1]], max(sum(view(lb, lc)) / w[lc[1]], alpha))
-    return one(alpha) - min(sum(view(ub, rc)) / w[rc[1]],
-                            max(sum(view(lb, rc)) / w[rc[1]], one(alpha) - alpha))
+    wlc = w[lc[1]]
+    wrc = w[rc[1]]
+    if iszero(wlc)
+        wlc = sqrt(eps(typeof(wlc)))
+    end
+    if iszero(wrc)
+        wrc = sqrt(eps(typeof(wrc)))
+    end
+    alpha = min(sum(view(ub, lc)) / wlc, max(sum(view(lb, lc)) / wlc, alpha))
+    return one(alpha) -
+           min(sum(view(ub, rc)) / wrc, max(sum(view(lb, rc)) / wrc, one(alpha) - alpha))
 end
 function optimise!(hc::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
