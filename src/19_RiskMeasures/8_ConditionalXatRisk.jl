@@ -37,11 +37,11 @@ function (r::ConditionalValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::Abstrac
     if isnothing(i)
         i = length(x)
     end
-    x .= view(x, idx)
     return -if isone(i)
-        x[1]
+        x[idx[1]]
     else
-        (dot(view(x, 1:(i - 1)), view(w, 1:(i - 1))) + x[i] * (alpha - cw[i - 1])) / alpha
+        (dot(view(x, view(idx, 1:(i - 1))), view(w, view(idx, 1:(i - 1)))) +
+         x[idx[i]] * (alpha - cw[i - 1])) / alpha
     end
 end
 struct DistributionallyRobustConditionalValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
@@ -98,11 +98,11 @@ function (r::DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any, <
     if isnothing(i)
         i = length(x)
     end
-    x .= view(x, idx)
     return -if isone(i)
-        x[1]
+        x[idx[1]]
     else
-        (dot(view(x, 1:(i - 1)), view(w, 1:(i - 1))) + x[i] * (alpha - cw[i - 1])) / alpha
+        (dot(view(x, view(idx, 1:(i - 1))), view(w, view(idx, 1:(i - 1)))) +
+         x[idx[i]] * (alpha - cw[i - 1])) / alpha
     end
 end
 struct ConditionalValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,

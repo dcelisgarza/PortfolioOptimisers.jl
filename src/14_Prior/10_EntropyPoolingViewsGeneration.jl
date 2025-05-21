@@ -569,11 +569,11 @@ function cvar(x::AbstractVector, alpha::Real, w::AbstractWeights)
     w = w[idx] / sum(w)
     cw = cumsum(w)
     i = findfirst(x -> x > alpha, cw)
-    x = view(x, idx)
     return -if isone(i)
-        x[1]
+        x[idx[1]]
     else
-        (dot(view(x, 1:(i - 1)), view(w, 1:(i - 1))) + x[i] * (alpha - cw[i - 1])) / alpha
+        (dot(view(x, view(idx, 1:(i - 1))), view(w, view(idx, 1:(i - 1)))) +
+         x[idx[i]] * (alpha - cw[i - 1])) / alpha
     end
 end
 function cvar(x::AbstractMatrix, alpha::Real, w::AbstractWeights)
@@ -583,13 +583,12 @@ function cvar(x::AbstractMatrix, alpha::Real, w::AbstractWeights)
     cw = cumsum(w; dims = 1)
     i = [findfirst(x -> x > alpha, cwi) for cwi ∈ axes(idx, 2)]
     i[isnothing.(i)] .= length(w)
-    x = view(x, idx)
     function f(_x, _i, _w, _cw)
         return -if isone(_i)
-            _x[1]
+            _x[idx[1]]
         else
-            (dot(view(_x, 1:(_i - 1)), view(_w, 1:(_i - 1))) +
-             _x[_i] * (alpha - _cw[_i - 1])) / alpha
+            (dot(view(_x, view(idx, 1:(_i - 1))), view(_w, view(idx, 1:(_i - 1)))) +
+             _x[idx[_i]] * (alpha - _cw[_i - 1])) / alpha
         end
     end
     return [f(view(x, :, i), i, view(w, :, i), view(cw, :, i)) for i ∈ axes(idx, 2)]
