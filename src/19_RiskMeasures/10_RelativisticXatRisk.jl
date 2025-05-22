@@ -1,18 +1,10 @@
 function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-             alpha::Real = 0.05, kappa::Real = 0.3)
+             alpha::Real = 0.05, kappa::Real = 0.3,
+             w::Union{Nothing, AbstractWeights} = nothing)
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
     T = length(x)
-    at = alpha * T
-    invat = inv(at)
-    invk2 = inv(2 * kappa)
-    ln_k = (invat^kappa - invat^(-kappa)) * invk2
-    opk = one(kappa) + kappa
-    omk = one(kappa) - kappa
-    invk = inv(kappa)
-    invopk = inv(opk)
-    invomk = inv(omk)
     model = JuMP.Model()
     set_string_names_on_creation(model, false)
     @variables(model, begin
@@ -23,6 +15,22 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                    theta[1:T]
                    epsilon[1:T]
                end)
+    if isnothing(w)
+        invat = inv(alpha * T)
+        invk2 = inv(2 * kappa)
+        ln_k = (invat^kappa - invat^(-kappa)) * invk2
+        @expression(model, risk, t + ln_k * z + sum(psi + theta))
+    else
+        invat = inv(alpha * sum(w))
+        invk2 = inv(2 * kappa)
+        ln_k = (invat^kappa - invat^(-kappa)) * invk2
+        @expression(model, risk, t + ln_k * z + dot(w, psi + theta))
+    end
+    opk = one(kappa) + kappa
+    omk = one(kappa) - kappa
+    invk = inv(kappa)
+    invopk = inv(opk)
+    invomk = inv(omk)
     @constraints(model,
                  begin
                      [i = 1:T],
@@ -32,7 +40,6 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                      [omega[i] * invomk, theta[i] * invk, -z * invk2] ∈ MOI.PowerCone(omk)
                      (epsilon + omega - x) .- t <= 0
                  end)
-    @expression(model, risk, t + ln_k * z + sum(psi + theta))
     @objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
         objective_value(model)
@@ -44,70 +51,18 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                        nu[1:T]
                        tau[1:T]
                    end)
-        @constraints(model, begin
-                         sum(z) - 1 == 0
-                         sum(nu - tau) * invk2 - ln_k <= 0
-                         [i = 1:T], [nu[i], 1, z[i]] ∈ MOI.PowerCone(invopk)
-                         [i = 1:T], [z[i], 1, tau[i]] ∈ MOI.PowerCone(omk)
-                     end)
-        @expression(model, risk, -dot(z, x))
-        @objective(model, Max, risk)
-        if optimise_JuMP_model!(model, slv).success
-            objective_value(model)
+        if isnothing(w)
+            @constraints(model, begin
+                             sum(z) - 1 == 0
+                             sum(nu - tau) * invk2 - ln_k <= 0
+                         end)
         else
-            NaN
+            @constraints(model, begin
+                             dot(w, z) - 1 == 0
+                             dot(w, nu - tau) * invk2 - ln_k <= 0
+                         end)
         end
-    end
-end
-function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-             w::AbstractWeights, alpha::Real = 0.05, kappa::Real = 0.3)
-    if isa(slv, AbstractVector)
-        @smart_assert(!isempty(slv))
-    end
-    T = sum(w)
-    at = alpha * T
-    invat = inv(at)
-    invk2 = inv(2 * kappa)
-    ln_k = (invat^kappa - invat^(-kappa)) * invk2
-    opk = one(kappa) + kappa
-    omk = one(kappa) - kappa
-    invk = inv(kappa)
-    invopk = inv(opk)
-    invomk = inv(omk)
-    model = JuMP.Model()
-    set_string_names_on_creation(model, false)
-    @variables(model, begin
-                   t
-                   z >= 0
-                   omega[1:T]
-                   psi[1:T]
-                   theta[1:T]
-                   epsilon[1:T]
-               end)
-    @constraints(model,
-                 begin
-                     [i = 1:T],
-                     [z * opk * invk2, psi[i] * opk * invk, epsilon[i]] ∈
-                     MOI.PowerCone(invopk)
-                     [i = 1:T],
-                     [omega[i] * invomk, theta[i] * invk, -z * invk2] ∈ MOI.PowerCone(omk)
-                     (epsilon + omega - x) .- t <= 0
-                 end)
-    @expression(model, risk, t + ln_k * z + dot(w, psi + theta))
-    @objective(model, Min, risk)
-    return if optimise_JuMP_model!(model, slv).success
-        objective_value(model)
-    else
-        model = JuMP.Model()
-        set_string_names_on_creation(model, false)
-        @variables(model, begin
-                       z[1:T]
-                       nu[1:T]
-                       tau[1:T]
-                   end)
         @constraints(model, begin
-                         dot(w, z) - 1 == 0
-                         dot(w, nu - tau) * invk2 - ln_k <= 0
                          [i = 1:T], [nu[i], 1, z[i]] ∈ MOI.PowerCone(invopk)
                          [i = 1:T], [z[i], 1, tau[i]] ∈ MOI.PowerCone(omk)
                      end)
@@ -153,11 +108,8 @@ function factory(r::RelativisticValueatRisk, prior::AbstractPriorResult,
     return RelativisticValueatRisk(; settings = r.settings, alpha = r.alpha,
                                    kappa = r.kappa, slv = slv, w = w)
 end
-function (r::RelativisticValueatRisk{<:Any, <:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
-    return RRM(x, r.slv, r.alpha, r.kappa)
-end
-function (r::RelativisticValueatRisk{<:Any, <:Any, <:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
-    return RRM(x, r.slv, r.w, r.alpha, r.kappa)
+function (r::RelativisticValueatRisk)(x::AbstractVector)
+    return RRM(x, r.slv, r.alpha, r.kappa, r.w)
 end
 struct RelativisticValueatRiskRange{T1 <: RiskMeasureSettings,
                                     T2 <:
@@ -195,13 +147,8 @@ function RelativisticValueatRiskRange(;
                                         typeof(w)}(settings, slv, alpha, kappa_a, beta,
                                                    kappa_b, w)
 end
-function (r::RelativisticValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          Nothing})(x::AbstractVector)
-    return RRM(x, r.slv, r.alpha, r.kappa_a) + RRM(-x, r.slv, r.beta, r.kappa_b)
-end
-function (r::RelativisticValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:AbstractWeights})(x::AbstractVector)
-    return RRM(x, r.slv, r.w, r.alpha, r.kappa_a) + RRM(-x, r.slv, r.w, r.beta, r.kappa_b)
+function (r::RelativisticValueatRiskRange)(x::AbstractVector)
+    return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)
 end
 function factory(r::RelativisticValueatRiskRange, prior::AbstractPriorResult,
                  slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}, args...;

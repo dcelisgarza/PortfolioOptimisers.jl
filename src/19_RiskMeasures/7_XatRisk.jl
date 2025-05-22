@@ -22,9 +22,11 @@ function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::AbstractVector)
 end
 function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
     idx = sortperm(x)
-    w = r.w[idx] / sum(r.w)
+    sw = sum(r.w)
+    w = r.w[idx]
     cw = cumsum(w)
-    i = findfirst(x -> x > r.alpha, cw)
+    alpha = r.alpha * sw
+    i = findfirst(x -> x > alpha, cw)
     if isnothing(i)
         i = length(x)
     end
@@ -62,14 +64,17 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
     idx = sortperm(x)
-    w = r.w[idx] / sum(r.w)
+    sw = sum(r.w)
+    w = r.w[idx]
     cwa = cumsum(w)
     cwb = cumsum(reverse(w))
-    ia = findfirst(x -> x > r.alpha, cwa)
+    alpha = r.alpha * sw
+    ia = findfirst(x -> x > alpha, cwa)
     if isnothing(ia)
         ia = length(x)
     end
-    ib = findfirst(x -> x > r.beta, cwb)
+    beta = r.beta * sw
+    ib = findfirst(x -> x > beta, cwb)
     if isnothing(ib)
         ib = length(x)
     end

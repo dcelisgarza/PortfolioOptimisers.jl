@@ -1,5 +1,5 @@
 function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-             alpha::Real = 0.05)
+             alpha::Real = 0.05, w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
@@ -11,36 +11,20 @@ function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:
                    z >= 0
                    u[1:T]
                end)
-    @constraints(model, begin
-                     sum(u) - z <= 0
-                     [i = 1:T], [-x[i] - t, z, u[i]] ∈ MOI.ExponentialCone()
-                 end)
-    @expression(model, risk, t - z * log(alpha * T))
-    @objective(model, Min, risk)
-    return if optimise_JuMP_model!(model, slv).success
-        objective_value(model)
+    aT = if isnothing(w)
+        @constraints(model, begin
+                         sum(u) - z <= 0
+                         [i = 1:T], [-x[i] - t, z, u[i]] ∈ MOI.ExponentialCone()
+                     end)
+        alpha * T
     else
-        NaN
+        @constraints(model, begin
+                         dot(w, u) - z <= 0
+                         [i = 1:T], [-x[i] - t, z, u[i]] ∈ MOI.ExponentialCone()
+                     end)
+        alpha * sum(w)
     end
-end
-function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-             w::AbstractWeights, alpha::Real = 0.05)
-    if isa(slv, AbstractVector)
-        @smart_assert(!isempty(slv))
-    end
-    model = JuMP.Model()
-    set_string_names_on_creation(model, false)
-    T = sum(w)
-    @variables(model, begin
-                   t
-                   z >= 0
-                   u[1:T]
-               end)
-    @constraints(model, begin
-                     dot(w, u) - z <= 0
-                     [i = 1:T], [-x[i] - t, z, u[i]] ∈ MOI.ExponentialCone()
-                 end)
-    @expression(model, risk, t - z * log(alpha * T))
+    @expression(model, risk, t - z * log(aT))
     @objective(model, Min, risk)
     return if optimise_JuMP_model!(model, slv).success
         objective_value(model)
@@ -73,11 +57,8 @@ function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettin
                                                                                         alpha,
                                                                                         w)
 end
-function (r::EntropicValueatRisk{<:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
-    return ERM(x, r.slv, r.alpha)
-end
-function (r::EntropicValueatRisk{<:Any, <:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
-    return ERM(x, r.slv, r.w, r.alpha)
+function (r::EntropicValueatRisk)(x::AbstractVector)
+    return ERM(x, r.slv, r.alpha, r.w)
 end
 function factory(r::EntropicValueatRisk, prior::AbstractPriorResult,
                  slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}, args...;
@@ -112,11 +93,8 @@ function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureS
     return EntropicValueatRiskRange{typeof(settings), typeof(slv), typeof(alpha),
                                     typeof(beta), typeof(w)}(settings, slv, alpha, beta, w)
 end
-function (r::EntropicValueatRiskRange{<:Any, <:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
-    return ERM(x, r.slv, r.alpha) + ERM(-x, r.slv, r.beta)
-end
-function (r::EntropicValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
-    return ERM(x, r.slv, r.w, r.alpha) + ERM(-x, r.slv, r.w, r.beta)
+function (r::EntropicValueatRiskRange)(x::AbstractVector)
+    return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)
 end
 function factory(r::EntropicValueatRiskRange, prior::AbstractPriorResult,
                  slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}, args...;

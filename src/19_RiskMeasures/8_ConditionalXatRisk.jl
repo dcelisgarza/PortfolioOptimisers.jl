@@ -30,9 +30,10 @@ function (r::ConditionalValueatRisk{<:Any, <:Any, Nothing})(x::AbstractVector)
 end
 function (r::ConditionalValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
     idx = sortperm(x)
-    w = r.w[idx] / sum(r.w)
+    sw = sum(r.w)
+    w = r.w[idx]
     cw = cumsum(w)
-    alpha = r.alpha
+    alpha = r.alpha * sw
     i = findfirst(x -> x > alpha, cw)
     if isnothing(i)
         i = length(x)
@@ -91,9 +92,10 @@ end
 function (r::DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any, <:Any,
                                                           <:AbstractWeights})(x::AbstractVector)
     idx = sortperm(x)
-    w = r.w[idx] / sum(r.w)
+    sw = sum(r.w)
+    w = r.w[idx]
     cw = cumsum(w)
-    alpha = r.alpha
+    alpha = r.alpha * sw
     i = findfirst(x -> x > alpha, cw)
     if isnothing(i)
         i = length(x)
@@ -125,7 +127,8 @@ function ConditionalValueatRiskRange(;
                                        typeof(w)}(settings, alpha, beta, w)
 end
 function (r::ConditionalValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
-    aT = r.alpha * length(x)
+    alpha = r.alpha
+    aT = alpha * length(x)
     idx1 = ceil(Int, aT)
     var1 = -partialsort!(x, idx1)
     sum_var1 = zero(eltype(x))
@@ -134,7 +137,8 @@ function (r::ConditionalValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::Abstr
     end
     loss = var1 - sum_var1 / aT
 
-    bT = r.beta * length(x)
+    beta = r.beta
+    bT = beta * length(x)
     idx2 = ceil(Int, bT)
     var2 = -partialsort!(x, idx2; rev = true)
     sum_var2 = zero(eltype(x))
@@ -142,37 +146,38 @@ function (r::ConditionalValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::Abstr
         sum_var2 += x[i] + var2
     end
     gain = var2 - sum_var2 / bT
-
     return loss - gain
 end
 function (r::ConditionalValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
     idx = sortperm(x)
-    w = r.w[idx] / sum(r.w)
-    cwa = cumsum(w)
-    cwb = cumsum(reverse(w))
-    alpha = r.alpha
-    beta = r.beta
-    ia = findlast(x -> x > alpha, cwa)
-    if isnothing(ia)
-        ia = length(x)
+    sw = sum(r.w)
+    w = r.w[idx]
+    cw = cumsum(w)
+    alpha = r.alpha * sw
+    i = findfirst(x -> x > alpha, cw)
+    if isnothing(i)
+        i = length(x)
     end
-    ib = findlast(x -> x > beta, cwb)
-    if isnothing(ib)
-        ib = length(x)
-    end
-    xa = view(x, idx)
-    xb = view(x, reverse(idx))
-    loss = -if isone(ia)
-        xa[1]
+    loss = -if isone(i)
+        x[idx[1]]
     else
-        (dot(view(xa, 1:(ia - 1)), view(w, 1:(ia - 1))) + xa[ia] * (alpha - cwa[ia - 1])) /
-        alpha
+        (dot(view(x, view(idx, 1:(i - 1))), view(w, view(idx, 1:(i - 1)))) +
+         x[idx[i]] * (alpha - cw[i - 1])) / alpha
     end
-    gain = -if isone(ib)
-        xb[1]
+
+    idx = reverse(idx)
+    w = reverse(w)
+    cw = cumsum(w)
+    beta = r.beta * sw
+    i = findfirst(x -> x > beta, cw)
+    if isnothing(i)
+        i = length(x)
+    end
+    gain = -if isone(i)
+        x[idx[1]]
     else
-        (dot(view(xb, 1:(ib - 1)), view(w, 1:(ib - 1))) + xb[ib] * (beta - cwb[ib - 1])) /
-        beta
+        (dot(view(x, view(idx, 1:(i - 1))), view(w, view(idx, 1:(i - 1)))) +
+         x[idx[i]] * (beta - cw[i - 1])) / beta
     end
 
     return loss - gain

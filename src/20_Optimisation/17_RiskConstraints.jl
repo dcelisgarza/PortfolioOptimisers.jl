@@ -410,7 +410,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                 :csecond_central_moment_rsoc_)
     else
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
-        wi .= sqrt.(wi)
+        wi = sqrt.(wi)
         scaled_second_central_moment = model[Symbol(:scaled_second_central_moment_, i)] = @expression(model,
                                                                                                       dot(wi,
                                                                                                           second_central_moment))
@@ -445,7 +445,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                 :csecond_lower_moment_rsoc_)
     else
         factor = StatsBase.varcorrection(wi, r.alg.ve.corrected)
-        wi .= sqrt.(wi)
+        wi = sqrt.(wi)
         scaled_second_lower_moment = model[Symbol(:scaled_second_lower_moment_, i)] = @expression(model,
                                                                                                   dot(wi,
                                                                                                       second_lower_moment))
@@ -578,9 +578,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                                                                                             ibt
                                                                                         end)
     else
-        swi = sum(wi)
-        iat = inv(r.alpha * swi)
-        ibt = inv(r.beta * swi)
+        sw = sum(wi)
+        iat = inv(r.alpha * sw)
+        ibt = inv(r.beta * sw)
         model[Symbol(:cvar_risk_l_, i)], model[Symbol(:cvar_risk_h_, i)] = @expressions(model,
                                                                                         begin
                                                                                             var_l +
@@ -771,6 +771,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
                                                                                 end)
         r.alpha * T, r.beta * T
     else
+        sw = sum(wi)
         model[Symbol(:cevar_l_, i)], model[Symbol(:cevar_h_, i)] = @constraints(model,
                                                                                 begin
                                                                                     sc *
@@ -784,8 +785,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::EntropicValueat
                                                                                      z_evar_h) >=
                                                                                     0
                                                                                 end)
-        swi = sum(wi)
-        r.alpha * swi, r.beta * swi
+        r.alpha * sw, r.beta * sw
     end
     model[Symbol(:cevar_exp_cone_l_, i)], model[Symbol(:cevar_exp_cone_h_, i)] = @constraints(model,
                                                                                               begin
@@ -936,8 +936,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
                          t_rlvar_h + lnk_b * z_rlvar_h + sum(psi_rlvar_h + theta_rlvar_h)
                      end)
     else
-        iat = inv(alpha * sum(wi))
-        ibt = inv(beta * sum(wi))
+        sw = sum(wi)
+        iat = inv(alpha * sw)
+        ibt = inv(beta * sw)
         lnk_a = (iat^kappa_a - iat^(-kappa_a)) * ik2_a
         lnk_b = (ibt^kappa_b - ibt^(-kappa_b)) * ik2_b
         @expressions(model,
