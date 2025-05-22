@@ -1,6 +1,6 @@
 @safetestset "Clustering Optimisation" begin
     using PortfolioOptimisers, CSV, DataFrames, Test, StableRNGs, Random, Clarabel,
-          StatsBase
+          StatsBase, TimeSeries
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -13,6 +13,377 @@
         end
     end
     @testset "Hierarchical Risk Parity" begin
+        X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
+                      timestamp = :timestamp)
+        F = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/factor_prices.csv"));
+                      timestamp = :timestamp)
+        rd = prices_to_returns(X, F)
+        slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false)),
+               Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.75)),
+               Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.6,
+                                      "max_iter" => 1500, "tol_gap_abs" => 1e-4,
+                                      "tol_gap_rel" => 1e-4, "tol_ktratio" => 1e-3,
+                                      "tol_feas" => 1e-4, "tol_infeas_abs" => 1e-4,
+                                      "tol_infeas_rel" => 1e-4,
+                                      "reduced_tol_gap_abs" => 1e-4,
+                                      "reduced_tol_gap_rel" => 1e-4,
+                                      "reduced_tol_ktratio" => 1e-3,
+                                      "reduced_tol_feas" => 1e-4,
+                                      "reduced_tol_infeas_abs" => 1e-4,
+                                      "reduced_tol_infeas_rel" => 1e-4))]
+        pr = prior(HighOrderPriorEstimator(;
+                                           pe = FactorPriorEstimator(;
+                                                                     re = DimensionReductionRegression())),
+                   rd)
+        clr = clusterise(ClusteringEstimator(), rd.X)
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
+        T, N = size(pr.X)
+        ew = eweights(1:T, inv(T); scale = true)
+        w1 = fill(inv(N), N)
+        rf = 4.34 / 100 / 252
+        sigma = cov(GerberCovariance(), pr.X)
+        mu = vec(mean(ShrunkExpectedReturns(; ce = GerberCovariance()), pr.X))
+        sk, V = coskewness(Coskewness(; alg = Semi()), pr.X; mean = transpose(mu))
+        kt = cokurtosis(Cokurtosis(; alg = Semi()), pr.X; mean = transpose(mu))
+
+        rs = [Variance(; sigma = sigma), Variance(),
+              UncertaintySetVariance(; sigma = sigma), UncertaintySetVariance(),
+              StandardDeviation(; sigma = sigma), StandardDeviation(),
+              BrownianDistanceVariance(), LowOrderMoment(; mu = mu),
+              LowOrderMoment(; mu = rf), LowOrderMoment(; w = ew), LowOrderMoment(),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = SqrtRiskExpr())),
+                             mu = mu),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = SqrtRiskExpr())),
+                             mu = rf),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     ve = SimpleVariance(;
+                                                                         corrected = false,
+                                                                         w = ew),
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = SqrtRiskExpr())),
+                             w = ew),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = SqrtRiskExpr()))),
+              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                             mu = mu),
+              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                             mu = rf),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     ve = SimpleVariance(;
+                                                                         corrected = false,
+                                                                         w = ew),
+                                                     alg = SecondLowerMoment()), w = ew),
+              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation()), HighOrderMoment(; mu = mu),
+              HighOrderMoment(; mu = rf), HighOrderMoment(; w = ew), HighOrderMoment(),
+              HighOrderMoment(; alg = FourthLowerMoment(), mu = mu),
+              HighOrderMoment(; alg = FourthLowerMoment(), mu = rf),
+              HighOrderMoment(; alg = FourthLowerMoment(), w = ew),
+              HighOrderMoment(; alg = FourthLowerMoment()),
+              HighOrderMoment(; alg = FourthCentralMoment(), mu = mu),
+              HighOrderMoment(; alg = FourthCentralMoment(), mu = rf),
+              HighOrderMoment(; alg = FourthCentralMoment(), w = ew),
+              HighOrderMoment(; alg = FourthCentralMoment()),
+              HighOrderMoment(; alg = HighOrderDeviation(), mu = mu),
+              HighOrderMoment(; alg = HighOrderDeviation(), mu = rf),
+              HighOrderMoment(;
+                              alg = HighOrderDeviation(;
+                                                       ve = SimpleVariance(;
+                                                                           corrected = false,
+                                                                           w = ew)),
+                              w = ew), HighOrderMoment(; alg = HighOrderDeviation()),
+              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
+                              mu = mu),
+              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
+                              mu = rf),
+              HighOrderMoment(;
+                              alg = HighOrderDeviation(;
+                                                       ve = SimpleVariance(;
+                                                                           corrected = false,
+                                                                           w = ew),
+                                                       alg = FourthLowerMoment()), w = ew),
+              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment())),
+              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()),
+                              mu = mu),
+              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()),
+                              mu = rf),
+              HighOrderMoment(;
+                              alg = HighOrderDeviation(;
+                                                       ve = SimpleVariance(;
+                                                                           corrected = false,
+                                                                           w = ew),
+                                                       alg = FourthCentralMoment()),
+                              w = ew),
+              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment())),
+              SquareRootKurtosis(; mu = mu), SquareRootKurtosis(; w = ew),
+              SquareRootKurtosis(), SquareRootKurtosis(; alg = Semi(), mu = mu),
+              SquareRootKurtosis(; alg = Semi(), w = ew),
+              SquareRootKurtosis(; alg = Semi()), NegativeSkewness(),
+              NegativeSkewness(; alg = QuadRiskExpr()), NegativeSkewness(; sk = sk, V = V),
+              NegativeSkewness(; alg = QuadRiskExpr(), sk = sk, V = V),#
+              ValueatRisk(; alpha = eps()),
+              ValueatRisk(; alpha = eps(),
+                          w = pweights(collect(range(; start = inv(size(pr.X, 1)),
+                                                     stop = inv(size(pr.X, 1)),
+                                                     length = size(pr.X, 1))))),
+              ValueatRisk(),
+              ValueatRisk(;
+                          w = pweights(collect(range(; start = inv(size(pr.X, 1)),
+                                                     stop = inv(size(pr.X, 1)),
+                                                     length = size(pr.X, 1))))),
+              ValueatRisk(; alpha = 0.5),
+              ValueatRisk(; alpha = 0.5,
+                          w = pweights(collect(range(; start = inv(size(pr.X, 1)),
+                                                     stop = inv(size(pr.X, 1)),
+                                                     length = size(pr.X, 1))))),
+              ValueatRisk(; alpha = 1 - eps()),
+              ValueatRisk(; alpha = 1 - eps(),
+                          w = pweights(collect(range(; start = inv(size(pr.X, 1)),
+                                                     stop = inv(size(pr.X, 1)),
+                                                     length = size(pr.X, 1))))),
+              ValueatRiskRange(; alpha = eps()),
+              ValueatRiskRange(; alpha = eps(),
+                               w = pweights(collect(range(; start = inv(size(pr.X, 1)),
+                                                          stop = inv(size(pr.X, 1)),
+                                                          length = size(pr.X, 1))))),
+              ValueatRiskRange(),
+              ValueatRiskRange(;
+                               w = pweights(collect(range(; start = inv(size(pr.X, 1)),
+                                                          stop = inv(size(pr.X, 1)),
+                                                          length = size(pr.X, 1))))),
+              ValueatRiskRange(; alpha = 0.5),
+              ValueatRiskRange(; alpha = 0.5,
+                               w = pweights(collect(range(; start = inv(size(pr.X, 1)),
+                                                          stop = inv(size(pr.X, 1)),
+                                                          length = size(pr.X, 1))))),
+              ValueatRiskRange(; alpha = 1 - eps()),
+              ValueatRiskRange(; alpha = 1 - eps(),
+                               w = pweights(collect(range(; start = inv(size(pr.X, 1)),
+                                                          stop = inv(size(pr.X, 1)),
+                                                          length = size(pr.X, 1))))),
+              DrawdownatRisk(; alpha = eps()), DrawdownatRisk(),
+              DrawdownatRisk(; alpha = 0.5), RelativeDrawdownatRisk(; alpha = eps()),
+              RelativeDrawdownatRisk(), RelativeDrawdownatRisk(; alpha = 0.5),
+              ConditionalValueatRisk(; alpha = eps()),
+              ConditionalValueatRisk(; alpha = eps(),
+                                     w = pweights(collect(range(;
+                                                                start = inv(size(pr.X, 1)),
+                                                                stop = inv(size(pr.X, 1)),
+                                                                length = size(pr.X, 1))))),
+              ConditionalValueatRisk(),
+              ConditionalValueatRisk(;
+                                     w = pweights(collect(range(;
+                                                                start = inv(size(pr.X, 1)),
+                                                                stop = inv(size(pr.X, 1)),
+                                                                length = size(pr.X, 1))))),
+              ConditionalValueatRisk(; alpha = 0.5),
+              ConditionalValueatRisk(; alpha = 0.5,
+                                     w = pweights(collect(range(;
+                                                                start = inv(size(pr.X, 1)),
+                                                                stop = inv(size(pr.X, 1)),
+                                                                length = size(pr.X, 1))))),
+              ConditionalValueatRisk(; alpha = 1 - eps()),
+              ConditionalValueatRisk(; alpha = 1 - eps(),
+                                     w = pweights(collect(range(;
+                                                                start = inv(size(pr.X, 1)),
+                                                                stop = inv(size(pr.X, 1)),
+                                                                length = size(pr.X, 1))))),
+              DistributionallyRobustConditionalValueatRisk(; alpha = eps()),
+              DistributionallyRobustConditionalValueatRisk(; alpha = eps(),
+                                                           w = pweights(collect(range(;
+                                                                                      start = inv(size(pr.X,
+                                                                                                       1)),
+                                                                                      stop = inv(size(pr.X,
+                                                                                                      1)),
+                                                                                      length = size(pr.X,
+                                                                                                    1))))),
+              DistributionallyRobustConditionalValueatRisk(),
+              DistributionallyRobustConditionalValueatRisk(;
+                                                           w = pweights(collect(range(;
+                                                                                      start = inv(size(pr.X,
+                                                                                                       1)),
+                                                                                      stop = inv(size(pr.X,
+                                                                                                      1)),
+                                                                                      length = size(pr.X,
+                                                                                                    1))))),
+              DistributionallyRobustConditionalValueatRisk(; alpha = 0.5),
+              DistributionallyRobustConditionalValueatRisk(; alpha = 0.5,
+                                                           w = pweights(collect(range(;
+                                                                                      start = inv(size(pr.X,
+                                                                                                       1)),
+                                                                                      stop = inv(size(pr.X,
+                                                                                                      1)),
+                                                                                      length = size(pr.X,
+                                                                                                    1))))),
+              DistributionallyRobustConditionalValueatRisk(; alpha = 1 - eps()),
+              DistributionallyRobustConditionalValueatRisk(; alpha = 1 - eps(),
+                                                           w = pweights(collect(range(;
+                                                                                      start = inv(size(pr.X,
+                                                                                                       1)),
+                                                                                      stop = inv(size(pr.X,
+                                                                                                      1)),
+                                                                                      length = size(pr.X,
+                                                                                                    1))))),
+              ConditionalValueatRiskRange(; alpha = eps(), beta = eps()),
+              ConditionalValueatRiskRange(; alpha = eps(), beta = eps(),
+                                          w = pweights(collect(range(;
+                                                                     start = inv(size(pr.X,
+                                                                                      1)),
+                                                                     stop = inv(size(pr.X,
+                                                                                     1)),
+                                                                     length = size(pr.X, 1))))),
+              ConditionalValueatRiskRange(),
+              ConditionalValueatRiskRange(;
+                                          w = pweights(collect(range(;
+                                                                     start = inv(size(pr.X,
+                                                                                      1)),
+                                                                     stop = inv(size(pr.X,
+                                                                                     1)),
+                                                                     length = size(pr.X, 1))))),
+              ConditionalValueatRiskRange(; alpha = 0.15, beta = 0.15),
+              ConditionalValueatRiskRange(; alpha = 0.15, beta = 0.15,
+                                          w = pweights(collect(range(;
+                                                                     start = inv(size(pr.X,
+                                                                                      1)),
+                                                                     stop = inv(size(pr.X,
+                                                                                     1)),
+                                                                     length = size(pr.X, 1))))),
+              ConditionalValueatRiskRange(; alpha = 0.8, beta = 0.8),
+              ConditionalValueatRiskRange(; alpha = 0.8, beta = 0.8,
+                                          w = pweights(collect(range(;
+                                                                     start = inv(size(pr.X,
+                                                                                      1)),
+                                                                     stop = inv(size(pr.X,
+                                                                                     1)),
+                                                                     length = size(pr.X, 1))))),
+              ConditionalDrawdownatRisk(; alpha = eps()), ConditionalDrawdownatRisk(),
+              ConditionalDrawdownatRisk(; alpha = 0.5),
+              RelativeConditionalDrawdownatRisk(; alpha = eps()),
+              RelativeConditionalDrawdownatRisk(),
+              RelativeConditionalDrawdownatRisk(; alpha = 0.5),
+              EntropicValueatRisk(; alpha = eps()),
+              EntropicValueatRisk(; alpha = eps(),
+                                  w = pweights(collect(range(; start = inv(size(pr.X, 1)),
+                                                             stop = inv(size(pr.X, 1)),
+                                                             length = size(pr.X, 1))))),
+              EntropicValueatRisk(;),
+              EntropicValueatRisk(;
+                                  w = pweights(collect(range(; start = inv(size(pr.X, 1)),
+                                                             stop = inv(size(pr.X, 1)),
+                                                             length = size(pr.X, 1))))),
+              EntropicValueatRisk(; alpha = 0.5),
+              EntropicValueatRisk(; alpha = 0.5,
+                                  w = pweights(collect(range(; start = inv(size(pr.X, 1)),
+                                                             stop = inv(size(pr.X, 1)),
+                                                             length = size(pr.X, 1))))),
+              EntropicValueatRiskRange(; alpha = eps(), beta = eps()),
+              EntropicValueatRiskRange(; alpha = eps(), beta = eps(),
+                                       w = pweights(collect(range(;
+                                                                  start = inv(size(pr.X, 1)),
+                                                                  stop = inv(size(pr.X, 1)),
+                                                                  length = size(pr.X, 1))))),
+              EntropicValueatRiskRange(;),
+              EntropicValueatRiskRange(;
+                                       w = pweights(collect(range(;
+                                                                  start = inv(size(pr.X, 1)),
+                                                                  stop = inv(size(pr.X, 1)),
+                                                                  length = size(pr.X, 1))))),
+              EntropicValueatRiskRange(; alpha = 0.25, beta = 0.25),
+              EntropicValueatRiskRange(; alpha = 0.25, beta = 0.25,
+                                       w = pweights(collect(range(;
+                                                                  start = inv(size(pr.X, 1)),
+                                                                  stop = inv(size(pr.X, 1)),
+                                                                  length = size(pr.X, 1))))),
+              EntropicDrawdownatRisk(; alpha = eps()), EntropicDrawdownatRisk(;),
+              EntropicDrawdownatRisk(; alpha = 0.5),
+              RelativeEntropicDrawdownatRisk(; alpha = eps()),
+              RelativeEntropicDrawdownatRisk(;),
+              RelativeEntropicDrawdownatRisk(; alpha = 0.5),
+              RelativisticValueatRisk(; alpha = eps()),
+              RelativisticValueatRisk(; alpha = eps(),
+                                      w = pweights(collect(range(;
+                                                                 start = inv(size(pr.X, 1)),
+                                                                 stop = inv(size(pr.X, 1)),
+                                                                 length = size(pr.X, 1))))),
+              RelativisticValueatRisk(; kappa = 0.6),
+              RelativisticValueatRisk(; kappa = 0.6,
+                                      w = pweights(collect(range(; start = 1, stop = 1,
+                                                                 length = size(pr.X, 1))))),
+              RelativisticValueatRisk(; alpha = 0.3, kappa = 0.6),
+              RelativisticValueatRisk(; alpha = 0.3, kappa = 0.6,
+                                      w = pweights(collect(range(;
+                                                                 start = inv(size(pr.X, 1)),
+                                                                 stop = inv(size(pr.X, 1)),
+                                                                 length = size(pr.X, 1))))),
+              RelativisticValueatRiskRange(; alpha = eps(), beta = eps()),
+              RelativisticValueatRiskRange(; alpha = eps(), beta = eps(),
+                                           w = pweights(collect(range(;
+                                                                      start = inv(size(pr.X,
+                                                                                       1)),
+                                                                      stop = inv(size(pr.X,
+                                                                                      1)),
+                                                                      length = size(pr.X,
+                                                                                    1))))),
+              RelativisticValueatRiskRange(;),
+              RelativisticValueatRiskRange(;
+                                           w = pweights(collect(range(;
+                                                                      start = inv(size(pr.X,
+                                                                                       1)),
+                                                                      stop = inv(size(pr.X,
+                                                                                      1)),
+                                                                      length = size(pr.X,
+                                                                                    1))))),
+              RelativisticValueatRiskRange(; alpha = 0.25, beta = 0.25),
+              RelativisticValueatRiskRange(; alpha = 0.25, beta = 0.25,
+                                           w = pweights(collect(range(;
+                                                                      start = inv(size(pr.X,
+                                                                                       1)),
+                                                                      stop = inv(size(pr.X,
+                                                                                      1)),
+                                                                      length = size(pr.X,
+                                                                                    1))))),
+              RelativisticDrawdownatRisk(; alpha = eps()),
+              RelativisticDrawdownatRisk(; kappa = 0.6),
+              RelativisticDrawdownatRisk(; alpha = 0.3, kappa = 0.6), OrderedWeightsArray(),
+              OrderedWeightsArray(; w = owa_tg(T)), OrderedWeightsArray(; w = owa_tgrg(T)),
+              OrderedWeightsArrayRange(; w1 = owa_tgrg(T)), AverageDrawdown(),
+              AverageDrawdown(; w = ew), RelativeAverageDrawdown(),
+              RelativeAverageDrawdown(; w = ew), UlcerIndex(), RelativeUlcerIndex(),
+              MaximumDrawdown(), RelativeMaximumDrawdown(), WorstRealisation(), Range(),
+              EqualRiskMeasure(), TurnoverRiskMeasure(; w = w1),
+              TrackingRiskMeasure(; tracking = WeightsTracking(; w = w1)),
+              TrackingRiskMeasure(; tracking = ReturnsTracking(; w = pr.X * w1))]
+        df = CSV.read(joinpath(@__DIR__, "./assets/HRP.csv"), DataFrame)
+        for i ∈ eachindex(rs)
+            w = PortfolioOptimisers.optimise!(HierarchicalRiskParity(; r = rs[i],
+                                                                     opt = opt)).w
+            res = isapprox(w, df[!, i]; rtol = 1e-6)
+            if !res
+                println("Iteration $(i) failed, $(typeof(rs[i]))")
+                find_tol(w, df[!, i]; name1 = "w", name2 = "df[!, $(i)]")
+            end
+            @test res
+        end
+        #=
         rng = StableRNG(987456321)
         X = randn(rng, 500, 10)
         rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
@@ -216,6 +587,7 @@
             end
             @test res
         end
+        =#
     end
     @testset "Hierarchical Equal Risk Contribution" begin
         rng = StableRNG(987456321)

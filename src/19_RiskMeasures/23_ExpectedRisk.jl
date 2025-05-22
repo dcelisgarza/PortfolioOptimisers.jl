@@ -12,8 +12,8 @@ function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRisk
                                 <:RelativeEntropicDrawdownatRisk,
                                 <:RelativeRelativisticDrawdownatRisk, <:Range,
                                 <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
-                                <:BrownianDistanceVariance, <:MeanReturn},
-                       w::AbstractVector, X::AbstractMatrix,
+                                <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
+                                <:MeanReturn}, w::AbstractVector, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, X, fees))
 end

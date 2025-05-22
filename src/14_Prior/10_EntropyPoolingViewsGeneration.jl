@@ -566,8 +566,10 @@ function Base.iterate(S::Union{<:ContinuousEntropyPoolingViewEstimator,
 end
 function cvar(x::AbstractVector, alpha::Real, w::AbstractWeights)
     idx = sortperm(x)
-    w = w[idx] / sum(w)
+    sw = sum(w)
+    w = w[idx]
     cw = cumsum(w)
+    alpha *= sw
     i = findfirst(x -> x > alpha, cw)
     return -if isone(i)
         x[idx[1]]
@@ -579,8 +581,9 @@ end
 function cvar(x::AbstractMatrix, alpha::Real, w::AbstractWeights)
     idx = sortperm(x; dims = 1)
     sw = sum(w)
-    w = [w[idx[i]] / sw for i ∈ axes(idx, 2)]
+    w = [w[idx[i]] for i ∈ axes(idx, 2)]
     cw = cumsum(w; dims = 1)
+    alpha *= sw
     i = [findfirst(x -> x > alpha, cwi) for cwi ∈ axes(idx, 2)]
     i[isnothing.(i)] .= length(w)
     function f(_x, _i, _w, _cw)
@@ -624,9 +627,10 @@ function _get_B_entropy_pooling_view_data(epv::C0_LinearEntropyPoolingConstraint
     # @smart_assert(all(var .>= zero(eltype(var))))
     X = pr.X
     idx = [sortperm(view(X, :, i)) for i ∈ axes(X, 2)]
-    isw = inv(sum(w))
-    ws = [view(w, i) * isw for i ∈ idx]
+    sw = sum(w)
+    ws = [view(w, i) for i ∈ idx]
     cw = cumsum.(ws)
+    alpha *= sw
     js = [findfirst(x -> x > alpha, i) for i ∈ cw]
     js[isnothing.(js)] .= length(w)
     return coef * sum([-view(X, idx[i], i)[j] for (i, j) ∈ zip(eachindex(idx), js)])
