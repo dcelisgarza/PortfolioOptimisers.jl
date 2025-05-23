@@ -310,15 +310,15 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::UncertaintySetV
     end
     set_sdp_constraints!(model)
     ucs = r.ucs
-    r_sigma = r.sigma
     X = pr.X
+    r_sigma = r.sigma
     sigma = pr.sigma
     ucs_variance_risk, key = set_ucs_variance_risk!(model, i, sigma_ucs(ucs, X), r_sigma,
                                                     sigma)
     set_risk_bounds_and_expression!(model, opt, ucs_variance_risk, r.settings, key)
     return nothing
 end
-function calc_risk_constraint_target(::LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
+function calc_risk_constraint_target(::LowOrderMoment{<:Any, <:Any, Nothing, <:Any},
                                      w::AbstractVector, mu::AbstractVector, args...)
     return dot(w, mu)
 end
@@ -1274,7 +1274,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     sqrt_kurtosis_risk = model[key] = @variable(model)
     L2 = pr.L2
     S2 = pr.S2
-    sqrt_sigma_4 = sqrt(S2 * kt * transpose(S2))
+    sqrt_sigma_4 = cholesky(S2 * kt * transpose(S2)).U
     zkurt = model[Symbol(:zkurt_, i)] = @expression(model, L2 * vec(W))
     model[Symbol(:ckurt_soc_, i)] = @constraint(model,
                                                 [sc * sqrt_kurtosis_risk;
