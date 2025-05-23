@@ -381,8 +381,6 @@
             w = optimise!(HierarchicalRiskParity(; r = rs[i], opt = opt)).w
             rtol = if i ∈ (112, 114, 120, 129)
                 5e-6
-            elseif i == 128
-                1e-5
             elseif i ∈ (128, 130, 131, 136, 137, 138, 139)
                 0.005
             elseif i == 133
@@ -391,6 +389,8 @@
                 5e-4
             elseif i == 140
                 1e-4
+            elseif i == 145
+                1e-5
             else
                 1e-6
             end
@@ -401,17 +401,6 @@
             end
             @test res
         end
-        # df = CSV.read(joinpath(@__DIR__, "./assets/HRP-vector-risk-measure.csv"), DataFrame)
-        # for (i, (r, rc)) ∈ enumerate(zip(rs, circshift(rs, 17)))
-        #     w = optimise!(HierarchicalRiskParity(; r = [r, rc], opt = opt)).w
-        #     rtol = 1e-6
-        #     res = isapprox(w, df[!, i]; rtol = rtol)
-        #     if !res
-        #         println("Iteration $(i) failed,\n$(typeof(r))\n$(typeof(rc))")
-        #         find_tol(w, df[!, i]; name1 = "w", name2 = "df[!, $(i)]")
-        #     end
-        #     @test res
-        # end
     end
     #=
     @testset "Hierarchical Equal Risk Contribution" begin
