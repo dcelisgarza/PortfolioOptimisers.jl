@@ -38,6 +38,7 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorit
     sigma = pr.sigma
     q = ue.q * 0.5
     sigma_mu = sigma / T
+    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     Random.seed!(ue.rng, ue.seed)
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     sigma_l = Matrix{eltype(sigma)}(undef, N, N)
@@ -75,6 +76,7 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetA
     sigma = pr.sigma
     q = ue.q * 0.5
     sigma_mu = sigma / T
+    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
     Random.seed!(ue.rng, ue.seed)
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     sigma_l = Matrix{eltype(sigma)}(undef, N, N)

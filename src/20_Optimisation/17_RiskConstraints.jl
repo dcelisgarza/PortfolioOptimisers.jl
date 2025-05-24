@@ -1579,14 +1579,26 @@ end
 function set_brownian_distance_variance_constraints!(model::JuMP.Model,
                                                      ::IneqBrownianDistanceVariance,
                                                      Dt::AbstractMatrix, Dx::AbstractMatrix)
-    T = size(Dt, 1)
     sc = model[:sc]
-    @constraints(model,
-                 begin
-                     cp_bdvariance[j = 1:T, i = j:T], sc * (Dt[i, j] - Dx[i, j]) >= 0
-                     cn_bdvariance[j = 1:T, i = j:T], sc * (Dt[i, j] + Dx[i, j]) >= 0
+    @constraints(model, begin
+                     cp_bdvariance, sc * (Dt - Dx) in Nonnegatives()
+                     cn_bdvariance, sc * (Dt + Dx) in Nonnegatives()
                  end)
     return nothing
+end
+function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::QuadRiskExpr,
+                                                Dt::AbstractMatrix, iT2::Real)
+    @expression(model, bdvariance_risk, iT2 * (dot(Dt, Dt) + iT2 * sum(Dt)^2))
+    return bdvariance_risk
+end
+function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::RSOCRiskExpr,
+                                                Dt::AbstractMatrix, iT2::Real)
+    sc = model[:sc]
+    @variable(model, tDt)
+    @constraint(model, rsoc_Dt, [sc * tDt; 0.5;
+                                 sc * vec(Dt)] in RotatedSecondOrderCone())
+    @expression(model, bdvariance_risk, iT2 * (tDt + iT2 * sum(Dt)^2))
+    return bdvariance_risk
 end
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVariance,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
@@ -1600,11 +1612,9 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVari
     iT2 = inv(T^2)
     ovec = range(1; stop = 1, length = T)
     @variable(model, Dt[1:T, 1:T], Symmetric)
-    @expressions(model, begin
-                     Dx, net_X * transpose(ovec) - ovec * transpose(net_X)
-                     bdvariance_risk, iT2 * (dot(Dt, Dt) + iT2 * sum(Dt)^2)
-                 end)
-    set_brownian_distance_variance_constraints!(model, r.formulation, Dt, Dx)
+    @expression(model, Dx, net_X * transpose(ovec) - ovec * transpose(net_X))
+    bdvariance_risk = set_brownian_distance_risk_constraint!(model, r.formulation, Dt, iT2)
+    set_brownian_distance_variance_constraints!(model, r.cformulation, Dt, Dx)
     set_risk_bounds_and_expression!(model, opt, bdvariance_risk, r.settings,
                                     :bdvariance_risk)
     return nothing
