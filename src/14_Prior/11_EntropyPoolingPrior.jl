@@ -113,7 +113,7 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
     @constraints(model,
                  begin
                      sc * (sum(q) - one(eltype(w))) == 0
-                     [sc * t; fill(sc, S); sc * q] in MOI.RelativeEntropyCone(2 * S + 1)
+                     [sc * t; fill(sc, S); sc * q] ∈ MOI.RelativeEntropyCone(2 * S + 1)
                  end)
     @objective(model, Min, so * (t - dot(q, log_p)))
     # Solve the optimization problem

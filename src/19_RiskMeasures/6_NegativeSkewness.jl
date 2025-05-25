@@ -1,8 +1,7 @@
-const NegativeSkewnessAlgorithm = Union{<:SqrtRiskExpr, <:QuadRiskExpr}
 struct NegativeSkewness{T1 <: RiskMeasureSettings, T2 <: AbstractMatrixProcessingEstimator,
                         T3 <: Union{Nothing, <:AbstractMatrix},
-                        T4 <: Union{Nothing, <:AbstractMatrix},
-                        T5 <: NegativeSkewnessAlgorithm} <: AbstractNegativeSkewRiskMeasure
+                        T4 <: Union{Nothing, <:AbstractMatrix}, T5 <: QuadSqrtRiskExpr} <:
+       AbstractNegativeSkewRiskMeasure
     settings::T1
     mp::T2
     sk::T3
@@ -13,7 +12,7 @@ function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
                           sk::Union{Nothing, <:AbstractMatrix} = nothing,
                           V::Union{Nothing, <:AbstractMatrix} = nothing,
-                          alg::NegativeSkewnessAlgorithm = SqrtRiskExpr())
+                          alg::QuadSqrtRiskExpr = SqrtRiskExpr())
     sk_flag = isnothing(sk)
     V_flag = isnothing(V)
     if sk_flag || V_flag

@@ -133,7 +133,9 @@ function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult
     set_mip_constraints!(model, wb, rrb.opt.card, gcard, nplg, cplg, rrb.opt.lt, rrb.opt.st,
                          rrb.opt.fees, rrb.opt.ss)
     set_turnover_constraints!(model, rrb.opt.tn)
-    set_tracking_error_constraints!(model, pr.X, rrb.opt.te)
+    set_noc_tracking_error_constraints!(model, pr, rrb.opt.te1)
+    set_soc_tracking_error_constraints!(model, pr, rrb.opt.te2)
+    set_vol_tracking_error_constraints!(model, pr, rrb.opt.tev)
     set_number_effective_assets!(model, rrb.opt.nea)
     set_l1_regularisation!(model, rrb.opt.l1)
     set_l2_regularisation!(model, rrb.opt.l2)

@@ -2,6 +2,34 @@ abstract type BaseJuMPOptimisationEstimator <: BaseOptimisationEstimator end
 abstract type JuMPOptimisationEstimator <: OptimisationEstimator end
 abstract type ObjectiveFunction <: AbstractEstimator end
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
+function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
+    if !haskey(model, :G)
+        G = cholesky(pr.sigma).U
+        @expression(model, G, G)
+    end
+    return model[:G]
+end
+function get_chol_or_sigma_pm(model::JuMP.Model,
+                              pr::Union{<:LowOrderPriorResult{<:Any, <:Any, <:Any,
+                                                              <:AbstractMatrix, <:Any,
+                                                              <:Any, <:Any, <:Any, <:Any},
+                                        <:HighOrderPriorResult{<:LowOrderPriorResult{<:Any,
+                                                                                     <:Any,
+                                                                                     <:Any,
+                                                                                     <:AbstractMatrix,
+                                                                                     <:Any,
+                                                                                     <:Any,
+                                                                                     <:Any,
+                                                                                     <:Any,
+                                                                                     <:Any},
+                                                               <:Any, <:Any, <:Any, <:Any,
+                                                               <:Any, <:Any}})
+    if !haskey(model, :G)
+        G = pr.chol
+        @expression(model, G, G)
+    end
+    return model[:G]
+end
 function jump_returns_factory(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end

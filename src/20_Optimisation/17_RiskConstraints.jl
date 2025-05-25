@@ -1,31 +1,3 @@
-function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
-    if !haskey(model, :G)
-        G = cholesky(pr.sigma).U
-        @expression(model, G, G)
-    end
-    return model[:G]
-end
-function get_chol_or_sigma_pm(model::JuMP.Model,
-                              pr::Union{<:LowOrderPriorResult{<:Any, <:Any, <:Any,
-                                                              <:AbstractMatrix, <:Any,
-                                                              <:Any, <:Any, <:Any, <:Any},
-                                        <:HighOrderPriorResult{<:LowOrderPriorResult{<:Any,
-                                                                                     <:Any,
-                                                                                     <:Any,
-                                                                                     <:AbstractMatrix,
-                                                                                     <:Any,
-                                                                                     <:Any,
-                                                                                     <:Any,
-                                                                                     <:Any,
-                                                                                     <:Any},
-                                                               <:Any, <:Any, <:Any, <:Any,
-                                                               <:Any, <:Any}})
-    if !haskey(model, :G)
-        G = pr.chol
-        @expression(model, G, G)
-    end
-    return model[:G]
-end
 function set_risk_upper_bound!(args...)
     return nothing
 end
@@ -143,10 +115,9 @@ function set_variance_risk!(model::JuMP.Model, i::Integer,
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     model[key] = @expression(model, dot(w, sigma, w))
-    key_dev = Symbol(:dev_, i)
-    dev = model[key_dev] = @variable(model)
-    model[Symbol(key_dev, :_soc)] = @constraint(model,
-                                                [sc * dev; sc * G * w] ∈ SecondOrderCone())
+    dev = model[Symbol(:dev_, i)] = @variable(model)
+    model[Symbol(:cdev_soc_, i)] = @constraint(model,
+                                               [sc * dev; sc * G * w] ∈ SecondOrderCone())
     return nothing
 end
 function variance_risk_bounds_expr(model::JuMP.Model, i::Integer, flag::Bool)
@@ -366,7 +337,7 @@ function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Integer,
     tsecond_moment = model[Symbol(keyt, i)] = @variable(model)
     model[Symbol(keyc, i)] = @constraint(model,
                                          [sc * tsecond_moment; 0.5;
-                                          sc * second_moment] in RotatedSecondOrderCone())
+                                          sc * second_moment] ∈ RotatedSecondOrderCone())
     return model[key] = @expression(model, factor * tsecond_moment)
 end
 function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Integer, factor::Real,
@@ -1646,7 +1617,7 @@ function set_brownian_distance_variance_constraints!(model::JuMP.Model,
     T = size(Dt, 1)
     sc = model[:sc]
     @constraint(model, cbdvariance_noc[j = 1:T, i = j:T],
-                [sc * Dt[i, j]; sc * Dx[i, j]] in MOI.NormOneCone(2))
+                [sc * Dt[i, j]; sc * Dx[i, j]] ∈ MOI.NormOneCone(2))
     return nothing
 end
 function set_brownian_distance_variance_constraints!(model::JuMP.Model,
@@ -1669,7 +1640,7 @@ function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::RSOCRiskExp
     sc = model[:sc]
     @variable(model, tDt)
     @constraint(model, rsoc_Dt, [sc * tDt; 0.5;
-                                 sc * vec(Dt)] in RotatedSecondOrderCone())
+                                 sc * vec(Dt)] ∈ RotatedSecondOrderCone())
     @expression(model, bdvariance_risk, iT2 * (tDt + iT2 * sum(Dt)^2))
     return bdvariance_risk
 end
@@ -1736,13 +1707,35 @@ function set_risk_constraints!(::JuMP.Model, ::Integer, ::NegativeSkewness,
                                        <:RiskBudgetting}, pr::LowOrderPriorResult, args...)
     throw(ArgumentError("NegativeSkewness requires a HighOrderPriorResult, not a $(typeof(pr))."))
 end
-function set_risk_constraints!(model::JuMP.Model, i::Integer, r::TrackingRiskMeasure,
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::TrackingRiskMeasure{<:Any, <:Any, <:NOCTracking},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...)
     key = Symbol(:tracking_risk_, i)
     sc = model[:sc]
-    w = model[:w]
+    k = model[:k]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = @variable(model)
+    tracking_risk = model[key] = @expression(model, t_tracking_risk / T)
+    tracking = r.tracking
+    benchmark = tracking_benchmark(tracking, pr.X)
+    tracking_r = model[Symbol(:tracking_r_, i)] = @expression(model, net_X - benchmark * k)
+    model[Symbol(:ctracking_r_noc_, i)] = @constraint(model,
+                                                      [sc * t_tracking_risk;
+                                                       sc * tracking_r] ∈
+                                                      MOI.NormOneCone(1 + T))
+    set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::TrackingRiskMeasure{<:Any, <:Any, <:SOCTracking},
+                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                          <:RiskBudgetting}, pr::AbstractPriorResult,
+                               args...)
+    key = Symbol(:tracking_risk_, i)
+    sc = model[:sc]
     k = model[:k]
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
@@ -1755,6 +1748,76 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer, r::TrackingRiskMea
                                                       [sc * t_tracking_risk;
                                                        sc * tracking_r] ∈ SecondOrderCone())
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
+    return nothing
+end
+function set_vol_tracking_constraints!(model::JuMP.Model, i::Integer,
+                                       r::VolTrackingRiskMeasure{<:Any, <:Any, <:Any,
+                                                                 <:QuadRiskExpr},
+                                       pr::AbstractPriorResult, key::Symbol)
+    sigma, G = if isnothing(r.sigma)
+        pr.sigma, get_chol_or_sigma_pm(model, pr)
+    else
+        r.sigma, cholesky(r.sigma).U
+    end
+    sc = model[:sc]
+    w = model[:w]
+    wb = r.tracking.w
+    wd = w - wb
+    vol_tracking_risk = model[key] = @expression(model, dot(wd, sigma, wd))
+    var_bound_key = Symbol(:vol_tr_dev_, i)
+    dev = model[var_bound_key] = @variable(model)
+    model[Symbol(:cdev_soc_, i)] = @constraint(model,
+                                               [sc * dev; sc * G * wd] ∈ SecondOrderCone())
+    return vol_tracking_risk, dev, var_bound_key
+end
+function set_vol_tracking_constraints!(model::JuMP.Model, i::Integer,
+                                       r::VolTrackingRiskMeasure{<:Any, <:Any, <:Any,
+                                                                 <:SOCRiskExpr},
+                                       pr::AbstractPriorResult, key::Symbol)
+    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
+    sc = model[:sc]
+    w = model[:w]
+    wb = r.tracking.w
+    wd = w - wb
+    var_bound_key = Symbol(:vol_tracking_dev_, i)
+    dev = model[var_bound_key] = @variable(model)
+    vol_tracking_risk = model[key] = @expression(model, dev^2)
+    model[Symbol(:cdev_soc_, i)] = @constraint(model,
+                                               [sc * dev; sc * G * wd] ∈ SecondOrderCone())
+    return vol_tracking_risk, dev, var_bound_key
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::VolTrackingRiskMeasure{<:Any, <:Any, <:Any,
+                                                         <:Union{<:QuadRiskExpr,
+                                                                 <:SOCRiskExpr}},
+                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                          <:RiskBudgetting}, pr::AbstractPriorResult,
+                               args...)
+    key = Symbol(:vol_tracking_risk_, i)
+    vol_tracking_risk, dev, var_bound_key = set_vol_tracking_constraints!(model, i, r, pr,
+                                                                          key)
+    ub = variance_risk_bounds_val(true, r.settings.ub)
+    set_variance_risk_bounds_and_expression!(model, opt, dev, ub, var_bound_key,
+                                             vol_tracking_risk, r.settings)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::VolTrackingRiskMeasure{<:Any, <:Any, <:Any,
+                                                         <:SqrtRiskExpr},
+                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                          <:RiskBudgetting}, pr::AbstractPriorResult,
+                               args...)
+    key = Symbol(:vol_tracking_risk_, i)
+    G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
+    sc = model[:sc]
+    w = model[:w]
+    wb = r.tracking.w
+    wd = w - wb
+    vol_tracking_risk = model[key] = @expression(model)
+    model[Symbol(:cdev_soc_, i)] = @constraint(model,
+                                               [sc * vol_tracking_risk; sc * G * wd] ∈
+                                               SecondOrderCone())
+    set_risk_bounds_and_expression!(model, opt, vol_tracking_risk, r.settings, key)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Integer, r::TurnoverRiskMeasure,

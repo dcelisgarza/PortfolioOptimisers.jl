@@ -118,10 +118,11 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = opt.lt, st = opt.st, lcs = lcs, lcm = opt.lcm, cent = cent,
                          gcard = gcard, sets = opt.sets, nplg = nplg, cplg = cplg,
-                         tn = opt.tn, te = opt.te, fees = opt.fees, ret = opt.ret,
-                         sce = opt.sce, ccnt = opt.ccnt, cobj = opt.cobj, sc = opt.sc,
-                         so = opt.so, card = opt.card, nea = opt.nea, l1 = opt.l1,
-                         l2 = opt.l2, ss = opt.ss, strict = opt.strict)
+                         tn = opt.tn, te1 = opt.te1, te2 = opt.te2, tev = opt.tev,
+                         fees = opt.fees, ret = opt.ret, sce = opt.sce, ccnt = opt.ccnt,
+                         cobj = opt.cobj, sc = opt.sc, so = opt.so, card = opt.card,
+                         nea = opt.nea, l1 = opt.l1, l2 = opt.l2, ss = opt.ss,
+                         strict = opt.strict)
 end
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
                                       fees::Union{Nothing, <:Fees},
@@ -282,8 +283,8 @@ function set_near_optimal_centering_constraints!(model::JuMP.Model, rk::Real, rt
     @constraints(model,
                  begin
                      clog_risk,
-                     [sc * log_risk, sc, sc * (rk - risk)] in MOI.ExponentialCone()
-                     clog_ret, [sc * log_ret, sc, sc * (ret - rt)] in MOI.ExponentialCone()
+                     [sc * log_risk, sc, sc * (rk - risk)] ∈ MOI.ExponentialCone()
+                     clog_ret, [sc * log_ret, sc, sc * (ret - rt)] ∈ MOI.ExponentialCone()
                      clog_w[i = 1:N],
                      [sc * log_w[i], sc, sc * w[i]] ∈ MOI.ExponentialCone()
                      clog_delta_w[i = 1:N],
@@ -355,7 +356,9 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.nplg, opt.cplg, opt.lt,
                          opt.st, opt.fees, opt.ss)
     set_turnover_constraints!(model, opt.tn)
-    set_tracking_error_constraints!(model, opt.pe.X, opt.te)
+    set_noc_tracking_error_constraints!(model, opt.pe, opt.te1)
+    set_soc_tracking_error_constraints!(model, opt.pe, opt.te2)
+    set_vol_tracking_error_constraints!(model, opt.pe, opt.tev)
     set_number_effective_assets!(model, opt.nea)
     set_l1_regularisation!(model, opt.l1)
     set_l2_regularisation!(model, opt.l2)

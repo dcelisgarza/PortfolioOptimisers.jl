@@ -461,22 +461,62 @@ function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
     set_turnover_fees!(model, fees.tn)
     return nothing
 end
-function set_tracking_error_constraints!(args...)
+function set_vol_tracking_error_constraints!(args...)
     return nothing
 end
-function set_tracking_error_constraints!(model::JuMP.Model, X::AbstractMatrix,
-                                         tre::TrackingError)
+function set_vol_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
+                                             tre::VolTrackingError)
+    G = isnothing(tre.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(tre.sigma).U
+    k = model[:k]
+    sc = model[:sc]
+    w = model[:w]
+    wb = tre.tracking.w
+    err = tre.err
+    @variable(model, t_trev)
+    @constraints(model, begin
+                     ctrev_noc, [sc * t_trev; sc * G * (w - wb)] ∈ SecondOrderCone()
+                     ctrev, sc * (t_trev - err * k) <= 0
+                 end)
+    return nothing
+end
+function set_noc_tracking_error_constraints!(args...)
+    return nothing
+end
+function set_noc_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
+                                             tre::TrackingError)
+    X = pr.X
+    k = model[:k]
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, X)
+    wb = tracking_benchmark(tre.tracking, X)
+    err = tre.err
+    T = size(X, 1)
+    f = err * T
+    @variable(model, t_tr1)
+    @expression(model, te1, net_X - wb * k)
+    @constraints(model, begin
+                     ctre1_noc, [sc * t_tr1; sc * te1] ∈ MOI.NormOneCone(1 + T)
+                     ctre1, sc * (t_tr1 - f * k) <= 0
+                 end)
+    return nothing
+end
+function set_soc_tracking_error_constraints!(args...)
+    return nothing
+end
+function set_soc_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
+                                             tre::TrackingError)
+    X = pr.X
     k = model[:k]
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(tre.tracking, X)
     err = tre.err
     f = err * sqrt(size(X, 1) - 1)
-    @variable(model, t_tr)
-    @expression(model, te, net_X - wb * k)
+    @variable(model, t_tr2)
+    @expression(model, te2, net_X - wb * k)
     @constraints(model, begin
-                     ctr_soc, [sc * t_tr; sc * te] ∈ SecondOrderCone()
-                     ctr, sc * (t_tr - f * k) <= 0
+                     ctre2_soc, [sc * t_tr2; sc * te2] ∈ SecondOrderCone()
+                     ctre2, sc * (t_tr2 - f * k) <= 0
                  end)
     return nothing
 end
@@ -494,8 +534,8 @@ function set_turnover_constraints!(model::JuMP.Model, tn::Turnover)
     @expression(model, tn, w - wi * k)
     @constraints(model,
                  begin
-                     ctr_noc[i = 1:N], [sc * t_tn[i]; sc * tn[i]] ∈ MOI.NormOneCone(2)
-                     ctr, sc * (t_tn ⊖ val * k) <= 0
+                     ctn_noc[i = 1:N], [sc * t_tn[i]; sc * tn[i]] ∈ MOI.NormOneCone(2)
+                     ctn, sc * (t_tn ⊖ val * k) <= 0
                  end)
     return nothing
 end
@@ -508,8 +548,8 @@ function set_number_effective_assets!(model::JuMP.Model, val::Real)
     sc = model[:sc]
     @variable(model, nea)
     @constraints(model, begin
-                     c_nea_soc, [sc * nea; sc * w] ∈ SecondOrderCone()
-                     c_nea, sc * (nea * sqrt(val) - k) <= 0
+                     cnea_soc, [sc * nea; sc * w] ∈ SecondOrderCone()
+                     cnea, sc * (nea * sqrt(val) - k) <= 0
                  end)
     return nothing
 end
@@ -523,7 +563,7 @@ function set_l1_regularisation!(model::JuMP.Model, l1::Real)
     w = model[:w]
     sc = model[:sc]
     @variable(model, t_l1)
-    @constraint(model, l1_noc, [sc * t_l1; sc * w] in MOI.NormOneCone(1 + length(w)))
+    @constraint(model, cl1_noc, [sc * t_l1; sc * w] ∈ MOI.NormOneCone(1 + length(w)))
     @expression(model, l1, l1 * t_l1)
     add_to_objective_penalty!(model, l1)
     return nothing
@@ -532,7 +572,7 @@ function set_l2_regularisation!(model::JuMP.Model, l2::Real)
     w = model[:w]
     sc = model[:sc]
     @variable(model, t_l2)
-    @constraint(model, l2_soc, [sc * t_l2; sc * w] in SecondOrderCone())
+    @constraint(model, cl2_soc, [sc * t_l2; sc * w] ∈ SecondOrderCone())
     @expression(model, l2, l2 * t_l2)
     add_to_objective_penalty!(model, l2)
     return nothing

@@ -90,13 +90,15 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T14 <: Union{Nothing, <:PhilogenyConstraintEstimator,
                                   <:PhilogenyConstraintResult},
                      T15 <: Union{Nothing, <:Turnover},
-                     T16 <: Union{Nothing, <:TrackingError}, T17 <: Union{Nothing, <:Fees},
-                     T18 <: JuMPReturnsEstimator, T19 <: Scalariser,
-                     T20 <: Union{Nothing, <:CustomConstraint},
-                     T21 <: Union{Nothing, <:CustomObjective}, T22 <: Real, T23 <: Real,
-                     T24 <: Union{Nothing, <:Integer}, T25 <: Union{Nothing, <:Real},
-                     T26 <: Union{Nothing, <:Real}, T27 <: Union{Nothing, <:Real},
-                     T28 <: Union{Nothing, <:Real}, T29 <: Bool} <:
+                     T16 <: Union{Nothing, <:TrackingError},
+                     T17 <: Union{Nothing, <:TrackingError},
+                     T18 <: Union{Nothing, <:VolTrackingError},
+                     T19 <: Union{Nothing, <:Fees}, T20 <: JuMPReturnsEstimator,
+                     T21 <: Scalariser, T22 <: Union{Nothing, <:CustomConstraint},
+                     T23 <: Union{Nothing, <:CustomObjective}, T24 <: Real, T25 <: Real,
+                     T26 <: Union{Nothing, <:Integer}, T27 <: Union{Nothing, <:Real},
+                     T28 <: Union{Nothing, <:Real}, T29 <: Union{Nothing, <:Real},
+                     T30 <: Union{Nothing, <:Real}, T31 <: Bool} <:
        BaseJuMPOptimisationEstimator
     pe::T1 # PriorEstimator
     slv::T2
@@ -113,20 +115,22 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
     nplg::T13
     cplg::T14
     tn::T15 # Turnover
-    te::T16 # TrackingError
-    fees::T17
-    ret::T18
-    sce::T19
-    ccnt::T20
-    cobj::T21
-    sc::T22
-    so::T23
-    card::T24
-    nea::T25
-    l1::T26
-    l2::T27
-    ss::T28
-    strict::T29
+    te1::T16 # TrackingError
+    te2::T17 # TrackingError
+    tev::T18
+    fees::T19
+    ret::T20
+    sce::T21
+    ccnt::T22
+    cobj::T23
+    sc::T24
+    so::T25
+    card::T26
+    nea::T27
+    l1::T28
+    l2::T29
+    ss::T30
+    strict::T31
 end
 function assert_finite_nonnegative_real_or_vec(val::Real)
     @smart_assert(isfinite(val) && val > zero(val))
@@ -160,7 +164,9 @@ function JuMPOptimiser(;
                        cplg::Union{Nothing, <:PhilogenyConstraintEstimator,
                                    <:PhilogenyConstraintResult} = nothing,
                        tn::Union{Nothing, <:Turnover} = nothing,
-                       te::Union{Nothing, <:TrackingError} = nothing,
+                       te1::Union{Nothing, <:TrackingError} = nothing,
+                       te2::Union{Nothing, <:TrackingError} = nothing,
+                       tev::Union{Nothing, <:VolTrackingError} = nothing,
                        fees::Union{Nothing, <:Fees} = nothing,
                        ret::JuMPReturnsEstimator = ArithmeticReturn(),
                        sce::Scalariser = SumScalariser(),
@@ -213,37 +219,14 @@ function JuMPOptimiser(;
     return JuMPOptimiser{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                          typeof(lt), typeof(st), typeof(lcs), typeof(lcm), typeof(cent),
                          typeof(gcard), typeof(sets), typeof(nplg), typeof(cplg),
-                         typeof(tn), typeof(te), typeof(fees), typeof(ret), typeof(sce),
-                         typeof(ccnt), typeof(cobj), typeof(sc), typeof(so), typeof(card),
-                         typeof(nea), typeof(l1), typeof(l2), typeof(ss), typeof(strict)}(pe,
-                                                                                          slv,
-                                                                                          wb,
-                                                                                          bgt,
-                                                                                          sbgt,
-                                                                                          lt,
-                                                                                          st,
-                                                                                          lcs,
-                                                                                          lcm,
-                                                                                          cent,
-                                                                                          gcard,
-                                                                                          sets,
-                                                                                          nplg,
-                                                                                          cplg,
-                                                                                          tn,
-                                                                                          te,
-                                                                                          fees,
-                                                                                          ret,
-                                                                                          sce,
-                                                                                          ccnt,
-                                                                                          cobj,
-                                                                                          sc,
-                                                                                          so,
-                                                                                          card,
-                                                                                          nea,
-                                                                                          l1,
-                                                                                          l2,
-                                                                                          ss,
-                                                                                          strict)
+                         typeof(tn), typeof(te1), typeof(te2), typeof(tev), typeof(fees),
+                         typeof(ret), typeof(sce), typeof(ccnt), typeof(cobj), typeof(sc),
+                         typeof(so), typeof(card), typeof(nea), typeof(l1), typeof(l2),
+                         typeof(ss), typeof(strict)}(pe, slv, wb, bgt, sbgt, lt, st, lcs,
+                                                     lcm, cent, gcard, sets, nplg, cplg, tn,
+                                                     te1, te2, tev, fees, ret, sce, ccnt,
+                                                     cobj, sc, so, card, nea, l1, l2, ss,
+                                                     strict)
 end
 function opt_view(opt::JuMPOptimiser, i::AbstractVector)
     pe = prior_view(opt.pe, i)
@@ -254,7 +237,9 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector)
     gcard = cardinality_constraint_view(opt.gcard, i)
     sets = nothing_dataframe_view(opt.sets, i)
     tn = turnover_view(opt.tn, i)
-    te = tracking_view(opt.te, i)
+    te1 = tracking_view(opt.te1, i)
+    te2 = tracking_view(opt.te2, i)
+    tev = tracking_view(opt.tev, i)
     fees = fees_view(opt.fees, i)
     ret = jump_returns_view(opt.ret, i)
     ccnt = custom_constraint_view(opt.ccnt, i)
@@ -262,8 +247,8 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = lcs, lcm = opt.lcm, cent = opt.cent,
                          gcard = gcard, sets = sets, nplg = opt.nplg, cplg = opt.cplg,
-                         tn = tn, te = te, fees = fees, ret = ret, sce = opt.sce,
-                         ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
+                         tn = tn, te1 = te1, te2 = te2, tev = tev, fees = fees, ret = ret,
+                         sce = opt.sce, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
                          card = opt.card, nea = opt.nea, l1 = opt.l1, l2 = opt.l2,
                          ss = opt.ss, strict = opt.strict)
 end
