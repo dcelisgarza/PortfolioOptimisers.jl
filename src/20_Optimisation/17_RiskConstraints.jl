@@ -1813,7 +1813,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     w = model[:w]
     wb = r.tracking.w
     wd = w - wb
-    vol_tracking_risk = model[key] = @expression(model)
+    vol_tracking_risk = model[key] = @variable(model)
     model[Symbol(:cdev_soc_, i)] = @constraint(model,
                                                [sc * vol_tracking_risk; sc * G * wd] ∈
                                                SecondOrderCone())
