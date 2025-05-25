@@ -520,6 +520,79 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::Range,
     set_risk_bounds_and_expression!(model, opt, range_risk, r.settings, :range_risk)
     return nothing
 end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
+                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                          <:RiskBudgetting}, pr::AbstractPriorResult,
+                               args...)
+    b = !isnothing(r.formulation.b) ? r.formulation.b : 1e3
+    s = !isnothing(r.formulation.s) ? r.formulation.s : 1e-5
+    @smart_assert(b > s)
+    key = Symbol(:var_risk_, i)
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    var_risk, z_var = model[key], model[Symbol(:z_var_, i)] = @variables(model,
+                                                                         begin
+                                                                             ()
+                                                                             [1:T],
+                                                                             (binary = true)
+                                                                         end)
+    alpha = r.alpha
+    wi = nothing_scalar_array_factory(r.w, pr.w)
+    if isnothing(wi)
+        model[Symbol(:csvar_, i)] = @constraint(model,
+                                                sc * (sum(z_var) - alpha * T + s * T) <= 0)
+    else
+        sw = sum(wi)
+        model[Symbol(:csvar_, i)] = @constraint(model,
+                                                sc *
+                                                (dot(wi, z_var) - alpha * sw + s * sw) <= 0)
+    end
+    model[Symbol(:cvar_, i)] = @constraint(model,
+                                           sc * ((net_X + b * z_var) .+ var_risk) >= 0)
+    set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, key)
+    return nothing
+end
+function compute_value_at_risk_z(distribution::Normal, alpha::Real)
+    return cquantile(distribution, alpha)
+end
+function compute_value_at_risk_z(distribution::TDist, alpha::Real)
+    d = dof(distribution)
+    @smart_assert(d > 2)
+    return cquantile(distribution, alpha) * sqrt((d - 2) / d)
+end
+function compute_value_at_risk_z(::Laplace, alpha::Real)
+    return -log(2 * alpha) / sqrt(2)
+end
+function set_risk_constraints!(model::JuMP.Model, i::Integer,
+                               r::ValueatRisk{<:Any, <:Any, <:Any,
+                                              <:DistributionValueatRisk},
+                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                          <:RiskBudgetting}, pr::AbstractPriorResult,
+                               args...)
+    formulation = r.formulation
+    sigma = formulation.sigma
+    mu = formulation.mu
+    G = if isnothing(sigma)
+        get_chol_or_sigma_pm(model, pr)
+    else
+        cholesky(sigma).U
+    end
+    if isnothing(mu)
+        mu = pr.mu
+    end
+    w = model[:w]
+    sc = model[:sc]
+    z = compute_value_at_risk_z(r.formulation.distribution, r.alpha)
+    key = Symbol(:var_risk_, i)
+    g_var = model[Symbol(:g_var_, i)] = @variable(model)
+    var_risk = model[key] = @expression(model, -dot(mu, w) + z * g_var)
+    model[Symbol(:cvar_, i)] = @constraint(model,
+                                           [sc * g_var; sc * G * w] ∈ SecondOrderCone())
+    set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, key)
+    return nothing
+end
 function set_risk_constraints!(model::JuMP.Model, i::Integer, r::ConditionalValueatRisk,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,

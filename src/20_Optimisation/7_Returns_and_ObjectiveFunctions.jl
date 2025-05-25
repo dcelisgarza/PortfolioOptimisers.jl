@@ -51,21 +51,23 @@ function MaximumUtility(; l::Real = 2)
     @smart_assert(l >= zero(l))
     return MaximumUtility{typeof(l)}(l)
 end
-struct MaximumRatio{T1 <: Real, T2 <: Real} <: ObjectiveFunction
+struct MaximumRatio{T1 <: Real, T2 <: Union{Nothing, <:Real}} <: ObjectiveFunction
     rf::T1
     ohf::T2
 end
-function MaximumRatio(; rf::Real = 0.0, ohf::Real = 0.0)
-    @smart_assert(rf >= zero(rf))
-    @smart_assert(ohf >= zero(ohf))
+function MaximumRatio(; rf::Real = 0.0, ohf::Union{Nothing, <:Real} = nothing)
+    if !isnothing(ohf)
+        @smart_assert(ohf > zero(ohf))
+    end
     return MaximumRatio{typeof(rf), typeof(ohf)}(rf, ohf)
 end
 struct MaximumReturn <: ObjectiveFunction end
 function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::AbstractVector,
                                              obj::MaximumRatio)
-    ohf = if iszero(obj.ohf)
+    ohf = if isnothing(obj.ohf)
         min(1e3, max(1e-3, mean(abs.(mu))))
     else
+        @smart_assert(obj.ohf > zero(obj.ohf))
         obj.ohf
     end
     @expression(model, ohf, ohf)

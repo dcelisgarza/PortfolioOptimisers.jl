@@ -1,17 +1,63 @@
-struct ValueatRisk{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real,
-                   T3 <: Union{Nothing, <:AbstractWeights}} <: HierarchicalRiskMeasure
+abstract type ValueatRiskFormulation <: AbstractAlgorithm end
+struct MIPValueatRisk{T1 <: Union{Nothing, <:Real}, T2 <: Union{Nothing, <:Real}} <:
+       ValueatRiskFormulation
+    b::T1
+    s::T2
+end
+function MIPValueatRisk(; b::Union{Nothing, <:Real} = nothing,
+                        s::Union{Nothing, <:Real} = nothing)
+    bflag = !isnothing(b)
+    sflag = !isnothing(s)
+    if bflag
+        @smart_assert(b > zero(b))
+    end
+    if sflag
+        @smart_assert(s > zero(s))
+    end
+    if bflag && sflag
+        @smart_assert(b > s)
+    end
+    return MIPValueatRisk{typeof(b), typeof(s)}(b, s)
+end
+struct DistributionValueatRisk{T1 <: Union{Nothing, <:AbstractVector},
+                               T2 <: Union{Nothing, <:AbstractMatrix},
+                               T3 <: Distribution} <: ValueatRiskFormulation
+    mu::T1
+    sigma::T2
+    distribution::T3
+end
+function DistributionValueatRisk(; mu::Union{Nothing, <:AbstractVector} = nothing,
+                                 sigma::Union{Nothing, <:AbstractMatrix} = nothing,
+                                 distribution::Distribution = Normal())
+    if !isnothing(mu)
+        @smart_assert(!isempty(mu))
+    end
+    if !isnothing(sigma)
+        @smart_assert(!isempty(sigma))
+    end
+    return DistributionValueatRisk{typeof(mu), typeof(sigma), typeof(distribution)}(mu,
+                                                                                    sigma,
+                                                                                    distribution)
+end
+struct ValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
+                   T3 <: Union{Nothing, <:AbstractWeights}, T4 <: ValueatRiskFormulation} <:
+       RiskMeasure
     settings::T1
     alpha::T2
     w::T3
+    formulation::T4
 end
-function ValueatRisk(;
-                     settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                     alpha::Real = 0.05, w::Union{Nothing, <:AbstractWeights} = nothing)
+function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                     alpha::Real = 0.05, w::Union{Nothing, <:AbstractWeights} = nothing,
+                     formulation::ValueatRiskFormulation = MIPValueatRisk())
     @smart_assert(zero(alpha) < alpha < one(alpha))
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return ValueatRisk{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
+    return ValueatRisk{typeof(settings), typeof(alpha), typeof(w), typeof(formulation)}(settings,
+                                                                                        alpha,
+                                                                                        w,
+                                                                                        formulation)
 end
 function factory(r::ValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
@@ -135,4 +181,5 @@ function (r::RelativeDrawdownatRisk)(x::AbstractVector)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
 
-export ValueatRisk, ValueatRiskRange, DrawdownatRisk, RelativeDrawdownatRisk
+export MIPValueatRisk, NormalValueatRisk, ValueatRisk, ValueatRiskRange, DrawdownatRisk,
+       RelativeDrawdownatRisk
