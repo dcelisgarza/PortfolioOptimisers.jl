@@ -1,8 +1,11 @@
+abstract type BudgetConstraintEstimator <: JuMPConstraintEstimator end
+abstract type BudgetEstimator <: BudgetConstraintEstimator end
+abstract type BudgetCostEstimator <: BudgetConstraintEstimator end
 function set_budget_costs!(args...)
     return nothing
 end
 struct BudgetRange{T1 <: Union{Nothing, <:Real}, T2 <: Union{Nothing, <:Real}} <:
-       JuMPConstraintEstimator
+       BudgetEstimator
     lb::T1
     ub::T2
 end
@@ -27,11 +30,11 @@ end
 function set_budget_constraints!(args...)
     return nothing
 end
-struct BudgetCosts{T1 <: Union{<:Real, <:BudgetRange}, T2 <: AbstractVector{<:Real},
+struct BudgetCosts{T1 <: Union{<:Real, <:BudgetEstimator}, T2 <: AbstractVector{<:Real},
                    T3 <: Union{<:Real, <:AbstractVector{<:Real}},
                    T4 <: Union{<:Real, <:AbstractVector{<:Real}},
                    T5 <: Union{<:Real, <:AbstractVector{<:Real}},
-                   T6 <: Union{<:Real, <:AbstractVector{<:Real}}} <: JuMPConstraintEstimator
+                   T6 <: Union{<:Real, <:AbstractVector{<:Real}}} <: BudgetCostEstimator
     bgt::T1
     w::T2
     vp::T3
@@ -81,7 +84,7 @@ struct BudgetMarketImpact{T1 <: Union{<:Real, <:BudgetRange}, T2 <: AbstractVect
                           T4 <: Union{<:Real, <:AbstractVector{<:Real}},
                           T5 <: Union{<:Real, <:AbstractVector{<:Real}},
                           T6 <: Union{<:Real, <:AbstractVector{<:Real}}, T7 <: Real} <:
-       JuMPConstraintEstimator
+       BudgetCostEstimator
     bgt::T1
     w::T2
     vp::T3
@@ -118,7 +121,7 @@ function BudgetMarketImpact(; bgt::Union{<:Real, <:BudgetRange} = 1.0,
     else
         @smart_assert(un >= zero(un))
     end
-    @smart_assert(beta >= zero(beta))
+    @smart_assert(zero(beta) <= beta <= one(beta))
     return BudgetMarketImpact{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up),
                               typeof(un), typeof(beta)}(bgt, w, vp, vn, up, un, beta)
 end
@@ -274,8 +277,8 @@ function set_cost_budget_constraints!(model::JuMP.Model,
     sc = model[:sc]
     wp = model[:wp]
     wn = model[:wn]
-    @constraint(model, cost_bgt,
-                sc * (sum(w) + dot_scalar(vp, wp) + dot_scalar(vn, wn) - k * val) == 0)
+    @expression(model, cost_bgt_expr, dot_scalar(vp, wp) + dot_scalar(vn, wn))
+    @constraint(model, cost_bgt, sc * (sum(w) + cost_bgt_expr - k * val) == 0)
     return nothing
 end
 function set_cost_budget_constraints!(model::JuMP.Model,
@@ -288,13 +291,12 @@ function set_cost_budget_constraints!(model::JuMP.Model,
     wn = model[:wn]
     lb = bgt.lb
     ub = bgt.ub
+    @expression(model, cost_bgt_expr, dot_scalar(vp, wp) + dot_scalar(vn, wn))
     if !isnothing(lb)
-        @constraint(model, cost_bgt_lb,
-                    sc * (sum(w) + dot_scalar(vp, wp) + dot_scalar(vn, wn) - k * lb) >= 0)
+        @constraint(model, cost_bgt_lb, sc * (sum(w) + cost_bgt_expr - k * lb) >= 0)
     end
     if !isnothing(ub)
-        @constraint(model, cost_bgt_ub,
-                    sc * (sum(w) + dot_scalar(vp, wp) + dot_scalar(vn, wn) - k * ub) <= 0)
+        @constraint(model, cost_bgt_ub, sc * (sum(w) + cost_bgt_expr - k * ub) <= 0)
     end
     return nothing
 end
@@ -316,27 +318,30 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::Abstrac
     set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w)
     return nothing
 end
-#!#######################
 function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact,
                                  w::AbstractVector)
     wb = bgt.w
     up = bgt.up
     un = bgt.un
+    beta = bgt.beta
     sc = model[:sc]
     N = length(w)
     @variables(model, begin
                    wp[1:N], (lower_bound = 0)
                    wn[1:N], (lower_bound = 0)
+                   wip[1:N]
+                   win[1:N]
                end)
     @constraints(model, begin
                      sc * (wp ⊖ up) <= 0
                      sc * (wn ⊖ un) <= 0
                      sc * (w - wb - wp + wn) == 0
+                     [i = 1:N], [sc * wip[i], sc, sc * wp[i]] ∈ MOI.PowerCone(beta)
+                     [i = 1:N], [sc * win[i], sc, sc * wn[i]] ∈ MOI.PowerCone(beta)
                  end)
-    set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w)
+    set_cost_budget_constraints!(model, wip, win, bgt.bgt, w)
     return nothing
 end
-########################
 function w_neg_flag(wb::Real)
     return wb < zero(wb)
 end
@@ -826,4 +831,4 @@ function set_sdp_frc_philogeny_constraints!(model::JuMP.Model,
     return nothing
 end
 
-export BudgetRange, BudgetCosts
+export BudgetRange, BudgetCosts, BudgetMarketImpact

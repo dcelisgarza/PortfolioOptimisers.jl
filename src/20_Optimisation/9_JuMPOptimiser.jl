@@ -144,8 +144,7 @@ function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                        slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                        wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = WeightBoundsResult(),
-                       bgt::Union{Nothing, <:Real, <:BudgetRange, <:BudgetCosts,
-                                  <:BudgetMarketImpact} = 1.0,
+                       bgt::Union{Nothing, <:Real, <:BudgetConstraintEstimator} = 1.0,
                        sbgt::Union{Nothing, <:Real, <:BudgetRange} = nothing,
                        lt::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                        st::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
@@ -180,7 +179,7 @@ function JuMPOptimiser(;
                        ss::Union{Nothing, <:Real} = nothing, strict::Bool = false)
     if isa(bgt, Real)
         @smart_assert(isfinite(bgt) && bgt >= 0)
-    elseif isa(bgt, BudgetCosts) || isa(bgt, BudgetMarketImpact)
+    elseif isa(bgt, BudgetCostEstimator)
         @smart_assert(isnothing(sbgt))
     end
     if isa(sbgt, Real)

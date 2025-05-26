@@ -115,6 +115,14 @@ function add_fees_to_ret!(model::JuMP.Model, ret)
     add_to_expression!(ret, -fees)
     return nothing
 end
+function add_market_impact_cost!(model::JuMP.Model, ret)
+    if !haskey(model, :wip)
+        return nothing
+    end
+    cost_bgt_expr = model[:cost_bgt_expr]
+    add_to_expression!(ret, -cost_bgt_expr)
+    return nothing
+end
 function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{Nothing, <:Any},
                                  obj::ObjectiveFunction, pr::AbstractPriorResult)
     w = model[:w]
@@ -122,6 +130,7 @@ function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{Nothi
     mu = pr.mu
     @expression(model, ret, dot(mu, w))
     add_fees_to_ret!(model, ret)
+    add_market_impact_cost!(model, ret)
     set_max_ratio_return_constraints!(model, obj, mu)
     set_return_bounds!(model, lb)
     return nothing
@@ -136,6 +145,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySetRe
     @constraint(model, bucs_ret[i = 1:N], [sc * bucs_w[i]; sc * w[i]] ∈ MOI.NormOneCone(2))
     @expression(model, ret, dot(mu, w) - dot(d_mu, bucs_w))
     add_fees_to_ret!(model, ret)
+    add_market_impact_cost!(model, ret)
     return nothing
 end
 function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySetResult,
@@ -149,6 +159,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintyS
     @constraint(model, eucs_ret, [sc * t_eucs_gw; sc * x_eucs_w] ∈ SecondOrderCone())
     @expression(model, ret, dot(mu, w) - k * t_eucs_gw)
     add_fees_to_ret!(model, ret)
+    add_market_impact_cost!(model, ret)
     return nothing
 end
 function set_return_constraints!(model::JuMP.Model,
@@ -192,6 +203,7 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
         @expression(model, ret, mean(t_ekelly, w))
     end
     add_fees_to_ret!(model, ret)
+    add_market_impact_cost!(model, ret)
     set_max_ratio_kelly_return_constraints!(model, obj, k, sc, ret)
     @expression(model, kret, k .+ net_X)
     @constraint(model, ekelly_ret[i = 1:T],
