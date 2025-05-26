@@ -122,7 +122,7 @@ function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims
     set_linear_weight_constraints!(model, rb.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, rb.opt.card, gcard, nplg, cplg, rb.opt.lt, rb.opt.st,
                          rb.opt.fees, rb.opt.ss)
-    set_smip_constraints!(model, rb.opt.scard, sgcard, smtx)
+    set_smip_constraints!(model, wb, rb.opt.scard, sgcard, smtx)
     set_turnover_constraints!(model, rb.opt.tn)
     set_noc_tracking_error_constraints!(model, pr, rb.opt.te1)
     set_soc_tracking_error_constraints!(model, pr, rb.opt.te2)

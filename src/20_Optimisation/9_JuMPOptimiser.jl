@@ -340,7 +340,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                     strict = opt.strict)
     sgcard = cardinality_constraints(opt.sgcard, opt.sets; datatype = datatype,
                                      strict = opt.strict)
-    smtx = asset_sets_matrix(opt.smtx, opt.sets; datatype = datatype)
+    smtx = asset_sets_matrix(opt.smtx, opt.sets)
     if isa(sgcard, LinearConstraintResult) && isa(smtx, AbstractMatrix)
         N = size(smtx, 1)
         N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0

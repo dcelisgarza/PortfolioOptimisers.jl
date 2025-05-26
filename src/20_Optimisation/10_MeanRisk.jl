@@ -41,7 +41,7 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_linear_weight_constraints!(model, mr.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, mr.opt.card, gcard, nplg, cplg, mr.opt.lt, mr.opt.st,
                          mr.opt.fees, mr.opt.ss)
-    set_smip_constraints!(model, mr.opt.scard, sgcard, smtx)
+    set_smip_constraints!(model, wb, mr.opt.scard, sgcard, smtx)
     set_turnover_constraints!(model, mr.opt.tn)
     set_noc_tracking_error_constraints!(model, pr, mr.opt.te1)
     set_soc_tracking_error_constraints!(model, pr, mr.opt.te2)

@@ -598,7 +598,8 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     return nothing
 end
-function set_smip_constraints!(model::JuMP.Model, card::Union{Nothing, <:Integer},
+function set_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+                               card::Union{Nothing, <:Integer},
                                gcard::Union{Nothing, <:LinearConstraintResult},
                                smtx::Union{Nothing, Symbol, <:AbstractString,
                                            <:AbstractMatrix})
@@ -607,11 +608,21 @@ function set_smip_constraints!(model::JuMP.Model, card::Union{Nothing, <:Integer
     if !(card_flag || gcard_flag)
         return nothing
     end
-    w = model[:w]
     sc = model[:sc]
+    w = model[:w]
     N = size(smtx, 1)
     @variable(model, sib[1:N], binary = true)
-    @constraint(model, scard_a, sc * (smtx * w - sib) <= 0)
+    @expression(model, smtx_expr, smtx * w)
+    lb = wb.lb
+    ub = wb.ub
+    if !isnothing(lb) && w_finite_flag(lb)
+        lb = [sum(lb[view(smtx, i, :)]) for i ∈ axes(smtx, 1)]
+        @constraint(model, set_w_mip_lb, sc * (smtx_expr - lb ⊙ sib) >= 0)
+    end
+    if !isnothing(ub) && w_finite_flag(ub)
+        ub = [sum(ub[view(smtx, i, :)]) for i ∈ axes(smtx, 1)]
+        @constraint(model, set_w_mip_ub, sc * (smtx_expr - ub ⊙ sib) <= 0)
+    end
     if card_flag
         @constraint(model, scard, sc * (sum(sib) - card) <= 0)
     end

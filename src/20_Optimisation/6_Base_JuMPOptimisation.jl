@@ -178,8 +178,6 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
         try
             JuMP.optimize!(model)
         catch jump_error
-            @warn("Failed to solve optimisation problem.")
-            println(jump_error)
             push!(trials, name => Dict(:jump_error => jump_error))
             continue
         end
@@ -192,8 +190,6 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                 break
             end
         catch err
-            @warn("Failed to solve optimisation problem.")
-            println(err.msg)
             push!(trials,
                   name => Dict(:objective_val => objective_value(model), :err => err,
                                :settings => settings))
@@ -205,6 +201,7 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
     retcode = if success
         OptimisationSuccess(; res = trials)
     else
+        @warn("Failed to solve optimisation problem. Check `retcode.res` for details.")
         OptimisationFailure(; res = trials)
     end
     return retcode, process_model(model, opt)

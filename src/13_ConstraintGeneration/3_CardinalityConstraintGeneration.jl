@@ -146,16 +146,15 @@ function asset_sets_matrix(smtx::Union{Nothing, Symbol, <:AbstractString}, args.
                            kwargs...)
     return smtx
 end
-function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFrame;
-                           datatype::Type = Float64)
+function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFrame)
     @smart_assert(!isempty(sets))
     sets = sets[!, smtx]
-    A = Vector{datatype}(undef, 0)
     unique_sets = unique(sets)
-    for s ∈ unique_sets
-        append!(A, sets .== s)
+    A = BitMatrix(undef, length(unique_sets), length(sets))
+    for (i, s) ∈ pairs(unique_sets)
+        A[i, :] = sets .== s
     end
-    return transpose(reshape(A, :, length(unique_sets)))
+    return A
 end
 function asset_sets_matrix_view(smtx::Union{Nothing, Symbol, <:AbstractString}, ::Any)
     return smtx
