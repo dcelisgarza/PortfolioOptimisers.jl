@@ -9,8 +9,7 @@ function drop_correlated(X::AbstractMatrix; threshold::Real = 0.95, absolute::Bo
     tril_idx = findall(tril!(trues(size(rho)), -1))
     candidate_idx = findall(rho[tril_idx] .>= threshold)
     candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]
-    to_remove = Set{Int}()
-    sizehint!(to_remove, div(length(candidate_idx), 2))
+    to_remove = sizehint!(Set{Int}(), div(length(candidate_idx), 2))
     for idx ∈ candidate_idx
         i, j = tril_idx[idx][1], tril_idx[idx][2]
         if i ∉ to_remove && j ∉ to_remove
@@ -269,8 +268,7 @@ function nothing_dataframe_getindex(x::AbstractDataFrame, i)
     return x[i, :]
 end
 function fourth_moment_index_factory(N::Integer, i)
-    idx = Vector{Int}(undef, 0)
-    sizehint!(idx, length(i)^2)
+    idx = sizehint!(Int[], length(i)^2)
     for c ∈ i
         append!(idx, (((c - 1) * N + 1):(c * N))[i])
     end
