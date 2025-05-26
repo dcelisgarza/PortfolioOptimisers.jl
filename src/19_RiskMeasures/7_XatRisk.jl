@@ -181,5 +181,5 @@ function (r::RelativeDrawdownatRisk)(x::AbstractVector)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
 
-export MIPValueatRisk, NormalValueatRisk, ValueatRisk, ValueatRiskRange, DrawdownatRisk,
-       RelativeDrawdownatRisk
+export MIPValueatRisk, DistributionValueatRisk, ValueatRisk, ValueatRiskRange,
+       DrawdownatRisk, RelativeDrawdownatRisk

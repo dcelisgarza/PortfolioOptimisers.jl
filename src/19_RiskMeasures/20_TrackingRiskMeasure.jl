@@ -1,14 +1,14 @@
 abstract type TrackingFormulation <: AbstractAlgorithm end
 struct SOCTracking <: TrackingFormulation end
 struct NOCTracking <: TrackingFormulation end
-struct TrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: AbstractTracking,
+struct TrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: AbstractTrackingAlgorithm,
                            T3 <: TrackingFormulation} <: RiskMeasure
     settings::T1
     tracking::T2
     formulation::T3
 end
 function TrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                             tracking::AbstractTracking,
+                             tracking::AbstractTrackingAlgorithm,
                              formulation::TrackingFormulation = SOCTracking())
     return TrackingRiskMeasure{typeof(settings), typeof(tracking), typeof(formulation)}(settings,
                                                                                         tracking,
