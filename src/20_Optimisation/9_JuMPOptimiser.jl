@@ -71,7 +71,7 @@ end
 struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                      T2 <: Union{<:Solver, <:AbstractVector{<:Solver}},
                      T3 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
-                     T4 <: Union{Nothing, <:Real, <:BudgetRange},
+                     T4 <: Union{Nothing, <:Real, <:BudgetRange, <:BudgetCosts},
                      T5 <: Union{Nothing, <:Real, <:BudgetRange},
                      T6 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                      T7 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
@@ -144,7 +144,7 @@ function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                        slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                        wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = WeightBoundsResult(),
-                       bgt::Union{Nothing, <:Real, <:BudgetRange} = 1.0,
+                       bgt::Union{Nothing, <:Real, <:BudgetRange, <:BudgetCosts} = 1.0,
                        sbgt::Union{Nothing, <:Real, <:BudgetRange} = nothing,
                        lt::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                        st::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
@@ -179,6 +179,8 @@ function JuMPOptimiser(;
                        ss::Union{Nothing, <:Real} = nothing, strict::Bool = false)
     if isa(bgt, Real)
         @smart_assert(isfinite(bgt) && bgt >= 0)
+    elseif isa(bgt, BudgetCosts)
+        @smart_assert(isnothing(sbgt))
     end
     if isa(sbgt, Real)
         @smart_assert(isfinite(sbgt) && sbgt >= 0)
@@ -231,6 +233,7 @@ end
 function opt_view(opt::JuMPOptimiser, i::AbstractVector)
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
+    bgt = budget_view(opt.bgt, i)
     lt = nothing_scalar_array_view(opt.lt, i)
     st = nothing_scalar_array_view(opt.lt, i)
     lcs = linear_constraint_view(opt.lcs, i)
@@ -244,7 +247,7 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector)
     ret = jump_returns_view(opt.ret, i)
     ccnt = custom_constraint_view(opt.ccnt, i)
     cobj = custom_objective_view(opt.cobj, i)
-    return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
+    return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = lcs, lcm = opt.lcm, cent = opt.cent,
                          gcard = gcard, sets = sets, nplg = opt.nplg, cplg = opt.cplg,
                          tn = tn, te1 = te1, te2 = te2, tev = tev, fees = fees, ret = ret,

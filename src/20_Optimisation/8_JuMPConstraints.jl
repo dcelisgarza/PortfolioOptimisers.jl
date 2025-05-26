@@ -1,3 +1,6 @@
+function set_budget_costs!(args...)
+    return nothing
+end
 struct BudgetRange{T1 <: Union{Nothing, <:Real}, T2 <: Union{Nothing, <:Real}} <:
        JuMPConstraintEstimator
     lb::T1
@@ -18,8 +21,60 @@ function BudgetRange(; lb::Union{Nothing, <:Real} = 1.0, ub::Union{Nothing, <:Re
     end
     return BudgetRange{typeof(lb), typeof(ub)}(lb, ub)
 end
+function budget_view(bgt::Union{<:Real, <:BudgetRange}, ::Any)
+    return bgt
+end
 function set_budget_constraints!(args...)
     return nothing
+end
+struct BudgetCosts{T1 <: Union{<:Real, <:BudgetRange}, T2 <: AbstractVector{<:Real},
+                   T3 <: Union{<:Real, <:AbstractVector{<:Real}},
+                   T4 <: Union{<:Real, <:AbstractVector{<:Real}},
+                   T5 <: Union{<:Real, <:AbstractVector{<:Real}},
+                   T6 <: Union{<:Real, <:AbstractVector{<:Real}}} <: JuMPConstraintEstimator
+    bgt::T1
+    w::T2
+    vp::T3
+    vn::T4
+    up::T5
+    un::T6
+end
+function BudgetCosts(; bgt::Union{<:Real, <:BudgetRange} = 1.0, w::AbstractVector{<:Real},
+                     vp::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                     vn::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                     up::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                     un::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
+    @smart_assert(!isempty(w))
+    if isa(vp, AbstractVector)
+        @smart_assert(!isempty(vp) && all(vp .>= zero(eltype(vp))))
+    else
+        @smart_assert(vp >= zero(vp))
+    end
+    if isa(vn, AbstractVector)
+        @smart_assert(!isempty(vn) && all(vn .>= zero(eltype(vn))))
+    else
+        @smart_assert(vn >= zero(vn))
+    end
+    if isa(up, AbstractVector)
+        @smart_assert(!isempty(up) && all(up .>= zero(eltype(up))))
+    else
+        @smart_assert(up >= zero(up))
+    end
+    if isa(un, AbstractVector)
+        @smart_assert(!isempty(un) && all(un .>= zero(eltype(un))))
+    else
+        @smart_assert(un >= zero(un))
+    end
+    return BudgetCosts{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up),
+                       typeof(un)}(bgt, w, vp, vn, up, un)
+end
+function budget_view(bgt::BudgetCosts, i::AbstractVector)
+    w = view(bgt.w, i)
+    vp = nothing_scalar_array_view(bgt.vp, i)
+    vn = nothing_scalar_array_view(bgt.vn, i)
+    up = nothing_scalar_array_view(bgt.up, i)
+    un = nothing_scalar_array_view(bgt.un, i)
+    return BudgetCosts(; bgt = bgt.bgt, w = w, vp = vp, vn = vn, up = up, un = un)
 end
 function set_budget_constraints!(model::JuMP.Model, val::Real, w::AbstractVector)
     k = model[:k]
@@ -40,7 +95,7 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::Abstrac
     end
     return nothing
 end
-function set_long_short_budget_constraints!(::JuMP.Model, ::Nothing, ::Nothing)
+function set_long_short_budget_constraints!(args...)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Real, ::Nothing)
@@ -148,6 +203,65 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     elseif ub_flag && !sub_flag
         @constraint(model, sbgt_ub, sc * (sum(sw) - k * sub) <= 0)
     end
+    return nothing
+end
+function dot_scalar(val::Real, w::AbstractVector)
+    return val * sum(w)
+end
+function dot_scalar(val::AbstractVector, w::AbstractVector)
+    return dot(val, w)
+end
+function set_cost_budget_constraints!(args...)
+    return nothing
+end
+function set_cost_budget_constraints!(model::JuMP.Model,
+                                      vp::Union{<:Real, <:AbstractVector{<:Real}},
+                                      vn::Union{<:Real, <:AbstractVector{<:Real}},
+                                      val::Real, w::AbstractVector)
+    k = model[:k]
+    sc = model[:sc]
+    wp = model[:wp]
+    wn = model[:wn]
+    @constraint(model, cost_bgt,
+                sc * (sum(w) + dot_scalar(vp, wp) + dot_scalar(vn, wn) - k * val) == 0)
+    return nothing
+end
+function set_cost_budget_constraints!(model::JuMP.Model,
+                                      vp::Union{<:Real, <:AbstractVector{<:Real}},
+                                      vn::Union{<:Real, <:AbstractVector{<:Real}},
+                                      bgt::BudgetRange, w::AbstractVector)
+    k = model[:k]
+    sc = model[:sc]
+    wp = model[:wp]
+    wn = model[:wn]
+    lb = bgt.lb
+    ub = bgt.ub
+    if !isnothing(lb)
+        @constraint(model, cost_bgt_lb,
+                    sc * (sum(w) + dot_scalar(vp, wp) + dot_scalar(vn, wn) - k * lb) >= 0)
+    end
+    if !isnothing(ub)
+        @constraint(model, cost_bgt_ub,
+                    sc * (sum(w) + dot_scalar(vp, wp) + dot_scalar(vn, wn) - k * ub) <= 0)
+    end
+    return nothing
+end
+function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::AbstractVector)
+    wb = bgt.w
+    up = bgt.up
+    un = bgt.un
+    sc = model[:sc]
+    N = length(w)
+    @variables(model, begin
+                   wp[1:N], (lower_bound = 0)
+                   wn[1:N], (lower_bound = 0)
+               end)
+    @constraints(model, begin
+                     sc * (wp ⊖ up) <= 0
+                     sc * (wn ⊖ un) <= 0
+                     sc * (w - wb - wp + wn) == 0
+                 end)
+    set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w)
     return nothing
 end
 function w_neg_flag(wb::Real)
