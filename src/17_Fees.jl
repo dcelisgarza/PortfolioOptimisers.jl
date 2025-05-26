@@ -61,23 +61,23 @@ end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Real,
                    op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees))))
-    return sum(fees * w[idx] ⊙ latest_prices[idx])
+    return dot_scalar(fees * w[idx], latest_prices[idx])
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
                    fees::AbstractVector{<:Real}, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(latest_prices), eltype(fees))))
-    return dot(fees[idx], w[idx] ⊙ latest_prices[idx])
+    return dot(fees[idx], w[idx] .* latest_prices[idx])
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector, ::Nothing)
     return zero(promote_type(eltype(w), eltype(latest_prices)))
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
                    tn::Turnover{<:Any, <:Real})
-    return sum(tn.val * abs.(w - tn.w) ⊙ latest_prices)
+    return dot_scalar(tn.val * abs.(w - tn.w), latest_prices)
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector,
                    tn::Turnover{<:Any, <:AbstractVector})
-    return dot(tn.val, abs.(w - tn.w) ⊙ latest_prices)
+    return dot(tn.val, abs.(w - tn.w) .* latest_prices)
 end
 function calc_fees(w::AbstractVector, latest_prices::AbstractVector, fees::Fees)
     fees_long = calc_fees(w, latest_prices, fees.l, .>=)

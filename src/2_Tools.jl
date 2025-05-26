@@ -219,6 +219,15 @@ outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A),
 ⊖(A::AbstractArray, B::AbstractArray) = A - B
 ⊖(A::AbstractArray, B) = A .- B
 ⊖(A, B::AbstractArray) = A .- B
+function dot_scalar(a::Real, b::AbstractVector)
+    return a * sum(b)
+end
+function dot_scalar(a::AbstractVector, b::Real)
+    return sum(a) * b
+end
+function dot_scalar(a::AbstractVector, b::AbstractVector)
+    return dot(a, b)
+end
 function nothing_scalar_array_view(::Nothing, ::Any)
     return nothing
 end

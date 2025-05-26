@@ -263,12 +263,6 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     end
     return nothing
 end
-function dot_scalar(val::Real, w::AbstractVector)
-    return val * sum(w)
-end
-function dot_scalar(val::AbstractVector, w::AbstractVector)
-    return dot(val, w)
-end
 function set_cost_budget_constraints!(model::JuMP.Model,
                                       vp::Union{<:Real, <:AbstractVector{<:Real}},
                                       vn::Union{<:Real, <:AbstractVector{<:Real}},
@@ -498,11 +492,11 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
     end
     if ffl_flag || ffs_flag
         if ffl_flag
-            @expression(model, ffl, sum(ffl ⊙ ilb))
+            @expression(model, ffl, dot_scalar(ffl, ilb))
             add_to_fees!(model, ffl)
         end
         if ffs_flag
-            @expression(model, ffs, sum(ffs ⊙ isb))
+            @expression(model, ffs, dot_scalar(ffs, isb))
             add_to_fees!(model, ffs)
         end
     end
@@ -536,7 +530,7 @@ function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
         @constraint(model, w_mip_lt, sc * (w - i_mip ⊙ lt) >= 0)
     end
     if ffl_flag
-        @expression(model, ffl, sum(ffl ⊙ ib))
+        @expression(model, ffl, dot_scalar(ffl, ib))
         add_to_fees!(model, ffl)
     end
     return ib
@@ -604,6 +598,34 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     return nothing
 end
+function set_smip_constraints!(::JuMP.Model, ::Nothing, ::Nothing, ::Any)
+    return nothing
+end
+function set_smip_constraints!(model::JuMP.Model, card::Union{Nothing, <:Integer},
+                               gcard::Union{Nothing, <:LinearConstraintResult},
+                               A_sets::AbstractMatrix)
+    w = model[:w]
+    sc = model[:sc]
+    N = size(A_sets, 1)
+    @variable(model, sib[1:N], binary = true)
+    @constraint(model, scard_a, sc * (A_sets * w - sib) <= 0)
+    if !isnothing(card)
+        @constraint(model, scard, sc * (sum(sib) - card) <= 0)
+    end
+    if !isnothing(gcard)
+        if !isnothing(gcard.ineq)
+            A = gcard.ineq.A
+            B = gcard.ineq.B
+            @constraint(model, gscard_ineq, sc * (A * sib ⊖ B) <= 0)
+        end
+        if !isnothing(gcard.eq)
+            A = gcard.eq.A
+            B = gcard.eq.B
+            @constraint(model, gscard_eq, sc * (A * sib ⊖ B) == 0)
+        end
+    end
+    return nothing
+end
 function set_turnover_fees!(args...)
     return nothing
 end
@@ -617,7 +639,7 @@ function set_turnover_fees!(model::JuMP.Model, tn::Turnover)
     @variable(model, t_ftn[1:N])
     @expressions(model, begin
                      x_ftn, w - wt * k
-                     ftn, sum(val ⊙ t_ftn)
+                     ftn, dot_scalar(val, t_ftn)
                  end)
     @constraint(model, cftn[i = 1:N], [sc * t_ftn[i]; sc * x_ftn[i]] ∈ MOI.NormOneCone(2))
     add_to_fees!(model, ftn)
@@ -634,7 +656,7 @@ function set_short_non_fixed_fees!(args...)
 end
 function set_long_non_fixed_fees!(model::JuMP.Model, fl::Union{<:Real, <:AbstractVector})
     lw = model[:lw]
-    @expression(model, fl, sum(fl ⊙ lw))
+    @expression(model, fl, dot_scalar(fl, lw))
     add_to_fees!(model, fl)
     return nothing
 end
@@ -643,7 +665,7 @@ function set_short_non_fixed_fees!(model::JuMP.Model, fs::Union{<:Real, <:Abstra
         return nothing
     end
     sw = model[:sw]
-    @expression(model, fs, sum(fs ⊙ sw))
+    @expression(model, fs, dot_scalar(fs, sw))
     add_to_fees!(model, fs)
     return nothing
 end

@@ -34,9 +34,9 @@ function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
     mu_a3, mu_b3 = mean(a), mean(b)
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
-    dcov2_xx = sum(A ⊙ A) / N2
-    dcov2_xy = sum(A ⊙ B) / N2
-    dcov2_yy = sum(B ⊙ B) / N2
+    dcov2_xx = dot(A, A) / N2
+    dcov2_xy = dot(A, B) / N2
+    dcov2_yy = dot(B, B) / N2
     return sqrt(dcov2_xy) / sqrt(sqrt(dcov2_xx) * sqrt(dcov2_yy))
 end
 function cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
@@ -73,7 +73,7 @@ function cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
     mu_a3, mu_b3 = mean(a), mean(b)
     A = a .- mu_a1 .- mu_a2 .+ mu_a3
     B = b .- mu_b1 .- mu_b2 .+ mu_b3
-    dcov2_xy = sum(A ⊙ B) / N2
+    dcov2_xy = dot(A, B) / N2
     return sqrt(dcov2_xy)
 end
 function cov_distance(ce::DistanceCovariance, X::AbstractMatrix)

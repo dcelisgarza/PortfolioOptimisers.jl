@@ -187,7 +187,7 @@ function average_centrality(cte::CentralityEstimator, w::AbstractVector, X::Abst
 end
 function asset_philogeny(w::AbstractVector, X::AbstractMatrix)
     aw = abs.(w * transpose(w))
-    c = sum(X ⊙ aw)
+    c = dot(X, aw)
     c /= sum(aw)
     return c
 end

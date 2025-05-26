@@ -306,7 +306,7 @@ function _freeze_view(epc::C4_LinearEntropyPoolingConstraintEstimator,
     dsigma = diag(sigma)
     dsigma1 = sqrt.(view(dsigma, idx1))
     dsigma2 = sqrt.(view(dsigma, idx2))
-    return sign(coef) * sum(dsigma1 ⊙ dsigma2)
+    return sign(coef) * dot(dsigma1, dsigma2)
 end
 function freeze_B_view(::AbstractPriorResult,
                        epv::ConstantEntropyPoolingConstraintEstimator, ::DataFrame, ::Bool,
@@ -718,7 +718,7 @@ function _get_B_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraintEst
     dsigma = diag(sigma)
     dsigma1 = sqrt.(view(dsigma, idx1))
     dsigma2 = sqrt.(view(dsigma, idx2))
-    return coef * sum(dsigma1 ⊙ dsigma2)
+    return coef * dot(dsigma1, dsigma2)
 end
 function get_B_entropy_pooling_view_data(pr::AbstractPriorResult,
                                          epvbs::AbstractVector{<:ContinuousEntropyPoolingConstraintEstimator},
