@@ -150,11 +150,11 @@ function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFram
     @smart_assert(!isempty(sets))
     sets = sets[!, smtx]
     unique_sets = unique(sets)
-    A = BitMatrix(undef, length(unique_sets), length(sets))
+    A = BitMatrix(undef, length(sets), length(unique_sets))
     for (i, s) ∈ pairs(unique_sets)
-        A[i, :] = sets .== s
+        A[:, i] = sets .== s
     end
-    return A
+    return transpose(A)
 end
 function asset_sets_matrix_view(smtx::Union{Nothing, Symbol, <:AbstractString}, ::Any)
     return smtx
