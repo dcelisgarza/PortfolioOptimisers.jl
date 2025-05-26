@@ -24,7 +24,7 @@ function cardinality_constraint_side_view(lc::CardinalityConstraintSide{<:Abstra
     return LinearConstraintSide(; group = group, name = name)
 end
 struct CardinalityConstraint{T1 <: CardinalityConstraintSide, T2 <: Integer,
-                             T3 <: ComparisonOperators}
+                             T3 <: ComparisonOperators} <: AbstractConstraint
     A::T1
     B::T2
     comp::T3
@@ -142,5 +142,27 @@ function cardinality_constraints(lcs::Union{<:CardinalityConstraint,
                                end)
     end
 end
+function asset_sets_matrix(smtx::Union{Nothing, Symbol, <:AbstractString}, args...;
+                           kwargs...)
+    return smtx
+end
+function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFrame;
+                           datatype::Type = Float64)
+    @smart_assert(!isempty(sets))
+    sets = sets[!, smtx]
+    A = Vector{datatype}(undef, 0)
+    unique_sets = unique(sets)
+    for s ∈ unique_sets
+        append!(A, sets .== s)
+    end
+    return transpose(reshape(A, :, length(unique_sets)))
+end
+function asset_sets_matrix_view(smtx::Union{Nothing, Symbol, <:AbstractString}, ::Any)
+    return smtx
+end
+function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector)
+    return view(smtx, :, i)
+end
 
-export CardinalityConstraintSide, CardinalityConstraint, cardinality_constraints
+export CardinalityConstraintSide, CardinalityConstraint, cardinality_constraints,
+       asset_sets_matrix

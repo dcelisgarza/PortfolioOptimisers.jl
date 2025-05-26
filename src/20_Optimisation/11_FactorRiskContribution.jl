@@ -88,8 +88,9 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
 end
 function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(frc.opt, rd;
-                                                                               dims = dims)
+    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg = processed_jump_optimiser_attributes(frc.opt,
+                                                                                             rd;
+                                                                                             dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
@@ -101,6 +102,7 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_linear_weight_constraints!(model, frc.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, frc.opt.card, gcard, nplg, cplg, frc.opt.lt, frc.opt.st,
                          frc.opt.fees, frc.opt.ss)
+    set_smip_constraints!(model, frc.opt.scard, sgcard, smtx)
     set_turnover_constraints!(model, frc.opt.tn)
     set_noc_tracking_error_constraints!(model, pr, frc.opt.te1)
     set_soc_tracking_error_constraints!(model, pr, frc.opt.te2)
@@ -121,8 +123,8 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_portfolio_objective_function!(model, frc.obj, ret, frc.opt.cobj, frc, pr)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(pr.X))
     return JuMPOptimisationFactorRiskContributionResult(typeof(frc), pr, wb, lcs, cent,
-                                                        gcard, nplg, cplg, frc_nplg,
-                                                        frc_cplg, retcode, sol,
+                                                        gcard, sgcard, smtx, nplg, cplg,
+                                                        frc_nplg, frc_cplg, retcode, sol,
                                                         ifelse(save, model, nothing))
 end
 

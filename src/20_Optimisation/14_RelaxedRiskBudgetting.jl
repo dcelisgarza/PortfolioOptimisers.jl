@@ -119,8 +119,9 @@ function set_relaxed_risk_budgetting_constraints!(model::JuMP.Model,
 end
 function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(rrb.opt, rd;
-                                                                               dims = dims)
+    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg = processed_jump_optimiser_attributes(rrb.opt,
+                                                                                             rd;
+                                                                                             dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)
@@ -132,6 +133,7 @@ function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult
     set_linear_weight_constraints!(model, rrb.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, rrb.opt.card, gcard, nplg, cplg, rrb.opt.lt, rrb.opt.st,
                          rrb.opt.fees, rrb.opt.ss)
+    set_smip_constraints!(model, rrb.opt.scard, sgcard, smtx)
     set_turnover_constraints!(model, rrb.opt.tn)
     set_noc_tracking_error_constraints!(model, pr, rrb.opt.te1)
     set_soc_tracking_error_constraints!(model, pr, rrb.opt.te2)
@@ -148,8 +150,8 @@ function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult
     add_custom_constraint!(model, rrb.opt.ccnt, rrb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rrb.opt.cobj, rrb, pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(pr.X))
-    return JuMPOptimisationResult(typeof(rrb), pr, wb, lcs, cent, gcard, nplg, cplg,
-                                  retcode, sol, ifelse(save, model, nothing))
+    return JuMPOptimisationResult(typeof(rrb), pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
+                                  cplg, retcode, sol, ifelse(save, model, nothing))
 end
 
 export BasicRelaxedRiskBudgettingAlgorithm, RegularisationRelaxedRiskBudgettingAlgorithm,

@@ -598,21 +598,24 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     return nothing
 end
-function set_smip_constraints!(::JuMP.Model, ::Nothing, ::Nothing, ::Any)
-    return nothing
-end
 function set_smip_constraints!(model::JuMP.Model, card::Union{Nothing, <:Integer},
                                gcard::Union{Nothing, <:LinearConstraintResult},
-                               A_sets::AbstractMatrix)
+                               smtx::Union{Nothing, Symbol, <:AbstractString,
+                                           <:AbstractMatrix})
+    card_flag = !isnothing(card)
+    gcard_flag = !isnothing(gcard)
+    if !(card_flag || gcard_flag)
+        return nothing
+    end
     w = model[:w]
     sc = model[:sc]
-    N = size(A_sets, 1)
+    N = size(smtx, 1)
     @variable(model, sib[1:N], binary = true)
-    @constraint(model, scard_a, sc * (A_sets * w - sib) <= 0)
-    if !isnothing(card)
+    @constraint(model, scard_a, sc * (smtx * w - sib) <= 0)
+    if card_flag
         @constraint(model, scard, sc * (sum(sib) - card) <= 0)
     end
-    if !isnothing(gcard)
+    if gcard_flag
         if !isnothing(gcard.ineq)
             A = gcard.ineq.A
             B = gcard.ineq.B

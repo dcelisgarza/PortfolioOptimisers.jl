@@ -27,8 +27,9 @@ function opt_view(mr::MeanRisk, i::AbstractVector, X::AbstractMatrix)
 end
 function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(mr.opt, rd;
-                                                                               dims = dims)
+    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg = processed_jump_optimiser_attributes(mr.opt,
+                                                                                             rd;
+                                                                                             dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
@@ -40,6 +41,7 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_linear_weight_constraints!(model, mr.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, mr.opt.card, gcard, nplg, cplg, mr.opt.lt, mr.opt.st,
                          mr.opt.fees, mr.opt.ss)
+    set_smip_constraints!(model, mr.opt.scard, sgcard, smtx)
     set_turnover_constraints!(model, mr.opt.tn)
     set_noc_tracking_error_constraints!(model, pr, mr.opt.te1)
     set_soc_tracking_error_constraints!(model, pr, mr.opt.te2)
@@ -57,8 +59,8 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
     retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
-    return JuMPOptimisationResult(typeof(mr), pr, wb, lcs, cent, gcard, nplg, cplg, retcode,
-                                  sol, ifelse(save, model, nothing))
+    return JuMPOptimisationResult(typeof(mr), pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
+                                  cplg, retcode, sol, ifelse(save, model, nothing))
 end
 
 export MeanRisk

@@ -113,16 +113,17 @@ function no_bounds_optimiser(opt::JuMPOptimiser, args...)
                          p[(idx + 1):end]...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
-    pr, wb, lcs, cent, gcard, nplg, cplg = processed_jump_optimiser_attributes(opt, rd;
-                                                                               dims = dims)
+    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg = processed_jump_optimiser_attributes(opt,
+                                                                                             rd;
+                                                                                             dims = dims)
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = opt.lt, st = opt.st, lcs = lcs, lcm = opt.lcm, cent = cent,
-                         gcard = gcard, sets = opt.sets, nplg = nplg, cplg = cplg,
-                         tn = opt.tn, te1 = opt.te1, te2 = opt.te2, tev = opt.tev,
-                         fees = opt.fees, ret = opt.ret, sce = opt.sce, ccnt = opt.ccnt,
-                         cobj = opt.cobj, sc = opt.sc, so = opt.so, card = opt.card,
-                         nea = opt.nea, l1 = opt.l1, l2 = opt.l2, ss = opt.ss,
-                         strict = opt.strict)
+                         gcard = gcard, sgcard = sgcard, smtx = smtx, sets = opt.sets,
+                         nplg = nplg, cplg = cplg, tn = opt.tn, te1 = opt.te1,
+                         te2 = opt.te2, tev = opt.tev, fees = opt.fees, ret = opt.ret,
+                         sce = opt.sce, ccnt = opt.ccnt, cobj = opt.cobj, sc = opt.sc,
+                         so = opt.so, card = opt.card, nea = opt.nea, l1 = opt.l1,
+                         l2 = opt.l2, ss = opt.ss, strict = opt.strict)
 end
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
                                       fees::Union{Nothing, <:Fees},
@@ -335,8 +336,9 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_unconstrainted_near_optimal_objective_function!(model, rk_opt, rt_opt, nb_opt.wb)
     retcode, sol = optimise_JuMP_model!(model, noc, eltype(nb_opt.pe.X))
     return JuMPOptimisationResult(typeof(noc), nb_opt.pe, nb_opt.wb, nb_opt.lcs,
-                                  nb_opt.cent, nb_opt.gcard, nb_opt.nplg, nb_opt.cplg,
-                                  retcode, sol, ifelse(save, model, nothing))
+                                  nb_opt.cent, nb_opt.gcard, nb_opt.sgcard, nb_opt.smtx,
+                                  nb_opt.nplg, nb_opt.cplg, retcode, sol,
+                                  ifelse(save, model, nothing))
 end
 function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -355,6 +357,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_linear_weight_constraints!(model, opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.nplg, opt.cplg, opt.lt,
                          opt.st, opt.fees, opt.ss)
+    set_smip_constraints!(model, opt.scard, opt.sgcard, opt.smtx)
     set_turnover_constraints!(model, opt.tn)
     set_noc_tracking_error_constraints!(model, opt.pe, opt.te1)
     set_soc_tracking_error_constraints!(model, opt.pe, opt.te2)
@@ -374,7 +377,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                      opt.cobj, opt, opt.pe)
     retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
     return JuMPOptimisationResult(typeof(noc), opt.pe, opt.wb, opt.lcs, opt.cent, opt.gcard,
-                                  opt.nplg, opt.cplg, retcode, sol,
+                                  opt.sgcard, opt.smtx, opt.nplg, opt.cplg, retcode, sol,
                                   ifelse(save, model, nothing))
 end
 

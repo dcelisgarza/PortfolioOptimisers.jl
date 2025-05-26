@@ -3,21 +3,27 @@ struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
                               T4 <: Union{Nothing, <:LinearConstraintResult},
                               T5 <: Union{Nothing, <:LinearConstraintResult},
                               T6 <: Union{Nothing, <:LinearConstraintResult},
-                              T7 <: Union{Nothing, <:PhilogenyConstraintResult},
-                              T8 <: Union{Nothing, <:PhilogenyConstraintResult},
-                              T9 <: OptimisationReturnCode, T10 <: JuMPOptimisationSolution,
-                              T11 <: Union{Nothing, JuMP.Model}} <: OptimisationResult
+                              T7 <: Union{Nothing, <:LinearConstraintResult},
+                              T8 <:
+                              Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix},
+                              T9 <: Union{Nothing, <:PhilogenyConstraintResult},
+                              T10 <: Union{Nothing, <:PhilogenyConstraintResult},
+                              T11 <: OptimisationReturnCode,
+                              T12 <: JuMPOptimisationSolution,
+                              T13 <: Union{Nothing, JuMP.Model}} <: OptimisationResult
     oe::T1
     pr::T2
     wb::T3
     lcs::T4
     cent::T5
     gcard::T6
-    nplg::T7
-    cplg::T8
-    retcode::T9
-    sol::T10
-    model::T11
+    sgcard::T7
+    smtx::T8
+    nplg::T9
+    cplg::T10
+    retcode::T11
+    sol::T12
+    model::T13
 end
 function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
     return if sym == :w
@@ -36,16 +42,21 @@ struct JuMPOptimisationFactorRiskContributionResult{T1 <: Type, T2 <: AbstractPr
                                                     T6 <: Union{Nothing,
                                                                 <:LinearConstraintResult},
                                                     T7 <: Union{Nothing,
-                                                                <:IntegerPhilogenyResult},
-                                                    T8 <: Union{Nothing,
-                                                                <:IntegerPhilogenyResult},
+                                                                <:LinearConstraintResult},
+                                                    T8 <:
+                                                    Union{Nothing, Symbol, <:AbstractString,
+                                                          <:AbstractMatrix},
                                                     T9 <: Union{Nothing,
-                                                                <:SemiDefinitePhilogenyResult},
+                                                                <:IntegerPhilogenyResult},
                                                     T10 <: Union{Nothing,
+                                                                 <:IntegerPhilogenyResult},
+                                                    T11 <: Union{Nothing,
                                                                  <:SemiDefinitePhilogenyResult},
-                                                    T11 <: OptimisationReturnCode,
-                                                    T12 <: JuMPOptimisationSolution,
-                                                    T13 <: Union{Nothing, JuMP.Model}} <:
+                                                    T12 <: Union{Nothing,
+                                                                 <:SemiDefinitePhilogenyResult},
+                                                    T13 <: OptimisationReturnCode,
+                                                    T14 <: JuMPOptimisationSolution,
+                                                    T15 <: Union{Nothing, JuMP.Model}} <:
        OptimisationResult
     oe::T1
     pr::T2
@@ -53,13 +64,15 @@ struct JuMPOptimisationFactorRiskContributionResult{T1 <: Type, T2 <: AbstractPr
     lcs::T4
     cent::T5
     gcard::T6
-    nplg::T7
-    cplg::T8
-    frc_nplg::T9
-    frc_cplg::T10
-    retcode::T11
-    sol::T12
-    model::T13
+    sgcard::T7
+    smtx::T8
+    nplg::T9
+    cplg::T10
+    frc_nplg::T11
+    frc_cplg::T12
+    retcode::T13
+    sol::T14
+    model::T15
 end
 function Base.getproperty(r::JuMPOptimisationFactorRiskContributionResult, sym::Symbol)
     return if sym == :w
@@ -84,22 +97,26 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T11 <: Union{Nothing, <:CardinalityConstraint,
                                   <:AbstractVector{<:CardinalityConstraint},
                                   <:LinearConstraintResult},
-                     T12 <: Union{Nothing, <:DataFrame},
-                     T13 <: Union{Nothing, <:PhilogenyConstraintEstimator,
+                     T12 <: Union{Nothing, <:CardinalityConstraint,
+                                  <:AbstractVector{<:CardinalityConstraint},
+                                  <:LinearConstraintResult},
+                     T13 <: Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix},
+                     T14 <: Union{Nothing, <:DataFrame},
+                     T15 <: Union{Nothing, <:PhilogenyConstraintEstimator,
                                   <:PhilogenyConstraintResult},
-                     T14 <: Union{Nothing, <:PhilogenyConstraintEstimator,
+                     T16 <: Union{Nothing, <:PhilogenyConstraintEstimator,
                                   <:PhilogenyConstraintResult},
-                     T15 <: Union{Nothing, <:Turnover},
-                     T16 <: Union{Nothing, <:TrackingError},
-                     T17 <: Union{Nothing, <:TrackingError},
-                     T18 <: Union{Nothing, <:VolTrackingError},
-                     T19 <: Union{Nothing, <:Fees}, T20 <: JuMPReturnsEstimator,
-                     T21 <: Scalariser, T22 <: Union{Nothing, <:CustomConstraint},
-                     T23 <: Union{Nothing, <:CustomObjective}, T24 <: Real, T25 <: Real,
-                     T26 <: Union{Nothing, <:Integer}, T27 <: Union{Nothing, <:Real},
-                     T28 <: Union{Nothing, <:Real}, T29 <: Union{Nothing, <:Real},
-                     T30 <: Union{Nothing, <:Real}, T31 <: Bool} <:
-       BaseJuMPOptimisationEstimator
+                     T17 <: Union{Nothing, <:Turnover},
+                     T18 <: Union{Nothing, <:TrackingError},
+                     T19 <: Union{Nothing, <:TrackingError},
+                     T20 <: Union{Nothing, <:VolTrackingError},
+                     T21 <: Union{Nothing, <:Fees}, T22 <: JuMPReturnsEstimator,
+                     T23 <: Scalariser, T24 <: Union{Nothing, <:CustomConstraint},
+                     T25 <: Union{Nothing, <:CustomObjective}, T26 <: Real, T27 <: Real,
+                     T28 <: Union{Nothing, <:Integer}, T29 <: Union{Nothing, <:Integer},
+                     T30 <: Union{Nothing, <:Real}, T31 <: Union{Nothing, <:Real},
+                     T32 <: Union{Nothing, <:Real}, T33 <: Union{Nothing, <:Real},
+                     T34 <: Bool} <: BaseJuMPOptimisationEstimator
     pe::T1 # PriorEstimator
     slv::T2
     wb::T3 # WeightBoundsResult
@@ -111,26 +128,29 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
     lcm::T9
     cent::T10
     gcard::T11
-    sets::T12
-    nplg::T13
-    cplg::T14
-    tn::T15 # Turnover
-    te1::T16 # TrackingError
-    te2::T17 # TrackingError
-    tev::T18
-    fees::T19
-    ret::T20
-    sce::T21
-    ccnt::T22
-    cobj::T23
-    sc::T24
-    so::T25
-    card::T26
-    nea::T27
-    l1::T28
-    l2::T29
-    ss::T30
-    strict::T31
+    sgcard::T12
+    smtx::T13
+    sets::T14
+    nplg::T15
+    cplg::T16
+    tn::T17 # Turnover
+    te1::T18 # TrackingError
+    te2::T19 # TrackingError
+    tev::T20
+    fees::T21
+    ret::T22
+    sce::T23
+    ccnt::T24
+    cobj::T25
+    sc::T26
+    so::T27
+    card::T28
+    scard::T29
+    nea::T30
+    l1::T31
+    l2::T32
+    ss::T33
+    strict::T34
 end
 function assert_finite_nonnegative_real_or_vec(val::Real)
     @smart_assert(isfinite(val) && val > zero(val))
@@ -158,6 +178,10 @@ function JuMPOptimiser(;
                        gcard::Union{Nothing, <:CardinalityConstraint,
                                     <:AbstractVector{<:CardinalityConstraint},
                                     <:LinearConstraintResult} = nothing,
+                       sgcard::Union{Nothing, <:CardinalityConstraint,
+                                     <:AbstractVector{<:CardinalityConstraint},
+                                     <:LinearConstraintResult} = nothing,
+                       smtx::Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix} = nothing,
                        sets::Union{Nothing, <:DataFrame} = nothing,
                        nplg::Union{Nothing, <:PhilogenyConstraintEstimator,
                                    <:PhilogenyConstraintResult} = nothing,
@@ -173,6 +197,7 @@ function JuMPOptimiser(;
                        ccnt::Union{Nothing, <:CustomConstraint} = nothing,
                        cobj::Union{Nothing, <:CustomObjective} = nothing, sc::Real = 1,
                        so::Real = 1, card::Union{Nothing, <:Integer} = nothing,
+                       scard::Union{Nothing, <:Integer} = nothing,
                        nea::Union{Nothing, <:Real} = nothing,
                        l1::Union{Nothing, <:Real} = nothing,
                        l2::Union{Nothing, <:Real} = nothing,
@@ -194,8 +219,17 @@ function JuMPOptimiser(;
     if !isnothing(card)
         @smart_assert(isfinite(card) && card > 0)
     end
+    if !isnothing(scard) || !isnothing(sgcard)
+        @smart_assert(!isnothing(smtx))
+        if !isnothing(scard)
+            @smart_assert(isfinite(scard) && scard > 0)
+        end
+    end
     if isa(gcard, AbstractVector)
         @smart_assert(!isempty(gcard))
+    end
+    if isa(sgcard, AbstractVector)
+        @smart_assert(!isempty(sgcard))
     end
     if isa(wb, WeightBoundsConstraint) ||
        isa(lcs, LinearConstraint) ||
@@ -203,8 +237,16 @@ function JuMPOptimiser(;
        isa(cent, CentralityConstraintEstimator) ||
        isa(cent, AbstractVector{<:CentralityConstraintEstimator}) ||
        isa(gcard, CardinalityConstraint) ||
-       isa(gcard, AbstractVector{<:CardinalityConstraint})
+       isa(gcard, AbstractVector{<:CardinalityConstraint}) ||
+       isa(sgcard, CardinalityConstraint) ||
+       isa(sgcard, AbstractVector{<:CardinalityConstraint})
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
+    end
+    if isa(sgcard, LinearConstraintResult) && isa(smtx, AbstractMatrix)
+        N = size(smtx, 1)
+        N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
+        N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
+        @smart_assert(N == N_ineq + N_eq)
     end
     if !isnothing(lt)
         assert_finite_nonnegative_real_or_vec(lt)
@@ -220,15 +262,44 @@ function JuMPOptimiser(;
     end
     return JuMPOptimiser{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                          typeof(lt), typeof(st), typeof(lcs), typeof(lcm), typeof(cent),
-                         typeof(gcard), typeof(sets), typeof(nplg), typeof(cplg),
-                         typeof(tn), typeof(te1), typeof(te2), typeof(tev), typeof(fees),
-                         typeof(ret), typeof(sce), typeof(ccnt), typeof(cobj), typeof(sc),
-                         typeof(so), typeof(card), typeof(nea), typeof(l1), typeof(l2),
-                         typeof(ss), typeof(strict)}(pe, slv, wb, bgt, sbgt, lt, st, lcs,
-                                                     lcm, cent, gcard, sets, nplg, cplg, tn,
-                                                     te1, te2, tev, fees, ret, sce, ccnt,
-                                                     cobj, sc, so, card, nea, l1, l2, ss,
-                                                     strict)
+                         typeof(gcard), typeof(sgcard), typeof(smtx), typeof(sets),
+                         typeof(nplg), typeof(cplg), typeof(tn), typeof(te1), typeof(te2),
+                         typeof(tev), typeof(fees), typeof(ret), typeof(sce), typeof(ccnt),
+                         typeof(cobj), typeof(sc), typeof(so), typeof(card), typeof(scard),
+                         typeof(nea), typeof(l1), typeof(l2), typeof(ss), typeof(strict)}(pe,
+                                                                                          slv,
+                                                                                          wb,
+                                                                                          bgt,
+                                                                                          sbgt,
+                                                                                          lt,
+                                                                                          st,
+                                                                                          lcs,
+                                                                                          lcm,
+                                                                                          cent,
+                                                                                          gcard,
+                                                                                          sgcard,
+                                                                                          smtx,
+                                                                                          sets,
+                                                                                          nplg,
+                                                                                          cplg,
+                                                                                          tn,
+                                                                                          te1,
+                                                                                          te2,
+                                                                                          tev,
+                                                                                          fees,
+                                                                                          ret,
+                                                                                          sce,
+                                                                                          ccnt,
+                                                                                          cobj,
+                                                                                          sc,
+                                                                                          so,
+                                                                                          card,
+                                                                                          scard,
+                                                                                          nea,
+                                                                                          l1,
+                                                                                          l2,
+                                                                                          ss,
+                                                                                          strict)
 end
 function opt_view(opt::JuMPOptimiser, i::AbstractVector)
     pe = prior_view(opt.pe, i)
@@ -238,6 +309,8 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector)
     st = nothing_scalar_array_view(opt.lt, i)
     lcs = linear_constraint_view(opt.lcs, i)
     gcard = cardinality_constraint_view(opt.gcard, i)
+    sgcard = cardinality_constraint_view(opt.sgcard, i)
+    smtx = asset_sets_matrix_view(opt.smtx, i)
     sets = nothing_dataframe_view(opt.sets, i)
     tn = turnover_view(opt.tn, i)
     te1 = tracking_view(opt.te1, i)
@@ -249,10 +322,11 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector)
     cobj = custom_objective_view(opt.cobj, i)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = lcs, lcm = opt.lcm, cent = opt.cent,
-                         gcard = gcard, sets = sets, nplg = opt.nplg, cplg = opt.cplg,
-                         tn = tn, te1 = te1, te2 = te2, tev = tev, fees = fees, ret = ret,
-                         sce = opt.sce, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
-                         card = opt.card, nea = opt.nea, l1 = opt.l1, l2 = opt.l2,
+                         gcard = gcard, sgcard = sgcard, smtx = smtx, sets = sets,
+                         nplg = opt.nplg, cplg = opt.cplg, tn = tn, te1 = te1, te2 = te2,
+                         tev = tev, fees = fees, ret = ret, sce = opt.sce, ccnt = ccnt,
+                         cobj = cobj, sc = opt.sc, so = opt.so, card = opt.card,
+                         scard = opt.scard, nea = opt.nea, l1 = opt.l1, l2 = opt.l2,
                          ss = opt.ss, strict = opt.strict)
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
@@ -264,9 +338,18 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     cent = centrality_constraints(opt.cent, pr.X)
     gcard = cardinality_constraints(opt.gcard, opt.sets; datatype = datatype,
                                     strict = opt.strict)
+    sgcard = cardinality_constraints(opt.sgcard, opt.sets; datatype = datatype,
+                                     strict = opt.strict)
+    smtx = asset_sets_matrix(opt.smtx, opt.sets; datatype = datatype)
+    if isa(sgcard, LinearConstraintResult) && isa(smtx, AbstractMatrix)
+        N = size(smtx, 1)
+        N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
+        N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
+        @smart_assert(N == N_ineq + N_eq)
+    end
     nplg = philogeny_constraints(opt.nplg, pr.X)
     cplg = philogeny_constraints(opt.cplg, pr.X)
-    return pr, wb, lcs, cent, gcard, nplg, cplg
+    return pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg
 end
 
 export JuMPOptimisationResult, JuMPOptimiser
