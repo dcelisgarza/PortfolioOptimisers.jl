@@ -72,6 +72,10 @@ function tracking_view(tracking::TrackingError, i::AbstractVector)
     return TrackingError(; tracking = tracking, err = tracking.err,
                          formulation = tracking.formulation)
 end
+function tracking_view(tracking::AbstractVector{<:TrackingError}, i::AbstractVector)
+    return tracking_view.(tracking, Ref(i))
+end
+#=
 struct VolTrackingError{T1 <: WeightsTracking, T2 <: Real,
                         T3 <: Union{Nothing, <:AbstractMatrix}} <: AbstractTracking
     tracking::T1
@@ -92,5 +96,6 @@ function tracking_view(tracking::VolTrackingError, i::AbstractVector)
     sigma = nothing_scalar_array_view(tracking.sigma, i)
     return VolTrackingError(; tracking = tracking, err = tracking.err, sigma = sigma)
 end
+=#
 
-export WeightsTracking, ReturnsTracking, TrackingError, VolTrackingError
+export WeightsTracking, ReturnsTracking, TrackingError

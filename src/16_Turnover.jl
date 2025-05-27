@@ -23,5 +23,8 @@ function turnover_view(tn::Turnover, i::AbstractVector)
     val = nothing_scalar_array_view(tn.val, i)
     return Turnover(; w = w, val = val)
 end
+function turnover_view(tn::AbstractVector{<:Turnover}, i::AbstractVector)
+    return turnover_view.(tn, Ref(i))
+end
 
 export Turnover

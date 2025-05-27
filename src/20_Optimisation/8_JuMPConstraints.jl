@@ -689,6 +689,7 @@ function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
     set_turnover_fees!(model, fees.tn)
     return nothing
 end
+#=
 function set_vol_tracking_error_constraints!(args...)
     return nothing
 end
@@ -707,11 +708,13 @@ function set_vol_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPrio
                  end)
     return nothing
 end
-function set_noc_tracking_error_constraints!(args...)
+=#
+function set_tracking_error_constraints!(args...)
     return nothing
 end
-function set_noc_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
-                                             tre::TrackingError)
+function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::AbstractPriorResult,
+                                         tre::TrackingError{<:Any, <:Any, <:NOCTracking},
+                                         args...)
     X = pr.X
     k = model[:k]
     sc = model[:sc]
@@ -720,51 +723,85 @@ function set_noc_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPrio
     err = tre.err
     T = size(X, 1)
     f = err * T
-    @variable(model, t_tr1)
-    @expression(model, te1, net_X - wb * k)
-    @constraints(model, begin
-                     ctre1_noc, [sc * t_tr1; sc * te1] ∈ MOI.NormOneCone(1 + T)
-                     ctre1, sc * (t_tr1 - f * k) <= 0
-                 end)
+    t_tre = model[Symbol(:t_tre_, i)] = @variable(model)
+    tre = model[Symbol(:tre_, i)] = @expression(model, net_X - wb * k)
+    model[Symbol(:ctre_noc_, i)], model[Symbol(:ctre_, i)] = @constraints(model,
+                                                                          begin
+                                                                              [sc * t_tre;
+                                                                               sc * tre] ∈
+                                                                              MOI.NormOneCone(1 +
+                                                                                              T)
+                                                                              sc *
+                                                                              (t_tre -
+                                                                               f * k) <= 0
+                                                                          end)
     return nothing
 end
-function set_soc_tracking_error_constraints!(args...)
-    return nothing
-end
-function set_soc_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
-                                             tre::TrackingError)
+function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::AbstractPriorResult,
+                                         tre::TrackingError{<:Any, <:Any, <:SOCTracking},
+                                         args...)
     X = pr.X
     k = model[:k]
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(tre.tracking, X)
     err = tre.err
-    f = err * sqrt(size(X, 1) - 1)
-    @variable(model, t_tr2)
-    @expression(model, te2, net_X - wb * k)
-    @constraints(model, begin
-                     ctre2_soc, [sc * t_tr2; sc * te2] ∈ SecondOrderCone()
-                     ctre2, sc * (t_tr2 - f * k) <= 0
-                 end)
+    f = err * sqrt(size(X, 1) - tre.formulation.ddof)
+    t_tre = model[Symbol(:t_tre_, i)] = @variable(model)
+    tre = model[Symbol(:tre_, i)] = @expression(model, net_X - wb * k)
+    model[Symbol(:ctre_soc_, i)], model[Symbol(:ctre_, i)] = @constraints(model,
+                                                                          begin
+                                                                              [sc * t_tre;
+                                                                               sc * tre] ∈
+                                                                              SecondOrderCone()
+                                                                              sc *
+                                                                              (t_tre -
+                                                                               f * k) <= 0
+                                                                          end)
+    return nothing
+end
+function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
+                                         tre::AbstractTracking, args...)
+    return set_tracking_error_constraints!(model, 1, pr, tre, args...)
+end
+function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
+                                         tres::AbstractVector{AbstractTracking}, args...)
+    for (i, tre) ∈ enumerate(tres)
+        set_tracking_error_constraints!(model, 1, pr, tre, args...)
+    end
     return nothing
 end
 function set_turnover_constraints!(args...)
     return nothing
 end
-function set_turnover_constraints!(model::JuMP.Model, tn::Turnover)
+function set_turnover_constraints!(model::JuMP.Model, i::Any, tn::Turnover)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
     N = length(w)
     wi = tn.w
     val = tn.val
-    @variable(model, t_tn[1:N])
-    @expression(model, tn, w - wi * k)
-    @constraints(model,
-                 begin
-                     ctn_noc[i = 1:N], [sc * t_tn[i]; sc * tn[i]] ∈ MOI.NormOneCone(2)
-                     ctn, sc * (t_tn ⊖ val * k) <= 0
-                 end)
+    t_tn = model[Symbol(:t_tn_, i)] = @variable(model, [1:N])
+    tn = model[Symbol(:tn_, i)] = @expression(model, tn, w - wi * k)
+    model[Symbol(:ctn_noc_, i)], model[Symbol(:ctn_, i)] = @constraints(model,
+                                                                        begin
+                                                                            [i = 1:N],
+                                                                            [sc * t_tn[i];
+                                                                             sc * tn[i]] ∈
+                                                                            MOI.NormOneCone(2)
+                                                                            sc *
+                                                                            (t_tn ⊖ val * k) <=
+                                                                            0
+                                                                        end)
+    return nothing
+end
+function set_turnover_constraints!(model::JuMP.Model, tn::Turnover)
+    return set_turnover_constraints!(model, 1, tn)
+end
+function set_turnover_constraints!(model::JuMP.Model, tns::AbstractVector{<:Turnover})
+    for (i, tn) ∈ enumerate(tns)
+        set_turnover_constraints!(model, i, tn)
+    end
     return nothing
 end
 function set_number_effective_assets!(args...)

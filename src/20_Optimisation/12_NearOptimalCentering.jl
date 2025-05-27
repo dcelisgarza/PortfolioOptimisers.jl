@@ -87,44 +87,6 @@ function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatri
                                 w_min_ini = w_min_ini, w_opt = w_opt, w_opt_ini = w_opt_ini,
                                 w_max = w_max, w_max_ini = w_max_ini)
 end
-for r ∈ setdiff(traverse_subtypes(RiskMeasure), (UncertaintySetVariance,))
-    eval(quote
-             function no_bounds_risk_measure(r::$(r), args...)
-                 pnames = setdiff(propertynames(r), (:settings,))
-                 settings = r.settings
-                 settings = RiskMeasureSettings(; rke = settings.rke,
-                                                scale = settings.scale)
-                 return if isempty(pnames)
-                     $(r)(settings)
-                 else
-                     $(r)(settings, getproperty.(Ref(r), pnames)...)
-                 end
-             end
-         end)
-end
-function no_bounds_risk_measure(r::AbstractVector{<:RiskMeasure}, args...)
-    return no_bounds_risk_measure.(r, Ref(args)...)
-end
-function no_bounds_optimiser(opt::JuMPOptimiser, args...)
-    pnames = propertynames(opt)
-    idx = findfirst(x -> x == :ret, pnames)
-    p = getproperty.(Ref(opt), pnames)
-    return JuMPOptimiser(p[1:(idx - 1)]..., no_bounds_returns_estimator(p[idx], args...),
-                         p[(idx + 1):end]...)
-end
-function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
-    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg = processed_jump_optimiser_attributes(opt,
-                                                                                             rd;
-                                                                                             dims = dims)
-    return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
-                         lt = opt.lt, st = opt.st, lcs = lcs, lcm = opt.lcm, cent = cent,
-                         gcard = gcard, sgcard = sgcard, smtx = smtx, sets = opt.sets,
-                         nplg = nplg, cplg = cplg, tn = opt.tn, te1 = opt.te1,
-                         te2 = opt.te2, tev = opt.tev, fees = opt.fees, ret = opt.ret,
-                         sce = opt.sce, ccnt = opt.ccnt, cobj = opt.cobj, sc = opt.sc,
-                         so = opt.so, card = opt.card, nea = opt.nea, l1 = opt.l1,
-                         l2 = opt.l2, ss = opt.ss, strict = opt.strict)
-end
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
                                       fees::Union{Nothing, <:Fees},
                                       slv::Union{<:Solver, <:AbstractVector{<:Solver}},
@@ -359,9 +321,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                          opt.st, opt.fees, opt.ss)
     set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx)
     set_turnover_constraints!(model, opt.tn)
-    set_noc_tracking_error_constraints!(model, opt.pe, opt.te1)
-    set_soc_tracking_error_constraints!(model, opt.pe, opt.te2)
-    set_vol_tracking_error_constraints!(model, opt.pe, opt.tev)
+    set_tracking_error_constraints!(model, opt.pe, opt.tre)
     set_number_effective_assets!(model, opt.nea)
     set_l1_regularisation!(model, opt.l1)
     set_l2_regularisation!(model, opt.l2)

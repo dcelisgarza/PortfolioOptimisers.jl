@@ -110,6 +110,7 @@ include("./19_RiskMeasures/20_TrackingRiskMeasure.jl")
 include("./19_RiskMeasures/21_NoOptimisationRiskMeasures.jl")
 include("./19_RiskMeasures/22_AdjustRiskContributions.jl")
 include("./19_RiskMeasures/23_ExpectedRisk.jl")
+include("./19_RiskMeasures/24_RiskMeasureTools.jl")
 
 include("./20_Optimisation/1_Base_Optimisation.jl")
 include("./20_Optimisation/2_Base_ClusteringOptimisation.jl")

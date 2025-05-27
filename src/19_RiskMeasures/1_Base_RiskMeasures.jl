@@ -72,6 +72,8 @@ function LogSumExpScalariser(; gamma::Real = 1.0)
     return LogSumExpScalariser{typeof(gamma)}(gamma)
 end
 function expected_risk end
+function no_bounds_risk_measure end
+function no_bounds_no_risk_expr_risk_meausre end
 
 export RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser, MaxScalariser,
        LogSumExpScalariser, expected_risk

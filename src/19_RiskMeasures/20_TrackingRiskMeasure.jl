@@ -75,6 +75,7 @@ function RiskTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSe
                                  tracking::WeightsTracking,
                                  r::AbstractBaseRiskMeasure = Variance(),
                                  formulation::VariableTracking = IndependentVariableTracking())
+    r = no_bounds_no_risk_expr_risk_meausre(r)
     return RiskTrackingRiskMeasure{typeof(settings), typeof(tracking), typeof(r),
                                    typeof(formulation)}(settings, tracking, r, formulation)
 end
@@ -110,4 +111,4 @@ function risk_measure_view(r::RiskTrackingRiskMeasure, i::AbstractVector, X::Abs
 end
 
 export SOCTracking, NOCTracking, IndependentVariableTracking, DependentVariableTracking,
-       TrackingRiskMeasure, VolTrackingRiskMeasure, RiskTrackingRiskMeasure
+       TrackingRiskMeasure, RiskTrackingRiskMeasure

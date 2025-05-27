@@ -25,8 +25,7 @@ function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingR
 end
 function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,
                                 <:TurnoverRiskMeasure, <:Variance, <:UncertaintySetVariance,
-                                <:EqualRiskMeasure, <:VolTrackingRiskMeasure},
-                       w::AbstractVector, args...; kwargs...)
+                                <:EqualRiskMeasure}, w::AbstractVector, args...; kwargs...)
     return r(w)
 end
 function number_effective_assets(w::AbstractVector)
