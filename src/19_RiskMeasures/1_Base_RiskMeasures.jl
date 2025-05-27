@@ -1,5 +1,4 @@
 abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
-
 abstract type NoOptimisationRiskMeasure <: AbstractBaseRiskMeasure end
 abstract type MuNoOptimisationRiskMeasure <: NoOptimisationRiskMeasure end
 abstract type AbstractMomentNoOptimisationRiskMeasure <: MuNoOptimisationRiskMeasure end
@@ -73,7 +72,7 @@ function LogSumExpScalariser(; gamma::Real = 1.0)
 end
 function expected_risk end
 function no_bounds_risk_measure end
-function no_bounds_no_risk_expr_risk_meausre end
+function no_bounds_no_risk_expr_risk_measure end
 
 export RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser, MaxScalariser,
        LogSumExpScalariser, expected_risk

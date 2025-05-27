@@ -1,3 +1,25 @@
+struct RiskTrackingError{T1 <: WeightsTracking, T2 <: AbstractBaseRiskMeasure, T3 <: Real,
+                         T4 <: VariableTracking} <: AbstractTracking
+    tracking::T1
+    r::T2
+    err::T3
+    formulation::T4
+end
+function RiskTrackingError(; tracking::WeightsTracking,
+                           r::AbstractBaseRiskMeasure = Variance(), err::Real = 0.0,
+                           formulation::VariableTracking = IndependentVariableTracking())
+    @smart_assert(isfinite(err) && err >= zero(err))
+    r = no_bounds_no_risk_expr_risk_measure(r)
+    return RiskTrackingError{typeof(tracking), typeof(r), typeof(err), typeof(formulation)}(tracking,
+                                                                                            r,
+                                                                                            err,
+                                                                                            formulation)
+end
+function tracking_view(tracking::RiskTrackingError, i::AbstractVector, X::AbstractMatrix)
+    return RiskTrackingError(; tracking = tracking_view(tracking.tracking, i),
+                             r = risk_measure_view(tracking.r, i, X), err = tracking.err,
+                             formulation = tracking.formulation)
+end
 struct TrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: AbstractTrackingAlgorithm,
                            T3 <: NormTracking} <: RiskMeasure
     settings::T1
@@ -75,7 +97,7 @@ function RiskTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSe
                                  tracking::WeightsTracking,
                                  r::AbstractBaseRiskMeasure = Variance(),
                                  formulation::VariableTracking = IndependentVariableTracking())
-    r = no_bounds_no_risk_expr_risk_meausre(r)
+    r = no_bounds_no_risk_expr_risk_measure(r)
     return RiskTrackingRiskMeasure{typeof(settings), typeof(tracking), typeof(r),
                                    typeof(formulation)}(settings, tracking, r, formulation)
 end

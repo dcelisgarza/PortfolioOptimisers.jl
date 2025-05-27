@@ -41,7 +41,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::StandardDeviation,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:sd_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -166,7 +166,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                            <:IntegerPhilogenyResult},
                                nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult}, args...)
+                                           <:IntegerPhilogenyResult}, args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
@@ -200,7 +200,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                                                                       <:Any},
                                                                 <:Any, <:Any, <:Any, <:Any,
                                                                 <:Any, <:Any}}, ::Any,
-                               ::Any, b1::AbstractMatrix, sets::Union{Nothing, <:DataFrame})
+                               ::Any, b1::AbstractMatrix, sets::Union{Nothing, <:DataFrame},
+                               args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
@@ -274,7 +275,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVariance,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
@@ -305,7 +306,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                  <:MeanAbsoluteDeviation},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:mad_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -362,7 +363,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                      <:SecondCentralMoment}},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:second_central_moment_risk_, i)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
@@ -395,7 +396,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                      <:SecondLowerMoment}},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:second_lower_moment_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -432,7 +433,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:flm_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -464,7 +465,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     if haskey(model, :wr_risk)
         return nothing
     end
@@ -475,7 +476,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::Range,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     if haskey(model, :range_risk)
         return nothing
     end
@@ -492,7 +493,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     b = !isnothing(r.formulation.b) ? r.formulation.b : 1e3
     s = !isnothing(r.formulation.s) ? r.formulation.s : 1e-5
     @smart_assert(b > s)
@@ -538,7 +539,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                               <:DistributionValueatRisk},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     formulation = r.formulation
     sigma = formulation.sigma
     mu = formulation.mu
@@ -564,7 +565,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRisk,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:cvar_risk_, i)
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
@@ -590,7 +591,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRiskRange,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:cvar_range_risk_, i)
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
@@ -654,7 +655,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalValueatRisk,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:drcvar_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -748,7 +749,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:evar_risk_, i)
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
@@ -780,7 +781,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRiskRange,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:evar_risk_range_, i)
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
@@ -864,7 +865,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRisk,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:rlvar_risk_, i)
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
@@ -935,7 +936,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRiskRange,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:rlvar_range_risk_, i)
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
@@ -1085,7 +1086,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::MaximumDrawdown,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     if haskey(model, :mdd_risk)
         return nothing
     end
@@ -1100,7 +1101,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::AverageDrawdown,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:add_risk_, i)
     dd = set_drawdown_constraints!(model, pr.X)
     T = length(dd) - 1
@@ -1116,7 +1117,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     if haskey(model, :uci)
         return nothing
     end
@@ -1132,7 +1133,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdownatRisk,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:cdar_risk_, i)
     sc = model[:sc]
     dd = set_drawdown_constraints!(model, pr.X)
@@ -1154,7 +1155,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatRisk,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:edar_risk_, i)
     sc = model[:sc]
     dd = set_drawdown_constraints!(model, pr.X)
@@ -1190,7 +1191,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdownatRisk,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:rldar_risk_, i)
     sc = model[:sc]
     dd = set_drawdown_constraints!(model, pr.X)
@@ -1260,7 +1261,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                      <:Any},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::HighOrderPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:sqrt_kurtosis_risk_, i)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
@@ -1305,7 +1306,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                      <:Any},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::HighOrderPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:sqrt_kurtosis_risk_, i)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
@@ -1324,7 +1325,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_risk_constraints!(::JuMP.Model, ::Any, ::SquareRootKurtosis,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
-                                       <:RiskBudgetting}, pr::LowOrderPriorResult, args...)
+                                       <:RiskBudgetting}, pr::LowOrderPriorResult, args...;
+                               kwargs...)
     throw(ArgumentError("SquareRootKurtosis requires a HighOrderPriorResult, not a $(typeof(pr))."))
 end
 function set_owa_constraints!(model::JuMP.Model, X::AbstractMatrix)
@@ -1343,7 +1345,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                       <:ExactOrderedWeightsArray},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:owa_risk_, i)
     sc = model[:sc]
     T = size(pr.X, 1)
@@ -1368,7 +1370,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                            <:ExactOrderedWeightsArray},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:owa_range_risk_, i)
     sc = model[:sc]
     T = size(pr.X, 1)
@@ -1396,7 +1398,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                       <:ApproxOrderedWeightsArray},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:aowa_risk_, i)
     sc = model[:sc]
     T = size(pr.X, 1)
@@ -1476,7 +1478,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                            <:ApproxOrderedWeightsArray},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:aowa_range_risk_, i)
     sc = model[:sc]
     T = size(pr.X, 1)
@@ -1642,7 +1644,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVariance,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     if haskey(model, :bdvariance_risk)
         return nothing
     end
@@ -1663,7 +1665,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                    <:SqrtRiskExpr},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::HighOrderPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:nskew_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -1681,7 +1683,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                    <:QuadRiskExpr},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::HighOrderPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:qnskew_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -1699,14 +1701,15 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_risk_constraints!(::JuMP.Model, ::Any, ::NegativeSkewness,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
-                                       <:RiskBudgetting}, pr::LowOrderPriorResult, args...)
+                                       <:RiskBudgetting}, pr::LowOrderPriorResult, args...;
+                               kwargs...)
     throw(ArgumentError("NegativeSkewness requires a HighOrderPriorResult, not a $(typeof(pr))."))
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:NOCTracking},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     sc = model[:sc]
     k = model[:k]
@@ -1728,7 +1731,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:SOCTracking},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     sc = model[:sc]
     k = model[:k]
@@ -1789,7 +1792,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                  <:SOCRiskExpr}},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...;kwargs...)
     key = Symbol(:vol_tracking_risk_, i)
     vol_tracking_risk, dev, var_bound_key = set_vol_tracking_constraints!(model, i, r, pr,
                                                                           key)
@@ -1803,7 +1806,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                          <:SqrtRiskExpr},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...)
+                               args...;kwargs...)
     key = Symbol(:vol_tracking_risk_, i)
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     sc = model[:sc]
@@ -1821,7 +1824,8 @@ end
 #! Implement RiskTrackingRiskMeasure
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::TurnoverRiskMeasure,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgetting}, ::AbstractPriorResult, args...)
+                                          <:RiskBudgetting}, ::AbstractPriorResult, args...;
+                               kwargs...)
     key = Symbol(:turnover_risk_, i)
     sc = model[:sc]
     w = model[:w]

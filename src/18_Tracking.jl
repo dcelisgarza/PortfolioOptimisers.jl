@@ -67,13 +67,12 @@ function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
     return TrackingError{typeof(tracking), typeof(err), typeof(formulation)}(tracking, err,
                                                                              formulation)
 end
-function tracking_view(tracking::TrackingError, i::AbstractVector)
-    tracking = tracking_view(tracking.tracking, i)
-    return TrackingError(; tracking = tracking, err = tracking.err,
-                         formulation = tracking.formulation)
+function tracking_view(tracking::TrackingError, i::AbstractVector, args...)
+    return TrackingError(; tracking = tracking_view(tracking.tracking, i),
+                         err = tracking.err, formulation = tracking.formulation)
 end
-function tracking_view(tracking::AbstractVector{<:TrackingError}, i::AbstractVector)
-    return tracking_view.(tracking, Ref(i))
+function tracking_view(tracking::AbstractVector{<:AbstractTracking}, args...)
+    return tracking_view.(tracking, Ref(args)...)
 end
 #=
 struct VolTrackingError{T1 <: WeightsTracking, T2 <: Real,

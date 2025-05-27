@@ -276,7 +276,7 @@ function JuMPOptimiser(;
                                                                  card, scard, nea, l1, l2,
                                                                  ss, strict)
 end
-function opt_view(opt::JuMPOptimiser, i::AbstractVector)
+function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
     bgt = budget_view(opt.bgt, i)
@@ -288,7 +288,7 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector)
     smtx = asset_sets_matrix_view(opt.smtx, i)
     sets = nothing_dataframe_view(opt.sets, i)
     tn = turnover_view(opt.tn, i)
-    tre = tracking_view(opt.tre, i)
+    tre = tracking_view(opt.tre, i, X)
     fees = fees_view(opt.fees, i)
     ret = jump_returns_view(opt.ret, i)
     ccnt = custom_constraint_view(opt.ccnt, i)

@@ -53,7 +53,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                   typeof(flag)}(opt, re, r, obj, nplg, cplg, sets, wi, flag)
 end
 function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMatrix)
-    opt = opt_view(frc.opt, i)
+    opt = opt_view(frc.opt, i, X)
     re = regression_view(frc.re, i)
     r = risk_measure_view(frc.r, i, X)
     sets = nothing_dataframe_view(frc.sets, i)

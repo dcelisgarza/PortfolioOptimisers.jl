@@ -689,26 +689,6 @@ function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
     set_turnover_fees!(model, fees.tn)
     return nothing
 end
-#=
-function set_vol_tracking_error_constraints!(args...)
-    return nothing
-end
-function set_vol_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
-                                             tre::VolTrackingError)
-    G = isnothing(tre.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(tre.sigma).U
-    k = model[:k]
-    sc = model[:sc]
-    w = model[:w]
-    wb = tre.tracking.w
-    err = tre.err
-    @variable(model, t_trev)
-    @constraints(model, begin
-                     ctrev_noc, [sc * t_trev; sc * G * (w - wb)] ∈ SecondOrderCone()
-                     ctrev, sc * (t_trev - err * k) <= 0
-                 end)
-    return nothing
-end
-=#
 function set_tracking_error_constraints!(args...)
     return nothing
 end
@@ -760,6 +740,42 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
                                                                           end)
     return nothing
 end
+#=
+function set_vol_tracking_error_constraints!(args...)
+    return nothing
+end
+function set_vol_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
+                                             tre::VolTrackingError)
+    G = isnothing(tre.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(tre.sigma).U
+    k = model[:k]
+    sc = model[:sc]
+    w = model[:w]
+    wb = tre.tracking.w
+    err = tre.err
+    @variable(model, t_trev)
+    @constraints(model, begin
+                     ctrev_noc, [sc * t_trev; sc * G * (w - wb)] ∈ SecondOrderCone()
+                     ctrev, sc * (t_trev - err * k) <= 0
+                 end)
+    return nothing
+end
+=#
+function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::AbstractPriorResult,
+                                         tre::RiskTrackingError,
+                                         opt::JuMPOptimisationEstimator,
+                                         cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
+                                                     <:IntegerPhilogenyResult},
+                                         nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
+                                                     <:IntegerPhilogenyResult}, args...)
+    r = tre.r
+    wb = tre.tracking.w
+    w = model[:w]
+    wd_key = Symbol(:dw_tre_, i)
+    wd = model[wd_key] = @expression(model, w - wb)
+    risk_expr = set_risk_constraints!(model, Symbol(:tre_, i), r, opt, pr, cplg, nplg,
+                                      args...; w = wd)
+    return nothing
+end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
                                          tre::AbstractTracking, args...)
     return set_tracking_error_constraints!(model, 1, pr, tre, args...)
@@ -782,7 +798,7 @@ function set_turnover_constraints!(model::JuMP.Model, i::Any, tn::Turnover)
     wi = tn.w
     val = tn.val
     t_tn = model[Symbol(:t_tn_, i)] = @variable(model, [1:N])
-    tn = model[Symbol(:tn_, i)] = @expression(model, tn, w - wi * k)
+    tn = model[Symbol(:tn_, i)] = @expression(model, w - wi * k)
     model[Symbol(:ctn_noc_, i)], model[Symbol(:ctn_, i)] = @constraints(model,
                                                                         begin
                                                                             [i = 1:N],

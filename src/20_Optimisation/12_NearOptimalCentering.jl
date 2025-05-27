@@ -75,7 +75,7 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
 end
 function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatrix)
     r = risk_measure_view(noc.r, i, X)
-    opt = opt_view(noc.opt, i)
+    opt = opt_view(noc.opt, i, X)
     w_min = nothing_scalar_array_view(noc.w_min, i)
     w_min_ini = nothing_scalar_array_view(noc.w_min_ini, i)
     w_opt = nothing_scalar_array_view(noc.w_opt, i)

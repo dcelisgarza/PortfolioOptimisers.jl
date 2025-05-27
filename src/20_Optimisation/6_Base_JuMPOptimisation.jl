@@ -128,7 +128,7 @@ function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
     @constraint(model, risk_ms, risk_vec .- risk <= 0)
     return nothing
 end
-function set_risk_constraints!(args...)
+function set_risk_constraints!(args...; kwargs...)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
@@ -136,8 +136,8 @@ function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
                                cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                            <:IntegerPhilogenyResult},
                                nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult}, args...)
-    set_risk_constraints!(model, 1, r, opt, pr, cplg, nplg, args...)
+                                           <:IntegerPhilogenyResult}, args...; kwargs...)
+    set_risk_constraints!(model, 1, r, opt, pr, cplg, nplg, args...; kwargs...)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasure},
@@ -145,9 +145,9 @@ function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasu
                                cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                            <:IntegerPhilogenyResult},
                                nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult}, args...)
+                                           <:IntegerPhilogenyResult}, args...; kwargs...)
     for (i, r) ∈ enumerate(rs)
-        set_risk_constraints!(model, i, r, opt, pr, cplg, nplg, args...)
+        set_risk_constraints!(model, i, r, opt, pr, cplg, nplg, args...; kwargs...)
     end
     return nothing
 end
