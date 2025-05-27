@@ -1,24 +1,3 @@
-abstract type TrackingFormulation <: AbstractAlgorithm end
-abstract type NormTracking <: TrackingFormulation end
-abstract type VariableTracking <: TrackingFormulation end
-struct SOCTracking{T1 <: Integer} <: NormTracking
-    ddof::T1
-end
-function SOCTracking(; ddof::Integer = 1)
-    @smart_assert(ddof > 0)
-    return SOCTracking{typeof(ddof)}(ddof)
-end
-struct NOCTracking <: NormTracking end
-function norm_tracking(f::SOCTracking, a, b, N = nothing)
-    factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
-    return norm(a - b, 2) / factor
-end
-function norm_tracking(::NOCTracking, a, b, N = nothing)
-    factor = isnothing(N) ? 1 : N
-    return norm(a - b, 1) / factor
-end
-struct IndependentVariableTracking <: VariableTracking end
-struct DependentVariableTracking <: VariableTracking end
 struct TrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: AbstractTrackingAlgorithm,
                            T3 <: NormTracking} <: RiskMeasure
     settings::T1
@@ -42,6 +21,7 @@ function risk_measure_view(r::TrackingRiskMeasure, i::AbstractVector, args...)
     return TrackingRiskMeasure(; settings = r.settings, tracking = tracking,
                                formulation = r.formulation)
 end
+#=
 struct VolTrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: WeightsTracking,
                               T3 <: Union{Nothing, <:AbstractMatrix},
                               T4 <: Union{<:QuadSqrtRiskExpr, <:SOCRiskExpr}} <: RiskMeasure
@@ -82,6 +62,7 @@ function risk_measure_view(r::VolTrackingRiskMeasure, i::AbstractVector, args...
     return VolTrackingRiskMeasure(; settings = r.settings, tracking = tracking,
                                   sigma = sigma, formulation = r.formulation)
 end
+=#
 struct RiskTrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: WeightsTracking,
                                T3 <: AbstractBaseRiskMeasure, T4 <: VariableTracking} <:
        RiskMeasure

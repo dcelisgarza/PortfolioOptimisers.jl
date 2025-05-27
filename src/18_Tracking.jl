@@ -1,5 +1,26 @@
 abstract type AbstractTracking <: AbstractEstimator end
 abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
+abstract type TrackingFormulation <: AbstractAlgorithm end
+abstract type NormTracking <: TrackingFormulation end
+abstract type VariableTracking <: TrackingFormulation end
+struct SOCTracking{T1 <: Integer} <: NormTracking
+    ddof::T1
+end
+function SOCTracking(; ddof::Integer = 1)
+    @smart_assert(ddof > 0)
+    return SOCTracking{typeof(ddof)}(ddof)
+end
+struct NOCTracking <: NormTracking end
+function norm_tracking(f::SOCTracking, a, b, N = nothing)
+    factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
+    return norm(a - b, 2) / factor
+end
+function norm_tracking(::NOCTracking, a, b, N = nothing)
+    factor = isnothing(N) ? 1 : N
+    return norm(a - b, 1) / factor
+end
+struct IndependentVariableTracking <: VariableTracking end
+struct DependentVariableTracking <: VariableTracking end
 function tracking_view(::Nothing, ::Any)
     return nothing
 end
@@ -34,17 +55,22 @@ end
 function tracking_benchmark(tracking::ReturnsTracking, ::Any)
     return tracking.w
 end
-struct TrackingError{T1 <: AbstractTrackingAlgorithm, T2 <: Real} <: AbstractTracking
+struct TrackingError{T1 <: AbstractTrackingAlgorithm, T2 <: Real, T3 <: NormTracking} <:
+       AbstractTracking
     tracking::T1
     err::T2
+    formulation::T3
 end
-function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0)
+function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
+                       formulation::NormTracking = SOCTracking())
     @smart_assert(isfinite(err) && err >= zero(err))
-    return TrackingError{typeof(tracking), typeof(err)}(tracking, err)
+    return TrackingError{typeof(tracking), typeof(err), typeof(formulation)}(tracking, err,
+                                                                             formulation)
 end
 function tracking_view(tracking::TrackingError, i::AbstractVector)
     tracking = tracking_view(tracking.tracking, i)
-    return TrackingError(; tracking = tracking, err = tracking.err)
+    return TrackingError(; tracking = tracking, err = tracking.err,
+                         formulation = tracking.formulation)
 end
 struct VolTrackingError{T1 <: WeightsTracking, T2 <: Real,
                         T3 <: Union{Nothing, <:AbstractMatrix}} <: AbstractTracking
