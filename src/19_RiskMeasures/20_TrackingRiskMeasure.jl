@@ -1,30 +1,41 @@
 abstract type TrackingFormulation <: AbstractAlgorithm end
-struct SOCTracking <: TrackingFormulation end
-struct NOCTracking <: TrackingFormulation end
+abstract type NormTracking <: TrackingFormulation end
+abstract type VariableTracking <: TrackingFormulation end
+struct SOCTracking{T1 <: Integer} <: NormTracking
+    ddof::T1
+end
+function SOCTracking(; ddof::Integer = 1)
+    @smart_assert(ddof > 0)
+    return SOCTracking{typeof(ddof)}(ddof)
+end
+struct NOCTracking <: NormTracking end
+function norm_tracking(f::SOCTracking, a, b, N = nothing)
+    factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
+    return norm(a - b, 2) / factor
+end
+function norm_tracking(::NOCTracking, a, b, N = nothing)
+    factor = isnothing(N) ? 1 : N
+    return norm(a - b, 1) / factor
+end
+struct IndependentVariableTracking <: VariableTracking end
+struct DependentVariableTracking <: VariableTracking end
 struct TrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: AbstractTrackingAlgorithm,
-                           T3 <: TrackingFormulation} <: RiskMeasure
+                           T3 <: NormTracking} <: RiskMeasure
     settings::T1
     tracking::T2
     formulation::T3
 end
 function TrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              tracking::AbstractTrackingAlgorithm,
-                             formulation::TrackingFormulation = SOCTracking())
+                             formulation::NormTracking = SOCTracking())
     return TrackingRiskMeasure{typeof(settings), typeof(tracking), typeof(formulation)}(settings,
                                                                                         tracking,
                                                                                         formulation)
 end
-function (r::TrackingRiskMeasure{<:Any, <:Any, <:SOCTracking})(w::AbstractVector,
-                                                               X::AbstractMatrix,
-                                                               fees::Union{Nothing, <:Fees} = nothing)
+function (r::TrackingRiskMeasure)(w::AbstractVector, X::AbstractMatrix,
+                                  fees::Union{Nothing, <:Fees} = nothing)
     benchmark = tracking_benchmark(r.tracking, X)
-    return norm(calc_net_returns(w, X, fees) - benchmark) / sqrt(size(X, 1) - 1)
-end
-function (r::TrackingRiskMeasure{<:Any, <:Any, <:NOCTracking})(w::AbstractVector,
-                                                               X::AbstractMatrix,
-                                                               fees::Union{Nothing, <:Fees} = nothing)
-    benchmark = tracking_benchmark(r.tracking, X)
-    return norm(calc_net_returns(w, X, fees) - benchmark, 1) / size(X, 1)
+    return norm_tracking(r.formulation, calc_net_returns(w, X, fees), benchmark, size(X, 1))
 end
 function risk_measure_view(r::TrackingRiskMeasure, i::AbstractVector, args...)
     tracking = tracking_view(r.tracking, i)
@@ -71,5 +82,51 @@ function risk_measure_view(r::VolTrackingRiskMeasure, i::AbstractVector, args...
     return VolTrackingRiskMeasure(; settings = r.settings, tracking = tracking,
                                   sigma = sigma, formulation = r.formulation)
 end
+struct RiskTrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: WeightsTracking,
+                               T3 <: AbstractBaseRiskMeasure, T4 <: VariableTracking} <:
+       RiskMeasure
+    settings::T1
+    tracking::T2
+    r::T3
+    formulation::T4
+end
+function RiskTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                                 tracking::WeightsTracking,
+                                 r::AbstractBaseRiskMeasure = Variance(),
+                                 formulation::VariableTracking = IndependentVariableTracking())
+    return RiskTrackingRiskMeasure{typeof(settings), typeof(tracking), typeof(r),
+                                   typeof(formulation)}(settings, tracking, r, formulation)
+end
+function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
+                                     <:IndependentVariableTracking})(w::AbstractVector,
+                                                                     X::AbstractMatrix,
+                                                                     fees::Union{Nothing,
+                                                                                 <:Fees} = nothing)
+    wb = r.tracking.w
+    wd = w - wb
+    return expected_risk(r.r, wd, X, fees)
+end
+function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
+                                     <:DependentVariableTracking})(w::AbstractVector,
+                                                                   X::AbstractMatrix,
+                                                                   fees::Union{Nothing,
+                                                                               <:Fees} = nothing)
+    wb = r.tracking.w
+    r1 = expected_risk(r.r, w, X, fees)
+    r2 = expected_risk(r.r, wb, X, fees)
+    return norm(r1 - r2)
+end
+function factory(r::RiskTrackingRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
+    return RiskTrackingRiskMeasure(; settings = r.settings, tracking = r.tracking,
+                                   r = factory(r.r, prior, args...; kwargs...),
+                                   formulation = r.formulation)
+end
+function risk_measure_view(r::RiskTrackingRiskMeasure, i::AbstractVector, X::AbstractMatrix)
+    tracking = tracking_view(r.tracking, i)
+    return RiskTrackingRiskMeasure(; settings = r.settings, tracking = tracking,
+                                   r = risk_measure_view(r.r, i, X),
+                                   formulation = r.formulation)
+end
 
-export TrackingRiskMeasure
+export SOCTracking, NOCTracking, IndependentVariableTracking, DependentVariableTracking,
+       TrackingRiskMeasure, VolTrackingRiskMeasure, RiskTrackingRiskMeasure

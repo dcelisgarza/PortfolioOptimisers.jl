@@ -1740,7 +1740,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = @variable(model)
-    tracking_risk = model[key] = @expression(model, t_tracking_risk / sqrt(T - one(T)))
+    tracking_risk = model[key] = @expression(model,
+                                             t_tracking_risk / sqrt(T - r.formulation.ddof))
     tracking = r.tracking
     benchmark = tracking_benchmark(tracking, pr.X)
     tracking_r = model[Symbol(:tracking_r_, i)] = @expression(model, net_X - benchmark * k)
@@ -1820,6 +1821,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Integer,
     set_risk_bounds_and_expression!(model, opt, vol_tracking_risk, r.settings, key)
     return nothing
 end
+#! Implement RiskTrackingRiskMeasure
 function set_risk_constraints!(model::JuMP.Model, i::Integer, r::TurnoverRiskMeasure,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, ::AbstractPriorResult, args...)

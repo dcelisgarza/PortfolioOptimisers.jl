@@ -71,6 +71,7 @@ function LogSumExpScalariser(; gamma::Real = 1.0)
     @smart_assert(gamma > zero(gamma))
     return LogSumExpScalariser{typeof(gamma)}(gamma)
 end
+function expected_risk end
 
 export RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser, MaxScalariser,
-       LogSumExpScalariser
+       LogSumExpScalariser, expected_risk
