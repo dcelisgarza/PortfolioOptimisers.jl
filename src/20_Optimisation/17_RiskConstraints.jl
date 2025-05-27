@@ -3,13 +3,15 @@ function set_risk_upper_bound!(args...)
 end
 function set_risk_upper_bound!(model::JuMP.Model,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
-                                       <:RiskBudgetting}, r_expr, ub::Real, key)
+                                       <:RiskBudgetting}, r_expr::AbstractJuMPScalar,
+                               ub::Real, key)
     k = model[:k]
     sc = model[:sc]
     model[Symbol(key, :_ub)] = @constraint(model, sc * (r_expr - ub * k) <= 0)
     return nothing
 end
-function set_risk_expression!(model::JuMP.Model, r_expr, scale::Real, rke::Bool)
+function set_risk_expression!(model::JuMP.Model, r_expr::AbstractJuMPScalar, scale::Real,
+                              rke::Bool)
     if !rke
         return nothing
     end
@@ -22,7 +24,8 @@ function set_risk_expression!(model::JuMP.Model, r_expr, scale::Real, rke::Bool)
 end
 function set_risk_bounds_and_expression!(model::JuMP.Model,
                                          opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                                    <:RiskBudgetting}, r_expr,
+                                                    <:RiskBudgetting},
+                                         r_expr::AbstractJuMPScalar,
                                          settings::RiskMeasureSettings, key)
     set_risk_upper_bound!(model, opt, r_expr, settings.ub, key)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
@@ -31,9 +34,11 @@ end
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                   opt::Union{<:MeanRisk,
                                                              <:NearOptimalCentering,
-                                                             <:RiskBudgetting}, r_expr_ub,
+                                                             <:RiskBudgetting},
+                                                  r_expr_ub::AbstractJuMPScalar,
                                                   ub::Union{Nothing, <:Real}, key::Symbol,
-                                                  r_expr, settings::RiskMeasureSettings)
+                                                  r_expr::AbstractJuMPScalar,
+                                                  settings::RiskMeasureSettings)
     set_risk_upper_bound!(model, opt, r_expr_ub, ub, key)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
@@ -79,12 +84,11 @@ function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
 end
 function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance, pr::AbstractPriorResult,
                             flag::Bool, key::Symbol)
-    if flag
+    return if flag
         set_sdp_variance_risk!(model, i, r, pr, key)
     else
         set_variance_risk!(model, i, r, pr, key)
     end
-    return nothing
 end
 function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                                 pr::AbstractPriorResult, key::Symbol)
@@ -92,7 +96,7 @@ function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     sigma_W = model[Symbol(:sigma_W_, i)] = @expression(model, sigma * W)
     model[key] = @expression(model, tr(sigma_W))
-    return nothing
+    return model[key] = @expression(model, tr(sigma_W))
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:SOCRiskExpr},
@@ -102,10 +106,9 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     key_dev = Symbol(:dev_, i)
     dev = model[key_dev] = @variable(model)
-    model[key] = @expression(model, dev^2)
     model[Symbol(key_dev, :_soc)] = @constraint(model,
                                                 [sc * dev; sc * G * w] ∈ SecondOrderCone())
-    return nothing
+    return model[key] = @expression(model, dev^2)
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:QuadRiskExpr},
@@ -114,11 +117,10 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
     w = model[:w]
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
-    model[key] = @expression(model, dot(w, sigma, w))
     dev = model[Symbol(:dev_, i)] = @variable(model)
     model[Symbol(:cdev_soc_, i)] = @constraint(model,
                                                [sc * dev; sc * G * w] ∈ SecondOrderCone())
-    return nothing
+    return model[key] = @expression(model, dot(w, sigma, w))
 end
 function variance_risk_bounds_expr(model::JuMP.Model, i::Any, flag::Bool)
     return if flag
@@ -175,8 +177,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
     sdp_flag = sdp_variance_flag!(model, rc_flag, cplg, nplg)
     key = Symbol(:variance_risk_, i)
-    set_variance_risk!(model, i, r, pr, sdp_flag, key)
-    variance_risk = model[key]
+    variance_risk = set_variance_risk!(model, i, r, pr, sdp_flag, key)
     rc_variance_constraints!(model, i, rc, variance_risk)
     var_bound_expr, var_bound_key = variance_risk_bounds_expr(model, i, sdp_flag)
     ub = variance_risk_bounds_val(sdp_flag, r.settings.ub)

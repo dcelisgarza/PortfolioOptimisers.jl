@@ -687,16 +687,16 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
-                            te2 = TrackingError(; err = 0,
-                                                tracking = WeightsTracking(; w = wt)))
+                            te = TrackingError(; err = 0,
+                                               tracking = WeightsTracking(; w = wt)))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w = optimise!(mre, rd).w
         @test isapprox(w, wt)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
-                            te2 = TrackingError(; err = 1e-1,
-                                                tracking = WeightsTracking(; w = wt)))
+                            te = TrackingError(; err = 1e-1,
+                                               tracking = WeightsTracking(; w = wt)))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w = optimise!(mre, rd).w
         @test isapprox(w,
@@ -708,8 +708,8 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
-                            te2 = TrackingError(; err = 0.2,
-                                                tracking = WeightsTracking(; w = wt)))
+                            te = TrackingError(; err = 0.2,
+                                               tracking = WeightsTracking(; w = wt)))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
         @test isapprox(w,

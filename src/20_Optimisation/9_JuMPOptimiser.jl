@@ -133,7 +133,7 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
     nplg::T15
     cplg::T16
     tn::T17 # Turnover
-    tre::T18 # TrackingError
+    te::T18 # TrackingError
     fees::T21
     ret::T22
     sce::T23
@@ -185,8 +185,8 @@ function JuMPOptimiser(;
                        cplg::Union{Nothing, <:PhilogenyConstraintEstimator,
                                    <:PhilogenyConstraintResult} = nothing,
                        tn::Union{Nothing, <:Turnover, <:AbstractVector{<:Turnover}} = nothing,
-                       tre::Union{Nothing, <:AbstractTracking,
-                                  <:AbstractVector{<:AbstractTracking}} = nothing,
+                       te::Union{Nothing, <:AbstractTracking,
+                                 <:AbstractVector{<:AbstractTracking}} = nothing,
                        fees::Union{Nothing, <:Fees} = nothing,
                        ret::JuMPReturnsEstimator = ArithmeticReturn(),
                        sce::Scalariser = SumScalariser(),
@@ -253,8 +253,8 @@ function JuMPOptimiser(;
     if isa(tn, AbstractVector)
         @smart_assert(!isempty(tn))
     end
-    if isa(tre, AbstractVector)
-        @smart_assert(!isempty(tre))
+    if isa(te, AbstractVector)
+        @smart_assert(!isempty(te))
     end
     if !isnothing(nea)
         @smart_assert(nea > zero(nea))
@@ -265,13 +265,13 @@ function JuMPOptimiser(;
     return JuMPOptimiser{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                          typeof(lt), typeof(st), typeof(lcs), typeof(lcm), typeof(cent),
                          typeof(gcard), typeof(sgcard), typeof(smtx), typeof(sets),
-                         typeof(nplg), typeof(cplg), typeof(tn), typeof(tre), typeof(fees),
+                         typeof(nplg), typeof(cplg), typeof(tn), typeof(te), typeof(fees),
                          typeof(ret), typeof(sce), typeof(ccnt), typeof(cobj), typeof(sc),
                          typeof(so), typeof(card), typeof(scard), typeof(nea), typeof(l1),
                          typeof(l2), typeof(ss), typeof(strict)}(pe, slv, wb, bgt, sbgt, lt,
                                                                  st, lcs, lcm, cent, gcard,
                                                                  sgcard, smtx, sets, nplg,
-                                                                 cplg, tn, tre, fees, ret,
+                                                                 cplg, tn, te, fees, ret,
                                                                  sce, ccnt, cobj, sc, so,
                                                                  card, scard, nea, l1, l2,
                                                                  ss, strict)
@@ -288,7 +288,7 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     smtx = asset_sets_matrix_view(opt.smtx, i)
     sets = nothing_dataframe_view(opt.sets, i)
     tn = turnover_view(opt.tn, i)
-    tre = tracking_view(opt.tre, i, X)
+    te = tracking_view(opt.te, i, X)
     fees = fees_view(opt.fees, i)
     ret = jump_returns_view(opt.ret, i)
     ccnt = custom_constraint_view(opt.ccnt, i)
@@ -296,7 +296,7 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = lcs, lcm = opt.lcm, cent = opt.cent,
                          gcard = gcard, sgcard = sgcard, smtx = smtx, sets = sets,
-                         nplg = opt.nplg, cplg = opt.cplg, tn = tn, tre = tre, fees = fees,
+                         nplg = opt.nplg, cplg = opt.cplg, tn = tn, te = te, fees = fees,
                          ret = ret, sce = opt.sce, ccnt = ccnt, cobj = cobj, sc = opt.sc,
                          so = opt.so, card = opt.card, scard = opt.scard, nea = opt.nea,
                          l1 = opt.l1, l2 = opt.l2, ss = opt.ss, strict = opt.strict)
@@ -337,7 +337,7 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = opt.lt, st = opt.st, lcs = lcs, lcm = opt.lcm, cent = cent,
                          gcard = gcard, sgcard = sgcard, smtx = smtx, sets = opt.sets,
-                         nplg = nplg, cplg = cplg, tn = opt.tn, tre = opt.tre,
+                         nplg = nplg, cplg = cplg, tn = opt.tn, te = opt.te,
                          fees = opt.fees, ret = opt.ret, sce = opt.sce, ccnt = opt.ccnt,
                          cobj = opt.cobj, sc = opt.sc, so = opt.so, card = opt.card,
                          nea = opt.nea, l1 = opt.l1, l2 = opt.l2, ss = opt.ss,
