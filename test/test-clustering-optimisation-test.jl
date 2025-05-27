@@ -54,196 +54,200 @@
         pw = pweights(collect(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
                                     length = size(pr.X, 1))))
 
-        rs = [Variance(; sigma = sigma), Variance(),
-              UncertaintySetVariance(; sigma = sigma), UncertaintySetVariance(),
-              StandardDeviation(; sigma = sigma), StandardDeviation(),
-              BrownianDistanceVariance(), LowOrderMoment(; mu = mu),
-              LowOrderMoment(; mu = rf), LowOrderMoment(; w = ew), LowOrderMoment(),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr())),
-                             mu = mu),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr())),
-                             mu = rf),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     ve = SimpleVariance(;
-                                                                         corrected = false,
-                                                                         w = ew),
-                                                     alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr())),
-                             w = ew),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr()))),
-              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
-                             mu = mu),
-              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
-                             mu = rf),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     ve = SimpleVariance(;
-                                                                         corrected = false,
-                                                                         w = ew),
-                                                     alg = SecondLowerMoment()), w = ew),
-              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
-              LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),
-              LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),
-              LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),
-              LowOrderMoment(; alg = MeanAbsoluteDeviation()), HighOrderMoment(; mu = mu),
-              HighOrderMoment(; mu = rf), HighOrderMoment(; w = ew), HighOrderMoment(),
-              HighOrderMoment(; alg = FourthLowerMoment(), mu = mu),
-              HighOrderMoment(; alg = FourthLowerMoment(), mu = rf),
-              HighOrderMoment(; alg = FourthLowerMoment(), w = ew),
-              HighOrderMoment(; alg = FourthLowerMoment()),
-              HighOrderMoment(; alg = FourthCentralMoment(), mu = mu),
-              HighOrderMoment(; alg = FourthCentralMoment(), mu = rf),
-              HighOrderMoment(; alg = FourthCentralMoment(), w = ew),
-              HighOrderMoment(; alg = FourthCentralMoment()),
-              HighOrderMoment(; alg = HighOrderDeviation(), mu = mu),
-              HighOrderMoment(; alg = HighOrderDeviation(), mu = rf),
-              HighOrderMoment(;
-                              alg = HighOrderDeviation(;
-                                                       ve = SimpleVariance(;
-                                                                           corrected = false,
-                                                                           w = ew)),
-                              w = ew), HighOrderMoment(; alg = HighOrderDeviation()),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
-                              mu = mu),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
-                              mu = rf),
-              HighOrderMoment(;
-                              alg = HighOrderDeviation(;
-                                                       ve = SimpleVariance(;
-                                                                           corrected = false,
-                                                                           w = ew),
-                                                       alg = FourthLowerMoment()), w = ew),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment())),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()),
-                              mu = mu),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()),
-                              mu = rf),
-              HighOrderMoment(;
-                              alg = HighOrderDeviation(;
-                                                       ve = SimpleVariance(;
-                                                                           corrected = false,
-                                                                           w = ew),
-                                                       alg = FourthCentralMoment()),
-                              w = ew),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment())),
-              SquareRootKurtosis(; mu = mu), SquareRootKurtosis(; w = ew),
-              SquareRootKurtosis(), SquareRootKurtosis(; alg = Semi(), mu = mu),
-              SquareRootKurtosis(; alg = Semi(), w = ew),
-              SquareRootKurtosis(; alg = Semi()), NegativeSkewness(),
-              NegativeSkewness(; alg = QuadRiskExpr()), NegativeSkewness(; sk = sk, V = V),
-              NegativeSkewness(; alg = QuadRiskExpr(), sk = sk, V = V),#
-              ValueatRisk(; alpha = eps()), ValueatRisk(; alpha = eps(), w = pw),
-              ValueatRisk(), ValueatRisk(; w = pw), ValueatRisk(; alpha = 0.5),
-              ValueatRisk(; alpha = 0.5, w = pw), ValueatRisk(; alpha = 1 - eps()),
-              ValueatRisk(; alpha = 1 - eps(), w = pw), ValueatRiskRange(; alpha = eps()),
-              ValueatRiskRange(; alpha = eps(), w = pw), ValueatRiskRange(),
-              ValueatRiskRange(; w = pw), ValueatRiskRange(; alpha = 0.5),
-              ValueatRiskRange(; alpha = 0.5, w = pw),
-              ValueatRiskRange(; alpha = 1 - eps()),
-              ValueatRiskRange(; alpha = 1 - eps(), w = pw),
-              DrawdownatRisk(; alpha = eps()), DrawdownatRisk(),
-              DrawdownatRisk(; alpha = 0.5), RelativeDrawdownatRisk(; alpha = eps()),
-              RelativeDrawdownatRisk(), RelativeDrawdownatRisk(; alpha = 0.5),
-              ConditionalValueatRisk(; alpha = eps()),
-              ConditionalValueatRisk(; alpha = eps(), w = pw), ConditionalValueatRisk(),
-              ConditionalValueatRisk(; w = pw), ConditionalValueatRisk(; alpha = 0.5),
-              ConditionalValueatRisk(; alpha = 0.5, w = pw),
-              ConditionalValueatRisk(; alpha = 1 - eps()),
-              ConditionalValueatRisk(; alpha = 1 - eps(), w = pw),
-              DistributionallyRobustConditionalValueatRisk(; alpha = eps()),
-              DistributionallyRobustConditionalValueatRisk(; alpha = eps(), w = pw),
-              DistributionallyRobustConditionalValueatRisk(),
-              DistributionallyRobustConditionalValueatRisk(; w = pw),
-              DistributionallyRobustConditionalValueatRisk(; alpha = 0.5),
-              DistributionallyRobustConditionalValueatRisk(; alpha = 0.5, w = pw),
-              DistributionallyRobustConditionalValueatRisk(; alpha = 1 - eps()),
-              DistributionallyRobustConditionalValueatRisk(; alpha = 1 - eps(), w = pw),
-              ConditionalValueatRiskRange(; alpha = eps(), beta = eps()),
-              ConditionalValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
-              ConditionalValueatRiskRange(), ConditionalValueatRiskRange(; w = pw),
-              ConditionalValueatRiskRange(; alpha = 0.15, beta = 0.15),
-              ConditionalValueatRiskRange(; alpha = 0.15, beta = 0.15, w = pw),
-              ConditionalValueatRiskRange(; alpha = 0.8, beta = 0.8),
-              ConditionalValueatRiskRange(; alpha = 0.8, beta = 0.8, w = pw),
-              ConditionalDrawdownatRisk(; alpha = eps()), ConditionalDrawdownatRisk(),
-              ConditionalDrawdownatRisk(; alpha = 0.5),
-              RelativeConditionalDrawdownatRisk(; alpha = eps()),
-              RelativeConditionalDrawdownatRisk(),
-              RelativeConditionalDrawdownatRisk(; alpha = 0.5),
-              EntropicValueatRisk(; alpha = eps()),
-              EntropicValueatRisk(; alpha = eps(), w = pw), EntropicValueatRisk(;),
-              EntropicValueatRisk(; w = pw), EntropicValueatRisk(; alpha = 0.5),
-              EntropicValueatRisk(; alpha = 0.5, w = pw),
-              EntropicValueatRiskRange(; alpha = eps(), beta = eps()),
-              EntropicValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
-              EntropicValueatRiskRange(;), EntropicValueatRiskRange(; w = pw),
-              EntropicValueatRiskRange(; alpha = 0.25, beta = 0.25),
-              EntropicValueatRiskRange(; alpha = 0.25, beta = 0.25, w = pw),
-              EntropicDrawdownatRisk(; alpha = eps()), EntropicDrawdownatRisk(;),
-              EntropicDrawdownatRisk(; alpha = 0.5),
-              RelativeEntropicDrawdownatRisk(; alpha = eps()),
-              RelativeEntropicDrawdownatRisk(;),
-              RelativeEntropicDrawdownatRisk(; alpha = 0.5),
-              RelativisticValueatRisk(; alpha = eps()),
-              RelativisticValueatRisk(; alpha = eps(), w = pw),
-              RelativisticValueatRisk(; kappa = 0.6),
-              RelativisticValueatRisk(; kappa = 0.6,
-                                      w = pweights(collect(range(; start = 1, stop = 1,
-                                                                 length = size(pr.X, 1))))),
-              RelativisticValueatRisk(; alpha = 0.3, kappa = 0.6),
-              RelativisticValueatRisk(; alpha = 0.3, kappa = 0.6, w = pw),
-              RelativisticValueatRiskRange(; alpha = eps(), beta = eps()),
-              RelativisticValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
-              RelativisticValueatRiskRange(;), RelativisticValueatRiskRange(; w = pw),
-              RelativisticValueatRiskRange(; alpha = 0.25, beta = 0.25),
-              RelativisticValueatRiskRange(; alpha = 0.25, beta = 0.25, w = pw),
-              RelativisticDrawdownatRisk(; alpha = eps()),
-              RelativisticDrawdownatRisk(; kappa = 0.6),
-              RelativisticDrawdownatRisk(; alpha = 0.3, kappa = 0.6),
-              RelativeRelativisticDrawdownatRisk(; alpha = eps()),
-              RelativeRelativisticDrawdownatRisk(; kappa = 0.6),
-              RelativeRelativisticDrawdownatRisk(; alpha = 0.3, kappa = 0.6),
-              OrderedWeightsArray(), OrderedWeightsArray(; w = owa_tg(T)),
-              OrderedWeightsArray(; w = owa_tgrg(T)),
-              OrderedWeightsArrayRange(; w1 = owa_tgrg(T)), AverageDrawdown(),
-              AverageDrawdown(; w = ew), RelativeAverageDrawdown(),
-              RelativeAverageDrawdown(; w = ew), UlcerIndex(), RelativeUlcerIndex(),
-              MaximumDrawdown(), RelativeMaximumDrawdown(), WorstRealisation(), Range(),
-              EqualRiskMeasure(), TurnoverRiskMeasure(; w = w1),
-              TrackingRiskMeasure(; tracking = WeightsTracking(; w = w1)),
-              TrackingRiskMeasure(; tracking = ReturnsTracking(; w = pr.X * w1))]
+        rs = rs = [Variance(; sigma = sigma), Variance(),
+                   UncertaintySetVariance(; sigma = sigma), UncertaintySetVariance(),
+                   StandardDeviation(; sigma = sigma), StandardDeviation(),
+                   BrownianDistanceVariance(), LowOrderMoment(; mu = mu),
+                   LowOrderMoment(; mu = rf), LowOrderMoment(; w = ew), LowOrderMoment(),
+                   LowOrderMoment(;
+                                  alg = LowOrderDeviation(;
+                                                          alg = SecondLowerMoment(;
+                                                                                  formulation = SqrtRiskExpr())),
+                                  mu = mu),
+                   LowOrderMoment(;
+                                  alg = LowOrderDeviation(;
+                                                          alg = SecondLowerMoment(;
+                                                                                  formulation = SqrtRiskExpr())),
+                                  mu = rf),
+                   LowOrderMoment(;
+                                  alg = LowOrderDeviation(;
+                                                          ve = SimpleVariance(;
+                                                                              corrected = false,
+                                                                              w = ew),
+                                                          alg = SecondLowerMoment(;
+                                                                                  formulation = SqrtRiskExpr())),
+                                  w = ew),
+                   LowOrderMoment(;
+                                  alg = LowOrderDeviation(;
+                                                          alg = SecondLowerMoment(;
+                                                                                  formulation = SqrtRiskExpr()))),
+                   LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                  mu = mu),
+                   LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                  mu = rf),
+                   LowOrderMoment(;
+                                  alg = LowOrderDeviation(;
+                                                          ve = SimpleVariance(;
+                                                                              corrected = false,
+                                                                              w = ew),
+                                                          alg = SecondLowerMoment()),
+                                  w = ew),
+                   LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+                   LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),
+                   LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),
+                   LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),
+                   LowOrderMoment(; alg = MeanAbsoluteDeviation()),
+                   HighOrderMoment(; mu = mu), HighOrderMoment(; mu = rf),
+                   HighOrderMoment(; w = ew), HighOrderMoment(),
+                   HighOrderMoment(; alg = FourthLowerMoment(), mu = mu),
+                   HighOrderMoment(; alg = FourthLowerMoment(), mu = rf),
+                   HighOrderMoment(; alg = FourthLowerMoment(), w = ew),
+                   HighOrderMoment(; alg = FourthLowerMoment()),
+                   HighOrderMoment(; alg = FourthCentralMoment(), mu = mu),
+                   HighOrderMoment(; alg = FourthCentralMoment(), mu = rf),
+                   HighOrderMoment(; alg = FourthCentralMoment(), w = ew),
+                   HighOrderMoment(; alg = FourthCentralMoment()),
+                   HighOrderMoment(; alg = HighOrderDeviation(), mu = mu),
+                   HighOrderMoment(; alg = HighOrderDeviation(), mu = rf),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(;
+                                                            ve = SimpleVariance(;
+                                                                                corrected = false,
+                                                                                w = ew)),
+                                   w = ew), HighOrderMoment(; alg = HighOrderDeviation()),
+                   HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
+                                   mu = mu),
+                   HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
+                                   mu = rf),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(;
+                                                            ve = SimpleVariance(;
+                                                                                corrected = false,
+                                                                                w = ew),
+                                                            alg = FourthLowerMoment()),
+                                   w = ew),
+                   HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment())),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(; alg = FourthCentralMoment()),
+                                   mu = mu),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(; alg = FourthCentralMoment()),
+                                   mu = rf),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(;
+                                                            ve = SimpleVariance(;
+                                                                                corrected = false,
+                                                                                w = ew),
+                                                            alg = FourthCentralMoment()),
+                                   w = ew),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(; alg = FourthCentralMoment())),
+                   SquareRootKurtosis(; mu = mu), SquareRootKurtosis(; w = ew),
+                   SquareRootKurtosis(), SquareRootKurtosis(; alg = Semi(), mu = mu),
+                   SquareRootKurtosis(; alg = Semi(), w = ew),
+                   SquareRootKurtosis(; alg = Semi()), NegativeSkewness(),
+                   NegativeSkewness(; alg = QuadRiskExpr()),
+                   NegativeSkewness(; sk = sk, V = V),
+                   NegativeSkewness(; alg = QuadRiskExpr(), sk = sk, V = V),#
+                   ValueatRisk(; alpha = eps()), ValueatRisk(; alpha = eps(), w = pw),
+                   ValueatRisk(), ValueatRisk(; w = pw), ValueatRisk(; alpha = 0.5),
+                   ValueatRisk(; alpha = 0.5, w = pw), ValueatRisk(; alpha = 1 - eps()),
+                   ValueatRisk(; alpha = 1 - eps(), w = pw),
+                   ValueatRiskRange(; alpha = eps()),
+                   ValueatRiskRange(; alpha = eps(), w = pw), ValueatRiskRange(),
+                   ValueatRiskRange(; w = pw), ValueatRiskRange(; alpha = 0.5),
+                   ValueatRiskRange(; alpha = 0.5, w = pw),
+                   ValueatRiskRange(; alpha = 1 - eps()),
+                   ValueatRiskRange(; alpha = 1 - eps(), w = pw),
+                   DrawdownatRisk(; alpha = eps()), DrawdownatRisk(),
+                   DrawdownatRisk(; alpha = 0.5), RelativeDrawdownatRisk(; alpha = eps()),
+                   RelativeDrawdownatRisk(), RelativeDrawdownatRisk(; alpha = 0.5),
+                   ConditionalValueatRisk(; alpha = eps()),
+                   ConditionalValueatRisk(; alpha = eps(), w = pw),
+                   ConditionalValueatRisk(), ConditionalValueatRisk(; w = pw),
+                   ConditionalValueatRisk(; alpha = 0.5),
+                   ConditionalValueatRisk(; alpha = 0.5, w = pw),
+                   ConditionalValueatRisk(; alpha = 1 - eps()),
+                   ConditionalValueatRisk(; alpha = 1 - eps(), w = pw),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = eps()),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = eps(), w = pw),
+                   DistributionallyRobustConditionalValueatRisk(),
+                   DistributionallyRobustConditionalValueatRisk(; w = pw),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = 0.5),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = 0.5, w = pw),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = 1 - eps()),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = 1 - eps(),
+                                                                w = pw),
+                   ConditionalValueatRiskRange(; alpha = eps(), beta = eps()),
+                   ConditionalValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
+                   ConditionalValueatRiskRange(), ConditionalValueatRiskRange(; w = pw),
+                   ConditionalValueatRiskRange(; alpha = 0.15, beta = 0.15),
+                   ConditionalValueatRiskRange(; alpha = 0.15, beta = 0.15, w = pw),
+                   ConditionalValueatRiskRange(; alpha = 0.8, beta = 0.8),
+                   ConditionalValueatRiskRange(; alpha = 0.8, beta = 0.8, w = pw),
+                   ConditionalDrawdownatRisk(; alpha = eps()), ConditionalDrawdownatRisk(),
+                   ConditionalDrawdownatRisk(; alpha = 0.5),
+                   RelativeConditionalDrawdownatRisk(; alpha = eps()),
+                   RelativeConditionalDrawdownatRisk(),
+                   RelativeConditionalDrawdownatRisk(; alpha = 0.5),
+                   EntropicValueatRisk(; alpha = eps()),
+                   EntropicValueatRisk(; alpha = eps(), w = pw), EntropicValueatRisk(;),
+                   EntropicValueatRisk(; w = pw), EntropicValueatRisk(; alpha = 0.5),
+                   EntropicValueatRisk(; alpha = 0.5, w = pw),
+                   EntropicValueatRiskRange(; alpha = eps(), beta = eps()),
+                   EntropicValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
+                   EntropicValueatRiskRange(;), EntropicValueatRiskRange(; w = pw),
+                   EntropicValueatRiskRange(; alpha = 0.25, beta = 0.25),
+                   EntropicValueatRiskRange(; alpha = 0.25, beta = 0.25, w = pw),
+                   EntropicDrawdownatRisk(; alpha = eps()), EntropicDrawdownatRisk(;),
+                   EntropicDrawdownatRisk(; alpha = 0.5),
+                   RelativeEntropicDrawdownatRisk(; alpha = eps()),
+                   RelativeEntropicDrawdownatRisk(;),
+                   RelativeEntropicDrawdownatRisk(; alpha = 0.5),
+                   RelativisticValueatRisk(; alpha = eps()),
+                   RelativisticValueatRisk(; alpha = eps(), w = pw),
+                   RelativisticValueatRisk(; kappa = 0.6),
+                   RelativisticValueatRisk(; kappa = 0.6,
+                                           w = pweights(collect(range(; start = 1, stop = 1,
+                                                                      length = size(pr.X,
+                                                                                    1))))),
+                   RelativisticValueatRisk(; alpha = 0.3, kappa = 0.6),
+                   RelativisticValueatRisk(; alpha = 0.3, kappa = 0.6, w = pw),
+                   RelativisticValueatRiskRange(; alpha = eps(), beta = eps()),
+                   RelativisticValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
+                   RelativisticValueatRiskRange(;), RelativisticValueatRiskRange(; w = pw),
+                   RelativisticValueatRiskRange(; alpha = 0.25, beta = 0.25),
+                   RelativisticValueatRiskRange(; alpha = 0.25, beta = 0.25, w = pw),
+                   RelativisticDrawdownatRisk(; alpha = eps()),
+                   RelativisticDrawdownatRisk(; kappa = 0.6),
+                   RelativisticDrawdownatRisk(; alpha = 0.3, kappa = 0.6),
+                   RelativeRelativisticDrawdownatRisk(; alpha = eps()),
+                   RelativeRelativisticDrawdownatRisk(; kappa = 0.6),
+                   RelativeRelativisticDrawdownatRisk(; alpha = 0.3, kappa = 0.6),
+                   OrderedWeightsArray(), OrderedWeightsArray(; w = owa_tg(T)),
+                   OrderedWeightsArray(; w = owa_tgrg(T)),
+                   OrderedWeightsArrayRange(; w1 = owa_tgrg(T)), AverageDrawdown(),
+                   AverageDrawdown(; w = ew), RelativeAverageDrawdown(),
+                   RelativeAverageDrawdown(; w = ew), UlcerIndex(), RelativeUlcerIndex(),
+                   MaximumDrawdown(), RelativeMaximumDrawdown(), WorstRealisation(),
+                   Range(), EqualRiskMeasure(), TurnoverRiskMeasure(; w = w1),
+                   TrackingRiskMeasure(; tracking = WeightsTracking(; w = w1)),
+                   TrackingRiskMeasure(; tracking = ReturnsTracking(; w = pr.X * w1)),
+                   TrackingRiskMeasure(; formulation = NOCTracking(),
+                                       tracking = WeightsTracking(; w = w1)),
+                   TrackingRiskMeasure(; formulation = NOCTracking(),
+                                       tracking = ReturnsTracking(; w = pr.X * w1)),
+                   VolTrackingRiskMeasure(; tracking = WeightsTracking(; w = w1),
+                                          formulation = SqrtRiskExpr()),
+                   VolTrackingRiskMeasure(; tracking = WeightsTracking(; w = w1),
+                                          formulation = QuadRiskExpr()),
+                   RiskTrackingRiskMeasure(; tracking = WeightsTracking(; w = w1)),
+                   RiskTrackingRiskMeasure(; formulation = DependentVariableTracking(),
+                                           tracking = WeightsTracking(; w = w1))]
         df = CSV.read(joinpath(@__DIR__, "./assets/HRP.csv"), DataFrame)
-        for i ∈ eachindex(rs)
-            w = optimise!(HierarchicalRiskParity(; r = rs[i], opt = opt)).w
-            rtol = if i ∈ (112, 114, 118, 129)
-                5e-6
-            elseif i ∈ (128, 134, 135, 140)
-                0.05
-            elseif i == 129
-                0.25
-            elseif i ∈ (130, 131, 136, 137, 138, 139, 143)
-                0.005
-            elseif i == 133
-                5e-5
-            elseif i == 120
-                5e-4
-            elseif i == 145
-                1e-5
-            elseif i == 142
-                5e-6
-            else
-                1e-6
-            end
+        for (i, r) ∈ pairs(rs)
+            w = optimise!(HierarchicalRiskParity(; r = r, opt = opt)).w
+            rtol = 1e-6
             res = isapprox(w, df[!, i]; rtol = rtol)
             if !res
                 println("Iteration $(i) failed, $(typeof(rs[i]))")
@@ -293,174 +297,196 @@
         kt = cokurtosis(Cokurtosis(; alg = Semi()), pr.X; mean = transpose(mu))
         pw = pweights(collect(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
                                     length = size(pr.X, 1))))
-        rs = [Variance(; sigma = sigma), Variance(),
-              UncertaintySetVariance(; sigma = sigma), UncertaintySetVariance(),
-              StandardDeviation(; sigma = sigma), StandardDeviation(),
-              BrownianDistanceVariance(), LowOrderMoment(; mu = mu),
-              LowOrderMoment(; mu = rf), LowOrderMoment(; w = ew), LowOrderMoment(),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr())),
-                             mu = mu),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr())),
-                             mu = rf),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     ve = SimpleVariance(;
-                                                                         corrected = false,
-                                                                         w = ew),
-                                                     alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr())),
-                             w = ew),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr()))),
-              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
-                             mu = mu),
-              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
-                             mu = rf),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     ve = SimpleVariance(;
-                                                                         corrected = false,
-                                                                         w = ew),
-                                                     alg = SecondLowerMoment()), w = ew),
-              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
-              LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),
-              LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),
-              LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),
-              LowOrderMoment(; alg = MeanAbsoluteDeviation()), HighOrderMoment(; mu = mu),
-              HighOrderMoment(; mu = rf), HighOrderMoment(; w = ew), HighOrderMoment(),
-              HighOrderMoment(; alg = FourthLowerMoment(), mu = mu),
-              HighOrderMoment(; alg = FourthLowerMoment(), mu = rf),
-              HighOrderMoment(; alg = FourthLowerMoment(), w = ew),
-              HighOrderMoment(; alg = FourthLowerMoment()),
-              HighOrderMoment(; alg = FourthCentralMoment(), mu = mu),
-              HighOrderMoment(; alg = FourthCentralMoment(), mu = rf),
-              HighOrderMoment(; alg = FourthCentralMoment(), w = ew),
-              HighOrderMoment(; alg = FourthCentralMoment()),
-              HighOrderMoment(; alg = HighOrderDeviation(), mu = mu),
-              HighOrderMoment(; alg = HighOrderDeviation(), mu = rf),
-              HighOrderMoment(;
-                              alg = HighOrderDeviation(;
-                                                       ve = SimpleVariance(;
-                                                                           corrected = false,
-                                                                           w = ew)),
-                              w = ew), HighOrderMoment(; alg = HighOrderDeviation()),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
-                              mu = mu),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
-                              mu = rf),
-              HighOrderMoment(;
-                              alg = HighOrderDeviation(;
-                                                       ve = SimpleVariance(;
-                                                                           corrected = false,
-                                                                           w = ew),
-                                                       alg = FourthLowerMoment()), w = ew),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment())),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()),
-                              mu = mu),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()),
-                              mu = rf),
-              HighOrderMoment(;
-                              alg = HighOrderDeviation(;
-                                                       ve = SimpleVariance(;
-                                                                           corrected = false,
-                                                                           w = ew),
-                                                       alg = FourthCentralMoment()),
-                              w = ew),
-              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment())),
-              SquareRootKurtosis(; mu = mu), SquareRootKurtosis(; w = ew),
-              SquareRootKurtosis(), SquareRootKurtosis(; alg = Semi(), mu = mu),
-              SquareRootKurtosis(; alg = Semi(), w = ew),
-              SquareRootKurtosis(; alg = Semi()), NegativeSkewness(),
-              NegativeSkewness(; alg = QuadRiskExpr()), NegativeSkewness(; sk = sk, V = V),
-              NegativeSkewness(; alg = QuadRiskExpr(), sk = sk, V = V),#
-              ValueatRisk(; alpha = eps()), ValueatRisk(; alpha = eps(), w = pw),
-              ValueatRisk(), ValueatRisk(; w = pw), ValueatRisk(; alpha = 0.5),
-              ValueatRisk(; alpha = 0.5, w = pw), ValueatRisk(; alpha = 1 - eps()),
-              ValueatRisk(; alpha = 1 - eps(), w = pw), ValueatRiskRange(; alpha = eps()),
-              ValueatRiskRange(; alpha = eps(), w = pw), ValueatRiskRange(),
-              ValueatRiskRange(; w = pw), ValueatRiskRange(; alpha = 0.5),
-              ValueatRiskRange(; alpha = 0.5, w = pw),
-              ValueatRiskRange(; alpha = 1 - eps()),
-              ValueatRiskRange(; alpha = 1 - eps(), w = pw),
-              DrawdownatRisk(; alpha = eps()), DrawdownatRisk(),
-              DrawdownatRisk(; alpha = 0.5), RelativeDrawdownatRisk(; alpha = eps()),
-              RelativeDrawdownatRisk(), RelativeDrawdownatRisk(; alpha = 0.5),
-              ConditionalValueatRisk(; alpha = eps()),
-              ConditionalValueatRisk(; alpha = eps(), w = pw), ConditionalValueatRisk(),
-              ConditionalValueatRisk(; w = pw), ConditionalValueatRisk(; alpha = 0.5),
-              ConditionalValueatRisk(; alpha = 0.5, w = pw),
-              ConditionalValueatRisk(; alpha = 1 - eps()),
-              ConditionalValueatRisk(; alpha = 1 - eps(), w = pw),
-              DistributionallyRobustConditionalValueatRisk(; alpha = eps()),
-              DistributionallyRobustConditionalValueatRisk(; alpha = eps(), w = pw),
-              DistributionallyRobustConditionalValueatRisk(),
-              DistributionallyRobustConditionalValueatRisk(; w = pw),
-              DistributionallyRobustConditionalValueatRisk(; alpha = 0.5),
-              DistributionallyRobustConditionalValueatRisk(; alpha = 0.5, w = pw),
-              DistributionallyRobustConditionalValueatRisk(; alpha = 1 - eps()),
-              DistributionallyRobustConditionalValueatRisk(; alpha = 1 - eps(), w = pw),
-              ConditionalValueatRiskRange(; alpha = eps(), beta = eps()),
-              ConditionalValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
-              ConditionalValueatRiskRange(), ConditionalValueatRiskRange(; w = pw),
-              ConditionalValueatRiskRange(; alpha = 0.15, beta = 0.15),
-              ConditionalValueatRiskRange(; alpha = 0.15, beta = 0.15, w = pw),
-              ConditionalValueatRiskRange(; alpha = 0.8, beta = 0.8),
-              ConditionalValueatRiskRange(; alpha = 0.8, beta = 0.8, w = pw),
-              ConditionalDrawdownatRisk(; alpha = eps()), ConditionalDrawdownatRisk(),
-              ConditionalDrawdownatRisk(; alpha = 0.5),
-              RelativeConditionalDrawdownatRisk(; alpha = eps()),
-              RelativeConditionalDrawdownatRisk(),
-              RelativeConditionalDrawdownatRisk(; alpha = 0.5),
-              EntropicValueatRisk(; alpha = eps()),
-              EntropicValueatRisk(; alpha = eps(), w = pw), EntropicValueatRisk(;),
-              EntropicValueatRisk(; w = pw), EntropicValueatRisk(; alpha = 0.5),
-              EntropicValueatRisk(; alpha = 0.5, w = pw),
-              EntropicValueatRiskRange(; alpha = eps(), beta = eps()),
-              EntropicValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
-              EntropicValueatRiskRange(;), EntropicValueatRiskRange(; w = pw),
-              EntropicValueatRiskRange(; alpha = 0.25, beta = 0.25),
-              EntropicValueatRiskRange(; alpha = 0.25, beta = 0.25, w = pw),
-              EntropicDrawdownatRisk(; alpha = eps()), EntropicDrawdownatRisk(;),
-              EntropicDrawdownatRisk(; alpha = 0.5),
-              RelativeEntropicDrawdownatRisk(; alpha = eps()),
-              RelativeEntropicDrawdownatRisk(;),
-              RelativeEntropicDrawdownatRisk(; alpha = 0.5),
-              RelativisticValueatRisk(; alpha = eps()),
-              RelativisticValueatRisk(; alpha = eps(), w = pw),
-              RelativisticValueatRisk(; kappa = 0.6),
-              RelativisticValueatRisk(; kappa = 0.6,
-                                      w = pweights(collect(range(; start = 1, stop = 1,
-                                                                 length = size(pr.X, 1))))),
-              RelativisticValueatRisk(; alpha = 0.3, kappa = 0.6),
-              RelativisticValueatRisk(; alpha = 0.3, kappa = 0.6, w = pw),
-              RelativisticValueatRiskRange(; alpha = eps(), beta = eps()),
-              RelativisticValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
-              RelativisticValueatRiskRange(;), RelativisticValueatRiskRange(; w = pw),
-              RelativisticValueatRiskRange(; alpha = 0.25, beta = 0.25),
-              RelativisticValueatRiskRange(; alpha = 0.25, beta = 0.25, w = pw),
-              RelativisticDrawdownatRisk(; alpha = eps()),
-              RelativisticDrawdownatRisk(; kappa = 0.6),
-              RelativisticDrawdownatRisk(; alpha = 0.3, kappa = 0.6),
-              RelativeRelativisticDrawdownatRisk(; alpha = eps()),
-              RelativeRelativisticDrawdownatRisk(; kappa = 0.6),
-              RelativeRelativisticDrawdownatRisk(; alpha = 0.3, kappa = 0.6),
-              OrderedWeightsArray(), OrderedWeightsArray(; w = owa_tg(T)),
-              OrderedWeightsArray(; w = owa_tgrg(T)),
-              OrderedWeightsArrayRange(; w1 = owa_tgrg(T)), AverageDrawdown(),
-              AverageDrawdown(; w = ew), RelativeAverageDrawdown(),
-              RelativeAverageDrawdown(; w = ew), UlcerIndex(), RelativeUlcerIndex(),
-              MaximumDrawdown(), RelativeMaximumDrawdown(), WorstRealisation(), Range(),
-              EqualRiskMeasure(), TurnoverRiskMeasure(; w = w1),
-              TrackingRiskMeasure(; tracking = WeightsTracking(; w = w1)),
-              TrackingRiskMeasure(; tracking = ReturnsTracking(; w = pr.X * w1))]
+        rs = rs = [Variance(; sigma = sigma), Variance(),
+                   UncertaintySetVariance(; sigma = sigma), UncertaintySetVariance(),
+                   StandardDeviation(; sigma = sigma), StandardDeviation(),
+                   BrownianDistanceVariance(), LowOrderMoment(; mu = mu),
+                   LowOrderMoment(; mu = rf), LowOrderMoment(; w = ew), LowOrderMoment(),
+                   LowOrderMoment(;
+                                  alg = LowOrderDeviation(;
+                                                          alg = SecondLowerMoment(;
+                                                                                  formulation = SqrtRiskExpr())),
+                                  mu = mu),
+                   LowOrderMoment(;
+                                  alg = LowOrderDeviation(;
+                                                          alg = SecondLowerMoment(;
+                                                                                  formulation = SqrtRiskExpr())),
+                                  mu = rf),
+                   LowOrderMoment(;
+                                  alg = LowOrderDeviation(;
+                                                          ve = SimpleVariance(;
+                                                                              corrected = false,
+                                                                              w = ew),
+                                                          alg = SecondLowerMoment(;
+                                                                                  formulation = SqrtRiskExpr())),
+                                  w = ew),
+                   LowOrderMoment(;
+                                  alg = LowOrderDeviation(;
+                                                          alg = SecondLowerMoment(;
+                                                                                  formulation = SqrtRiskExpr()))),
+                   LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                  mu = mu),
+                   LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                                  mu = rf),
+                   LowOrderMoment(;
+                                  alg = LowOrderDeviation(;
+                                                          ve = SimpleVariance(;
+                                                                              corrected = false,
+                                                                              w = ew),
+                                                          alg = SecondLowerMoment()),
+                                  w = ew),
+                   LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+                   LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),
+                   LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),
+                   LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),
+                   LowOrderMoment(; alg = MeanAbsoluteDeviation()),
+                   HighOrderMoment(; mu = mu), HighOrderMoment(; mu = rf),
+                   HighOrderMoment(; w = ew), HighOrderMoment(),
+                   HighOrderMoment(; alg = FourthLowerMoment(), mu = mu),
+                   HighOrderMoment(; alg = FourthLowerMoment(), mu = rf),
+                   HighOrderMoment(; alg = FourthLowerMoment(), w = ew),
+                   HighOrderMoment(; alg = FourthLowerMoment()),
+                   HighOrderMoment(; alg = FourthCentralMoment(), mu = mu),
+                   HighOrderMoment(; alg = FourthCentralMoment(), mu = rf),
+                   HighOrderMoment(; alg = FourthCentralMoment(), w = ew),
+                   HighOrderMoment(; alg = FourthCentralMoment()),
+                   HighOrderMoment(; alg = HighOrderDeviation(), mu = mu),
+                   HighOrderMoment(; alg = HighOrderDeviation(), mu = rf),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(;
+                                                            ve = SimpleVariance(;
+                                                                                corrected = false,
+                                                                                w = ew)),
+                                   w = ew), HighOrderMoment(; alg = HighOrderDeviation()),
+                   HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
+                                   mu = mu),
+                   HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment()),
+                                   mu = rf),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(;
+                                                            ve = SimpleVariance(;
+                                                                                corrected = false,
+                                                                                w = ew),
+                                                            alg = FourthLowerMoment()),
+                                   w = ew),
+                   HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthLowerMoment())),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(; alg = FourthCentralMoment()),
+                                   mu = mu),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(; alg = FourthCentralMoment()),
+                                   mu = rf),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(;
+                                                            ve = SimpleVariance(;
+                                                                                corrected = false,
+                                                                                w = ew),
+                                                            alg = FourthCentralMoment()),
+                                   w = ew),
+                   HighOrderMoment(;
+                                   alg = HighOrderDeviation(; alg = FourthCentralMoment())),
+                   SquareRootKurtosis(; mu = mu), SquareRootKurtosis(; w = ew),
+                   SquareRootKurtosis(), SquareRootKurtosis(; alg = Semi(), mu = mu),
+                   SquareRootKurtosis(; alg = Semi(), w = ew),
+                   SquareRootKurtosis(; alg = Semi()), NegativeSkewness(),
+                   NegativeSkewness(; alg = QuadRiskExpr()),
+                   NegativeSkewness(; sk = sk, V = V),
+                   NegativeSkewness(; alg = QuadRiskExpr(), sk = sk, V = V),#
+                   ValueatRisk(; alpha = eps()), ValueatRisk(; alpha = eps(), w = pw),
+                   ValueatRisk(), ValueatRisk(; w = pw), ValueatRisk(; alpha = 0.5),
+                   ValueatRisk(; alpha = 0.5, w = pw), ValueatRisk(; alpha = 1 - eps()),
+                   ValueatRisk(; alpha = 1 - eps(), w = pw),
+                   ValueatRiskRange(; alpha = eps()),
+                   ValueatRiskRange(; alpha = eps(), w = pw), ValueatRiskRange(),
+                   ValueatRiskRange(; w = pw), ValueatRiskRange(; alpha = 0.5),
+                   ValueatRiskRange(; alpha = 0.5, w = pw),
+                   ValueatRiskRange(; alpha = 1 - eps()),
+                   ValueatRiskRange(; alpha = 1 - eps(), w = pw),
+                   DrawdownatRisk(; alpha = eps()), DrawdownatRisk(),
+                   DrawdownatRisk(; alpha = 0.5), RelativeDrawdownatRisk(; alpha = eps()),
+                   RelativeDrawdownatRisk(), RelativeDrawdownatRisk(; alpha = 0.5),
+                   ConditionalValueatRisk(; alpha = eps()),
+                   ConditionalValueatRisk(; alpha = eps(), w = pw),
+                   ConditionalValueatRisk(), ConditionalValueatRisk(; w = pw),
+                   ConditionalValueatRisk(; alpha = 0.5),
+                   ConditionalValueatRisk(; alpha = 0.5, w = pw),
+                   ConditionalValueatRisk(; alpha = 1 - eps()),
+                   ConditionalValueatRisk(; alpha = 1 - eps(), w = pw),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = eps()),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = eps(), w = pw),
+                   DistributionallyRobustConditionalValueatRisk(),
+                   DistributionallyRobustConditionalValueatRisk(; w = pw),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = 0.5),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = 0.5, w = pw),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = 1 - eps()),
+                   DistributionallyRobustConditionalValueatRisk(; alpha = 1 - eps(),
+                                                                w = pw),
+                   ConditionalValueatRiskRange(; alpha = eps(), beta = eps()),
+                   ConditionalValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
+                   ConditionalValueatRiskRange(), ConditionalValueatRiskRange(; w = pw),
+                   ConditionalValueatRiskRange(; alpha = 0.15, beta = 0.15),
+                   ConditionalValueatRiskRange(; alpha = 0.15, beta = 0.15, w = pw),
+                   ConditionalValueatRiskRange(; alpha = 0.8, beta = 0.8),
+                   ConditionalValueatRiskRange(; alpha = 0.8, beta = 0.8, w = pw),
+                   ConditionalDrawdownatRisk(; alpha = eps()), ConditionalDrawdownatRisk(),
+                   ConditionalDrawdownatRisk(; alpha = 0.5),
+                   RelativeConditionalDrawdownatRisk(; alpha = eps()),
+                   RelativeConditionalDrawdownatRisk(),
+                   RelativeConditionalDrawdownatRisk(; alpha = 0.5),
+                   EntropicValueatRisk(; alpha = eps()),
+                   EntropicValueatRisk(; alpha = eps(), w = pw), EntropicValueatRisk(;),
+                   EntropicValueatRisk(; w = pw), EntropicValueatRisk(; alpha = 0.5),
+                   EntropicValueatRisk(; alpha = 0.5, w = pw),
+                   EntropicValueatRiskRange(; alpha = eps(), beta = eps()),
+                   EntropicValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
+                   EntropicValueatRiskRange(;), EntropicValueatRiskRange(; w = pw),
+                   EntropicValueatRiskRange(; alpha = 0.25, beta = 0.25),
+                   EntropicValueatRiskRange(; alpha = 0.25, beta = 0.25, w = pw),
+                   EntropicDrawdownatRisk(; alpha = eps()), EntropicDrawdownatRisk(;),
+                   EntropicDrawdownatRisk(; alpha = 0.5),
+                   RelativeEntropicDrawdownatRisk(; alpha = eps()),
+                   RelativeEntropicDrawdownatRisk(;),
+                   RelativeEntropicDrawdownatRisk(; alpha = 0.5),
+                   RelativisticValueatRisk(; alpha = eps()),
+                   RelativisticValueatRisk(; alpha = eps(), w = pw),
+                   RelativisticValueatRisk(; kappa = 0.6),
+                   RelativisticValueatRisk(; kappa = 0.6,
+                                           w = pweights(collect(range(; start = 1, stop = 1,
+                                                                      length = size(pr.X,
+                                                                                    1))))),
+                   RelativisticValueatRisk(; alpha = 0.3, kappa = 0.6),
+                   RelativisticValueatRisk(; alpha = 0.3, kappa = 0.6, w = pw),
+                   RelativisticValueatRiskRange(; alpha = eps(), beta = eps()),
+                   RelativisticValueatRiskRange(; alpha = eps(), beta = eps(), w = pw),
+                   RelativisticValueatRiskRange(;), RelativisticValueatRiskRange(; w = pw),
+                   RelativisticValueatRiskRange(; alpha = 0.25, beta = 0.25),
+                   RelativisticValueatRiskRange(; alpha = 0.25, beta = 0.25, w = pw),
+                   RelativisticDrawdownatRisk(; alpha = eps()),
+                   RelativisticDrawdownatRisk(; kappa = 0.6),
+                   RelativisticDrawdownatRisk(; alpha = 0.3, kappa = 0.6),
+                   RelativeRelativisticDrawdownatRisk(; alpha = eps()),
+                   RelativeRelativisticDrawdownatRisk(; kappa = 0.6),
+                   RelativeRelativisticDrawdownatRisk(; alpha = 0.3, kappa = 0.6),
+                   OrderedWeightsArray(), OrderedWeightsArray(; w = owa_tg(T)),
+                   OrderedWeightsArray(; w = owa_tgrg(T)),
+                   OrderedWeightsArrayRange(; w1 = owa_tgrg(T)), AverageDrawdown(),
+                   AverageDrawdown(; w = ew), RelativeAverageDrawdown(),
+                   RelativeAverageDrawdown(; w = ew), UlcerIndex(), RelativeUlcerIndex(),
+                   MaximumDrawdown(), RelativeMaximumDrawdown(), WorstRealisation(),
+                   Range(), EqualRiskMeasure(), TurnoverRiskMeasure(; w = w1),
+                   TrackingRiskMeasure(; tracking = WeightsTracking(; w = w1)),
+                   TrackingRiskMeasure(; tracking = ReturnsTracking(; w = pr.X * w1)),
+                   TrackingRiskMeasure(; formulation = NOCTracking(),
+                                       tracking = WeightsTracking(; w = w1)),
+                   TrackingRiskMeasure(; formulation = NOCTracking(),
+                                       tracking = ReturnsTracking(; w = pr.X * w1)),
+                   VolTrackingRiskMeasure(; tracking = WeightsTracking(; w = w1),
+                                          formulation = SqrtRiskExpr()),
+                   VolTrackingRiskMeasure(; tracking = WeightsTracking(; w = w1),
+                                          formulation = QuadRiskExpr()),
+                   RiskTrackingRiskMeasure(; tracking = WeightsTracking(; w = w1)),
+                   RiskTrackingRiskMeasure(; formulation = DependentVariableTracking(),
+                                           tracking = WeightsTracking(; w = w1))]
         df = CSV.read(joinpath(@__DIR__, "./assets/HERC-ri=ro.csv"), DataFrame)
         for (i, r) ∈ pairs(rs)
             w = optimise!(HierarchicalEqualRiskContribution(; ri = r, opt = opt)).w
