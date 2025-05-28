@@ -76,8 +76,7 @@ end
 function owa_model_solve(model::JuMP.Model, method::OWAJuMPEstimator,
                          weights::AbstractMatrix)
     slv = method.slv
-    success = optimise_JuMP_model!(model, slv).success
-    return if success
+    return if optimise_JuMP_model!(model, slv).success
         phi = model[:phi]
         phis = value.(phi)
         phis ./= sum(phis)

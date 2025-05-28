@@ -1,12 +1,5 @@
 abstract type BaseAssetAllocationOptimisationEstimator <: BaseOptimisationEstimator end
 abstract type AssetAllocationOptimisationAlgorithm <: OptimisationAlgorithm end
-struct AllocationResult{T1 <: AbstractVector, T2 <: AbstractVector, T3 <: AbstractVector,
-                        T4 <: Real} <: OptimisationResult
-    shares::T1
-    cost::T2
-    w::T3
-    cash::T4
-end
 function setup_alloc_optim(w::AbstractVector, p::AbstractVector, cash::Real,
                            T::Union{Nothing, <:Real} = nothing,
                            fees::Union{Nothing, <:Fees} = nothing)
@@ -30,5 +23,3 @@ function setup_alloc_optim(w::AbstractVector, p::AbstractVector, cash::Real,
     lcash = cash * lbgt
     return cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash
 end
-
-export AllocationResult

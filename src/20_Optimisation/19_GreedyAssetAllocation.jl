@@ -1,3 +1,10 @@
+struct GreedyAllocationResult{T1 <: AbstractVector, T2 <: AbstractVector,
+                              T3 <: AbstractVector, T4 <: Real} <: OptimisationResult
+    shares::T1
+    cost::T2
+    w::T3
+    cash::T4
+end
 struct GreedyAllocation{T1 <: Real, T2 <: Tuple, T3 <: NamedTuple} <:
        BaseAssetAllocationOptimisationEstimator
     unit::T1
@@ -85,13 +92,13 @@ function greedy_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real
 end
 function optimise!(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
                    cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
-                   fees::Union{Nothing, <:Fees} = nothing)
+                   fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     @smart_assert(!isempty(w) && !isempty(p) && length(w) == length(p))
     @smart_assert(cash > zero(cash))
     if !isnothing(fees)
         @smart_assert(!isnothing(T))
     end
-    cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, T, fees, cash)
+    cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, cash, T, fees)
     sshares, scost, sw, scash = greedy_sub_allocation!(-view(w, sidx), view(p, sidx), scash,
                                                        sbgt, ga)
     lcash = adjust_long_cash(bgt, lcash, scash)
@@ -104,7 +111,7 @@ function optimise!(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
     res[sidx, 2] = -scost
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
-    return AllocationResult(view(res, :, 1), view(res, :, 2), view(res, :, 3), lcash)
+    return GreedyAllocationResult(view(res, :, 1), view(res, :, 2), view(res, :, 3), lcash)
 end
 
-export GreedyAllocation
+export GreedyAllocationResult, GreedyAllocation
