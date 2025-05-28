@@ -354,11 +354,11 @@ end
 function set_weight_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
                                  bgt::Union{Nothing, <:Real, <:BudgetRange},
                                  sbgt::Union{Nothing, <:Real, <:BudgetRange},
-                                 long_only::Bool = false)
+                                 long::Bool = false)
     lb = wb.lb
     ub = wb.ub
     flag = w_neg_flag(lb) || w_neg_flag(ub)
-    @smart_assert(long_only ⊼ flag, "Long-only strategy cannot have negative weight limits")
+    @smart_assert(long ⊼ flag, "Long-only strategy cannot have negative weight limits")
     w = model[:w]
     N = length(w)
     k = model[:k]
