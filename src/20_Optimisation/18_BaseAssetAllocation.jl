@@ -41,8 +41,8 @@ function setup_alloc_optim(w::AbstractVector, p::AbstractVector, T::Integer,
     else
         sidx = .!lidx
         lbgt = sum(view(w, lidx))
-        sbgt = sum(view(w, sidx))
-        scash = -cash * sbgt
+        sbgt = -sum(view(w, sidx))
+        scash = cash * sbgt
     end
     lcash = cash * lbgt
     return cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash
@@ -117,10 +117,7 @@ function greedy_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real
         acash -= _pi * unit
     end
     cost = p .* shares
-    alpha = sum(cost) / bgt
-    aw = cost / alpha
-    alpha /= tcash
-    aw .*= alpha
+    aw = cost / sum(cost) * bgt
     idx = invperm(idx)
     return view(shares, idx), view(cost, idx), view(aw, idx), acash
 end
