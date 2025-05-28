@@ -118,7 +118,7 @@ function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
     wb = r.tracking.w
     r1 = expected_risk(r.r, w, X, fees)
     r2 = expected_risk(r.r, wb, X, fees)
-    return norm(r1 - r2)
+    return abs(r1 - r2)
 end
 function factory(r::RiskTrackingRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
     return RiskTrackingRiskMeasure(; settings = r.settings, tracking = r.tracking,

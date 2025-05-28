@@ -43,7 +43,7 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
                          mr.opt.fees, mr.opt.ss)
     set_smip_constraints!(model, wb, mr.opt.scard, sgcard, smtx)
     set_turnover_constraints!(model, mr.opt.tn)
-    set_tracking_error_constraints!(model, pr, mr.opt.te)
+    set_tracking_error_constraints!(model, pr, mr.opt.te, mr, nplg, cplg)
     set_number_effective_assets!(model, mr.opt.nea)
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)

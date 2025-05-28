@@ -740,28 +740,9 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
                                                                         end)
     return nothing
 end
-#=
-function set_vol_tracking_error_constraints!(args...)
-    return nothing
-end
-function set_vol_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
-                                             te::VolTrackingError)
-    G = isnothing(te.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(te.sigma).U
-    k = model[:k]
-    sc = model[:sc]
-    w = model[:w]
-    wb = te.tracking.w
-    err = te.err
-    @variable(model, t_trev)
-    @constraints(model, begin
-                     ctrev_noc, [sc * t_trev; sc * G * (w - wb)] ∈ SecondOrderCone()
-                     ctrev, sc * (t_trev - err * k) <= 0
-                 end)
-    return nothing
-end
-=#
 function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::AbstractPriorResult,
-                                         te::RiskTrackingError,
+                                         te::RiskTrackingError{<:Any, <:Any, <:Any,
+                                                               <:IndependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
                                          cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                                      <:IntegerPhilogenyResult},
@@ -769,12 +750,44 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
                                                      <:IntegerPhilogenyResult}, args...)
     r = te.r
     wb = te.tracking.w
+    err = te.err
     w = model[:w]
     k = model[:k]
-    te_dw = Symbol(:tre_dw_, i)
+    sc = model[:sc]
+    te_dw = Symbol(:te_dw_, i)
     model[te_dw] = @expression(model, w - wb * k)
-    #! Do this very carefully and methodically. Or create new functions for it.
-    risk_expr = set_risk_constraints!(model, te_dw, r, opt, pr, cplg, nplg, args...)
+    risk_expr = set_risk!(model, te_dw, r, opt, pr, cplg, nplg, args...)[1]
+    model[Symbol(:cter_, i)] = @constraint(model, sc * (risk_expr - err * k) <= 0)
+    return nothing
+end
+function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::AbstractPriorResult,
+                                         te::RiskTrackingError{<:Any, <:Any, <:Any,
+                                                               <:DependentVariableTracking},
+                                         opt::JuMPOptimisationEstimator,
+                                         cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
+                                                     <:IntegerPhilogenyResult},
+                                         nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
+                                                     <:IntegerPhilogenyResult}, args...)
+    r = te.r
+    wb = te.tracking.w
+    err = te.err
+    rb = expected_risk(r, wb, pr.X, opt.opt.fees)
+    k = model[:k]
+    sc = model[:sc]
+    te_dw = Symbol(:te_w_, i)
+    t_dr = model[Symbol(:t_dr_, i)] = @variable(model)
+    risk_expr = set_risk!(model, te_dw, r, opt, pr, cplg, nplg, args...)[1]
+    dr = model[Symbol(:dr_, i)] = @expression(model, risk_expr - rb * k)
+    model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = @constraints(model,
+                                                                          begin
+                                                                              [sc * t_dr;
+                                                                               sc * dr] ∈
+                                                                              MOI.NormOneCone(2)
+                                                                              sc *
+                                                                              (t_dr -
+                                                                               err * k) <=
+                                                                              0
+                                                                          end)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
@@ -859,17 +872,18 @@ function set_l2_regularisation!(model::JuMP.Model, l2::Real)
     add_to_objective_penalty!(model, l2)
     return nothing
 end
-function set_sdp_constraints!(model::JuMP.Model)
-    if haskey(model, :W)
-        return model[:W]
+function set_sdp_constraints!(model::JuMP.Model, w_key::Symbol = :w, W_key::Symbol = :W)
+    if haskey(model, W_key)
+        return model[W_key]
     end
-    w = model[:w]
+    w = model[w_key]
     k = model[:k]
     sc = model[:sc]
     N = length(w)
-    @variable(model, W[1:N, 1:N], Symmetric)
-    @expression(model, M, hcat(vcat(W, transpose(w)), vcat(w, k)))
-    @constraint(model, M_PSD, sc * M ∈ PSDCone())
+    W = model[W_key] = @variable(model, [1:N, 1:N], Symmetric)
+    M = model[Symbol(W_key, :_M)] = @expression(model,
+                                                hcat(vcat(W, transpose(w)), vcat(w, k)))
+    model[Symbol(M, :_PSD)] = @constraint(model, sc * M ∈ PSDCone())
     return W
 end
 function set_sdp_frc_constraints!(model::JuMP.Model)
