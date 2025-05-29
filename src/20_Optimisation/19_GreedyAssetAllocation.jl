@@ -86,7 +86,11 @@ function greedy_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real
         acash -= _pi * unit
     end
     cost = p .* shares
-    aw = cost / sum(cost) * bgt
+    aw = if any(!iszero, cost)
+        cost / sum(cost) * bgt
+    else
+        range(; start = 0, stop = 0, length = N)
+    end
     idx = invperm(idx)
     return view(shares, idx), view(cost, idx), view(aw, idx), acash
 end

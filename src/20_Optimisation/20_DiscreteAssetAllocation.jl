@@ -57,7 +57,11 @@ function discrete_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Re
     return if res.success
         shares = round.(Int, value.(x))
         cost = shares .* p
-        aw = cost / sum(cost) * bgt
+        aw = if any(!iszero, cost)
+            cost / sum(cost) * bgt
+        else
+            range(; start = 0, stop = 0, length = N)
+        end
         acash = value(r)
         shares, cost, aw, acash, OptimisationSuccess(; res = res.trials), model
     else
