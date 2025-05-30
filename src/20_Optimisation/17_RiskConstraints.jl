@@ -677,14 +677,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     formulation = r.formulation
     sigma = formulation.sigma
-    mu = formulation.mu
+    mu = nothing_scalar_array_factory(formulation.mu, pr.mu)
     G = if isnothing(sigma)
         get_chol_or_sigma_pm(model, pr)
     else
         cholesky(sigma).U
-    end
-    if isnothing(mu)
-        mu = pr.mu
     end
     w = model[:w]
     sc = model[:sc]

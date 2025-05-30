@@ -196,11 +196,11 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
     net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
     @variable(model, t_ekelly[1:T])
-    w = pret.w
-    if isnothing(w)
+    wi = nothing_scalar_array_factory(pret.w, pr.w)
+    if isnothing(wi)
         @expression(model, ret, mean(t_ekelly))
     else
-        @expression(model, ret, mean(t_ekelly, w))
+        @expression(model, ret, mean(t_ekelly, wi))
     end
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
