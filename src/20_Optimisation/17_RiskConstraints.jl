@@ -341,14 +341,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     mad = model[Symbol(:mad_, i)] = @variable(model, [1:T], lower_bound = 0)
-    mar_mad = model[Symbol(:mar_mad_, i)] = @expression(model, (net_X + mad) .- target)
     wi = nothing_scalar_array_factory(r.w, pr.w)
     mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(wi)
-        @expression(model, mean(mad + mar_mad))
+        @expression(model, mean(2 * mad))
     else
-        @expression(model, mean(mad + mar_mad, wi))
+        @expression(model, mean(2 * mad, wi))
     end
-    model[Symbol(:cmar_mad_, i)] = @constraint(model, sc * mar_mad >= 0)
+    model[Symbol(:cmar_mad_, i)] = @constraint(model, sc * ((net_X + mad) .- target) >= 0)
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
     return nothing
 end
@@ -587,13 +586,85 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, key)
     return nothing
 end
-function compute_value_at_risk_z(distribution::Normal, alpha::Real)
-    return cquantile(distribution, alpha)
+function set_risk_constraints!(model::JuMP.Model, i::Any,
+                               r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                                   <:MIPValueatRisk},
+                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                          <:RiskBudgetting}, pr::AbstractPriorResult,
+                               args...; kwargs...)
+    b = !isnothing(r.formulation.b) ? r.formulation.b : 1e3
+    s = !isnothing(r.formulation.s) ? r.formulation.s : 1e-5
+    @smart_assert(b > s)
+    key = Symbol(:var_range_risk_, i)
+    sc = model[:sc]
+    net_X = set_net_portfolio_returns!(model, pr.X)
+    T = length(net_X)
+    var_risk_l, z_var_l, var_risk_h, z_var_h = model[Symbol(:var_risk_l_, i)], model[Symbol(:z_var_l_, i)], model[Symbol(:var_risk_h_, i)], model[Symbol(:z_var_h_, i)] = @variables(model,
+                                                                                                                                                                                     begin
+                                                                                                                                                                                         ()
+                                                                                                                                                                                         [1:T],
+                                                                                                                                                                                         (binary = true)
+                                                                                                                                                                                         ()
+                                                                                                                                                                                         [1:T],
+                                                                                                                                                                                         (binary = true)
+                                                                                                                                                                                     end)
+    alpha = r.alpha
+    beta = r.beta
+    wi = nothing_scalar_array_factory(r.w, pr.w)
+    if isnothing(wi)
+        model[Symbol(:csvar_l_, i)], model[Symbol(:csvar_h_, i)] = @constraints(model,
+                                                                                begin
+                                                                                    sc *
+                                                                                    (sum(z_var_l) -
+                                                                                     alpha *
+                                                                                     T +
+                                                                                     s * T) <=
+                                                                                    0
+                                                                                    sc *
+                                                                                    (sum(z_var_h) -
+                                                                                     beta *
+                                                                                     T +
+                                                                                     s * T) >=
+                                                                                    0
+                                                                                end)
+    else
+        sw = sum(wi)
+        model[Symbol(:csvar_l_, i)], model[Symbol(:csvar_h_, i)] = @constraints(model,
+                                                                                begin
+                                                                                    sc *
+                                                                                    (dot(wi,
+                                                                                         z_var_l) -
+                                                                                     alpha *
+                                                                                     sw +
+                                                                                     s * sw) <=
+                                                                                    0
+                                                                                    sc *
+                                                                                    (dot(wi,
+                                                                                         z_var_h) -
+                                                                                     beta *
+                                                                                     sw +
+                                                                                     s * sw) >=
+                                                                                    0
+                                                                                end)
+    end
+    model[Symbol(:cvar_, i)] = @constraints(model,
+                                            begin
+                                                sc *
+                                                ((net_X + b * z_var_l) .+ var_risk_l) >= 0
+                                                sc *
+                                                ((net_X + b * z_var_h) .+ var_risk_h) <= 0
+                                            end)
+    var_range_risk = model[key] = @expression(model, var_risk_l - var_risk_h)
+    set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
+    return nothing
 end
-function compute_value_at_risk_z(distribution::TDist, alpha::Real)
-    d = dof(distribution)
+function compute_value_at_risk_z(dist::Normal, alpha::Real)
+    return cquantile(dist, alpha)
+end
+function compute_value_at_risk_z(dist::TDist, alpha::Real)
+    d = dof(dist)
     @smart_assert(d > 2)
-    return cquantile(distribution, alpha) * sqrt((d - 2) / d)
+    return cquantile(dist, alpha) * sqrt((d - 2) / d)
 end
 function compute_value_at_risk_z(::Laplace, alpha::Real)
     return -log(2 * alpha) / sqrt(2)
@@ -617,13 +688,49 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     end
     w = model[:w]
     sc = model[:sc]
-    z = compute_value_at_risk_z(r.formulation.distribution, r.alpha)
+    z = compute_value_at_risk_z(r.formulation.dist, r.alpha)
     key = Symbol(:var_risk_, i)
     g_var = model[Symbol(:g_var_, i)] = @variable(model)
     var_risk = model[key] = @expression(model, -dot(mu, w) + z * g_var)
-    model[Symbol(:cvar_, i)] = @constraint(model,
-                                           [sc * g_var; sc * G * w] ∈ SecondOrderCone())
+    model[Symbol(:cvar_soc_, i)] = @constraint(model,
+                                               [sc * g_var; sc * G * w] ∈ SecondOrderCone())
     set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, key)
+    return nothing
+end
+function set_risk_constraints!(model::JuMP.Model, i::Any,
+                               r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                                   <:DistributionValueatRisk},
+                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                          <:RiskBudgetting}, pr::AbstractPriorResult,
+                               args...; kwargs...)
+    formulation = r.formulation
+    sigma = formulation.sigma
+    G = if isnothing(sigma)
+        get_chol_or_sigma_pm(model, pr)
+    else
+        cholesky(sigma).U
+    end
+    w = model[:w]
+    sc = model[:sc]
+    dist = r.formulation.dist
+    z_l = compute_value_at_risk_z(dist, r.alpha)
+    z_h = compute_value_at_risk_z(dist, r.beta)
+    key = Symbol(:var_range_risk_, i)
+    g_var = model[Symbol(:g_var_, i)] = @variable(model)
+    var_risk_l, var_risk_h = model[Symbol(:var_risk_l_, i)], model[Symbol(:var_risk_h_, i)] = @expressions(model,
+                                                                                                           begin
+                                                                                                               z_l *
+                                                                                                               g_var
+                                                                                                               z_h *
+                                                                                                               g_var
+                                                                                                           end)
+    var_range_risk = model[key] = @expression(model, var_risk_l - var_risk_h)
+    model[Symbol(:cvar_range_soc_, i)] = @constraints(model,
+                                                      begin
+                                                          [sc * g_var; sc * G * w] ∈
+                                                          SecondOrderCone()
+                                                      end)
+    set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRisk,
@@ -1343,7 +1450,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     vals_A = clamp.(real(vals_A), 0, Inf) .+ clamp.(imag(vals_A), 0, Inf)im
     Bi = Vector{Matrix{eltype(kt)}}(undef, Nf)
     N_eig = length(vals_A)
-    for i ∈ 1:Nf
+    @inbounds for i ∈ 1:Nf
         j = i - 1
         B = reshape(real(complex(sqrt(vals_A[end - j])) * view(vecs_A, :, N_eig - j)), N, N)
         Bi[i] = B
