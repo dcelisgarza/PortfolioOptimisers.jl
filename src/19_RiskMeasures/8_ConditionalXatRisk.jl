@@ -355,5 +355,5 @@ function (r::RelativeConditionalDrawdownatRisk)(x::AbstractVector)
 end
 
 export ConditionalValueatRisk, DistributionallyRobustConditionalValueatRisk,
-       ConditionalValueatRiskRange, ConditionalDrawdownatRisk,
-       RelativeConditionalDrawdownatRisk
+       ConditionalValueatRiskRange, DistributionallyRobustConditionalValueatRiskRange,
+       ConditionalDrawdownatRisk, RelativeConditionalDrawdownatRisk
