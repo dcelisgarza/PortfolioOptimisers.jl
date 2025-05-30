@@ -59,7 +59,8 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
 end
 function factory(r::ValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
-    return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w)
+    return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w,
+                       formulation = r.formulation)
 end
 function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::AbstractVector)
     return -partialsort!(x, ceil(Int, r.alpha * length(x)))
@@ -99,7 +100,8 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
 end
 function factory(r::ValueatRiskRange, prior::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
-    return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w)
+    return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w,
+                            formulation = r.formulation)
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
     loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))
