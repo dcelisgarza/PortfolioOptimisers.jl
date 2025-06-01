@@ -1,6 +1,7 @@
 function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
                                 <:ConditionalValueatRisk,
                                 <:DistributionallyRobustConditionalValueatRisk,
+                                <:DistributionallyRobustConditionalValueatRiskRange,
                                 <:EntropicValueatRisk, <:EntropicValueatRiskRange,
                                 <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
                                 <:DrawdownatRisk, <:MaximumDrawdown, <:AverageDrawdown,

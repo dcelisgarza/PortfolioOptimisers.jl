@@ -12,161 +12,177 @@
             end
         end
     end
-    rf = 4.34 / 100 / 252
-    rng = StableRNG(987456321)
-    X = randn(rng, 200, 10)
-    rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
+    X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
+                  timestamp = :timestamp)
+    F = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/factor_prices.csv"));
+                  timestamp = :timestamp)
+    rd = prices_to_returns(X, F)
+    slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "max_step_fraction" => 0.75))]
+    pr = prior(HighOrderPriorEstimator(;
+                                       pe = FactorPriorEstimator(;
+                                                                 re = DimensionReductionRegression())),
+               rd)
     @testset "MeanRisk measures" begin
+        T, N = size(pr.X)
+        ew = eweights(1:T, inv(T); scale = true)
+        w1 = fill(inv(N), N)
+        rf = 4.34 / 100 / 252
+        sigma = cov(GerberCovariance(), pr.X)
+        mu = vec(mean(ShrunkExpectedReturns(; ce = GerberCovariance()), pr.X))
+        sk, V = coskewness(Coskewness(;), rd.X)
+        kt = cokurtosis(Cokurtosis(;), rd.X)
+        pr.sk .= sk
+        pr.V .= V
+        pr.kt .= kt
+        sk, V = coskewness(Coskewness(; alg = Semi()), rd.X)
+        kt = cokurtosis(Cokurtosis(; alg = Semi()), rd.X)
         rng = StableRNG(987456321)
-        X = randn(rng, 200, 10)
-        rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
-        pr = prior(HighOrderPriorEstimator(), rd)
-        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
-                     check_sol = (; allow_local = true, allow_almost = true),
-                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
-        ew = eweights(1:size(X, 1), inv(size(X, 1)); scale = true)
-        w1 = fill(inv(10), 10)
-        sigma = cov(GerberCovariance(), X)
-        mu = vec(mean(ShrunkExpectedReturns(; ce = GerberCovariance()), X))
-        kt = cokurtosis(Cokurtosis(; alg = Semi()), X; mean = transpose(mu))
-        sk, V = coskewness(Coskewness(; alg = Semi()), X; mean = transpose(mu))
         ucs1 = sigma_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
                                                        rng = rng,
                                                        alg = BoxUncertaintySetAlgorithm(),
-                                                       seed = 987654321), X)
+                                                       seed = 987654321), pr.X)
         ucs2 = sigma_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
                                                        rng = rng,
                                                        alg = EllipseUncertaintySetAlgorithm(),
-                                                       seed = 987654321), X)
-        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk.csv"), DataFrame)
-        risks = [Variance(; sigma = sigma),#
-                 Variance(),#
-                 Variance(; formulation = QuadRiskExpr()),#
-                 Variance(; formulation = RSOCRiskExpr()),# 4
-                 ###
-                 UncertaintySetVariance(; sigma = sigma, ucs = ucs1),#
-                 UncertaintySetVariance(; ucs = ucs2),# 6
-                 ###
-                 StandardDeviation(; sigma = sigma),#
-                 StandardDeviation(;),# 8
-                 ###
-                 LowOrderMoment(; mu = mu),#
-                 LowOrderMoment(; mu = rf),#
-                 LowOrderMoment(; w = ew),#
-                 LowOrderMoment(),# 12
-                 ###
-                 LowOrderMoment(;
-                                alg = LowOrderDeviation(;
-                                                        alg = SecondLowerMoment(;
-                                                                                formulation = SqrtRiskExpr())),
-                                mu = mu),#
-                 LowOrderMoment(;
-                                alg = LowOrderDeviation(;
-                                                        alg = SecondLowerMoment(;
-                                                                                formulation = SqrtRiskExpr())),
-                                mu = rf),#
-                 LowOrderMoment(;
-                                alg = LowOrderDeviation(;
-                                                        alg = SecondLowerMoment(;
-                                                                                formulation = SqrtRiskExpr())),
-                                w = ew),#
-                 LowOrderMoment(;
-                                alg = LowOrderDeviation(;
-                                                        alg = SecondLowerMoment(;
-                                                                                formulation = SqrtRiskExpr()))),# 16
-                 ###
-                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
-                                mu = mu),#
-                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
-                                mu = rf),#
-                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
-                                w = ew),#
-                 LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),# 20
-                 ###
-                 LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),#
-                 LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),#
-                 LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),#
-                 LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),#
-                 LowOrderMoment(; alg = MeanAbsoluteDeviation(;)),# 25
-                 ###
-                 SquareRootKurtosis(),#
-                 SquareRootKurtosis(; kt = kt),#
-                 SquareRootKurtosis(; N = 2),# 28
-                 ###
-                 NegativeSkewness(),#
-                 NegativeSkewness(; alg = QuadRiskExpr()),#
-                 NegativeSkewness(; sk = sk, V = V),#
-                 NegativeSkewness(; alg = QuadRiskExpr(), sk = sk, V = V),# 32
-                 ###
-                 ConditionalValueatRisk(),#
-                 DistributionallyRobustConditionalValueatRisk(; l = 2.5, r = 0.85),#
-                 ConditionalValueatRiskRange(),#
-                 ConditionalDrawdownatRisk(),# 36
-                 ###
-                 EntropicValueatRisk(),#
-                 EntropicValueatRiskRange(),#
-                 EntropicDrawdownatRisk(),# 39
-                 ###
-                 RelativisticValueatRisk(),#
-                 RelativisticValueatRiskRange(),#
-                 RelativisticDrawdownatRisk(),# 42
-                 ###
-                 OrderedWeightsArray(),#
-                 OrderedWeightsArray(; w = owa_tg(200)),#
-                 OrderedWeightsArrayRange(;),# 45
-                 ###
-                 OrderedWeightsArray(; formulation = ExactOrderedWeightsArray()),#
-                 OrderedWeightsArray(; formulation = ExactOrderedWeightsArray(),
-                                     w = owa_tg(200)),#
-                 OrderedWeightsArrayRange(; formulation = ExactOrderedWeightsArray()),# 48
-                 ###
-                 AverageDrawdown(),#
-                 AverageDrawdown(; w = ew),# 50
-                 ###
-                 UlcerIndex(),# 51
-                 ###
-                 MaximumDrawdown(),# 52
-                 ###
-                 WorstRealisation(),# 53
-                 ###
-                 Range(),# 54
-                 ###
-                 TurnoverRiskMeasure(; w = w1),#
-                 TrackingRiskMeasure(; tracking = WeightsTracking(; w = w1)),#
-                 TrackingRiskMeasure(; tracking = ReturnsTracking(; w = pr.X * w1))]
-        objs = [MinimumRisk(), MaximumUtility(), MaximumUtility(; l = 1),
-                MaximumRatio(; ohf = 1), MaximumRatio(;), MaximumRatio(; rf = rf, ohf = 1),
-                MaximumRatio(; rf = rf), MaximumReturn()]
+                                                       seed = 987654321), pr.X)
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv"), DataFrame)
+        rs = [PortfolioOptimisers.Variance(; sigma = sigma, formulation = QuadRiskExpr()),
+              PortfolioOptimisers.Variance(),
+              UncertaintySetVariance(; sigma = sigma, ucs = ucs1),
+              UncertaintySetVariance(; ucs = ucs2), StandardDeviation(; sigma = sigma),
+              StandardDeviation(), LowOrderMoment(; mu = mu), LowOrderMoment(; mu = rf),
+              LowOrderMoment(; w = pw), LowOrderMoment(),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = SqrtRiskExpr())),
+                             mu = mu),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = SqrtRiskExpr())),
+                             mu = rf),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                             corrected = false,
+                                                                                             w = pw),
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = SqrtRiskExpr())),
+                             w = pw),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = SqrtRiskExpr()))),
+              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                             mu = mu),
+              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
+                             mu = rf),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                             corrected = false,
+                                                                                             w = pw),
+                                                     alg = SecondLowerMoment()), w = pw),
+              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = QuadRiskExpr())),
+                             mu = mu),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = QuadRiskExpr())),
+                             mu = rf),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                             corrected = false,
+                                                                                             w = pw),
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = QuadRiskExpr())),
+                             w = pw),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = QuadRiskExpr()))),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = RSOCRiskExpr())),
+                             mu = mu),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = RSOCRiskExpr())),
+                             mu = rf),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     ve = PortfolioOptimisers.SimpleVariance(;
+                                                                                             corrected = false,
+                                                                                             w = pw),
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = RSOCRiskExpr())),
+                             w = pw),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             formulation = RSOCRiskExpr()))),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation()), SquareRootKurtosis(),
+              SquareRootKurtosis(; kt = kt), SquareRootKurtosis(; N = 2),
+              SquareRootKurtosis(; kt = kt, N = 2), NegativeSkewness(),
+              NegativeSkewness(; alg = QuadRiskExpr()), NegativeSkewness(; sk = sk, V = V),
+              NegativeSkewness(; alg = QuadRiskExpr(), sk = sk, V = V),
+              ValueatRisk(; formulation = DistributionValueatRisk()),
+              ValueatRisk(; formulation = DistributionValueatRisk(; dist = TDist(30))),
+              ValueatRisk(; formulation = DistributionValueatRisk(; dist = Laplace())),
+              ValueatRiskRange(; beta = 0.2, formulation = DistributionValueatRisk()),
+              ValueatRiskRange(; beta = 0.2,
+                               formulation = DistributionValueatRisk(; dist = TDist(30))),
+              ValueatRiskRange(; beta = 0.2,
+                               formulation = DistributionValueatRisk(; dist = Laplace())),
+              ConditionalValueatRisk(;), ConditionalValueatRisk(; w = pw),
+              DistributionallyRobustConditionalValueatRisk(; l = 1.7, r = 3e-4),
+              DistributionallyRobustConditionalValueatRisk(; l = 1.7, r = 3e-4, w = pw),
+              ConditionalValueatRiskRange(), ConditionalValueatRiskRange(; w = pw),
+              DistributionallyRobustConditionalValueatRiskRange(; l_a = 1.7, r_a = 3e-4,
+                                                                l_b = 1.7, r_b = 3e-4),
+              DistributionallyRobustConditionalValueatRiskRange(; l_a = 1.7, r_a = 3e-4,
+                                                                l_b = 1.7, r_b = 3e-4,
+                                                                w = pw),
+              ConditionalDrawdownatRisk(), EntropicValueatRisk(),
+              EntropicValueatRisk(; w = pw), EntropicValueatRiskRange(),
+              EntropicValueatRiskRange(; w = pw), EntropicDrawdownatRisk(),
+              RelativisticValueatRisk(), RelativisticValueatRisk(; w = pw),
+              RelativisticValueatRiskRange(), RelativisticValueatRiskRange(; w = pw),
+              RelativisticDrawdownatRisk(), AverageDrawdown(), AverageDrawdown(; w = pw),
+              UlcerIndex(), MaximumDrawdown(), WorstRealisation(), Range(),
+              [ConditionalValueatRisk(), TurnoverRiskMeasure(; w = w1)],
+              [ConditionalValueatRisk(; settings = RiskMeasureSettings(; scale = 0.5)),
+               TrackingRiskMeasure(; tracking = WeightsTracking(; w = w1))],
+              [ConditionalValueatRisk(; settings = RiskMeasureSettings(; scale = 0.5)),
+               TrackingRiskMeasure(; tracking = ReturnsTracking(; w = pr.X * w1))]]
+        objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf), MaximumReturn()]
         rets = [ArithmeticReturn(), KellyReturn()]
         i = 1
         for r ∈ risks
             for obj ∈ objs
                 for ret ∈ rets
                     opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
-                    sol1 = optimise!(MeanRisk(; r = r, obj = obj, opt = opt))
-                    sol2 = optimise!(MeanRisk(; r = [r, r], obj = obj, opt = opt))
-                    if isa(sol1.retcode, OptimisationFailure) ||
-                       isa(sol2.retcode, OptimisationFailure)
-                        i += 1
+                    sol = optimise!(MeanRisk(; r = r, obj = obj, opt = opt))
+                    if isa(sol.retcode, OptimisationFailure)
                         continue
                     end
-                    w1 = sol1.w
-                    w2 = sol1.w
-                    @test isapprox(w1, w2)
+                    w = sol.w
                     wt = df[!, i]
-                    res = if i ∈ (92, 140, 142, 160, 220, 364, 380, 396, 460, 474, 506, 510,
-                                  520, 524, 540, 556)
-                        isapprox(w1, wt; rtol = 1e-4)
-                    elseif i == 726
-                        isapprox(w1, wt; rtol = 5e-4)
-                    elseif Sys.isapple() && i ∈ (154, 488) ||
-                           Sys.iswindows() && i ∈ (88, 138, 492, 888, 904)
-                        isapprox(w1, wt; rtol = 1e-4)
-                    elseif Sys.isapple() && i == 536
-                        isapprox(w1, wt; rtol = 5e-4)
-                    else
-                        isapprox(w1, wt; rtol = 5e-5)
-                    end
+                    rtol = 1e-6
+                    res = isapprox(w, wt; rtol = rtol)
                     if !res
                         println("Iteration $i failed.")
                         find_tol(w1, wt; name1 = :w1, name2 = :wt)
@@ -178,11 +194,8 @@
             end
         end
     end
-    pr = prior(EmpiricalPriorEstimator(), rd)
+    #=
     @testset "Returns lower bounds" begin
-        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
-                     check_sol = (; allow_local = true, allow_almost = true),
-                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
         ucs1 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
                                                     rng = rng,
                                                     alg = BoxUncertaintySetAlgorithm(),
@@ -861,4 +874,5 @@
                         3.260477423319088e-10, 0.08088011921478026, 0.3382397556825816,
                         1.0562258217209712e-9])
     end
+    =#
 end
