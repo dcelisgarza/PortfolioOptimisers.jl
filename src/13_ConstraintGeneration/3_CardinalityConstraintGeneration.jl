@@ -1,27 +1,36 @@
-struct CardinalityConstraintSide{T1, T2} <: AbstractConstraintSide
+struct CardinalityConstraintSide{T1, T2,
+                                 T3 <: Union{<:Integer, <:AbstractVector{<:Integer}}} <:
+       AbstractConstraintSide
     group::T1
     name::T2
+    coef::T3
 end
-function CardinalityConstraintSide(; group, name)
+function CardinalityConstraintSide(; group, name,
+                                   coef::Union{<:Integer, <:AbstractVector{<:Integer}} = 1)
     group_flag = isa(group, AbstractVector)
     name_flag = isa(name, AbstractVector)
-    if group_flag || name_flag
+    coef_flag = isa(coef, AbstractVector)
+    if group_flag || name_flag || coef_flag
         @smart_assert(group_flag && name_flag)
         @smart_assert(!isempty(group) && !isempty(name))
         @smart_assert(length(group) == length(name))
+        @smart_assert(length(group) == length(name) == length(coef))
     end
-    return CardinalityConstraintSide{typeof(group), typeof(name)}(group, name)
+    return CardinalityConstraintSide{typeof(group), typeof(name), typeof(coef)}(group, name,
+                                                                                coef)
 end
 function cardinality_constraint_side_view(lc::CardinalityConstraintSide{<:Any, <:Any},
                                           ::Any)
     return lc
 end
 function cardinality_constraint_side_view(lc::CardinalityConstraintSide{<:AbstractVector,
+                                                                        <:AbstractVector,
                                                                         <:AbstractVector},
                                           i::AbstractVector)
     group = nothing_scalar_array_view(lc.group, i)
     name = nothing_scalar_array_view(lc.name, i)
-    return LinearConstraintSide(; group = group, name = name)
+    coef = nothing_scalar_array_view(lc.coef, i)
+    return LinearConstraintSide(; group = group, name = name, coef = coef)
 end
 struct CardinalityConstraint{T1 <: CardinalityConstraintSide, T2 <: Integer,
                              T3 <: ComparisonOperators} <: AbstractConstraint
@@ -48,13 +57,14 @@ function Base.iterate(S::Union{<:CardinalityConstraintSide, <:CardinalityConstra
                       state = 1)
     return state > 1 ? nothing : (S, state + 1)
 end
-function get_cardinality_constraint_data(lc::CardinalityConstraintSide{<:Any, <:Any},
+function get_cardinality_constraint_data(lc::CardinalityConstraintSide{<:Any, <:Any, <:Any},
                                          sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     A = Vector{Int}(undef, 0)
-    (; group, name) = lc
+    (; group, name, coef) = lc
     if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
+        idx = coef * idx
         append!(A, idx)
     elseif strict
         throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lc)"))
@@ -64,13 +74,15 @@ function get_cardinality_constraint_data(lc::CardinalityConstraintSide{<:Any, <:
     return A
 end
 function get_cardinality_constraint_data(lc::CardinalityConstraintSide{<:AbstractVector,
+                                                                       <:AbstractVector,
                                                                        <:AbstractVector},
                                          sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     A = Vector{Int}(undef, 0)
-    for (group, name) ∈ zip(lc.group, lc.name)
+    for (group, name, coef) ∈ zip(lc.group, lc.name, lc.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
+            idx = coef * idx
             append!(A, idx)
         elseif strict
             throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lc)."))
