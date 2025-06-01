@@ -48,6 +48,8 @@
                                                        alg = EllipseUncertaintySetAlgorithm(),
                                                        seed = 987654321), pr.X)
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv"), DataFrame)
+        pw = pweights(collect(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
+                                    length = size(pr.X, 1))))
         rs = [PortfolioOptimisers.Variance(; sigma = sigma, formulation = QuadRiskExpr()),
               PortfolioOptimisers.Variance(),
               UncertaintySetVariance(; sigma = sigma, ucs = ucs1),
@@ -284,11 +286,7 @@
             end
         end
     end
-    #=
     @testset "Budget" begin
-        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
-                     check_sol = (; allow_local = true, allow_almost = true),
-                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
         opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = BudgetRange(; lb = 0.8, ub = 1.5))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w = optimise!(mre, rd).w
@@ -299,100 +297,122 @@
         @test 0.8 <= sum(w) <= 1.5
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15), bgt = 0.7,
-                            sbgt = 0.2)
+                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15), bgt = 1.3,
+                            sbgt = nothing)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
-        @test isapprox(sum(w[w .< 0]), -0.2, rtol = 1e-6)
-        @test isapprox(sum(w[w .> 0]), 0.7 + 0.2, rtol = 1e-6)
-        @test isapprox(sum(w), 0.7, rtol = 1e-6)
         @test all(-0.1 - sqrt(eps()) .<= w .<= 0.15 + sqrt(eps()))
+        @test isapprox(sum(w), 1.3)
+        @test isapprox(sum(w[w .< 0]), 0)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15), bgt = nothing,
+                            sbgt = 0.4)
+        mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test all(-0.1 - sqrt(eps()) .<= w .<= 0.15 + sqrt(eps()))
+        @test isapprox(sum(w[w .< 0]), -0.4, rtol = 5e-5)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15), bgt = 1.3,
+                            sbgt = 0.3)
+        mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test all(-0.1 - sqrt(eps()) .<= w .<= 0.15 + sqrt(eps()))
+        @test isapprox(sum(w), 1.3)
+        @test isapprox(sum(w[w .< 0]), -0.3, rtol = 1e-5)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -0.1, ub = 0.15),
+                            bgt = BudgetRange(; lb = 0.6, ub = 0.8), sbgt = 0.25)
+        mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test all(-0.1 - sqrt(eps()) .<= w .<= 0.15 + sqrt(eps()))
+        @test 0.6 - sqrt(eps()) < sum(w) < 0.8 + sqrt(eps())
+        @test 0.6 + 0.25 - sqrt(eps()) <= sum(w[w .> 0]) <= 0.8 + 0.25 + sqrt(eps())
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15),
+                            sbgt = BudgetRange(; lb = 0.2, ub = 0.6), bgt = 0.9)
+        mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test all(-0.1 - sqrt(eps()) .<= w .<= 0.15 + sqrt(eps()))
+        @test isapprox(sum(w), 0.9)
+        @test -0.6 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.2 + sqrt(eps())
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15),
+                            bgt = BudgetRange(; lb = 0.6, ub = 0.8), sbgt = nothing)
+        mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test all(-0.1 - sqrt(eps()) .<= w .<= 0.15 + sqrt(eps()))
+        @test 0.6 - sqrt(eps()) < sum(w) < 0.8 + sqrt(eps())
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15),
+                            sbgt = BudgetRange(; lb = 0.2, ub = 0.6), bgt = nothing)
+        mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test all(-0.1 - sqrt(eps()) .<= w .<= 0.15 + sqrt(eps()))
+        @test -0.6 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.2 + sqrt(eps())
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.13, ub = 0.25),
                             bgt = BudgetRange(; lb = 0.6, ub = 0.8),
-                            sbgt = BudgetRange(; lb = 0.1, ub = 0.3))
+                            sbgt = BudgetRange(; lb = 0.2, ub = 0.5))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
-        @test -0.3 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.1 + sqrt(eps())
-        @test 0.6 + 0.1 - sqrt(eps()) <= sum(w[w .> 0]) <= 0.8 + 0.3 + sqrt(eps())
-        @test 0.6 - sqrt(eps()) <= sum(w) <= 0.8 + sqrt(eps())
-
-        opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = nothing)
-        mre = MeanRisk(; obj = MaximumReturn(), opt = opt)
-        w = optimise!(mre, rd).w
-        @test all(isapprox.(w[pr.mu .>= 0], 1))
-
-        opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = nothing,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = nothing)
-        mre = MeanRisk(; obj = MaximumReturn(), opt = opt)
-        w = optimise!(mre, rd).w
-        @test all(isapprox.(w[pr.mu .>= 0], 1, rtol = 5e-8))
-        @test all(isapprox.(w[pr.mu .< 0], -1, rtol = 1e-6))
-
-        opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = nothing)
-        mre = MeanRisk(; obj = MaximumReturn(), opt = opt)
-        w = optimise!(mre, rd).w
-        @test isapprox(w[argmax(pr.mu)], 1)
-
-        opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = nothing,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1)
-        mre = MeanRisk(; obj = MaximumReturn(), opt = opt)
-        w = optimise!(mre, rd).w
-        @test isapprox(w[argmin(pr.mu)], -1, rtol = 5e-8)
-        @test all(isapprox.(w[w .>= 1e-6], 1, rtol = 5e-8))
+        @test all(-0.13 - sqrt(eps()) .<= w .<= 0.25 + sqrt(eps()))
+        @test 0.6 - sqrt(eps()) < sum(w) < 0.8 + sqrt(eps())
+        @test 0.2 + 0.6 - sqrt(eps()) <= sum(w[w .>= 0]) <= 0.8 + 0.5 + sqrt(eps())
+        @test -0.5 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.2 + sqrt(eps())
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1),
-                            bgt = BudgetRange(; lb = 0.6, ub = 1), sbgt = nothing)
-        mre = MeanRisk(; obj = MaximumReturn(), opt = opt)
-        w = optimise!(mre, rd).w
-        @test isapprox(sum(w), 0.6)
-        @test isapprox(w[argmax(w)], 1)
-        @test isapprox(w[argmin(w)], -0.4, rtol = 5e-8)
-
-        opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1),
-                            sbgt = BudgetRange(; lb = 0.6, ub = 1), bgt = nothing)
-        mre = MeanRisk(; obj = MaximumReturn(), opt = opt)
-        w = optimise!(mre, rd).w
-        @test all(isapprox.(w[pr.mu .>= 0], 1, rtol = 5e-8))
-        @test isapprox(w[argmin(w)], -1, rtol = 5e-8)
-
-        opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1),
-                            bgt = BudgetRange(; lb = 0.6, ub = 1), sbgt = 1)
-        mre = MeanRisk(; obj = MaximumReturn(), opt = opt)
-        w = optimise!(mre, rd).w
-        @test isapprox(sum(w), 0.6)
-
-        opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1),
-                            sbgt = BudgetRange(; lb = 0.6, ub = 1), bgt = 1)
-        mre = MeanRisk(; obj = MaximumReturn(), opt = opt)
-        w = optimise!(mre, rd).w
-        @test isapprox(sum(w), 1)
-        @test isapprox(sum(w[w .< 0]), -1)
-
-        opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1),
-                            bgt = BudgetRange(; lb = 0.6, ub = nothing),
-                            sbgt = BudgetRange(; lb = nothing, ub = 0.3))
+                            wb = WeightBoundsResult(; lb = -0.13, ub = 0.25),
+                            bgt = BudgetRange(; lb = 0.6, ub = 0.8),
+                            sbgt = BudgetRange(; lb = 0.2, ub = nothing))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
-        @test sum(w) >= 0.6
-        @test sum(w[w .< 0]) >= -0.3
+        @test all(-0.13 - sqrt(eps()) .<= w .<= 0.25 + sqrt(eps()))
+        @test 0.6 - sqrt(eps()) < sum(w) < 0.8 + sqrt(eps())
+        @test (0.2 + 0.6 - 375 * sqrt(eps())) <= sum(w[w .>= 0]) <= 0.8 + sqrt(eps())
+        @test sum(w[w .< 0]) <= -0.2 + 150 * sqrt(eps())
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1),
+                            wb = WeightBoundsResult(; lb = -0.13, ub = 0.25),
+                            bgt = BudgetRange(; lb = 0.6, ub = 0.8),
+                            sbgt = BudgetRange(; lb = nothing, ub = 0.5))
+        mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test all(-0.13 - sqrt(eps()) .<= w .<= 0.25 + sqrt(eps()))
+        @test 0.6 - sqrt(eps()) < sum(w) < 0.8 + sqrt(eps())
+        @test 0.2 + 0.6 - sqrt(eps()) <= sum(w[w .>= 0]) <= 0.8 + 0.5 + sqrt(eps())
+        @test -0.5 - sqrt(eps()) <= sum(w[w .< 0])
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.13, ub = 0.25),
                             bgt = BudgetRange(; lb = nothing, ub = 0.8),
-                            sbgt = BudgetRange(; lb = 0.1, ub = nothing))
+                            sbgt = BudgetRange(; lb = 0.2, ub = 0.5))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
-        @test sum(w) <= 0.8
-        @test sum(w[w .< 0]) <= -0.1
+        @test all(-0.13 - sqrt(eps()) .<= w .<= 0.25 + sqrt(eps()))
+        @test sum(w) < 0.8 + sqrt(eps())
+        @test sum(w[w .>= 0]) <= 0.8 + 0.5 + sqrt(eps())
+        @test -0.5 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.2 + sqrt(eps())
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            wb = WeightBoundsResult(; lb = -0.13, ub = 0.25),
+                            bgt = BudgetRange(; lb = 0.6, ub = nothing),
+                            sbgt = BudgetRange(; lb = 0.2, ub = 0.5))
+        mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        w = optimise!(mre, rd).w
+        @test all(-0.13 - sqrt(eps()) .<= w .<= 0.25 + sqrt(eps()))
+        @test 0.6 - sqrt(eps()) < sum(w)
+        @test 0.2 + 0.6 - sqrt(eps()) <= sum(w[w .>= 0])
+        @test -0.5 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.2 + sqrt(eps())
     end
+    #=
+
     rng = StableRNG(987456321)
     X = randn(rng, 100, 10)
     rd = ReturnsResult(; nx = 1:size(X, 2), X = X)
