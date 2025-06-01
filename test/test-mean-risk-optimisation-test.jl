@@ -1,6 +1,6 @@
 @safetestset "MeanRisk Optimisation" begin
     using PortfolioOptimisers, CSV, DataFrames, Test, StableRNGs, Random, Clarabel,
-          StatsBase, LinearAlgebra, Pajarito, HiGHS, JuMP
+          StatsBase, LinearAlgebra, Pajarito, HiGHS, JuMP, TimeSeries
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -24,11 +24,11 @@
                                        pe = FactorPriorEstimator(;
                                                                  re = DimensionReductionRegression())),
                rd)
+    rf = 4.34 / 100 / 252
     @testset "MeanRisk measures" begin
         T, N = size(pr.X)
         ew = eweights(1:T, inv(T); scale = true)
         w1 = fill(inv(N), N)
-        rf = 4.34 / 100 / 252
         sigma = cov(GerberCovariance(), pr.X)
         mu = vec(mean(ShrunkExpectedReturns(; ce = GerberCovariance()), pr.X))
         sk, V = coskewness(Coskewness(;), rd.X)
@@ -194,16 +194,16 @@
             end
         end
     end
-    #=
-    @testset "Returns lower bounds" begin
+    @testset "Returns lower bounds and uncertainty sets" begin
+        rng = StableRNG(123456789)
         ucs1 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
                                                     rng = rng,
                                                     alg = BoxUncertaintySetAlgorithm(),
-                                                    seed = 987654321), X)
+                                                    seed = 987654321), pr.X)
         ucs2 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
                                                     rng = rng,
                                                     alg = EllipseUncertaintySetAlgorithm(),
-                                                    seed = 987654321), X)
+                                                    seed = 987654321), pr.X)
 
         ret = ArithmeticReturn()
         opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
@@ -242,7 +242,7 @@
         res3 = optimise!(mre)
         @test mean(log1p.(pr.X * res3.w)) >= ret.lb - sqrt(eps())
 
-        ew = eweights(1:200, inv(200); scale = true)
+        ew = eweights(1:size(pr.X, 1), inv(size(pr.X, 1)); scale = true)
         ret = KellyReturn(; w = ew)
         opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
@@ -261,7 +261,7 @@
 
         ucss = (ucs1, ucs2)
         objs = (MinimumRisk(), MaximumRatio(; rf = rf))
-        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk_ReturnUncertainty.csv"),
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk-UncertaintyReturns.csv"),
                       DataFrame)
         i = 1
         for ucs ∈ ucss
@@ -272,15 +272,8 @@
                 res1 = optimise!(mre)
                 w = res1.w
                 wt = df[!, i]
-                res = if i == 1
-                    isapprox(w, wt; rtol = 1e-7)
-                elseif i == 2
-                    isapprox(w, wt; rtol = 5e-8)
-                elseif i == 4
-                    isapprox(w, wt; rtol = 5e-3)
-                else
-                    isapprox(w, wt)
-                end
+                rtol = 1e-6
+                res = isapprox(w, wt; rtol = rtol)
                 if !res
                     println("Iteration $i failed.")
                     find_tol(w, wt; name1 = :w, name2 = :wt)
@@ -291,6 +284,7 @@
             end
         end
     end
+    #=
     @testset "Budget" begin
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                      check_sol = (; allow_local = true, allow_almost = true),
