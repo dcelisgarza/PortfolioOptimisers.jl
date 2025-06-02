@@ -15,6 +15,9 @@ function RiskTrackingError(; tracking::WeightsTracking,
                                                                                             err,
                                                                                             formulation)
 end
+function tracking_view(::Nothing, args...)
+    return nothing
+end
 function tracking_view(tracking::RiskTrackingError, i::AbstractVector, X::AbstractMatrix)
     return RiskTrackingError(; tracking = tracking_view(tracking.tracking, i),
                              r = risk_measure_view(tracking.r, i, X), err = tracking.err,

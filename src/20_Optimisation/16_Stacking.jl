@@ -17,8 +17,8 @@ struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                 T3 <: Union{Nothing, <:DataFrame},
                 T4 <:
                 Union{<:OptimisationEstimator, <:AbstractVector{<:OptimisationEstimator}},
-                T5 <: OptimisationEstimator, T6 <: ClusteringWeightFinaliser, T7 <: Bool} <:
-       BaseStackingOptimisationEstimator
+                T5 <: OptimisationEstimator, T6 <: ClusteringWeightFinaliser, T7 <: Bool,
+                T8 <: Bool} <: BaseStackingOptimisationEstimator
     pe::T1
     wb::T2
     sets::T3
@@ -26,6 +26,7 @@ struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
     opto::T5
     cwf::T6
     strict::T7
+    threaded::T8
 end
 function Stacking(;
                   pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
@@ -35,13 +36,14 @@ function Stacking(;
                               <:AbstractVector{<:OptimisationEstimator}} = MeanRisk(),
                   opto::OptimisationEstimator = MeanRisk(),
                   cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
-                  strict::Bool = false)
+                  strict::Bool = false, threaded::Bool = true)
     assert_nested_clustering_optimiser(opto)
     if isa(wb, WeightBoundsConstraint)
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
     return Stacking{typeof(pe), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
-                    typeof(cwf), typeof(strict)}(pe, wb, sets, opti, opto, cwf, strict)
+                    typeof(cwf), typeof(strict), typeof(threaded)}(pe, wb, sets, opti, opto,
+                                                                   cwf, strict, threaded)
 end
 function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
     pe = prior_view(st.pe, i)
@@ -58,10 +60,11 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     pr = prior(st.pe, rd.X, rd.F; dims = dims)
     opti = st.opti
     Ni = length(opti)
+    threaded = st.threaded && Ni > one(Ni)
     wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)
     resi = Vector{OptimisationResult}(undef, Ni)
-    for (i, opt) ∈ enumerate(opti)
-        res = optimise!(opt, rd; dims = dims, branchorder = branchorder,
+    @cthreads threaded for i ∈ eachindex(opti)
+        res = optimise!(opti[i], rd; dims = dims, branchorder = branchorder,
                         str_names = str_names, save = save, kwargs...)
         wi[:, i] = res.w
         resi[i] = res

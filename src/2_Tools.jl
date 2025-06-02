@@ -156,6 +156,15 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     end
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F)
 end
+macro cthreads(condition::Symbol, loop::Expr) #does not work well because of #15276, but seems to work on Julia v0.7
+    return esc(quote
+                   if $condition
+                       Threads.@threads $loop
+                   else
+                       $loop
+                   end
+               end)
+end
 function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
                              asset_classes::DataFrame, col, date0 = nothing,
                              date1 = nothing)

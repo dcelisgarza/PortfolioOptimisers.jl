@@ -2,26 +2,28 @@ struct HierarchicalEqualRiskContribution{T1 <: HierarchicalOptimiser,
                                          T2 <: Union{<:OptimisationRiskMeasure,
                                                      <:AbstractVector{<:OptimisationRiskMeasure}},
                                          T3 <: Union{<:OptimisationRiskMeasure,
-                                                     <:AbstractVector{<:OptimisationRiskMeasure}}} <:
-       ClusteringOptimisationEstimator
+                                                     <:AbstractVector{<:OptimisationRiskMeasure}},
+                                         T4 <: Bool} <: ClusteringOptimisationEstimator
     opt::T1
     ri::T2
     ro::T3
+    threaded::T4
 end
 function HierarchicalEqualRiskContribution(;
                                            opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                            ri::Union{<:OptimisationRiskMeasure,
                                                      <:AbstractVector{<:OptimisationRiskMeasure}} = Variance(),
                                            ro::Union{<:OptimisationRiskMeasure,
-                                                     <:AbstractVector{<:OptimisationRiskMeasure}} = ri)
+                                                     <:AbstractVector{<:OptimisationRiskMeasure}} = ri,
+                                           threaded::Bool = true)
     if isa(ri, AbstractVector)
         @smart_assert(!isempty(ri))
     end
     if isa(ro, AbstractVector)
         @smart_assert(!isempty(ro))
     end
-    return HierarchicalEqualRiskContribution{typeof(opt), typeof(ri), typeof(ro)}(opt, ri,
-                                                                                  ro)
+    return HierarchicalEqualRiskContribution{typeof(opt), typeof(ri), typeof(ro),
+                                             typeof(threaded)}(opt, ri, ro, threaded)
 end
 function opt_view(hc::HierarchicalEqualRiskContribution, i::AbstractVector,
                   X::AbstractMatrix)
@@ -122,8 +124,7 @@ end
 function herc_scalarised_risk_i!(::SumScalariser, wk::AbstractVector, riku::AbstractVector,
                                  cl::AbstractVector,
                                  ris::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees},
-                                 cache::Bool = false)
+                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for ri ∈ ris
         unitary_expected_risks!(wk, riku, ri, X, fees)
@@ -136,8 +137,7 @@ end
 function herc_scalarised_risk_i!(::SumScalariser, wk::AbstractVector, riku::AbstractMatrix,
                                  cl::AbstractVector,
                                  ris::AbstractVector{<:OptimisationRiskMeasure},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees},
-                                 cache::Bool = false)
+                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     risk = zeros(eltype(X), length(cl), 2)
     for (i, ri) ∈ pairs(ris)
         unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
@@ -222,9 +222,12 @@ function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRi
         roku = unitary_expected_risks(ro, pr.X, hc.opt.fees)
     end
     rkbo = zeros(eltype(pr.X), size(pr.X, 2))
-    rkcl = Vector{eltype(pr.X)}(undef, length(cls))
+    Nc = length(cls)
+    threaded = hc.threaded && Nc > one(Nc)
+    rkcl = Vector{eltype(pr.X)}(undef, Nc)
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
-    for (i, cl) ∈ pairs(cls)
+    @cthreads threaded for i ∈ eachindex(cls)
+        cl = cls[i]
         w[cl] .= inv.(view(riku, cl))
         w[cl] ./= sum(view(w, cl))
         rkbo[cl] .= inv.(view(roku, cl))
@@ -241,15 +244,20 @@ function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any,
     ri = factory(hc.ri, Ref(pr), Ref(hc.opt.slv))
     if hc.ri === hc.ro
         ro = ri
-        rku = zeros(eltype(pr.X), size(pr.X, 2), length(cls))
+        rku = zeros(eltype(pr.X), size(pr.X, 2), length(ri))
     else
         rku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
         ro = factory(hc.ro, Ref(pr), Ref(hc.opt.slv))
     end
-    rkbo = zeros(eltype(pr.X), size(pr.X, 2))
     rkcl = Vector{eltype(pr.X)}(undef, length(cls))
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
+    #! This works when ri == ro, but not in other cases
+    #! wk = zeros(eltype(pr.X), size(pr.X, 2))
+    #! w[cl] .= herc_scalarised_risk_i!(hc.opt.sce, wk[:, i], rku, cl, ri, pr.X, hc.opt.fees)
+    #! rkbo = zeros(eltype(pr.X), size(pr.X, 2), length(cls))
+    #! rkcl[i] = herc_scalarised_risk_o!(hc.opt.sce, wk[:, i], rku, rkbo[:, i], cl, ro, pr.X, hc.opt.fees)
     wk = zeros(eltype(pr.X), size(pr.X, 2))
+    rkbo = zeros(eltype(pr.X), size(pr.X, 2))
     for (i, cl) ∈ pairs(cls)
         w[cl] .= herc_scalarised_risk_i!(hc.opt.sce, wk, rku, cl, ri, pr.X, hc.opt.fees)
         rkcl[i] = herc_scalarised_risk_o!(hc.opt.sce, wk, rku, rkbo, cl, ro, pr.X,
@@ -265,10 +273,10 @@ function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRi
     riku = unitary_expected_risks(ri, pr.X, hc.opt.fees)
     ro = factory(hc.ro, Ref(pr), Ref(hc.opt.slv))
     roku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
-    rkbo = zeros(eltype(pr.X), size(pr.X, 2))
     rkcl = Vector{eltype(pr.X)}(undef, length(cls))
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     wk = zeros(eltype(pr.X), size(pr.X, 2))
+    rkbo = zeros(eltype(pr.X), size(pr.X, 2))
     for (i, cl) ∈ pairs(cls)
         w[cl] .= inv.(view(riku, cl))
         w[cl] ./= sum(view(w, cl))
@@ -286,10 +294,10 @@ function herc_risk(hc::HierarchicalEqualRiskContribution{<:Any,
     riku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     ro = factory(hc.ro, pr, hc.opt.slv)
     roku = unitary_expected_risks(ro, pr.X, hc.opt.fees)
-    rkbo = zeros(eltype(pr.X), size(pr.X, 2))
     rkcl = Vector{eltype(pr.X)}(undef, length(cls))
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     wk = zeros(eltype(pr.X), size(pr.X, 2))
+    rkbo = zeros(eltype(pr.X), size(pr.X, 2))
     for (i, cl) ∈ pairs(cls)
         w[cl] .= herc_scalarised_risk_i!(hc.opt.sce, wk, riku, cl, ri, pr.X, hc.opt.fees)
         rkbo[cl] .= inv.(view(roku, cl))
