@@ -28,7 +28,7 @@ struct NestedClustering{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorRes
     opto::T6
     cwf::T7
     strict::T8
-    threaded::T9
+    threads::T9
 end
 function assert_nested_clustering_optimiser(opt::ClusteringOptimisationEstimator)
     @smart_assert(!isa(opt.opt.cle, AbstractClusteringResult))
@@ -54,7 +54,7 @@ function NestedClustering(;
                           opti::OptimisationEstimator = MeanRisk(),
                           opto::OptimisationEstimator = opti,
                           cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
-                          strict::Bool = false, threaded::Bool = true)
+                          strict::Bool = false, threads::Bool = true)
     assert_nested_clustering_optimiser(opti)
     if !(opti === opto)
         assert_nested_clustering_optimiser(opto)
@@ -64,15 +64,15 @@ function NestedClustering(;
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
     return NestedClustering{typeof(pe), typeof(cle), typeof(wb), typeof(sets), typeof(opti),
-                            typeof(opto), typeof(cwf), typeof(strict), typeof(threaded)}(pe,
-                                                                                         cle,
-                                                                                         wb,
-                                                                                         sets,
-                                                                                         opti,
-                                                                                         opto,
-                                                                                         cwf,
-                                                                                         strict,
-                                                                                         threaded)
+                            typeof(opto), typeof(cwf), typeof(strict), typeof(threads)}(pe,
+                                                                                        cle,
+                                                                                        wb,
+                                                                                        sets,
+                                                                                        opti,
+                                                                                        opto,
+                                                                                        cwf,
+                                                                                        strict,
+                                                                                        threads)
 end
 function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
     pe = prior_view(nco.pe, i)
@@ -114,12 +114,12 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
     pr = prior(nco.pe, rd.X, rd.F; dims = dims)
     clr = clusterise(nco.cle, pr.X; dims = dims, branchorder = branchorder)
     idx = cutree(clr.clustering; k = clr.k)
-    threaded = nco.threaded && clr.k > one(clr.k)
+    threads = nco.threads && clr.k > one(clr.k)
     cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
     wi = zeros(eltype(pr.X), size(pr.X, 2), clr.k)
     opti = nco.opti
     resi = Vector{OptimisationResult}(undef, clr.k)
-    @cthreads threaded for i ∈ eachindex(cls)
+    @conditional_threading threads for i ∈ eachindex(cls)
         cl = cls[i]
         if length(cl) == 1
             wi[cl, i] = 1

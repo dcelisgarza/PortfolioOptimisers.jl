@@ -26,7 +26,7 @@ struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
     opto::T5
     cwf::T6
     strict::T7
-    threaded::T8
+    threads::T8
 end
 function Stacking(;
                   pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
@@ -36,14 +36,14 @@ function Stacking(;
                               <:AbstractVector{<:OptimisationEstimator}} = MeanRisk(),
                   opto::OptimisationEstimator = MeanRisk(),
                   cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
-                  strict::Bool = false, threaded::Bool = true)
+                  strict::Bool = false, threads::Bool = true)
     assert_nested_clustering_optimiser(opto)
     if isa(wb, WeightBoundsConstraint)
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
     return Stacking{typeof(pe), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
-                    typeof(cwf), typeof(strict), typeof(threaded)}(pe, wb, sets, opti, opto,
-                                                                   cwf, strict, threaded)
+                    typeof(cwf), typeof(strict), typeof(threads)}(pe, wb, sets, opti, opto,
+                                                                  cwf, strict, threads)
 end
 function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
     pe = prior_view(st.pe, i)
@@ -60,10 +60,10 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     pr = prior(st.pe, rd.X, rd.F; dims = dims)
     opti = st.opti
     Ni = length(opti)
-    threaded = st.threaded && Ni > one(Ni)
+    threads = st.threads && Ni > one(Ni)
     wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)
     resi = Vector{OptimisationResult}(undef, Ni)
-    @cthreads threaded for i ∈ eachindex(opti)
+    @conditional_threading threads for i ∈ eachindex(opti)
         res = optimise!(opti[i], rd; dims = dims, branchorder = branchorder,
                         str_names = str_names, save = save, kwargs...)
         wi[:, i] = res.w

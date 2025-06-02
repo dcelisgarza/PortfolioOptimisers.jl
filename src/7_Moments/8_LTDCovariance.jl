@@ -2,6 +2,7 @@ struct LTDCovariance{T1 <: AbstractVarianceEstimator, T2 <: Real} <:
        AbstractCovarianceEstimator
     ve::T1
     alpha::T2
+    #! Add conditional threading.
 end
 function LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                        alpha::Real = 0.05)

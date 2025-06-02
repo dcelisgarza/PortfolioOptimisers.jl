@@ -5,6 +5,7 @@ struct DistanceCovariance{T1 <: Distances.Metric, T2 <: Tuple, T3 <: NamedTuple,
     args::T2
     kwargs::T3
     w::T4
+    #! Add conditional threading.
 end
 function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),

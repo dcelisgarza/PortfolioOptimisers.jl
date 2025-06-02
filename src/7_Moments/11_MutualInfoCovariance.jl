@@ -4,6 +4,7 @@ struct MutualInfoCovariance{T1 <: AbstractVarianceEstimator,
     ve::T1
     bins::T2
     normalise::T3
+    #! Add conditional threading.
 end
 function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                               bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),

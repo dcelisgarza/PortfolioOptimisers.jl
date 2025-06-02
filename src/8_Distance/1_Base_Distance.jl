@@ -9,6 +9,7 @@ struct VariationInfoDistance{T1 <: Union{<:AbstractBins, <:Integer}, T2 <: Bool}
        AbstractDistanceAlgorithm
     bins::T1
     normalise::T2
+    #! Add conditional threading.
 end
 function VariationInfoDistance(;
                                bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),

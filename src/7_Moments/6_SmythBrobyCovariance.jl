@@ -49,6 +49,7 @@ struct SmythBrobyCovariance{T1 <: AbstractExpectedReturnsEstimator,
     c3::T7
     n::T8
     alg::T9
+    #! Add conditional threading.
 end
 function SmythBrobyCovariance(;
                               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
