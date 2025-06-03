@@ -1,23 +1,22 @@
 struct DistanceCovariance{T1 <: Distances.Metric, T2 <: Tuple, T3 <: NamedTuple,
-                          T4 <: Union{Nothing, <:AbstractWeights}} <:
-       AbstractCovarianceEstimator
+                          T4 <: Union{Nothing, <:AbstractWeights},
+                          T5 <: FLoops.Transducers.Executor} <: AbstractCovarianceEstimator
     dist::T1
     args::T2
     kwargs::T3
     w::T4
-    #! Add conditional threading.
+    threads::T5
 end
 function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
-                            w::Union{Nothing, <:AbstractWeights} = nothing)
-    return DistanceCovariance{typeof(dist), typeof(args), typeof(kwargs), typeof(w)}(dist,
-                                                                                     args,
-                                                                                     kwargs,
-                                                                                     w)
+                            w::Union{Nothing, <:AbstractWeights} = nothing,
+                            threads::FLoops.Transducers.Executor = ThreadedEx())
+    return DistanceCovariance{typeof(dist), typeof(args), typeof(kwargs), typeof(w),
+                              typeof(threads)}(dist, args, kwargs, w, threads)
 end
 function factory(ce::DistanceCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs,
-                              w = isnothing(w) ? ce.w : w)
+                              w = isnothing(w) ? ce.w : w, threads = ce.threads)
 end
 function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
     N = length(v1)
@@ -43,7 +42,7 @@ end
 function cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         xj = view(X, :, j)
         for i ∈ 1:j
             rho[j, i] = rho[i, j] = cor_distance(ce, view(X, :, i), xj)
@@ -80,7 +79,7 @@ end
 function cov_distance(ce::DistanceCovariance, X::AbstractMatrix)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         xj = view(X, :, j)
         for i ∈ 1:j
             rho[j, i] = rho[i, j] = cov_distance(ce, view(X, :, i), xj)

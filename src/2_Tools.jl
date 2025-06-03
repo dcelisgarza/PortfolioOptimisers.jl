@@ -156,16 +156,6 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     end
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F)
 end
-macro conditional_threading(condition::Symbol, loop::Expr)
-    # https://discourse.julialang.org/t/macro-for-optional-threading-not-working/40491/2
-    return esc(quote
-                   if $condition
-                       Threads.@threads $loop
-                   else
-                       $loop
-                   end
-               end)
-end
 function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
                              asset_classes::DataFrame, col, date0 = nothing,
                              date1 = nothing)

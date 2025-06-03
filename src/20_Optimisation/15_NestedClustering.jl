@@ -19,7 +19,8 @@ struct NestedClustering{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorRes
                         Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
                         T4 <: Union{Nothing, <:DataFrame}, T5 <: OptimisationEstimator,
                         T6 <: OptimisationEstimator, T7 <: ClusteringWeightFinaliser,
-                        T8 <: Bool, T9 <: Bool} <: ClusteringOptimisationEstimator
+                        T8 <: Bool, T9 <: FLoops.Transducers.Executor} <:
+       ClusteringOptimisationEstimator
     pe::T1
     cle::T2
     wb::T3
@@ -54,7 +55,8 @@ function NestedClustering(;
                           opti::OptimisationEstimator = MeanRisk(),
                           opto::OptimisationEstimator = opti,
                           cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
-                          strict::Bool = false, threads::Bool = true)
+                          strict::Bool = false,
+                          threads::FLoops.Transducers.Executor = ThreadedEx())
     assert_nested_clustering_optimiser(opti)
     if !(opti === opto)
         assert_nested_clustering_optimiser(opto)
@@ -81,7 +83,8 @@ function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
     opti = opt_view(nco.opti, i, X)
     opto = opt_view(nco.opto, i, X)
     return NestedClustering(; pe = pe, cle = nco.cle, wb = wb, sets = sets, opti = opti,
-                            opto = opto, cwf = nco.cwf, strict = nco.strict)
+                            opto = opto, cwf = nco.cwf, strict = nco.strict,
+                            threads = nco.threads)
 end
 function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsResult,
                                                <:WeightBoundsConstraint},
@@ -114,13 +117,11 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
     pr = prior(nco.pe, rd.X, rd.F; dims = dims)
     clr = clusterise(nco.cle, pr.X; dims = dims, branchorder = branchorder)
     idx = cutree(clr.clustering; k = clr.k)
-    threads = nco.threads && clr.k > one(clr.k)
     cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
     wi = zeros(eltype(pr.X), size(pr.X, 2), clr.k)
     opti = nco.opti
     resi = Vector{OptimisationResult}(undef, clr.k)
-    @conditional_threading threads for i ∈ eachindex(cls)
-        cl = cls[i]
+    @floop nco.threads for (i, cl) ∈ pairs(cls)
         if length(cl) == 1
             wi[cl, i] = 1
         else
@@ -133,11 +134,11 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
         end
     end
     rdo = ReturnsResult(; nx = 1:(clr.k), X = pr.X * wi, nf = rd.nf, F = rd.F)
-    res = optimise!(nco.opto, rdo; dims = dims, branchorder = branchorder,
-                    str_names = str_names, save = save, kwargs...)
+    reso = optimise!(nco.opto, rdo; dims = dims, branchorder = branchorder,
+                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.cwf, nco.strict,
-                                                 resi, res, wi * res.w)
-    return NestedClusteringResult(typeof(nco), pr, wb, clr, resi, res, retcode, w)
+                                                 resi, reso, wi * reso.w)
+    return NestedClusteringResult(typeof(nco), pr, wb, clr, resi, reso, retcode, w)
 end
 
 export NestedClusteringResult, NestedClustering

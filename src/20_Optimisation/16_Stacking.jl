@@ -18,7 +18,7 @@ struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                 T4 <:
                 Union{<:OptimisationEstimator, <:AbstractVector{<:OptimisationEstimator}},
                 T5 <: OptimisationEstimator, T6 <: ClusteringWeightFinaliser, T7 <: Bool,
-                T8 <: Bool} <: BaseStackingOptimisationEstimator
+                T8 <: FLoops.Transducers.Executor} <: BaseStackingOptimisationEstimator
     pe::T1
     wb::T2
     sets::T3
@@ -36,7 +36,7 @@ function Stacking(;
                               <:AbstractVector{<:OptimisationEstimator}} = MeanRisk(),
                   opto::OptimisationEstimator = MeanRisk(),
                   cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
-                  strict::Bool = false, threads::Bool = true)
+                  strict::Bool = false, threads::FLoops.Transducers.Executor = ThreadedEx())
     assert_nested_clustering_optimiser(opto)
     if isa(wb, WeightBoundsConstraint)
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
@@ -52,7 +52,7 @@ function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
     wb = weight_bounds_view(st.wb, i)
     sets = nothing_dataframe_view(st.sets, i)
     return Stacking(; pe = pe, opti = opti, opto = opto, wb = wb, cwf = st.cwf, sets = sets,
-                    strict = st.strict)
+                    strict = st.strict, threads = st.threads)
 end
 function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
@@ -60,21 +60,20 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     pr = prior(st.pe, rd.X, rd.F; dims = dims)
     opti = st.opti
     Ni = length(opti)
-    threads = st.threads && Ni > one(Ni)
     wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)
     resi = Vector{OptimisationResult}(undef, Ni)
-    @conditional_threading threads for i ∈ eachindex(opti)
-        res = optimise!(opti[i], rd; dims = dims, branchorder = branchorder,
+    @floop st.threads for (i, opt) ∈ pairs(opti)
+        res = optimise!(opt, rd; dims = dims, branchorder = branchorder,
                         str_names = str_names, save = save, kwargs...)
         wi[:, i] = res.w
         resi[i] = res
     end
     rdo = ReturnsResult(; nx = 1:Ni, X = pr.X * wi, nf = rd.nf, F = rd.F)
-    res = optimise!(st.opto, rdo; dims = dims, branchorder = branchorder,
-                    str_names = str_names, save = save, kwargs...)
+    reso = optimise!(st.opto, rdo; dims = dims, branchorder = branchorder,
+                     str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.cwf, st.strict, resi,
-                                                 res, wi * res.w)
-    return StackingResult(typeof(st), pr, wb, resi, res, retcode, w)
+                                                 reso, wi * reso.w)
+    return StackingResult(typeof(st), pr, wb, resi, reso, retcode, w)
 end
 
 export StackingResult, Stacking

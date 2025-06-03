@@ -59,7 +59,7 @@ function distance(de::Distance{<:VariationInfoDistance}, ::Any, X::AbstractMatri
     if dims == 2
         X = transpose(X)
     end
-    return variation_info(X, de.alg.bins, de.alg.normalise)
+    return variation_info(X, de.alg.bins, de.alg.normalise, de.alg.threads)
 end
 function distance(::Distance{<:CorrelationDistance}, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1)
