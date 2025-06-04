@@ -454,7 +454,7 @@
         swc = w[sets[!, :Clusters] .== 1]
         @test round(sum(swc) * sum(swc) / dot(swc, swc)) <= 5
 
-        gcard = cardinality_constraints(gcard, sets)
+        gcard = linear_constraints(gcard, sets)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                             wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
                             sbgt = 0.2, gcard = gcard)
@@ -470,14 +470,13 @@
                                                                             :MRK],
                                                                     coef = [1, 1, 1]),
                                       B = 1, comp = LEQ())
-        gcard = cardinality_constraints(gcard, sets)
+        gcard = linear_constraints(gcard, sets)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, gcard = gcard, sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
-        res = optimise!(mre, rd; str_names = true)
+        res = optimise!(mre, rd)
         colnames(X)[[7, 12, 18]]
         w = res.w
         @test sum(w[[7, 12, 18]]) <= 1
-        println("")
     end
 
     #=

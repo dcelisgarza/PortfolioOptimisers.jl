@@ -94,12 +94,10 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T10 <: Union{Nothing, <:CentralityConstraintEstimator,
                                   <:AbstractVector{<:CentralityConstraintEstimator},
                                   <:LinearConstraintResult},
-                     T11 <: Union{Nothing, <:CardinalityConstraint,
-                                  <:AbstractVector{<:CardinalityConstraint},
-                                  <:LinearConstraintResult},
-                     T12 <: Union{Nothing, <:CardinalityConstraint,
-                                  <:AbstractVector{<:CardinalityConstraint},
-                                  <:LinearConstraintResult},
+                     T11 <: Union{Nothing, <:LinearConstraint,
+                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintResult},
+                     T12 <: Union{Nothing, <:LinearConstraint,
+                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintResult},
                      T13 <: Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix},
                      T14 <: Union{Nothing, <:DataFrame},
                      T15 <: Union{Nothing, <:PhilogenyConstraintEstimator,
@@ -172,11 +170,11 @@ function JuMPOptimiser(;
                        cent::Union{Nothing, <:CentralityConstraintEstimator,
                                    <:AbstractVector{<:CentralityConstraintEstimator},
                                    <:LinearConstraintResult} = nothing,
-                       gcard::Union{Nothing, <:CardinalityConstraint,
-                                    <:AbstractVector{<:CardinalityConstraint},
+                       gcard::Union{Nothing, <:LinearConstraint,
+                                    <:AbstractVector{<:LinearConstraint},
                                     <:LinearConstraintResult} = nothing,
-                       sgcard::Union{Nothing, <:CardinalityConstraint,
-                                     <:AbstractVector{<:CardinalityConstraint},
+                       sgcard::Union{Nothing, <:LinearConstraint,
+                                     <:AbstractVector{<:LinearConstraint},
                                      <:LinearConstraintResult} = nothing,
                        smtx::Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix} = nothing,
                        sets::Union{Nothing, <:DataFrame} = nothing,
@@ -232,10 +230,10 @@ function JuMPOptimiser(;
        isa(lcs, AbstractVector{<:LinearConstraint}) ||
        isa(cent, CentralityConstraintEstimator) ||
        isa(cent, AbstractVector{<:CentralityConstraintEstimator}) ||
-       isa(gcard, CardinalityConstraint) ||
-       isa(gcard, AbstractVector{<:CardinalityConstraint}) ||
-       isa(sgcard, CardinalityConstraint) ||
-       isa(sgcard, AbstractVector{<:CardinalityConstraint})
+       isa(gcard, LinearConstraint) ||
+       isa(gcard, AbstractVector{<:LinearConstraint}) ||
+       isa(sgcard, LinearConstraint) ||
+       isa(sgcard, AbstractVector{<:LinearConstraint})
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
     if isa(sgcard, LinearConstraintResult) && isa(smtx, AbstractMatrix)
@@ -308,10 +306,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(pr.X, 2), strict = opt.strict)
     lcs = linear_constraints(opt.lcs, opt.sets; datatype = datatype, strict = opt.strict)
     cent = centrality_constraints(opt.cent, pr.X)
-    gcard = cardinality_constraints(opt.gcard, opt.sets; datatype = datatype,
-                                    strict = opt.strict)
-    sgcard = cardinality_constraints(opt.sgcard, opt.sets; datatype = datatype,
-                                     strict = opt.strict)
+    gcard = linear_constraints(opt.gcard, opt.sets; datatype = Int, strict = opt.strict)
+    sgcard = linear_constraints(opt.sgcard, opt.sets; datatype = Int, strict = opt.strict)
     smtx = asset_sets_matrix(opt.smtx, opt.sets)
     if isa(sgcard, LinearConstraintResult) && isa(smtx, AbstractMatrix)
         N = size(smtx, 1)
