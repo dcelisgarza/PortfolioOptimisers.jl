@@ -11,9 +11,8 @@ function CardinalityConstraintSide(; group, name,
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
     if group_flag || name_flag || coef_flag
-        @smart_assert(group_flag && name_flag)
+        @smart_assert(group_flag && name_flag && coef_flag)
         @smart_assert(!isempty(group) && !isempty(name))
-        @smart_assert(length(group) == length(name))
         @smart_assert(length(group) == length(name) == length(coef))
     end
     return CardinalityConstraintSide{typeof(group), typeof(name), typeof(coef)}(group, name,
@@ -103,7 +102,7 @@ function cardinality_constraints(::Nothing, args...; kwargs...)
 end
 function cardinality_constraints(lcs::Union{<:CardinalityConstraint,
                                             <:AbstractVector{<:CardinalityConstraint}},
-                                 sets::DataFrame; datatype::Type = Float64,
+                                 sets::DataFrame; datatype::Type = Int,
                                  strict::Bool = false)
     if isa(lcs, AbstractVector)
         @smart_assert(!isempty(lcs))
