@@ -186,7 +186,7 @@
         objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf), MaximumReturn()]
         rets = [ArithmeticReturn(), KellyReturn()]
         i = 1
-        for r ∈ risks
+        for r ∈ rs
             for obj ∈ objs
                 for ret ∈ rets
                     opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
