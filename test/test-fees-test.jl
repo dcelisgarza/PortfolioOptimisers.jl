@@ -1,5 +1,5 @@
 @safetestset "Fees" begin
-    using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames
+    using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames, FLoops
     import PortfolioOptimisers: fees_view
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
@@ -30,7 +30,7 @@
         f1_t = CSV.read(joinpath(@__DIR__, "assets/Fees.csv"), DataFrame)
         f2_t = CSV.read(joinpath(@__DIR__, "assets/Asset-Fees.csv"), DataFrame)
 
-        for (i, fe) ∈ enumerate(fes)
+        FLoops.@floop FLoops.ThreadedEx() for (i, fe) ∈ enumerate(fes)
             f1 = calc_fees(w1, fe)
             res1 = isapprox(f1, f1_t[(i - 1) * 2 + 1, 1])
             if !res1

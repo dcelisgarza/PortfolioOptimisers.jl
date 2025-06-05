@@ -1,6 +1,6 @@
 @safetestset "DBHT" begin
     using PortfolioOptimisers, DataFrames, CSV, Random, StableRNGs, Test, StatsBase,
-          Statistics, SparseArrays
+          Statistics, SparseArrays, FLoops
 
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
@@ -283,7 +283,7 @@
                Distance(; alg = VariationInfoDistance()),
                DistanceDistance(; alg = VariationInfoDistance())]
 
-        for i ∈ 1:ncol(logo_t)
+        FLoops.@floop FLoops.ThreadedEx() for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i]),
@@ -310,7 +310,7 @@
                GeneralDistance(; alg = VariationInfoDistance()),
                GeneralDistanceDistance(; alg = VariationInfoDistance())]
 
-        for i ∈ 1:ncol(logo_t)
+        FLoops.@floop FLoops.ThreadedEx() for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i]),
@@ -339,7 +339,7 @@
                Distance(; alg = VariationInfoDistance()),
                DistanceDistance(; alg = VariationInfoDistance())]
 
-        for i ∈ 1:ncol(logo_t)
+        FLoops.@floop FLoops.ThreadedEx() for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i],
@@ -367,7 +367,7 @@
                GeneralDistance(; alg = VariationInfoDistance()),
                GeneralDistanceDistance(; alg = VariationInfoDistance())]
 
-        for i ∈ 1:ncol(logo_t)
+        FLoops.@floop FLoops.ThreadedEx() for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i],
