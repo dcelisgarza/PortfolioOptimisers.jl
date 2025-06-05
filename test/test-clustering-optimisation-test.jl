@@ -16,7 +16,7 @@
                   timestamp = :timestamp)
     F = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/factor_prices.csv"));
                   timestamp = :timestamp)
-    rd = prices_to_returns(X[(end - 251):end], F[(end - 251):end])
+    rd = prices_to_returns(X[(end - 252):end], F[(end - 252):end])
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
                   settings = Dict("verbose" => false)),
@@ -218,8 +218,9 @@
                                   formulation = DependentVariableTracking())]
     @testset "Hierarchical Risk Parity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HRP.csv"), DataFrame)
-        Threads.@threads for i ∈ eachindex(rs)
-            r = rs[i]
+        df = DataFrame()
+        i = 1
+        for r ∈ rs
             w = optimise!(HierarchicalRiskParity(; r = r, opt = opt)).w
             rtol = 1e-6
             res = isapprox(w, df[!, i]; rtol = rtol)
@@ -228,21 +229,25 @@
                 find_tol(w, df[!, i]; name1 = "w", name2 = "df[!, $(i)]")
             end
             @test isapprox(w, df[!, i]; rtol = rtol)
+            i += 1
         end
+        CSV.write(joinpath(@__DIR__, "./assets/HRP.csv"), df)
     end
     @testset "Hierarchical Equal Risk Contribution" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HERC-ri=ro.csv"), DataFrame)
-        Threads.@threads for i ∈ eachindex(rs)
-            r = rs[i]
+        i = 1
+        for r ∈ rs
             w = optimise!(HierarchicalEqualRiskContribution(; ri = r, opt = opt)).w
-            rto = 1e-6
+            rtol = 1e-6
             res = isapprox(w, df[!, i]; rtol = rtol)
             if !res
                 println("Iteration $(i) failed, $(typeof(rs[i]))")
                 find_tol(w, df[!, i]; name1 = "w", name2 = "df[!, $(i)]")
             end
             @test isapprox(w, df[!, i]; rtol = rtol)
+            i += 1
         end
+        CSV.write(joinpath(@__DIR__, "./assets/HERC-ri=ro.csv"), df)
     end
     @testset "Bounds tests" begin
         rng = StableRNG(987456321)
@@ -282,7 +287,7 @@
                 JuMP_ClusteringWeightFiniliser(;
                                                alg = SquareAbsoluteErrorClusteringWeightFiniliser(),
                                                slv = [slv])]
-        Threads.@threads for cwf ∈ cwfs
+        for cwf ∈ cwfs
             opt = HierarchicalOptimiser(; pe = pr, cle = clr, cwf = cwf,
                                         wb = WeightBoundsResult(; lb = lb, ub = ub),
                                         slv = [slv])

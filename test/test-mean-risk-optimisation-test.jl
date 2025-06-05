@@ -17,7 +17,7 @@
                   timestamp = :timestamp)
     F = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/factor_prices.csv"));
                   timestamp = :timestamp)
-    rd = prices_to_returns(X, F)
+    rd = prices_to_returns(X[(end - 252):end], F[(end - 252):end])
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
                   settings = Dict("verbose" => false, "max_step_fraction" => 0.75))]
@@ -183,8 +183,10 @@
                TrackingRiskMeasure(; tracking = WeightsTracking(; w = w1))],
               [ConditionalValueatRisk(; settings = RiskMeasureSettings(; scale = 0.5)),
                TrackingRiskMeasure(; tracking = ReturnsTracking(; w = pr.X * w1))]]
-        objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf), MaximumReturn()]
+        objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; ohf = 1, rf = rf),
+                MaximumReturn()]
         rets = [ArithmeticReturn(), KellyReturn()]
+        df = DataFrame()
         i = 1
         for r ∈ rs
             for obj ∈ objs
@@ -195,19 +197,19 @@
                         continue
                     end
                     w = sol.w
-                    wt = df[!, i]
+                    wt = df[!, "$i"]
                     rtol = 1e-6
                     res = isapprox(w, wt; rtol = rtol)
                     if !res
-                        println("Iteration $i failed.")
+                        println("$i failed.")
                         find_tol(w1, wt; name1 = :w1, name2 = :wt)
                     end
-                    @test res
-
+                    @test isapprox(w, wt; rtol = rtol)
                     i += 1
                 end
             end
         end
+        CSV.write(joinpath(@__DIR__, "./assets/MeanRisk1.csv"), df)
     end
     @testset "Returns lower bounds and uncertainty sets" begin
         rng = StableRNG(123456789)
@@ -478,6 +480,47 @@
         w = res.w
         @test sum(w[[7, 12, 18]]) <= 1
     end
+
+    ####################
+    ####################
+    pr = prior(HighOrderPriorEstimator(;), rd)
+    plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = 1)
+    opt = JuMPOptimiser(; pe = pr, slv = mip_slv, bgt = 1, cplg = plc,
+                        wb = WeightBoundsResult(; lb = -0.2, ub = 1), sbgt = 0.2)
+    mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf), opt = opt)
+    res = optimise!(mre, rd)
+    m1 = res.cplg.A * value.(res.model[:ib])
+
+    using PortfolioOptimiser
+    portfolio = Portfolio(; prices = X, f_prices = F, long_ub = 1, short_lb = -0.2,
+                          budget = 1, short_budget = -0.2, short = true,
+                          solvers = [PortOptSolver(; name = :pajarito,
+                                                   solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                                                      "verbose" => false,
+                                                                                      "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                                               MOI.Silent() => true),
+                                                                                      "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                                                  "verbose" => false,
+                                                                                                                                  "max_step_fraction" => 0.75)),
+                                                   check_sol = (; allow_local = true,
+                                                                allow_almost = true)),
+                                     PortOptSolver(; name = :Clarabel,
+                                                   solver = Clarabel.Optimizer,
+                                                   check_sol = (; allow_local = true,
+                                                                allow_almost = true),
+                                                   params = Dict("verbose" => false,
+                                                                 "max_step_fraction" => 0.75))])
+
+    asset_statistics!(portfolio)
+    B = connection_matrix(portfolio)
+    portfolio.cluster_adj = IP(; A = B)
+    w = PortfolioOptimiser.optimise!(portfolio,
+                                     Trad(; rm = CVaR(), obj = Sharpe(; rf = rf, ohf = 0)))
+    m2 = portfolio.cluster_adj.A * value.(portfolio.model[:is_invested_bool])
+    println("")
+    ####################
+    ####################
+
     #=
     @testset "Buy in threshold" begin
     slv = Solver(; name = :clarabel,
