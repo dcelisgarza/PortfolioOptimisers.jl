@@ -218,7 +218,7 @@
                                   formulation = DependentVariableTracking())]
     @testset "Hierarchical Risk Parity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HRP.csv"), DataFrame)
-        @floop ThreadedEx() for (i, r) ∈ pairs(rs)
+        FLoops.@floop FLoops.ThreadedEx() for (i, r) ∈ pairs(rs)
             w = optimise!(HierarchicalRiskParity(; r = r, opt = opt)).w
             rtol = 1e-6
             res = isapprox(w, df[!, i]; rtol = rtol)
@@ -231,7 +231,7 @@
     end
     @testset "Hierarchical Equal Risk Contribution" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HERC-ri=ro.csv"), DataFrame)
-        @floop ThreadedEx() for (i, r) ∈ pairs(rs)
+        FLoops.@floop FLoops.ThreadedEx() for (i, r) ∈ pairs(rs)
             w = optimise!(HierarchicalEqualRiskContribution(; ri = r, opt = opt)).w
             rto = 1e-6
             res = isapprox(w, df[!, i]; rtol = rtol)
@@ -280,7 +280,7 @@
                 JuMP_ClusteringWeightFiniliser(;
                                                alg = SquareAbsoluteErrorClusteringWeightFiniliser(),
                                                slv = [slv])]
-        @floop ThreadedEx() for cwf ∈ cwfs
+        FLoops.@floop FLoops.ThreadedEx() for cwf ∈ cwfs
             opt = HierarchicalOptimiser(; pe = pr, cle = clr, cwf = cwf,
                                         wb = WeightBoundsResult(; lb = lb, ub = ub),
                                         slv = [slv])
