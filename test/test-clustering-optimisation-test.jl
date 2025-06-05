@@ -218,7 +218,6 @@
                                   formulation = DependentVariableTracking())]
     @testset "Hierarchical Risk Parity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HRP.csv"), DataFrame)
-        df = DataFrame()
         i = 1
         for r ∈ rs
             w = optimise!(HierarchicalRiskParity(; r = r, opt = opt)).w
@@ -231,7 +230,6 @@
             @test isapprox(w, df[!, i]; rtol = rtol)
             i += 1
         end
-        CSV.write(joinpath(@__DIR__, "./assets/HRP.csv"), df)
     end
     @testset "Hierarchical Equal Risk Contribution" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HERC-ri=ro.csv"), DataFrame)
@@ -247,7 +245,6 @@
             @test isapprox(w, df[!, i]; rtol = rtol)
             i += 1
         end
-        CSV.write(joinpath(@__DIR__, "./assets/HERC-ri=ro.csv"), df)
     end
     @testset "Bounds tests" begin
         rng = StableRNG(987456321)
