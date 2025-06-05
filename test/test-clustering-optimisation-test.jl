@@ -1,6 +1,6 @@
 @safetestset "Clustering Optimisation" begin
     using PortfolioOptimisers, CSV, DataFrames, Test, StableRNGs, Random, Clarabel,
-          StatsBase, TimeSeries, FLoops
+          StatsBase, TimeSeries
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -218,7 +218,8 @@
                                   formulation = DependentVariableTracking())]
     @testset "Hierarchical Risk Parity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HRP.csv"), DataFrame)
-        FLoops.@floop FLoops.ThreadedEx() for (i, r) ∈ pairs(rs)
+        Threads.@threads for i ∈ eachindex(rs)
+            r = rs[i]
             w = optimise!(HierarchicalRiskParity(; r = r, opt = opt)).w
             rtol = 1e-6
             res = isapprox(w, df[!, i]; rtol = rtol)
@@ -231,7 +232,8 @@
     end
     @testset "Hierarchical Equal Risk Contribution" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HERC-ri=ro.csv"), DataFrame)
-        FLoops.@floop FLoops.ThreadedEx() for (i, r) ∈ pairs(rs)
+        Threads.@threads for i ∈ eachindex(rs)
+            r = rs[i]
             w = optimise!(HierarchicalEqualRiskContribution(; ri = r, opt = opt)).w
             rto = 1e-6
             res = isapprox(w, df[!, i]; rtol = rtol)
@@ -280,7 +282,7 @@
                 JuMP_ClusteringWeightFiniliser(;
                                                alg = SquareAbsoluteErrorClusteringWeightFiniliser(),
                                                slv = [slv])]
-        FLoops.@floop FLoops.ThreadedEx() for cwf ∈ cwfs
+        Threads.@threads for cwf ∈ cwfs
             opt = HierarchicalOptimiser(; pe = pr, cle = clr, cwf = cwf,
                                         wb = WeightBoundsResult(; lb = lb, ub = ub),
                                         slv = [slv])

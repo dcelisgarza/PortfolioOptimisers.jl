@@ -41,7 +41,7 @@
         des = [nothing, Denoise(; alg = FixedDenoise()), Denoise(; alg = ShrunkDenoise()),
                Denoise(; alg = SpectralDenoise())]
         denoise_t = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv"), DataFrame)
-        FLoops.@floop FLoops.ThreadedEx() for i ∈ 1:ncol(denoise_t)
+        Threads.@threads for i ∈ 1:ncol(denoise_t)
             sigma1 = copy(sigma)
             denoise!(des[i], PosDefEstimator(), sigma1, q)
             MN = size(sigma1)
@@ -60,7 +60,7 @@
         sigma = cov(X)
         des = [nothing, Detone(), Detone(; n = 3)]
         detone = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv"), DataFrame)
-        FLoops.@floop FLoops.ThreadedEx() for i ∈ 1:ncol(detone)
+        Threads.@threads for i ∈ 1:ncol(detone)
             sigma1 = copy(sigma)
             detone!(des[i], PosDefEstimator(), sigma1)
             MN = size(sigma1)

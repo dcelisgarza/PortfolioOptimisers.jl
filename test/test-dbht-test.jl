@@ -283,7 +283,7 @@
                Distance(; alg = VariationInfoDistance()),
                DistanceDistance(; alg = VariationInfoDistance())]
 
-        FLoops.@floop FLoops.ThreadedEx() for i ∈ 1:ncol(logo_t)
+        Threads.@threads for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i]),
@@ -310,7 +310,7 @@
                GeneralDistance(; alg = VariationInfoDistance()),
                GeneralDistanceDistance(; alg = VariationInfoDistance())]
 
-        FLoops.@floop FLoops.ThreadedEx() for i ∈ 1:ncol(logo_t)
+        Threads.@threads for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i]),
@@ -339,7 +339,7 @@
                Distance(; alg = VariationInfoDistance()),
                DistanceDistance(; alg = VariationInfoDistance())]
 
-        FLoops.@floop FLoops.ThreadedEx() for i ∈ 1:ncol(logo_t)
+        Threads.@threads for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i],
@@ -367,7 +367,7 @@
                GeneralDistance(; alg = VariationInfoDistance()),
                GeneralDistanceDistance(; alg = VariationInfoDistance())]
 
-        FLoops.@floop FLoops.ThreadedEx() for i ∈ 1:ncol(logo_t)
+        Threads.@threads for i ∈ 1:ncol(logo_t)
             sigma1 = copy(sigma)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i],
