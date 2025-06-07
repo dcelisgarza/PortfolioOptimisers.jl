@@ -12,3 +12,4 @@ env
 node_modules
 .CondaPkg
 *NOTRACK*
+*.venv
