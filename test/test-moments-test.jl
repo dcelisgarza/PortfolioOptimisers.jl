@@ -1,6 +1,6 @@
 @safetestset "Moments" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
-          CSV, DataFrames
+          CSV, DataFrames, TimeSeries
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -12,11 +12,15 @@
             end
         end
     end
+    rng = StableRNG(123456789)
+    X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
+                  timestamp = :timestamp)
+    rd = prices_to_returns(X[(end - 252):end])
+    X = rd.X
+    ew = eweights(1:252, inv(252); scale = true)
+    fw = fweights(rand(rng, 252))
+    rf = 4.34 / 100 / 252
     @testset "Expected Returns" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 1000, 20)
-        ew = eweights(1:1000, 0.01; scale = true)
-        fw = fweights(rand(rng, 1000))
         mes = [SimpleExpectedReturns(), SimpleExpectedReturns(; w = ew),
                ShrunkExpectedReturns(; alg = JamesStein()),
                ShrunkExpectedReturns(; alg = JamesStein(; target = VolatilityWeighted())),
@@ -54,7 +58,7 @@
                                                                target = MeanSquareError()),
                                      me = SimpleExpectedReturns(; w = ew)),
                EquilibriumExpectedReturns(), EquilibriumExpectedReturns(; l = 2),
-               ExcessExpectedReturns(), ExcessExpectedReturns(; rf = 0.01)]
+               ExcessExpectedReturns(), ExcessExpectedReturns(; rf = rf)]
         ert = CSV.read(joinpath(@__DIR__, "./assets/Expected-Returns.csv"), DataFrame)
         for i ∈ eachindex(mes)
             er = mean(mes[i], X)
@@ -68,10 +72,6 @@
         @test_throws AssertionError EquilibriumExpectedReturns(w = [])
     end
     @testset "Covariance and Correlation correctness" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 1000, 20)
-        fw = FrequencyWeights(rand(rng, 1000))
-        ew = eweights(1:1000, 0.01; scale = true)
         ces = [PortfolioOptimisersCovariance(), Covariance(; alg = Full()),
                Covariance(; alg = Full(), me = SimpleExpectedReturns(; w = ew),
                           ce = GeneralWeightedCovariance(;
@@ -225,9 +225,10 @@
         cvrt = CSV.read(joinpath(@__DIR__,
                                  "./assets/Covariance-and-Correlation-correctness.csv"),
                         DataFrame)
-        for (i, j) ∈ zip(1:55, 1:2:ncol(cvrt))
-            cv = cov(ces[i], X)
-            cr = cor(ces[i], X)
+        for (i, j) ∈ zip(1:length(ces), 1:2:(2 * length(ces)))
+            println(i)
+            cv = cov(ces[i], Matrix(transpose(X)); dims = 2)
+            cr = cor(ces[i], Matrix(transpose(X)); dims = 2)
             MN = size(cv)
             res1 = isapprox(cv, reshape(cvrt[!, j], MN))
             res2 = isapprox(cr, reshape(cvrt[!, j + 1], MN))
@@ -241,6 +242,20 @@
                 find_tol(cr, reshape(cvrt[!, j + 1], MN); name1 = :cr, name2 = :cr_t)
             end
             @test res2
+            res3 = isapprox(if isa(cv, Matrix)
+                                StatsBase.cov2cor(cv)
+                            else
+                                StatsBase.cov2cor(Matrix(cv))
+                            end, cr)
+            if !res3
+                println("Test cov2cor $i fails on:\n$(ce)\n")
+                find_tol(if isa(cv, Matrix)
+                             StatsBase.cov2cor(cv)
+                         else
+                             StatsBase.cov2cor(Matrix(cv))
+                         end, cr; name1 = :cv, name2 = :cr)
+            end
+            @test res3
         end
     end
     @testset "cov2cor" begin

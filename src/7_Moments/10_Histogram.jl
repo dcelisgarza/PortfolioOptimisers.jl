@@ -95,12 +95,11 @@ function intrinsic_mutual_info(X::AbstractMatrix)
 end
 function variation_info(X::AbstractMatrix,
                         bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
-                        normalise::Bool = true,
-                        threads::FLoops.Transducers.Executor = SequentialEx())
+                        normalise::Bool = true)
     T, N = size(X)
     var_mtx = Matrix{eltype(X)}(undef, N, N)
     bin_width_func = get_bin_width_func(bins)
-    @floop threads for j ∈ axes(X, 2)
+    for j ∈ axes(X, 2)
         xj = view(X, :, j)
         for i ∈ 1:j
             xi = view(X, :, i)
@@ -164,12 +163,11 @@ end
 =#
 function mutual_info(X::AbstractMatrix,
                      bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
-                     normalise::Bool = true,
-                     threads::FLoops.Transducers.Executor = SequentialEx())
+                     normalise::Bool = true)
     T, N = size(X)
     mut_mtx = Matrix{eltype(X)}(undef, N, N)
     bin_width_func = get_bin_width_func(bins)
-    @floop threads for j ∈ axes(X, 2)
+    for j ∈ axes(X, 2)
         xj = view(X, :, j)
         for i ∈ 1:j
             xi = view(X, :, i)
