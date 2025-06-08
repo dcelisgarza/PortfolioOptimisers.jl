@@ -1,6 +1,6 @@
 @safetestset "DBHT" begin
     using PortfolioOptimisers, DataFrames, CSV, Random, StableRNGs, Test, StatsBase,
-          Statistics, SparseArrays
+          Statistics, SparseArrays, TimeSeries
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -22,14 +22,17 @@
         rho = cor(ce, X)
         dist = distance(de, rho, X)
 
-        @test isapprox(dbht_similarity(GeneralExponentialSimilarity(); D = rho),
-                       dbht_similarity(ExponentialSimilarity(); D = rho))
+        @test isapprox(PortfolioOptimisers.dbht_similarity(GeneralExponentialSimilarity();
+                                                           D = rho),
+                       PortfolioOptimisers.dbht_similarity(ExponentialSimilarity();
+                                                           D = rho))
 
         sim = MaximumDistanceSimilarity()
-        S = dbht_similarity(sim; S = rho, D = dist)
+        S = PortfolioOptimisers.dbht_similarity(sim; S = rho, D = dist)
         root = UniqueRoot()
-        T8, Rpm, Adjv, Dpm, Mv, Z1, dbht = DBHTs(dist, S; branchorder = :default,
-                                                 root = root)
+        T8, Rpm, Adjv, Dpm, Mv, Z1, dbht = PortfolioOptimisers.DBHTs(dist, S;
+                                                                     branchorder = :default,
+                                                                     root = root)
         Z1_t = reshape([-3.0, -1.0, -7.0, -25.0, -21.0, -2.0, -8.0, -6.0, -28.0, -26.0,
                         -22.0, -14.0, -9.0, -11.0, -30.0, -4.0, -17.0, -10.0, -5.0, 6.0,
                         17.0, 2.0, 18.0, 11.0, 13.0, 22.0, 4.0, 15.0, 27.0, -29.0, 1.0,
@@ -175,11 +178,12 @@
         @test isapprox(cliqueTree1, cliqueTree1_t)
 
         sim = ExponentialSimilarity()
-        S = dbht_similarity(sim; S = rho, D = dist)
+        S = PortfolioOptimisers.dbht_similarity(sim; S = rho, D = dist)
 
         root = EqualRoot()
-        T8, Rpm, Adjv, Dpm, Mv, Z2, dbht = DBHTs(dist, S; branchorder = :optimal,
-                                                 root = root)
+        T8, Rpm, Adjv, Dpm, Mv, Z2, dbht = PortfolioOptimisers.DBHTs(dist, S;
+                                                                     branchorder = :optimal,
+                                                                     root = root)
         Z2_t = reshape([-3.0, -1.0, -10.0, -25.0, -21.0, -9.0, -8.0, -14.0, -23.0, -26.0,
                         -22.0, -11.0, -30.0, -6.0, -28.0, -2.0, -4.0, -7.0, -5.0, 6.0, 2.0,
                         17.0, 15.0, 4.0, 11.0, 18.0, 13.0, 24.0, 27.0, -29.0, 1.0, -16.0,
@@ -321,7 +325,9 @@
         @test isapprox(cliques2, cliques2_t)
         @test isapprox(cliqueTree2, cliqueTree2_t)
 
-        T8, Rpm, Adjv, Dpm, Mv, Z3, dbht = DBHTs(dist, S; branchorder = :r, root = root)
+        T8, Rpm, Adjv, Dpm, Mv, Z3, dbht = PortfolioOptimisers.DBHTs(dist, S;
+                                                                     branchorder = :r,
+                                                                     root = root)
         Z3_t = reshape([-3.0, -1.0, -10.0, -25.0, -21.0, -9.0, -8.0, -14.0, -23.0, -26.0,
                         -22.0, -11.0, -30.0, -6.0, -28.0, -2.0, -4.0, -7.0, -5.0, 6.0, 2.0,
                         17.0, 15.0, 4.0, 11.0, 18.0, 13.0, 24.0, 27.0, -29.0, 1.0, -16.0,
