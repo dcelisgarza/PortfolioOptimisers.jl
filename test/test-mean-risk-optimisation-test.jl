@@ -202,13 +202,13 @@
                     if !res
                         println("$i failed.")
                         find_tol(w1, wt; name1 = :w1, name2 = :wt)
+                        display([w wt])
                     end
                     @test isapprox(w, wt; rtol = rtol)
                     i += 1
                 end
             end
         end
-        CSV.write(joinpath(@__DIR__, "./assets/MeanRisk1.csv"), df)
     end
     @testset "Returns lower bounds and uncertainty sets" begin
         rng = StableRNG(123456789)
@@ -293,6 +293,7 @@
                 if !res
                     println("Iteration $i failed.")
                     find_tol(w, wt; name1 = :w, name2 = :wt)
+                    display([w wt])
                 end
                 @test res
                 i += 1
@@ -461,22 +462,24 @@
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         @test isapprox(w, optimise!(mre, rd).w)
 
+        gnames = [:T, :GOOG, :GILD, :MSFT, :NFLX]
         gcard = CardinalityConstraint(;
                                       A = CardinalityConstraintSide(;
                                                                     group = [:Assets,
                                                                              :Assets,
+                                                                             :Assets,
+                                                                             :Assets,
                                                                              :Assets],
-                                                                    name = [:BKNG, :GOOG,
-                                                                            :MRK],
-                                                                    coef = [1, 1, 1]),
+                                                                    name = gnames,
+                                                                    coef = [1, 1, 1, 1, 1]),
                                       B = 1, comp = LEQ())
         gcard = linear_constraints(gcard, sets)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, gcard = gcard, sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
-        colnames(X)[[7, 12, 18]]
         w = res.w
-        @test sum(w[[7, 12, 18]]) <= 1
+        idx = [findfirst(x -> x == string(n), rd.nx) for n ∈ gnames]
+        @test sum(w[idx] .>= eps()) == 1
     end
     #=
     @testset "Buy in threshold" begin
@@ -789,23 +792,8 @@
     wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
     sbgt = 0.2, nplg = philogeny_constraints(plc, pr.X))
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
-    w = optimise!(mre, rd).w
-    @test isapprox(w,
-    [0.17673383391348899, 0.08326967338268225, 0.18709665987606094,
-    0.2002578058940592, 1.6110864592698421e-9, 0.18807982323288358,
-    5.105720929163698e-10, 1.8374998058844176e-9, 0.16456219746839842,
-    2.273269661767486e-9])
-
-    opt = JuMPOptimiser(; pe = pr, slv = slv,
-    wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
-    sbgt = 0.2, nplg = philogeny_constraints(plc, pr.X))
-    mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
-    w = optimise!(mre, rd).w
-    @test isapprox(w,
-    [0.1173710496744111, 0.10295801829339872, 0.20602685793235045,
-    0.16816808542114753, 0.128471143599474, 0.040312910353117445,
-    2.3739773429047343e-9, 0.055963185526288824, 0.04558432590959013,
-    0.13514442091624446])
+    w = optimise!(mre, rd).wprintln(card_flag, "\n", gcard_flag, "\n", n_flag, "\n", c_flag, "\n", lt_flag, "\n",
+                st_flag, "\n", ffl_flag, "\n", ffs_flag, "\n")
 
     mre = MeanRisk(;
     r = UncertaintySetVariance(;

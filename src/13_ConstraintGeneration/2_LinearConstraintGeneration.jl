@@ -95,12 +95,19 @@ function get_constraint_data(lc::LinearConstraintSide{<:Any, <:Any, <:Any}, sets
     (; group, name, coef) = lc
     if !(isnothing(group) || string(group) ∉ group_names)
         idx = sets[!, group] .== name
+        if all(iszero, idx)
+            if strict
+                throw(ArgumentError("$(string(name)) is not in $(group). If you are sure the name is in the group make sure to use the same type in both. Comparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group])."))
+            else
+                @warn("$(string(name)) is not in $(group). If you are sure the name is in the group make sure to use the same typeinr both. Comparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group]).")
+            end
+        end
         idx = coef * idx
         append!(A, idx)
     elseif strict
-        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lc)"))
+        throw(ArgumentError("$(string(group)) is not in $(group_names). If you are sure the name is in the group make sure to use the saminype for both. Comparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group])"))
     else
-        @warn("$(string(group)) is not in $(group_names).\n$(lc)")
+        @warn("$(string(group)) is not in $(group_names). If you are sure the name is in the group make sure to use the saintype for both. Comparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group])")
     end
     return A
 end
@@ -112,12 +119,19 @@ function get_constraint_data(lc::LinearConstraintSide{<:AbstractVector, <:Abstra
     for (group, name, coef) ∈ zip(lc.group, lc.name, lc.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
+            if all(iszero, idx)
+                if strict
+                    throw(ArgumentError("$(string(name)) is not in $(group). If you are sure the name is in the group make sure to use the same type for bothinomparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group])."))
+                else
+                    @warn("$(string(name)) is not in $(group). If you are sure the name is in the group make sure to use the same type for inh. Comparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group]).")
+                end
+            end
             idx = coef * idx
             append!(A, idx)
         elseif strict
-            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(lc)."))
+            throw(ArgumentError("$(string(group)) is not in $(group_names). If you are sure the name is in the group make sure to use the same tin for both. Comparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group])."))
         else
-            @warn("$(string(group)) is not in $(group_names).\n$(lc).")
+            @warn("$(string(group)) is not in $(group_names). If you are sure the name is in the group make sure to use the same tyinfor both. Comparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group]).")
         end
     end
     if !isempty(A)

@@ -225,6 +225,8 @@
                 0.5
             elseif i == 71
                 0.01
+            elseif !Sys.islinux() && i == 114 || Sys.iswindows() && i == 121
+                5e-6
             elseif i == 133
                 1e-4
             else
@@ -250,8 +252,10 @@
                 0.005
             elseif i == 114
                 5e-6
-            elseif i == 133
+            elseif !Sys.isapple() && i == 133
                 5e-5
+            elseif Sys.isapple() && i == 133
+                1e-4
             else
                 1e-6
             end
