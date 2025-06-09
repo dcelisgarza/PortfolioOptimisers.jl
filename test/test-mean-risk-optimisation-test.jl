@@ -186,7 +186,6 @@
         objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; ohf = 1, rf = rf),
                 MaximumReturn()]
         rets = [ArithmeticReturn(), KellyReturn()]
-        df = DataFrame()
         i = 1
         for r ∈ rs
             for obj ∈ objs
@@ -296,7 +295,6 @@
                     find_tol(w, wt; name1 = :w, name2 = :wt)
                 end
                 @test res
-                df[!, "$(i)"] = res1.w
                 i += 1
             end
         end
@@ -391,7 +389,7 @@
         @test all(-0.13 - sqrt(eps()) .<= w .<= 0.25 + sqrt(eps()))
         @test 0.6 - sqrt(eps()) < sum(w) < 0.8 + sqrt(eps())
         @test (0.2 + 0.6 - 375 * sqrt(eps())) <= sum(w[w .>= 0]) <= 0.8 + sqrt(eps())
-        @test sum(w[w .< 0]) <= -0.2 + 150 * sqrt(eps())
+        @test isapprox(sum(w[w .< 0]), -0.2, rtol = 5e-5)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -0.13, ub = 0.25),
@@ -480,47 +478,6 @@
         w = res.w
         @test sum(w[[7, 12, 18]]) <= 1
     end
-
-    ####################
-    ####################
-    pr = prior(HighOrderPriorEstimator(;), rd)
-    plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = 1)
-    opt = JuMPOptimiser(; pe = pr, slv = mip_slv, bgt = 1, cplg = plc,
-                        wb = WeightBoundsResult(; lb = -0.2, ub = 1), sbgt = 0.2)
-    mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf), opt = opt)
-    res = optimise!(mre, rd)
-    m1 = res.cplg.A * value.(res.model[:ib])
-
-    using PortfolioOptimiser
-    portfolio = Portfolio(; prices = X, f_prices = F, long_ub = 1, short_lb = -0.2,
-                          budget = 1, short_budget = -0.2, short = true,
-                          solvers = [PortOptSolver(; name = :pajarito,
-                                                   solver = optimizer_with_attributes(Pajarito.Optimizer,
-                                                                                      "verbose" => false,
-                                                                                      "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                                               MOI.Silent() => true),
-                                                                                      "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                                                  "verbose" => false,
-                                                                                                                                  "max_step_fraction" => 0.75)),
-                                                   check_sol = (; allow_local = true,
-                                                                allow_almost = true)),
-                                     PortOptSolver(; name = :Clarabel,
-                                                   solver = Clarabel.Optimizer,
-                                                   check_sol = (; allow_local = true,
-                                                                allow_almost = true),
-                                                   params = Dict("verbose" => false,
-                                                                 "max_step_fraction" => 0.75))])
-
-    asset_statistics!(portfolio)
-    B = connection_matrix(portfolio)
-    portfolio.cluster_adj = IP(; A = B)
-    w = PortfolioOptimiser.optimise!(portfolio,
-                                     Trad(; rm = CVaR(), obj = Sharpe(; rf = rf, ohf = 0)))
-    m2 = portfolio.cluster_adj.A * value.(portfolio.model[:is_invested_bool])
-    println("")
-    ####################
-    ####################
-
     #=
     @testset "Buy in threshold" begin
     slv = Solver(; name = :clarabel,
