@@ -1,6 +1,6 @@
 @safetestset "Linear Algebra" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CSV, LinearAlgebra,
-          DataFrames, FLoops
+          DataFrames, TimeSeries
     @testset "Operators" begin
         rng = StableRNG(987654321)
         X1 = rand(rng, 10)
@@ -32,16 +32,18 @@
         @test !isposdef(sigma2)
         @test isapprox(sigma2, sigma3)
     end
+    X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
+                  timestamp = :timestamp)
+    rd = prices_to_returns(X[(end - 252):end])
+    X = rd.X
+    T, N = size(X)
+    q = T / N
+    sigma = cov(X)
     @testset "Denoise algorithms" begin
-        rng = StableRNG(987654321)
-        X = randn(rng, 1000, 20)
-        T, N = size(X)
-        q = T / N
-        sigma = cov(X)
         des = [nothing, Denoise(; alg = FixedDenoise()), Denoise(; alg = ShrunkDenoise()),
                Denoise(; alg = SpectralDenoise())]
         denoise_t = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv"), DataFrame)
-        Threads.@threads for i ∈ 1:ncol(denoise_t)
+        for i ∈ eachindex(des)
             sigma1 = copy(sigma)
             denoise!(des[i], PosDefEstimator(), sigma1, q)
             MN = size(sigma1)
@@ -53,18 +55,13 @@
         end
     end
     @testset "Detone" begin
-        rng = StableRNG(987654321)
-        X = randn(rng, 1000, 20)
-        T, N = size(X)
-        q = T / N
-        sigma = cov(X)
         des = [nothing, Detone(), Detone(; n = 3)]
-        detone = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv"), DataFrame)
-        Threads.@threads for i ∈ 1:ncol(detone)
+        detone_t = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv"), DataFrame)
+        for i ∈ eachindex(des)
             sigma1 = copy(sigma)
             detone!(des[i], PosDefEstimator(), sigma1)
             MN = size(sigma1)
-            res = isapprox(sigma1, reshape(detone[!, i], MN))
+            res = isapprox(sigma1, reshape(detone_t[!, i], MN))
             if !res
                 println("Fails on iteration $i")
             end
