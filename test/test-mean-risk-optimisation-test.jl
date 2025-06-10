@@ -601,6 +601,7 @@ end
     @test all(res.nplg.A * value.(res.model[:ib]) .<= 2)
 end
 #=
+
 @testset "Buy in threshold" begin
 slv = Solver(; name = :clarabel,
 solver = solver = optimizer_with_attributes(Pajarito.Optimizer,
