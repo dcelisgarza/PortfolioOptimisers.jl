@@ -307,14 +307,9 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     lcs = linear_constraints(opt.lcs, opt.sets; datatype = datatype, strict = opt.strict)
     cent = centrality_constraints(opt.cent, pr.X)
     gcard = linear_constraints(opt.gcard, opt.sets; datatype = Int, strict = opt.strict)
-    sgcard = linear_constraints(opt.sgcard, opt.sets; datatype = Int, strict = opt.strict)
+    sgcard = linear_constraints(opt.sgcard, opt.sets; datatype = datatype,
+                                strict = opt.strict)
     smtx = asset_sets_matrix(opt.smtx, opt.sets)
-    if isa(sgcard, LinearConstraintResult) && isa(smtx, AbstractMatrix)
-        N = size(smtx, 1)
-        N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
-        N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
-        @smart_assert(N == N_ineq + N_eq)
-    end
     nplg = philogeny_constraints(opt.nplg, pr.X)
     cplg = philogeny_constraints(opt.cplg, pr.X)
     return pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg

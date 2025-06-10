@@ -631,7 +631,7 @@ function set_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     N = size(smtx, 1)
     @variable(model, sib[1:N], binary = true)
     if isa(k, Real)
-        @expression(model, i_smip, isb)
+        @expression(model, i_smip, sib)
     else
         if isnothing(ss)
             ss = 100_000.0
@@ -639,10 +639,10 @@ function set_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
         @variable(model, isbf[1:N] >= 0)
         @constraints(model, begin
                          isbf_ub, isbf .- k <= 0
-                         isbfd_ub, isbf - ss * isb <= 0
-                         isbfd_lb, (isbf + ss * (1 .- isb)) .- k >= 0
+                         isbfd_ub, isbf - ss * sib <= 0
+                         isbfd_lb, (isbf + ss * (1 .- sib)) .- k >= 0
                      end)
-        @expression(model, i_smip, ibf)
+        @expression(model, i_smip, isbf)
     end
     @expression(model, smtx_expr, smtx * w)
     lb = wb.lb
@@ -662,12 +662,12 @@ function set_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
         if !isnothing(gcard.ineq)
             A = gcard.ineq.A
             B = gcard.ineq.B
-            @constraint(model, gscard_ineq, sc * (A * sib ⊖ B) <= 0)
+            @constraint(model, gscard_ineq, sc * (A * transpose(smtx) * sib ⊖ B) <= 0)
         end
         if !isnothing(gcard.eq)
             A = gcard.eq.A
             B = gcard.eq.B
-            @constraint(model, gscard_eq, sc * (A * sib ⊖ B) == 0)
+            @constraint(model, gscard_eq, sc * (A * transpose(smtx) * sib ⊖ B) == 0)
         end
     end
     return nothing
