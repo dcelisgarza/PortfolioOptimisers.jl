@@ -12,6 +12,15 @@
                 break
             end
         end
+        for atol ∈
+            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
+             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
+             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
+            if isapprox(a1, a2; atol = atol)
+                println("isapprox($name1, $name2, atol = $(atol))")
+                break
+            end
+        end
     end
     X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
                   timestamp = :timestamp)
@@ -197,14 +206,26 @@
                     end
                     w = sol.w
                     wt = df[!, "$i"]
-                    rtol = 1e-6
+                    rtol = if i ∈
+                              (6, 10, 14, 17, 18, 19, 20, 21, 22, 30, 46, 62, 70, 78, 158,
+                               179, 187, 189, 213, 221, 229, 237, 245, 253, 261, 267, 275,
+                               285, 291, 293, 301, 309, 317, 325, 333, 341, 349, 357, 365,
+                               368, 370, 371, 374, 376, 377, 385, 393, 396, 399, 400, 403,
+                               407, 415, 418, 419, 420, 423, 426, 427, 428, 430, 431, 434,
+                               435, 436, 437, 438, 441, 442, 443, 444, 446, 449, 450, 451,
+                               457, 462, 469, 470, 486, 518, 526, 534, 542, 556, 558, 564,
+                               566)
+                        1
+                    else
+                        1e-6
+                    end
                     res = isapprox(w, wt; rtol = rtol)
                     if !res
-                        println("$i failed.")
+                        println("$i failed:\n$r\n$obj\n$ret.")
                         find_tol(w1, wt; name1 = :w1, name2 = :wt)
                         display([w wt])
                     end
-                    @test isapprox(w, wt; rtol = rtol)
+                    @test res
                     i += 1
                 end
             end

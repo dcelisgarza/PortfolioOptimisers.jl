@@ -105,9 +105,9 @@ function get_constraint_data(lc::LinearConstraintSide{<:Any, <:Any, <:Any}, sets
         idx = coef * idx
         append!(A, idx)
     elseif strict
-        throw(ArgumentError("$(string(group)) is not in $(group_names). If you are sure the name is in the group make sure to use the saminype for both. Comparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group])"))
+        throw(ArgumentError("$(string(group)) is not in $(group_names)."))
     else
-        @warn("$(string(group)) is not in $(group_names). If you are sure the name is in the group make sure to use the saintype for both. Comparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group])")
+        @warn("$(string(group)) is not in $(group_names).")
     end
     return A
 end
@@ -129,9 +129,9 @@ function get_constraint_data(lc::LinearConstraintSide{<:AbstractVector, <:Abstra
             idx = coef * idx
             append!(A, idx)
         elseif strict
-            throw(ArgumentError("$(string(group)) is not in $(group_names). If you are sure the name is in the group make sure to use the same tin for both. Comparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group])."))
+            throw(ArgumentError("$(string(group)) is not in $(group_names)."))
         else
-            @warn("$(string(group)) is not in $(group_names). If you are sure the name is in the group make sure to use the same tyinfor both. Comparing strings to symbols will yield false.\n$(lc)\nsets[!, group] = $(sets[!, group]).")
+            @warn("$(string(group)) is not in $(group_names).")
         end
     end
     if !isempty(A)
