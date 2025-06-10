@@ -19,6 +19,9 @@ end
 abstract type OptimisationModelResult <: AbstractResult end
 Base.length(opt::OptimisationEstimator) = 1
 Base.iterate(S::OptimisationEstimator, state = 1) = state > 1 ? nothing : (S, state + 1)
+function opt_view(opt::OptimisationEstimator, args...)
+    return opt
+end
 function optimise! end
 
 export optimise!, OptimisationSuccess, OptimisationFailure
