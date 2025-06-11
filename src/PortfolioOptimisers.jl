@@ -133,6 +133,7 @@ include("./20_Optimisation/18_Base_AssetAllocation.jl")
 include("./20_Optimisation/19_GreedyAssetAllocation.jl")
 include("./20_Optimisation/20_DiscreteAssetAllocation.jl")
 include("./20_Optimisation/21_NaiveOptimisation.jl")
+include("./20_Optimisation/22_SchurHierarchicalRiskParity.jl")
 
 include("./21_Expected_Returns.jl")
 
