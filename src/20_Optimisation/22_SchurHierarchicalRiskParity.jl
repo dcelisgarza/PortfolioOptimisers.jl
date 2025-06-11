@@ -1,6 +1,7 @@
 struct SchurHierarchicalOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
                                            T3 <: Union{Nothing, <:WeightBoundsResult},
-                                           T4 <: AbstractClusteringResult, T5 <: Real,
+                                           T4 <: AbstractClusteringResult,
+                                           T5 <: Union{<:Real, <:AbstractVector{<:Real}},
                                            T6 <: OptimisationReturnCode,
                                            T7 <: AbstractVector} <: OptimisationResult
     oe::T1
@@ -55,9 +56,9 @@ function SchurHierarchicalRiskParity(; opt::HierarchicalOptimiser = Hierarchical
     end
     return SchurHierarchicalRiskParity{typeof(opt), typeof(params)}(opt, params)
 end
-function opt_view(shc::SchurHierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
-    opt = opt_view(shc.opt, i)
-    params = schur_params_view(shc.params, i, X)
+function opt_view(sh::SchurHierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
+    opt = opt_view(sh.opt, i)
+    params = schur_params_view(sh.params, i, X)
     return SchurHierarchicalRiskParity(; opt = opt, params = params)
 end
 function symmetric_step_up_matrix(n1::Integer, n2::Integer)
@@ -213,17 +214,34 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector,
     return schur_binary_search(objective, gammas[end - 1], gammas[end], risks[end - 1],
                                params.alg.tol)
 end
-function optimise!(shc::SchurHierarchicalRiskParity, rd::ReturnsResult = ReturnsResult();
-                   dims::Int = 1, kwargs...)
-    pr = prior(shc.opt.pe, rd.X, rd.F; dims = dims)
-    clr = clusterise(shc.opt.cle, pr.X; dims = dims)
+function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    pr = prior(sh.opt.pe, rd.X, rd.F; dims = dims)
+    clr = clusterise(sh.opt.cle, pr.X; dims = dims)
     items = [clr.clustering.order]
-    wb = weight_bounds_constraints(shc.opt.wb, shc.opt.sets; N = size(pr.X, 2),
-                                   strict = shc.opt.strict)
-    w, gamma = schur_weights(pr, items, wb, shc.params)
-    retcode, w = clustering_optimisation_result(shc.opt.cwf, wb, w)
-    return SchurHierarchicalOptimisationResult(typeof(SchurHierarchicalRiskParity), pr, wb,
-                                               clr, gamma, retcode, w)
+    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
+                                   strict = sh.opt.strict)
+    w, gamma = schur_weights(pr, items, wb, sh.params)
+    retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w)
+    return SchurHierarchicalOptimisationResult(typeof(sh), pr, wb, clr, gamma, retcode, w)
+end
+function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    pr = prior(sh.opt.pe, rd.X, rd.F; dims = dims)
+    clr = clusterise(sh.opt.cle, pr.X; dims = dims)
+    items = [clr.clustering.order]
+    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
+                                   strict = sh.opt.strict)
+    params = sh.params
+    gammas = Vector{eltype(pr.X)}(undef, length(params))
+    w = zeros(eltype(pr.X), size(pr.X, 2))
+    for (i, ps) ∈ enumerate(params)
+        wi, gamma = schur_weights(pr, items, wb, ps)
+        w .+= ps.r.settings.scale * wi
+        gammas[i] = gamma
+    end
+    retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w / sum(w))
+    return SchurHierarchicalOptimisationResult(typeof(sh), pr, wb, clr, gammas, retcode, w)
 end
 
 export SchurHierarchicalOptimisationResult, SchurParams, SchurHierarchicalRiskParity,

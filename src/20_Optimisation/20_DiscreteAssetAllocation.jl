@@ -1,12 +1,13 @@
-struct DiscreteAllocationResult{T1 <: AbstractVector, T2 <: AbstractVector,
-                                T3 <: AbstractVector, T4, T5, T6 <: Real} <:
+struct DiscreteAllocationResult{T1, T2 <: AbstractVector, T3 <: AbstractVector,
+                                T4 <: AbstractVector, T5, T6, T7 <: Real} <:
        OptimisationResult
-    shares::T1
-    cost::T2
-    w::T3
-    retcode::T4
-    model::T5
-    cash::T6
+    oe::T1
+    shares::T2
+    cost::T3
+    w::T4
+    retcode::T5
+    model::T6
+    cash::T7
 end
 struct DiscreteAllocation{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T2 <: Real,
                           T3 <: Real} <: BaseAssetAllocationOptimisationEstimator
@@ -96,8 +97,8 @@ function optimise!(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
     res[sidx, 2] = -scost
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
-    return DiscreteAllocationResult(view(res, :, 1), view(res, :, 2), view(res, :, 3),
-                                    (sretcode, lretcode),
+    return DiscreteAllocationResult(typeof(da), view(res, :, 1), view(res, :, 2),
+                                    view(res, :, 3), (sretcode, lretcode),
                                     ifelse(save, (smodel, lmodel), nothing), lcash)
 end
 

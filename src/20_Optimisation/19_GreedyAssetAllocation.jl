@@ -1,9 +1,10 @@
-struct GreedyAllocationResult{T1 <: AbstractVector, T2 <: AbstractVector,
-                              T3 <: AbstractVector, T4 <: Real} <: OptimisationResult
-    shares::T1
-    cost::T2
-    w::T3
-    cash::T4
+struct GreedyAllocationResult{T1, T2 <: AbstractVector, T3 <: AbstractVector,
+                              T4 <: AbstractVector, T5 <: Real} <: OptimisationResult
+    oe::T1
+    shares::T2
+    cost::T3
+    w::T4
+    cash::T5
 end
 struct GreedyAllocation{T1 <: Real, T2 <: Tuple, T3 <: NamedTuple} <:
        BaseAssetAllocationOptimisationEstimator
@@ -115,7 +116,8 @@ function optimise!(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
     res[sidx, 2] = -scost
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
-    return GreedyAllocationResult(view(res, :, 1), view(res, :, 2), view(res, :, 3), lcash)
+    return GreedyAllocationResult(typeof(ga), view(res, :, 1), view(res, :, 2),
+                                  view(res, :, 3), lcash)
 end
 
 export GreedyAllocationResult, GreedyAllocation

@@ -1,6 +1,6 @@
 @safetestset "Clustering Optimisation" begin
     using PortfolioOptimisers, CSV, DataFrames, Test, StableRNGs, Random, Clarabel,
-          StatsBase, TimeSeries
+          StatsBase, TimeSeries, CovarianceEstimation
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -326,5 +326,40 @@
             end
             @test all(w[.!idx] .<= ub[.!idx])
         end
+    end
+    @testset "Schur HRP" begin
+        pr = prior(EmpiricalPriorEstimator(;
+                                           ce = PortfolioOptimisersCovariance(;
+                                                                              ce = Covariance(;
+                                                                                              alg = Full(),
+                                                                                              ce = GeneralWeightedCovariance(;
+                                                                                                                             ce = LinearShrinkage(CommonCovariance(),
+                                                                                                                                                  :ss))))),
+                   rd)
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
+        res1 = optimise!(SchurHierarchicalRiskParity(;
+                                                     params = SchurParams(; gamma = 0,
+                                                                          alg = MonotonicSchur()),
+                                                     opt = opt))
+        res2 = optimise!(HierarchicalRiskParity(; opt = opt))
+        @test isapprox(res1.w, res2.w)
+
+        res3 = optimise!(SchurHierarchicalRiskParity(;
+                                                     params = [SchurParams(; gamma = 0,
+                                                                           alg = MonotonicSchur())],
+                                                     opt = opt))
+        @test isapprox(res1.w, res3.w)
+
+        res4 = optimise!(SchurHierarchicalRiskParity(;
+                                                     params = SchurParams(; gamma = 1,
+                                                                          alg = MonotonicSchur()),
+                                                     opt = opt))
+
+        @test_throws MethodError optimise!(SchurHierarchicalRiskParity(;
+                                                                       params = SchurParams(;
+                                                                                            gamma = res4.gamma +
+                                                                                                    1e-4,
+                                                                                            alg = NonMonotonicSchur()),
+                                                                       opt = opt))
     end
 end
