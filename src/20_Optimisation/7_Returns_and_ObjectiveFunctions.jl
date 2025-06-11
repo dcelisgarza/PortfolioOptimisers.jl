@@ -193,9 +193,8 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
     sc = model[:sc]
     lb = pret.lb
     X = pr.X
-    #! See if this works with fixed fees, if not use portfolio returns and add the fees to ret
-    net_X = set_net_portfolio_returns!(model, X)
-    T = length(net_X)
+    X = set_portfolio_returns!(model, X)
+    T = length(X)
     @variable(model, t_ekelly[1:T])
     wi = nothing_scalar_array_factory(pret.w, pr.w)
     if isnothing(wi)
@@ -203,11 +202,10 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
     else
         @expression(model, ret, mean(t_ekelly, wi))
     end
-    #! If the net portfolio returns doesn't work, use the returns and add the fees here.
-    # add_fees_to_ret!(model, ret)
+    add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
     set_max_ratio_kelly_return_constraints!(model, obj, k, sc, ret)
-    @expression(model, kret, k .+ net_X)
+    @expression(model, kret, k .+ X)
     @constraint(model, ekelly_ret[i = 1:T],
                 [sc * t_ekelly[i], sc * k, sc * kret[i]] ∈ MOI.ExponentialCone())
     set_return_bounds!(model, lb)
