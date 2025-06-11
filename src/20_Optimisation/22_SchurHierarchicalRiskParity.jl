@@ -23,19 +23,22 @@ function MonotonicSchur(; N::Integer = 10, tol::Real = 1e-4)
     return MonotonicSchur{typeof(N), typeof(tol)}(N, tol)
 end
 struct SchurParams{T1 <: Union{<:StandardDeviation, <:Variance}, T2 <: Real,
-                   T3 <: SchurAlgorithm} <: AbstractAlgorithm
+                   T3 <: SchurAlgorithm, T4 <: Bool} <: AbstractAlgorithm
     r::T1
     gamma::T2
     alg::T3
+    flag::T4
 end
 function SchurParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
-                     gamma::Real = 0.5, alg::SchurAlgorithm = MonotonicSchur(),)
-    @smart_assert(gamma >= zero(gamma))
-    return SchurParams{typeof(r), typeof(gamma), typeof(alg)}(r, gamma, alg)
+                     gamma::Real = 0.5, alg::SchurAlgorithm = MonotonicSchur(),
+                     flag::Bool = true)
+    @smart_assert(one(gamma) >= gamma >= zero(gamma))
+    return SchurParams{typeof(r), typeof(gamma), typeof(alg), typeof(flag)}(r, gamma, alg,
+                                                                            flag)
 end
 function schur_params_view(sp::SchurParams, i::AbstractVector, X::AbstractMatrix)
     r = risk_measure_view(sp.r, i, X)
-    return SchurParams(; r = r, gamma = sp.gamma, alg = sp.alg)
+    return SchurParams(; r = r, gamma = sp.gamma, alg = sp.alg, flag = sp.flag)
 end
 struct SchurHierarchicalRiskParity{T1 <: HierarchicalOptimiser,
                                    T2 <:
@@ -103,12 +106,13 @@ function naive_portfolio_risk(::StandardDeviation, sigma::AbstractMatrix)
 end
 function schur_weights(pr::AbstractPriorResult, items::AbstractVector,
                        wb::WeightBoundsResult,
-                       params::SchurParams{<:Any, <:Any, <:NonMonotonicSchur},
-                       flag::Bool = false, gamma::Union{Nothing, <:Real} = nothing)
+                       params::SchurParams{<:Any, <:Any, <:NonMonotonicSchur, <:Any},
+                       gamma::Union{Nothing, <:Real} = nothing)
     r = factory(params.r, pr)
-    sigma = copy(r.sigma)
+    sigma = ismutable(r.sigma) ? copy(r.sigma) : Matrix(r.sigma)
     gamma = isnothing(gamma) ? params.gamma : gamma
     w = ones(eltype(pr.X), size(pr.X, 2))
+    flag = params.flag
     @inbounds while length(items) > 0
         items = [i[j:k] for i ∈ items
                  for (j, k) ∈ ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
@@ -144,7 +148,7 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector,
 end
 function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lrisk::Real,
                              tol::Real = 1e-4)
-    iter = ceil(Int, log2((hgamma - lgamma) / tol) * 2 + 1)
+    iter = ceil(Int, log2((hgamma - lgamma) / tol) * 4 + 1)
     for _ ∈ 1:iter
         mgamma = (lgamma + hgamma) * 0.5
         w, risk, hrisk = try
@@ -173,15 +177,16 @@ function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lr
 end
 function schur_weights(pr::AbstractPriorResult, items::AbstractVector,
                        wb::WeightBoundsResult,
-                       params::SchurParams{<:Any, <:Any, <:MonotonicSchur})
+                       params::SchurParams{<:Any, <:Any, <:MonotonicSchur, <:Any})
     max_gamma = params.gamma
     r = factory(params.r, pr)
-    nm_params = SchurParams(; r = r, gamma = max_gamma, alg = NonMonotonicSchur())
+    nm_params = SchurParams(; r = r, gamma = max_gamma, alg = NonMonotonicSchur(),
+                            flag = params.flag)
     if iszero(max_gamma)
         return schur_weights(pr, items, wb, nm_params)
     end
     function objective(x::Real)
-        w = schur_weights(pr, items, wb, nm_params, true, x)[1]
+        w = schur_weights(pr, items, wb, nm_params, x)[1]
         risk = isnothing(w) ? typemax(eltype(pr.X)) : dot(w, r.sigma, w)
         return w, risk
     end
@@ -193,7 +198,6 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector,
     for i ∈ 2:length(gammas)
         w, risk = objective(gammas[i])
         risks[i] = risk
-        println(risk, " ", gammas[i])
         if risk >= risks[i - 1]
             # Turning point is strictly between [gammas[i-2], gammas[i]].
             lidx = max(1, i - 2)
