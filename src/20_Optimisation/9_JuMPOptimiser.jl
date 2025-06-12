@@ -8,9 +8,9 @@ struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
                               Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix},
                               T9 <: Union{Nothing, <:PhilogenyConstraintResult},
                               T10 <: Union{Nothing, <:PhilogenyConstraintResult},
-                              T11 <: OptimisationReturnCode,
-                              T12 <: JuMPOptimisationSolution,
-                              T13 <: Union{Nothing, JuMP.Model}} <: OptimisationResult
+                              T11 <: JuMPReturnsEstimator, T12 <: OptimisationReturnCode,
+                              T13 <: JuMPOptimisationSolution,
+                              T14 <: Union{Nothing, JuMP.Model}} <: OptimisationResult
     oe::T1
     pr::T2
     wb::T3
@@ -21,9 +21,10 @@ struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
     smtx::T8
     nplg::T9
     cplg::T10
-    retcode::T11
-    sol::T12
-    model::T13
+    ret::T11
+    retcode::T12
+    sol::T13
+    model::T14
 end
 function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
     return if sym == :w

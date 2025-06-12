@@ -149,7 +149,7 @@ function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rrb.opt.cobj, rrb, pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(pr.X))
     return JuMPOptimisationResult(typeof(rrb), pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
-                                  cplg, retcode, sol, ifelse(save, model, nothing))
+                                  cplg, ret, retcode, sol, ifelse(save, model, nothing))
 end
 
 export BasicRelaxedRiskBudgettingAlgorithm, RegularisationRelaxedRiskBudgettingAlgorithm,

@@ -139,7 +139,7 @@ function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
     return JuMPOptimisationResult(typeof(rb), pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
-                                  cplg, retcode, sol, ifelse(save, model, nothing))
+                                  cplg, ret, retcode, sol, ifelse(save, model, nothing))
 end
 
 export AssetRiskBudgettingAlgorithm, FactorRiskBudgettingAlgorithm, RiskBudgetting

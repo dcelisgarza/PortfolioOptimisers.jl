@@ -32,12 +32,6 @@ end
 function number_effective_assets(w::AbstractVector)
     return inv(dot(w, w))
 end
-function risk_bounds(r::AbstractBaseRiskMeasure, w1::AbstractVector, w2::AbstractVector,
-                     X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing; kwargs...)
-    r1 = expected_risk(r, w1, X, fees; kwargs...)
-    r2 = expected_risk(r, w2, X, fees; kwargs...)
-    return r1, r2
-end
 function risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector, X::AbstractMatrix,
                            fees::Union{Nothing, <:Fees} = nothing; delta::Real = 1e-6,
                            marginal::Bool = false, kwargs...)
@@ -49,8 +43,8 @@ function risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector, X::Abs
     for i ∈ eachindex(w)
         ws[i, 1] += delta
         ws[i, 2] -= delta
-        r1, r2 = risk_bounds(r, view(ws, :, 1), view(ws, :, 2), X, fees; delta = delta,
-                             kwargs...)
+        r1 = expected_risk(r, view(ws, :, 1), X, fees; kwargs...)
+        r2 = expected_risk(r, view(ws, :, 2), X, fees; kwargs...)
         r1 = adjust_risk_contribution(r, r1, delta)
         r2 = adjust_risk_contribution(r, r2, delta)
         rci = (r1 - r2) * id2

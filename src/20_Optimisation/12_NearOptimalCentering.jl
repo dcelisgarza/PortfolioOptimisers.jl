@@ -299,7 +299,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     retcode, sol = optimise_JuMP_model!(model, noc, eltype(nb_opt.pe.X))
     return JuMPOptimisationResult(typeof(noc), nb_opt.pe, nb_opt.wb, nb_opt.lcs,
                                   nb_opt.cent, nb_opt.gcard, nb_opt.sgcard, nb_opt.smtx,
-                                  nb_opt.nplg, nb_opt.cplg, retcode, sol,
+                                  nb_opt.nplg, nb_opt.cplg, nb_opt.ret, retcode, sol,
                                   ifelse(save, model, nothing))
 end
 function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -337,8 +337,8 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                      opt.cobj, opt, opt.pe)
     retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
     return JuMPOptimisationResult(typeof(noc), opt.pe, opt.wb, opt.lcs, opt.cent, opt.gcard,
-                                  opt.sgcard, opt.smtx, opt.nplg, opt.cplg, retcode, sol,
-                                  ifelse(save, model, nothing))
+                                  opt.sgcard, opt.smtx, opt.nplg, opt.cplg, opt.ret,
+                                  retcode, sol, ifelse(save, model, nothing))
 end
 
 export ConstrainedNearOptimalCenteringAlgorithm, UnconstrainedNearOptimalCenteringAlgorithm,

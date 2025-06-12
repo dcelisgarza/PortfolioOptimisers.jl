@@ -23,5 +23,6 @@ function opt_view(opt::OptimisationEstimator, args...)
     return opt
 end
 function optimise! end
+function efficient_frontier! end
 
-export optimise!, OptimisationSuccess, OptimisationFailure
+export optimise!, efficient_frontier!, OptimisationSuccess, OptimisationFailure

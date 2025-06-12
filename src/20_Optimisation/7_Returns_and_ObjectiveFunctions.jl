@@ -40,6 +40,18 @@ end
 function no_bounds_returns_estimator(r::KellyReturn, args...)
     return KellyReturn(; w = r.w)
 end
+for r ∈ traverse_subtypes(JuMPReturnsEstimator)
+    eval(quote
+             function bounds_returns_estimator(r::$(r), lb::Real)
+                 pnames = setdiff(propertynames(r), (:lb,))
+                 return if isempty(pnames)
+                     $(r)(lb)
+                 else
+                     $(r)(getproperty.(Ref(r), pnames)..., lb)
+                 end
+             end
+         end)
+end
 function jump_returns_factory(r::KellyReturn, pr::AbstractPriorResult; kwargs...)
     return KellyReturn(; w = nothing_scalar_array_factory(r.w, pr.w), lb = r.lb)
 end

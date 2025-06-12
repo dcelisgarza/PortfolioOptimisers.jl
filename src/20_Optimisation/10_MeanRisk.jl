@@ -58,7 +58,115 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
     retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
     return JuMPOptimisationResult(typeof(mr), pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
-                                  cplg, retcode, sol, ifelse(save, model, nothing))
+                                  cplg, ret, retcode, sol, ifelse(save, model, nothing))
+end
+function efficient_frontier_bounds(mr::MeanRisk, rd::ReturnsResult,
+                                   wi_min::Union{Nothing, <:AbstractVector{<:Real}},
+                                   wi_max::Union{Nothing, <:AbstractVector{<:Real}}, dims;
+                                   kwargs...)
+    res = optimise!(mr, rd; dims = dims, kwargs...)
+    if isa(res.retcode, OptimisationFailure)
+        throw(OptimisationFailure("Failed to compute minimum risk for efficient frontier."))
+    end
+    model = res.model
+    try
+        set_start_value.(model[:w], wi_max)
+    catch
+    end
+    unregister(model, :obj_expr)
+    set_portfolio_objective_function!(model, MaximumReturn(), res.ret, mr.opt.cobj, mr,
+                                      res.pr)
+    retcode, sol = optimise_JuMP_model!(model, mr, eltype(res.w))
+    if isa(retcode, OptimisationFailure)
+        throw(OptimisationFailure("Failed to compute maximum return for efficient frontier."))
+    end
+    return res, sol.w
+end
+function efficient_frontier!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
+                             N::Integer = 20,
+                             wi_min::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                             wi_max::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                             risk_ub::Real = inv(sqrt(eps())),
+                             ret_lb::Real = -inv(sqrt(eps())),
+                             rf::Union{Nothing, <:Real} = 0.0,
+                             ohf::Union{Nothing, <:Real} = nothing, dims::Int = 1,
+                             kwargs...)
+    opt = JuMPOptimiser(; pe = mr.opt.pe, slv = mr.opt.slv, wb = mr.opt.wb,
+                        bgt = mr.opt.bgt, sbgt = mr.opt.sbgt, lt = mr.opt.lt,
+                        st = mr.opt.st, lcs = mr.opt.lcs, lcm = mr.opt.lcm,
+                        cent = mr.opt.cent, gcard = mr.opt.gcard, sgcard = mr.opt.sgcard,
+                        smtx = mr.opt.smtx, sets = mr.opt.sets, nplg = mr.opt.nplg,
+                        cplg = mr.opt.cplg, tn = mr.opt.tn, te = mr.opt.te,
+                        fees = mr.opt.fees,
+                        ret = bounds_returns_estimator(mr.opt.ret, ret_lb),
+                        sce = mr.opt.sce, ccnt = mr.opt.ccnt, cobj = mr.opt.cobj,
+                        sc = mr.opt.sc, so = mr.opt.so, card = mr.opt.card,
+                        scard = mr.opt.scard, nea = mr.opt.nea, l1 = mr.opt.l1,
+                        l2 = mr.opt.l2, ss = mr.opt.ss, strict = mr.opt.strict)
+    mr = MeanRisk(; opt = opt, r = bounds_first_risk_measure(mr.r, risk_ub),
+                  obj = MinimumRisk(), wi = wi_min)
+    res, w2 = efficient_frontier_bounds(mr, rd, wi_min, wi_max, dims; kwargs...)
+    w1 = res.w
+    r = factory(mr.r, res.pr, mr.opt.slv)
+    ri = isa(r, AbstractVector) ? r[1] : r
+    risk1 = expected_risk(ri, w1, res.pr.X, mr.opt.fees; kwargs...)
+    risk2 = expected_risk(ri, w2, res.pr.X, mr.opt.fees; kwargs...)
+    ret1 = expected_returns(res.ret, w1, res.pr, mr.opt.fees)
+    ret2 = expected_returns(res.ret, w2, res.pr, mr.opt.fees)
+
+    risks = range(risk1; stop = risk2, length = N)
+    rets = range(ret1; stop = ret2, length = N)
+    model = res.model
+    ks = string.(keys(object_dictionary(model)))
+    key = Symbol(ks[findfirst(x -> contains(x, r".*_1_ub.*"), ks)])
+    M = length(w1)
+    ws = Vector{eltype(w1)}(undef, (N + (!isnothing(rf) ? 1 : 0)) * M)
+    ws[1:M] .= w1
+    ws[((N - 1) * M + 1):(N * M)] .= w2
+    try
+        set_start_value.(model[:w], w1)
+    catch
+    end
+    unregister(model, :obj_expr)
+    set_portfolio_objective_function!(model, MaximumReturn(), res.ret, mr.opt.cobj, mr,
+                                      res.pr)
+    for i ∈ 2:length(risks)
+        idx = ((i - 1) * M + 1):(i * M)
+        set_normalized_rhs(model[key], risks[i])
+        retcode, sol = optimise_JuMP_model!(model, mr, eltype(w1))
+        if isa(retcode, OptimisationSuccess)
+            ws[idx] .= sol.w
+        else
+            set_normalized_rhs(model[key], risk_ub)
+            set_normalized_rhs(model[:ret_lb], rets[i])
+            unregister(model, :obj_expr)
+            set_portfolio_objective_function!(model, MinimumRisk(), res.ret, mr.opt.cobj,
+                                              mr, res.pr)
+            retcode, sol = optimise_JuMP_model!(model, mr, eltype(res.w))
+            set_normalized_rhs(model[:ret_lb], ret_lb)
+            if isa(retcode, OptimisationSuccess)
+                ws[idx] .= sol.w
+            else
+                ws[idx] .= NaN
+            end
+        end
+    end
+    if !isnothing(rf)
+        delete(model, model[key])
+        unregister(model, key)
+        delete(model, model[:ret_lb])
+        unregister(model, :ret_lb)
+        unregister(model, :obj_expr)
+        set_portfolio_objective_function!(model, MaximumRatio(; rf = rf, ohf = ohf),
+                                          res.ret, mr.opt.cobj, mr, res.pr)
+        retcode, sol = optimise_JuMP_model!(model, mr, eltype(res.w))
+        if isa(retcode, OptimisationSuccess)
+            ws[(N * M + 1):end] .= sol.w
+        else
+            ws[(N * M + 1):end] .= NaN
+        end
+    end
+    return reshape(ws, M, :)
 end
 
 export MeanRisk
