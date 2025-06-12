@@ -166,7 +166,11 @@ function efficient_frontier!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
             ws[(N * M + 1):end] .= NaN
         end
     end
-    return reshape(ws, M, :)
+    return JuMPOptimisationResult(typeof(mr), res.pr, res.wb, res.lcs, res.cent, res.gcard,
+                                  res.sgcard, res.smtx, res.nplg, res.cplg, res.ret,
+                                  OptimisationSuccess(; res = nothing),
+                                  JuMPOptimisationSolution(; w = reshape(ws, M, :)),
+                                  nothing)
 end
 
 export MeanRisk
