@@ -919,10 +919,15 @@
     end
     # opt = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBoundsResult(; lb = 0, ub = 1),
     #                     sbgt = 0, bgt = 1)
-    # mre = MeanRisk(; r=StandardDeviation(),obj = MaximumReturn(), opt = opt)
-    # res = optimise!(mre)
-    # @time ws = efficient_frontier!(mre)
+    # mre = MeanRisk(; r = StandardDeviation(), obj = MaximumReturn(), opt = opt)
+    # @time res0 = efficient_frontier!(mre)
 
+    # noc = NearOptimalCentering(; r = StandardDeviation(), obj = MaximumReturn(), opt = opt)
+    # @time res1 = efficient_frontier!(noc; str_names = true)
+    # test = optimise!(NearOptimalCentering(; r = StandardDeviation(), obj = MinimumRisk(),
+    #                                       opt = opt, w_opt = res0.w[:, 20]), rd;
+    #                  str_names = true)
+    # println("")
     # contains(ks[1], )
     #=
     @testset "Linear constraints" begin

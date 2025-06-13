@@ -8,7 +8,9 @@ struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
                               Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix},
                               T9 <: Union{Nothing, <:PhilogenyConstraintResult},
                               T10 <: Union{Nothing, <:PhilogenyConstraintResult},
-                              T11 <: JuMPReturnsEstimator, T12 <: OptimisationReturnCode,
+                              T11 <: JuMPReturnsEstimator,
+                              T12 <: Union{<:OptimisationReturnCode,
+                                           <:AbstractVector{<:OptimisationReturnCode}},
                               T13 <: JuMPOptimisationSolution,
                               T14 <: Union{Nothing, JuMP.Model}} <: OptimisationResult
     oe::T1
@@ -313,7 +315,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     smtx = asset_sets_matrix(opt.smtx, opt.sets)
     nplg = philogeny_constraints(opt.nplg, pr.X)
     cplg = philogeny_constraints(opt.cplg, pr.X)
-    return pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg
+    ret = jump_returns_factory(opt.ret, pr)
+    return pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret
 end
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = propertynames(opt)
@@ -323,14 +326,14 @@ function no_bounds_optimiser(opt::JuMPOptimiser, args...)
                          p[(idx + 1):end]...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
-    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg = processed_jump_optimiser_attributes(opt,
-                                                                                             rd;
-                                                                                             dims = dims)
+    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret = processed_jump_optimiser_attributes(opt,
+                                                                                                  rd;
+                                                                                                  dims = dims)
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = opt.lt, st = opt.st, lcs = lcs, lcm = opt.lcm, cent = cent,
                          gcard = gcard, sgcard = sgcard, smtx = smtx, sets = opt.sets,
                          nplg = nplg, cplg = cplg, tn = opt.tn, te = opt.te,
-                         fees = opt.fees, ret = opt.ret, sce = opt.sce, ccnt = opt.ccnt,
+                         fees = opt.fees, ret = ret, sce = opt.sce, ccnt = opt.ccnt,
                          cobj = opt.cobj, sc = opt.sc, so = opt.so, card = opt.card,
                          nea = opt.nea, l1 = opt.l1, l2 = opt.l2, ss = opt.ss,
                          strict = opt.strict)

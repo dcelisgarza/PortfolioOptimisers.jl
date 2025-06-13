@@ -88,9 +88,9 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
 end
 function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg = processed_jump_optimiser_attributes(frc.opt,
-                                                                                             rd;
-                                                                                             dims = dims)
+    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret = processed_jump_optimiser_attributes(frc.opt,
+                                                                                                  rd;
+                                                                                                  dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
@@ -111,7 +111,6 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_non_fixed_fees!(model, frc.opt.fees)
     set_risk_constraints!(model, frc.r, frc, pr, nplg, cplg, b1, frc.sets)
     scalarise_risk_expression!(model, frc.opt.sce)
-    ret = jump_returns_factory(frc.opt.ret, pr)
     set_return_constraints!(model, ret, frc.obj, pr)
     frc_nplg = philogeny_constraints(frc.nplg, rd.F)
     frc_cplg = philogeny_constraints(frc.cplg, rd.F)
