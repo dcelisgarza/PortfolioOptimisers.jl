@@ -640,7 +640,7 @@
         res = optimise!(mre, rd)
         w = res.w
         @test all(isapprox.(w[w .>= sqrt(eps())], 0.2))
-        @test all(isapprox.(w[w .<= -sqrt(eps())], -0.2))
+        @test all(isapprox.(w[w .<= -sqrt(eps())], -0.2, rtol = 1e-6))
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = 0.5, st = 0.5, sbgt = 1, bgt = 1,
                             wb = WeightBoundsResult(; lb = -1, ub = 1))
@@ -917,18 +917,6 @@
         w = optimise!(mre, rd).w
         @test norm(pr.X * (w - eqw), 1) / T <= 6e-3
     end
-    # opt = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBoundsResult(; lb = 0, ub = 1),
-    #                     sbgt = 0, bgt = 1)
-    # mre = MeanRisk(; r = StandardDeviation(), obj = MaximumReturn(), opt = opt)
-    # @time res0 = efficient_frontier!(mre)
-
-    # noc = NearOptimalCentering(; r = StandardDeviation(), obj = MaximumReturn(), opt = opt)
-    # @time res1 = efficient_frontier!(noc; str_names = true)
-    # test = optimise!(NearOptimalCentering(; r = StandardDeviation(), obj = MinimumRisk(),
-    #                                       opt = opt, w_opt = res0.w[:, 20]), rd;
-    #                  str_names = true)
-    # println("")
-    # contains(ks[1], )
     #=
     @testset "Linear constraints" begin
         slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,

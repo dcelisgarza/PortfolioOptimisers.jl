@@ -225,5 +225,22 @@ end
 function calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees)
     return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
+function cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
+    return if compound
+        cumprod(Ref(one(eltype(X))) .+ X; dims = dims)
+    else
+        cumsum(X; dims = dims)
+    end
+end
+function drawdowns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
+    cX = cumulative_returns(X; compound = compound, dims = dims)
+    if compound
+        return cX ./ accumulate(max, cX; dims = dims) .- Ref(one(eltype(X)))
+    else
+        return cX - accumulate(max, cX; dims = dims)
+    end
+    return nothing
+end
 
-export Fees, calc_fees, calc_asset_fees, calc_net_returns, calc_net_asset_returns
+export Fees, calc_fees, calc_asset_fees, calc_net_returns, calc_net_asset_returns,
+       cumulative_returns, drawdowns

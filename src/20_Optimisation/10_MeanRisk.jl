@@ -119,7 +119,7 @@ function efficient_frontier!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
         risk1 = sqrt(risk1)
         risk2 = sqrt(risk2)
     end
-    key = Symbol(ks[findfirst(x -> contains(x, r".*_1_ub.*"), ks)])
+    key = Symbol(ks[findfirst(x -> contains(x, r".*_1_ub$"), ks)])
     risks = range(risk1; stop = risk2, length = N)
     rets = range(ret1; stop = ret2, length = N)
     M = length(w1)

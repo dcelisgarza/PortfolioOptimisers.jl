@@ -1,7 +1,7 @@
 module PortfolioOptimisers
 
 using AverageShiftedHistograms, Clustering, Distances, Distributions, FLoops, GLM, Impute,
-      InteractiveUtils, JuMP, LinearAlgebra, LogExpFunctions, MultivariateStats,
+      InteractiveUtils, JuMP, LinearAlgebra, LogExpFunctions, Makie, MultivariateStats,
       NearestCorrelationMatrix, Optim, Graphs, SimpleWeightedGraphs, PythonCall, Random,
       SmartAsserts, SparseArrays, Statistics, StatsBase, DataFrames, TimeSeries
 
@@ -136,5 +136,6 @@ include("./20_Optimisation/21_NaiveOptimisation.jl")
 include("./20_Optimisation/22_SchurHierarchicalRiskParity.jl")
 
 include("./21_Expected_Returns.jl")
+include("./22_Plotting.jl")
 
 end

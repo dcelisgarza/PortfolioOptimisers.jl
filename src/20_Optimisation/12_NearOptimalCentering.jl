@@ -181,10 +181,10 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_min_flag = isnothing(w_min)
     w_opt_flag = isnothing(w_opt)
     w_max_flag = isnothing(w_max)
-    unconstrained_flag = isa(noc.alg, UnconstrainedNearOptimalCenteringAlgorithm)
+    unconstrained = isa(noc.alg, UnconstrainedNearOptimalCenteringAlgorithm)
     r = noc.r
     opt = processed_jump_optimiser(noc.opt, rd; dims = dims)
-    if w_min_flag || w_max_flag || unconstrained_flag
+    if w_min_flag || w_max_flag || unconstrained
         nb_r = no_bounds_risk_measure(r, noc.ucs_flag)
         nb_opt = no_bounds_optimiser(opt, noc.ucs_flag)
     end
@@ -224,7 +224,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     rt_delta = (rt_max - rt_min) * ibins
     rk_opt += rk_delta
     rt_opt -= rt_delta
-    if unconstrained_flag
+    if unconstrained
         r, opt = nb_r, nb_opt
     end
     return w_opt, rk_opt, rt_opt, r, opt
@@ -352,13 +352,14 @@ function unregister_noc_frontier!(model::JuMP.Model)
     unregister(model, :obj_expr)
     return nothing
 end
-function _near_opt_centering_resolve(model::JuMP.Model, noc::NearOptimalCentering,
-                                     w::AbstractVector, rd::ReturnsResult, dims::Int)
+function near_opt_centering_resolve(model::JuMP.Model, noc::NearOptimalCentering,
+                                    w::AbstractVector, rd::ReturnsResult, dims::Int)
     noc.w_opt .= w
     try
         set_start_value.(model[:w], w)
     catch
     end
+    #! This can be made more efficient by not recomputing the minimum and maximum risks. But means lifting the computation of rk_opt and rt_opt into a separate function that takes rk_delta and rt_delta. It means creating a new near_optimal_centering_setup function that returns rk_delta, rt_delta and opt which is called before the first invoaction of near_opt_centering_resolve, they would also be outputed by efficient_frontier_bounds.
     rk_opt, rt_opt, opt = near_optimal_centering_setup(noc, rd; dims = dims)[[2, 3, 5]]
     unregister_noc_frontier!(model)
     set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
@@ -371,7 +372,7 @@ function efficient_frontier_bounds(noc::NearOptimalCentering, rd::ReturnsResult,
         throw(OptimisationFailure("Failed to compute minimum risk for efficient frontier."))
     end
     model = res.model
-    retcode, sol = _near_opt_centering_resolve(model, noc, w_max, rd, dims)
+    retcode, sol = near_opt_centering_resolve(model, noc, w_max, rd, dims)
     if isa(retcode, OptimisationFailure)
         throw(OptimisationFailure("Failed to compute maximum return for efficient frontier."))
     end
@@ -415,7 +416,7 @@ function efficient_frontier!(noc::NearOptimalCentering, rd::ReturnsResult = Retu
         risk1 = sqrt(risk1)
         risk2 = sqrt(risk2)
     end
-    key = Symbol(ks[findfirst(x -> contains(x, r".*_1_ub.*"), ks)])
+    key = Symbol(ks[findfirst(x -> contains(x, r".*_1_ub$"), ks)])
     risks = range(risk1; stop = risk2, length = N)
     rets = range(ret1; stop = ret2, length = N)
     M = length(w1)
@@ -448,7 +449,7 @@ function efficient_frontier!(noc::NearOptimalCentering, rd::ReturnsResult = Retu
         set_normalized_rhs(mr_model[key], risks[i])
         mr_retcode, sol = optimise_JuMP_model!(mr_model, mr, eltype(w1))
         if isa(mr_retcode, OptimisationSuccess)
-            noc_retcode, sol = _near_opt_centering_resolve(noc_model, noc, sol.w, rd, dims)
+            noc_retcode, sol = near_opt_centering_resolve(noc_model, noc, sol.w, rd, dims)
             if isa(noc_retcode, OptimisationSuccess)
                 ws[idx] .= sol.w
                 continue
@@ -462,7 +463,7 @@ function efficient_frontier!(noc::NearOptimalCentering, rd::ReturnsResult = Retu
         mr_retcode, sol = optimise_JuMP_model!(mr_model, mr, eltype(res.w))
         set_normalized_rhs(mr_model[:ret_lb], ret_lb)
         if isa(mr_retcode, OptimisationSuccess)
-            noc_retcode, sol = _near_opt_centering_resolve(noc_model, noc, sol.w, rd, dims)
+            noc_retcode, sol = near_opt_centering_resolve(noc_model, noc, sol.w, rd, dims)
             if isa(noc_retcode, OptimisationSuccess)
                 ws[idx] .= sol.w
             else
@@ -484,7 +485,7 @@ function efficient_frontier!(noc::NearOptimalCentering, rd::ReturnsResult = Retu
                                           res.ret, mr.opt.cobj, mr, res.pr)
         retcode, sol = optimise_JuMP_model!(mr_model, mr, eltype(res.w))
         if isa(retcode, OptimisationSuccess)
-            noc_retcode, sol = _near_opt_centering_resolve(noc_model, noc, sol.w, rd, dims)
+            noc_retcode, sol = near_opt_centering_resolve(noc_model, noc, sol.w, rd, dims)
             if isa(noc_retcode, OptimisationSuccess)
                 ws[(N * M + 1):end] .= sol.w
             else
