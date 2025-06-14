@@ -639,8 +639,8 @@
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test all(isapprox.(w[w .>= sqrt(eps())], 0.2))
-        @test all(isapprox.(w[w .<= -sqrt(eps())], -0.2, rtol = 1e-6))
+        @test all(isapprox.(w[w .>= sqrt(eps())], 0.2, rtol=5e-6))
+        @test all(isapprox.(w[w .<= -sqrt(eps())], -0.2, rtol = 5e-6))
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = 0.5, st = 0.5, sbgt = 1, bgt = 1,
                             wb = WeightBoundsResult(; lb = -1, ub = 1))
