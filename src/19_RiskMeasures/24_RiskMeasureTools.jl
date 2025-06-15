@@ -48,7 +48,12 @@ for r ∈ traverse_subtypes(RiskMeasure)
          end)
 end
 function bounds_first_risk_measure(r::AbstractVector{<:RiskMeasure}, ub::Real)
-    r[1] = bounds_risk_measure_expression(r[1], ub)
+    try
+        r[1] = bounds_risk_measure_expression(r[1], ub)
+    catch
+        rn = bounds_risk_measure_expression(r[1], ub)
+        r = [rn; r[2:end]]
+    end
     return r
 end
 function bounds_first_risk_measure(r::RiskMeasure, ub::Real)
