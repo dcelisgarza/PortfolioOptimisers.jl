@@ -72,8 +72,7 @@ function tracking_view(tracking::TrackingError, i::AbstractVector, args...)
                          err = tracking.err, formulation = tracking.formulation)
 end
 function tracking_view(tracking::AbstractVector{<:AbstractTracking}, args...)
-    #! turn into list comprehension.
-    return tracking_view.(tracking, Ref(args)...)
+    return [tracking_view(t, args...) for t ∈ tracking]
 end
 #=
 struct VolTrackingError{T1 <: WeightsTracking, T2 <: Real,

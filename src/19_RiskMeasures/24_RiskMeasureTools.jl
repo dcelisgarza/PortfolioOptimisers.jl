@@ -13,8 +13,8 @@ for r ∈ setdiff(traverse_subtypes(RiskMeasure), (UncertaintySetVariance,))
              end
          end)
 end
-function no_bounds_risk_measure(r::AbstractVector{<:RiskMeasure}, args...)
-    return no_bounds_risk_measure.(r, Ref(args)...)
+function no_bounds_risk_measure(rs::AbstractVector{<:RiskMeasure}, args...)
+    return [no_bounds_risk_measure(r, args...) for r ∈ rs]
 end
 function no_bounds_first_risk_measure(r::AbstractVector{<:RiskMeasure}, args...)
     return no_bounds_risk_measure(r[1], args...)
