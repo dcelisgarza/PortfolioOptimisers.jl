@@ -11,7 +11,8 @@ struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
                               T11 <: JuMPReturnsEstimator,
                               T12 <: Union{<:OptimisationReturnCode,
                                            <:AbstractVector{<:OptimisationReturnCode}},
-                              T13 <: JuMPOptimisationSolution,
+                              T13 <: Union{<:JuMPOptimisationSolution,
+                                           <:AbstractVector{<:JuMPOptimisationSolution}},
                               T14 <: Union{Nothing, JuMP.Model}} <: OptimisationResult
     oe::T1
     pr::T2
@@ -30,7 +31,7 @@ struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
 end
 function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
     return if sym == :w
-        r.sol.w
+        !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, Ref(:w))
     else
         getfield(r, sym)
     end

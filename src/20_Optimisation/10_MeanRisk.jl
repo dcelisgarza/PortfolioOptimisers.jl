@@ -25,6 +25,38 @@ function opt_view(mr::MeanRisk, i::AbstractVector, X::AbstractMatrix)
     wi = nothing_scalar_array_view(mr.wi, i)
     return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi)
 end
+function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
+                         pr::AbstractPriorResult, args...)
+    set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
+    return optimise_JuMP_model!(model, mr, eltype(pr.X))
+end
+function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
+                         pr::AbstractPriorResult, ::Val{true}, ::Val{false})
+    lbs = model[:ret_bounds]
+    sc = model[:sc]
+    k = model[:k]
+    ret_expr = model[:ret]
+    retcodes = Vector{OptimisationReturnCode}(undef, length(lbs))
+    sols = Vector{JuMPOptimisationSolution}(undef, length(lbs))
+    for (i, lb) ∈ enumerate(lbs)
+        if i != 1
+            delete(model, model[:ret_lb])
+            unregister(model, :ret_lb)
+            unregister(model, :obj_expr)
+        end
+        @constraint(model, ret_lb, sc * (ret_expr - lb * k) >= 0)
+        set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
+        retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
+        retcodes[i] = retcode
+        sols[i] = sol
+    end
+    return retcodes, sols
+end
+function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
+                         pr::AbstractPriorResult, ::Val{false}, ::Val{true})
+    set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
+    return optimise_JuMP_model!(model, mr, eltype(pr.X))
+end
 function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret = processed_jump_optimiser_attributes(mr.opt,
@@ -54,8 +86,8 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_sdp_philogeny_constraints!(model, nplg, :sdp_nplg)
     set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
-    set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
-    retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
+    retcode, sol = solve_mean_risk(model, mr, ret, pr, Val(haskey(model, :ret_bounds)),
+                                   Val(haskey(model, :risk_frontier)))
     return JuMPOptimisationResult(typeof(mr), pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
                                   cplg, ret, retcode, sol, ifelse(save, model, nothing))
 end

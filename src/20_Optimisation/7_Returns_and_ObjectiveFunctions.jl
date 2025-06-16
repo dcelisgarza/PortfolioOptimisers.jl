@@ -1,14 +1,15 @@
 function bounds_returns_estimator end
 struct ArithmeticReturn{T1 <: Union{Nothing, <:AbstractUncertaintySetResult,
                                     <:AbstractUncertaintySetEstimator},
-                        T2 <: Union{Nothing, <:Real}} <: JuMPReturnsEstimator
+                        T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
+       JuMPReturnsEstimator
     ucs::T1
     lb::T2
 end
 function ArithmeticReturn(;
                           ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                      <:AbstractUncertaintySetEstimator} = nothing,
-                          lb::Union{Nothing, <:Real} = nothing)
+                          lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
     if isa(ucs, EllipseUncertaintySetResult)
         @smart_assert(isa(ucs,
                           EllipseUncertaintySetResult{<:Any, <:Any,
@@ -16,6 +17,8 @@ function ArithmeticReturn(;
     end
     if isa(lb, Real)
         @smart_assert(isfinite(lb))
+    elseif isa(lb, AbstractVector)
+        @smart_assert(!isempty(lb) && all(isfinite, lb))
     end
     return ArithmeticReturn{typeof(ucs), typeof(lb)}(ucs, lb)
 end
@@ -26,15 +29,21 @@ end
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
     return flag ? ArithmeticReturn(; ucs = r.ucs) : ArithmeticReturn()
 end
-struct KellyReturn{T1 <: Union{Nothing, <:AbstractWeights}, T2 <: Union{Nothing, <:Real}} <:
+struct KellyReturn{T1 <: Union{Nothing, <:AbstractWeights},
+                   T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
        JuMPReturnsEstimator
     w::T1
     lb::T2
 end
 function KellyReturn(; w::Union{Nothing, <:AbstractWeights} = nothing,
-                     lb::Union{Nothing, <:Real} = nothing)
+                     lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
     if isa(w, AbstractVector)
         @smart_assert(!isempty(w))
+    end
+    if isa(lb, Real)
+        @smart_assert(isfinite(lb))
+    elseif isa(lb, AbstractVector)
+        @smart_assert(!isempty(lb) && all(isfinite, lb))
     end
     return KellyReturn{typeof(w), typeof(lb)}(w, lb)
 end
@@ -98,31 +107,11 @@ function set_return_bounds!(model::JuMP.Model, lb::Real)
     sc = model[:sc]
     k = model[:k]
     ret = model[:ret]
-    if !haskey(model, :ret_bounds)
-        @expression(model, ret_bounds,
-                    Dict{Symbol, Union{<:Real, <:AbstractVector{<:Real}}}(:ret_lb => lb))
-    else
-        ret_bounds = model[:ret_bounds]
-        push!(ret_bounds, :ret_lb => lb)
-    end
     @constraint(model, ret_lb, sc * (ret - lb * k) >= 0)
     return nothing
 end
 function set_return_bounds!(model::JuMP.Model, lb::AbstractVector)
-    sc = model[:sc]
-    k = model[:k]
-    ret = model[:ret]
-    if !haskey(model, :ret_frontier)
-        @expression(model, ret_frontier, true)
-    end
-    if !haskey(model, :ret_bounds)
-        @expression(model, ret_bounds,
-                    Dict{Symbol, Union{<:Real, <:AbstractVector{<:Real}}}(:ret_lb => lb))
-    else
-        ret_bounds = model[:ret_bounds]
-        push!(ret_bounds, :ret_lb => lb)
-    end
-    @constraint(model, ret_lb, sc * (ret - lb[1] * k) >= 0)
+    @expression(model, ret_bounds, lb)
     return nothing
 end
 function set_max_ratio_return_constraints!(args...)
