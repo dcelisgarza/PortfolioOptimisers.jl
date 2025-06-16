@@ -1,25 +1,24 @@
 function set_risk_upper_bound!(args...)
     return nothing
 end
-#! Make a function to do use the product of the upper bounds of the risk measures to compute the efficient frontier inside optimise!, also means chaning near opt centering w_opt calculation.
 function set_risk_upper_bound!(model::JuMP.Model,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
                                        <:RiskBudgetting}, r_expr::AbstractJuMPScalar,
                                ub::AbstractVector, key)
-    k = model[:k]
-    sc = model[:sc]
+    # k = model[:k]
+    # sc = model[:sc]
     bound_key = Symbol(key, :_ub)
     if !haskey(model, :risk_frontier)
-        @expression(model, risk_frontier, true)
-    end
-    if !haskey(model, :risk_bounds)
-        @expression(model, risk_bounds,
-                    Dict{Symbol, Union{<:Real, <:AbstractVector{<:Real}}}(bound_key => ub))
+        risk_frontier = @expression(model, risk_frontier,
+                                    Pair{Symbol,
+                                         <:Tuple{<:AbstractJuMPScalar,
+                                                 <:AbstractVector{<:Real}}}[bound_key => (r_expr,
+                                                                                          ub)])
     else
-        risk_bounds = model[:risk_bounds]
-        push!(risk_bounds, bound_key => ub)
+        risk_frontier = model[:risk_frontier]
+        push!(risk_frontier, bound_key => (r_expr, ub))
     end
-    model[bound_key] = @constraint(model, sc * (r_expr - ub[1] * k) <= 0)
+    # model[bound_key] = @constraint(model, sc * (r_expr - ub[1] * k) <= 0)
     return nothing
 end
 function set_risk_upper_bound!(model::JuMP.Model,
@@ -29,13 +28,6 @@ function set_risk_upper_bound!(model::JuMP.Model,
     k = model[:k]
     sc = model[:sc]
     bound_key = Symbol(key, :_ub)
-    if !haskey(model, :risk_bounds)
-        @expression(model, risk_bounds,
-                    Dict{Symbol, Union{<:Real, <:AbstractVector{<:Real}}}(bound_key => ub))
-    else
-        risk_bounds = model[:risk_bounds]
-        push!(risk_bounds, bound_key => ub)
-    end
     model[bound_key] = @constraint(model, sc * (r_expr - ub * k) <= 0)
     return nothing
 end
@@ -65,7 +57,8 @@ function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                              <:NearOptimalCentering,
                                                              <:RiskBudgetting},
                                                   r_expr_ub::AbstractJuMPScalar,
-                                                  ub::Union{Nothing, <:Real}, key::Symbol,
+                                                  ub::Union{Nothing, <:Real,
+                                                            <:AbstractVector}, key::Symbol,
                                                   r_expr::AbstractJuMPScalar,
                                                   settings::RiskMeasureSettings)
     set_risk_upper_bound!(model, opt, r_expr_ub, ub, key)
@@ -172,6 +165,9 @@ function variance_risk_bounds_expr(model::JuMP.Model, i::Any, flag::Bool)
         key = Symbol(:dev_, i)
         model[key], key
     end
+end
+function variance_risk_bounds_val(flag::Bool, ub::AbstractVector)
+    return flag ? ub : sqrt.(ub)
 end
 function variance_risk_bounds_val(flag::Bool, ub::Real)
     return flag ? ub : sqrt(ub)
@@ -405,6 +401,15 @@ function set_second_moment_risk!(model::JuMP.Model, ::SqrtRiskExpr, i::Any, fact
                                  tsecond_moment::AbstractJuMPScalar)
     factor = sqrt(factor)
     return model[key] = @expression(model, factor * tsecond_moment), factor
+end
+function second_moment_bound_val(formulation::SecondMomentFormulation, ub::AbstractVector,
+                                 factor::Real)
+    return factor *
+           if isa(formulation, Union{<:QuadRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr})
+        return sqrt.(ub)
+    else
+        ub
+    end
 end
 function second_moment_bound_val(formulation::SecondMomentFormulation, ub::Real,
                                  factor::Real)

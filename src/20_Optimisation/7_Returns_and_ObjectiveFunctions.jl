@@ -111,7 +111,7 @@ function set_return_bounds!(model::JuMP.Model, lb::Real)
     return nothing
 end
 function set_return_bounds!(model::JuMP.Model, lb::AbstractVector)
-    @expression(model, ret_bounds, lb)
+    @expression(model, ret_frontier, lb)
     return nothing
 end
 function set_max_ratio_return_constraints!(args...)

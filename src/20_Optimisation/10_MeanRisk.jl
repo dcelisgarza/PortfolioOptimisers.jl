@@ -32,7 +32,7 @@ function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstima
 end
 function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
                          pr::AbstractPriorResult, ::Val{true}, ::Val{false})
-    lbs = model[:ret_bounds]
+    lbs = model[:ret_frontier]
     sc = model[:sc]
     k = model[:k]
     ret_expr = model[:ret]
@@ -54,8 +54,31 @@ function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstima
 end
 function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
                          pr::AbstractPriorResult, ::Val{false}, ::Val{true})
-    set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
-    return optimise_JuMP_model!(model, mr, eltype(pr.X))
+    k = model[:k]
+    sc = model[:sc]
+    risk_frontier = model[:risk_frontier]
+    itrs = [(Iterators.repeated(i[1], length(i[2][2])),
+             Iterators.repeated(i[2][1], length(i[2][2])), i[2][2]) for i ∈ risk_frontier]
+    pitrs = Iterators.product.(itrs...)
+    retcodes = sizehint!(Vector{OptimisationReturnCode}(undef, 0), length(pitrs))
+    sols = sizehint!(Vector{JuMPOptimisationSolution}(undef, 0), length(pitrs))
+    for (keys, r_exprs, ubs) ∈ zip(pitrs[1], pitrs[2], pitrs[3])
+        if haskey(model, :obj_expr)
+            unregister(model, :obj_expr)
+        end
+        for (key, r_expr, ub) ∈ zip(keys, r_exprs, ubs)
+            if haskey(model, key)
+                delete(model, model[key])
+                unregister(model, key)
+            end
+            model[key] = @constraint(model, sc * (r_expr - ub * k) <= 0)
+        end
+        set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
+        retcode, sol = optimise_JuMP_model!(model, mr, eltype(pr.X))
+        push!(retcodes, retcode)
+        push!(sols, sol)
+    end
+    return retcodes, sols
 end
 function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
@@ -86,7 +109,7 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_sdp_philogeny_constraints!(model, nplg, :sdp_nplg)
     set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
-    retcode, sol = solve_mean_risk(model, mr, ret, pr, Val(haskey(model, :ret_bounds)),
+    retcode, sol = solve_mean_risk(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
                                    Val(haskey(model, :risk_frontier)))
     return JuMPOptimisationResult(typeof(mr), pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
                                   cplg, ret, retcode, sol, ifelse(save, model, nothing))
