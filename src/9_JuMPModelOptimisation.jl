@@ -10,6 +10,9 @@ end
 function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
                 settings::Union{Nothing, <:AbstractDict} = nothing,
                 check_sol::NamedTuple = (;), add_bridges::Bool = true)
+    if !isnothing(settings)
+        @smart_assert(!isempty(settings))
+    end
     return Solver{typeof(name), typeof(solver), typeof(settings), typeof(check_sol),
                   typeof(add_bridges)}(name, solver, settings, check_sol, add_bridges)
 end
@@ -45,7 +48,7 @@ function optimise_JuMP_model!(model::JuMP.Model,
         add_bridges = solver.add_bridges
         check_sol = solver.check_sol
         set_optimizer(model, solver_i; add_bridges = add_bridges)
-        if !isnothing(settings) && !isempty(settings)
+        if !isnothing(settings)
             for (k, v) ∈ settings
                 set_attribute(model, k, v)
             end

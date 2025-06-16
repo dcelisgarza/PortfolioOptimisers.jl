@@ -5,8 +5,6 @@ function set_risk_upper_bound!(model::JuMP.Model,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
                                        <:RiskBudgetting}, r_expr::AbstractJuMPScalar,
                                ub::AbstractVector, key)
-    # k = model[:k]
-    # sc = model[:sc]
     bound_key = Symbol(key, :_ub)
     if !haskey(model, :risk_frontier)
         risk_frontier = @expression(model, risk_frontier,
@@ -18,7 +16,6 @@ function set_risk_upper_bound!(model::JuMP.Model,
         risk_frontier = model[:risk_frontier]
         push!(risk_frontier, bound_key => (r_expr, ub))
     end
-    # model[bound_key] = @constraint(model, sc * (r_expr - ub[1] * k) <= 0)
     return nothing
 end
 function set_risk_upper_bound!(model::JuMP.Model,

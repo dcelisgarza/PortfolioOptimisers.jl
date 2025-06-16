@@ -170,7 +170,7 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
         add_bridges = solver.add_bridges
         check_sol = solver.check_sol
         set_optimizer(model, solver_i; add_bridges = add_bridges)
-        if !isnothing(settings) && !isempty(settings)
+        if !isnothing(settings)
             for (k, v) ∈ settings
                 set_attribute(model, k, v)
             end
