@@ -98,7 +98,31 @@ function set_return_bounds!(model::JuMP.Model, lb::Real)
     sc = model[:sc]
     k = model[:k]
     ret = model[:ret]
+    if !haskey(model, :ret_bounds)
+        @expression(model, ret_bounds,
+                    Dict{Symbol, Union{<:Real, <:AbstractVector{<:Real}}}(:ret_lb => lb))
+    else
+        ret_bounds = model[:ret_bounds]
+        push!(ret_bounds, :ret_lb => lb)
+    end
     @constraint(model, ret_lb, sc * (ret - lb * k) >= 0)
+    return nothing
+end
+function set_return_bounds!(model::JuMP.Model, lb::AbstractVector)
+    sc = model[:sc]
+    k = model[:k]
+    ret = model[:ret]
+    if !haskey(model, :ret_frontier)
+        @expression(model, ret_frontier, true)
+    end
+    if !haskey(model, :ret_bounds)
+        @expression(model, ret_bounds,
+                    Dict{Symbol, Union{<:Real, <:AbstractVector{<:Real}}}(:ret_lb => lb))
+    else
+        ret_bounds = model[:ret_bounds]
+        push!(ret_bounds, :ret_lb => lb)
+    end
+    @constraint(model, ret_lb, sc * (ret - lb[1] * k) >= 0)
     return nothing
 end
 function set_max_ratio_return_constraints!(args...)

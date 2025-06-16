@@ -274,12 +274,12 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:SequentialEx},
                    pr::AbstractPriorResult, cls::AbstractVector)
-    ri = factory(hec.ri, Ref(pr), Ref(hec.opt.slv))
+    ri = factory(hec.ri, pr, hec.opt.slv)
     if hec.ri === hec.ro
         ro = ri
         rku = zeros(eltype(pr.X), size(pr.X, 2), length(ri))
     else
-        ro = factory(hec.ro, Ref(pr), Ref(hec.opt.slv))
+        ro = factory(hec.ro, pr, hec.opt.slv)
         rku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     end
     rkcl = Vector{eltype(pr.X)}(undef, length(cls))
@@ -303,11 +303,11 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
                                                           <:FLoops.Transducers.Executor},
                    pr::AbstractPriorResult, cls::AbstractVector)
-    ri = factory(hec.ri, Ref(pr), Ref(hec.opt.slv))
+    ri = factory(hec.ri, pr, hec.opt.slv)
     if hec.ri === hec.ro
         ro = ri
     else
-        ro = factory(hec.ro, Ref(pr), Ref(hec.opt.slv))
+        ro = factory(hec.ro, pr, hec.opt.slv)
     end
     Nc = length(cls)
     rkcl = Vector{eltype(pr.X)}(undef, Nc)
@@ -333,7 +333,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
                    pr::AbstractPriorResult, cls::AbstractVector)
     ri = factory(hec.ri, pr, hec.opt.slv)
     riku = unitary_expected_risks(ri, pr.X, hec.opt.fees)
-    ro = factory(hec.ro, Ref(pr), Ref(hec.opt.slv))
+    ro = factory(hec.ro, pr, hec.opt.slv)
     rkcl = Vector{eltype(pr.X)}(undef, length(cls))
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     roku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
@@ -354,7 +354,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
                    pr::AbstractPriorResult, cls::AbstractVector)
     ri = factory(hec.ri, pr, hec.opt.slv)
     riku = unitary_expected_risks(ri, pr.X, hec.opt.fees)
-    ro = factory(hec.ro, Ref(pr), Ref(hec.opt.slv))
+    ro = factory(hec.ro, pr, hec.opt.slv)
     Nc = length(cls)
     rkcl = Vector{eltype(pr.X)}(undef, Nc)
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
@@ -374,7 +374,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:OptimisationRiskMeasure,
                                                           <:SequentialEx},
                    pr::AbstractPriorResult, cls::AbstractVector)
-    ri = factory(hec.ri, Ref(pr), Ref(hec.opt.slv))
+    ri = factory(hec.ri, pr, hec.opt.slv)
     ro = factory(hec.ro, pr, hec.opt.slv)
     roku = unitary_expected_risks(ro, pr.X, hec.opt.fees)
     rkcl = Vector{eltype(pr.X)}(undef, length(cls))
@@ -396,7 +396,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:OptimisationRiskMeasure,
                                                           <:FLoops.Transducers.Executor},
                    pr::AbstractPriorResult, cls::AbstractVector)
-    ri = factory(hec.ri, Ref(pr), Ref(hec.opt.slv))
+    ri = factory(hec.ri, pr, hec.opt.slv)
     ro = factory(hec.ro, pr, hec.opt.slv)
     roku = unitary_expected_risks(ro, pr.X, hec.opt.fees)
     Nc = length(cls)

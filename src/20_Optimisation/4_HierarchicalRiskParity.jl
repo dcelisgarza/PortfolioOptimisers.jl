@@ -139,7 +139,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hrp.opt.pe, rd.X, rd.F; dims = dims)
     clr = clusterise(hrp.opt.cle, pr.X; dims = dims)
-    r = factory(hrp.r, Ref(pr), Ref(hrp.opt.slv))
+    r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     wk = zeros(eltype(pr.X), size(pr.X, 2))
     rku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))

@@ -1,13 +1,42 @@
 function set_risk_upper_bound!(args...)
     return nothing
 end
+#! Make a function to do use the product of the upper bounds of the risk measures to compute the efficient frontier inside optimise!, also means chaning near opt centering w_opt calculation.
+function set_risk_upper_bound!(model::JuMP.Model,
+                               ::Union{<:MeanRisk, <:NearOptimalCentering,
+                                       <:RiskBudgetting}, r_expr::AbstractJuMPScalar,
+                               ub::AbstractVector, key)
+    k = model[:k]
+    sc = model[:sc]
+    bound_key = Symbol(key, :_ub)
+    if !haskey(model, :risk_frontier)
+        @expression(model, risk_frontier, true)
+    end
+    if !haskey(model, :risk_bounds)
+        @expression(model, risk_bounds,
+                    Dict{Symbol, Union{<:Real, <:AbstractVector{<:Real}}}(bound_key => ub))
+    else
+        risk_bounds = model[:risk_bounds]
+        push!(risk_bounds, bound_key => ub)
+    end
+    model[bound_key] = @constraint(model, sc * (r_expr - ub[1] * k) <= 0)
+    return nothing
+end
 function set_risk_upper_bound!(model::JuMP.Model,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
                                        <:RiskBudgetting}, r_expr::AbstractJuMPScalar,
                                ub::Real, key)
     k = model[:k]
     sc = model[:sc]
-    model[Symbol(key, :_ub)] = @constraint(model, sc * (r_expr - ub * k) <= 0)
+    bound_key = Symbol(key, :_ub)
+    if !haskey(model, :risk_bounds)
+        @expression(model, risk_bounds,
+                    Dict{Symbol, Union{<:Real, <:AbstractVector{<:Real}}}(bound_key => ub))
+    else
+        risk_bounds = model[:risk_bounds]
+        push!(risk_bounds, bound_key => ub)
+    end
+    model[bound_key] = @constraint(model, sc * (r_expr - ub * k) <= 0)
     return nothing
 end
 function set_risk_expression!(model::JuMP.Model, r_expr::AbstractJuMPScalar, scale::Real,
