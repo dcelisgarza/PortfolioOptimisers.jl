@@ -15,8 +15,9 @@ end
 struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                 T2 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
                 T3 <: Union{Nothing, <:DataFrame},
-                T4 <:
-                Union{<:OptimisationEstimator, <:AbstractVector{<:OptimisationEstimator}},
+                T4 <: Union{<:OptimisationResult, <:OptimisationEstimator,
+                            <:AbstractVector{<:Union{<:OptimisationEstimator,
+                                                     <:OptimisationResult}}},
                 T5 <: OptimisationEstimator, T6 <: ClusteringWeightFinaliser, T7 <: Bool,
                 T8 <: FLoops.Transducers.Executor} <: BaseStackingOptimisationEstimator
     pe::T1
@@ -32,8 +33,9 @@ function Stacking(;
                   pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                   wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = nothing,
                   sets::Union{Nothing, <:DataFrame} = nothing,
-                  opti::Union{<:OptimisationEstimator,
-                              <:AbstractVector{<:OptimisationEstimator}} = MeanRisk(),
+                  opti::Union{<:OptimisationResult, <:OptimisationEstimator,
+                              <:AbstractVector{<:Union{<:OptimisationEstimator,
+                                                       <:OptimisationResult}}} = MeanRisk(),
                   opto::OptimisationEstimator = MeanRisk(),
                   cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
                   strict::Bool = false, threads::FLoops.Transducers.Executor = ThreadedEx())
@@ -65,6 +67,8 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     @floop st.threads for (i, opt) ∈ pairs(opti)
         res = optimise!(opt, rd; dims = dims, branchorder = branchorder,
                         str_names = str_names, save = save, kwargs...)
+        #! Support efficient frontier?
+        @smart_assert(!isa(res.retcode, AbstractVector))
         wi[:, i] = res.w
         resi[i] = res
     end

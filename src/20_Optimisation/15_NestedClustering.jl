@@ -129,6 +129,8 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
             rdc = returns_result_view(rd, cl)
             res = optimise!(optic, rdc; dims = dims, branchorder = branchorder,
                             str_names = str_names, save = save, kwargs...)
+            #! Support efficient frontier?
+            @smart_assert(!isa(res.retcode, AbstractVector))
             wi[cl, i] = res.w
             resi[i] = res
         end
