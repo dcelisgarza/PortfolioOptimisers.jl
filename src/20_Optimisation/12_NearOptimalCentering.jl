@@ -360,7 +360,53 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     end
     return retcodes, sols
 end
-function compute_risk_ubs(model::JuMP.Model, noc::NearOptimalCentering,
+function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector, <:Any,
+                                                         <:Any, <:Any, <:Any, <:Any, <:Any,
+                                                         <:Any, <:Any, <:Any,
+                                                         <:ConstrainedNearOptimalCenteringAlgorithm},
+                               pr::AbstractPriorResult, risk_frontier::AbstractVector,
+                               w_min::AbstractVector, w_max::AbstractVector,
+                               idx::AbstractVector)
+    risk_frontier = copy(risk_frontier)
+    r = factory(view(noc.r, idx), pr, noc.opt.slv)
+    for (i, ri) ∈ zip(idx, r)
+        (; N, factor, flag) = risk_frontier[i].second[2]
+        rk_min = expected_risk(ri, w_min, pr.X, noc.opt.fees)
+        rk_max = expected_risk(ri, w_max, pr.X, noc.opt.fees)
+        rk_min, rk_max = if flag
+            factor * sqrt(rk_min), factor * sqrt(rk_max)
+        else
+            factor * rk_min, factor * rk_max
+        end
+        ub = range(; start = rk_min, stop = rk_max, length = N)
+        risk_frontier[i] = risk_frontier[i].first => (risk_frontier[i].second[1], ub)
+    end
+    return risk_frontier
+end
+function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                         <:Any, <:Any, <:Any, <:Any, <:Any,
+                                                         <:Any,
+                                                         <:ConstrainedNearOptimalCenteringAlgorithm},
+                               pr::AbstractPriorResult, risk_frontier::AbstractVector,
+                               w_min::AbstractVector, w_max::AbstractVector, args...)
+    risk_frontier = copy(risk_frontier)
+    r = factory(noc.r, pr, noc.opt.slv)
+    (; N, factor, flag) = risk_frontier[1].second[2]
+    rk_min = expected_risk(r, w_min, pr.X, noc.opt.fees)
+    rk_max = expected_risk(r, w_max, pr.X, noc.opt.fees)
+    rk_min, rk_max = if flag
+        factor * sqrt(rk_min), factor * sqrt(rk_max)
+    else
+        factor * rk_min, factor * rk_max
+    end
+    ub = range(; start = rk_min, stop = rk_max, length = N)
+    return [risk_frontier[1].first => (risk_frontier[1].second[1], ub)]
+end
+function compute_risk_ubs(model::JuMP.Model,
+                          noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                    <:Any, <:Any, <:Any, <:Any, <:Any,
+                                                    <:Any,
+                                                    <:ConstrainedNearOptimalCenteringAlgorithm},
                           pr::AbstractPriorResult, w_min::AbstractVector,
                           w_max::AbstractVector)
     risk_frontier = model[:risk_frontier]
@@ -373,8 +419,7 @@ function compute_risk_ubs(model::JuMP.Model, noc::NearOptimalCentering,
     if isempty(idx)
         return risk_frontier
     end
-    #! Compute risk upper bounds for the risk frontier using w_min and w_max
-    return nothing
+    return rebuild_risk_frontier(noc, pr, risk_frontier, w_min, w_max, idx)
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
