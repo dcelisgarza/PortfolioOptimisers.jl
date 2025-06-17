@@ -71,9 +71,9 @@ function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
     w = model[w_key]
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     sd_risk = model[key] = @variable(model)
-    model[Symbol(:csd_risk_soc, i)] = @constraint(model,
-                                                  [sc * sd_risk; sc * G * w] ∈
-                                                  SecondOrderCone())
+    model[Symbol(:csd_risk_soc_, i)] = @constraint(model,
+                                                   [sc * sd_risk; sc * G * w] ∈
+                                                   SecondOrderCone())
     return sd_risk, key
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::StandardDeviation,

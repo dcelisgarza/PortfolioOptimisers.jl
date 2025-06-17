@@ -242,7 +242,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     if unconstrained
         r, opt = nb_r, nb_opt
     end
-    return w_opt, rk_opt, rt_opt, r, opt
+    return w_opt, rk_opt, rt_opt, r, opt, rk_min, rt_min, rk_max, rt_max
 end
 function set_near_optimal_centering_constraints!(model::JuMP.Model, rk::Real, rt::Real,
                                                  wb::WeightBoundsResult)
@@ -286,17 +286,9 @@ function set_near_optimal_objective_function!(::ConstrainedNearOptimalCenteringA
     so = model[:so]
     obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, opt.wb)
     add_penalty_to_objective!(model, 1, obj_expr)
-    add_custom_objective_term!(model, opt.ret, opt.cobj, obj_expr, opt, opt.pr)
+    add_custom_objective_term!(model, opt.ret, opt.cobj, obj_expr, opt, opt.pe)
     @objective(model, Min, so * obj_expr)
     return nothing
-end
-function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:UnconstrainedNearOptimalCenteringAlgorithm},
-                    model::JuMP.Model, rk_opt::Real, rt_opt::Real,
-                    opt::BaseJuMPOptimisationEstimator)
-    set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
-    return optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
 end
 function unregister_noc_variables!(model::JuMP.Model)
     if !haskey(model, :log_ret)
@@ -321,6 +313,11 @@ function unregister_noc_variables!(model::JuMP.Model)
     unregister(model, :obj_expr)
     return nothing
 end
+function solve_noc!(noc::NearOptimalCentering, model::JuMP.Model, rk_opt::Real,
+                    rt_opt::Real, opt::BaseJuMPOptimisationEstimator, args...)
+    set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
+    return optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
+end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:UnconstrainedNearOptimalCenteringAlgorithm},
@@ -337,12 +334,42 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     end
     return retcodes, sols
 end
+function compute_ret_lbs(lbs::Frontier, rt_min::Real, rt_max::Real)
+    return range(; start = rt_min, stop = rt_max, length = lbs.N)
+end
+function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:ConstrainedNearOptimalCenteringAlgorithm},
+                    model::JuMP.Model, rk_opts::AbstractVector{<:Real},
+                    rt_opts::AbstractVector{<:Real}, opt::BaseJuMPOptimisationEstimator,
+                    rk_min::Real, rt_min::Real, rk_max::Real, rt_max::Real, ::Val{true},
+                    ::Val{false})
+    lbs = compute_ret_lbs(model[:ret_frontier], rt_min, rt_max)
+    sc = model[:sc]
+    ret_expr = model[:ret]
+    retcodes = Vector{OptimisationReturnCode}(undef, length(rk_opts))
+    sols = Vector{JuMPOptimisationSolution}(undef, length(rk_opts))
+    for (i, (rk_opt, rt_opt, lb)) ∈ enumerate(zip(rk_opts, rt_opts, lbs))
+        if i != 1
+            delete(model, model[:ret_lb])
+            unregister(model, :ret_lb)
+            unregister(model, :obj_expr)
+        end
+        @constraint(model, ret_lb, sc * (ret_expr - lb) >= 0)
+        unregister_noc_variables!(model)
+        set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
+        retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
+        retcodes[i] = retcode
+        sols[i] = sol
+    end
+    return retcodes, sols
+end
 function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:UnconstrainedNearOptimalCenteringAlgorithm},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    w_opt, rk_opt, rt_opt, r, opt = near_optimal_centering_setup(noc, rd; dims = dims)
+    w_opt, rk_opt, rt_opt, r, opt = near_optimal_centering_setup(noc, rd; dims = dims)[1:5]
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
@@ -364,7 +391,9 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                              <:ConstrainedNearOptimalCenteringAlgorithm},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    w_opt, rk_opt, rt_opt, r, opt = near_optimal_centering_setup(noc, rd; dims = dims)
+    w_opt, rk_opt, rt_opt, r, opt, rk_min, rt_min, rk_max, rt_max = near_optimal_centering_setup(noc,
+                                                                                                 rd;
+                                                                                                 dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
@@ -389,8 +418,11 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_sdp_philogeny_constraints!(model, opt.nplg, :sdp_nplg)
     set_sdp_philogeny_constraints!(model, opt.cplg, :sdp_cplg)
     add_custom_constraint!(model, opt.ccnt, opt, opt.pe)
-    set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
-    retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
+    # set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
+    # retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
+    retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, rk_min, rt_min, rk_max,
+                              rt_max, Val(haskey(model, :ret_frontier)),
+                              Val(haskey(model, :risk_frontier)))
     return JuMPOptimisationResult(typeof(noc), opt.pe, opt.wb, opt.lcs, opt.cent, opt.gcard,
                                   opt.sgcard, opt.smtx, opt.nplg, opt.cplg, opt.ret,
                                   retcode, sol, ifelse(save, model, nothing))
