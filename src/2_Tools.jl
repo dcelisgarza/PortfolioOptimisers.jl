@@ -219,9 +219,11 @@ outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A),
 ⊕(A::AbstractArray, B::AbstractArray) = A .+ B
 ⊕(A::Real, B::AbstractArray) = A .+ B
 ⊕(A::AbstractArray, B::Real) = A .+ B
+⊕(A, B) = A + B
 ⊖(A::AbstractArray, B::AbstractArray) = A - B
 ⊖(A::AbstractArray, B) = A .- B
 ⊖(A, B::AbstractArray) = A .- B
+⊖(A, B) = A - B
 function dot_scalar(a::Real, b::AbstractVector)
     return a * sum(b)
 end

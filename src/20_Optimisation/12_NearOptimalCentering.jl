@@ -208,7 +208,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     if w_opt_flag
         res_opt = optimise!(MeanRisk(; r = r, obj = noc.obj, opt = opt, wi = noc.w_opt_ini),
                             rd; save = false)
-        if !isa(res_opt.w, AbstractVector)
+        if !isa(res_opt.retcode, AbstractVector)
             @smart_assert(isa(res_opt.retcode, OptimisationSuccess))
         else
             @smart_assert(all(isa.(res_opt.retcode, Ref(OptimisationSuccess))))
