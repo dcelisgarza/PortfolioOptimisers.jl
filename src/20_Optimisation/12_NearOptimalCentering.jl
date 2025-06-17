@@ -290,7 +290,53 @@ function set_near_optimal_objective_function!(::ConstrainedNearOptimalCenteringA
     @objective(model, Min, so * obj_expr)
     return nothing
 end
-function solve_unconstrained_noc!() end
+function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:UnconstrainedNearOptimalCenteringAlgorithm},
+                    model::JuMP.Model, rk_opt::Real, rt_opt::Real,
+                    opt::BaseJuMPOptimisationEstimator)
+    set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
+    return optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
+end
+function unregister_noc_variables!(model::JuMP.Model)
+    if !haskey(model, :log_ret)
+        return nothing
+    end
+    delete(model, model[:log_ret])
+    unregister(model, :log_ret)
+    delete(model, model[:log_risk])
+    unregister(model, :log_risk)
+    delete(model, model[:log_w])
+    unregister(model, :log_w)
+    delete(model, model[:log_delta_w])
+    unregister(model, :log_delta_w)
+    delete(model, model[:clog_risk])
+    unregister(model, :clog_risk)
+    delete(model, model[:clog_ret])
+    unregister(model, :clog_ret)
+    delete(model, model[:clog_w])
+    unregister(model, :clog_w)
+    delete(model, model[:clog_delta_w])
+    unregister(model, :clog_delta_w)
+    unregister(model, :obj_expr)
+    return nothing
+end
+function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:UnconstrainedNearOptimalCenteringAlgorithm},
+                    model::JuMP.Model, rk_opts::AbstractVector{<:Real},
+                    rt_opts::AbstractVector{<:Real}, opt::BaseJuMPOptimisationEstimator)
+    retcodes = sizehint!(Vector{OptimisationReturnCode}(undef, 0), length(rk_opts))
+    sols = sizehint!(Vector{JuMPOptimisationSolution}(undef, 0), length(rk_opts))
+    for (rk_opt, rt_opt) ∈ zip(rk_opts, rt_opts)
+        unregister_noc_variables!(model)
+        set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
+        retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
+        push!(retcodes, retcode)
+        push!(sols, sol)
+    end
+    return retcodes, sols
+end
 function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:UnconstrainedNearOptimalCenteringAlgorithm},
@@ -306,9 +352,9 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing)
     scalarise_risk_expression!(model, opt.sce)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe)
-    #! this into solve_unconstrained_noc, dispatch on rk_opt and rt_opt being abstractvectors or soemthing else
-    set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
-    retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
+    # set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
+    # retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
+    retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
     return JuMPOptimisationResult(typeof(noc), opt.pe, opt.wb, opt.lcs, opt.cent, opt.gcard,
                                   opt.sgcard, opt.smtx, opt.nplg, opt.cplg, opt.ret,
                                   retcode, sol, ifelse(save, model, nothing))
@@ -349,26 +395,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                   opt.sgcard, opt.smtx, opt.nplg, opt.cplg, opt.ret,
                                   retcode, sol, ifelse(save, model, nothing))
 end
-function unregister_noc_frontier!(model::JuMP.Model)
-    delete(model, model[:log_ret])
-    unregister(model, :log_ret)
-    delete(model, model[:log_risk])
-    unregister(model, :log_risk)
-    delete(model, model[:log_w])
-    unregister(model, :log_w)
-    delete(model, model[:log_delta_w])
-    unregister(model, :log_delta_w)
-    delete(model, model[:clog_risk])
-    unregister(model, :clog_risk)
-    delete(model, model[:clog_ret])
-    unregister(model, :clog_ret)
-    delete(model, model[:clog_w])
-    unregister(model, :clog_w)
-    delete(model, model[:clog_delta_w])
-    unregister(model, :clog_delta_w)
-    unregister(model, :obj_expr)
-    return nothing
-end
+
 function near_opt_centering_resolve(model::JuMP.Model, noc::NearOptimalCentering,
                                     w::AbstractVector, rd::ReturnsResult, dims::Int)
     noc.w_opt .= w
@@ -378,7 +405,7 @@ function near_opt_centering_resolve(model::JuMP.Model, noc::NearOptimalCentering
     end
     #! This can be made more efficient by not recomputing the minimum and maximum risks. But means lifting the computation of rk_opt and rt_opt into a separate function that takes rk_delta and rt_delta. It means creating a new near_optimal_centering_setup function that returns rk_delta, rt_delta and opt which is called before the first invoaction of near_opt_centering_resolve, they would also be outputed by efficient_frontier_bounds.
     rk_opt, rt_opt, opt = near_optimal_centering_setup(noc, rd; dims = dims)[[2, 3, 5]]
-    unregister_noc_frontier!(model)
+    unregister_noc_variables!(model)
     set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
     return optimise_JuMP_model!(model, noc, eltype(w))
 end
