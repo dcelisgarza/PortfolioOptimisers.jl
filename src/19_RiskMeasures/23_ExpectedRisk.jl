@@ -14,20 +14,26 @@ function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRisk
                                 <:RelativeRelativisticDrawdownatRisk, <:Range,
                                 <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
                                 <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
-                                <:MeanReturn}, w::AbstractVector, X::AbstractMatrix,
+                                <:MeanReturn}, w::AbstractVector{<:Real}, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, X, fees))
 end
 function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                                 <:RiskTrackingRiskMeasure, <:SquareRootKurtosis,
-                                <:ThirdCentralMoment, <:Skewness}, w::AbstractVector,
-                       X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+                                <:ThirdCentralMoment, <:Skewness},
+                       w::AbstractVector{<:Real}, X::AbstractMatrix,
+                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(w, X, fees)
 end
 function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,
                                 <:TurnoverRiskMeasure, <:Variance, <:UncertaintySetVariance,
-                                <:EqualRiskMeasure}, w::AbstractVector, args...; kwargs...)
+                                <:EqualRiskMeasure}, w::AbstractVector{<:Real}, args...;
+                       kwargs...)
     return r(w)
+end
+function expected_risk(r::AbstractBaseRiskMeasure, w::AbstractVector{<:AbstractVector},
+                       args...; kwargs...)
+    return [expected_risk(r, wi, args...; kwargs...) for wi ∈ w]
 end
 function number_effective_assets(w::AbstractVector)
     return inv(dot(w, w))

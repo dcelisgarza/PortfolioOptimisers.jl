@@ -210,6 +210,12 @@ function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector
 end
 ⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
 outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
+⊕(A::AbstractArray, B::AbstractArray) = A .+ B
+⊕(A::Real, B::AbstractArray) = A .+ B
+⊕(A::AbstractArray, B::Real) = A .+ B
+⊖(A::AbstractArray, B::AbstractArray) = A .- B
+⊖(A::Real, B::AbstractArray) = A .- B
+⊖(A::AbstractArray, B::Real) = A .- B
 ⊙(A::AbstractArray, B::AbstractArray) = A .* B
 ⊙(A::AbstractArray, B) = A * B
 ⊙(A, B::AbstractArray) = A * B
@@ -236,6 +242,9 @@ function nothing_scalar_array_view(x::Real, ::Any)
 end
 function nothing_scalar_array_view(x::AbstractVector, i)
     return view(x, i)
+end
+function nothing_scalar_array_view(x::AbstractVector{<:AbstractVector}, i)
+    return view.(x, Ref(i))
 end
 function nothing_scalar_array_view(x::AbstractArray, i)
     return view(x, i, i)

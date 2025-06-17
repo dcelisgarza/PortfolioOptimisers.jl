@@ -25,8 +25,8 @@ function opt_view(mr::MeanRisk, i::AbstractVector, X::AbstractMatrix)
     wi = nothing_scalar_array_view(mr.wi, i)
     return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi)
 end
-function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
-                         pr::AbstractPriorResult, args...)
+function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
+                          pr::AbstractPriorResult, args...)
     set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
     return optimise_JuMP_model!(model, mr, eltype(pr.X))
 end
@@ -47,8 +47,8 @@ function compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk,
     rt_max = expected_returns(ret, sol_max.w, pr, mr.opt.fees)
     return range(; start = rt_min, stop = rt_max, length = lbs.N)
 end
-function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
-                         pr::AbstractPriorResult, ::Val{true}, ::Val{false})
+function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
+                          pr::AbstractPriorResult, ::Val{true}, ::Val{false})
     lbs = compute_ret_lbs(model[:ret_frontier], model, mr, ret, pr)
     sc = model[:sc]
     k = model[:k]
@@ -134,8 +134,8 @@ function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     end
     return rebuild_risk_frontier(model, mr, ret, pr, risk_frontier, idx)
 end
-function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
-                         pr::AbstractPriorResult, ::Val{false}, ::Val{true})
+function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
+                          pr::AbstractPriorResult, ::Val{false}, ::Val{true})
     risk_frontier = compute_risk_ubs(model, mr, ret, pr)
     itrs = [(Iterators.repeated(rkf[1], length(rkf[2][2])),
              Iterators.repeated(rkf[2][1], length(rkf[2][2])), rkf[2][2])
@@ -192,8 +192,8 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_sdp_philogeny_constraints!(model, nplg, :sdp_nplg)
     set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
-    retcode, sol = solve_mean_risk(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
-                                   Val(haskey(model, :risk_frontier)))
+    retcode, sol = solve_mean_risk!(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
+                                    Val(haskey(model, :risk_frontier)))
     return JuMPOptimisationResult(typeof(mr), pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
                                   cplg, ret, retcode, sol, ifelse(save, model, nothing))
 end

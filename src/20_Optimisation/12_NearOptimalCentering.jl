@@ -32,8 +32,8 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               bins::Union{Nothing, <:Real} = nothing,
                               w_min::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               w_min_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                              w_opt::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                              w_opt_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                              w_opt::Union{Nothing, <:AbstractVector} = nothing,
+                              w_opt_ini::Union{Nothing, <:AbstractVector} = nothing,
                               w_max::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               w_max_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               ucs_flag::Bool = true,
@@ -109,7 +109,11 @@ function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:Risk
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
     risk_min = zero(datatype)
-    risk_opt = zero(datatype)
+    risk_opt = if !isa(w_opt, AbstractVector{<:AbstractVector})
+        zero(datatype)
+    else
+        zeros(datatype, size(X, 2))
+    end
     risk_max = zero(datatype)
     for r ∈ rs
         scale = r.settings.scale
@@ -129,7 +133,8 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
     risk_min = zero(datatype)
-    risk_opt = zero(datatype)
+    flag = !isa(w_opt, AbstractVector{<:AbstractVector})
+    risk_opt = flag ? zero(datatype) : zeros(datatype, size(X, 2))
     risk_max = zero(datatype)
     gamma = scalarisation.gamma
     for r ∈ rs
@@ -140,7 +145,7 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
     end
     igamma = inv(gamma)
     risk_min = log(risk_min) * igamma
-    risk_opt = log(risk_opt) * igamma
+    risk_opt = (flag ? log(risk_opt) : log.(risk_opt)) * igamma
     risk_max = log(risk_max) * igamma
     return risk_min, risk_opt, risk_max
 end
@@ -154,7 +159,8 @@ function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:Risk
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
     risk_min = typemin(datatype)
-    risk_opt = typemin(datatype)
+    flag = !isa(w_opt, AbstractVector{<:AbstractVector})
+    risk_opt = flag ? zero(datatype) : zeros(datatype, size(X, 2))
     risk_max = typemin(datatype)
     for r ∈ rs
         scale = r.settings.scale
@@ -164,8 +170,13 @@ function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:Risk
         if risk_min_i >= risk_min
             risk_min = risk_min_i
         end
-        if risk_opt_i >= risk_opt
-            risk_opt = risk_opt_i
+        if flag
+            if risk_opt_i >= risk_opt
+                risk_opt = risk_opt_i
+            end
+        else
+            idx = risk_opt_i .>= risk_opt
+            risk_opt[idx] = risk_opt_i[idx]
         end
         if risk_max_i >= risk_max
             risk_max = risk_max_i
@@ -197,7 +208,11 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     if w_opt_flag
         res_opt = optimise!(MeanRisk(; r = r, obj = noc.obj, opt = opt, wi = noc.w_opt_ini),
                             rd; save = false)
-        @smart_assert(isa(res_opt.retcode, OptimisationSuccess))
+        if !isa(res_opt.w, AbstractVector)
+            @smart_assert(isa(res_opt.retcode, OptimisationSuccess))
+        else
+            @smart_assert(all(isa.(res_opt.retcode, Ref(OptimisationSuccess))))
+        end
         w_opt = res_opt.w
     end
     if w_max_flag
@@ -222,8 +237,8 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     end
     rk_delta = (rk_max - rk_min) * ibins
     rt_delta = (rt_max - rt_min) * ibins
-    rk_opt += rk_delta
-    rt_opt -= rt_delta
+    rk_opt = rk_opt ⊕ rk_delta
+    rt_opt = rt_opt ⊖ rt_delta
     if unconstrained
         r, opt = nb_r, nb_opt
     end
@@ -275,6 +290,7 @@ function set_near_optimal_objective_function!(::ConstrainedNearOptimalCenteringA
     @objective(model, Min, so * obj_expr)
     return nothing
 end
+function solve_unconstrained_noc!() end
 function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:UnconstrainedNearOptimalCenteringAlgorithm},
@@ -290,6 +306,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing)
     scalarise_risk_expression!(model, opt.sce)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe)
+    #! this into solve_unconstrained_noc, dispatch on rk_opt and rt_opt being abstractvectors or soemthing else
     set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
     retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
     return JuMPOptimisationResult(typeof(noc), opt.pe, opt.wb, opt.lcs, opt.cent, opt.gcard,

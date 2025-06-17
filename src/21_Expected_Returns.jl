@@ -1,14 +1,18 @@
-function expected_returns(::ArithmeticReturn, w::AbstractVector, pr::AbstractPriorResult,
-                          fees::Union{Nothing, Fees} = nothing)
+function expected_returns(::ArithmeticReturn, w::AbstractVector{<:Real},
+                          pr::AbstractPriorResult, fees::Union{Nothing, Fees} = nothing)
     mu = pr.mu
     return dot(w, mu) - calc_fees(w, fees)
 end
-function expected_returns(ret::KellyReturn, w::AbstractVector, pr::AbstractPriorResult,
-                          fees::Union{Nothing, Fees} = nothing)
+function expected_returns(ret::KellyReturn, w::AbstractVector{<:Real},
+                          pr::AbstractPriorResult, fees::Union{Nothing, Fees} = nothing)
     rw = ret.w
     X = pr.X
     kret = isnothing(rw) ? mean(log1p.(X * w)) : mean(log1p.(X * w), rw)
     return kret - calc_fees(w, fees)
+end
+function expected_returns(ret::JuMPReturnsEstimator, w::AbstractVector{<:AbstractVector},
+                          pr::AbstractPriorResult, fees::Union{Nothing, Fees} = nothing)
+    return expected_returns.(Ref(ret), w, Ref(pr), Ref(fees))
 end
 function expected_sharpe_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
                                w::AbstractVector, pr::AbstractPriorResult,
