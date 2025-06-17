@@ -4,14 +4,14 @@ end
 function set_risk_upper_bound!(model::JuMP.Model,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
                                        <:RiskBudgetting}, r_expr::AbstractJuMPScalar,
-                               ub::AbstractVector, key)
+                               ub::Union{<:AbstractVector, <:Frontier}, key)
     bound_key = Symbol(key, :_ub)
     if !haskey(model, :risk_frontier)
         risk_frontier = @expression(model, risk_frontier,
                                     Pair{Symbol,
                                          <:Tuple{<:AbstractJuMPScalar,
-                                                 <:AbstractVector{<:Real}}}[bound_key => (r_expr,
-                                                                                          ub)])
+                                                 <:Union{<:AbstractVector, <:Frontier}}}[bound_key => (r_expr,
+                                                                                                       ub)])
     else
         risk_frontier = model[:risk_frontier]
         push!(risk_frontier, bound_key => (r_expr, ub))
@@ -55,8 +55,8 @@ function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                              <:RiskBudgetting},
                                                   r_expr_ub::AbstractJuMPScalar,
                                                   ub::Union{Nothing, <:Real,
-                                                            <:AbstractVector}, key::Symbol,
-                                                  r_expr::AbstractJuMPScalar,
+                                                            <:AbstractVector, <:Frontier},
+                                                  key::Symbol, r_expr::AbstractJuMPScalar,
                                                   settings::RiskMeasureSettings)
     set_risk_upper_bound!(model, opt, r_expr_ub, ub, key)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
@@ -162,6 +162,9 @@ function variance_risk_bounds_expr(model::JuMP.Model, i::Any, flag::Bool)
         key = Symbol(:dev_, i)
         model[key], key
     end
+end
+function variance_risk_bounds_val(flag::Bool, ub::Frontier)
+    return flag ? ub : Frontier(; N = ub.N, factor = 1, flag = true)
 end
 function variance_risk_bounds_val(flag::Bool, ub::AbstractVector)
     return flag ? ub : sqrt.(ub)
@@ -399,11 +402,19 @@ function set_second_moment_risk!(model::JuMP.Model, ::SqrtRiskExpr, i::Any, fact
     factor = sqrt(factor)
     return model[key] = @expression(model, factor * tsecond_moment), factor
 end
+function second_moment_bound_val(formulation::SecondMomentFormulation, ub::Frontier,
+                                 factor::Real)
+    return if isa(formulation, Union{<:QuadRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr})
+        Frontier(; N = ub.N, factor = factor, flag = true)
+    else
+        ub
+    end
+end
 function second_moment_bound_val(formulation::SecondMomentFormulation, ub::AbstractVector,
                                  factor::Real)
     return factor *
            if isa(formulation, Union{<:QuadRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr})
-        return sqrt.(ub)
+        sqrt.(ub)
     else
         ub
     end

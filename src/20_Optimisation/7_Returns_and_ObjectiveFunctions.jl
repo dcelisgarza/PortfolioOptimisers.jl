@@ -1,7 +1,7 @@
 function bounds_returns_estimator end
 struct ArithmeticReturn{T1 <: Union{Nothing, <:AbstractUncertaintySetResult,
                                     <:AbstractUncertaintySetEstimator},
-                        T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
+                        T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:Frontier}} <:
        JuMPReturnsEstimator
     ucs::T1
     lb::T2
@@ -9,7 +9,7 @@ end
 function ArithmeticReturn(;
                           ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                      <:AbstractUncertaintySetEstimator} = nothing,
-                          lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+                          lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:Frontier} = nothing)
     if isa(ucs, EllipseUncertaintySetResult)
         @smart_assert(isa(ucs,
                           EllipseUncertaintySetResult{<:Any, <:Any,
@@ -30,13 +30,13 @@ function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
     return flag ? ArithmeticReturn(; ucs = r.ucs) : ArithmeticReturn()
 end
 struct KellyReturn{T1 <: Union{Nothing, <:AbstractWeights},
-                   T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
+                   T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:Frontier}} <:
        JuMPReturnsEstimator
     w::T1
     lb::T2
 end
 function KellyReturn(; w::Union{Nothing, <:AbstractWeights} = nothing,
-                     lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+                     lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:Frontier} = nothing)
     if isa(w, AbstractVector)
         @smart_assert(!isempty(w))
     end
@@ -110,7 +110,7 @@ function set_return_bounds!(model::JuMP.Model, lb::Real)
     @constraint(model, ret_lb, sc * (ret - lb * k) >= 0)
     return nothing
 end
-function set_return_bounds!(model::JuMP.Model, lb::AbstractVector)
+function set_return_bounds!(model::JuMP.Model, lb::Union{<:AbstractVector, <:Frontier})
     @expression(model, ret_frontier, lb)
     return nothing
 end

@@ -30,9 +30,26 @@ function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstima
     set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
     return optimise_JuMP_model!(model, mr, eltype(pr.X))
 end
+function compute_ret_lbs(lbs::AbstractVector, args...)
+    return lbs
+end
+function compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk,
+                         ret::JuMPReturnsEstimator, pr::AbstractPriorResult)
+    set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
+    retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(pr.X))
+    @smart_assert(isa(retcode, OptimisationSuccess))
+    unregister(model, :obj_expr)
+    set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
+    retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(pr.X))
+    @smart_assert(isa(retcode, OptimisationSuccess))
+    unregister(model, :obj_expr)
+    rt_min = expected_returns(ret, sol_min.w, pr, mr.opt.fees)
+    rt_max = expected_returns(ret, sol_max.w, pr, mr.opt.fees)
+    return range(; start = rt_min, stop = rt_max, length = lbs.N)
+end
 function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
                          pr::AbstractPriorResult, ::Val{true}, ::Val{false})
-    lbs = model[:ret_frontier]
+    lbs = compute_ret_lbs(model[:ret_frontier], model, mr, ret, pr)
     sc = model[:sc]
     k = model[:k]
     ret_expr = model[:ret]
