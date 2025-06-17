@@ -88,9 +88,9 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
 end
 function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret = processed_jump_optimiser_attributes(frc.opt,
-                                                                                                  rd;
-                                                                                                  dims = dims)
+    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret) = processed_jump_optimiser_attributes(frc.opt,
+                                                                                                      rd;
+                                                                                                      dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)

@@ -9,9 +9,9 @@ function set_risk_upper_bound!(model::JuMP.Model,
     if !haskey(model, :risk_frontier)
         risk_frontier = @expression(model, risk_frontier,
                                     Pair{Symbol,
-                                         <:Tuple{<:AbstractJuMPScalar,
-                                                 <:Union{<:AbstractVector, <:Frontier}}}[bound_key => (r_expr,
-                                                                                                       ub)])
+                                         Tuple{<:AbstractJuMPScalar,
+                                               <:Union{<:AbstractVector, <:Frontier}}}[bound_key => (r_expr,
+                                                                                                     ub)])
     else
         risk_frontier = model[:risk_frontier]
         push!(risk_frontier, bound_key => (r_expr, ub))

@@ -69,16 +69,82 @@ function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstima
     end
     return retcodes, sols
 end
+function rebuild_risk_frontier(model::JuMP.Model,
+                               mr::MeanRisk{<:Any, <:AbstractVector, <:Any, <:Any},
+                               ret::JuMPReturnsEstimator, pr::AbstractPriorResult,
+                               risk_frontier::AbstractVector, idx::AbstractVector)
+    risk_frontier = copy(risk_frontier)
+    set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
+    retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(pr.X))
+    @smart_assert(isa(retcode, OptimisationSuccess))
+    unregister(model, :obj_expr)
+    set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
+    retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(pr.X))
+    @smart_assert(isa(retcode, OptimisationSuccess))
+    unregister(model, :obj_expr)
+    r = factory(view(mr.r, idx), pr, mr.opt.slv)
+    for (i, ri) ∈ zip(idx, r)
+        (; N, factor, flag) = risk_frontier[i].second[2]
+        rk_min = expected_risk(ri, sol_min.w, pr.X, mr.opt.fees)
+        rk_max = expected_risk(ri, sol_max.w, pr.X, mr.opt.fees)
+        rk_min, rk_max = if flag
+            factor * sqrt(rk_min), factor * sqrt(rk_max)
+        else
+            factor * rk_min, factor * rk_max
+        end
+        ub = range(; start = rk_min, stop = rk_max, length = N)
+        risk_frontier[i] = risk_frontier[i].first => (risk_frontier[i].second[1], ub)
+    end
+    return risk_frontier
+end
+function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:Any, <:Any},
+                               ret::JuMPReturnsEstimator, pr::AbstractPriorResult,
+                               risk_frontier::AbstractVector, args...)
+    set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
+    retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(pr.X))
+    @smart_assert(isa(retcode, OptimisationSuccess))
+    unregister(model, :obj_expr)
+    set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
+    retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(pr.X))
+    @smart_assert(isa(retcode, OptimisationSuccess))
+    unregister(model, :obj_expr)
+    (; N, factor, flag) = risk_frontier[1].second[2]
+    r = factory(mr.r, pr, mr.opt.slv)
+    rk_min = expected_risk(r, sol_min.w, pr.X, mr.opt.fees)
+    rk_max = expected_risk(r, sol_max.w, pr.X, mr.opt.fees)
+    rk_min, rk_max = if flag
+        factor * sqrt(rk_min), factor * sqrt(rk_max)
+    else
+        factor * rk_min, factor * rk_max
+    end
+    ub = range(; start = rk_min, stop = rk_max, length = N)
+    return [risk_frontier[1].first => (risk_frontier[1].second[1], ub)]
+end
+function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
+                          pr::AbstractPriorResult)
+    risk_frontier = model[:risk_frontier]
+    idx = Vector{Int}(undef, 0)
+    for (i, rkf) ∈ enumerate(risk_frontier)
+        if !isa(rkf.second[2], AbstractVector)
+            push!(idx, i)
+        end
+    end
+    if isempty(idx)
+        return risk_frontier
+    end
+    return rebuild_risk_frontier(model, mr, ret, pr, risk_frontier, idx)
+end
 function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
                          pr::AbstractPriorResult, ::Val{false}, ::Val{true})
-    k = model[:k]
-    sc = model[:sc]
-    risk_frontier = model[:risk_frontier]
-    itrs = [(Iterators.repeated(i[1], length(i[2][2])),
-             Iterators.repeated(i[2][1], length(i[2][2])), i[2][2]) for i ∈ risk_frontier]
+    risk_frontier = compute_risk_ubs(model, mr, ret, pr)
+    itrs = [(Iterators.repeated(rkf[1], length(rkf[2][2])),
+             Iterators.repeated(rkf[2][1], length(rkf[2][2])), rkf[2][2])
+            for rkf ∈ risk_frontier]
     pitrs = Iterators.product.(itrs...)
     retcodes = sizehint!(Vector{OptimisationReturnCode}(undef, 0), length(pitrs))
     sols = sizehint!(Vector{JuMPOptimisationSolution}(undef, 0), length(pitrs))
+    k = model[:k]
+    sc = model[:sc]
     for (keys, r_exprs, ubs) ∈ zip(pitrs[1], pitrs[2], pitrs[3])
         if haskey(model, :obj_expr)
             unregister(model, :obj_expr)
@@ -99,9 +165,9 @@ function solve_mean_risk(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstima
 end
 function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret = processed_jump_optimiser_attributes(mr.opt,
-                                                                                                  rd;
-                                                                                                  dims = dims)
+    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret) = processed_jump_optimiser_attributes(mr.opt,
+                                                                                                      rd;
+                                                                                                      dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)

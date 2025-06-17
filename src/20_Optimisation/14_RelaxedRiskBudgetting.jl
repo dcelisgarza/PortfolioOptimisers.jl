@@ -119,9 +119,9 @@ function set_relaxed_risk_budgetting_constraints!(model::JuMP.Model,
 end
 function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret = processed_jump_optimiser_attributes(rrb.opt,
-                                                                                                  rd;
-                                                                                                  dims = dims)
+    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret) = processed_jump_optimiser_attributes(rrb.opt,
+                                                                                                      rd;
+                                                                                                      dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)

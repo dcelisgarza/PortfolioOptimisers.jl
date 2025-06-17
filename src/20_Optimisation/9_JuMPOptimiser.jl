@@ -303,6 +303,28 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
                          so = opt.so, card = opt.card, scard = opt.scard, nea = opt.nea,
                          l1 = opt.l1, l2 = opt.l2, ss = opt.ss, strict = opt.strict)
 end
+struct ProcessedJuMPOptimiserAttributes{T1 <: AbstractPriorResult,
+                                        T2 <: Union{Nothing, <:WeightBoundsResult},
+                                        T3 <: Union{Nothing, <:LinearConstraintResult},
+                                        T4 <: Union{Nothing, <:LinearConstraintResult},
+                                        T5 <: Union{Nothing, <:LinearConstraintResult},
+                                        T6 <: Union{Nothing, <:LinearConstraintResult},
+                                        T7 <: Union{Nothing, Symbol, <:AbstractString,
+                                                    <:AbstractMatrix},
+                                        T8 <: Union{Nothing, <:PhilogenyConstraintResult},
+                                        T9 <: Union{Nothing, <:PhilogenyConstraintResult},
+                                        T10 <: JuMPReturnsEstimator} <: AbstractResult
+    pr::T1
+    wb::T2
+    lcs::T3
+    cent::T4
+    gcard::T5
+    sgcard::T6
+    smtx::T7
+    nplg::T8
+    cplg::T9
+    ret::T10
+end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
     pr = prior(opt.pe, rd.X, rd.F; dims = dims)
@@ -317,7 +339,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     nplg = philogeny_constraints(opt.nplg, pr.X)
     cplg = philogeny_constraints(opt.cplg, pr.X)
     ret = jump_returns_factory(opt.ret, pr)
-    return pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret
+    return ProcessedJuMPOptimiserAttributes(pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
+                                            cplg, ret)
 end
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = propertynames(opt)
@@ -327,9 +350,9 @@ function no_bounds_optimiser(opt::JuMPOptimiser, args...)
                          p[(idx + 1):end]...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
-    pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret = processed_jump_optimiser_attributes(opt,
-                                                                                                  rd;
-                                                                                                  dims = dims)
+    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret) = processed_jump_optimiser_attributes(opt,
+                                                                                                      rd;
+                                                                                                      dims = dims)
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = opt.lt, st = opt.st, lcs = lcs, lcm = opt.lcm, cent = cent,
                          gcard = gcard, sgcard = sgcard, smtx = smtx, sets = opt.sets,

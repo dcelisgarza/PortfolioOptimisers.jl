@@ -20,16 +20,27 @@ abstract type MuHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
 abstract type AbstractMomentHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
 
 abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
+struct Frontier{T1 <: Integer, T2 <: Real, T3 <: Bool} <: AbstractAlgorithm
+    N::T1
+    factor::T2
+    flag::T3
+end
+function Frontier(; N::Integer = 20, factor::Real = 1, flag::Bool = false)
+    @smart_assert(N > zero(N))
+    @smart_assert(factor > zero(factor))
+    return Frontier{typeof(N), typeof(factor), typeof(flag)}(N, factor, flag)
+end
 struct RiskMeasureSettings{T1 <: Real,
-                           T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                           T2 <:
+                           Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:Frontier},
                            T3 <: Bool} <: AbstractRiskMeasureSettings
     scale::T1
     ub::T2
     rke::T3
 end
 function RiskMeasureSettings(; scale::Real = 1.0,
-                             ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                             rke::Bool = true)
+                             ub::Union{Nothing, <:Real, <:AbstractVector{<:Real},
+                                       <:Frontier} = nothing, rke::Bool = true)
     if isa(ub, Real)
         @smart_assert(isfinite(ub) && ub > zero(ub))
     elseif isa(ub, AbstractVector)
@@ -78,5 +89,5 @@ function expected_risk end
 function no_bounds_risk_measure end
 function no_bounds_no_risk_expr_risk_measure end
 
-export RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser, MaxScalariser,
-       LogSumExpScalariser, expected_risk
+export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
+       MaxScalariser, LogSumExpScalariser, expected_risk
