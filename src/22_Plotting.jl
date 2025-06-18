@@ -150,6 +150,62 @@ function plot_stacked_area_composition(w::AbstractArray, nx::AbstractVector = 1:
     Legend(f[lpos...], elements, string.(nx), "Assets")
     return f
 end
+function plot_clusters(clr::AbstractClusteringResult, X::AbstractMatrix,
+                       nx::AbstractVector = 1:size(X, 1);
+                       f::Union{Nothing, Figure} = Figure(), fpos::Tuple = (1, 1),
+                       ax_kwargs::NamedTuple = (; yreversed = true,
+                                                xticklabelrotation = pi / 2, aspect = 1,
+                                                title = "Clusters"),
+                       color_func = x -> if any(x .< Ref(zero(eltype(x))))
+                           (-1, 1)
+                       else
+                           (0, 1)
+                       end, heatmap_kwargs::NamedTuple = (; colormap = :viridis),
+                       lines_kwargs::NamedTuple = (color = :black, linewidth = 3))
+    issquare(X)
+    iscov = any(!isone, diag(X))
+    if iscov
+        X = cov2cor(X)
+    end
+    colorrange = color_func(X)
+    N = size(X, 1)
+    X = view(X, clr.clustering.order, clr.clustering.order)
+    nx = view(nx, clr.clustering.order)
+    ticks = (1:size(X, 1), string.(nx))
+    idx = cutree(clr.clustering; k = clr.k)
+    cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
+    ax = Axis(f[fpos...]; yticks = ticks, xticks = ticks, ax_kwargs...)
+    heatmap!(ax, 1:N, 1:N, X; colorrange = colorrange, heatmap_kwargs...)
+    for (i, cl) ∈ pairs(cls)
+        a = [findfirst(x -> x == c, clr.clustering.order) for c ∈ cl]
+        a = a[.!isnothing.(a)]
+        xmin = minimum(a)
+        xmax = xmin + length(cl)
+        i1 = [findfirst(x -> x == c, -clr.clustering.merges[:, 1]) for c ∈ cl]
+        i1 = i1[.!isnothing.(i1)]
+        i2 = [findfirst(x -> x == c, -clr.clustering.merges[:, 2]) for c ∈ cl]
+        i2 = i2[.!isnothing.(i2)]
+        i3 = unique([i1; i2])
+        h = min(maximum(clr.clustering.heights[i3]) * 1.1, 1)
+        lines!(ax,
+               [xmin - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmin - 0.5,
+                xmin - 0.5, xmin - 0.5],
+               [xmin - 0.5, xmin - 0.5, xmin - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5,
+                xmax - 0.5, xmin - 0.5]; lines_kwargs...)
+    end
+    Colorbar(f[:, end + 1]; colorrange = colorrange,
+             colormap = if haskey(heatmap_kwargs, :colormap)
+                 heatmap_kwargs.colormap
+             else
+                 :viridis
+             end)
+    # heights = clr.clustering.heights
+    # sort_order = clr.clustering.order
+    # ordered_corr = rho[sort_order, sort_order]
+    # ordered_assets = assets[sort_order]
+    # return cutree(clr.clustering; k = clr.k)
+    return f
+end
 
 export plot_asset_cumulative_returns, plot_ptf_cumulative_returns, plot_composition,
-       plot_stacked_bar_composition, plot_stacked_area_composition
+       plot_stacked_bar_composition, plot_stacked_area_composition, plot_clusters
