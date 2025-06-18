@@ -164,39 +164,37 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
     trials = Dict()
     success = false
     for solver ∈ opt.opt.slv
-        name = solver.name
-        solver_i = solver.solver
-        settings = solver.settings
-        add_bridges = solver.add_bridges
-        check_sol = solver.check_sol
-        set_optimizer(model, solver_i; add_bridges = add_bridges)
-        if !isnothing(settings)
-            for (k, v) ∈ settings
+        try
+            set_optimizer(model, solver.solver; add_bridges = solver.add_bridges)
+        catch err
+            trials[solver.name] = Dict(:set_optimiser => err)
+            continue
+        end
+        if !isnothing(solver.settings)
+            for (k, v) ∈ solver.settings
                 set_attribute(model, k, v)
             end
         end
         try
             JuMP.optimize!(model)
-        catch jump_error
-            push!(trials, name => Dict(:jump_error => jump_error))
+        catch err
+            trials[solver.name] = Dict(:optimize! => err)
             continue
         end
         all_finite_weights = all(isfinite, value.(model[:w]))
         all_non_zero_weights = !all(isapprox.(abs.(value.(model[:w])), zero(datatype)))
         try
-            assert_is_solved_and_feasible(model; check_sol...)
+            assert_is_solved_and_feasible(model; solver.check_sol...)
             if all_finite_weights && all_non_zero_weights
                 success = true
                 break
             end
         catch err
-            push!(trials,
-                  name => Dict(:objective_val => objective_value(model), :err => err,
-                               :settings => settings))
+            trials[solver.name] = Dict(:assert_is_solved_and_feasible => err,
+                                       :settings => solver.settings)
         end
-        push!(trials,
-              name => Dict(:objective_val => objective_value(model),
-                           :err => solution_summary(model), :settings => settings))
+        trials[solver.name] = Dict(:err => solution_summary(model),
+                                   :settings => solver.settings)
     end
     retcode = if success
         OptimisationSuccess(; res = trials)
