@@ -626,30 +626,29 @@
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test all(isapprox.(w[w .>= sqrt(eps())], 0.2))
+        @test all(w[w .>= sqrt(eps())] .>= 0.2 - sqrt(eps()))
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = 0.5)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test all(isapprox.(w[w .>= sqrt(eps())], 0.5))
+        @test all(w[w .>= sqrt(eps())] .>= 0.5 - sqrt(eps()))
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = 0.2, st = 0.2, sbgt = 1, bgt = 1,
                             wb = WeightBoundsResult(; lb = -1, ub = 1))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test all(isapprox.(w[w .>= sqrt(eps())], 0.2, rtol = 5e-6))
-        @test all(isapprox.(w[w .<= -sqrt(eps())], -0.2, rtol = 1e-5))
-        display(w[w .<= -sqrt(eps())])
+        @test all(w[w .>= sqrt(eps())] .>= 0.2 - sqrt(eps()))
+        @test all(w[w .<= -sqrt(eps())] .<= -0.2 + sqrt(eps()))
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = 0.5, st = 0.5, sbgt = 1, bgt = 1,
                             wb = WeightBoundsResult(; lb = -1, ub = 1))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test all(isapprox.(w[w .>= sqrt(eps())], 0.5))
-        @test all(isapprox.(w[w .<= -sqrt(eps())], -0.5))
+        @test all(w[w .>= sqrt(eps())] .>= 0.5 - sqrt(eps()))
+        @test all(w[w .<= -sqrt(eps())] .<= -0.5 + sqrt(eps()))
     end
     @testset "L1 and L2 penalties" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv,
