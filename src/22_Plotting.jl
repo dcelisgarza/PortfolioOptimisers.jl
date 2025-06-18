@@ -150,6 +150,69 @@ function plot_stacked_area_composition(w::AbstractArray, nx::AbstractVector = 1:
     Legend(f[lpos...], elements, string.(nx), "Assets")
     return f
 end
+function plot_dendrogram(hclust::Hclust)
+    f = Figure()
+    ax = Axis(f[1, 1])
+    n = length(hclust.order)
+
+    # Map leaf index to its x-position in the plot
+    leaf_positions = Dict(hclust.order[i] => i for i ∈ 1:n)
+
+    # Store the (x, y) coordinates of the top of the vertical line for each cluster
+    cluster_coords = Dict{Int, Point2f}()
+
+    # Store all line segments to be plotted
+    segments = Point2f[]
+
+    # Iterate through the merges from lowest to highest
+    for i ∈ 1:(n - 1)
+        height = hclust.height[i]
+
+        # Get the two sub-clusters being merged
+        c1_id = hclust.merge[i, 1]
+        c2_id = hclust.merge[i, 2]
+
+        # Get coordinates for the first sub-cluster
+        x1, y1 = if c1_id < 0
+            (leaf_positions[-c1_id], 0.0f0) # It's a leaf
+        else
+            cluster_coords[c1_id] # It's a previously merged cluster
+        end
+
+        # Get coordinates for the second sub-cluster
+        x2, y2 = if c2_id < 0
+            (leaf_positions[-c2_id], 0.0f0) # It's a leaf
+        else
+            cluster_coords[c2_id] # It's a previously merged cluster
+        end
+
+        # Ensure x1 < x2 for consistent drawing
+        if x1 > x2
+            x1, x2 = x2, x1
+            y1, y2 = y2, y1
+        end
+
+        # Add vertical lines from the base of the clusters to the merge height
+        push!(segments, Point2f(x1, y1), Point2f(x1, height))
+        push!(segments, Point2f(x2, y2), Point2f(x2, height))
+
+        # Add the horizontal line connecting them at the merge height
+        push!(segments, Point2f(x1, height), Point2f(x2, height))
+
+        # Store the coordinates for the new cluster formed by this merge
+        # The x-position is the midpoint, the y-position is the height
+        cluster_coords[i] = Point2f((x1 + x2) / 2, height)
+    end
+
+    # Plot all segments at once
+    linesegments!(ax, segments; color = :black)
+
+    # Configure axis ticks and labels
+    ax.xticks = (1:n, string.(hclust.order))
+    ax.xlabel = "Sample"
+    ax.ylabel = "Distance"
+    return f
+end
 function plot_clusters(clr::AbstractClusteringResult, X::AbstractMatrix,
                        nx::AbstractVector = 1:size(X, 1);
                        f::Union{Nothing, Figure} = Figure(), fpos::Tuple = (1, 1),
@@ -199,13 +262,9 @@ function plot_clusters(clr::AbstractClusteringResult, X::AbstractMatrix,
              else
                  :viridis
              end)
-    # heights = clr.clustering.heights
-    # sort_order = clr.clustering.order
-    # ordered_corr = rho[sort_order, sort_order]
-    # ordered_assets = assets[sort_order]
-    # return cutree(clr.clustering; k = clr.k)
     return f
 end
 
 export plot_asset_cumulative_returns, plot_ptf_cumulative_returns, plot_composition,
-       plot_stacked_bar_composition, plot_stacked_area_composition, plot_clusters
+       plot_stacked_bar_composition, plot_stacked_area_composition, plot_clusters,
+       get_makie_dendrogram_data
