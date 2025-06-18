@@ -374,9 +374,9 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector
         rk_min = expected_risk(ri, w_min, pr.X, noc.opt.fees)
         rk_max = expected_risk(ri, w_max, pr.X, noc.opt.fees)
         rk_min, rk_max = if flag
-            factor * sqrt(rk_min), factor * sqrt(rk_max)
-        else
             factor * rk_min, factor * rk_max
+        else
+            factor * sqrt(rk_min), factor * sqrt(rk_max)
         end
         ub = range(; start = rk_min, stop = rk_max, length = N)
         risk_frontier[i] = risk_frontier[i].first => (risk_frontier[i].second[1], ub)
@@ -395,9 +395,9 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:
     rk_min = expected_risk(r, w_min, pr.X, noc.opt.fees)
     rk_max = expected_risk(r, w_max, pr.X, noc.opt.fees)
     rk_min, rk_max = if flag
-        factor * sqrt(rk_min), factor * sqrt(rk_max)
-    else
         factor * rk_min, factor * rk_max
+    else
+        factor * sqrt(rk_min), factor * sqrt(rk_max)
     end
     ub = range(; start = rk_min, stop = rk_max, length = N)
     return [risk_frontier[1].first => (risk_frontier[1].second[1], ub)]

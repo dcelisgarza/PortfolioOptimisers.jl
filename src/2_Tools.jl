@@ -305,5 +305,9 @@ function traverse_subtypes(types, ctarr = nothing)
     end
     return ctarr
 end
+function concrete_typed_array(A::AbstractArray)
+    return reshape(Union{typeof.(A)...}[A...], size(A))
+end
 
-export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns
+export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns,
+       concrete_typed_array

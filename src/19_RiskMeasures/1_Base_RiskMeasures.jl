@@ -20,14 +20,19 @@ abstract type MuHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
 abstract type AbstractMomentHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
 
 abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
-struct Frontier{T1 <: Integer, T2 <: Real, T3 <: Bool} <: AbstractAlgorithm
+struct Frontier{T1 <: Integer, T2 <: Union{Nothing, <:Real},
+                T3 <: Union{Nothing, <:Bool}} <: AbstractAlgorithm
     N::T1
     factor::T2
     flag::T3
 end
-function Frontier(; N::Integer = 20, factor::Real = 1, flag::Bool = false)
+function Frontier(; N::Integer = 20)
     @smart_assert(N > zero(N))
-    @smart_assert(factor > zero(factor))
+    return Frontier{typeof(N), Nothing, Nothing}(N, nothing, nothing)
+end
+function _Frontier(; N::Integer = 20, factor::Real, flag::Bool)
+    @smart_assert(N > zero(N))
+    @smart_assert(isfinite(factor) && factor > zero(factor))
     return Frontier{typeof(N), typeof(factor), typeof(flag)}(N, factor, flag)
 end
 struct RiskMeasureSettings{T1 <: Real,

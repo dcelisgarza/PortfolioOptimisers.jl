@@ -164,7 +164,7 @@ function variance_risk_bounds_expr(model::JuMP.Model, i::Any, flag::Bool)
     end
 end
 function variance_risk_bounds_val(flag::Bool, ub::Frontier)
-    return flag ? ub : Frontier(; N = ub.N, factor = 1, flag = true)
+    return _Frontier(; N = ub.N, factor = 1, flag = flag)
 end
 function variance_risk_bounds_val(flag::Bool, ub::AbstractVector)
     return flag ? ub : sqrt.(ub)
@@ -404,29 +404,15 @@ function set_second_moment_risk!(model::JuMP.Model, ::SqrtRiskExpr, i::Any, fact
 end
 function second_moment_bound_val(formulation::SecondMomentFormulation, ub::Frontier,
                                  factor::Real)
-    return if isa(formulation, Union{<:QuadRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr})
-        Frontier(; N = ub.N, factor = factor, flag = true)
-    else
-        ub
-    end
+    return _Frontier(; N = ub.N, factor = factor, flag = isa(formulation, SqrtRiskExpr))
 end
 function second_moment_bound_val(formulation::SecondMomentFormulation, ub::AbstractVector,
                                  factor::Real)
-    return factor *
-           if isa(formulation, Union{<:QuadRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr})
-        sqrt.(ub)
-    else
-        ub
-    end
+    return factor * isa(formulation, SqrtRiskExpr) ? ub : sqrt.(ub)
 end
 function second_moment_bound_val(formulation::SecondMomentFormulation, ub::Real,
                                  factor::Real)
-    return factor *
-           if isa(formulation, Union{<:QuadRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr})
-        return sqrt(ub)
-    else
-        ub
-    end
+    return factor * isa(formulation, SqrtRiskExpr) ? ub : sqrt(ub)
 end
 function second_moment_bound_val(::Any, ::Nothing, ::Any)
     return nothing

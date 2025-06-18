@@ -57,9 +57,8 @@ function opt_view(hco::HierarchicalOptimiser, i::AbstractVector)
                                  sce = hco.sce, wb = wb, cwf = hco.cwf, sets = sets,
                                  strict = hco.strict)
 end
-function unitary_expected_risks(r::Union{<:OptimisationRiskMeasure,
-                                         <:AbstractVector{<:OptimisationRiskMeasure}},
-                                X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing)
+function unitary_expected_risks(r::OptimisationRiskMeasure, X::AbstractMatrix,
+                                fees::Union{Nothing, <:Fees} = nothing)
     wk = zeros(eltype(X), size(X, 2))
     rk = Vector{eltype(X)}(undef, size(X, 2))
     for i ∈ eachindex(wk)
@@ -70,9 +69,8 @@ function unitary_expected_risks(r::Union{<:OptimisationRiskMeasure,
     return rk
 end
 function unitary_expected_risks!(wk::AbstractVector, rk::AbstractVector,
-                                 r::Union{<:OptimisationRiskMeasure,
-                                          <:AbstractVector{<:OptimisationRiskMeasure}},
-                                 X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing)
+                                 r::OptimisationRiskMeasure, X::AbstractMatrix,
+                                 fees::Union{Nothing, <:Fees} = nothing)
     fill!(rk, zero(eltype(X)))
     for i ∈ eachindex(wk)
         wk[i] = one(eltype(X))
@@ -82,4 +80,4 @@ function unitary_expected_risks!(wk::AbstractVector, rk::AbstractVector,
     return nothing
 end
 
-export HierarchicalOptimiser
+export HierarchicalOptimisationResult, HierarchicalOptimiser

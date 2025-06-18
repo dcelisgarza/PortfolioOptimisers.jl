@@ -88,9 +88,9 @@ function rebuild_risk_frontier(model::JuMP.Model,
         rk_min = expected_risk(ri, sol_min.w, pr.X, mr.opt.fees)
         rk_max = expected_risk(ri, sol_max.w, pr.X, mr.opt.fees)
         rk_min, rk_max = if flag
-            factor * sqrt(rk_min), factor * sqrt(rk_max)
-        else
             factor * rk_min, factor * rk_max
+        else
+            factor * sqrt(rk_min), factor * sqrt(rk_max)
         end
         ub = range(; start = rk_min, stop = rk_max, length = N)
         risk_frontier[i] = risk_frontier[i].first => (risk_frontier[i].second[1], ub)
@@ -113,9 +113,9 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:A
     rk_min = expected_risk(r, sol_min.w, pr.X, mr.opt.fees)
     rk_max = expected_risk(r, sol_max.w, pr.X, mr.opt.fees)
     rk_min, rk_max = if flag
-        factor * sqrt(rk_min), factor * sqrt(rk_max)
-    else
         factor * rk_min, factor * rk_max
+    else
+        factor * sqrt(rk_min), factor * sqrt(rk_max)
     end
     ub = range(; start = rk_min, stop = rk_max, length = N)
     return [risk_frontier[1].first => (risk_frontier[1].second[1], ub)]
