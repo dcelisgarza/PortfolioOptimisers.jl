@@ -48,7 +48,7 @@
     opt = JuMPOptimiser(; pe = pr, slv = slv)
     objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf), MaximumReturn()]
     bins = [1, 5, 10, 20, nothing, 50]
-    @testset "Unconstrainted NearOptimalCentering" begin
+    @testset "NearOptimalCentering" begin
         w_min = optimise!(MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(),
                                    opt = opt), rd).w
         w_max = optimise!(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumReturn(),
@@ -112,36 +112,36 @@
                 i += 1
             end
         end
-        # r = ConditionalValueatRisk()
-        # mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
-        # w1 = optimise!(mr, rd).w
-        # ub = expected_risk(r, w1, rd.X)
-        # lb = expected_returns(ArithmeticReturn(), w1, pr)
+        r = ConditionalValueatRisk()
+        mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        w1 = optimise!(mr, rd).w
+        ub = expected_risk(r, w1, rd.X)
+        lb = expected_returns(ArithmeticReturn(), w1, pr)
 
-        # noc1 = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
-        # w2 = optimise!(noc1, rd).w
+        noc1 = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        w2 = optimise!(noc1, rd).w
 
-        # noc2 = NearOptimalCentering(;
-        #                             r = ConditionalValueatRisk(;
-        #                                                        settings = RiskMeasureSettings(;
-        #                                                                                       ub = ub)),
-        #                             obj = MaximumReturn(), opt = opt)
-        # w3 = optimise!(noc2, rd).w
-        # @test isapprox(w2, w3, rtol = 5e-5)
+        noc2 = NearOptimalCentering(;
+                                    r = ConditionalValueatRisk(;
+                                                               settings = RiskMeasureSettings(;
+                                                                                              ub = ub)),
+                                    obj = MaximumReturn(), opt = opt)
+        w3 = optimise!(noc2, rd).w
+        @test isapprox(w2, w3, rtol = 0.5)
 
-        # opt = JuMPOptimiser(; ret = ArithmeticReturn(; lb = lb), pe = pr, slv = slv)
-        # noc3 = NearOptimalCentering(; r = r, obj = MinimumRisk(), opt = opt)
-        # w4 = optimise!(noc3, rd).w
-        # @test isapprox(w2, w4, rtol = 5e-5)
+        opt = JuMPOptimiser(; ret = ArithmeticReturn(; lb = lb), pe = pr, slv = slv)
+        noc3 = NearOptimalCentering(; r = r, obj = MinimumRisk(), opt = opt)
+        w4 = optimise!(noc3, rd).w
+        @test isapprox(w2, w4, rtol = 5e-4)
 
-        # opt = JuMPOptimiser(; pe = pr, slv = slv)
-        # r = ConditionalValueatRisk()
-        # mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
-        # w1 = optimise!(mr, rd).w
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        r = ConditionalValueatRisk()
+        mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        w1 = optimise!(mr, rd).w
 
-        # r = ConditionalDrawdownatRisk()
-        # mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
-        # w2 = optimise!(mr, rd).w
+        r = ConditionalDrawdownatRisk()
+        mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        w2 = optimise!(mr, rd).w
 
         # r = [ConditionalValueatRisk(), ConditionalDrawdownatRisk()]
         # mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
@@ -172,28 +172,28 @@
         #                 0.13494612519443497, 0.33875402175662866, 0.15563480930705087,
         #                 0.21960221598910773], rtol = 5e-5)
 
-        # r = ConditionalValueatRisk()
-        # mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
-        # w1 = optimise!(mr, rd).w
-        # ub = expected_risk(r, w1, rd.X)
-        # lb = expected_returns(ArithmeticReturn(), w1, pr)
+        r = ConditionalValueatRisk()
+        mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        w1 = optimise!(mr, rd).w
+        ub = expected_risk(r, w1, rd.X)
+        lb = expected_returns(ArithmeticReturn(), w1, pr)
 
-        # noc1 = NearOptimalCentering(; alg = ConstrainedNearOptimalCenteringAlgorithm(), r = r,
-        #                             obj = MaximumRatio(; rf = rf), opt = opt)
-        # w2 = optimise!(noc1, rd).w
+        noc1 = NearOptimalCentering(; alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                    r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        w2 = optimise!(noc1, rd).w
 
-        # noc2 = NearOptimalCentering(; alg = ConstrainedNearOptimalCenteringAlgorithm(),
-        #                             r = ConditionalValueatRisk(;
-        #                                                        settings = RiskMeasureSettings(;
-        #                                                                                       ub = ub)),
-        #                             obj = MaximumReturn(), opt = opt)
-        # w3 = optimise!(noc2, rd).w
-        # @test expected_risk(r, w3, rd.X) <= ub + sqrt(eps())
+        noc2 = NearOptimalCentering(; alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                    r = ConditionalValueatRisk(;
+                                                               settings = RiskMeasureSettings(;
+                                                                                              ub = ub)),
+                                    obj = MaximumReturn(), opt = opt)
+        sol = optimise!(noc2, rd)
+        @test value(sol.model[:cvar_risk_1]) <= ub + sqrt(eps())
 
-        # opt = JuMPOptimiser(; ret = ArithmeticReturn(; lb = lb), pe = pr, slv = slv)
-        # noc3 = NearOptimalCentering(; alg = ConstrainedNearOptimalCenteringAlgorithm(), r = r,
-        #                             obj = MinimumRisk(), opt = opt)
-        # w4 = optimise!(noc3, rd).w
-        # @test expected_returns(ArithmeticReturn(), w4, pr) >= lb - sqrt(eps())
+        opt = JuMPOptimiser(; ret = ArithmeticReturn(; lb = lb), pe = pr, slv = slv)
+        noc3 = NearOptimalCentering(; alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                    r = r, obj = MinimumRisk(), opt = opt)
+        sol = optimise!(noc3, rd)
+        @test value(sol.model[:ret]) >= lb - sqrt(eps())
     end
 end
