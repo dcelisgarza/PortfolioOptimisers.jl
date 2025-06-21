@@ -15,5 +15,8 @@ function risk_measure_view(r::TurnoverRiskMeasure, i::AbstractVector, args...)
     w = view(r.w, i)
     return TurnoverRiskMeasure(; settings = r.settings, w = w)
 end
+function factory(r::TurnoverRiskMeasure, w::AbstractVector)
+    return TurnoverRiskMeasure(; settings = r.settings, w = w)
+end
 
 export TurnoverRiskMeasure

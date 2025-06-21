@@ -46,48 +46,6 @@ function risk_measure_view(r::TrackingRiskMeasure, i::AbstractVector, args...)
     return TrackingRiskMeasure(; settings = r.settings, tracking = tracking,
                                formulation = r.formulation)
 end
-#=
-struct VolTrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: WeightsTracking,
-                              T3 <: Union{Nothing, <:AbstractMatrix},
-                              T4 <: Union{<:QuadSqrtRiskExpr, <:SOCRiskExpr}} <: RiskMeasure
-    settings::T1
-    tracking::T2
-    sigma::T3
-    formulation::T4
-end
-function VolTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                tracking::WeightsTracking,
-                                sigma::Union{Nothing, <:AbstractMatrix} = nothing,
-                                formulation::Union{<:QuadSqrtRiskExpr, <:SOCRiskExpr} = SqrtRiskExpr())
-    return VolTrackingRiskMeasure{typeof(settings), typeof(tracking), typeof(sigma),
-                                  typeof(formulation)}(settings, tracking, sigma,
-                                                       formulation)
-end
-function (r::VolTrackingRiskMeasure{<:Any, <:Any, <:Any, <:SqrtRiskExpr})(w::AbstractVector)
-    wb = r.tracking.w
-    wd = w - wb
-    sigma = r.sigma
-    return sqrt(dot(wd, sigma, wd))
-end
-function (r::VolTrackingRiskMeasure{<:Any, <:Any, <:Any,
-                                    <:Union{<:QuadRiskExpr, <:SOCRiskExpr}})(w::AbstractVector)
-    wb = r.tracking.w
-    wd = w - wb
-    sigma = r.sigma
-    return dot(wd, sigma, wd)
-end
-function factory(r::VolTrackingRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
-    sigma = nothing_scalar_array_factory(r.sigma, prior.sigma)
-    return VolTrackingRiskMeasure(; settings = r.settings, tracking = r.tracking,
-                                  sigma = sigma, formulation = r.formulation)
-end
-function risk_measure_view(r::VolTrackingRiskMeasure, i::AbstractVector, args...)
-    tracking = tracking_view(r.tracking, i)
-    sigma = nothing_scalar_array_view(r.sigma, i)
-    return VolTrackingRiskMeasure(; settings = r.settings, tracking = tracking,
-                                  sigma = sigma, formulation = r.formulation)
-end
-=#
 struct RiskTrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: WeightsTracking,
                                T3 <: AbstractBaseRiskMeasure, T4 <: VariableTracking} <:
        RiskMeasure
@@ -132,6 +90,11 @@ function risk_measure_view(r::RiskTrackingRiskMeasure, i::AbstractVector, X::Abs
     tracking = tracking_view(r.tracking, i)
     return RiskTrackingRiskMeasure(; settings = r.settings, tracking = tracking,
                                    r = risk_measure_view(r.r, i, X),
+                                   formulation = r.formulation)
+end
+function factory(r::RiskTrackingRiskMeasure, w::AbstractVector)
+    return RiskTrackingRiskMeasure(; settings = r.settings,
+                                   tracking = factory(r.tracking, w), r = r.r,
                                    formulation = r.formulation)
 end
 

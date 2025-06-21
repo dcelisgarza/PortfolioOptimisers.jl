@@ -26,5 +26,8 @@ end
 function turnover_view(tn::AbstractVector{<:Turnover}, i::AbstractVector)
     return turnover_view.(tn, Ref(i))
 end
+function factory(tn::Turnover, w::AbstractVector)
+    return Turnover(; w = w, val = tn.val)
+end
 
 export Turnover

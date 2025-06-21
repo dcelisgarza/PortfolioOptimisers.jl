@@ -1,4 +1,3 @@
-function bounds_returns_estimator end
 struct ArithmeticReturn{T1 <: Union{Nothing, <:AbstractUncertaintySetResult,
                                     <:AbstractUncertaintySetEstimator},
                         T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:Frontier}} <:

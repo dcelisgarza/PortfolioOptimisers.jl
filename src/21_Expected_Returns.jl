@@ -47,6 +47,30 @@ function expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEsti
                                                 kwargs...)
     return rk, rt, sr - N / (T * sr)
 end
+struct RatioRiskMeasure{T1 <: JuMPReturnsEstimator, T2 <: AbstractBaseRiskMeasure,
+                        T3 <: Real} <: NoOptimisationRiskMeasure
+    rt::T1
+    rk::T2
+    rf::T3
+end
+function RatioRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
+                          rk::AbstractBaseRiskMeasure = Variance(), rf::Real = 0.0)
+    return RatioRiskMeasure{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
+end
+function factory(r::RatioRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
+    rt = jump_returns_factory(r.rt, prior, args...; kwargs...)
+    rk = factory(r.rk, prior, args...; kwargs...)
+    return RatioRiskMeasure(; rt = rt, rk = rk, r.rf)
+end
+function factory(r::RatioRiskMeasure, w::AbstractVector)
+    return RatioRiskMeasure(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
+end
+#! Need to change other expected risks
+function expected_risk(r::RatioRiskMeasure, w::AbstractVector{<:Real},
+                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees} = nothing;
+                       kwargs...)
+    return expected_sharpe_ratio(r.rk, r.rt, w, pr, fees; rf = r.rf, kwargs...)
+end
 
 export expected_returns, expected_sharpe_ratio, expected_risk_ret_sharpe_ratio,
        expected_sric, expected_risk_ret_sric

@@ -29,6 +29,9 @@ struct WeightsTracking{T1 <: Union{Nothing, <:Fees}, T2 <: AbstractVector{<:Real
     fees::T1
     w::T2
 end
+function factory(tracking::WeightsTracking, w::AbstractVector)
+    return WeightsTracking(; fees = factory(tracking.fees, w), w = w)
+end
 function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing,
                          w::AbstractVector{<:Real})
     @smart_assert(!isempty(w))
@@ -74,27 +77,9 @@ end
 function tracking_view(tracking::AbstractVector{<:AbstractTracking}, args...)
     return [tracking_view(t, args...) for t ∈ tracking]
 end
-#=
-struct VolTrackingError{T1 <: WeightsTracking, T2 <: Real,
-                        T3 <: Union{Nothing, <:AbstractMatrix}} <: AbstractTracking
-    tracking::T1
-    err::T2
-    sigma::T3
+function factory(tracking::TrackingError, w::AbstractVector)
+    return TrackingError(; tracking = factory(tracking.tracking, w), err = tracking.err,
+                         formulation = tracking.formulation)
 end
-function VolTrackingError(; tracking::WeightsTracking, err::Real = 0.0,
-                          sigma::Union{Nothing, <:AbstractMatrix} = nothing)
-    @smart_assert(isfinite(err) && err >= zero(err))
-    if isa(sigma, AbstractMatrix)
-        @smart_assert(!isempty(sigma))
-    end
-    return VolTrackingError{typeof(tracking), typeof(err), typeof(sigma)}(tracking, err,
-                                                                          sigma)
-end
-function tracking_view(tracking::VolTrackingError, i::AbstractVector)
-    tracking = tracking_view(tracking.tracking, i)
-    sigma = nothing_scalar_array_view(tracking.sigma, i)
-    return VolTrackingError(; tracking = tracking, err = tracking.err, sigma = sigma)
-end
-=#
 
 export WeightsTracking, ReturnsTracking, TrackingError
