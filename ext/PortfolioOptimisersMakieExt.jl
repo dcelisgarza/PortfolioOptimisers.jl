@@ -1,3 +1,4 @@
+#=
 function plot_ptf_cumulative_returns(w::AbstractArray, X::AbstractArray,
                                      fees::Union{Nothing, <:Fees} = nothing;
                                      ts::AbstractVector = 1:size(X, 1),
@@ -258,3 +259,4 @@ end
 export plot_asset_cumulative_returns, plot_ptf_cumulative_returns, plot_composition,
        plot_stacked_bar_composition, plot_stacked_area_composition, plot_clusters,
        plot_dendrogram
+       =#

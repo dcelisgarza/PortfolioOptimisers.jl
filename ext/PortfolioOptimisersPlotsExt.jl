@@ -1,6 +1,7 @@
 module PortfolioOptimisersPlotsExt
 
-using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra
+using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra, Statistics, StatsBase,
+      Clustering
 
 function PortfolioOptimisers.plot_ptf_cumulative_returns(w::AbstractArray, X::AbstractArray,
                                                          fees::Union{Nothing, <:Fees} = nothing;
@@ -116,6 +117,75 @@ function PortfolioOptimisers.plot_stacked_area_composition(w::AbstractArray,
         w = hcat(w...)
     end
     return areaplot(transpose(w); label = permutedims(nx), kwargs...)
+end
+function PortfolioOptimisers.plot_clusters(clr::PortfolioOptimisers.AbstractClusteringResult,
+                                           X::AbstractMatrix,
+                                           nx::AbstractVector = 1:size(X, 1);
+                                           color_func = x -> if any(x .<
+                                                                    Ref(zero(eltype(x))))
+                                               (-1, 1)
+                                           else
+                                               (0, 1)
+                                           end, theme_d = :Spectral, theme = :Spectral,
+                                           theme_kwargs = (;), dend1_kwargs = (;),
+                                           dend2_kwargs = (;), hmap_kwargs = (;),
+                                           line_kwargs = (; color = :black, linewidth = 3),
+                                           fig_kwargs = (; size = (600, 600)))
+    PortfolioOptimisers.issquare(X)
+    iscov = any(!isone, diag(X))
+    if iscov
+        X = cov2cor(X)
+    end
+    clim = color_func(X)
+    N = size(X, 1)
+    X = view(X, clr.clustering.order, clr.clustering.order)
+    nx = view(nx, clr.clustering.order)
+    idx = cutree(clr.clustering; k = clr.k)
+    cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
+
+    colours = palette(theme_d, clr.k)
+    colgrad = cgrad(theme; theme_kwargs...)
+
+    #yticks=(1:nrows,rowlabels)
+    hmap = plot(X; st = :heatmap, yticks = (1:N, nx), xticks = (1:N, nx), xrotation = 90,
+                colorbar = false, clim = clim, xlim = (0.5, N + 0.5), ylim = (0.5, N + 0.5),
+                color = colgrad, yflip = true, hmap_kwargs...)
+    dend1 = plot(clr.clustering; xticks = false, ylim = (0, 1), dend1_kwargs...)
+    dend2 = plot(clr.clustering; yticks = false, xrotation = 90, orientation = :horizontal,
+                 yflip = true, xlim = (0, 1), dend2_kwargs...)
+
+    for (i, cl) ∈ pairs(cls)
+        a = [findfirst(x -> x == c, clr.clustering.order) for c ∈ cl]
+        a = a[.!isnothing.(a)]
+        xmin = minimum(a)
+        xmax = xmin + length(cl)
+
+        i1 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 1)) for c ∈ cl]
+        i1 = i1[.!isnothing.(i1)]
+        i2 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 2)) for c ∈ cl]
+        i2 = i2[.!isnothing.(i2)]
+        i3 = unique([i1; i2])
+        h = min(maximum(clr.clustering.heights[i3]) * 1.1, 1)
+        plot!(hmap,
+              [xmin - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmin - 0.5,
+               xmin - 0.5, xmin - 0.5],
+              [xmin - 0.5, xmin - 0.5, xmin - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5,
+               xmax - 0.5, xmin - 0.5]; legend = false, line_kwargs...)
+        plot!(dend1,
+              [xmin - 0.25, xmax - 0.75, xmax - 0.75, xmax - 0.75, xmax - 0.75, xmin - 0.25,
+               xmin - 0.25, xmin - 0.25], [0, 0, 0, h, h, h, h, 0]; color = nothing,
+              legend = false, fill = (0, 0.5, colours[(i - 1) % clr.k + 1]))
+
+        plot!(dend2, [0, 0, 0, h, h, h, h, 0],
+              [xmin - 0.25, xmax - 0.75, xmax - 0.75, xmax - 0.75, xmax - 0.75, xmin - 0.25,
+               xmin - 0.25, xmin - 0.25]; color = nothing, legend = false,
+              fill = (0, 0.5, colours[(i - 1) % clr.k + 1]))
+    end
+
+    # https://docs.juliaplots.org/latest/generated/statsplots/#Dendrogram-on-the-right-side
+    l = StatsPlots.grid(2, 2; heights = [0.2, 0.8], widths = [0.8, 0.2])
+    return plot(dend1, plot(; ticks = nothing, border = :none, background_color = nothing),
+                hmap, dend2; layout = l, fig_kwargs...)
 end
 
 end
