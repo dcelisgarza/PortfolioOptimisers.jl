@@ -13,7 +13,6 @@ repos:
       - id: check-json
       - id: check-toml
       - id: check-yaml
-      - id: end-of-file-fixer
       - id: file-contents-sorter
         files: .JuliaFormatter.toml
         args: [--unique]
@@ -23,6 +22,7 @@ repos:
       - id: pretty-format-json
         args: [--autofix, --indent=2]
       - id: trailing-whitespace
+      - id: end-of-file-fixer
       - id: check-merge-conflict
         args: [--assume-in-merge]
   - repo: https://github.com/igorshubovych/markdownlint-cli
@@ -41,12 +41,6 @@ repos:
     rev: v1.35.1
     hooks:
       - id: yamllint
-  - repo: https://github.com/ericphanson/ExplicitImports.jl
-    rev: v1.10.1
-    hooks:
-      - id: explicit-imports
-        name: ExplicitImports checks
-        args: [--print, --checklist, all]
   - repo: https://github.com/domluna/JuliaFormatter.jl
     rev: v2.0.0
     hooks:

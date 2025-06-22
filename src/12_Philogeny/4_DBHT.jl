@@ -980,7 +980,7 @@ function HierarchyConstruct4s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<
     for n ∈ eachindex(kvec)
         Mc = vec(E[:, kvec[n]]) ⊙ Mv   # Get the list of bubbles which coincide with nth cluster
         Mvv = BubbleMember(Rpm, Mv, Mc) # Assign each vertex in the nth cluster to a specific bubble
-        Bub = findall(vec(sum(Mvv; dims = 1) .> 0)) # Get the list of bubbles which contain the vertices of nth cluster 
+        Bub = findall(vec(sum(Mvv; dims = 1) .> 0)) # Get the list of bubbles which contain the vertices of nth cluster
         nc = sum(Tc .== kvec[n]) - 1
 
         # Apply the linkage within the bubbles.
@@ -1047,7 +1047,7 @@ function turn_into_Hclust_merges(Z::AbstractMatrix{<:Real})
         a = Int(Z[i, 1])
         b = Int(Z[i, 2])
 
-        # If the cluster index is less than N, it represents a leaf, 
+        # If the cluster index is less than N, it represents a leaf,
         # so only one add one to the count.
         if a <= N
             Z[i, 1] = -a

@@ -1,7 +1,7 @@
 function set_risk_upper_bound!(args...)
     return nothing
 end
-#! Using parameters to set the upper bounds would make things more difficult from a user perspective. Keep an eye on this in case things change in the future. We could simplify solve_mean_risk! and solve_noc! for pareto frontiers, we can define ub as a parameter and update it for subsequent solves. 
+#! Using parameters to set the upper bounds would make things more difficult from a user perspective. Keep an eye on this in case things change in the future. We could simplify solve_mean_risk! and solve_noc! for pareto frontiers, we can define ub as a parameter and update it for subsequent solves.
 # Solver(; name = :clarabel2,
 #        solver = () -> ParametricOptInterface.Optimizer(MOI.instantiate(Clarabel.Optimizer;
 #                                                                        with_cache_type = Float64)),
