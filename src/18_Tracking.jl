@@ -58,6 +58,9 @@ end
 function tracking_benchmark(tracking::ReturnsTracking, ::Any)
     return tracking.w
 end
+function factory(tracking::ReturnsTracking, ::Any)
+    return tracking
+end
 struct TrackingError{T1 <: AbstractTrackingAlgorithm, T2 <: Real, T3 <: NormTracking} <:
        AbstractTracking
     tracking::T1

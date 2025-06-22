@@ -35,6 +35,11 @@ function expected_risk(r::AbstractBaseRiskMeasure, w::AbstractVector{<:AbstractV
                        args...; kwargs...)
     return [expected_risk(r, wi, args...; kwargs...) for wi ∈ w]
 end
+function expected_risk(r::AbstractBaseRiskMeasure, w::AbstractVector{<:Real},
+                       pr::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing;
+                       kwargs...)
+    return expected_risk(r, w, pr.X, fees; kwargs...)
+end
 function number_effective_assets(w::AbstractVector)
     return inv(dot(w, w))
 end

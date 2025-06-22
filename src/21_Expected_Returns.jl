@@ -65,7 +65,6 @@ end
 function factory(r::RatioRiskMeasure, w::AbstractVector)
     return RatioRiskMeasure(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
-#! Need to change other expected risks
 function expected_risk(r::RatioRiskMeasure, w::AbstractVector{<:Real},
                        pr::AbstractPriorResult, fees::Union{Nothing, <:Fees} = nothing;
                        kwargs...)
@@ -73,4 +72,4 @@ function expected_risk(r::RatioRiskMeasure, w::AbstractVector{<:Real},
 end
 
 export expected_returns, expected_sharpe_ratio, expected_risk_ret_sharpe_ratio,
-       expected_sric, expected_risk_ret_sric
+       expected_sric, expected_risk_ret_sric, RatioRiskMeasure

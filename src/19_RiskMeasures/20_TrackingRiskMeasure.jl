@@ -23,6 +23,12 @@ function tracking_view(tracking::RiskTrackingError, i::AbstractVector, X::Abstra
                              r = risk_measure_view(tracking.r, i, X), err = tracking.err,
                              formulation = tracking.formulation)
 end
+function factory(tracking::RiskTrackingError, prior::AbstractPriorResult, ::Any, w::Any,
+                 args...; kwargs...)
+    return RiskTrackingError(; tracking = factory(tracking.tracking, w),
+                             r = factory(tracking.r, prior, args...; kwargs...),
+                             err = tracking.err, formulation = tracking.formulation)
+end
 struct TrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: AbstractTrackingAlgorithm,
                            T3 <: NormTracking} <: RiskMeasure
     settings::T1
@@ -44,6 +50,11 @@ end
 function risk_measure_view(r::TrackingRiskMeasure, i::AbstractVector, args...)
     tracking = tracking_view(r.tracking, i)
     return TrackingRiskMeasure(; settings = r.settings, tracking = tracking,
+                               formulation = r.formulation)
+end
+function factory(r::TrackingRiskMeasure, prior::AbstractPriorResult, ::Any, w::Any, args...;
+                 kwargs...)
+    return TrackingRiskMeasure(; settings = r.settings, tracking = factory(r.tracking, w),
                                formulation = r.formulation)
 end
 struct RiskTrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: WeightsTracking,
@@ -81,20 +92,17 @@ function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
     r2 = expected_risk(r.r, wb, X, fees)
     return abs(r1 - r2)
 end
-function factory(r::RiskTrackingRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
-    return RiskTrackingRiskMeasure(; settings = r.settings, tracking = r.tracking,
-                                   r = factory(r.r, prior, args...; kwargs...),
-                                   formulation = r.formulation)
-end
 function risk_measure_view(r::RiskTrackingRiskMeasure, i::AbstractVector, X::AbstractMatrix)
     tracking = tracking_view(r.tracking, i)
     return RiskTrackingRiskMeasure(; settings = r.settings, tracking = tracking,
                                    r = risk_measure_view(r.r, i, X),
                                    formulation = r.formulation)
 end
-function factory(r::RiskTrackingRiskMeasure, w::AbstractVector)
+function factory(r::RiskTrackingRiskMeasure, prior::AbstractPriorResult, ::Any, w::Any,
+                 args...; kwargs...)
     return RiskTrackingRiskMeasure(; settings = r.settings,
-                                   tracking = factory(r.tracking, w), r = r.r,
+                                   tracking = factory(r.tracking, w),
+                                   r = factory(r.r, prior, args...; kwargs...),
                                    formulation = r.formulation)
 end
 
