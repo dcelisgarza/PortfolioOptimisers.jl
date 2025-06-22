@@ -266,6 +266,7 @@ function (r::RelativeConditionalDrawdownatRisk)(x::AbstractVector)
         end
         dd[idx] = i / peak - 1
     end
+    popfirst!(x)
     popfirst!(dd)
     idx = ceil(Int, aT)
     var = -partialsort!(dd, idx)

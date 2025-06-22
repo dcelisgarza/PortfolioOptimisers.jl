@@ -168,6 +168,7 @@ function (r::RelativeEntropicDrawdownatRisk)(x::AbstractVector)
         end
         dd[idx] = i / peak - one(eltype(dd))
     end
+    popfirst!(x)
     popfirst!(dd)
     return ERM(dd, r.slv, r.alpha)
 end

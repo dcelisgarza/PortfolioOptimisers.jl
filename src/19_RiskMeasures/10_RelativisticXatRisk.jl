@@ -228,6 +228,7 @@ function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
         end
         dd[idx] = i / peak - 1
     end
+    popfirst!(x)
     popfirst!(dd)
     return RRM(dd, r.slv, r.alpha, r.kappa)
 end

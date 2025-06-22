@@ -150,8 +150,8 @@ function (r::DrawdownatRisk)(x::AbstractVector)
         end
         dd[idx] = i - peak
     end
-    popfirst!(dd)
     popfirst!(x)
+    popfirst!(dd)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
 struct RelativeDrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real} <:
@@ -176,8 +176,8 @@ function (r::RelativeDrawdownatRisk)(x::AbstractVector)
         end
         dd[idx] = i / peak - one(peak)
     end
-    popfirst!(dd)
     popfirst!(x)
+    popfirst!(dd)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
 

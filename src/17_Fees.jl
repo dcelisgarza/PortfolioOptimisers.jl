@@ -240,14 +240,20 @@ function cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int 
         cumsum(X; dims = dims)
     end
 end
-function drawdowns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
+function drawdowns(X::AbstractMatrix; compound::Bool = false, dims::Int = 1)
     cX = cumulative_returns(X; compound = compound, dims = dims)
-    if compound
-        return cX ./ accumulate(max, cX; dims = dims) .- Ref(one(eltype(X)))
+    return if compound
+        cX ./ accumulate(max, cX; dims = dims) .- Ref(one(eltype(X)))
     else
-        return cX - accumulate(max, cX; dims = dims)
+        cX - accumulate(max, cX; dims = dims)
     end
-    return nothing
+end
+function drawdowns(X::AbstractVector; compound::Bool = false, dims::Int = 1)
+    return if compound
+        X ./ accumulate(max, X; dims = dims) .- Ref(one(eltype(X)))
+    else
+        X - accumulate(max, X; dims = dims)
+    end
 end
 
 export Fees, calc_fees, calc_asset_fees, calc_net_returns, calc_net_asset_returns,
