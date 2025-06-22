@@ -1,7 +1,10 @@
 name: Aqua
 on:
   push:
-    branches: [master, main, release-*, dev, dev-*]
+    branches:
+      - main
+      - release-*
+      - dev*
     tags: [v*]
   pull_request:
     types: [opened, synchronize, reopened]
