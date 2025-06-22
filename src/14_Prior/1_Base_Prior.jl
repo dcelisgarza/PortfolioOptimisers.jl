@@ -24,8 +24,5 @@ end
 function prior(pr::AbstractPriorResult, args...; kwargs...)
     return pr
 end
-function factory(::Nothing, args...; kwargs...)
-    return nothing
-end
 
 export prior
