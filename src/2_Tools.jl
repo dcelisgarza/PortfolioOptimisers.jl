@@ -308,7 +308,7 @@ end
 function concrete_typed_array(A::AbstractArray)
     return reshape(Union{typeof.(A)...}[A...], size(A))
 end
-function factory(::Nothing)
+function factory(::Nothing, args...; kwargs...)
     return nothing
 end
 

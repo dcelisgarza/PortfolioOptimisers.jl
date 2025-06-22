@@ -30,7 +30,7 @@ struct WeightsTracking{T1 <: Union{Nothing, <:Fees}, T2 <: AbstractVector{<:Real
     w::T2
 end
 function factory(tracking::WeightsTracking, w::AbstractVector)
-    return WeightsTracking(; fees = factory(tracking.fees, w), w = w)
+    return WeightsTracking(; fees = factory(tracking.fees, tracking.w), w = w)
 end
 function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing,
                          w::AbstractVector{<:Real})

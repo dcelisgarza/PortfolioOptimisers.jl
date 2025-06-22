@@ -30,16 +30,16 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
         @smart_assert(!isempty(fs))
     end
     if !isnothing(l)
-        @smart_assert(all(l .> Ref(zero(l))))
+        @smart_assert(all(l .> zero(l)))
     end
     if !isnothing(s)
-        @smart_assert(all(s .> Ref(zero(s))))
+        @smart_assert(all(s .> zero(s)))
     end
     if !isnothing(fl)
-        @smart_assert(all(fl .> Ref(zero(fl))))
+        @smart_assert(all(fl .> zero(fl)))
     end
     if !isnothing(fs)
-        @smart_assert(all(fs .> Ref(zero(fs))))
+        @smart_assert(all(fs .> zero(fs)))
     end
     return Fees{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
                 typeof(tol_kwargs)}(tn, l, s, fl, fs, tol_kwargs)
@@ -64,12 +64,12 @@ function calc_fees(w::AbstractVector, p::AbstractVector, ::Nothing, ::Function)
 end
 function calc_fees(w::AbstractVector, p::AbstractVector, fees::Real, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    return dot_scalar(fees * view(w, idx), view(p, idx))
+    return dot_scalar(fees * w[idx], p[idx])
 end
 function calc_fees(w::AbstractVector, p::AbstractVector, fees::AbstractVector{<:Real},
                    op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    return dot(view(fees, idx), view(w, idx) .* view(p, idx))
+    return dot(fees[idx], w[idx] .* p[idx])
 end
 function calc_fees(w::AbstractVector, p::AbstractVector, ::Nothing)
     return zero(promote_type(eltype(w), eltype(p)))
@@ -94,11 +94,11 @@ function calc_fees(w::AbstractVector, ::Nothing, ::Function)
 end
 function calc_fees(w::AbstractVector, fees::Real, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    return sum(fees * view(w, idx))
+    return sum(fees * w[idx])
 end
 function calc_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function)
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    return dot(view(fees, idx), view(w, idx))
+    return dot(fees[idx], w[idx])
 end
 function calc_fees(w::AbstractVector, tn::Turnover{<:Any, <:Real})
     return sum(tn.val * abs.(w - tn.w))
@@ -115,16 +115,14 @@ end
 function calc_fixed_fees(w::AbstractVector, fees::Real, tol_kwargs::NamedTuple,
                          op::Function)
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    idx2 = .!isapprox.(view(w, idx1), Ref(zero(promote_type(eltype(w), eltype(fees))));
-                       tol_kwargs...)
+    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); tol_kwargs...)
     return fees * sum(idx2)
 end
 function calc_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
                          tol_kwargs::NamedTuple, op::Function)
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    idx2 = .!isapprox.(view(w, idx1), Ref(zero(promote_type(eltype(w), eltype(fees))));
-                       tol_kwargs...)
-    return sum(view(view(fees, idx1), idx2))
+    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); tol_kwargs...)
+    return sum(fees[idx1][idx2])
 end
 function calc_fees(w::AbstractVector, fees::Fees)
     fees_long = calc_fees(w, fees.l, .>=)
@@ -140,13 +138,13 @@ end
 function calc_asset_fees(w::AbstractVector, fees::Real, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    fees_w[idx] .= fees * view(w, idx)
+    fees_w[idx] .= fees * w[idx]
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    fees_w[idx] .= view(fees, idx) ⊙ view(w, idx)
+    fees_w[idx] .= fees[idx] ⊙ w[idx]
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, ::Nothing)
@@ -165,8 +163,7 @@ function calc_asset_fixed_fees(w::AbstractVector, fees::Real, tol_kwargs::NamedT
                                op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    idx2 = .!isapprox.(view(w, idx1), zero(promote_type(eltype(w), eltype(fees)));
-                       tol_kwargs...)
+    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); tol_kwargs...)
     fees_w[idx1] .= fees * idx2
     return fees_w
 end
@@ -174,9 +171,8 @@ function calc_asset_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
                                tol_kwargs::NamedTuple, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    idx2 = .!isapprox.(view(w, idx1), zero(promote_type(eltype(w), eltype(fees)));
-                       tol_kwargs...)
-    fees_w[idx1] .= view(view(fees, idx1), idx2)
+    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); tol_kwargs...)
+    fees_w[idx1] .= fees[idx1][idx2]
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, fees::Fees)
@@ -193,14 +189,14 @@ end
 function calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::Real, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    fees_w[idx] .= fees * view(w, idx) ⊙ view(p, idx)
+    fees_w[idx] .= fees * w[idx] ⊙ p[idx]
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::AbstractVector{<:Real},
                          op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    fees_w[idx] .= view(fees, idx) ⊙ view(w, idx) ⊙ view(p, idx)
+    fees_w[idx] .= fees[idx] ⊙ w[idx] ⊙ p[idx]
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, p::AbstractVector, tn::Turnover{<:Any, <:Real})
@@ -240,20 +236,14 @@ function cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int 
         cumsum(X; dims = dims)
     end
 end
-function drawdowns(X::AbstractMatrix; compound::Bool = false, dims::Int = 1)
+function drawdowns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
     cX = cumulative_returns(X; compound = compound, dims = dims)
-    return if compound
-        cX ./ accumulate(max, cX; dims = dims) .- Ref(one(eltype(X)))
+    if compound
+        return cX ./ accumulate(max, cX; dims = dims) .- Ref(one(eltype(X)))
     else
-        cX - accumulate(max, cX; dims = dims)
+        return cX - accumulate(max, cX; dims = dims)
     end
-end
-function drawdowns(X::AbstractVector; compound::Bool = false, dims::Int = 1)
-    return if compound
-        X ./ accumulate(max, X; dims = dims) .- Ref(one(eltype(X)))
-    else
-        X - accumulate(max, X; dims = dims)
-    end
+    return nothing
 end
 
 export Fees, calc_fees, calc_asset_fees, calc_net_returns, calc_net_asset_returns,
