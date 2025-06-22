@@ -212,33 +212,33 @@ function PortfolioOptimisers.plot_clusters(clr::PortfolioOptimisers.AbstractClus
     return plot(dend1, plot(; ticks = nothing, border = :none, background_color = nothing),
                 hmap, dend2; layout = l, fig_kwargs...)
 end
-function PortfolioOptimisers.plot_ptf_drawdown(w::AbstractArray, X::AbstractArray,
-                                               slv::Union{<:Solver,
-                                                          <:AbstractVector{<:Solver}},
-                                               fees::Union{Nothing, <:Fees} = nothing;
-                                               ts::AbstractVector = 1:size(X, 1),
-                                               compound::Bool = false, alpha::Real = 0.05,
-                                               kappa::Real = 0.3,
-                                               rw::Union{Nothing, <:AbstractWeights} = nothing,
-                                               theme::Symbol = :Spectral,
-                                               dd_kwargs = (;
-                                                            label = "$(compound ? "Compounded" : "Uncompounded") Drawdown",
-                                                            ylabel = "$(compound ? "Compounded" : "Uncompounded")\nDrawdown Percentage",
-                                                            xlabel = "Date", linewidth = 2,
-                                                            yguidefontsize = 10),
-                                               dd_func = x -> extrema(x) .* [1.2, 1.01],
-                                               l_kwargs::NamedTuple = (; linewidth = 2,
-                                                                       legend = true),
-                                               ret_kwargs::NamedTuple = (;
-                                                                         ylabel = "$(compound ? "Compounded" : "Uncompounded")\nCumulative Returns",
-                                                                         linewidth = 2,
-                                                                         legend = false,
-                                                                         yguidefontsize = 10),
-                                               f_kwargs::NamedTuple = (;
-                                                                       size = (750,
-                                                                               ceil(Integer,
-                                                                                    750 /
-                                                                                    1.618))))
+function PortfolioOptimisers.plot_ptf_drawdowns(w::AbstractArray, X::AbstractArray,
+                                                slv::Union{<:Solver,
+                                                           <:AbstractVector{<:Solver}},
+                                                fees::Union{Nothing, <:Fees} = nothing;
+                                                ts::AbstractVector = 1:size(X, 1),
+                                                compound::Bool = false, alpha::Real = 0.05,
+                                                kappa::Real = 0.3,
+                                                rw::Union{Nothing, <:AbstractWeights} = nothing,
+                                                theme::Symbol = :Dark2_5,
+                                                dd_kwargs = (;
+                                                             label = "$(compound ? "Compounded" : "Uncompounded") Drawdown",
+                                                             ylabel = "$(compound ? "Compounded" : "Uncompounded")\nDrawdown Percentage",
+                                                             xlabel = "Date", linewidth = 2,
+                                                             yguidefontsize = 10),
+                                                dd_func = x -> extrema(x) .* [1.2, 1.01],
+                                                l_kwargs::NamedTuple = (; linewidth = 2,
+                                                                        legend = true),
+                                                ret_kwargs::NamedTuple = (;
+                                                                          ylabel = "$(compound ? "Compounded" : "Uncompounded")\nCumulative Returns",
+                                                                          linewidth = 2,
+                                                                          legend = false,
+                                                                          yguidefontsize = 10),
+                                                f_kwargs::NamedTuple = (;
+                                                                        size = (750,
+                                                                                ceil(Integer,
+                                                                                     750 /
+                                                                                     1.618))))
     ret = calc_net_returns(w, X, fees)
     cret = cumulative_returns(ret; compound = compound)
     dd = drawdowns(cret; compound = compound)

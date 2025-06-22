@@ -18,12 +18,40 @@ function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRisk
                        fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, X, fees))
 end
+function expected_risk(r::Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
+                                <:ConditionalValueatRisk,
+                                <:DistributionallyRobustConditionalValueatRisk,
+                                <:DistributionallyRobustConditionalValueatRiskRange,
+                                <:EntropicValueatRisk, <:EntropicValueatRiskRange,
+                                <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
+                                <:DrawdownatRisk, <:MaximumDrawdown, <:AverageDrawdown,
+                                <:ConditionalDrawdownatRisk, <:UlcerIndex,
+                                <:EntropicDrawdownatRisk, <:RelativisticDrawdownatRisk,
+                                <:RelativeDrawdownatRisk, <:RelativeMaximumDrawdown,
+                                <:RelativeAverageDrawdown,
+                                <:RelativeConditionalDrawdownatRisk, <:RelativeUlcerIndex,
+                                <:RelativeEntropicDrawdownatRisk,
+                                <:RelativeRelativisticDrawdownatRisk, <:Range,
+                                <:ConditionalValueatRiskRange, <:OrderedWeightsArray,
+                                <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
+                                <:MeanReturn}, w::AbstractVector{<:Real},
+                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees} = nothing;
+                       kwargs...)
+    return r(calc_net_returns(w, pr.X, fees))
+end
 function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                                 <:RiskTrackingRiskMeasure, <:SquareRootKurtosis,
                                 <:ThirdCentralMoment, <:Skewness},
                        w::AbstractVector{<:Real}, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     return r(w, X, fees)
+end
+function expected_risk(r::Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
+                                <:RiskTrackingRiskMeasure, <:SquareRootKurtosis,
+                                <:ThirdCentralMoment, <:Skewness},
+                       w::AbstractVector{<:Real}, pr::AbstractPriorResult,
+                       fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+    return r(w, pr.X, fees)
 end
 function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,
                                 <:TurnoverRiskMeasure, <:Variance, <:UncertaintySetVariance,
@@ -35,15 +63,11 @@ function expected_risk(r::AbstractBaseRiskMeasure, w::AbstractVector{<:AbstractV
                        args...; kwargs...)
     return [expected_risk(r, wi, args...; kwargs...) for wi ∈ w]
 end
-function expected_risk(r::AbstractBaseRiskMeasure, w::AbstractVector{<:Real},
-                       pr::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing;
-                       kwargs...)
-    return expected_risk(r, w, pr.X, fees; kwargs...)
-end
 function number_effective_assets(w::AbstractVector)
     return inv(dot(w, w))
 end
-function risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector, X::AbstractMatrix,
+function risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector,
+                           X::Union{<:AbstractMatrix, <:AbstractPriorResult},
                            fees::Union{Nothing, <:Fees} = nothing; delta::Real = 1e-6,
                            marginal::Bool = false, kwargs...)
     N = length(w)
@@ -69,7 +93,8 @@ function risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector, X::Abs
     return rc
 end
 function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector,
-                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing;
+                                  X::Union{<:AbstractMatrix, <:AbstractPriorResult},
+                                  fees::Union{Nothing, <:Fees} = nothing;
                                   re::Union{<:RegressionResult,
                                             <:AbstractRegressionEstimator} = StepwiseRegression(),
                                   rd::ReturnsResult = ReturnsResult(), delta::Real = 1e-6,

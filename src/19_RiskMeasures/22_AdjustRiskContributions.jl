@@ -25,6 +25,13 @@ const FourthPowerRiskMeasures = Union{<:HighOrderMoment{<:Any, <:FourthLowerMome
                                                         <:HighOrderDeviation{<:Any,
                                                                              <:FourthCentralMoment},
                                                         <:Any, <:Any}}
+const DrawdownRiskMeasures = Union{<:DrawdownatRisk, <:RelativeDrawdownatRisk,
+                                   <:ConditionalDrawdownatRisk,
+                                   <:RelativeConditionalDrawdownatRisk,
+                                   <:EntropicDrawdownatRisk,
+                                   <:RelativeEntropicDrawdownatRisk,
+                                   <:RelativisticDrawdownatRisk,
+                                   <:RelativeRelativisticDrawdownatRisk}
 function adjust_risk_contribution(::Any, val::Real, args...)
     return val
 end
