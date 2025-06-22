@@ -18,10 +18,10 @@ If this is the first time you work with this repository, follow the instructions
 
  2. Clone your repo (this will create a `git remote` called `origin`)
  3. Add this repo as a remote:
-    
-    ```bash
-    git remote add upstream https://github.com/dcelisgarza/PortfolioOptimisers.jl
-    ```
+
+```bash
+git remote add upstream https://github.com/dcelisgarza/PortfolioOptimisers.jl
+```
 
 This will ensure that you have two remotes in your git: `origin` and `upstream`.
 You will create branches and push to `origin`, and you will fetch and update your local `main` branch from `upstream`.

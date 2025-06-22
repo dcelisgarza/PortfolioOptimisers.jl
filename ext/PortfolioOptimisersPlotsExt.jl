@@ -109,7 +109,7 @@ function PortfolioOptimisers.plot_stacked_area_composition(w::AbstractArray,
                                                                                  xticks = (1:size(w,
                                                                                                   2),
                                                                                            1:size(w,
-                                                                                                  2)),))
+                                                                                                  2))))
     if isa(w, AbstractVector{<:AbstractVector})
         w = hcat(w...)
     end

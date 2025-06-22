@@ -64,7 +64,7 @@
                 w1 = optimise!(noc1, rd).w
                 res1 = isapprox(w1, wt; rtol = 1e-6)
                 if !res1
-                    println("NOC unconstrained failed: $obj\n$bin.")
+                    println("NOC unconstrained failed: iter: $i\nobj: $obj\nbin: $bin.")
                     find_tol(w1, wt; name1 = :w1, name2 = :wt)
                 end
                 @test res1
@@ -77,7 +77,7 @@
                 w2 = optimise!(noc2, rd).w
                 res2 = isapprox(w2, w1)
                 if !res2
-                    println("NOC unconstrained initial values failed: $obj\n$bin.")
+                    println("NOC unconstrained initial values failed: iter: $i\nobj: $obj\nbin: $bin.")
                     find_tol(w2, w1; name1 = :w2, name2 = :w1)
                 end
                 @test res2
@@ -89,7 +89,7 @@
                 w3 = optimise!(noc3, rd).w
                 res3 = isapprox(w3, w1)
                 if !res3
-                    println("NOC constrained failed: $obj\n$bin.")
+                    println("NOC constrained failed: iter: $i\nobj: $obj\nbin: $bin.")
                     find_tol(w3, w1; name1 = :w3, name2 = :wt)
                 end
                 @test res3
@@ -105,7 +105,7 @@
                 w4 = optimise!(noc4, rd).w
                 res2 = isapprox(w4, w2)
                 if !res2
-                    println("NOC constrained initial values failed: $obj\n$bin.")
+                    println("NOC constrained initial values failed: iter: $i\nobj: $obj\nbin: $bin.")
                     find_tol(w4, w2; name1 = :w4, name2 = :w3)
                 end
                 @test res2
