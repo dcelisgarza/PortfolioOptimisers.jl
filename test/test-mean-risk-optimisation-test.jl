@@ -224,6 +224,40 @@ eqw = range(; start = inv(N), stop = inv(N), length = N)
         end
     end
 end
+@testset "Scalarisers" begin
+    r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+    mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+    w1 = optimise!(mr, rd).w
+    @test isapprox(w1,
+                   [7.225161701773924e-5, 0.00010432337189003065, 6.423156772282265e-5,
+                    0.00019225514839873453, 0.00010287988071399077, 0.00011636330678112027,
+                    0.0002716692139336672, 0.0001007649846945602, 0.00028823393929298225,
+                    0.00018584723388792882, 0.18973764396183676, 0.00012635181258293957,
+                    0.00010887585778807517, 0.0002341155057962851, 0.00011764165640339249,
+                    0.00011217288230003435, 0.0002936615459141612, 0.00012931568249504514,
+                    0.00015858612952987657, 0.3378178417352519, 0.0016139685001988727,
+                    0.0008982045920991744, 0.00011380604673779557, 5.621227210024855e-5,
+                    0.00011405761662614858, 0.43959101382670207, 0.0040089773996816215,
+                    0.023050013814047608, 6.732157843261866e-5, 0.0001513973191416557],
+                   rtol = 1e-6)
+
+    opt = JuMPOptimiser(; pe = pr, slv = slv, sce = MaxScalariser())
+    r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+    mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+    w2 = optimise!(mr, rd).w
+
+    opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser(; gamma = 1e-3))
+    r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+    mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+    w3 = optimise!(mr, rd).w
+    @test isapprox(w3, w1, rtol = 1e-6)
+
+    opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser(; gamma = 1e5))
+    r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+    mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+    w4 = optimise!(mr, rd).w
+    @test isapprox(w4, w2, rtol = 5e-5)
+end
 @testset "Returns lower bounds and uncertainty sets" begin
     rng = StableRNG(123456789)
     ucs1 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,

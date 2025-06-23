@@ -125,7 +125,7 @@ end
 function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
     risk_vec = model[:risk_vec]
     @variable(model, risk)
-    @constraint(model, risk_ms, risk_vec .- risk <= 0)
+    @constraint(model, risk_ms, risk .- risk_vec .>= 0)
     return nothing
 end
 function set_risk_constraints!(args...; kwargs...)

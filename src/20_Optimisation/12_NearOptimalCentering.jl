@@ -137,7 +137,8 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
     for r ∈ rs
         scale = r.settings.scale * gamma
         risk_min += exp(expected_risk(r, w_min, X, fees) * scale)
-        risk_opt += exp(expected_risk(r, w_opt, X, fees) * scale)
+        tmp = expected_risk(r, w_opt, X, fees) * scale
+        risk_opt += flag ? exp(tmp) : exp.(tmp)
         risk_max += exp(expected_risk(r, w_max, X, fees) * scale)
     end
     igamma = inv(gamma)
@@ -145,42 +146,6 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
     risk_opt = (flag ? log(risk_opt) : log.(risk_opt)) * igamma
     risk_max = log(risk_max) * igamma
     return risk_min, risk_opt, risk_max
-    #=
-    X = pr.X
-    rs = factory(rs, pr, slv)
-    datatype = eltype(X)
-    risk_min = Vector{datatype}(undef, length(rs))
-    flag = !isa(w_opt, AbstractVector{<:AbstractVector})
-    risk_opt = if flag
-        Vector{datatype}(undef, length(rs))
-    else
-        Vector{datatype}(undef, length(w_opt) * length(rs))
-    end
-    risk_max = Vector{datatype}(undef, length(rs))
-    gamma = scalarisation.gamma
-    for (i, r) ∈ pairs(rs)
-        scale = r.settings.scale * gamma
-        risk_min[i] = expected_risk(r, w_min, X, fees) * scale
-        if flag
-            risk_opt[i] = expected_risk(r, w_opt, X, fees) * scale
-        else
-            # Linear indexing for risk_opt
-            offset = (i - 1) * length(w_opt)
-            risk_opt[(offset + 1):(offset + length(w_opt))] = expected_risk(r, w_opt, X,
-                                                                            fees) * scale
-        end
-        risk_max[i] = expected_risk(r, w_max, X, fees) * scale
-    end
-    igamma = inv(gamma)
-    risk_min = logsumexp(risk_min) * igamma
-    risk_opt = (if flag
-                    logsumexp(risk_opt)
-                else
-                    vec(logsumexp(reshape(risk_opt, length(w_opt), length(rs)); dims = 2))
-                end) * igamma
-    risk_max = logsumexp(risk_max) * igamma
-    return risk_min, risk_opt, risk_max
-    =#
 end
 function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
@@ -209,7 +174,7 @@ function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:Risk
             end
         else
             idx = risk_opt_i .>= risk_opt
-            risk_opt[idx] = risk_opt_i[idx]
+            risk_opt[idx] = view(risk_opt_i, idx)
         end
         if risk_max_i >= risk_max
             risk_max = risk_max_i

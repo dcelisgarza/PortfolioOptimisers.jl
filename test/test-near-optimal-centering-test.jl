@@ -70,7 +70,7 @@
                     isapprox(w1, wt; rtol = 5e-5)
                 elseif i ∈ (12, 18, 21)
                     isapprox(w1, wt; rtol = 5e-6)
-                elseif io ∈ (22, 23)
+                elseif i ∈ (22, 23)
                     isapprox(w1, wt; rtol = 1e-5)
                 else
                     isapprox(w1, wt; rtol = 1e-6)
@@ -155,34 +155,46 @@
         mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w2 = optimise!(mr, rd).w
 
-        # r = [ConditionalValueatRisk(), ConditionalDrawdownatRisk()]
-        # mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        ###############
+        ###############
+        # r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+        # mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         # w3 = optimise!(mr, rd).w
+        # @test !isapprox(w1, w3)
+        # @test !isapprox(w2, w3)
+        # @test !isapprox(sum([w1 w2]; dims = 2), w3)
         # @test isapprox(w3,
-        #                [0.010979049616329416, 0.06713140531624666, 0.010067267106669109,
-        #                 0.02597915950737006, 0.04689117684508539, 0.022555523572993657,
-        #                 0.1348099741676934, 0.33312912809740247, 0.13265356880003143,
-        #                 0.21580374073920855], rtol = 5e-5)
+        #                [0.0040045132949514655, 0.0068078718659283785, 0.005778120742868111,
+        #                 0.01102643618591882, 0.005644348083705127, 0.005944275867574235,
+        #                 0.010939162965132743, 0.005549819490698245, 0.01073344107815392,
+        #                 0.009934567451467827, 0.034371272920275926, 0.0053822441303191014,
+        #                 0.007222957855670791, 0.011615063714488472, 0.006805338428831159,
+        #                 0.006896522633479259, 0.008988008734040695, 0.0036262075082924418,
+        #                 0.006450178927700632, 0.313400648695782, 0.010245851606501282,
+        #                 0.014757808328200814, 0.00833803184904843, 0.004092758407746584,
+        #                 0.007910618841243935, 0.2891108968649568, 0.024468650605150813,
+        #                 0.14775717344447362, 0.00537023572184974, 0.006826966311175611],
+        #                rtol = 1e-5)
 
         # opt = JuMPOptimiser(; pe = pr, slv = slv, sce = MaxScalariser())
-        # r = [ConditionalValueatRisk(), ConditionalDrawdownatRisk()]
-        # mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        # r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+        # mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         # w4 = optimise!(mr, rd).w
-        # @test isapprox(w4,
-        #                [0.00869185402031569, 0.04623619488036266, 0.007213865019645758,
-        #                 0.022358056550848663, 0.037789152899705504, 0.015153983822462731,
-        #                 0.12982686774260818, 0.32681802094007506, 0.16569729359555802,
-        #                 0.24021470319896132], rtol = 5e-5)
+        # @test isapprox(w2, w4, rtol = 1e-4)
 
-        # opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser())
-        # r = [ConditionalValueatRisk(), ConditionalDrawdownatRisk()]
-        # mr = NearOptimalCentering(; r = r, obj = MaximumRatio(; ohf = 1, rf = rf), opt = opt)
+        # opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser(; gamma = 1e-3))
+        # r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+        # mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         # w5 = optimise!(mr, rd).w
-        # @test isapprox(w5,
-        #                [0.009242527297389894, 0.054648908748791185, 0.008140831454820764,
-        #                 0.02311630047119653, 0.038861917666119045, 0.017052336573436123,
-        #                 0.13494612519443497, 0.33875402175662866, 0.15563480930705087,
-        #                 0.21960221598910773], rtol = 5e-5)
+        # @test isapprox(w5, w3, rtol = 3e-2)
+
+        # opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser(; gamma = 1e5))
+        # r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+        # mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
+        # w6 = optimise!(mr, rd).w
+        # @test isapprox(w6, w4, rtol = 1e-3)
+        #################
+        #################
 
         r = ConditionalValueatRisk()
         mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
