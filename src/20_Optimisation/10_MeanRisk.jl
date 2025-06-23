@@ -112,7 +112,9 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:A
     r = factory(mr.r, pr, mr.opt.slv)
     rk_min = expected_risk(r, sol_min.w, pr.X, mr.opt.fees)
     rk_max = expected_risk(r, sol_max.w, pr.X, mr.opt.fees)
-    rk_min, rk_max = if flag
+    rk_min, rk_max = if isnothing(flag)
+        rk_min, rk_max
+    elseif flag
         factor * rk_min, factor * rk_max
     else
         factor * sqrt(rk_min), factor * sqrt(rk_max)

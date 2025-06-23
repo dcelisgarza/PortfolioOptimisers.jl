@@ -145,6 +145,42 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
     risk_opt = (flag ? log(risk_opt) : log.(risk_opt)) * igamma
     risk_max = log(risk_max) * igamma
     return risk_min, risk_opt, risk_max
+    #=
+    X = pr.X
+    rs = factory(rs, pr, slv)
+    datatype = eltype(X)
+    risk_min = Vector{datatype}(undef, length(rs))
+    flag = !isa(w_opt, AbstractVector{<:AbstractVector})
+    risk_opt = if flag
+        Vector{datatype}(undef, length(rs))
+    else
+        Vector{datatype}(undef, length(w_opt) * length(rs))
+    end
+    risk_max = Vector{datatype}(undef, length(rs))
+    gamma = scalarisation.gamma
+    for (i, r) ∈ pairs(rs)
+        scale = r.settings.scale * gamma
+        risk_min[i] = expected_risk(r, w_min, X, fees) * scale
+        if flag
+            risk_opt[i] = expected_risk(r, w_opt, X, fees) * scale
+        else
+            # Linear indexing for risk_opt
+            offset = (i - 1) * length(w_opt)
+            risk_opt[(offset + 1):(offset + length(w_opt))] = expected_risk(r, w_opt, X,
+                                                                            fees) * scale
+        end
+        risk_max[i] = expected_risk(r, w_max, X, fees) * scale
+    end
+    igamma = inv(gamma)
+    risk_min = logsumexp(risk_min) * igamma
+    risk_opt = (if flag
+                    logsumexp(risk_opt)
+                else
+                    vec(logsumexp(reshape(risk_opt, length(w_opt), length(rs)); dims = 2))
+                end) * igamma
+    risk_max = logsumexp(risk_max) * igamma
+    return risk_min, risk_opt, risk_max
+    =#
 end
 function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:RiskMeasure},
                                       pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
@@ -373,7 +409,9 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector
         (; N, factor, flag) = risk_frontier[i].second[2]
         rk_min = expected_risk(ri, w_min, pr.X, noc.opt.fees)
         rk_max = expected_risk(ri, w_max, pr.X, noc.opt.fees)
-        rk_min, rk_max = if flag
+        rk_min, rk_max = if isnothing(flag)
+            rk_min, rk_max
+        elseif flag
             factor * rk_min, factor * rk_max
         else
             factor * sqrt(rk_min), factor * sqrt(rk_max)
@@ -672,5 +710,5 @@ function efficient_frontier!(noc::NearOptimalCentering, rd::ReturnsResult = Retu
                                   ifelse(save, noc_model, nothing))
 end
 
-export ConstrainedNearOptimalCenteringAlgorithm, UnconstrainedNearOptimalCenteringAlgorithm,
-       NearOptimalCentering
+export NearOptimalCentering, UnconstrainedNearOptimalCenteringAlgorithm,
+       ConstrainedNearOptimalCenteringAlgorithm
