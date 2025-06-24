@@ -14,7 +14,7 @@ function EquilibriumExpectedReturns(;
     end
     return EquilibriumExpectedReturns{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
 end
-function StatsBase.mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1)
+function StatsBase.mean(me::EquilibriumExpectedReturns, X::AbstractArray; dims::Int = 1)
     sigma = cov(me.ce, X; dims = dims)
     w = !isnothing(me.w) ? me.w : fill(inv(size(sigma, 1)), size(sigma, 1))
     return me.l * sigma * w

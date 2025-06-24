@@ -36,6 +36,7 @@ include("./7_Moments/14_EquilibriumExpectedReturns.jl")
 include("./7_Moments/15_ExcessExpectedReturns.jl")
 include("./7_Moments/16_Coskewness.jl")
 include("./7_Moments/17_Cokurtosis.jl")
+include("./7_Moments/18_ImpliedVolatility.jl")
 
 include("./8_Distance/1_Base_Distance.jl")
 include("./8_Distance/2_Distance.jl")

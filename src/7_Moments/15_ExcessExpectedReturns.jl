@@ -8,7 +8,7 @@ function ExcessExpectedReturns(;
                                rf::Real = 0.0)
     return ExcessExpectedReturns{typeof(me), typeof(rf)}(me, rf)
 end
-function StatsBase.mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1)
+function StatsBase.mean(me::ExcessExpectedReturns, X::AbstractArray; dims::Int = 1)
     return mean(me.me, X; dims = dims) .- me.rf
 end
 function factory(me::ExcessExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
