@@ -8,7 +8,7 @@
                                                               solver = Clarabel.Optimizer,
                                                               settings = Dict("verbose" => false)))
         @test !res.success
-        @test haskey(res.trials[:Clarabel], :jump_error)
+        @test haskey(res.trials[:Clarabel], :optimize!)
         res = PortfolioOptimisers.optimise_JuMP_model!(JuMP.Model(), Solver[])
         @test !res.success
     end

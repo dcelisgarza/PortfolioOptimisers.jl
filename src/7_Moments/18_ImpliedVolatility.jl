@@ -109,7 +109,6 @@ end
 function StatsBase.cov(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
                        mean = nothing, iv::AbstractMatrix, kwargs...)
     @smart_assert(size(X) == size(iv))
-    @smart_assert(all(x -> x >= zero(eltype(iv)), iv))
     rho = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     #iv= predict_realised_vols(ce::AbstractVarianceEstimator, X::AbstractMatrix,

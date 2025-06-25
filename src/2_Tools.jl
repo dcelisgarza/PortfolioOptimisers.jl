@@ -42,18 +42,21 @@ struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
                      T2 <: Union{Nothing, <:AbstractMatrix},
                      T3 <: Union{Nothing, <:AbstractVector},
                      T4 <: Union{Nothing, <:AbstractMatrix},
-                     T5 <: Union{Nothing, <:AbstractVector}} <: AbstractReturnsResult
+                     T5 <: Union{Nothing, <:AbstractVector},
+                     T6 <: Union{Nothing, <:AbstractMatrix}} <: AbstractReturnsResult
     nx::T1
     X::T2
     nf::T3
     F::T4
     ts::T5
+    iv::T6
 end
 function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                        X::Union{Nothing, <:AbstractMatrix} = nothing,
                        nf::Union{Nothing, <:AbstractVector} = nothing,
                        F::Union{Nothing, <:AbstractMatrix} = nothing,
-                       ts::Union{Nothing, <:AbstractVector} = nothing)
+                       ts::Union{Nothing, <:AbstractVector} = nothing,
+                       iv::Union{Nothing, <:AbstractMatrix} = nothing)
     nxs_flag = !isnothing(nx)
     X_flag = !isnothing(X)
     if nxs_flag || X_flag
@@ -73,16 +76,20 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
         @smart_assert(!isempty(ts))
         @smart_assert(length(ts) == size(X, 1))
     end
-    return ReturnsResult{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts)}(nx, X,
-                                                                                   nf, F,
-                                                                                   ts)
+    if !isnothing(iv)
+        @smart_assert(all(x -> x >= zero(eltype(iv)), iv))
+    end
+    return ReturnsResult{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts),
+                         typeof(iv)}(nx, X, nf, F, ts, iv)
 end
 function returns_result_view(rd::ReturnsResult, i::AbstractVector)
     nx = nothing_scalar_array_view(rd.nx, i)
     X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
-    return ReturnsResult(nx, X, rd.nf, rd.F, rd.ts)
+    iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)
+    return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts, iv = iv)
 end
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
+                           iv::Union{Nothing, <:TimeArray} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
                            missing_col_percent::Real = 1.0, missing_row_percent::Real = 1.0,
                            collapse_args::Tuple = (),
@@ -154,7 +161,7 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     else
         X = Matrix(X[!, nx])
     end
-    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F)
+    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = iv)
 end
 function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
                              asset_classes::DataFrame, col, date0 = nothing,

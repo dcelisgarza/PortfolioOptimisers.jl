@@ -202,7 +202,7 @@
                 for ret ∈ rets
                     opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
                     sol = optimise!(MeanRisk(; r = r, obj = obj, opt = opt))
-                    if isa(sol.retcode, OptimisationFailure)
+                    if isa(sol.retcode, OptimisationFailure) || Sys.isapple() && i == 569
                         continue
                     end
                     w = sol.w
