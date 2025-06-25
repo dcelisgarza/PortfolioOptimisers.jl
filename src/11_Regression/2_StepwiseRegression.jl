@@ -63,6 +63,7 @@ function add_best_asset_after_failure_pval!(included::AbstractVector, F::Abstrac
     for i ∈ excluded
         factors = [included; i]
         f1 = [ovec view(F, :, factors)]
+        #! Call fit(LinearModel, X, y, args...; kwargs...) where you dispatch on the first argument.
         fit_result = GLM.lm(f1, x)
         new_pvals = coeftable(fit_result).cols[4][2:end]
         idx = findfirst(x -> x == i, factors)
@@ -90,6 +91,7 @@ function regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVect
         for i ∈ excluded
             factors = [included; i]
             f1 = [ovec view(F, :, factors)]
+            #! Call fit(LinearModel, X, y, args...; kwargs...) where you dispatch on the first argument.
             fit_result = GLM.lm(f1, x)
             new_pvals = coeftable(fit_result).cols[4][2:end]
             idx = findfirst(x -> x == i, factors)
@@ -145,6 +147,7 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
             factors = copy(included)
             push!(factors, i)
             f1 = [ovec view(F, :, factors)]
+            #! Call fit(LinearModel, X, y, args...; kwargs...) where you dispatch on the first argument.
             fit_result = GLM.lm(f1, x)
             value[i] = criterion_func(fit_result)
         end
@@ -175,6 +178,7 @@ function regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVec
             break
         end
         f1 = [ovec view(F, :, factors)]
+        #! Call fit(LinearModel, X, y, args...; kwargs...) where you dispatch on the first argument.
         fit_result = GLM.lm(f1, x)
         pvals = coeftable(fit_result).cols[4][2:end]
         val, idx = findmax(pvals)
@@ -224,6 +228,7 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
             else
                 f1 = reshape(ovec, :, 1)
             end
+            #! Call fit(LinearModel, X, y, args...; kwargs...) where you dispatch on the first argument.
             fit_result = GLM.lm(f1, x)
             value[factor] = criterion_func(fit_result)
         end
@@ -246,6 +251,7 @@ function regression(method::StepwiseRegression, X::AbstractMatrix, F::AbstractMa
     for i ∈ axes(loadings, 1)
         included = regression(method, view(X, :, i), F)
         x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)
+        #! Call fit(LinearModel, X, y, args...; kwargs...) where you dispatch on the first argument.
         fit_result = GLM.lm(x1, view(X, :, i))
         params = coef(fit_result)
         loadings[i, 1] = params[1]

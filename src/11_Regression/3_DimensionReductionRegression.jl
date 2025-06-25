@@ -42,6 +42,7 @@ function prep_dim_red_reg(type::DimensionReductionRegression, X::AbstractMatrix)
 end
 function regression(y::AbstractVector, mu::AbstractVector, sigma::AbstractVector,
                     x1::AbstractMatrix, Vp::AbstractMatrix)
+    #! Call fit(LinearModel, X, y, args...; kwargs...) where you dispatch on the first argument.
     fit_result = GLM.lm(x1, y)
     beta_pc = coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma

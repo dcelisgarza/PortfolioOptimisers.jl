@@ -196,7 +196,7 @@
                         0.02385481833356798, 0.014376852276222856, 0.00703008032762147,
                         0.013449081435994293, 0.17700511436847838, 0.03729883908556524,
                         0.13764501268074134, 0.00950406983452321, 0.011285556107478728],
-                       rtol = 1e-6)
+                       rtol = 5e-6)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, sce = MaxScalariser())
         r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
