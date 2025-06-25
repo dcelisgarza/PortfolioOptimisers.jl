@@ -1,11 +1,25 @@
 abstract type ImpliedVolatilityAlgorithm <: AbstractAlgorithm end
 abstract type ImpliedVolatilityRegressionEstimator <: ImpliedVolatilityAlgorithm end
-struct ImpliedVolatilityRegression{T1 <: Real} <: ImpliedVolatilityAlgorithm
-    ws::T1
+struct ImpliedVolatilityRegression{T1 <: AbstractVarianceEstimator, T2 <: Real,
+                                   T3 <: AbstractStepwiseRegressionCriterion, T4} <:
+       ImpliedVolatilityAlgorithm
+    ve::T1
+    ws::T2
+    crit::T3
+    re::T4
 end
-function ImpliedVolatilityRegression(; ws::Real = 20)
+function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
+                                     ws::Real = 20,
+                                     crit::AbstractStepwiseRegressionCriterion = RSquared(),
+                                     re = LinearModel)
     @smart_assert(ws > 2)
-    return ImpliedVolatilityRegression{typeof(ws)}(ws)
+    tre = if isa(re, DataType)
+        re
+    else
+        typeof(re)
+    end
+    return ImpliedVolatilityRegression{typeof(ve), typeof(ws), typeof(crit), tre}(ve, ws,
+                                                                                  crit, re)
 end
 struct ImpliedVolatilityPremium{T1 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
        ImpliedVolatilityAlgorithm
@@ -30,20 +44,13 @@ struct ImpliedVolatility{T1 <: AbstractCovarianceEstimator,
     alg::T3
     af::T4
 end
-#! Rework
 function ImpliedVolatility(; ce::AbstractCovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                           re, af::Real = 252, ws::Integer = 20,
-                           vrpa::Union{Nothing, <:Real, <:AbstractVector} = nothing)
-    @smart_assert(ws > 2)
-    #! either re or vrpa must be provided
-    if isa(vrpa, AbstractVector)
-        @smart_assert(!isempty(vrpa) &&
-                      all(isfinite, vrpa) &&
-                      all(vrpa .>= zero(eltype(vrpa))))
-    end
-    return ImpliedVolatility{typeof(ce), typeof(mp), typeof(re), typeof(af), typeof(ws),
-                             typeof(vrpa)}(ce, mp, re, af, ws, vrpa)
+                           alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
+                           af::Real = 252)
+    @smart_assert(af > zero(af) && isfinite(af))
+    return ImpliedVolatility{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg,
+                                                                              af)
 end
 function factory(ce::ImpliedVolatility, w::Union{Nothing, <:AbstractWeights} = nothing)
     return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
@@ -70,18 +77,21 @@ function implied_vol(X::AbstractMatrix, ws::Integer,
     end
     return view(X, (T - (chunk - 1) * ws):ws:T, :)
 end
-#! dispatch based on ImpliedVolatilityAlgorithm
-function predict_realised_vols(ce::AbstractVarianceEstimator, X::AbstractMatrix,
-                               iv::AbstractMatrix, ws::Integer)
+function predict_realised_vols(alg::ImpliedVolatilityPremium, iv::AbstractMatrix, ::Any)
+    return view(iv, size(iv, 1), :) ⊘ alg.val
+end
+function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::AbstractMatrix,
+                               X::AbstractMatrix)
     T, N = size(X)
-    chunk = div(T, ws)
+    chunk = div(T, alg.ws)
     @smart_assert(chunk > 2)
-    rv = realised_vol(ce, X, ws, chunk, T, N)
-    iv = implied_vol(iv, ws, chunk, T, N)
+    rv = realised_vol(alg.ve, X, alg.ws, chunk, T, N)
+    iv = implied_vol(iv, alg.ws, chunk, T, N)
     @smart_assert(size(rv) == size(iv))
     T2 = size(iv, 1)
     rv = log.(rv)
     iv = log.(iv)
+    criterion_func = regression_criterion_func(alg.crit)
     ovec = range(; start = one(promote_type(eltype(rv), eltype(iv))),
                  stop = one(promote_type(eltype(rv), eltype(iv))), length = T2 - 1)
     reg = Matrix{promote_type(eltype(rv), eltype(iv))}(undef, N, 3)
@@ -93,13 +103,11 @@ function predict_realised_vols(ce::AbstractVarianceEstimator, X::AbstractMatrix,
         X_t = [ovec view(X, 1:(T2 - 1), :)]
         X_p = [one(eltype(X)) transpose(X[T2, :])]
         y_t = view(rv, 2:T2, i)
-        #! Call fit(LinearModel, X, y, args...; kwargs...) where you dispatch on the first argument.
-        fri = GLM.lm(X_t, y_t)
+        fri = fit(alg.re, X_t, y_t)
         params = coef(fri)
         reg[i, 1] = params[1]
         reg[i, 2:3] .= params[2:end]
-        #! Use an AbstractMinValStepwiseRegressionCriterion
-        r2s[i] = r2(fri)
+        r2s[i] = criterion_func(fri)
         rvpi = predict(fri, X_p)[1]
         rv_p[i] = exp(rvpi)
         push!(fr, fri)
@@ -111,8 +119,8 @@ function StatsBase.cov(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
     @smart_assert(size(X) == size(iv))
     rho = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
-    #iv= predict_realised_vols(ce::AbstractVarianceEstimator, X::AbstractMatrix,
-    #                       iv::AbstractMatrix, ws::Integer)
+    iv = predict_realised_vols(ce.alg, X, iv)
+    #! Continue implementing
     return nothing
 end
 function StatsBase.cor(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,

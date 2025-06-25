@@ -36,7 +36,8 @@ include("./7_Moments/14_EquilibriumExpectedReturns.jl")
 include("./7_Moments/15_ExcessExpectedReturns.jl")
 include("./7_Moments/16_Coskewness.jl")
 include("./7_Moments/17_Cokurtosis.jl")
-include("./7_Moments/18_ImpliedVolatility.jl")
+include("./7_Moments/18_Base_Regression.jl")
+include("./7_Moments/19_ImpliedVolatility.jl")
 
 include("./8_Distance/1_Base_Distance.jl")
 include("./8_Distance/2_Distance.jl")
@@ -48,9 +49,8 @@ include("./9_JuMPModelOptimisation.jl")
 
 include("./10_OWA.jl")
 
-include("./11_Regression/1_Base_Regression.jl")
-include("./11_Regression/2_StepwiseRegression.jl")
-include("./11_Regression/3_DimensionReductionRegression.jl")
+include("./11_Regression/1_StepwiseRegression.jl")
+include("./11_Regression/2_DimensionReductionRegression.jl")
 
 include("./12_Philogeny/1_Base_Philogeny.jl")
 include("./12_Philogeny/2_Clustering.jl")

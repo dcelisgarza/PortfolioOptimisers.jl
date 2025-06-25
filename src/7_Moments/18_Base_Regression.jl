@@ -1,6 +1,38 @@
 abstract type AbstractRegressionEstimator <: AbstractEstimator end
 abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
 abstract type AbstractRegressionResult <: AbstractResult end
+abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
+abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
+abstract type AbstractMinValStepwiseRegressionCriterion <:
+              AbstractStepwiseRegressionCriterion end
+abstract type AbstractMaxValStepwiseRegressionCriteria <:
+              AbstractStepwiseRegressionCriterion end
+struct AIC <: AbstractMinValStepwiseRegressionCriterion end
+struct AICC <: AbstractMinValStepwiseRegressionCriterion end
+struct BIC <: AbstractMinValStepwiseRegressionCriterion end
+struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
+struct AdjustedRSquared <: AbstractMaxValStepwiseRegressionCriteria end
+function regression_criterion_func(::AIC)
+    return GLM.aic
+end
+function regression_criterion_func(::AICC)
+    return GLM.aicc
+end
+function regression_criterion_func(::BIC)
+    return GLM.bic
+end
+function regression_criterion_func(::RSquared)
+    return GLM.r2
+end
+function regression_criterion_func(::AdjustedRSquared)
+    return GLM.adjr2
+end
+function regression_threshold(::AbstractMinValStepwiseRegressionCriterion)
+    return Inf
+end
+function regression_threshold(::AbstractMaxValStepwiseRegressionCriteria)
+    return -Inf
+end
 struct RegressionResult{T1 <: AbstractMatrix, T2 <: Union{Nothing, <:AbstractMatrix},
                         T3 <: Union{Nothing, <:AbstractVector}} <: AbstractRegressionResult
     M::T1
