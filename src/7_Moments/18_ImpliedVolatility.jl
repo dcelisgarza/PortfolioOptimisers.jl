@@ -1,21 +1,36 @@
 abstract type ImpliedVolatilityAlgorithm <: AbstractAlgorithm end
 abstract type ImpliedVolatilityRegressionEstimator <: ImpliedVolatilityAlgorithm end
-
-struct ImpliedVolatilityRegression{T1 <: ImpliedVolatilityRegressionEstimator} <:
+struct ImpliedVolatilityRegression{T1 <: Real} <: ImpliedVolatilityAlgorithm
+    ws::T1
+end
+function ImpliedVolatilityRegression(; ws::Real = 20)
+    @smart_assert(ws > 2)
+    return ImpliedVolatilityRegression{typeof(ws)}(ws)
+end
+struct ImpliedVolatilityPremium{T1 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
        ImpliedVolatilityAlgorithm
-    re::T1
+    val::T1
+end
+function ImpliedVolatilityPremium(; val::Union{<:Real, <:AbstractVector{<:Real}} = 20)
+    if isa(val, Real)
+        @smart_assert(isfinite(val) && val >= zero(val))
+    elseif isa(val, AbstractVector)
+        @smart_assert(!isempty(val) &&
+                      all(isfinite, val) &&
+                      all(x -> x >= zero(eltype(val)), val))
+    end
+    return ImpliedVolatilityPremium{typeof(val)}(val)
 end
 struct ImpliedVolatility{T1 <: AbstractCovarianceEstimator,
-                         T2 <: AbstractMatrixProcessingEstimator, T3, T4 <: Real,
-                         T5 <: Integer, T6 <: Union{Nothing, <:Real, <:AbstractVector}} <:
+                         T2 <: AbstractMatrixProcessingEstimator,
+                         T3 <: ImpliedVolatilityRegressionEstimator, T4 <: Real} <:
        AbstractCovarianceEstimator
     ce::T1
     mp::T2
-    re::T3
+    alg::T3
     af::T4
-    ws::T5
-    vrpa::T6
 end
+#! Rework
 function ImpliedVolatility(; ce::AbstractCovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                            re, af::Real = 252, ws::Integer = 20,
@@ -45,19 +60,6 @@ function realised_vol(ce::AbstractVarianceEstimator, X::AbstractMatrix, ws::Inte
                                   reshape(view(X, (1 + T - chunk * ws):T, :), ws, chunk, N);
                                   dims = 1); dims = 1)
 end
-# Compute realised volatility over non-overlapping windows
-function compute_realised_vol(returns::AbstractMatrix, window_size::Int;
-                              corrected::Bool = true)
-    n_observations, n_assets = size(returns)
-    chunks = div(n_observations, window_size)
-    # Only use the last (chunks * window_size) rows so we can reshape
-    X = returns[(n_observations - chunks * window_size + 1):end, :]
-    Xr = reshape(X, window_size, chunks, n_assets)
-    # Compute std along the window dimension (dim=1), result is (1, chunks, n_assets)
-    # Drop the first dimension to get (chunks, n_assets)
-    stds = dropdims(std(Xr; dims = 1, corrected = corrected); dims = 1)
-    return stds
-end
 function implied_vol(X::AbstractMatrix, ws::Integer,
                      chunk::Union{Nothing, <:Integer} = nothing,
                      T::Union{Nothing, <:Integer} = nothing,
@@ -68,6 +70,7 @@ function implied_vol(X::AbstractMatrix, ws::Integer,
     end
     return view(X, (T - (chunk - 1) * ws):ws:T, :)
 end
+#! dispatch based on ImpliedVolatilityAlgorithm
 function predict_realised_vols(ce::AbstractVarianceEstimator, X::AbstractMatrix,
                                iv::AbstractMatrix, ws::Integer)
     T, N = size(X)
@@ -103,4 +106,16 @@ function predict_realised_vols(ce::AbstractVarianceEstimator, X::AbstractMatrix,
     end
     return RegressionResult(; b = view(reg, :, 1), M = view(reg, :, 2:3)), r2s, rv_p, fr
 end
+function StatsBase.cov(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
+                       mean = nothing, iv::AbstractMatrix, kwargs...)
+    @smart_assert(size(X) == size(iv))
+    @smart_assert(all(x -> x >= zero(eltype(iv)), iv))
+    rho = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
+    iv = iv / sqrt(ce.af)
+    #iv= predict_realised_vols(ce::AbstractVarianceEstimator, X::AbstractMatrix,
+    #                       iv::AbstractMatrix, ws::Integer)
+    return nothing
+end
+function StatsBase.cor(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
+                       mean = nothing, kwargs...) end
 export ImpliedVolatility, predict_realised_vols
