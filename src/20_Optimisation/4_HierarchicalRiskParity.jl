@@ -38,7 +38,7 @@ end
 function optimise!(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hrp.opt.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
-    clr = clusterise(hrp.opt.cle, pr.X; vi = rd.iv, ivpa = rd.ivpa, dims = dims)
+    clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     rku = unitary_expected_risks(r, pr.X, hrp.opt.fees)

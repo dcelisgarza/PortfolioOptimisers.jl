@@ -4,7 +4,6 @@ end
 function Distance(; alg::AbstractDistanceAlgorithm = SimpleDistance())
     return Distance{typeof(alg)}(alg)
 end
-#! Ensure kwargs are passed into distance at every possibility.
 function distance(::Distance{<:SimpleDistance}, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)

@@ -37,7 +37,8 @@
                StepwiseRegression(; alg = Backward(), crit = BIC()),
                StepwiseRegression(; alg = Backward(), crit = RSquared()),
                StepwiseRegression(; alg = Backward(), crit = AdjustedRSquared()),
-               DimensionReductionRegression(), DimensionReductionRegression(; alg = PPCA())]
+               DimensionReductionRegression(),
+               DimensionReductionRegression(; drtgt = PPCA())]
         res_t = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv"), DataFrame)
         for i ∈ eachindex(res)
             loadings = regression(res[i], X, F)

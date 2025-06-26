@@ -190,7 +190,7 @@ function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector
                              asset_classes::DataFrame, col, date0 = nothing,
                              date1 = nothing)
     #! Make this efficient with filter.
-    #! sort!(filter!(:timestamp => x -> date0 <= x <= date1, prices), :timestamp)
+    # sort!(filter!(:timestamp => x -> date0 <= x <= date1, prices), :timestamp)
     idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
         timestamps = timestamp(X)
         idx = DateTime(date0) .<= timestamps .<= DateTime(date1)

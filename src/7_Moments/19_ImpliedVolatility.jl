@@ -13,16 +13,11 @@ function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVar
                                      #  crit::AbstractStepwiseRegressionCriterion = RSquared(),
                                      re = LinearModel)
     @smart_assert(ws > 2)
-    tre = if isa(re, DataType)
-        re
-    else
-        typeof(re)
-    end
     return ImpliedVolatilityRegression{typeof(ve), typeof(ws),
                                        # typeof(crit),
-                                       tre}(ve, ws,
-                                            #   crit,
-                                            re)
+                                       typeof(re)}(ve, ws,
+                                                   #   crit,
+                                                   re)
 end
 struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
 struct ImpliedVolatility{T1 <: AbstractCovarianceEstimator,

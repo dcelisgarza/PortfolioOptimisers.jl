@@ -53,7 +53,7 @@ end
 function StatsBase.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims, kwargs...) : mean
-    return robust_cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
+    return cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
 function StatsBase.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
@@ -65,7 +65,7 @@ function StatsBase.cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims, kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
-    return robust_cor(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
+    return cor(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
 end
 
 export GeneralWeightedCovariance, Covariance

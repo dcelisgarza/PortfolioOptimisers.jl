@@ -12,7 +12,7 @@ function distance(de::GeneralDistance{<:Any, <:SimpleDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                   kwargs...)
     scale = isodd(de.power) ? 0.5 : 1.0
-    rho = robust_cor(ce, X; dims = dims, kwargs...) .^ de.power
+    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     return sqrt.(clamp!((one(eltype(X)) .- rho) * scale, zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::GeneralDistance{<:Any, <:SimpleDistance}, rho::AbstractMatrix,
@@ -30,7 +30,7 @@ end
 function distance(de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                   kwargs...)
-    rho = abs.(robust_cor(ce, X; dims = dims), kwargs...) .^ de.power
+    rho = abs.(cor(ce, X; dims = dims), kwargs...) .^ de.power
     return sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance}, rho::AbstractMatrix,
@@ -47,12 +47,12 @@ end
 function distance(de::GeneralDistance{<:Any, <:LogDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                   kwargs...)
-    rho = abs.(robust_cor(ce, X; dims = dims, kwargs...)) .^ de.power
+    rho = abs.(cor(ce, X; dims = dims, kwargs...)) .^ de.power
     return -log.(rho)
 end
 function distance(de::GeneralDistance{<:Any, <:LogDistance}, ce::LTDCovariance,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
-    rho = robust_cor(ce, X; dims = dims, kwargs...) .^ de.power
+    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     return -log.(rho)
 end
 function distance(de::GeneralDistance{<:Any, <:LogDistance}, rho::AbstractMatrix, args...;
@@ -76,7 +76,7 @@ end
 function distance(de::GeneralDistance{<:Any, <:CorrelationDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                   kwargs...)
-    rho = robust_cor(ce, X; dims = dims, kwargs...) .^ de.power
+    rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     return sqrt.(clamp!(one(eltype(X)) .- rho, zero(eltype(X)), one(eltype(X))))
 end
 function distance(de::GeneralDistance{<:Any, <:CorrelationDistance}, rho::AbstractMatrix,

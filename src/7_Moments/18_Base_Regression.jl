@@ -3,6 +3,26 @@ abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
 abstract type AbstractRegressionResult <: AbstractResult end
 abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
 abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
+abstract type RegressionTarget <: AbstractRegressionAlgorithm end
+struct LinearModel{T1 <: NamedTuple} <: RegressionTarget
+    kwargs::T1
+end
+function LinearModel(; kwargs::NamedTuple = (;))
+    return LinearModel{typeof(kwargs)}(kwargs)
+end
+function GLM.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
+    return GLM.fit(GLM.LinearModel, X, y; target.kwargs...)
+end
+struct GeneralisedLinearModel{T1 <: Tuple, T2 <: NamedTuple} <: RegressionTarget
+    args::T1
+    kwargs::T2
+end
+function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
+    return GeneralisedLinearModel{typeof(args), typeof(kwargs)}(args, kwargs)
+end
+function GLM.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
+    return GLM.fit(GLM.GeneralizedLinearModel, X, y, target.args...; target.kwargs...)
+end
 abstract type AbstractMinValStepwiseRegressionCriterion <:
               AbstractStepwiseRegressionCriterion end
 abstract type AbstractMaxValStepwiseRegressionCriteria <:
