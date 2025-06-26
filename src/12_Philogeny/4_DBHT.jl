@@ -1283,8 +1283,8 @@ function logo!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator}, sigma::Abstract
 end
 function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator},
                                       sigma::AbstractMatrix, X::AbstractMatrix;
-                                      dims::Int = 1)
-    return logo!(je, pdm, sigma, X; dims = dims)
+                                      dims::Int = 1, kwargs...)
+    return logo!(je, pdm, sigma, X; dims = dims, kwargs...)
 end
 
 export ExponentialSimilarity, GeneralExponentialSimilarity, MaximumDistanceSimilarity,

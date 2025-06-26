@@ -132,7 +132,7 @@ function CentralityEstimator(; ne::AbstractNetworkEstimator = NetworkEstimator()
 end
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
                         X::AbstractMatrix; dims::Int = 1, kwargs...)
-    S = cor(ne.ce, X; dims = dims)
+    S = cor(ne.ce, X; dims = dims, kwargs...)
     D = distance(ne.de, S, X; dims = dims, kwargs...)
     G = SimpleWeightedGraph(D)
     tree = calc_mst(ne.alg, G)
@@ -141,14 +141,14 @@ end
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any,
                                              <:AbstractSimilarityMatrixAlgorithm, <:Any},
                         X::AbstractMatrix; dims::Int = 1, kwargs...)
-    S = cor(ne.ce, X; dims = dims)
+    S = cor(ne.ce, X; dims = dims, kwargs...)
     D = distance(ne.de, S, X; dims = dims, kwargs...)
     S = dbht_similarity(ne.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
     return adjacency_matrix(SimpleGraph(Rpm))
 end
 function philogeny_matrix(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    A = calc_adjacency(ne, X; dims = dims)
+    A = calc_adjacency(ne, X; dims = dims, kwargs...)
     P = zeros(Int, size(Matrix(A)))
     for i ∈ 0:(ne.n)
         P .+= A^i

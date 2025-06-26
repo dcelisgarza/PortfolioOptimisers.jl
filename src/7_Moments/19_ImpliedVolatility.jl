@@ -118,7 +118,7 @@ function StatsBase.cov(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)
     StatsBase.cov2cor!(sigma, iv)
-    matrix_processing!(ce.mp, sigma, X)
+    matrix_processing!(ce.mp, sigma, X; kwargs...)
     return sigma
 end
 function StatsBase.cor(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
@@ -130,7 +130,7 @@ function StatsBase.cor(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)
     StatsBase.cor2cov!(rho, iv)
     StatsBase.cov2cor!(rho)
-    matrix_processing!(ce.mp, rho, X)
+    matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
 end
 export ImpliedVolatility, predict_realised_vols

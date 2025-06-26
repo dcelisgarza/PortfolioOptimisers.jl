@@ -94,7 +94,7 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     v2 = sigma_hat + transpose(M) * v1
     v3 = inv(prior_sigma)
     posterior_sigma = inv(v3 - v1 * (v2 \ transpose(M)) * v3)
-    matrix_processing!(pe.mp, posterior_sigma, posterior_X)
+    matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b) .+ pe.rf
     return LowOrderPriorResult(; X = posterior_X, mu = posterior_mu,
                                sigma = posterior_sigma, loadings = loadings, f_mu = f_mu,

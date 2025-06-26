@@ -45,7 +45,7 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
     posterior_X = F * transpose(M) .+ transpose(b)
     posterior_mu = M * f_mu + b
     posterior_sigma = M * f_sigma * transpose(M)
-    matrix_processing!(pe.mp, posterior_sigma, posterior_X)
+    matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     posterior_csigma = M * cholesky(f_sigma).L
     if pe.rsd
         err = X - posterior_X

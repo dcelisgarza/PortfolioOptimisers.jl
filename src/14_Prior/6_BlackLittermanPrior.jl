@@ -90,7 +90,7 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
     v3 = Q - P * prior_mu
     posterior_mu = (prior_mu + v1 * (v2 \ v3)) .+ pe.rf
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
-    matrix_processing!(pe.mp, posterior_sigma, posterior_X)
+    matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     return LowOrderPriorResult(; X = posterior_X, mu = posterior_mu,
                                sigma = posterior_sigma)
 end
