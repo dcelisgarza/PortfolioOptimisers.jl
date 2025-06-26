@@ -59,7 +59,7 @@ end
 function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
-    pr = prior(st.pe, rd.X, rd.F; dims = dims)
+    pr = prior(st.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     opti = st.opti
     Ni = length(opti)
     wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)

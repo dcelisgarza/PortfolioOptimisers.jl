@@ -18,7 +18,7 @@ function opt_view(opt::InverseVolatility, i::AbstractVector, args...)
 end
 function optimise!(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, kwargs...)
-    pr = prior(iv.pe, rd.X, rd.F; dims = dims)
+    pr = prior(iv.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     w = inv.(sqrt.(diag(pr.sigma)))
     return NaiveOptimisationResult(typeof(iv), pr, w / sum(w))
 end

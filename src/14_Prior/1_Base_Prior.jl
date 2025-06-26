@@ -16,7 +16,7 @@ const AbstractLowOrderPriorEstimatorMap_1o2_1o2 = Union{<:AbstractLowOrderPriorE
 abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
 abstract type AbstractPriorResult <: AbstractResult end
 function prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
-    return prior(pr, rd.X, rd.F; kwargs...)
+    return prior(pr, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 function prior_view(pr::AbstractPriorEstimator, args...; kwargs...)
     return pr

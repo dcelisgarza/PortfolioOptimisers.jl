@@ -9,7 +9,8 @@ struct OpinionPoolingPrior{T1 <:
                            Union{Nothing, <:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
                            T4 <: Union{Nothing, <:Real},
                            T5 <: Union{Nothing, <:AbstractVector},
-                           T6 <: OpinionPoolingAlgorithm} <:
+                           T6 <: OpinionPoolingAlgorithm,
+                           T7 <: FLoops.Transducers.Executor} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
     pes::T1
     pe1::T2
@@ -17,6 +18,7 @@ struct OpinionPoolingPrior{T1 <:
     p::T4
     w::T5
     alg::T6
+    threads::T7
 end
 function OpinionPoolingPrior(;
                              pes::AbstractVector{<:AbstractLowOrderPriorEstimator_1o2_1o2},
@@ -24,7 +26,8 @@ function OpinionPoolingPrior(;
                              pe2::Union{Nothing, <:AbstractLowOrderPriorEstimator_1o2_1o2} = nothing,
                              p::Union{Nothing, <:Real} = nothing,
                              w::Union{Nothing, <:AbstractVector} = nothing,
-                             alg::OpinionPoolingAlgorithm = LinearOpinionPooling())
+                             alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
+                             threads::FLoops.Transducers.Executor = ThreadedEx())
     @smart_assert(!isempty(pes))
     if !isnothing(p)
         @smart_assert(p > zero(p))
@@ -34,7 +37,8 @@ function OpinionPoolingPrior(;
         @smart_assert(sum(w) <= one(eltype(w)))
     end
     return OpinionPoolingPrior{typeof(pes), typeof(pe1), typeof(pe2), typeof(p), typeof(w),
-                               typeof(alg)}(pes, pe1, pe2, p, w, alg)
+                               typeof(alg), typeof(threads)}(pes, pe1, pe2, p, w, alg,
+                                                             threads)
 end
 function robust_probabilities(::AbstractMatrix, ow::AbstractVector, ::Nothing)
     return ow
@@ -69,7 +73,7 @@ function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
     T = size(X, 1)
     M = length(pe.pes)
     pw = Vector{eltype(X)}(undef, T * M)
-    for (i, pe) ∈ enumerate(pe.pes)
+    @floop pe.threads for (i, pe) ∈ enumerate(pe.pes)
         pr = prior(pe, X, F; strict = strict, kwargs...)
         @smart_assert(!isnothing(pr.w))
         pw[(1 + (i - 1) * M):(i * M)] = pr.w

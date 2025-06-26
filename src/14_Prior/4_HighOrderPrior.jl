@@ -312,11 +312,11 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
             F = transpose(F)
         end
     end
-    pr = prior(pe.pe, X, F)
+    pr = prior(pe.pe, X, F; kwargs...)
     (; X, mu) = pr
-    kt = cokurtosis(pe.kte, X; mean = transpose(mu))
+    kt = cokurtosis(pe.kte, X; mean = transpose(mu), kwargs...)
     L2, S2 = !isnothing(kt) ? dup_elim_sum_matrices(length(mu))[2:3] : (nothing, nothing)
-    sk, V = coskewness(pe.ske, X; mean = transpose(mu))
+    sk, V = coskewness(pe.ske, X; mean = transpose(mu), kwargs...)
     return HighOrderPriorResult(; pr = pr, kt = kt, L2 = L2, S2 = S2, sk = sk, V = V,
                                 skmp = isnothing(sk) ? nothing : pe.ske.mp)
 end

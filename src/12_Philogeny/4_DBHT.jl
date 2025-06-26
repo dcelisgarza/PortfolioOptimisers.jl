@@ -1228,9 +1228,9 @@ function DBHTClusteringResult(; clustering::Clustering.Hclust, S::AbstractMatrix
 end
 function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
                     X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
-                    dims::Int = 1)
-    S = cor(cle.ce, X; dims = dims)
-    D = distance(cle.de, S, X; dims = dims)
+                    dims::Int = 1, kwargs...)
+    S = cor(cle.ce, X; dims = dims, kwargs...)
+    D = distance(cle.de, S, X; dims = dims, kwargs...)
     S = dbht_similarity(cle.alg.sim; S = S, D = D)
     clustering = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
     k = optimal_number_clusters(cle.onc, clustering, D)
@@ -1263,7 +1263,7 @@ function LoGo_dist_assert(args...)
     return nothing
 end
 function logo!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator}, sigma::AbstractMatrix,
-               X::AbstractMatrix; dims::Int = 1)
+               X::AbstractMatrix; dims::Int = 1, kwargs...)
     issquare(sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
@@ -1274,7 +1274,7 @@ function logo!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator}, sigma::Abstract
     else
         sigma
     end
-    D = distance(je.dist, S, X; dims = dims)
+    D = distance(je.dist, S, X; dims = dims, kwargs...)
     S = dbht_similarity(je.sim; S = S, D = D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
     sigma .= J_LoGo(sigma, separators, cliques) \ I

@@ -14,8 +14,8 @@ function DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
                                                                                      alg)
 end
 function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
-                  X::AbstractMatrix; dims::Int = 1)
-    dist = distance(Distance(; alg = de.alg), ce, X; dims = dims)
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+    dist = distance(Distance(; alg = de.alg), ce, X; dims = dims, kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 function distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)

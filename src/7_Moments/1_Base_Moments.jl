@@ -5,13 +5,32 @@ abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 struct Full <: AbstractMomentAlgorithm end
 struct Semi <: AbstractMomentAlgorithm end
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
-
-function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
-                    mean = nothing)
+function robust_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                    mean = nothing, kwargs...)
     return try
-        cor(ce, X; dims = dims, mean = mean)
+        cov(ce, X; dims = dims, mean = mean, kwargs...)
     catch
-        sigma = cov(ce, X; dims = dims, mean = mean)
+        cov(ce, X; dims = dims, mean = mean)
+    end
+end
+function robust_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix,
+                    w::AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
+    return try
+        cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+    catch
+        cov(ce, X, w; dims = dims, mean = mean)
+    end
+end
+function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                    mean = nothing, kwargs...)
+    return try
+        try
+            cor(ce, X; dims = dims, mean = mean, kwargs...)
+        catch
+            cor(ce, X; dims = dims, mean = mean)
+        end
+    catch
+        sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
             StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
         else
@@ -21,11 +40,15 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::
     end
 end
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix,
-                    w::AbstractWeights; dims::Int = 1, mean = nothing)
+                    w::AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     return try
-        cor(ce, X, w; dims = dims, mean = mean)
+        try
+            cor(ce, X, w; dims = dims, mean = mean, kwargs...)
+        catch
+            cor(ce, X, w; dims = dims, mean = mean)
+        end
     catch
-        sigma = cov(ce, X, w; dims = dims, mean = mean)
+        sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
         if ismutable(sigma)
             StatsBase.cov2cor!(sigma, sqrt.(diag(sigma)))
         else
@@ -35,4 +58,4 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix,
     end
 end
 
-export robust_cor, Full, Semi
+export Full, Semi

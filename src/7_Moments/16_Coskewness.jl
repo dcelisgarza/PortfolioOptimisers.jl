@@ -41,22 +41,22 @@ function _coskewness(y, X, mp)
     return cskew, V
 end
 function coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1,
-                    mean = nothing)
+                    mean = nothing, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
-    mu = isnothing(mean) ? StatsBase.mean(ske.me, X) : mean
+    mu = isnothing(mean) ? StatsBase.mean(ske.me, X; kwargs...) : mean
     y = X .- mu
     return _coskewness(y, X, ske.mp)
 end
 function coskewness(ske::Coskewness{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1,
-                    mean = nothing)
+                    mean = nothing, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
-    mu = isnothing(mean) ? StatsBase.mean(ske.me, X) : mean
+    mu = isnothing(mean) ? StatsBase.mean(ske.me, X; kwargs...) : mean
     y = min.(X .- mu, zero(eltype(X)))
     return _coskewness(y, X, ske.mp)
 end

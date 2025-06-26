@@ -10,8 +10,9 @@ function DeltaUncertaintySetEstimator(;
     return DeltaUncertaintySetEstimator{typeof(pe), typeof(dmu), typeof(dsigma)}(pe, dmu,
                                                                                  dsigma)
 end
-function ucs(ue::DeltaUncertaintySetEstimator, X::AbstractMatrix, args...; dims::Int = 1)
-    pr = prior(ue.pe, X, args...; dims = dims)
+function ucs(ue::DeltaUncertaintySetEstimator, X::AbstractMatrix, args...; dims::Int = 1,
+             kwargs...)
+    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
     d_sigma = ue.dsigma * abs.(pr.sigma)
     return BoxUncertaintySetResult(;
                                    lb = range(; start = 0, stop = 0,
@@ -19,16 +20,17 @@ function ucs(ue::DeltaUncertaintySetEstimator, X::AbstractMatrix, args...; dims:
                                    ub = ue.dmu * abs.(pr.mu) * 2),
            BoxUncertaintySetResult(; lb = pr.sigma - d_sigma, ub = pr.sigma + d_sigma)
 end
-function mu_ucs(ue::DeltaUncertaintySetEstimator, X::AbstractMatrix, args...; dims::Int = 1)
-    pr = prior(ue.pe, X, args...; dims = dims)
+function mu_ucs(ue::DeltaUncertaintySetEstimator, X::AbstractMatrix, args...; dims::Int = 1,
+                kwargs...)
+    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
     return BoxUncertaintySetResult(;
                                    lb = range(; start = 0, stop = 0,
                                               length = length(pr.mu)),
                                    ub = ue.dmu * abs.(pr.mu) * 2)
 end
 function sigma_ucs(ue::DeltaUncertaintySetEstimator, X::AbstractMatrix, args...;
-                   dims::Int = 1)
-    pr = prior(ue.pe, X, args...; dims = dims)
+                   dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
     d_sigma = ue.dsigma * abs.(pr.sigma)
     return BoxUncertaintySetResult(; lb = pr.sigma - d_sigma, ub = pr.sigma + d_sigma)
 end

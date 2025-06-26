@@ -47,7 +47,7 @@ function KellyReturn(; w::Union{Nothing, <:AbstractWeights} = nothing,
     return KellyReturn{typeof(w), typeof(lb)}(w, lb)
 end
 function no_bounds_returns_estimator(r::KellyReturn, args...)
-    return KellyReturn(; w = r.w)
+    return r
 end
 for r ∈ traverse_subtypes(JuMPReturnsEstimator)
     eval(quote
@@ -149,7 +149,7 @@ function add_market_impact_cost!(model::JuMP.Model, ret)
     return nothing
 end
 function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{Nothing, <:Any},
-                                 obj::ObjectiveFunction, pr::AbstractPriorResult)
+                                 obj::ObjectiveFunction, pr::AbstractPriorResult; kwargs...)
     w = model[:w]
     lb = pret.lb
     mu = pr.mu
@@ -191,12 +191,12 @@ function set_return_constraints!(model::JuMP.Model,
                                  pret::ArithmeticReturn{<:Union{<:AbstractUncertaintySetResult,
                                                                 <:AbstractUncertaintySetEstimator},
                                                         <:Any}, obj::ObjectiveFunction,
-                                 pr::AbstractPriorResult)
+                                 pr::AbstractPriorResult; kwargs...)
     lb = pret.lb
     ucs = pret.ucs
     X = pr.X
     mu = pr.mu
-    set_ucs_return_constraints!(model, mu_ucs(ucs, X), mu)
+    set_ucs_return_constraints!(model, mu_ucs(ucs, X; kwargs...), mu)
     set_max_ratio_return_constraints!(model, obj, mu)
     set_return_bounds!(model, lb)
     return nothing
@@ -213,7 +213,7 @@ function set_max_ratio_kelly_return_constraints!(model::JuMP.Model, obj::Maximum
     @constraint(model, sr_ekelly_risk, sc * (risk - ohf) <= 0)
 end
 function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
-                                 obj::ObjectiveFunction, pr::AbstractPriorResult)
+                                 obj::ObjectiveFunction, pr::AbstractPriorResult; kwargs...)
     k = model[:k]
     sc = model[:sc]
     lb = pret.lb

@@ -84,8 +84,8 @@ function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, Nothing}, X::AbstractMa
     if dims == 2
         X = transpose(X)
     end
-    mu = vec(mean(pe.me, X))
-    sigma = cov(pe.ce, X)
+    mu = vec(mean(pe.me, X; kwargs...))
+    sigma = cov(pe.ce, X; kwargs...)
     return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma)
 end
 function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMatrix,
@@ -95,8 +95,8 @@ function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMat
         X = transpose(X)
     end
     X_log = log1p.(X)
-    mu = vec(mean(pe.me, X_log))
-    sigma = cov(pe.ce, X_log)
+    mu = vec(mean(pe.me, X_log; kwargs...))
+    sigma = cov(pe.ce, X_log; kwargs...)
     mu .*= pe.horizon
     sigma .*= pe.horizon
     mu .= exp.(mu + 0.5 * diag(sigma))

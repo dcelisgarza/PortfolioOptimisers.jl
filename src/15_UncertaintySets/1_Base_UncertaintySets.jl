@@ -22,13 +22,13 @@ function sigma_ucs(uc::AbstractUncertaintySetResult, args...; kwargs...)
     return uc
 end
 function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
-    return ucs(uc, rd.X, rd.F; kwargs...)
+    return ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
-    return mu_ucs(uc, rd.X, rd.F; kwargs...)
+    return mu_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
-    return sigma_ucs(uc, rd.X, rd.F; kwargs...)
+    return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
 struct BoxUncertaintySetResult{T1 <: AbstractArray, T2 <: AbstractArray} <:

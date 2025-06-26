@@ -97,9 +97,10 @@ function no_bounds_risk_measure(r::UncertaintySetVariance, flag::Bool = true)
                                                    scale = r.settings.scale), r.ucs,
                                r.sigma)
     else
-        UncertaintySetVariance(RiskMeasureSettings(; rke = r.settings.rke,
-                                                   scale = r.settings.scale), nothing,
-                               r.sigma)
+        Variance(;
+                 settings = RiskMeasureSettings(; rke = r.settings.rke,
+                                                scale = r.settings.scale), nothing,
+                 sigma = r.sigma)
     end
 end
 function factory(r::UncertaintySetVariance, prior::AbstractPriorResult, ::Any,

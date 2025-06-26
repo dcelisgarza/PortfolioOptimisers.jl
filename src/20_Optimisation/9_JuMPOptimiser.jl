@@ -327,7 +327,7 @@ struct ProcessedJuMPOptimiserAttributes{T1 <: AbstractPriorResult,
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
-    pr = prior(opt.pe, rd.X, rd.F; dims = dims)
+    pr = prior(opt.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     datatype = eltype(pr.X)
     wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(pr.X, 2), strict = opt.strict)
     lcs = linear_constraints(opt.lcs, opt.sets; datatype = datatype, strict = opt.strict)

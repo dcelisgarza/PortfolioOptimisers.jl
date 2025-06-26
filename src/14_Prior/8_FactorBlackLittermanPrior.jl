@@ -88,7 +88,7 @@ function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::Abs
         F = transpose(F)
     end
     # Factor prior.
-    f_prior = prior(pe.pe, F; strict = strict, kwargs...)
+    f_prior = prior(pe.pe, F; strict = strict)
     f_prior_mu, f_prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors.
     loadings = regression(pe.re, X, F)

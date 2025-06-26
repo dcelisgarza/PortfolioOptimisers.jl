@@ -145,7 +145,7 @@ function prior(pe::AugmentedBlackLittermanPriorEstimator, X::AbstractMatrix,
     a_prior = prior(pe.a_pe, X; strict = strict, kwargs...)
     a_prior_mu, a_prior_sigma = a_prior.mu, a_prior.sigma
     # Factor prior.
-    f_prior = prior(pe.f_pe, F; strict = strict, kwargs...)
+    f_prior = prior(pe.f_pe, F; strict = strict)
     f_prior_mu, f_prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors.
     loadings = regression(pe.re, X, F)

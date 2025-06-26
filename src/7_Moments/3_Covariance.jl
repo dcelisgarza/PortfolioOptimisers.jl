@@ -13,17 +13,17 @@ end
 function StatsBase.cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1,
                        mean = nothing, kwargs...)
     return if isnothing(ce.w)
-        cov(ce.ce, X; dims = dims, mean = mean)
+        robust_cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
-        cov(ce.ce, X, ce.w; dims = dims, mean = mean)
+        robust_cov(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
     end
 end
 function StatsBase.cor(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1,
                        mean = nothing, kwargs...)
     if isnothing(ce.w)
-        robust_cor(ce.ce, X; dims = dims, mean = mean)
+        robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
-        robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean)
+        robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
     end
 end
 function factory(ce::GeneralWeightedCovariance,
@@ -47,25 +47,25 @@ function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
 end
 function StatsBase.cov(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
-    mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims) : mean
-    return cov(ce.ce, X; dims = dims, mean = mu)
+    mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims, kwargs...) : mean
+    return cov(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
 function StatsBase.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
-    mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims) : mean
-    return robust_cor(ce.ce, X; dims = dims, mean = mu)
+    mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims, kwargs...) : mean
+    return robust_cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
 function StatsBase.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
-    mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims) : mean
+    mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims, kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
-    return cov(ce.ce, X; dims = dims, mean = zero(eltype(X)))
+    return cov(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
 end
 function StatsBase.cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
                        dims::Int = 1, mean = nothing, kwargs...)
-    mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims) : mean
+    mu = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = dims, kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
-    return robust_cor(ce.ce, X; dims = dims, mean = zero(eltype(X)))
+    return robust_cor(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
 end
 
 export GeneralWeightedCovariance, Covariance

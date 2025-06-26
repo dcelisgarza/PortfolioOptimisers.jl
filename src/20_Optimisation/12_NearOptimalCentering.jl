@@ -468,9 +468,11 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     @expression(model, k, 1)
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
-    set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing)
+    set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing; iv = rd.iv,
+                          ivpa = rd.ivpa)
     scalarise_risk_expression!(model, opt.sce)
-    set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe)
+    set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; iv = rd.iv,
+                            ivpa = rd.ivpa)
     # set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
     # retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
     retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
@@ -504,9 +506,11 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_l1_regularisation!(model, opt.l1)
     set_l2_regularisation!(model, opt.l2)
     set_non_fixed_fees!(model, opt.fees)
-    set_risk_constraints!(model, r, noc, opt.pe, opt.nplg, opt.cplg)
+    set_risk_constraints!(model, r, noc, opt.pe, opt.nplg, opt.cplg; iv = rd.iv,
+                          ivpa = rd.ivpa)
     scalarise_risk_expression!(model, opt.sce)
-    set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe)
+    set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; iv = rd.iv,
+                            ivpa = rd.ivpa)
     set_sdp_philogeny_constraints!(model, opt.nplg, :sdp_nplg)
     set_sdp_philogeny_constraints!(model, opt.cplg, :sdp_cplg)
     add_custom_constraint!(model, opt.ccnt, opt, opt.pe)

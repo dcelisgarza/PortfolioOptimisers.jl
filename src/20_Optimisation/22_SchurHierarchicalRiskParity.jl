@@ -216,7 +216,7 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector,
 end
 function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
-    pr = prior(sh.opt.pe, rd.X, rd.F; dims = dims)
+    pr = prior(sh.opt.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     clr = clusterise(sh.opt.cle, pr.X; dims = dims)
     items = [clr.clustering.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
@@ -227,7 +227,7 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
 end
 function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
-    pr = prior(sh.opt.pe, rd.X, rd.F; dims = dims)
+    pr = prior(sh.opt.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     clr = clusterise(sh.opt.cle, pr.X; dims = dims)
     items = [clr.clustering.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),

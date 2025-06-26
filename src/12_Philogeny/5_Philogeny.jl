@@ -131,18 +131,18 @@ function CentralityEstimator(; ne::AbstractNetworkEstimator = NetworkEstimator()
     return CentralityEstimator{typeof(ne), typeof(cent)}(ne, cent)
 end
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
-                        X::AbstractMatrix; dims::Int = 1)
+                        X::AbstractMatrix; dims::Int = 1, kwargs...)
     S = cor(ne.ce, X; dims = dims)
-    D = distance(ne.de, S, X; dims = dims)
+    D = distance(ne.de, S, X; dims = dims, kwargs...)
     G = SimpleWeightedGraph(D)
     tree = calc_mst(ne.alg, G)
     return adjacency_matrix(SimpleGraph(G[tree]))
 end
 function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any,
                                              <:AbstractSimilarityMatrixAlgorithm, <:Any},
-                        X::AbstractMatrix; dims::Int = 1)
+                        X::AbstractMatrix; dims::Int = 1, kwargs...)
     S = cor(ne.ce, X; dims = dims)
-    D = distance(ne.de, S, X; dims = dims)
+    D = distance(ne.de, S, X; dims = dims, kwargs...)
     S = dbht_similarity(ne.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
     return adjacency_matrix(SimpleGraph(Rpm))
