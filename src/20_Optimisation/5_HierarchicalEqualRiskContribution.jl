@@ -418,7 +418,8 @@ function optimise!(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, kwargs...)
     pr = prior(hec.opt.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
-    clr = clusterise(hec.opt.cle, pr.X; dims = dims, branchorder = branchorder)
+    clr = clusterise(hec.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+                     branchorder = branchorder)
     idx = cutree(clr.clustering; k = clr.k)
     cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
     w, rkcl = herc_risk(hec, pr, cls)

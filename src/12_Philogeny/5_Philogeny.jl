@@ -158,7 +158,7 @@ function philogeny_matrix(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1
 end
 function philogeny_matrix(cle::ClusteringEstimator, X::AbstractMatrix;
                           branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
-    res = clusterise(cle, X; branchorder = branchorder, dims = dims)
+    res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
     clusters = cutree(res.clustering; k = res.k)
     P = zeros(Int, size(X, 2), res.k)
     for i ∈ axes(P, 2)
