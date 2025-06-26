@@ -114,15 +114,26 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::AbstractMat
     end
     return RegressionResult(; b = view(reg, :, 1), M = view(reg, :, 2:3)), r2s, rv_p, fr
 end
+#! Change priors to provide iv.
 function StatsBase.cov(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
+                       mean = nothing, iv::AbstractMatrix, kwargs...)
+    @smart_assert(size(X) == size(iv))
+    sigma = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
+    iv = iv / sqrt(ce.af)
+    iv = predict_realised_vols(ce.alg, X, iv)
+    StatsBase.cov2cor!(sigma, iv)
+    matrix_processing!(ce.mp, sigma, X)
+    return sigma
+end
+function StatsBase.cor(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
                        mean = nothing, iv::AbstractMatrix, kwargs...)
     @smart_assert(size(X) == size(iv))
     rho = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv)
-    #! Continue implementing
-    return nothing
+    StatsBase.cor2cov!(rho, iv)
+    StatsBase.cov2cor!(rho)
+    matrix_processing!(ce.mp, rho, X)
+    return rho
 end
-function StatsBase.cor(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
-                       mean = nothing, kwargs...) end
 export ImpliedVolatility, predict_realised_vols

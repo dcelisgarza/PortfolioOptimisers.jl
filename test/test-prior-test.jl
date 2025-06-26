@@ -1395,8 +1395,8 @@
             end
             @test res
 
-            re = relative_entropy(pr.w,
-                                  range(; start = inv(100), stop = inv(100), length = 100))
+            re = kldivergence(pr.w,
+                              range(; start = inv(100), stop = inv(100), length = 100))
             ens = effective_number_scenarios(pr.w,
                                              range(; start = inv(100), stop = inv(100),
                                                    length = 100))
@@ -1559,8 +1559,8 @@
             end
             @test res
 
-            re = relative_entropy(pr.w,
-                                  range(; start = inv(100), stop = inv(100), length = 100))
+            re = kldivergence(pr.w,
+                              range(; start = inv(100), stop = inv(100), length = 100))
             ens = effective_number_scenarios(pr.w,
                                              range(; start = inv(100), stop = inv(100),
                                                    length = 100))
@@ -1724,8 +1724,8 @@
             end
             @test res
 
-            re = relative_entropy(pr.w,
-                                  range(; start = inv(100), stop = inv(100), length = 100))
+            re = kldivergence(pr.w,
+                              range(; start = inv(100), stop = inv(100), length = 100))
             ens = effective_number_scenarios(pr.w,
                                              range(; start = inv(100), stop = inv(100),
                                                    length = 100))
