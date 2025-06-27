@@ -129,24 +129,24 @@
         @test pv1.chol == view(pr1.chol, :, i)
     end
     @testset "High Order Prior" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 100, 10)
+        rd = prices_to_returns(X[(end - 100):end][:AAPL, :BKNG, :COST, :GOOG, :MRK, :NFLX,
+                                                  :SBUX, :TSLA, :TXN, :VRTX])
         pe = HighOrderPriorEstimator()
-        pr = prior(pe, transpose(X); dims = 2)
-        @test isapprox(pr.X, X)
-        @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), X)))
-        @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), X))
-        @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Full()), X))
-        @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Full()), X)))
+        pr = prior(pe, transpose(rd.X); dims = 2)
+        @test isapprox(pr.X, rd.X)
+        @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), rd.X)))
+        @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), rd.X))
+        @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Full()), rd.X))
+        @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Full()), rd.X)))
 
         pe = HighOrderPriorEstimator(; kte = Cokurtosis(; alg = Semi()),
                                      ske = Coskewness(; alg = Semi()))
-        pr = prior(pe, transpose(X); dims = 2)
-        @test isapprox(pr.X, X)
-        @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), X)))
-        @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), X))
-        @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Semi()), X))
-        @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Semi()), X)))
+        pr = prior(pe, transpose(rd.X); dims = 2)
+        @test isapprox(pr.X, rd.X)
+        @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), rd.X)))
+        @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), rd.X))
+        @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Semi()), rd.X))
+        @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Semi()), rd.X)))
 
         pe1 = HighOrderPriorEstimator()
         ew = eweights(1:10, 0.3)
@@ -165,7 +165,7 @@
         @test isnothing(pe2.kte)
         @test isnothing(pe2.ske)
 
-        pr1 = prior(pe, ReturnsResult(; nx = 1:10, X = X))
+        pr1 = prior(pe, rd)
         @test isapprox(pr.X, pr1.X)
         @test isapprox(pr.mu, pr1.mu)
         @test isapprox(pr.sigma, pr1.sigma)
@@ -173,14 +173,13 @@
         @test isapprox(pr.sk, pr1.sk)
         @test isapprox(pr.V, pr1.V)
 
-        pr = prior(HighOrderPriorEstimator(; kte = nothing, ske = nothing), transpose(X);
-                   dims = 2)
+        pr = prior(HighOrderPriorEstimator(; kte = nothing, ske = nothing), rd; dims = 2)
         @test isnothing(pr.kt)
         @test isnothing(pr.sk)
         @test isnothing(pr.V)
         @test pr === prior(pr)
 
-        pr = prior(HighOrderPriorEstimator(; kte = nothing), X)
+        pr = prior(HighOrderPriorEstimator(; kte = nothing), rd.X)
         prv = prior_view(pr, [10, 5, 9])
         @test isnothing(prv.kt)
         @test isnothing(prv.L2)
@@ -213,15 +212,15 @@
                      [2, 2, 2, 2, 2, 2, 2, 2, 2, 2], 10, 25)
     end
     @testset "High Order Factor Prior" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 1000, 10) * 0.001
-        F = X[:, [3, 8]]
+        rd = prices_to_returns(X[(end - 100):end][:AAPL, :BKNG, :COST, :GOOG, :MRK, :NFLX,
+                                                  :SBUX, :TSLA, :TXN, :VRTX],
+                               F[(end - 100):end][:GLOF, :QUAL])
 
         pe1 = FactorPriorEstimator(; re = DimensionReductionRegression(;), rsd = true)
-        pr1 = prior(pe1, transpose(X), transpose(F); dims = 2)
+        pr1 = prior(pe1, transpose(rd.X), transpose(rd.F); dims = 2)
 
         pe2 = HighOrderPriorEstimator(; pe = pe1)
-        pr2 = prior(pe2, transpose(X), transpose(F); dims = 2)
+        pr2 = prior(pe2, transpose(rd.X), transpose(rd.F); dims = 2)
         @test isa(pe2.me, SimpleExpectedReturns)
         @test isa(pe2.ce, PortfolioOptimisersCovariance)
 
@@ -236,7 +235,7 @@
 
         i = [10, 5, 9]
         pe2 == prior_view(pe2, i)
-        pr1 = prior(pe2, X, F)
+        pr1 = prior(pe2, rd)
         pv1 = prior_view(pr1, i)
         @test pv1.mu == view(pr1.mu, i)
         @test pv1.sigma == view(pr1.sigma, i, i)

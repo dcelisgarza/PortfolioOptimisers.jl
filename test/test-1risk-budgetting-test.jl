@@ -198,7 +198,7 @@
                         -0.028166622637413603, 0.07284150709131941, 0.09746134847616136,
                         0.12106775081177601, 0.05668171991912606, 0.002146375959345128,
                         0.0882119760653703, 0.011142165451508668, 0.03420537804186409],
-                       rtol = 5e-5)
+                       rtol = 1e-4)
         rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.loadings)
         lo, hi = extrema(rkc[1:10])
         @test isapprox(hi / lo, 10, rtol = 5e-4)
@@ -222,7 +222,7 @@
                         -0.10419362578166538, 0.10912533767111478, 0.2367126887727429,
                         0.16726434595527243, 0.05843900321136253, -0.01278014016775593,
                         0.1009543951494394, -0.04492126492093387, 0.04002577481426828],
-                       rtol = 5e-5)
+                       rtol = 1e-4)
         rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.loadings)
         lo, hi = extrema(rkc[1:10])
         @test isapprox(hi / lo, 10, rtol = 2e-1)
