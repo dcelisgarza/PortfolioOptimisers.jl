@@ -9,8 +9,7 @@ function drop_correlated(X::AbstractMatrix; threshold::Real = 0.95, absolute::Bo
     tril_idx = findall(tril!(trues(size(rho)), -1))
     candidate_idx = findall(rho[tril_idx] .>= threshold)
     candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]
-    to_remove = Set{Int}()
-    sizehint!(to_remove, div(length(candidate_idx), 2))
+    to_remove = sizehint!(Set{Int}(), div(length(candidate_idx), 2))
     for idx ∈ candidate_idx
         i, j = tril_idx[idx][1], tril_idx[idx][2]
         if i ∉ to_remove && j ∉ to_remove
@@ -43,18 +42,25 @@ struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
                      T2 <: Union{Nothing, <:AbstractMatrix},
                      T3 <: Union{Nothing, <:AbstractVector},
                      T4 <: Union{Nothing, <:AbstractMatrix},
-                     T5 <: Union{Nothing, <:AbstractVector}} <: AbstractReturnsResult
+                     T5 <: Union{Nothing, <:AbstractVector},
+                     T6 <: Union{Nothing, <:AbstractMatrix},
+                     T7 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
+       AbstractReturnsResult
     nx::T1
     X::T2
     nf::T3
     F::T4
     ts::T5
+    iv::T6
+    ivpa::T7
 end
 function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                        X::Union{Nothing, <:AbstractMatrix} = nothing,
                        nf::Union{Nothing, <:AbstractVector} = nothing,
                        F::Union{Nothing, <:AbstractMatrix} = nothing,
-                       ts::Union{Nothing, <:AbstractVector} = nothing)
+                       ts::Union{Nothing, <:AbstractVector} = nothing,
+                       iv::Union{Nothing, <:AbstractMatrix} = nothing,
+                       ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
     nxs_flag = !isnothing(nx)
     X_flag = !isnothing(X)
     if nxs_flag || X_flag
@@ -74,18 +80,37 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
         @smart_assert(!isempty(ts))
         @smart_assert(length(ts) == size(X, 1))
     end
-    return ReturnsResult{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts)}(nx, X,
-                                                                                   nf, F,
-                                                                                   ts)
+    if !isnothing(iv)
+        @smart_assert(!isempty(iv))
+        @smart_assert(size(iv) == size(X))
+        @smart_assert(all(x -> x > zero(eltype(iv)), iv))
+        if !isnothing(ivpa)
+            if isa(ivpa, Real)
+                @smart_assert(isfinite(ivpa) && ivpa > zero(ivpa))
+            elseif isa(ivpa, AbstractVector)
+                @smart_assert(!isempty(ivpa))
+                @smart_assert(all(isfinite, ivpa) && all(x -> x > zero(eltype(ivpa)), ivpa))
+                @smart_assert(length(ivpa) == size(iv, 2))
+            end
+        end
+    end
+    return ReturnsResult{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts),
+                         typeof(iv), typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
 end
 function returns_result_view(rd::ReturnsResult, i::AbstractVector)
     nx = nothing_scalar_array_view(rd.nx, i)
     X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
-    return ReturnsResult(nx, X, rd.nf, rd.F, rd.ts)
+    iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)
+    ivpa = nothing_scalar_array_view(rd.ivpa, i)
+    return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts, iv = iv,
+                         ivpa = ivpa)
 end
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
+                           iv::Union{Nothing, <:TimeArray} = nothing,
+                           ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                            ret_method::Symbol = :simple, padding::Bool = false,
-                           missing_col_percent::Real = 1.0, missing_row_percent::Real = 1.0,
+                           missing_col_percent::Real = 1.0,
+                           missing_row_percent::Union{Nothing, <:Real} = 1.0,
                            collapse_args::Tuple = (),
                            map_func::Union{Nothing, Function} = nothing,
                            join_method::Symbol = :outer,
@@ -93,12 +118,11 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     @smart_assert(zero(missing_col_percent) <
                   missing_col_percent <=
                   one(missing_col_percent))
-    if !isinf(missing_row_percent)
+    if !isnothing(missing_row_percent)
         @smart_assert(zero(missing_row_percent) <
                       missing_row_percent <=
                       one(missing_row_percent))
     end
-
     if !isempty(F)
         asset_names = string.(colnames(X))
         factor_names = string.(colnames(F))
@@ -129,7 +153,7 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     keep_rows = missings_cols .<= (ncol(X) - 1) * missing_col_percent
     X = X[keep_rows, :]
     missings_rows = vec(count(missing_mtx; dims = 1))
-    keep_cols = if !isinf(missing_row_percent)
+    keep_cols = if !isnothing(missing_row_percent)
         missings_rows .<= nrow(X) * missing_row_percent
     else
         missings_rows .== StatsBase.mode(missings_rows)
@@ -144,6 +168,9 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     nf = intersect(col_names, factor_names)
     oc = setdiff(col_names, union(nx, nf))
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
+    if !isnothing(ts) && !isnothing(iv)
+        @smart_assert(ts == timestamp(iv))
+    end
     if isempty(nf)
         nf = nothing
         F = nothing
@@ -156,12 +183,14 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     else
         X = Matrix(X[!, nx])
     end
-    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F)
+    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = values(iv),
+                         ivpa = ivpa)
 end
 function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
                              asset_classes::DataFrame, col, date0 = nothing,
                              date1 = nothing)
     #! Make this efficient with filter.
+    # sort!(filter!(:timestamp => x -> date0 <= x <= date1, prices), :timestamp)
     idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
         timestamps = timestamp(X)
         idx = DateTime(date0) .<= timestamps .<= DateTime(date1)
@@ -217,9 +246,23 @@ outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A),
 ⊘(A::AbstractArray, B::AbstractArray) = A ./ B
 ⊘(A::AbstractArray, B) = A / B
 ⊘(A, B::AbstractArray) = A ./ B
+⊕(A::AbstractArray, B::AbstractArray) = A .+ B
+⊕(A::Real, B::AbstractArray) = A .+ B
+⊕(A::AbstractArray, B::Real) = A .+ B
+⊕(A, B) = A + B
 ⊖(A::AbstractArray, B::AbstractArray) = A - B
 ⊖(A::AbstractArray, B) = A .- B
 ⊖(A, B::AbstractArray) = A .- B
+⊖(A, B) = A - B
+function dot_scalar(a::Real, b::AbstractVector)
+    return a * sum(b)
+end
+function dot_scalar(a::AbstractVector, b::Real)
+    return sum(a) * b
+end
+function dot_scalar(a::AbstractVector, b::AbstractVector)
+    return dot(a, b)
+end
 function nothing_scalar_array_view(::Nothing, ::Any)
     return nothing
 end
@@ -228,6 +271,9 @@ function nothing_scalar_array_view(x::Real, ::Any)
 end
 function nothing_scalar_array_view(x::AbstractVector, i)
     return view(x, i)
+end
+function nothing_scalar_array_view(x::AbstractVector{<:AbstractVector}, i)
+    return view.(x, Ref(i))
 end
 function nothing_scalar_array_view(x::AbstractArray, i)
     return view(x, i, i)
@@ -269,8 +315,7 @@ function nothing_dataframe_getindex(x::AbstractDataFrame, i)
     return x[i, :]
 end
 function fourth_moment_index_factory(N::Integer, i)
-    idx = Vector{Int}(undef, 0)
-    sizehint!(idx, length(i)^2)
+    idx = sizehint!(Int[], length(i)^2)
     for c ∈ i
         append!(idx, (((c - 1) * N + 1):(c * N))[i])
     end
@@ -290,5 +335,12 @@ function traverse_subtypes(types, ctarr = nothing)
     end
     return ctarr
 end
+function concrete_typed_array(A::AbstractArray)
+    return reshape(Union{typeof.(A)...}[A...], size(A))
+end
+function factory(::Nothing, args...; kwargs...)
+    return nothing
+end
 
-export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns
+export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns,
+       concrete_typed_array

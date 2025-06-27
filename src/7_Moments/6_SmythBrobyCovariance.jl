@@ -39,7 +39,8 @@ struct NormalisedSmythBrobyGerber2 <: NormalisedSmythBrobyCovarianceAlgorithm en
 struct SmythBrobyCovariance{T1 <: AbstractExpectedReturnsEstimator,
                             T2 <: StatsBase.CovarianceEstimator, T3 <: PosDefEstimator,
                             T4 <: Real, T5 <: Real, T6 <: Real, T7 <: Real, T8 <: Real,
-                            T9 <: SmythBrobyCovarianceAlgorithm} <: BaseSmythBrobyCovariance
+                            T9 <: SmythBrobyCovarianceAlgorithm,
+                            T10 <: FLoops.Transducers.Executor} <: BaseSmythBrobyCovariance
     me::T1
     ve::T2
     pdm::T3
@@ -49,6 +50,7 @@ struct SmythBrobyCovariance{T1 <: AbstractExpectedReturnsEstimator,
     c3::T7
     n::T8
     alg::T9
+    threads::T10
 end
 function SmythBrobyCovariance(;
                               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
@@ -56,28 +58,24 @@ function SmythBrobyCovariance(;
                               pdm::Union{Nothing, <:PosDefEstimator} = PosDefEstimator(),
                               threshold::Real = 0.5, c1::Real = 0.5, c2::Real = 0.5,
                               c3::Real = 4.0, n::Real = 2.0,
-                              alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1())
+                              alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
+                              threads::FLoops.Transducers.Executor = ThreadedEx())
     @smart_assert(zero(threshold) < threshold < one(threshold))
     @smart_assert(zero(c1) < c1 <= one(c1))
     @smart_assert(zero(c2) < c2 <= one(c2) && c3 > c2)
     return SmythBrobyCovariance{typeof(me), typeof(ve), typeof(pdm), typeof(threshold),
-                                typeof(c1), typeof(c2), typeof(c3), typeof(n), typeof(alg)}(me,
-                                                                                            ve,
-                                                                                            pdm,
-                                                                                            threshold,
-                                                                                            c1,
-                                                                                            c2,
-                                                                                            c3,
-                                                                                            n,
-                                                                                            alg)
+                                typeof(c1), typeof(c2), typeof(c3), typeof(n), typeof(alg),
+                                typeof(threads)}(me, ve, pdm, threshold, c1, c2, c3, n, alg,
+                                                 threads)
 end
 function factory(ce::SmythBrobyCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return SmythBrobyCovariance(; me = factory(ce.me, w), ve = factory(ce.ve, w),
                                 pdm = ce.pdm, threshold = ce.threshold, c1 = ce.c1,
-                                c2 = ce.c2, c3 = ce.c3, n = ce.n, alg = ce.alg)
+                                c2 = ce.c2, c3 = ce.c3, n = ce.n, alg = ce.alg,
+                                threads = ce.threads)
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:SmythBroby0},
+                                             <:Any, <:Any, <:SmythBroby0, <:Any},
                     X::AbstractMatrix, mean_vec::AbstractArray, std_vec::AbstractArray)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -86,7 +84,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i ∈ 1:j
@@ -117,7 +115,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBroby0},
+                                             <:Any, <:Any, <:NormalisedSmythBroby0, <:Any},
                     X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -126,7 +124,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         for i ∈ 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -155,7 +153,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:SmythBroby1},
+                                             <:Any, <:Any, <:SmythBroby1, <:Any},
                     X::AbstractMatrix, mean_vec::AbstractArray, std_vec::AbstractArray)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -164,7 +162,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i ∈ 1:j
@@ -198,7 +196,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBroby1},
+                                             <:Any, <:Any, <:NormalisedSmythBroby1, <:Any},
                     X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -207,7 +205,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         for i ∈ 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -240,7 +238,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:SmythBroby2},
+                                             <:Any, <:Any, <:SmythBroby2, <:Any},
                     X::AbstractMatrix, mean_vec::AbstractArray, std_vec::AbstractArray)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -249,7 +247,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i ∈ 1:j
@@ -277,7 +275,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBroby2},
+                                             <:Any, <:Any, <:NormalisedSmythBroby2, <:Any},
                     X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -286,7 +284,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         for i ∈ 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -312,7 +310,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:SmythBrobyGerber0},
+                                             <:Any, <:Any, <:SmythBrobyGerber0, <:Any},
                     X::AbstractMatrix, mean_vec::AbstractArray, std_vec::AbstractArray)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -321,7 +319,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i ∈ 1:j
@@ -358,8 +356,8 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBrobyGerber0},
-                    X::AbstractMatrix)
+                                             <:Any, <:Any, <:NormalisedSmythBrobyGerber0,
+                                             <:Any}, X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold
@@ -367,7 +365,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         for i ∈ 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -402,7 +400,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:SmythBrobyGerber1},
+                                             <:Any, <:Any, <:SmythBrobyGerber1, <:Any},
                     X::AbstractMatrix, mean_vec::AbstractArray, std_vec::AbstractArray)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -411,7 +409,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i ∈ 1:j
@@ -454,8 +452,8 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBrobyGerber1},
-                    X::AbstractMatrix)
+                                             <:Any, <:Any, <:NormalisedSmythBrobyGerber1,
+                                             <:Any}, X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold
@@ -463,7 +461,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         for i ∈ 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -505,7 +503,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:SmythBrobyGerber2},
+                                             <:Any, <:Any, <:SmythBrobyGerber2, <:Any},
                     X::AbstractMatrix, mean_vec::AbstractArray, std_vec::AbstractArray)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -514,7 +512,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
         for i ∈ 1:j
@@ -546,8 +544,8 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                             <:Any, <:Any, <:NormalisedSmythBrobyGerber2},
-                    X::AbstractMatrix)
+                                             <:Any, <:Any, <:NormalisedSmythBrobyGerber2,
+                                             <:Any}, X::AbstractMatrix)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
     threshold = ce.threshold
@@ -555,7 +553,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    for j ∈ axes(X, 2)
+    @floop ce.threads for j ∈ axes(X, 2)
         for i ∈ 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
@@ -587,13 +585,13 @@ end
 function StatsBase.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                 <:Any, <:Any,
                                                 <:UnNormalisedSmythBrobyCovarianceAlgorithm},
-                       X::AbstractMatrix; dims::Int = 1, mean = nothing)
+                       X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
-    mean_vec = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = 1) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
+    mean_vec = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = 1, kwargs...) : mean
+    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     return smythbroby(ce, X, mean_vec, std_vec)
@@ -601,13 +599,13 @@ end
 function StatsBase.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                 <:Any, <:Any,
                                                 <:UnNormalisedSmythBrobyCovarianceAlgorithm},
-                       X::AbstractMatrix; dims::Int = 1, mean = nothing)
+                       X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
-    mean_vec = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = 1) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
+    mean_vec = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = 1, kwargs...) : mean
+    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     return smythbroby(ce, X, mean_vec, std_vec) ⊙ (std_vec ⊗ std_vec)
@@ -615,13 +613,13 @@ end
 function StatsBase.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                 <:Any, <:Any,
                                                 <:NormalisedSmythBrobyCovarianceAlgorithm},
-                       X::AbstractMatrix; dims::Int = 1, mean = nothing)
+                       X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
-    mean_vec = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = 1) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
+    mean_vec = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = 1, kwargs...) : mean
+    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ⊘ std_vec
@@ -630,13 +628,13 @@ end
 function StatsBase.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                 <:Any, <:Any,
                                                 <:NormalisedSmythBrobyCovarianceAlgorithm},
-                       X::AbstractMatrix; dims::Int = 1, mean = nothing)
+                       X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
-    mean_vec = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = 1) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
+    mean_vec = isnothing(mean) ? StatsBase.mean(ce.me, X; dims = 1, kwargs...) : mean
+    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ⊘ std_vec

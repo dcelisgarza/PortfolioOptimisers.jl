@@ -36,7 +36,7 @@ function matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
     posdef!(mp.pdm, sigma)
     denoise!(mp.denoise, mp.pdm, sigma, T / N)
     detone!(mp.detone, mp.pdm, sigma)
-    matrix_processing_algorithm!(mp.alg, mp.pdm, sigma, X)
+    matrix_processing_algorithm!(mp.alg, mp.pdm, sigma, X; kwargs...)
     return nothing
 end
 function matrix_processing(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
@@ -67,7 +67,7 @@ function matrix_processing!(mp::NonPositiveDefiniteMatrixProcessing, sigma::Abst
     posdef!(nothing, sigma)
     denoise!(mp.denoise, nothing, sigma, T / N)
     detone!(mp.detone, nothing, sigma)
-    matrix_processing_algorithm!(mp.alg, nothing, sigma, X)
+    matrix_processing_algorithm!(mp.alg, nothing, sigma, X; kwargs...)
     return nothing
 end
 function matrix_processing(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,

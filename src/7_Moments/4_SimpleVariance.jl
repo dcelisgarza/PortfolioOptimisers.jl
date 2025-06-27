@@ -11,8 +11,9 @@ function SimpleVariance(;
                         corrected::Bool = true)
     return SimpleVariance{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
 end
-function StatsBase.std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing)
-    mu = isnothing(mean) ? StatsBase.mean(ve.me, X; dims = dims) : mean
+function StatsBase.std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing,
+                       kwargs...)
+    mu = isnothing(mean) ? StatsBase.mean(ve.me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
         std(X; dims = dims, corrected = ve.corrected, mean = mu)
     else
@@ -26,8 +27,9 @@ function StatsBase.std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
         std(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
-function StatsBase.var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing)
-    mu = isnothing(mean) ? StatsBase.mean(ve.me, X; dims = dims) : mean
+function StatsBase.var(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing,
+                       kwargs...)
+    mu = isnothing(mean) ? StatsBase.mean(ve.me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
         var(X; dims = dims, corrected = ve.corrected, mean = mu)
     else

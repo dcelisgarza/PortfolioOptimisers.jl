@@ -10,5 +10,6 @@ coverage
 docs/build/
 env
 node_modules
-.CondaPkg
+bestietemplate/*
+.CondaPkg/*
 *NOTRACK*

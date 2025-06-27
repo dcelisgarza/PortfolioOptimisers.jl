@@ -1,29 +1,13 @@
 # Changes here will be overwritten by Copier
-AddAllcontributors: true
-AddCodeOfConduct: true
-AddContributionDocs: true
-AddCopierCI: true
-AddGitHubTemplates: true
-AddMacToCI: true
-AddPrecommit: true
-AddWinToCI: true
-AnswerStrategy: ask
 Authors: Daniel Celis Garza <daniel.celis.garza@gmail.com>
-AutoIncludeTests: true
-CheckExplicitImports: true
-CodeOfConductContact: daniel.celis.garza@gmail.com
-ConfigIndentation: 2
-ExplicitImportsChecklist: all
-JuliaIndentation: 4
-JuliaMinCIVersion: lts
 JuliaMinVersion: '1.10'
 License: MIT
 LicenseCopyrightHolders: Daniel Celis Garza
-MarkdownIndentation: 2
 PackageName: PortfolioOptimisers
 PackageOwner: dcelisgarza
 PackageUUID: fa682b3e-00c5-5c62-9cc2-3773ac6947ae
-RunJuliaNightlyOnCI: true
-UseCirrusCI: true
-_commit: v0.15.0
+StrategyConfirmIncluded: false
+StrategyLevel: 3
+StrategyReviewExcluded: false
+_commit: v0.16.2
 _src_path: https://github.com/JuliaBesties/BestieTemplate.jl

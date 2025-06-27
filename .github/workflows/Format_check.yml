@@ -1,7 +1,10 @@
 name: format-check
 on:
   push:
-    branches: [master, main, release-*, dev]
+    branches:
+      - main
+      - release-*
+      - dev*
     tags: [v*]
   pull_request:
     types: [opened, synchronize, reopened]

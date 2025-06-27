@@ -1,4 +1,4 @@
-@safetestset "Utils tests" begin
+@safetestset "Tools tests" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, Dates, Random, StableRNGs, CSV,
           Statistics, LinearAlgebra
 
@@ -21,7 +21,8 @@
         ts1 = rd.ts
         X1 = rd.X
         F1 = rd.F
-        rd = prices_to_returns(Px, Py; missing_col_percent = 0.1, missing_row_percent = Inf)
+        rd = prices_to_returns(Px, Py; missing_col_percent = 0.1,
+                               missing_row_percent = nothing)
         ts2 = rd.ts
         X2 = rd.X
         F2 = rd.F
@@ -35,7 +36,7 @@
         F3 = rd.F
         @test isnothing(F3)
 
-        rd = prices_to_returns(Px; missing_col_percent = 0.1, missing_row_percent = Inf)
+        rd = prices_to_returns(Px; missing_col_percent = 0.1, missing_row_percent = nothing)
         ts4 = rd.ts
         X4 = rd.X
         F4 = rd.F

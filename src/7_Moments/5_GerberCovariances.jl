@@ -167,7 +167,7 @@ function StatsBase.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1)
+    std_vec = std(ce.ve, X; dims = 1, kwargs...)
     return gerber(ce, X, std_vec)
 end
 function StatsBase.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
@@ -177,18 +177,18 @@ function StatsBase.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     if dims == 2
         X = transpose(X)
     end
-    std_vec = std(ce.ve, X; dims = 1)
+    std_vec = std(ce.ve, X; dims = 1, kwargs...)
     return gerber(ce, X, std_vec) ⊙ (std_vec ⊗ std_vec)
 end
 function StatsBase.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                             <:NormalisedGerberCovarianceAlgorithm},
-                       X::AbstractMatrix; dims::Int = 1, mean = nothing)
+                       X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
-    mean_vec = isnothing(mean) ? StatsBase.mean(ce.alg.me, X; dims = 1) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
+    mean_vec = isnothing(mean) ? StatsBase.mean(ce.alg.me, X; dims = 1, kwargs...) : mean
+    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ⊘ std_vec
@@ -196,13 +196,13 @@ function StatsBase.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
 end
 function StatsBase.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                             <:NormalisedGerberCovarianceAlgorithm},
-                       X::AbstractMatrix; dims::Int = 1, mean = nothing)
+                       X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
     @smart_assert(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
     end
-    mean_vec = isnothing(mean) ? StatsBase.mean(ce.alg.me, X; dims = 1) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec)
+    mean_vec = isnothing(mean) ? StatsBase.mean(ce.alg.me, X; dims = 1, kwargs...) : mean
+    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
     idx = iszero.(std_vec)
     std_vec[idx] .= eps(eltype(X))
     X = (X .- mean_vec) ⊘ std_vec

@@ -37,6 +37,7 @@ function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real)
     N = size(weights, 2)
     phis = Vector{eltype(weights)}(undef, N)
     e = 1
+    #! https://juliafolds2.github.io/FLoops.jl/dev/howto/parallel/
     for i ∈ eachindex(phis)
         e *= g + i - 1
         phis[i] = e / factorial(i + 1)
@@ -76,8 +77,7 @@ end
 function owa_model_solve(model::JuMP.Model, method::OWAJuMPEstimator,
                          weights::AbstractMatrix)
     slv = method.slv
-    success = optimise_JuMP_model!(model, slv).success
-    return if success
+    return if optimise_JuMP_model!(model, slv).success
         phi = model[:phi]
         phis = value.(phi)
         phis ./= sum(phis)
