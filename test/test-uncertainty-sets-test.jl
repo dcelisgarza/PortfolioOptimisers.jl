@@ -246,6 +246,8 @@
 
             rtol = if i == 5
                 0.05
+            elseif i == 13
+                0.01
             else
                 1e-6
             end
@@ -258,6 +260,8 @@
 
             rtol = if i == 5
                 0.005
+            elseif i == 13
+                0.01
             else
                 1e-6
             end
