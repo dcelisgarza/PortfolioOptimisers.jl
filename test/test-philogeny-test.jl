@@ -26,10 +26,7 @@
     F = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/factor_prices.csv"));
                   timestamp = :timestamp)
     rd = prices_to_returns(X[(end - 252):end], F[(end - 252):end])
-    pr = prior(HighOrderPriorEstimator(;
-                                       pe = FactorPriorEstimator(;
-                                                                 re = DimensionReductionRegression())),
-               rd)
+    pr = prior(FactorPriorEstimator(; re = DimensionReductionRegression()), rd)
     @testset "Clustering tests" begin
         X = pr.X
         clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),

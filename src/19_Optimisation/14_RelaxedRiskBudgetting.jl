@@ -6,7 +6,7 @@ struct RegularisationPenaltyRelaxedRiskBudgettingAlgorithm{T1 <: Real} <:
     p::T1
 end
 function RegularisationPenaltyRelaxedRiskBudgettingAlgorithm(; p::Real = 1.0)
-    @smart_assert(isfinite(p))
+    @smart_assert(isfinite(p) && p > zero(p))
     return RegularisationPenaltyRelaxedRiskBudgettingAlgorithm{typeof(p)}(p)
 end
 struct RelaxedRiskBudgetting{T1 <: JuMPOptimiser,

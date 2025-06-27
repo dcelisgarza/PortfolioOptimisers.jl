@@ -1,5 +1,6 @@
 @safetestset "Regression tests" begin
-    using PortfolioOptimisers, DataFrames, Test, CSV, Random, StableRNGs, Logging
+    using PortfolioOptimisers, DataFrames, Test, CSV, Random, StableRNGs, Logging,
+          TimeSeries
     import PortfolioOptimisers: regression_view
     Logging.disable_logging(Logging.Warn)
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
@@ -22,42 +23,42 @@
             end
         end
     end
-    @testset "Regression tests" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 1000, 20)
-        F = X[:, [3, 8, 14, 19, 10]]
-        res = [StepwiseRegression(; alg = Forward()),
-               StepwiseRegression(; alg = Forward(), crit = AIC()),
-               StepwiseRegression(; alg = Forward(), crit = AICC()),
-               StepwiseRegression(; alg = Forward(), crit = BIC()),
-               StepwiseRegression(; alg = Forward(), crit = RSquared()),
-               StepwiseRegression(; alg = Forward(), crit = AdjustedRSquared()),
-               StepwiseRegression(; alg = Backward()),
-               StepwiseRegression(; alg = Backward(), crit = AIC()),
-               StepwiseRegression(; alg = Backward(), crit = AICC()),
-               StepwiseRegression(; alg = Backward(), crit = BIC()),
-               StepwiseRegression(; alg = Backward(), crit = RSquared()),
-               StepwiseRegression(; alg = Backward(), crit = AdjustedRSquared()),
-               DimensionReductionRegression(),
-               DimensionReductionRegression(; drtgt = PPCA())]
-        res_t = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv"), DataFrame)
-        for i ∈ eachindex(res)
-            loadings = regression(res[i], X, F)
-            lt = [loadings.b; vec(loadings.M)]
-            result = isapprox(lt, res_t[!, i])
-            if !result
-                if i == length(res)
-                    continue
-                end
-                println("Test $i fails.\n$(res[i])")
-                find_tol(lt, res_t[!, i]; name1 = :loadings, name2 = :loadings_t)
+    X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
+                  timestamp = :timestamp)
+    F = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/factor_prices.csv"));
+                  timestamp = :timestamp)
+    rd = prices_to_returns(X, F)
+    (; X, F) = rd
+    res = [StepwiseRegression(; alg = Forward()),
+           StepwiseRegression(; alg = Forward(), crit = AIC()),
+           StepwiseRegression(; alg = Forward(), crit = AICC()),
+           StepwiseRegression(; alg = Forward(), crit = BIC()),
+           StepwiseRegression(; alg = Forward(), crit = RSquared()),
+           StepwiseRegression(; alg = Forward(), crit = AdjustedRSquared()),
+           StepwiseRegression(; alg = Backward()),
+           StepwiseRegression(; alg = Backward(), crit = AIC()),
+           StepwiseRegression(; alg = Backward(), crit = AICC()),
+           StepwiseRegression(; alg = Backward(), crit = BIC()),
+           StepwiseRegression(; alg = Backward(), crit = RSquared()),
+           StepwiseRegression(; alg = Backward(), crit = AdjustedRSquared()),
+           DimensionReductionRegression(), DimensionReductionRegression(; drtgt = PPCA())]
+    res_t = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv"), DataFrame)
+    for (i, re) ∈ enumerate(res)
+        loadings = regression(re, X, F)
+        lt = [loadings.b; vec(loadings.M)]
+        result = isapprox(lt, res_t[!, i])
+        if !result
+            if i == length(res)
+                continue
             end
-            @test result
+            println("Test $i fails.\n$(res[i])")
+            find_tol(lt, res_t[!, i]; name1 = :loadings, name2 = :loadings_t)
         end
-        @test res[1] === regression_view(res[1])
-        loadings = regression(res[1], X, F)
-        lv = regression_view(loadings, [2, 5, 17, 4])
-        @test lv.b == view(loadings.b, [2, 5, 17, 4])
-        @test lv.M == view(loadings.M, [2, 5, 17, 4], :)
+        @test result
     end
+    @test res[1] === regression_view(res[1])
+    loadings = regression(res[1], X, F)
+    lv = regression_view(loadings, [2, 5, 17, 4])
+    @test lv.b == view(loadings.b, [2, 5, 17, 4])
+    @test lv.M == view(loadings.M, [2, 5, 17, 4], :)
 end
