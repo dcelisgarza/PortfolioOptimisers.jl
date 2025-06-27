@@ -992,7 +992,7 @@
         @test 0.5 * w[rd.nx .== "ADI"][1] <= w[rd.nx .== "TXN"][1]
         @test w[rd.nx .== "ADP"][1] + w[rd.nx .== "AMGN"][1] >= w[rd.nx .== "MSFT"][1]
     end
-    @testset "SDP philogeny constraints" begin
+    @testset "Philogeny constraints" begin
         plc = SemiDefinitePhilogenyConstraintEstimator(; pe = NetworkEstimator())
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
@@ -1079,7 +1079,7 @@
         plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator())
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                             wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
-                            sbgt = 0.5, cplg = plc)
+                            sbgt = 0.5, nplg = plc)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
         sol = optimise!(mre, rd)
@@ -1093,7 +1093,7 @@
         plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator())
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                             wb = WeightBoundsResult(; lb = 0, ub = 1), bgt = 1, sbgt = 0.5,
-                            cplg = plc)
+                            nplg = plc)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
         sol = optimise!(mre, rd)
@@ -1103,112 +1103,44 @@
                         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.40016878959796814, 0.0,
                         0.0, 0.0, 0.0, 0.0, 0.4381447521586327, 0.0, 0.0, 0.0, 0.0],
                        rtol = 1e-6)
-        ########################
-        ########################
-        # using PortfolioOptimiser
-        # portfolio = Portfolio(; ret = pr.X, mu = pr.mu, cov = pr.sigma, assets = rd.nx,
-        #                       solvers = PortOptSolver(; name = :PClGL,
-        #                                               solver = optimizer_with_attributes(Pajarito.Optimizer,
-        #                                                                                  "verbose" => false,
-        #                                                                                  "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-        #                                                                                                                           MOI.Silent() => true),
-        #                                                                                  "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-        #                                                                                                                              "verbose" => false,
-        #                                                                                                                              "max_step_fraction" => 0.75))))
 
-        # A = PortfolioOptimiser.centrality_vector(portfolio)
-        # B = PortfolioOptimiser.connection_matrix(portfolio)
-        # C = PortfolioOptimiser.cluster_matrix(portfolio)
-
-        # portfolio.short = false
-        # portfolio.short_lb = -0.2
-        # portfolio.short_budget = -0.5
-        # portfolio.long_ub = 1
-        # portfolio.budget = 1
-        # portfolio.cluster_adj = IP(; A = B)
-        # optt = Trad(; rm = CVaR(), obj = Sharpe(; ohf = 1, rf = rf))
-        # @time wt = PortfolioOptimiser.optimise!(portfolio, optt)
-
-        ########################
-        ########################
-        # @test isapprox(w,
-        #                [1.9182464594380404e-9, -5.486929531582411e-9, 0.25294011598798327,
-        #                 0.30736755395924736, 1.4314131117487336e-9, -0.035502895237015414,
-        #                 -1.8881132164854558e-10, 0.17572595977320954, 0.29946926729917145,
-        #                 5.434866179443442e-10])
-
-        # mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf), opt = opt)
-        # w = optimise!(mre, rd).w
-        # @test isapprox(w,
-        #                [-2.1268204115045244e-9, -0.06023046002084164, 0.2601463681020507,
-        #                 0.4010094500291993, -1.499386434008056e-10, -0.13976952342299712,
-        #                 -1.5207511190183943e-8, 0.23777409644795705, 0.3010700864415278,
-        #                 -9.263056126010764e-11])
-
-        # plc = SemiDefinitePhilogenyConstraintEstimator(; pe = NetworkEstimator(), p = 6)
-        # opt = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBoundsResult(; lb = -0.2, ub = 1),
-        #                     bgt = 1, sbgt = 0.2, nplg = philogeny_constraints(plc, pr.X))
-        # mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
-        # w = optimise!(mre, rd).wprintln(card_flag, "\n", gcard_flag, "\n", n_flag, "\n", c_flag,
-        #                                 "\n", lt_flag, "\n", st_flag, "\n", ffl_flag, "\n",
-        #                                 ffs_flag, "\n")
-
-        # mre = MeanRisk(;
-        #                r = UncertaintySetVariance(;
-        #                                           ucs = NormalUncertaintySetEstimator(;
-        #                                                                               pe = EmpiricalPriorEstimator(),
-        #                                                                               rng = rng,
-        #                                                                               alg = BoxUncertaintySetAlgorithm(),
-        #                                                                               seed = 987654321)),
-        #                obj = MinimumRisk(), opt = opt)
-        # res = optimise!(mre, rd)
-        # @test !haskey(res.model, :sdp_nplg_p)
-
-        # opt = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBoundsResult(; lb = -0.2, ub = 1),
-        #                     bgt = 1, sbgt = 0.2, cplg = philogeny_constraints(plc, pr.X))
-        # mre = MeanRisk(;
-        #                r = UncertaintySetVariance(;
-        #                                           ucs = sigma_ucs(NormalUncertaintySetEstimator(;
-        #                                                                                         pe = EmpiricalPriorEstimator(),
-        #                                                                                         rng = rng,
-        #                                                                                         alg = BoxUncertaintySetAlgorithm(),
-        #                                                                                         seed = 987654321),
-        #                                                           pr.X)), obj = MinimumRisk(),
-        #                opt = opt)
-        # res = optimise!(mre, rd)
-        # @test !haskey(res.model, :sdp_cplg_p)
-    end
-    #=
-    @testset "Centrality" begin
-        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
-                     check_sol = (; allow_local = true, allow_almost = true),
-                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
         ce = CentralityConstraintEstimator(; A = CentralityEstimator(), B = MinValue(),
                                            comp = LEQ())
-        sets = DataFrame(; Assets = 1:10, Clusters = [1, 2, 2, 2, 3, 2, 2, 1, 3, 3])
-        opt = JuMPOptimiser(; pe = pr, slv = slv, cent = ce, sets = sets)
-        mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
-        res = optimise!(mre, rd)
-        w = res.w
-        @test all(abs.(res.cent.A_ineq * w .- res.cent.B_ineq) .<= sqrt(eps()))
-        @test isapprox(w,
-                       [0.22435864236807318, 0.11900511795941895, 0.2042024901056272,
-                        0.21713501321050613, -1.1594442746740814e-10, 0.23529873506572008,
-                        -1.461171082669015e-10, -1.3517306778692135e-10,
-                        1.1400266353179912e-9, 5.478625248874811e-10])
-
-        ce = [CentralityConstraintEstimator(; A = CentralityEstimator(), B = MedianValue(),
-                                            comp = EQ())]
         opt = JuMPOptimiser(; pe = pr, slv = slv, cent = ce, sets = sets)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test all(abs.(res.cent.A_eq * w .- res.cent.B_eq) .<= sqrt(eps()))
+        @test all(abs.(res.cent.A_ineq * w .- res.cent.B_ineq) .<= sqrt(eps()))
         @test isapprox(w,
-                       [1.5080697736395485e-9, 1.0676961354967205e-10, 0.20143237340958933,
-                        0.37944774611460697, 2.08976824723604e-9, 4.915607815862469e-10,
-                        3.260477423319088e-10, 0.08088011921478026, 0.3382397556825816,
-                        1.0562258217209712e-9])
+                       [2.1447605251747904e-6, 4.9555522233308075e-6,
+                        -3.048940921125532e-10, -6.335742240074599e-11,
+                        3.0187478707549293e-6, 7.271579409066108e-10, 0.0005497745025639536,
+                        3.263142400806418e-6, 3.221740106733761e-5, 7.303976772421854e-10,
+                        0.19282060915575108, 4.763609364242417e-6, -6.554897009256369e-11,
+                        -5.672390807110499e-11, 7.135752393246407e-10, 5.730381122392376e-6,
+                        -3.104126163671757e-10, 6.88527743640993e-10, 7.100028708162024e-10,
+                        0.28235947293416386, 0.03775974833251591, 0.07628255832555499,
+                        7.493570890879621e-10, 7.441278087723419e-10, 6.505459842129682e-6,
+                        0.41016523338701283, 7.246385613075014e-10, -4.4123969177698076e-11,
+                        -3.1024091744633977e-10, -3.2453162827112235e-10], rtol = 1e-6)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, cent = ce, sets = sets,
+                            wb = WeightBoundsResult(; lb = -0.2), sbgt = 0.2)
+        mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test all(abs.(res.cent.A_ineq * w .- res.cent.B_ineq) .<= 10 * sqrt(eps()))
+        @test isapprox(w,
+                       [-0.04240425125756214, 1.0584787692400547e-7, -6.631057765173388e-7,
+                        6.099347672589588e-7, -4.3112912853638063e-7, 1.6124012264484388e-7,
+                        0.03150024923244586, -2.2747112277364104e-7, 5.900381877872145e-6,
+                        1.2076023163590833e-6, 0.21355508452318192, 1.4262618788550154e-7,
+                        -9.208897985580136e-9, 5.47082366787729e-6, -1.6733137292613466e-8,
+                        1.5654863600976744e-7, 0.0025103099615115124, -0.10101441922708894,
+                        3.2112528560829895e-7, 0.26334004450145576, 0.04529158679551895,
+                        0.13272444153042973, 1.377444204938884e-7, -0.05657465192152953,
+                        2.1202053830036573e-7, 0.3945871594431534, 0.08289991548144819,
+                        0.03357215005600953, -7.881667397474365e-7, 9.080013146741573e-8],
+                       rtol = 1e-6)
     end
-    =#
 end
