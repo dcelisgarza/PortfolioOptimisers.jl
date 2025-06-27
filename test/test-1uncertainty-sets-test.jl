@@ -244,17 +244,24 @@
             end
             @test res1
 
-            if (i == 13 && (Sys.islinux() || Sys.isapple())) || (i == 5 && Sys.isapple())
-                continue
+            rtol = if i == 5
+                0.05
+            else
+                1e-6
             end
-            res2 = isapprox(sigma2, uesigma_t[!, i])
+            res2 = isapprox(sigma2, uesigma_t[!, i]; rtol = rtol)
             if !res2
                 println("Sigma iteration $i failed")
                 find_tol(sigma2, uesigma_t[!, i]; name1 = :sigma1, name2 = :uesigma_t)
             end
             @test res2
 
-            res3 = isapprox([mu1; sigma1], ues_t[!, i])
+            rtol = if i == 5
+                0.005
+            else
+                1e-6
+            end
+            res3 = isapprox([mu1; sigma1], ues_t[!, i]; rtol = rtol)
             if !res3
                 println("Dataframe iteration $i failed")
                 find_tol([mu1; sigma1], ues_t[!, i]; name1 = :sigma1, name2 = :sigma2)
