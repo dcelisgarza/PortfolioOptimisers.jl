@@ -1,8 +1,9 @@
 @safetestset "Prior tests" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
-          CSV, DataFrames, LinearAlgebra, Clarabel, SparseArrays
+          CSV, DataFrames, LinearAlgebra, Clarabel, SparseArrays, Logging
     using PortfolioOptimisers: duplication_matrix, elimination_matrix, summation_matrix,
                                prior_view
+    Logging.min_enabled_level(Logging.Error)
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
