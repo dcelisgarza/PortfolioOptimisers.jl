@@ -448,7 +448,7 @@
     end
     @testset "Philogeny constraints" begin
         rng = StableRNG(123456789)
-        X = randn(rng, 1000, 20)
+        X = randn(rng, 100, 20)
 
         plc = SemiDefinitePhilogenyConstraintEstimator(; pe = NetworkEstimator(), p = 0.1)
         res = philogeny_constraints(plc, X)
@@ -511,7 +511,7 @@
     end
     @testset "Centrality constraints" begin
         rng = StableRNG(123456789)
-        X = randn(rng, 1000, 20)
+        X = randn(rng, 100, 20)
         ces = [CentralityEstimator(), CentralityEstimator(; cent = EigenvectorCentrality()),
                CentralityEstimator(; cent = ClosenessCentrality()),
                CentralityEstimator(; cent = StressCentrality()),

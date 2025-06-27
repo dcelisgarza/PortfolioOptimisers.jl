@@ -1,5 +1,5 @@
 @safetestset "OWA" begin
-    using PortfolioOptimisers, CSV, DataFrames, Clarabel, Test, Random, StableRNGs, Logging
+    using PortfolioOptimisers, CSV, DataFrames, Clarabel, Test, Random, Logging
     Logging.disable_logging(Logging.Warn)
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈

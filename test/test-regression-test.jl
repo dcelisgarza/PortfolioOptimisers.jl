@@ -1,6 +1,5 @@
 @safetestset "Regression tests" begin
-    using PortfolioOptimisers, DataFrames, Test, CSV, Random, StableRNGs, Logging,
-          TimeSeries
+    using PortfolioOptimisers, DataFrames, Test, CSV, Random, Logging, TimeSeries
     import PortfolioOptimisers: regression_view
     Logging.disable_logging(Logging.Warn)
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
