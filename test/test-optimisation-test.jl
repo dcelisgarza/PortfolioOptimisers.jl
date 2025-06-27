@@ -1,6 +1,6 @@
 @safetestset "Optimisation failure" begin
     using PortfolioOptimisers, JuMP, Test, Clarabel, Logging
-    Logging.min_enabled_level(Logging.Error)
+    Logging.disable_logging(Logging.Warn)
     @testset "optimise_JuMP_model!" begin
         model = JuMP.Model()
         set_optimizer(model, Clarabel.Optimizer)

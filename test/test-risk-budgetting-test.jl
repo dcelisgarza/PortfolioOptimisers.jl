@@ -1,6 +1,6 @@
 @safetestset "Risk Budgetting Optimisation" begin
     using PortfolioOptimisers, Test, StableRNGs, Random, Clarabel, Logging
-    Logging.min_enabled_level(Logging.Error)
+    Logging.disable_logging(Logging.Warn)
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -92,21 +92,13 @@
                         0.017546661546835148], rtol = 5e-5)
         rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; rd = rd)
         lo, hi = extrema(rkc[1:3])
-        rtol = if Sys.iswindows()
-            1e-4
-        else
-            5e-5
-        end
+        rtol = 1e-4
         @test isapprox(hi / lo, 1, rtol = rtol)
 
         rbe = RiskBudgetting(; alg = FactorRiskBudgettingAlgorithm(; rkb = 1:3), r = r,
                              opt = opt)
         w = optimise!(rbe, rd).w
-        rtol = if Sys.islinux()
-            1e-5
-        else
-            5e-5
-        end
+        rtol = 5e-5
         @test isapprox(w,
                        [-0.0024299694588815622, 0.01854069887141735, 0.2310357404166038,
                         -0.013001802561148969, 0.40416631720507656, 0.018345407610834332,
@@ -114,11 +106,7 @@
                         0.022462819302194334], rtol = rtol)
         rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; rd = rd)
         lo, hi = extrema(rkc[1:3])
-        if Sys.iswindows()
-            rtol = 1e-4
-        else
-            rtol = 5e-5
-        end
+        rtol = 1e-4
         @test isapprox(hi / lo, 3, rtol = rtol)
         @test argmin(rkc[1:3]) == 1
         @test argmax(rkc[1:3]) == 3

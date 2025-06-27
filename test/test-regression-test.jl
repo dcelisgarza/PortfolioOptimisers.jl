@@ -1,7 +1,7 @@
 @safetestset "Regression tests" begin
     using PortfolioOptimisers, DataFrames, Test, CSV, Random, StableRNGs, Logging
     import PortfolioOptimisers: regression_view
-    Logging.min_enabled_level(Logging.Error)
+    Logging.disable_logging(Logging.Warn)
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
