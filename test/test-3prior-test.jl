@@ -1,6 +1,6 @@
 @safetestset "Prior tests" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
-          CSV, DataFrames, LinearAlgebra, Clarabel, SparseArrays, Logging
+          CSV, DataFrames, LinearAlgebra, Clarabel, SparseArrays, Logging, TimeSeries
     using PortfolioOptimisers: duplication_matrix, elimination_matrix, summation_matrix,
                                prior_view
     Logging.disable_logging(Logging.Warn)
@@ -24,17 +24,18 @@
             end
         end
     end
+    X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
+                  timestamp = :timestamp)
+    F = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/factor_prices.csv"));
+                  timestamp = :timestamp)
     @testset "Empirical Prior" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 1000, 10) * 0.001
-        assets = 1:10
-        sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        rd = prices_to_returns(X[(end - 252):end], F[(end - 252):end])
         pes = [EmpiricalPriorEstimator(), EmpiricalPriorEstimator(; horizon = 252)]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Empirical-Prior.csv"), DataFrame)
-        for i ∈ eachindex(pes)
-            pr = prior(pes[i], transpose(X); dims = 2)
-            mu_t = reshape(pet[1:10, i], size(pr.mu))
-            sigma_t = reshape(pet[11:end, i], size(pr.sigma))
+        for (i, pe) ∈ enumerate(pes)
+            pr = prior(pe, transpose(rd.X); dims = 2)
+            mu_t = reshape(pet[1:30, i], size(pr.mu))
+            sigma_t = reshape(pet[31:end, i], size(pr.sigma))
             res1 = isapprox(pr.mu, mu_t)
             if !res1
                 println("Test $i fails on mu.")
@@ -49,8 +50,8 @@
             @test res2
             @test pr === prior(pr)
         end
-        pr1 = prior(EmpiricalPriorEstimator(), ReturnsResult(; nx = 1:10, X = X))
-        pr2 = prior(EmpiricalPriorEstimator(), X)
+        pr1 = prior(EmpiricalPriorEstimator(), rd)
+        pr2 = prior(EmpiricalPriorEstimator(), rd.X)
         @test pr1.X == pr2.X
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
@@ -62,11 +63,10 @@
         pv1.X == view(pr1.X, :, i)
     end
     @testset "Factor Prior" begin
-        rng = StableRNG(123456789)
-        X = randn(rng, 100, 10)
-        F = X[:, [3, 8]]
-
-        pr1 = prior(FactorPriorEstimator(; rsd = false), transpose(X), transpose(F);
+        rd = prices_to_returns(X[(end - 100):end][:AAPL, :BKNG, :COST, :GOOG, :MRK, :NFLX,
+                                                  :SBUX, :TSLA, :TXN, :VRTX],
+                               F[(end - 100):end][:GLOF, :QUAL])
+        pr1 = prior(FactorPriorEstimator(; rsd = false), transpose(rd.X), transpose(rd.F);
                     dims = 2)
         pm1_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-No-Residuals.csv"),
                          DataFrame)
@@ -80,7 +80,7 @@
         @test isapprox(pr1.chol, chol_t)
         @test pr1 === prior(pr1)
 
-        pr2 = prior(FactorPriorEstimator(; rsd = true), transpose(X), transpose(F);
+        pr2 = prior(FactorPriorEstimator(; rsd = true), transpose(rd.X), transpose(rd.F);
                     dims = 2)
         pm2_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-Residuals.csv"),
                          DataFrame)
@@ -93,10 +93,9 @@
         @test isapprox(pr2.sigma, sigma_t)
         @test isapprox(pr2.chol, chol_t)
 
-        pr1 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())),
-                    ReturnsResult(; nx = 1:10, X = X, nf = 1:2, F = F))
-        pr2 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())), X,
-                    F)
+        pr1 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())), rd)
+        pr2 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())),
+                    rd.X, rd.F)
         @test pr1.X == pr2.X
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
@@ -118,7 +117,7 @@
 
         i = [10, 5, 9]
         pe1 === prior_view(pe1, i)
-        pr1 = prior(pe1, X, F)
+        pr1 = prior(pe1, rd)
         pv1 = prior_view(pr1, i)
         @test pv1.mu == view(pr1.mu, i)
         @test pv1.sigma == view(pr1.sigma, i, i)
