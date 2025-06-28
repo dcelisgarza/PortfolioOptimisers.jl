@@ -1,6 +1,6 @@
 @safetestset "Clustering Optimisation" begin
     using PortfolioOptimisers, CSV, DataFrames, Test, Random, Clarabel, StatsBase,
-          TimeSeries, CovarianceEstimation
+          TimeSeries, CovarianceEstimation, FLoops
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -361,5 +361,86 @@
                                                                                                     1e-4,
                                                                                             alg = NonMonotonicSchur()),
                                                                        opt = opt))
+    end
+    @testset "Nested Clustering" begin
+        pr = prior(EmpiricalPriorEstimator(), rd)
+        clr = clusterise(ClusteringEstimator(), pr.X)
+        jopt = JuMPOptimiser(; pe = pr, slv = slv)
+        hopt = HierarchicalOptimiser(; slv = slv)
+        res1 = optimise!(NestedClustering(; pe = pr, cle = clr,
+                                          opti = NearOptimalCentering(;
+                                                                      r = ConditionalValueatRisk(),
+                                                                      bins = 20,
+                                                                      obj = MaximumRatio(;
+                                                                                         rf = rf),
+                                                                      opt = jopt),
+                                          opto = HierarchicalEqualRiskContribution(;
+                                                                                   ri = ConditionalDrawdownatRisk(),
+                                                                                   ro = StandardDeviation(),
+                                                                                   opt = hopt),
+                                          threads = SequentialEx()), rd)
+        res2 = optimise!(NestedClustering(; pe = pr, cle = clr,
+                                          opti = NearOptimalCentering(;
+                                                                      r = ConditionalValueatRisk(),
+                                                                      bins = 20,
+                                                                      obj = MaximumRatio(;
+                                                                                         rf = rf),
+                                                                      opt = jopt),
+                                          opto = HierarchicalEqualRiskContribution(;
+                                                                                   ri = ConditionalDrawdownatRisk(),
+                                                                                   ro = StandardDeviation(),
+                                                                                   opt = hopt)),
+                         rd)
+        @test isapprox(res1.w,
+                       [0.0018222027347502524, 0.003018495528527348, 0.0026864529798926746,
+                        0.012681388345795436, 0.0008337946449769315, 0.0027990998709179764,
+                        0.005535728517142857, 0.0030462435901917892, 0.005157792172153478,
+                        0.03851249282703271, 0.2047064398188737, 0.0023257673444756046,
+                        0.007376444419233182, 0.005798894488076123, 0.005312358350199489,
+                        0.003304823890323986, 0.004021251241074547, 0.0004208461854390179,
+                        0.0030689909363023162, 0.22743290904635988, 0.006345403613759411,
+                        0.1317028546678364, 0.00424262864533623, 0.0017548183311587482,
+                        0.007274196840803503, 0.23295706548658007, 0.011893535517372976,
+                        0.0600405726796676, 0.002554411563893469, 0.0013720852159448413],
+                       rtol = 1e-6)
+        @test isapprox(res1.w, res2.w)
+
+        jopt = JuMPOptimiser(; slv = slv)
+        hopt = HierarchicalOptimiser(; pe = pr, slv = slv)
+        res3 = optimise!(NestedClustering(; pe = pr, cle = clr,
+                                          opto = NearOptimalCentering(;
+                                                                      r = ConditionalValueatRisk(),
+                                                                      obj = MaximumRatio(;
+                                                                                         rf = rf),
+                                                                      opt = jopt),
+                                          opti = HierarchicalEqualRiskContribution(;
+                                                                                   ri = ConditionalDrawdownatRisk(),
+                                                                                   ro = StandardDeviation(),
+                                                                                   opt = hopt),
+                                          threads = SequentialEx()), rd)
+        res4 = optimise!(NestedClustering(; pe = pr, cle = clr,
+                                          opto = NearOptimalCentering(;
+                                                                      r = ConditionalValueatRisk(),
+                                                                      obj = MaximumRatio(;
+                                                                                         rf = rf),
+                                                                      opt = jopt),
+                                          opti = HierarchicalEqualRiskContribution(;
+                                                                                   ri = ConditionalDrawdownatRisk(),
+                                                                                   ro = StandardDeviation(),
+                                                                                   opt = hopt)),
+                         rd)
+        @test isapprox(res3.w,
+                       [0.00024883463926763153, 0.00010174731357962266,
+                        0.00032046290032649455, 0.05334331526368971, 0.00024287792567891233,
+                        9.058334317154616e-5, 0.00014059196284429897, 0.017898077443852776,
+                        0.000166353050966532, 0.03391266745884957, 0.00041134834084408523,
+                        9.256129941895275e-5, 0.027231244929182784, 0.00011674161017761308,
+                        0.03219827272876661, 8.852364662592574e-5, 8.13917760039694e-5,
+                        0.00011774201832057956, 0.0001290803429228256,
+                        0.00016931965791270348, 8.455890836019534e-5, 0.30649349734599307,
+                        0.00012053009746729449, 0.00022033684779288818, 0.06882491486079627,
+                        0.29679600954853047, 0.159474038802478, 4.170019166091807e-5,
+                        0.00028018364679019994, 0.0005624900984134234], rtol = 1e-6)
+        @test isapprox(res3.w, res4.w)
     end
 end

@@ -279,14 +279,15 @@ function JuMPOptimiser(;
                                                                  ss, strict)
 end
 function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
+    X = ifelse(isa(opt.pe, AbstractPriorResult), opt.pe.X, X)
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
     bgt = budget_view(opt.bgt, i)
     lt = nothing_scalar_array_view(opt.lt, i)
     st = nothing_scalar_array_view(opt.lt, i)
-    lcs = linear_constraint_view(opt.lcs, i)
-    gcard = cardinality_constraint_view(opt.gcard, i)
-    sgcard = cardinality_constraint_view(opt.sgcard, i)
+    # lcs = linear_constraint_view(opt.lcs, i)
+    # gcard = linear_constraint_view(opt.gcard, i)
+    # sgcard = linear_constraint_view(opt.sgcard, i)
     smtx = asset_sets_matrix_view(opt.smtx, i)
     sets = nothing_dataframe_view(opt.sets, i)
     tn = turnover_view(opt.tn, i)
@@ -296,8 +297,8 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     ccnt = custom_constraint_view(opt.ccnt, i)
     cobj = custom_objective_view(opt.cobj, i)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
-                         lt = lt, st = st, lcs = lcs, lcm = opt.lcm, cent = opt.cent,
-                         gcard = gcard, sgcard = sgcard, smtx = smtx, sets = sets,
+                         lt = lt, st = st, lcs = opt.lcs, lcm = opt.lcm, cent = opt.cent,
+                         gcard = opt.gcard, sgcard = opt.sgcard, smtx = smtx, sets = sets,
                          nplg = opt.nplg, cplg = opt.cplg, tn = tn, te = te, fees = fees,
                          ret = ret, sce = opt.sce, ccnt = ccnt, cobj = cobj, sc = opt.sc,
                          so = opt.so, card = opt.card, scard = opt.scard, nea = opt.nea,

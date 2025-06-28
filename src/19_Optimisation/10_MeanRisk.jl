@@ -20,6 +20,7 @@ function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(),
     return MeanRisk{typeof(opt), typeof(r), typeof(obj), typeof(wi)}(opt, r, obj, wi)
 end
 function opt_view(mr::MeanRisk, i::AbstractVector, X::AbstractMatrix)
+    X = ifelse(isa(mr.opt.pe, AbstractPriorResult), mr.opt.pe.X, X)
     opt = opt_view(mr.opt, i, X)
     r = risk_measure_view(mr.r, i, X)
     wi = nothing_scalar_array_view(mr.wi, i)

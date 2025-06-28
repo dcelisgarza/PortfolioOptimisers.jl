@@ -45,15 +45,15 @@ function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureS
                                   w1::Union{Nothing, <:AbstractVector} = nothing,
                                   w2::Union{Nothing, <:AbstractVector} = nothing,
                                   formulation::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
-                                  reversed::Bool = false)
-    w1_flag = isa(w1, AbstractVector)
-    w2_flag = isa(w2, AbstractVector)
+                                  rev::Bool = false)
+    w1_flag = !isnothing(w1)
+    w2_flag = !isnothing(w2)
     if w1_flag
         @smart_assert(!isempty(w1))
     end
     if w2_flag
         @smart_assert(!isempty(w2))
-        if !reversed
+        if !rev
             w2 = reverse(w2)
         end
     end

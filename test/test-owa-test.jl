@@ -91,5 +91,12 @@
         w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]
         w2 = owa_wcvarrg(100, alphas, w)
         @test isapprox(w1, w2)
+
+        w = owa_tg(100)
+        r = OrderedWeightsArrayRange(; w1 = w, w2 = w)
+        @test r.w1 == reverse(r.w2)
+
+        r = OrderedWeightsArrayRange(; w1 = w, w2 = w, rev = true)
+        @test r.w1 == r.w2
     end
 end

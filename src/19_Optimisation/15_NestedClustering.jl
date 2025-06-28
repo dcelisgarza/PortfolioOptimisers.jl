@@ -31,20 +31,39 @@ struct NestedClustering{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorRes
     strict::T8
     threads::T9
 end
-function assert_nested_clustering_optimiser(opt::ClusteringOptimisationEstimator)
+function assert_internal_nested_clustering_optimiser(opt::ClusteringOptimisationEstimator)
     @smart_assert(!isa(opt.opt.cle, AbstractClusteringResult))
+    return nothing
 end
-function assert_nested_clustering_optimiser(opt::JuMPOptimisationEstimator)
+function assert_internal_nested_clustering_optimiser(opt::JuMPOptimisationEstimator)
     @smart_assert(!isa(opt.opt.lcs, LinearConstraintResult))
     @smart_assert(!isa(opt.opt.lcm, LinearConstraintResult))
     @smart_assert(!isa(opt.opt.cent, LinearConstraintResult))
     @smart_assert(!isa(opt.opt.gcard, LinearConstraintResult))
+    @smart_assert(!isa(opt.opt.sgcard, LinearConstraintResult))
+    # @smart_assert(!isa(opt.opt.smtx, AbstractMatrix))
     @smart_assert(!isa(opt.opt.nplg, PhilogenyConstraintResult))
     @smart_assert(!isa(opt.opt.cplg, PhilogenyConstraintResult))
+    return nothing
 end
-function assert_nested_clustering_optimiser(opt::NestedClustering)
-    @smart_assert(!isa(opt.pe, AbstractPriorResult))
+function assert_internal_nested_clustering_optimiser(opt::NestedClustering)
     @smart_assert(!isa(opt.cle, AbstractClusteringResult))
+    return nothing
+end
+function assert_external_nested_clustering_optimiser(opt::ClusteringOptimisationEstimator)
+    @smart_assert(!isa(opt.opt.pe, AbstractPriorResult))
+    assert_internal_nested_clustering_optimiser(opt)
+    return nothing
+end
+function assert_external_nested_clustering_optimiser(opt::JuMPOptimisationEstimator)
+    @smart_assert(!isa(opt.opt.pe, AbstractPriorResult))
+    assert_internal_nested_clustering_optimiser(opt)
+    return nothing
+end
+function assert_external_nested_clustering_optimiser(opt::NestedClustering)
+    @smart_assert(!isa(opt.pe, AbstractPriorResult))
+    assert_internal_nested_clustering_optimiser(opt)
+    return nothing
 end
 function NestedClustering(;
                           pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
@@ -57,11 +76,10 @@ function NestedClustering(;
                           cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
                           strict::Bool = false,
                           threads::FLoops.Transducers.Executor = ThreadedEx())
-    assert_nested_clustering_optimiser(opti)
+    assert_external_nested_clustering_optimiser(opto)
     if !(opti === opto)
-        assert_nested_clustering_optimiser(opto)
+        assert_internal_nested_clustering_optimiser(opti)
     end
-    @smart_assert(!isa(opto.opt.pe, AbstractPriorResult))
     if isa(wb, WeightBoundsConstraint)
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
@@ -77,6 +95,7 @@ function NestedClustering(;
                                                                                         threads)
 end
 function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
+    X = ifelse(isa(nco.pe, AbstractPriorResult), nco.pe.X, X)
     pe = prior_view(nco.pe, i)
     wb = weight_bounds_view(nco.wb, i)
     sets = nothing_dataframe_view(nco.sets, i)

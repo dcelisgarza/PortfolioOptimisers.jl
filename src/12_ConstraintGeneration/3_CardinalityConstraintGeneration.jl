@@ -15,9 +15,6 @@ function CardinalityConstraint(; A::LinearConstraintSide, B::Integer = 1,
                                comp::ComparisonOperators = LEQ())
     return LinearConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
-function cardinality_constraint_view(::Nothing, ::Any)
-    return nothing
-end
 function asset_sets_matrix(smtx::Union{Nothing, Symbol, <:AbstractString}, args...;
                            kwargs...)
     return smtx

@@ -41,8 +41,8 @@ function risk_measure_view(r::Variance, i::AbstractVector, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     @smart_assert(!isa(r.rc, LinearConstraintResult),
                   "`rc` cannot be a `LinearConstraintResult` because there is no way to only consider items from a specific cluster.")
-    rc = linear_constraint_view(r.rc, i)
-    return Variance(; settings = r.settings, sigma = sigma, rc = rc,
+    # rc = linear_constraint_view(r.rc, i)
+    return Variance(; settings = r.settings, sigma = sigma, rc = r.rc,
                     formulation = r.formulation)
 end
 struct StandardDeviation{T1 <: RiskMeasureSettings,

@@ -14,6 +14,7 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
     return HierarchicalRiskParity{typeof(opt), typeof(r)}(opt, r)
 end
 function opt_view(hrp::HierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
+    X = ifelse(isa(hrp.opt.pe, AbstractPriorResult), hrp.opt.pe.X, X)
     r = risk_measure_view(hrp.r, i, X)
     opt = opt_view(hrp.opt, i)
     return HierarchicalRiskParity(; r = r, opt = opt)
