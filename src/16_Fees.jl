@@ -11,6 +11,8 @@ struct Fees{T1 <: Union{Nothing, <:Turnover},
     fs::T5
     tol_kwargs::T6
 end
+Base.length(::Fees) = 1
+Base.iterate(::Fees, i = 1) = i <= 1 ? (i, nothing) : nothing
 function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
               l::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
               s::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,

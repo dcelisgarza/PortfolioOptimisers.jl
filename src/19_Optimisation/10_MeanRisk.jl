@@ -44,8 +44,8 @@ function compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk,
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(pr.X))
     @smart_assert(isa(retcode, OptimisationSuccess))
     unregister(model, :obj_expr)
-    rt_min = expected_returns(ret, sol_min.w, pr, mr.opt.fees)
-    rt_max = expected_returns(ret, sol_max.w, pr, mr.opt.fees)
+    rt_min = expected_return(ret, sol_min.w, pr, mr.opt.fees)
+    rt_max = expected_return(ret, sol_max.w, pr, mr.opt.fees)
     return range(; start = rt_min, stop = rt_max, length = lbs.N)
 end
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
@@ -113,9 +113,7 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:A
     r = factory(mr.r, pr, mr.opt.slv)
     rk_min = expected_risk(r, sol_min.w, pr.X, mr.opt.fees)
     rk_max = expected_risk(r, sol_max.w, pr.X, mr.opt.fees)
-    rk_min, rk_max = if isnothing(flag)
-        rk_min, rk_max
-    elseif flag
+    rk_min, rk_max = if flag
         factor * rk_min, factor * rk_max
     else
         factor * sqrt(rk_min), factor * sqrt(rk_max)
@@ -251,8 +249,8 @@ function efficient_frontier!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
     ri = isa(r, AbstractVector) ? r[1] : r
     risk1 = expected_risk(ri, w1, res.pr.X, mr.opt.fees; kwargs...)
     risk2 = expected_risk(ri, w2, res.pr.X, mr.opt.fees; kwargs...)
-    ret1 = expected_returns(res.ret, w1, res.pr, mr.opt.fees)
-    ret2 = expected_returns(res.ret, w2, res.pr, mr.opt.fees)
+    ret1 = expected_return(res.ret, w1, res.pr, mr.opt.fees)
+    ret2 = expected_return(res.ret, w2, res.pr, mr.opt.fees)
     model = res.model
     ks = string.(keys(object_dictionary(model)))
     rkey = Symbol(ks[findfirst(x -> contains(x, r".*_risk_1$"), ks)])

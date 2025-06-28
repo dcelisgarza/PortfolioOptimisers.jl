@@ -225,9 +225,9 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     ret = opt.ret
     rk_min, rk_opt, rk_max = near_optimal_centering_risks(opt.sce, r, pr, fees, opt.slv,
                                                           w_min, w_opt, w_max)
-    rt_min = expected_returns(ret, w_min, pr, fees)
-    rt_opt = expected_returns(ret, w_opt, pr, fees)
-    rt_max = expected_returns(ret, w_max, pr, fees)
+    rt_min = expected_return(ret, w_min, pr, fees)
+    rt_opt = expected_return(ret, w_opt, pr, fees)
+    rt_max = expected_return(ret, w_max, pr, fees)
     ibins = if isnothing(noc.bins)
         T, N = size(pr.X)
         N / T

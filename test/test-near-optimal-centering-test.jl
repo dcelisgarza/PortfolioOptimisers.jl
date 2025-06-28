@@ -128,7 +128,7 @@
         mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w1 = optimise!(mr, rd).w
         ub = expected_risk(r, w1, rd.X)
-        lb = expected_returns(ArithmeticReturn(), w1, pr)
+        lb = expected_return(ArithmeticReturn(), w1, pr)
 
         noc1 = NearOptimalCentering(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w2 = optimise!(noc1, rd).w
@@ -159,7 +159,7 @@
         mr = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
         w1 = optimise!(mr, rd).w
         ub = expected_risk(r, w1, rd.X)
-        lb = expected_returns(ArithmeticReturn(), w1, pr)
+        lb = expected_return(ArithmeticReturn(), w1, pr)
 
         noc1 = NearOptimalCentering(; alg = ConstrainedNearOptimalCenteringAlgorithm(),
                                     r = r, obj = MaximumRatio(; rf = rf), opt = opt)
