@@ -346,9 +346,9 @@ end
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = propertynames(opt)
     idx = findfirst(x -> x == :ret, pnames)
-    p = getproperty.(opt, pnames)
-    return JuMPOptimiser(p[1:(idx - 1)]..., no_bounds_returns_estimator(p[idx], args...),
-                         p[(idx + 1):end]...)
+    return JuMPOptimiser((getproperty(opt, pnames[i]) for i ∈ 1:(idx - 1))...,
+                         no_bounds_returns_estimator(opt.ret, args...),
+                         (getproperty(opt, pnames[i]) for i ∈ (idx + 1):length(pnames))...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
     (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret) = processed_jump_optimiser_attributes(opt,
