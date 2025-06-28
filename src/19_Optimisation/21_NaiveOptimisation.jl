@@ -1,8 +1,10 @@
 struct NaiveOptimisationResult{T1 <: Type, T2 <: Union{Nothing, <:AbstractPriorResult},
-                               T3 <: AbstractVector} <: OptimisationResult
+                               T3 <: AbstractVector, T4 <: OptimisationReturnCode} <:
+       OptimisationResult
     oe::T1
     pr::T2
     w::T3
+    retcode::T4
 end
 struct InverseVolatility{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult}} <:
        OptimisationEstimator
@@ -20,7 +22,7 @@ function optimise!(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, kwargs...)
     pr = prior(iv.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     w = inv.(sqrt.(diag(pr.sigma)))
-    return NaiveOptimisationResult(typeof(iv), pr, w / sum(w))
+    return NaiveOptimisationResult(typeof(iv), pr, w / sum(w), OptimisationSuccess(nothing))
 end
 struct EqualWeighted <: OptimisationEstimator end
 function optimise!(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
@@ -29,7 +31,8 @@ function optimise!(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     dims = dims == 1 ? 2 : 1
     N = size(rd.X, dims)
     return NaiveOptimisationResult(typeof(ew), nothing,
-                                   range(; start = inv(N), stop = inv(N), length = N))
+                                   range(; start = inv(N), stop = inv(N), length = N),
+                                   OptimisationSuccess(nothing))
 end
 struct RandomWeights{T1 <: Union{Nothing, <:AbstractRNG}} <: OptimisationEstimator
     rng::T1
@@ -43,7 +46,7 @@ function optimise!(rw::RandomWeights, rd::ReturnsResult; dims::Int = 1, kwargs..
     dims = dims == 1 ? 2 : 1
     N = size(rd.X, dims)
     w = isnothing(rw.rng) ? rand(Dirichlet(N, 1)) : rand(rw.rng, Dirichlet(N, 1))
-    return NaiveOptimisationResult(typeof(rw), nothing, w)
+    return NaiveOptimisationResult(typeof(rw), nothing, w, OptimisationSuccess(nothing))
 end
 
 export NaiveOptimisationResult, InverseVolatility, EqualWeighted, RandomWeights

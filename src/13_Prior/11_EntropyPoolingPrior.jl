@@ -142,7 +142,7 @@ function entropy_pooling(w::AbstractVector, epcs::Union{Nothing, <:LinearConstra
     alpha, d_opt = if N == 1
         d_views.A.alpha, !isnothing(d_opt1) ? d_opt1 : OptimEntropyPoolingEstimator()
     else
-        getproperty.(getproperty.(d_views, Ref(:A)), Ref(:alpha)),
+        getproperty.(getproperty.(d_views, :A), :alpha),
         !isnothing(d_opt2) ? d_opt2 : OptimEntropyPoolingEstimator()
     end
     A = d_epcs.A_eq
@@ -152,9 +152,9 @@ function entropy_pooling(w::AbstractVector, epcs::Union{Nothing, <:LinearConstra
     ialpha = inv(alpha)
     function g(x)
         @smart_assert(all(zero(eltype(x)) .< x .<= B))
-        pos_part = max.(-A .- Ref(x), eltype(x))
+        pos_part = max.(-A .- x, zero(eltype(x)))
         A_eq = vcat(epcs.A_eq, pos_part * ialpha)
-        B_eq = vcat(epcs.B_eq, B .- Ref(x))
+        B_eq = vcat(epcs.B_eq, B .- x)
         epcs2 = LinearConstraintResult(; ineq = epcs.ineq,
                                        eq = PartialLinearConstraintResult(; A = A_eq,
                                                                           B = B_eq))

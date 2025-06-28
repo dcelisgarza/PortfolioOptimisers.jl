@@ -28,7 +28,7 @@ function HierarchicalEqualRiskContribution(;
 end
 function opt_view(hec::HierarchicalEqualRiskContribution, i::AbstractVector,
                   X::AbstractMatrix)
-    X = ifelse(isa(hec.opt.pe, AbstractPriorResult), hec.opt.pe.X, X)
+    X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
     ri = hec.ri
     ro = hec.ro
     if ri === ro

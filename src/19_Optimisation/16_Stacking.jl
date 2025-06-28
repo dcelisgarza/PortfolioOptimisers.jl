@@ -29,22 +29,27 @@ struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
     strict::T7
     threads::T8
 end
-function assert_external_nested_clustering_optimiser(opt::Stacking)
+function assert_external_optimiser(opt::Stacking)
     @smart_assert(!isa(opt.pe, AbstractPriorResult))
-    assert_internal_nested_clustering_optimiser(opt)
+    assert_external_optimiser(opt.opti)
+    assert_external_optimiser(opt.opto)
+    return nothing
+end
+function assert_internal_optimiser(opt::Stacking)
+    assert_internal_optimiser(opt.opti)
+    assert_internal_optimiser(opt.opto)
     return nothing
 end
 function Stacking(;
                   pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                   wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = nothing,
                   sets::Union{Nothing, <:DataFrame} = nothing,
-                  opti::Union{<:OptimisationResult, <:OptimisationEstimator,
-                              <:AbstractVector{<:Union{<:OptimisationEstimator,
-                                                       <:OptimisationResult}}} = MeanRisk(),
+                  opti::AbstractVector{<:Union{<:OptimisationEstimator,
+                                               <:OptimisationResult}} = [MeanRisk()],
                   opto::OptimisationEstimator = MeanRisk(),
                   cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
                   strict::Bool = false, threads::FLoops.Transducers.Executor = ThreadedEx())
-    assert_external_nested_clustering_optimiser(opto)
+    assert_external_optimiser(opto)
     if isa(wb, WeightBoundsConstraint)
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
     end
@@ -53,7 +58,7 @@ function Stacking(;
                                                                   cwf, strict, threads)
 end
 function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
-    X = ifelse(isa(st.pe, AbstractPriorResult), st.pe.X, X)
+    X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
     pe = prior_view(st.pe, i)
     opti = opt_view(st.opti, i, X)
     opto = opt_view(st.opto, i, X)

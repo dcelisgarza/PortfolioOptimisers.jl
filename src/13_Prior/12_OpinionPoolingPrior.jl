@@ -57,7 +57,7 @@ function compute_pooling(::LogarithmicOpinionPooling, pw::AbstractMatrix,
                          ow::AbstractVector)
     u = log.(pw) * ow
     lse = logsumexp(u)
-    return vec(exp.(u .- Ref(lse)))
+    return vec(exp.(u .- lse))
 end
 function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,

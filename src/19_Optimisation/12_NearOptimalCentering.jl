@@ -40,7 +40,7 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCenteringAlgorithm())
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
-        @smart_assert(!any(isa.(r, Ref(SquaredRiskMeasures))))
+        @smart_assert(!any(isa.(r, SquaredRiskMeasures)))
     else
         @smart_assert(!isa(r, SquaredRiskMeasures))
     end
@@ -74,7 +74,7 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                                                                alg)
 end
 function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatrix)
-    X = ifelse(isa(noc.opt.pe, AbstractPriorResult), noc.opt.pe.X, X)
+    X = isa(noc.opt.pe, AbstractPriorResult) ? noc.opt.pe.X : X
     opt = opt_view(noc.opt, i, X)
     r = risk_measure_view(noc.r, i, X)
     w_min = nothing_scalar_array_view(noc.w_min, i)
@@ -210,7 +210,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
         if !isa(res_opt.retcode, AbstractVector)
             @smart_assert(isa(res_opt.retcode, OptimisationSuccess))
         else
-            @smart_assert(all(isa.(res_opt.retcode, Ref(OptimisationSuccess))))
+            @smart_assert(all(isa.(res_opt.retcode, OptimisationSuccess)))
         end
         w_opt = res_opt.w
     end

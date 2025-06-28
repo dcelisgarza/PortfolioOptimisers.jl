@@ -194,7 +194,7 @@ function plot_clusters(clr::AbstractClusteringResult, X::AbstractMatrix,
                        f::Union{Nothing, Figure} = Figure(),
                        ax_kwargs::NamedTuple = (; yreversed = true,
                                                 xticklabelrotation = pi / 2, aspect = 1),
-                       color_func = x -> if any(x .< Ref(zero(eltype(x))))
+                       color_func = x -> if any(x .< zero(eltype(x)))
                            (-1, 1)
                        else
                            (0, 1)

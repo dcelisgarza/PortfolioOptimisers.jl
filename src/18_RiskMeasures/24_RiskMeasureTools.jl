@@ -8,7 +8,7 @@ for r ∈ setdiff(traverse_subtypes(RiskMeasure), (UncertaintySetVariance,))
                  return if isempty(pnames)
                      $(r)(settings)
                  else
-                     $(r)(settings, getproperty.(Ref(r), pnames)...)
+                     $(r)(settings, getproperty.(r, pnames)...)
                  end
              end
          end)
@@ -31,7 +31,7 @@ for r ∈ traverse_subtypes(RiskMeasure)
                  return if isempty(pnames)
                      $(r)(settings)
                  else
-                     $(r)(settings, getproperty.(Ref(r), pnames)...)
+                     $(r)(settings, getproperty.(r, pnames)...)
                  end
              end
              function bounds_risk_measure_expression(r::$(r), ub::Real)
@@ -42,7 +42,7 @@ for r ∈ traverse_subtypes(RiskMeasure)
                  return if isempty(pnames)
                      $(r)(settings)
                  else
-                     $(r)(settings, getproperty.(Ref(r), pnames)...)
+                     $(r)(settings, getproperty.(r, pnames)...)
                  end
              end
          end)

@@ -34,7 +34,7 @@ function RelaxedRiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
                                                                                     alg)
 end
 function opt_view(rrb::RelaxedRiskBudgetting, i::AbstractVector, X::AbstractMatrix)
-    X = ifelse(isa(rrb.opt.pe, AbstractPriorResult), rrb.opt.pe.X, X)
+    X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
     rkb = nothing_scalar_array_view(rrb.rkb, i)
     wi = nothing_scalar_array_view(rrb.wi, i)

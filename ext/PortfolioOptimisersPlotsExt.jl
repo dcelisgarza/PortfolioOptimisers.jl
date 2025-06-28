@@ -148,8 +148,7 @@ end
 function PortfolioOptimisers.plot_clusters(clr::PortfolioOptimisers.AbstractClusteringResult,
                                            X::AbstractMatrix,
                                            nx::AbstractVector = 1:size(X, 1);
-                                           color_func = x -> if any(x .<
-                                                                    Ref(zero(eltype(x))))
+                                           color_func = x -> if any(x .< zero(eltype(x)))
                                                (-1, 1)
                                            else
                                                (0, 1)

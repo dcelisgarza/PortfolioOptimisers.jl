@@ -31,11 +31,11 @@ struct NestedClustering{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorRes
     strict::T8
     threads::T9
 end
-function assert_internal_nested_clustering_optimiser(opt::ClusteringOptimisationEstimator)
+function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
     @smart_assert(!isa(opt.opt.cle, AbstractClusteringResult))
     return nothing
 end
-function assert_internal_nested_clustering_optimiser(opt::JuMPOptimisationEstimator)
+function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     @smart_assert(!isa(opt.opt.lcs, LinearConstraintResult))
     @smart_assert(!isa(opt.opt.lcm, LinearConstraintResult))
     @smart_assert(!isa(opt.opt.cent, LinearConstraintResult))
@@ -46,23 +46,31 @@ function assert_internal_nested_clustering_optimiser(opt::JuMPOptimisationEstima
     @smart_assert(!isa(opt.opt.cplg, PhilogenyConstraintResult))
     return nothing
 end
-function assert_internal_nested_clustering_optimiser(opt::NestedClustering)
+function assert_internal_optimiser(opt::NestedClustering)
     @smart_assert(!isa(opt.cle, AbstractClusteringResult))
     return nothing
 end
-function assert_external_nested_clustering_optimiser(opt::ClusteringOptimisationEstimator)
-    @smart_assert(!isa(opt.opt.pe, AbstractPriorResult))
-    assert_internal_nested_clustering_optimiser(opt)
+function assert_internal_optimiser(opt::AbstractVector{<:OptimisationEstimator})
+    assert_internal_optimiser.(opt)
     return nothing
 end
-function assert_external_nested_clustering_optimiser(opt::JuMPOptimisationEstimator)
+function assert_external_optimiser(opt::ClusteringOptimisationEstimator)
     @smart_assert(!isa(opt.opt.pe, AbstractPriorResult))
-    assert_internal_nested_clustering_optimiser(opt)
+    assert_internal_optimiser(opt)
     return nothing
 end
-function assert_external_nested_clustering_optimiser(opt::NestedClustering)
+function assert_external_optimiser(opt::JuMPOptimisationEstimator)
+    @smart_assert(!isa(opt.opt.pe, AbstractPriorResult))
+    assert_internal_optimiser(opt)
+    return nothing
+end
+function assert_external_optimiser(opt::NestedClustering)
     @smart_assert(!isa(opt.pe, AbstractPriorResult))
-    assert_internal_nested_clustering_optimiser(opt)
+    assert_internal_optimiser(opt)
+    return nothing
+end
+function assert_external_optimiser(opt::AbstractVector{<:OptimisationEstimator})
+    assert_internal_optimiser.(opt)
     return nothing
 end
 function NestedClustering(;
@@ -76,9 +84,9 @@ function NestedClustering(;
                           cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
                           strict::Bool = false,
                           threads::FLoops.Transducers.Executor = ThreadedEx())
-    assert_external_nested_clustering_optimiser(opto)
+    assert_external_optimiser(opto)
     if !(opti === opto)
-        assert_internal_nested_clustering_optimiser(opti)
+        assert_internal_optimiser(opti)
     end
     if isa(wb, WeightBoundsConstraint)
         @smart_assert(isa(sets, DataFrame) && !isempty(sets))
@@ -95,7 +103,7 @@ function NestedClustering(;
                                                                                         threads)
 end
 function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
-    X = ifelse(isa(nco.pe, AbstractPriorResult), nco.pe.X, X)
+    X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
     pe = prior_view(nco.pe, i)
     wb = weight_bounds_view(nco.wb, i)
     sets = nothing_dataframe_view(nco.sets, i)
@@ -115,9 +123,9 @@ function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsResult,
     retcode, w = clustering_optimisation_result(cwf, wb, w)
     if isa(retcode, OptimisationFailure) ||
        isa(res.retcode, OptimisationFailure) ||
-       any(isa.(getproperty.(resi, Ref(:retcode)), Ref(OptimisationFailure)))
+       any(isa.(getproperty.(resi, :retcode), OptimisationFailure))
         msg = ""
-        if any(isa.(getproperty.(resi, Ref(:retcode)), Ref(OptimisationFailure)))
+        if any(isa.(getproperty.(resi, :retcode), OptimisationFailure))
             msg *= "opti failed.\n"
         end
         if isa(res.retcode, OptimisationFailure)
@@ -143,7 +151,8 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
     resi = Vector{OptimisationResult}(undef, clr.k)
     @floop nco.threads for (i, cl) ∈ pairs(cls)
         if length(cl) == 1
-            wi[cl, i] = 1
+            wi[cl, i] .= 1
+            resi[i] = SingletonOptimisationResult(OptimisationSuccess(nothing))
         else
             optic = opt_view(opti, cl, pr.X)
             rdc = returns_result_view(rd, cl)

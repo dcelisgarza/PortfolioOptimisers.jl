@@ -16,11 +16,17 @@ end
 function OptimisationFailure(; res = nothing)
     return OptimisationFailure{typeof(res)}(res)
 end
+struct SingletonOptimisationResult{T1 <: OptimisationReturnCode} <: OptimisationResult
+    retcode::T1
+end
 abstract type OptimisationModelResult <: AbstractResult end
 Base.length(opt::OptimisationEstimator) = 1
 Base.iterate(S::OptimisationEstimator, state = 1) = state > 1 ? nothing : (S, state + 1)
 function opt_view(opt::OptimisationEstimator, args...)
     return opt
+end
+function opt_view(opt::AbstractVector{<:OptimisationEstimator}, args...)
+    return [opt_view(opti, args...) for opti ∈ opt]
 end
 function optimise! end
 function optimise!(or::OptimisationResult, args...)

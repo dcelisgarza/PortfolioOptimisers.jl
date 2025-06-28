@@ -231,7 +231,7 @@ function calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees
 end
 function cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
     return if compound
-        cumprod(Ref(one(eltype(X))) .+ X; dims = dims)
+        cumprod(one(eltype(X)) .+ X; dims = dims)
     else
         cumsum(X; dims = dims)
     end
@@ -239,7 +239,7 @@ end
 function drawdowns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
     cX = cumulative_returns(X; compound = compound, dims = dims)
     if compound
-        return cX ./ accumulate(max, cX; dims = dims) .- Ref(one(eltype(X)))
+        return cX ./ accumulate(max, cX; dims = dims) .- one(eltype(X))
     else
         return cX - accumulate(max, cX; dims = dims)
     end

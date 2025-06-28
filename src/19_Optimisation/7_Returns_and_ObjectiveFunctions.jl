@@ -56,7 +56,7 @@ for r ∈ traverse_subtypes(JuMPReturnsEstimator)
                  return if isempty(pnames)
                      $(r)(lb)
                  else
-                     $(r)(getproperty.(Ref(r), pnames)..., lb)
+                     $(r)(getproperty.(r, pnames)..., lb)
                  end
              end
          end)

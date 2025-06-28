@@ -31,7 +31,7 @@ struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
 end
 function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
     return if sym == :w
-        !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, Ref(:w))
+        !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, :w)
     else
         getfield(r, sym)
     end
@@ -279,7 +279,7 @@ function JuMPOptimiser(;
                                                                  ss, strict)
 end
 function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
-    X = ifelse(isa(opt.pe, AbstractPriorResult), opt.pe.X, X)
+    X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
     bgt = budget_view(opt.bgt, i)
@@ -346,7 +346,7 @@ end
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = propertynames(opt)
     idx = findfirst(x -> x == :ret, pnames)
-    p = getproperty.(Ref(opt), pnames)
+    p = getproperty.(opt, pnames)
     return JuMPOptimiser(p[1:(idx - 1)]..., no_bounds_returns_estimator(p[idx], args...),
                          p[(idx + 1):end]...)
 end

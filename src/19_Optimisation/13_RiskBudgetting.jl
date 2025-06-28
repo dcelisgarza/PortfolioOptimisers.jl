@@ -59,7 +59,7 @@ function RiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
     return RiskBudgetting{typeof(opt), typeof(r), typeof(alg), typeof(wi)}(opt, r, alg, wi)
 end
 function opt_view(rb::RiskBudgetting, i::AbstractVector, X::AbstractMatrix)
-    X = ifelse(isa(rb.opt.pe, AbstractPriorResult), rb.opt.pe.X, X)
+    X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
     opt = opt_view(rb.opt, i, X)
     r = risk_measure_view(rb.r, i, X)
     alg = risk_budgetting_algorithm_view(rb.alg, i)

@@ -57,7 +57,7 @@ function SchurHierarchicalRiskParity(; opt::HierarchicalOptimiser = Hierarchical
     return SchurHierarchicalRiskParity{typeof(opt), typeof(params)}(opt, params)
 end
 function opt_view(sh::SchurHierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
-    X = ifelse(isa(sh.opt.pe, AbstractPriorResult), sh.opt.pe.X, X)
+    X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
     opt = opt_view(sh.opt, i)
     params = schur_params_view(sh.params, i, X)
     return SchurHierarchicalRiskParity(; opt = opt, params = params)
