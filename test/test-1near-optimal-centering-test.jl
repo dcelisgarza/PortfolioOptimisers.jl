@@ -132,12 +132,14 @@
                     5e-6
                 elseif i == 2
                     1e-5
-                elseif i ∈ (4, 7, 8)
+                elseif i ∈ (4, 8)
                     5e-5
                 elseif i == 5
                     5e-2
                 elseif i == 9
                     5e-4
+                elseif i == 7
+                    1e-4
                 else
                     1e-6
                 end
@@ -152,7 +154,7 @@
                 elseif i == 5
                     5e-3
                 elseif i == 7
-                    1e-4
+                    5e-3
                 elseif i == 6
                     1e-3
                 else
