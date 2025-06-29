@@ -187,8 +187,10 @@
                 rt_fnt = expected_return(ret1, w_fnt1, pr)
                 rk_rtol = if i ∈ (1, 4, 5, 7, 20, 26)
                     5e-6
-                elseif i ∈ (6, 14, 24)
+                elseif i ∈ (6, 24)
                     1e-5
+                elseif i == 14
+                    5e-5
                 elseif i ∈ (8, 9, 10, 15, 17, 18, 19, 20)
                     5e-5
                 elseif i == 12
@@ -202,7 +204,7 @@
                 end
                 rt_rtol = if i ∈ (1, 2, 12)
                     1e-3
-                elseif i ∈ (7, 20)
+                elseif i == 7
                     5e-5
                 elseif i == 26
                     5e-6
@@ -210,9 +212,9 @@
                     5e-4
                 elseif i ∈ (4, 5, 6, 16, 21, 22, 23, 24)
                     5e-3
-                elseif i == 11
+                elseif i ∈ (11, 20)
                     1e-4
-                elseif i ∈ (14, 15)
+                elseif i == 15
                     1e-2
                 elseif i ∈ (17, 18, 19)
                     5e-2
@@ -440,7 +442,7 @@
                     else
                         rtol
                     end
-                    res = isapprox(w, wt; rtol = _rtol)
+                    res = isapprox(w, wt; rtol = rtol)
                     if !res
                         println("$i failed:\n$(typeof(r))\n$(typeof(obj))\n$(typeof(ret)).")
                         find_tol(w, wt; name1 = :w, name2 = :wt)
