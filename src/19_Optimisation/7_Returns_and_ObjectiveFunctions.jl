@@ -47,7 +47,7 @@ function KellyReturn(; w::Union{Nothing, <:AbstractWeights} = nothing,
     return KellyReturn{typeof(w), typeof(lb)}(w, lb)
 end
 function no_bounds_returns_estimator(r::KellyReturn, args...)
-    return r
+    return KellyReturn(; w = r.w)
 end
 for r ∈ traverse_subtypes(JuMPReturnsEstimator)
     eval(quote

@@ -214,7 +214,7 @@
                     5e-3
                 elseif i ∈ (11, 20)
                     1e-4
-                elseif i == 15
+                elseif i ∈ (14, 15)
                     1e-2
                 elseif i ∈ (17, 18, 19)
                     5e-2

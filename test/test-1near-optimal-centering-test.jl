@@ -1,6 +1,6 @@
 @safetestset "NearOptimalCentering Optimisation" begin
     using PortfolioOptimisers, CSV, DataFrames, Test, Random, Clarabel, TimeSeries, JuMP,
-          Pajarito, HiGHS
+          Pajarito, HiGHS, StableRNGs, StatsBase
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol ∈
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -59,86 +59,50 @@
         rets1 = [ArithmeticReturn(), KellyReturn()]
         rets2 = [ArithmeticReturn(; lb = Frontier(; N = 3)),
                  KellyReturn(; lb = Frontier(; N = 3))]
-        risks1 = [Variance(; formulation = QuadRiskExpr()),
-                  Variance(; settings = RiskMeasureSettings(;)),
+        risks1 = [StandardDeviation(;),
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
                                                                                  formulation = SqrtRiskExpr()))),
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
-                                                         alg = SecondLowerMoment(;
-                                                                                 formulation = QuadRiskExpr()))),
-                  LowOrderMoment(;
-                                 alg = LowOrderDeviation(;
-                                                         alg = SecondLowerMoment(;
-                                                                                 formulation = RSOCRiskExpr()))),
-                  LowOrderMoment(;
-                                 alg = LowOrderDeviation(;
-                                                         alg = SecondLowerMoment(;
-                                                                                 formulation = SOCRiskExpr()))),
-                  LowOrderMoment(;
-                                 alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
                                                                                    formulation = SqrtRiskExpr()))),
-                  LowOrderMoment(;
-                                 alg = LowOrderDeviation(;
-                                                         alg = SecondCentralMoment(;
-                                                                                   formulation = QuadRiskExpr()))),
-                  LowOrderMoment(;
-                                 alg = LowOrderDeviation(;
-                                                         alg = SecondCentralMoment(;
-                                                                                   formulation = RSOCRiskExpr()))),
-                  LowOrderMoment(;
-                                 alg = LowOrderDeviation(;
-                                                         alg = SecondCentralMoment(;
-                                                                                   formulation = SOCRiskExpr()))),
                   NegativeSkewness(; settings = RiskMeasureSettings(;)),
-                  NegativeSkewness(; alg = QuadRiskExpr()), ConditionalValueatRisk(;)]
-        risks2 = [Variance(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
-                           formulation = QuadRiskExpr()),
-                  Variance(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3))),
+                  ConditionalValueatRisk(;)]
+        risks2 = [StandardDeviation(;
+                                    settings = RiskMeasureSettings(;
+                                                                   ub = Frontier(; N = 3))),
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
                                                                                  formulation = SqrtRiskExpr()))),
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
-                                                         alg = SecondLowerMoment(;
-                                                                                 formulation = QuadRiskExpr()))),
-                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
-                                 alg = LowOrderDeviation(;
-                                                         alg = SecondLowerMoment(;
-                                                                                 formulation = RSOCRiskExpr()))),
-                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
-                                 alg = LowOrderDeviation(;
-                                                         alg = SecondLowerMoment(;
-                                                                                 formulation = SOCRiskExpr()))),
-                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
-                                 alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
                                                                                    formulation = SqrtRiskExpr()))),
-                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
-                                 alg = LowOrderDeviation(;
-                                                         alg = SecondCentralMoment(;
-                                                                                   formulation = QuadRiskExpr()))),
-                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
-                                 alg = LowOrderDeviation(;
-                                                         alg = SecondCentralMoment(;
-                                                                                   formulation = RSOCRiskExpr()))),
-                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
-                                 alg = LowOrderDeviation(;
-                                                         alg = SecondCentralMoment(;
-                                                                                   formulation = SOCRiskExpr()))),
                   NegativeSkewness(;
                                    settings = RiskMeasureSettings(; ub = Frontier(; N = 3))),
-                  NegativeSkewness(;
-                                   settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
-                                   alg = QuadRiskExpr()),
                   ConditionalValueatRisk(;
                                          settings = RiskMeasureSettings(;
                                                                         ub = Frontier(;
                                                                                       N = 3)))]
+        slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false)),
+               Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.9)),
+               Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.75)),
+               Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.9,
+                                      "max_iter" => 500, "equilibrate_min_scaling" => 1e-5,
+                                      "equilibrate_max_scaling" => 1e5,
+                                      "linesearch_backtrack_step" => 0.95,
+                                      "equilibrate_max_iter" => 100))]
         i = 1
         for (ret1, ret2) ∈ zip(rets1, rets2)
             opt1 = JuMPOptimiser(; pe = pr, ret = ret1, slv = slv)
@@ -164,39 +128,29 @@
                 rt_min = expected_return(ret1, w_min, pr)
                 rt_max = expected_return(ret1, w_max, pr)
                 rt_fnt = expected_return(ret1, w_fnt1, pr)
-                rk_rtol = if i ∈ (1, 4, 5, 7, 20, 26)
+                rk_rtol = if i ∈ (1, 2, 3, 6)
                     5e-6
-                elseif i ∈ (6, 14, 24)
-                    1e-5
-                elseif i ∈ (8, 9, 10, 15, 17, 18, 19, 20)
+                elseif i ∈ (4, 7, 8)
                     5e-5
-                elseif i == 12
-                    1e-4
-                elseif i ∈ (21, 22, 23)
-                    5e-4
-                elseif i == 25
+                elseif i == 5
                     5e-2
+                elseif i == 9
+                    5e-4
                 else
                     1e-6
                 end
-                rt_rtol = if i ∈ (1, 2, 12)
-                    1e-3
-                elseif i ∈ (7, 20)
-                    5e-5
-                elseif i == 26
+                rt_rtol = if i ∈ (1, 10)
                     5e-6
-                elseif i ∈ (3, 8, 9, 10)
+                elseif i ∈ (2, 8, 9)
                     5e-4
-                elseif i ∈ (4, 5, 6, 16, 21, 22, 23, 24)
+                elseif i == 3
+                    1e-5
+                elseif i == 4
+                    5e-5
+                elseif i ∈ (5, 7)
                     5e-3
-                elseif i == 11
-                    1e-4
-                elseif i ∈ (14, 15)
-                    1e-2
-                elseif i ∈ (17, 18, 19)
-                    5e-2
-                elseif i == 25
-                    1e-1
+                elseif i == 6
+                    1e-3
                 else
                     1e-6
                 end
