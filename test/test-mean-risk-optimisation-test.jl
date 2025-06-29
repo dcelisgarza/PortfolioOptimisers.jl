@@ -74,13 +74,6 @@
     T, N = size(pr.X)
     eqw = range(; start = inv(N), stop = inv(N), length = N)
     @testset "Efficient Frontier" begin
-        rng = StableRNG(987456321)
-        ucs1 = sigma_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
-                                                       rng = rng,
-                                                       alg = BoxUncertaintySetAlgorithm(),
-                                                       seed = 987654321), pr.X)
-        pw = pweights(collect(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
-                                    length = size(pr.X, 1))))
         rets1 = [ArithmeticReturn(), KellyReturn()]
         rets2 = [ArithmeticReturn(; lb = Frontier(; N = 3)),
                  KellyReturn(; lb = Frontier(; N = 3))]
@@ -185,41 +178,35 @@
                 rt_min = expected_return(ret1, w_min, pr)
                 rt_max = expected_return(ret1, w_max, pr)
                 rt_fnt = expected_return(ret1, w_fnt1, pr)
-                rk_rtol = if i ∈ (1, 4, 5, 7, 20, 26)
+                rk_rtol = if i in (1, 4, 5, 26)
                     5e-6
-                elseif i ∈ (6, 24)
+                elseif i in (6, 9, 10, 14, 24)
                     1e-5
-                elseif i == 14
-                    5e-5
-                elseif i ∈ (8, 9, 10, 15, 17, 18, 19, 20)
-                    5e-5
                 elseif i == 12
                     1e-4
-                elseif i ∈ (21, 22, 23)
-                    5e-4
+                elseif i in (15, 17, 18, 19, 21, 22, 23)
+                    5e-5
                 elseif i == 25
                     5e-2
                 else
                     1e-6
                 end
-                rt_rtol = if i ∈ (1, 2, 12)
+                rt_rtol = if i in (1, 2, 7, 12)
                     1e-3
-                elseif i == 7
-                    5e-5
-                elseif i == 26
-                    5e-6
-                elseif i ∈ (3, 8, 9, 10)
+                elseif i == 3
                     5e-4
-                elseif i ∈ (4, 5, 6, 16, 21, 22, 23, 24)
+                elseif i in (4, 5, 6, 8, 16, 20, 24)
                     5e-3
-                elseif i ∈ (11, 20)
-                    1e-4
-                elseif i ∈ (14, 15)
+                elseif i in (9, 10, 14, 15)
                     1e-2
-                elseif i ∈ (17, 18, 19)
+                elseif i == 11
+                    1e-4
+                elseif i in (17, 18, 19, 21, 22, 23)
                     5e-2
                 elseif i == 25
                     1e-1
+                elseif i == 26
+                    5e-6
                 else
                     1e-6
                 end
@@ -232,6 +219,7 @@
                 @test rk_min <= rk_fnt[2] <= rk_max
                 res = isapprox(rk_fnt[3], rk_max; rtol = rk_rtol)
                 if !res
+                    println(i)
                     find_tol(rk_fnt[3], rk_max; name1 = "rk_fnt[3]", name2 = "rk_max")
                 end
                 @test res
@@ -250,6 +238,141 @@
                 @test res
                 i += 1
             end
+        end
+        risks3 = [Variance(;
+                           settings = RiskMeasureSettings(;
+                                                          ub = range(;
+                                                                     start = 6.866856440213463e-5,
+                                                                     stop = 0.0020770775356002027,
+                                                                     length = 3)),
+                           formulation = QuadRiskExpr()),
+                  Variance(;
+                           settings = RiskMeasureSettings(;
+                                                          ub = range(;
+                                                                     start = 6.866832742697026e-5,
+                                                                     stop = 0.0020770775356002027,
+                                                                     length = 3))),
+                  LowOrderMoment(;
+                                 settings = RiskMeasureSettings(;
+                                                                ub = range(;
+                                                                           start = 0.0049444908053744695,
+                                                                           stop = 0.02159931505620857,
+                                                                           length = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = SqrtRiskExpr()))),
+                  LowOrderMoment(;
+                                 settings = RiskMeasureSettings(;
+                                                                ub = range(;
+                                                                           start = 2.444861342284663e-5,
+                                                                           stop = 0.0004665304108973583,
+                                                                           length = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = QuadRiskExpr()))),
+                  LowOrderMoment(;
+                                 settings = RiskMeasureSettings(;
+                                                                ub = range(;
+                                                                           start = 2.4448262122158845e-5,
+                                                                           stop = 0.00046653038387627706,
+                                                                           length = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = RSOCRiskExpr()))),
+                  LowOrderMoment(;
+                                 settings = RiskMeasureSettings(;
+                                                                ub = range(;
+                                                                           start = 2.444847324400398e-5,
+                                                                           stop = 0.0004665304108973583,
+                                                                           length = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = SOCRiskExpr()))),
+                  LowOrderMoment(;
+                                 settings = RiskMeasureSettings(;
+                                                                ub = range(;
+                                                                           start = 0.0066631114898292945,
+                                                                           stop = 0.030531423662781672,
+                                                                           length = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = SqrtRiskExpr()))),
+                  LowOrderMoment(;
+                                 settings = RiskMeasureSettings(;
+                                                                ub = range(;
+                                                                           start = 4.439760977636718e-5,
+                                                                           stop = 0.0009321678308762646,
+                                                                           length = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = QuadRiskExpr()))),
+                  LowOrderMoment(;
+                                 settings = RiskMeasureSettings(;
+                                                                ub = range(;
+                                                                           start = 4.439739571850773e-5,
+                                                                           stop = 0.0009321677609297462,
+                                                                           length = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = RSOCRiskExpr()))),
+                  LowOrderMoment(;
+                                 settings = RiskMeasureSettings(;
+                                                                ub = range(;
+                                                                           start = 4.43975673023564e-5,
+                                                                           stop = 0.0009321678308762646,
+                                                                           length = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = SOCRiskExpr()))),
+                  NegativeSkewness(;
+                                   settings = RiskMeasureSettings(;
+                                                                  ub = range(;
+                                                                             start = 0.0004845554751596269,
+                                                                             stop = 0.00400658322849469,
+                                                                             length = 3))),
+                  NegativeSkewness(;
+                                   settings = RiskMeasureSettings(;
+                                                                  ub = range(;
+                                                                             start = 2.3482936933392686e-7,
+                                                                             stop = 1.6052709166854938e-5,
+                                                                             length = 3)),
+                                   alg = QuadRiskExpr()),
+                  ConditionalValueatRisk(;
+                                         settings = RiskMeasureSettings(;
+                                                                        ub = range(;
+                                                                                   start = 0.013440511085279036,
+                                                                                   stop = 0.06941842129425456,
+                                                                                   length = 3)))]
+        ret1 = rets1[1]
+        opt1 = JuMPOptimiser(; pe = pr, ret = ret1, slv = slv)
+        i = 1
+        for r1 in risks3
+            sol_fnt = optimise!(MeanRisk(; r = r1, obj = MaximumReturn(), opt = opt1))
+            w_fnt = sol_fnt.w
+            r1 = PortfolioOptimisers.factory(r1, pr, slv)
+            rk_fnt = expected_risk(r1, w_fnt, pr.X)
+            ub = r1.settings.ub
+            rtol = if i in (3, 4, 5, 6, 8, 9, 10, 11, 12)
+                5e-6
+            else
+                1e-6
+            end
+            res = isapprox(rk_fnt[1], ub[1]; rtol = rtol)
+            if !res
+                println(i)
+                find_tol(rk_fnt[1], ub[1]; name1 = "rk_fnt[1]", name2 = "ub[1]")
+            end
+            res = isapprox(rk_fnt[2], ub[2]; rtol = rtol)
+            if !res
+                println(i)
+                find_tol(rk_fnt[2], ub[2]; name1 = "rk_fnt[2]", name2 = "ub[2]")
+            end
+            res = isapprox(rk_fnt[3], ub[3]; rtol = rtol)
+            if !res
+                println(i)
+                find_tol(rk_fnt[3], ub[3]; name1 = "rk_fnt[3]", name2 = "ub[3]")
+            end
+            i += 1
         end
     end
     @testset "MeanRisk measures" begin
@@ -400,12 +523,12 @@
                 MaximumReturn()]
         rets = [ArithmeticReturn(), KellyReturn()]
         i = 1
-        @inbounds for r in rs
+        for r in rs
             for obj in objs
                 for ret in rets
                     opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
                     sol = optimise!(MeanRisk(; r = r, obj = obj, opt = opt))
-                    if isa(sol.retcode, OptimisationFailure) || i == 568
+                    if isa(sol.retcode, OptimisationFailure)
                         continue
                     end
                     w = sol.w

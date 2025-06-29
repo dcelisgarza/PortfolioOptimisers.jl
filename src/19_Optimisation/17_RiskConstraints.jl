@@ -391,6 +391,7 @@ end
 function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, factor::Real,
                                  second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
                                  args...)
+    net_X = model[:net_X]
     sc = model[:sc]
     tsecond_moment = model[Symbol(keyt, i)] = @variable(model)
     model[Symbol(keyc, i)] = @constraint(model,
@@ -416,11 +417,11 @@ function second_moment_bound_val(formulation::SecondMomentFormulation, ub::Front
 end
 function second_moment_bound_val(formulation::SecondMomentFormulation, ub::AbstractVector,
                                  factor::Real)
-    return inv(factor) * isa(formulation, SqrtRiskExpr) ? ub : sqrt.(ub)
+    return inv(factor) * (isa(formulation, SqrtRiskExpr) ? ub : sqrt.(ub))
 end
 function second_moment_bound_val(formulation::SecondMomentFormulation, ub::Real,
                                  factor::Real)
-    return inv(factor) * isa(formulation, SqrtRiskExpr) ? ub : sqrt(ub)
+    return inv(factor) * (isa(formulation, SqrtRiskExpr) ? ub : sqrt(ub))
 end
 function second_moment_bound_val(::Any, ::Nothing, ::Any)
     return nothing
@@ -433,15 +434,16 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:second_central_moment_risk_, i)
+    w = model[:w]
+    k = model[:k]
+    target = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     bound_key = Symbol(:sqrt_second_central_moment_, i)
-    sqrt_second_central_moment, second_central_moment = model[bound_key], model[Symbol(:second_central_moment_, i)] = @variables(model,
-                                                                                                                                 begin
-                                                                                                                                     ()
-                                                                                                                                     [1:T],
-                                                                                                                                     (lower_bound = 0)
-                                                                                                                                 end)
+    sqrt_second_central_moment = model[bound_key] = @variable(model)
+    second_central_moment = model[Symbol(:second_central_moment_, i)] = @expression(model,
+                                                                                    net_X .-
+                                                                                    target)
     sc = model[:sc]
     wi = nothing_scalar_array_factory(r.w, pr.w)
     second_central_moment_risk, factor = if isnothing(wi)
@@ -459,18 +461,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                 scaled_second_central_moment, key, :tsecond_central_moment_,
                                 :csecond_central_moment_rsoc_, sqrt_second_central_moment)
     end
-    model[Symbol(:csqrt_second_central_moment_soc, i)], model[Symbol(:csecond_central_moment_nonneg_, i)] = @constraints(model,
-                                                                                                                         begin
-                                                                                                                             [sc *
-                                                                                                                              sqrt_second_central_moment
-                                                                                                                              sc *
-                                                                                                                              second_central_moment] ∈
-                                                                                                                             SecondOrderCone()
-                                                                                                                             sc *
-                                                                                                                             ((net_X +
-                                                                                                                               second_central_moment)) in
-                                                                                                                             Nonnegatives()
-                                                                                                                         end)
+    model[Symbol(:csqrt_second_central_moment_soc, i)] = @constraint(model,
+                                                                     [sc *
+                                                                      sqrt_second_central_moment
+                                                                      sc *
+                                                                      second_central_moment] ∈
+                                                                     SecondOrderCone())
     ub = second_moment_bound_val(r.alg.alg.formulation, r.settings.ub, factor)
     set_variance_risk_bounds_and_expression!(model, opt, sqrt_second_central_moment, ub,
                                              bound_key, second_central_moment_risk,
