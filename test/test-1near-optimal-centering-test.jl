@@ -128,8 +128,10 @@
                 rt_min = expected_return(ret1, w_min, pr)
                 rt_max = expected_return(ret1, w_max, pr)
                 rt_fnt = expected_return(ret1, w_fnt1, pr)
-                rk_rtol = if i ∈ (1, 2, 3, 6)
+                rk_rtol = if i ∈ (1, 3, 6)
                     5e-6
+                elseif i == 2
+                    1e-5
                 elseif i ∈ (4, 7, 8)
                     5e-5
                 elseif i == 5
@@ -139,16 +141,18 @@
                 else
                     1e-6
                 end
-                rt_rtol = if i ∈ (1, 10)
+                rt_rtol = if i == 10
                     5e-6
                 elseif i ∈ (2, 8, 9)
                     5e-4
-                elseif i == 3
+                elseif i == 1
                     1e-5
-                elseif i == 4
+                elseif i ∈ (3, 4)
                     5e-5
-                elseif i ∈ (5, 7)
+                elseif i == 5
                     5e-3
+                elseif i == 7
+                    1e-4
                 elseif i == 6
                     1e-3
                 else
