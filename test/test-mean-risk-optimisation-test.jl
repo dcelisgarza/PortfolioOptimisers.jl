@@ -4,7 +4,7 @@
           Distributions, Logging
     Logging.disable_logging(Logging.Warn)
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
-        for rtol ∈
+        for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -13,7 +13,7 @@
                 break
             end
         end
-        for atol ∈
+        for atol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -25,7 +25,7 @@
     end
     function return_tol(a1, a2)
         rrtol = 0.0
-        for rtol ∈
+        for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -35,7 +35,7 @@
             end
         end
         aatol = 0.0
-        for atol ∈
+        for atol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -165,10 +165,10 @@
                                                                         ub = Frontier(;
                                                                                       N = 3)))]
         i = 1
-        for (ret1, ret2) ∈ zip(rets1, rets2)
+        for (ret1, ret2) in zip(rets1, rets2)
             opt1 = JuMPOptimiser(; pe = pr, ret = ret1, slv = slv)
             opt2 = JuMPOptimiser(; pe = pr, ret = ret2, slv = slv)
-            for (r1, r2) ∈ zip(risks1, risks2)
+            for (r1, r2) in zip(risks1, risks2)
                 sol_min = optimise!(MeanRisk(; r = r1, obj = MinimumRisk(), opt = opt1))
                 w_min = sol_min.w
                 sol_max = optimise!(MeanRisk(; r = r1, obj = MaximumReturn(), opt = opt1))
@@ -400,9 +400,9 @@
                 MaximumReturn()]
         rets = [ArithmeticReturn(), KellyReturn()]
         i = 1
-        @inbounds for r ∈ rs
-            for obj ∈ objs
-                for ret ∈ rets
+        @inbounds for r in rs
+            for obj in objs
+                for ret in rets
                     opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
                     sol = optimise!(MeanRisk(; r = r, obj = obj, opt = opt))
                     if isa(sol.retcode, OptimisationFailure) || i == 568
@@ -412,7 +412,7 @@
                     wt = df[!, "$i"]
                     rtols = [1e-6, 5e-6, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3]
                     rtol = 0.0
-                    for _rtol ∈ rtols
+                    for _rtol in rtols
                         res = isapprox(w, wt; rtol = _rtol)
                         if res
                             rtol = _rtol
@@ -560,8 +560,8 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk-UncertaintyReturns.csv"),
                       DataFrame)
         i = 1
-        for ucs ∈ ucss
-            for obj ∈ objs
+        for ucs in ucss
+            for obj in objs
                 ret = ArithmeticReturn(; ucs = ucs)
                 opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
                 mre = MeanRisk(; obj = obj, opt = opt)
@@ -756,7 +756,7 @@
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test sum([abs(sum(w[sets[!, :Clusters] .== i])) >= sqrt(eps()) for i ∈ 1:3]) <= 2
+        @test sum([abs(sum(w[sets[!, :Clusters] .== i])) >= sqrt(eps()) for i in 1:3]) <= 2
 
         gnames = [:T, :GOOG, :GILD, :MSFT, :NFLX]
         gcard = CardinalityConstraint(;
@@ -774,7 +774,7 @@
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        idx = [findfirst(x -> x == string(n), rd.nx) for n ∈ gnames]
+        idx = [findfirst(x -> x == string(n), rd.nx) for n in gnames]
         @test sum(w[idx] .>= eps()) == 1
 
         gnames = [:T, :GOOG, :GILD, :MSFT, :NFLX, :TSLA]
@@ -796,7 +796,7 @@
                        opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        idx = [findfirst(x -> x == string(n), rd.nx) for n ∈ gnames]
+        idx = [findfirst(x -> x == string(n), rd.nx) for n in gnames]
         @test sum(w[idx] .>= sqrt(eps())) == 1
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1, smtx = :Clusters,
@@ -804,7 +804,7 @@
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test isapprox([sum(w[res.smtx[i, :]]) for i ∈ axes(res.smtx, 1)], [0, 0, 1])
+        @test isapprox([sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)], [0, 0, 1])
 
         sgcard = LinearConstraint(;
                                   A = LinearConstraintSide(; group = [:Clusters, :Clusters],
@@ -817,7 +817,7 @@
         res = optimise!(mre, rd)
 
         w = res.w
-        @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i ∈ [1, 3]]) <= 1
+        @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i in [1, 3]]) <= 1
 
         sgcard = LinearConstraint(;
                                   A = LinearConstraintSide(; group = [:Clusters, :Clusters],
@@ -830,7 +830,7 @@
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i ∈ [1, 2]]) <= 1
+        @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i in [1, 2]]) <= 1
 
         sgcard = LinearConstraint(;
                                   A = LinearConstraintSide(; group = [:Clusters, :Clusters],
@@ -843,7 +843,7 @@
                        opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i ∈ [1, 3]]) <= 1
+        @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i in [1, 3]]) <= 1
 
         sgcard = LinearConstraint(;
                                   A = LinearConstraintSide(; group = [:Clusters, :Clusters],
@@ -857,7 +857,7 @@
                        opt = opt)
         res = optimise!(mre, rd)
         w = res.w
-        @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i ∈ [2, 3]]) <= 1
+        @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i in [2, 3]]) <= 1
 
         plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = 1)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, bgt = 1, cplg = plc,

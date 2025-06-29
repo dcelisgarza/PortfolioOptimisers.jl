@@ -46,7 +46,7 @@ function herc_scalarised_risk_o!(::SumScalariser, wk::AbstractVector, roku::Abst
                                  ros::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     crisk = zero(eltype(X))
-    for ro ∈ ros
+    for ro in ros
         unitary_expected_risks!(wk, roku, ro, X, fees)
         rkbo[cl] .= inv.(view(roku, cl))
         rkbo[cl] ./= sum(view(rkbo, cl))
@@ -59,7 +59,7 @@ function herc_scalarised_risk_o!(::SumScalariser, wk::AbstractVector, roku::Abst
                                  ros::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     crisk = zero(eltype(X))
-    for (i, ro) ∈ pairs(ros)
+    for (i, ro) in pairs(ros)
         rkbo[cl] .= inv.(view(roku, cl, i))
         rkbo[cl] ./= sum(view(rkbo, cl))
         crisk += ro.settings.scale * expected_risk(ro, rkbo, X, fees)
@@ -71,7 +71,7 @@ function herc_scalarised_risk_o!(::MaxScalariser, wk::AbstractVector, roku::Abst
                                  ros::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     crisk = typemin(eltype(X))
-    for ro ∈ ros
+    for ro in ros
         unitary_expected_risks!(wk, roku, ro, X, fees)
         rkbo[cl] .= inv.(view(roku, cl))
         rkbo[cl] ./= sum(view(rkbo, cl))
@@ -87,7 +87,7 @@ function herc_scalarised_risk_o!(::MaxScalariser, wk::AbstractVector, roku::Abst
                                  ros::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     crisk = typemin(eltype(X))
-    for (i, ro) ∈ pairs(ros)
+    for (i, ro) in pairs(ros)
         rkbo[cl] .= inv.(view(roku, cl, i))
         rkbo[cl] ./= sum(view(rkbo, cl))
         crisk_i = ro.settings.scale * expected_risk(ro, rkbo, X, fees)
@@ -103,7 +103,7 @@ function herc_scalarised_risk_o!(sce::LogSumExpScalariser, wk::AbstractVector,
                                  ros::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     crisk = zero(eltype(X))
-    for ro ∈ ros
+    for ro in ros
         unitary_expected_risks!(wk, roku, ro, X, fees)
         rkbo[cl] .= inv.(view(roku, cl))
         rkbo[cl] ./= sum(view(rkbo, cl))
@@ -117,7 +117,7 @@ function herc_scalarised_risk_o!(sce::LogSumExpScalariser, ::AbstractVector,
                                  ros::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     crisk = zero(eltype(X))
-    for (i, ro) ∈ pairs(ros)
+    for (i, ro) in pairs(ros)
         rkbo[cl] .= inv.(view(roku, cl, i))
         rkbo[cl] ./= sum(view(rkbo, cl))
         crisk += ro.settings.scale * sce.gamma * expected_risk(ro, rkbo, X, fees)
@@ -129,7 +129,7 @@ function herc_scalarised_risk_i!(::SumScalariser, wk::AbstractVector, riku::Abst
                                  ris::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     risk = zeros(eltype(X), length(cl), 2)
-    for ri ∈ ris
+    for ri in ris
         unitary_expected_risks!(wk, riku, ri, X, fees)
         risk[:, 1] .= inv.(view(riku, cl))
         risk[:, 1] ./= sum(view(risk, :, 1))
@@ -142,7 +142,7 @@ function herc_scalarised_risk_i!(::SumScalariser, wk::AbstractVector, riku::Abst
                                  ris::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     risk = zeros(eltype(X), length(cl), 2)
-    for (i, ri) ∈ pairs(ris)
+    for (i, ri) in pairs(ris)
         unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
         risk[:, 1] .= inv.(view(view(riku, :, i), cl))
         risk[:, 1] ./= sum(view(risk, :, 1))
@@ -156,7 +156,7 @@ function herc_scalarised_risk_i!(::MaxScalariser, wk::AbstractVector, riku::Abst
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     risk_t = typemin(eltype(X))
     risk = zeros(eltype(X), length(cl), 2)
-    for ri ∈ ris
+    for ri in ris
         unitary_expected_risks!(wk, riku, ri, X, fees)
         risk[:, 1] .= ri.settings.scale * view(riku, cl)
         risk_i = sum(view(risk, :, 1))
@@ -174,7 +174,7 @@ function herc_scalarised_risk_i!(::MaxScalariser, wk::AbstractVector, riku::Abst
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     risk_t = typemin(eltype(X))
     risk = zeros(eltype(X), length(cl), 2)
-    for (i, ri) ∈ pairs(ris)
+    for (i, ri) in pairs(ris)
         unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
         risk[:, 1] .= ri.settings.scale * view(riku, cl, i)
         risk_i = sum(view(risk, :, 1))
@@ -191,7 +191,7 @@ function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::AbstractVector,
                                  ris::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     risk = zeros(eltype(X), length(cl), 2)
-    for ri ∈ ris
+    for ri in ris
         unitary_expected_risks!(wk, riku, ri, X, fees)
         risk[:, 1] .= inv.(view(riku, cl))
         risk[:, 1] ./= sum(view(risk, :, 1))
@@ -204,7 +204,7 @@ function herc_scalarised_risk_i!(sce::LogSumExpScalariser, wk::AbstractVector,
                                  ris::AbstractVector{<:OptimisationRiskMeasure},
                                  X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     risk = zeros(eltype(X), length(cl), 2)
-    for (i, ri) ∈ pairs(ris)
+    for (i, ri) in pairs(ris)
         unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
         risk[:, 1] .= inv.(view(riku, cl, i))
         risk[:, 1] ./= sum(view(risk, :, 1))
@@ -230,7 +230,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     let
         roku_i, ro_i = roku, ro
-        @floop hec.threads for (i, cl) ∈ pairs(cls)
+        @floop hec.threads for (i, cl) in pairs(cls)
             w[cl] .= inv.(view(riku, cl))
             w[cl] ./= sum(view(w, cl))
             rkbo[cl] .= inv.(view(roku_i, cl))
@@ -260,7 +260,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     let
         roku_i, ro_i = roku, ro
-        @floop hec.threads for (i, cl) ∈ pairs(cls)
+        @floop hec.threads for (i, cl) in pairs(cls)
             w[cl] .= inv.(view(riku, cl))
             w[cl] ./= sum(view(w, cl))
             rkbo[cl, i] .= inv.(view(roku_i, cl))
@@ -289,7 +289,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
     rkbo = zeros(eltype(pr.X), size(pr.X, 2))
     let
         rku_i, ro_i = rku, ro
-        @floop hec.threads for (i, cl) ∈ pairs(cls)
+        @floop hec.threads for (i, cl) in pairs(cls)
             w[cl] .= herc_scalarised_risk_i!(hec.opt.sce, wk, rku_i, cl, ri, pr.X,
                                              hec.opt.fees)
             rkcl[i] = herc_scalarised_risk_o!(hec.opt.sce, wk, rku_i, rkbo, cl, ro_i, pr.X,
@@ -318,7 +318,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
     rkbo = zeros(eltype(pr.X), size(pr.X, 2), Nc)
     let
         ro_i = ro
-        @floop hec.threads for (i, cl) ∈ pairs(cls)
+        @floop hec.threads for (i, cl) in pairs(cls)
             w[cl] .= herc_scalarised_risk_i!(hec.opt.sce, view(wk, :, i), view(rku, :, i),
                                              cl, ri, pr.X, hec.opt.fees)
             rkcl[i] = herc_scalarised_risk_o!(hec.opt.sce, view(wk, :, i), view(rku, :, i),
@@ -340,7 +340,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     roku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     wk = zeros(eltype(pr.X), size(pr.X, 2))
     rkbo = zeros(eltype(pr.X), size(pr.X, 2))
-    @floop hec.threads for (i, cl) ∈ pairs(cls)
+    @floop hec.threads for (i, cl) in pairs(cls)
         w[cl] .= inv.(view(riku, cl))
         w[cl] ./= sum(view(w, cl))
         rkcl[i] = herc_scalarised_risk_o!(hec.opt.sce, wk, roku, rkbo, cl, ro, pr.X,
@@ -362,7 +362,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     roku = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), Nc)
     wk = zeros(eltype(pr.X), size(pr.X, 2), Nc)
     rkbo = zeros(eltype(pr.X), size(pr.X, 2), Nc)
-    @floop hec.threads for (i, cl) ∈ pairs(cls)
+    @floop hec.threads for (i, cl) in pairs(cls)
         w[cl] .= inv.(view(riku, cl))
         w[cl] ./= sum(view(w, cl))
         rkcl[i] = herc_scalarised_risk_o!(hec.opt.sce, view(wk, :, i), view(roku, :, i),
@@ -383,7 +383,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
     wk = zeros(eltype(pr.X), size(pr.X, 2))
     riku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     rkbo = zeros(eltype(pr.X), size(pr.X, 2))
-    @floop hec.threads for (i, cl) ∈ pairs(cls)
+    @floop hec.threads for (i, cl) in pairs(cls)
         w[cl] .= herc_scalarised_risk_i!(hec.opt.sce, wk, riku, cl, ri, pr.X, hec.opt.fees)
         rkbo[cl] .= inv.(view(roku, cl))
         rkbo[cl] ./= sum(view(rkbo, cl))
@@ -406,7 +406,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
     wk = zeros(eltype(pr.X), size(pr.X, 2), Nc)
     riku = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), Nc)
     rkbo = zeros(eltype(pr.X), size(pr.X, 2), Nc)
-    @floop hec.threads for (i, cl) ∈ pairs(cls)
+    @floop hec.threads for (i, cl) in pairs(cls)
         w[cl] .= herc_scalarised_risk_i!(hec.opt.sce, view(wk, :, i), view(riku, :, i), cl,
                                          ri, pr.X, hec.opt.fees)
         rkbo[cl, i] .= inv.(view(roku, cl))
@@ -422,23 +422,23 @@ function optimise!(hec::HierarchicalEqualRiskContribution,
     clr = clusterise(hec.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
     idx = cutree(clr.clustering; k = clr.k)
-    cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
+    cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     w, rkcl = herc_risk(hec, pr, cls)
     nd = to_tree(clr.clustering)[2]
-    hs = [i.height for i ∈ nd]
+    hs = [i.height for i in nd]
     nd = nd[sortperm(hs; rev = true)]
     # Treat each cluster as its own portfolio and optimise each one individually.
     # Calculate the weight of each cluster relative to the other clusters.
     lc = Vector{Int}(undef, 0)
     rc = Vector{Int}(undef, 0)
-    @inbounds for i ∈ nd[1:(clr.k - 1)]
+    @inbounds for i in nd[1:(clr.k - 1)]
         if is_leaf(i)
             continue
         end
         # Do this recursively accounting for the dendrogram structure.
         ln = pre_order(i.left)
         rn = pre_order(i.right)
-        for (i, cl) ∈ pairs(cls)
+        for (i, cl) in pairs(cls)
             if issubset(cl, ln)
                 push!(lc, i)
             elseif issubset(cl, rn)

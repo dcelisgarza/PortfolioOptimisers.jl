@@ -58,7 +58,7 @@ function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, Nothing},
     idx = ceil(Int, aT)
     var = -partialsort!(x, idx)
     sum_var = zero(eltype(x))
-    for i ∈ 1:(idx - 1)
+    for i in 1:(idx - 1)
         sum_var += x[i] + var
     end
     return var - sum_var / aT
@@ -157,7 +157,7 @@ function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, Nothing},
     idx1 = ceil(Int, aT)
     var1 = -partialsort!(x, idx1)
     sum_var1 = zero(eltype(x))
-    for i ∈ 1:(idx1 - 1)
+    for i in 1:(idx1 - 1)
         sum_var1 += x[i] + var1
     end
     loss = var1 - sum_var1 / aT
@@ -167,7 +167,7 @@ function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, Nothing},
     idx2 = ceil(Int, bT)
     var2 = -partialsort!(x, idx2; rev = true)
     sum_var2 = zero(eltype(x))
-    for i ∈ 1:(idx2 - 1)
+    for i in 1:(idx2 - 1)
         sum_var2 += x[i] + var2
     end
     gain = var2 - sum_var2 / bT
@@ -227,7 +227,7 @@ function (r::ConditionalDrawdownatRisk)(x::AbstractVector)
     cs = cumsum(x)
     peak = typemin(eltype(x))
     dd = similar(cs)
-    for (idx, i) ∈ pairs(cs)
+    for (idx, i) in pairs(cs)
         if i > peak
             peak = i
         end
@@ -237,7 +237,7 @@ function (r::ConditionalDrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     var = -partialsort!(dd, idx)
     sum_var = zero(eltype(x))
-    for i ∈ 1:(idx - 1)
+    for i in 1:(idx - 1)
         sum_var += dd[i] + var
     end
     return var - sum_var / aT
@@ -260,7 +260,7 @@ function (r::RelativeConditionalDrawdownatRisk)(x::AbstractVector)
     cs = cumprod(x)
     peak = typemin(eltype(x))
     dd = similar(cs)
-    for (idx, i) ∈ pairs(cs)
+    for (idx, i) in pairs(cs)
         if i > peak
             peak = i
         end
@@ -271,7 +271,7 @@ function (r::RelativeConditionalDrawdownatRisk)(x::AbstractVector)
     idx = ceil(Int, aT)
     var = -partialsort!(dd, idx)
     sum_var = zero(eltype(x))
-    for i ∈ 1:(idx - 1)
+    for i in 1:(idx - 1)
         sum_var += dd[i] + var
     end
     return var - sum_var / aT

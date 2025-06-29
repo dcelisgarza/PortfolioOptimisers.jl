@@ -126,7 +126,7 @@ struct C4_LinearEntropyPoolingConstraintEstimator{T1, T2, T3, T4,
 end
 function C4_LinearEntropyPoolingConstraintEstimator(; group1, name1, group2, name2,
                                                     coef::Union{<:Real,
-                                                                <:AbstractVector{<:Real}} = 1.0,)
+                                                                <:AbstractVector{<:Real}} = 1.0)
     group1_flag = isa(group1, AbstractVector)
     name1_flag = isa(name1, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
@@ -190,7 +190,7 @@ function constant_entropy_pooling_constraint!(pr::AbstractPriorResult, cache::Ab
                                                                                   stop = 1,
                                                                                   length = size(pr.X,
                                                                                                 1))))
-    for (i, epv) ∈ zip(idx, view(epvs, idx))
+    for (i, epv) in zip(idx, view(epvs, idx))
         if i ∈ cache
             continue
         end
@@ -288,7 +288,7 @@ function _freeze_view(epc::C2_LinearEntropyPoolingConstraintEstimator{<:Any, <:A
                                                           length = size(pr.X, 1))),
                       kwargs...)
     X = view(pr.X, :, idx)
-    return sign(coef) * sum([skewness(X[:, i], w) for i ∈ axes(X, 2)])
+    return sign(coef) * sum([skewness(X[:, i], w) for i in axes(X, 2)])
 end
 function _freeze_view(epc::C2_LinearEntropyPoolingConstraintEstimator{<:Any, <:Any, <:Any,
                                                                       <:KurtosisEntropyPoolingAlgorithm},
@@ -297,7 +297,7 @@ function _freeze_view(epc::C2_LinearEntropyPoolingConstraintEstimator{<:Any, <:A
                                                           length = size(pr.X, 1))),
                       kwargs...)
     X = view(pr.X, :, idx)
-    return sign(coef) * sum([kurtosis(X[:, i], w) + 3 for i ∈ axes(X, 2)])
+    return sign(coef) * sum([kurtosis(X[:, i], w) + 3 for i in axes(X, 2)])
 end
 function _freeze_view(epc::C4_LinearEntropyPoolingConstraintEstimator,
                       pr::AbstractPriorResult, idx1::AbstractVector, idx2::AbstractVector,
@@ -371,7 +371,7 @@ function freeze_B_view(pr::AbstractPriorResult,
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     B = Vector{eltype(pr.X)}(undef, 0)
-    for (group, name, coef) ∈ zip(epv.group, epv.name, epv.coef)
+    for (group, name, coef) in zip(epv.group, epv.name, epv.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
             if all(iszero, idx)
@@ -446,7 +446,7 @@ function freeze_B_view(pr::AbstractPriorResult,
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     B = Vector{eltype(pr.X)}(undef, 0)
-    for (group1, group2, name1, name2, coef) ∈
+    for (group1, group2, name1, name2, coef) in
         zip(epv.group1, epv.group2, epv.name1, epv.name2, epv.coef)
         if !(isnothing(group1) ||
              string(group1) ∉ group_names ||
@@ -581,10 +581,10 @@ end
 function cvar(x::AbstractMatrix, alpha::Real, w::AbstractWeights)
     idx = sortperm(x; dims = 1)
     sw = sum(w)
-    w = [w[idx[i]] for i ∈ axes(idx, 2)]
+    w = [w[idx[i]] for i in axes(idx, 2)]
     cw = cumsum(w; dims = 1)
     alpha *= sw
-    i = [findfirst(x -> x > alpha, cwi) for cwi ∈ axes(idx, 2)]
+    i = [findfirst(x -> x > alpha, cwi) for cwi in axes(idx, 2)]
     i[isnothing.(i)] .= length(w)
     function f(_x, _i, _w, _cw)
         return -if isone(_i)
@@ -594,7 +594,7 @@ function cvar(x::AbstractMatrix, alpha::Real, w::AbstractWeights)
              _x[idx[_i]] * (alpha - _cw[_i - 1])) / alpha
         end
     end
-    return [f(view(x, :, i), i, view(w, :, i), view(cw, :, i)) for i ∈ axes(idx, 2)]
+    return [f(view(x, :, i), i, view(w, :, i), view(cw, :, i)) for i in axes(idx, 2)]
 end
 function _get_B_entropy_pooling_view_data(epv::ConditionalValueatRiskPoolingConstraintEstimator,
                                           pr::AbstractPriorResult, idx::AbstractVector,
@@ -626,14 +626,14 @@ function _get_B_entropy_pooling_view_data(epv::C0_LinearEntropyPoolingConstraint
     # var = sum([-partialsort(view(X, :, i), j) for i ∈ idx])
     # @smart_assert(all(var .>= zero(eltype(var))))
     X = pr.X
-    idx = [sortperm(view(X, :, i)) for i ∈ axes(X, 2)]
+    idx = [sortperm(view(X, :, i)) for i in axes(X, 2)]
     sw = sum(w)
-    ws = [view(w, i) for i ∈ idx]
+    ws = [view(w, i) for i in idx]
     cw = cumsum.(ws)
     alpha *= sw
-    js = [findfirst(x -> x > alpha, i) for i ∈ cw]
+    js = [findfirst(x -> x > alpha, i) for i in cw]
     js[isnothing.(js)] .= length(w)
-    return coef * sum([-view(X, idx[i], i)[j] for (i, j) ∈ zip(eachindex(idx), js)])
+    return coef * sum([-view(X, idx[i], i)[j] for (i, j) in zip(eachindex(idx), js)])
 end
 function set_var_cvar_A_B(::Any, A, B)
     return A, B
@@ -694,7 +694,7 @@ function _get_B_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraintEst
                                                                                             1))),
                                           kwargs...)
     X = view(pr.X, :, idx)
-    return coef * sum([skewness(X[:, i], w)] for i ∈ axes(X, 2))
+    return coef * sum([skewness(X[:, i], w)] for i in axes(X, 2))
 end
 function _get_B_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraintEstimator{<:Any,
                                                                                        <:Any,
@@ -708,7 +708,7 @@ function _get_B_entropy_pooling_view_data(::C2_LinearEntropyPoolingConstraintEst
                                                                                             1))),
                                           kwargs...)
     X = view(pr.X, :, idx)
-    return coef * sum([kurtosis(X[:, i], w) + 3] for i ∈ axes(X, 2))
+    return coef * sum([kurtosis(X[:, i], w) + 3] for i in axes(X, 2))
 end
 function _get_B_entropy_pooling_view_data(::C4_LinearEntropyPoolingConstraintEstimator,
                                           pr::AbstractPriorResult, idx1::AbstractVector,
@@ -728,7 +728,7 @@ function get_B_entropy_pooling_view_data(pr::AbstractPriorResult,
                                                                              length = size(pr.X,
                                                                                            1))))
     B = zero(eltype(pr.X))
-    for epv ∈ epvbs
+    for epv in epvbs
         B += get_B_entropy_pooling_view_data(pr, epv, sets, strict, args...; w = w)
     end
     return B
@@ -785,7 +785,7 @@ function get_B_entropy_pooling_view_data(pr::AbstractPriorResult,
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     B = zero(eltype(pr.X))
-    for (group1, group2, name1, name2, coef) ∈
+    for (group1, group2, name1, name2, coef) in
         zip(epv.group1, epv.group2, epv.name1, epv.name2, epv.coef)
         if !(isnothing(group1) ||
              string(group1) ∉ group_names ||
@@ -871,7 +871,7 @@ function get_view_index(epv::Union{<:C0_LinearEntropyPoolingConstraintEstimator{
                         sets::DataFrame, strict::Bool = false, args...)
     @smart_assert(!isempty(sets))
     group_names = names(sets)
-    return for (group, name) ∈ zip(epv.group, epv.name)
+    return for (group, name) in zip(epv.group, epv.name)
         if !(isnothing(group) || string(group) ∉ group_names)
             sets[!, group] .== name
         elseif strict
@@ -926,7 +926,7 @@ function get_B_entropy_pooling_view_data(pr::AbstractPriorResult,
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     B = zero(eltype(pr.X))
-    for (group, name, coef) ∈ zip(epv.group, epv.name, epv.coef)
+    for (group, name, coef) in zip(epv.group, epv.name, epv.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
             if all(iszero, idx)
@@ -1034,7 +1034,7 @@ function get_A_entropy_pooling_view_data(pr::AbstractPriorResult,
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     A = Vector{eltype(pr.X)}(undef, 0)
-    for (group1, group2, name1, name2, coef) ∈
+    for (group1, group2, name1, name2, coef) in
         zip(epv.group1, epv.group2, epv.name1, epv.name2, epv.coef)
         if !(isnothing(group1) ||
              string(group1) ∉ group_names ||
@@ -1114,7 +1114,7 @@ function get_A_entropy_pooling_view_data(pr::AbstractPriorResult,
     @smart_assert(!isempty(sets))
     group_names = names(sets)
     A = Vector{eltype(pr.X)}(undef, 0)
-    for (group, name, coef) ∈ zip(epv.group, epv.name, epv.coef)
+    for (group, name, coef) in zip(epv.group, epv.name, epv.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
             if all(iszero, idx)
@@ -1153,7 +1153,7 @@ function entropy_pooling_views(pr::AbstractPriorResult,
     B_ineq = Vector{eltype(pr.X)}(undef, 0)
     A_eq = Vector{eltype(pr.X)}(undef, 0)
     B_eq = Vector{eltype(pr.X)}(undef, 0)
-    for epv ∈ epvs
+    for epv in epvs
         A = get_A_entropy_pooling_view_data(pr, epv.A, sets, strict)
         if isempty(A)
             continue

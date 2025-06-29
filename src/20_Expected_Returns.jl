@@ -12,7 +12,7 @@ function expected_return(ret::KellyReturn, w::AbstractVector{<:Real},
 end
 function expected_return(ret::JuMPReturnsEstimator, w::AbstractVector{<:AbstractVector},
                          pr::AbstractPriorResult, fees::Union{Nothing, Fees} = nothing)
-    return [expected_return(ret, wi, pr, fees) for wi ∈ w]
+    return [expected_return(ret, wi, pr, fees) for wi in w]
 end
 function expected_sharpe_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
                                w::AbstractVector, pr::AbstractPriorResult,

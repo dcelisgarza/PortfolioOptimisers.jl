@@ -45,7 +45,7 @@ function robust_probabilities(::AbstractMatrix, ow::AbstractVector, ::Nothing)
 end
 function robust_probabilities(pw::AbstractMatrix, ow::AbstractVector, p::Real)
     c = pw * ow
-    kldivs = [sum(kldivergence(view(pw, :, i), c)) for i ∈ axes(pw, 2)]
+    kldivs = [sum(kldivergence(view(pw, :, i), c)) for i in axes(pw, 2)]
     ow .*= exp.(-p * kldivs)
     ow /= sum(ow)
     return ow
@@ -73,7 +73,7 @@ function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
     T = size(X, 1)
     M = length(pe.pes)
     pw = Vector{eltype(X)}(undef, T * M)
-    @floop pe.threads for (i, pe) ∈ enumerate(pe.pes)
+    @floop pe.threads for (i, pe) in enumerate(pe.pes)
         pr = prior(pe, X, F; strict = strict, kwargs...)
         @smart_assert(!isnothing(pr.w))
         pw[(1 + (i - 1) * M):(i * M)] = pr.w

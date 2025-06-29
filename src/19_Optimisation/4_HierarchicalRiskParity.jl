@@ -48,10 +48,10 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     w = ones(eltype(pr.X), size(pr.X, 2))
     items = [clr.clustering.order]
     @inbounds while length(items) > 0
-        items = [i[j:k] for i ∈ items
-                 for (j, k) ∈ ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
+        items = [i[j:k] for i in items
+                 for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
                  if length(i) > 1]
-        for i ∈ 1:2:length(items)
+        for i in 1:2:length(items)
             fill!(wu, zero(eltype(pr.X)))
             lc = items[i]
             rc = items[i + 1]
@@ -78,7 +78,7 @@ function hrp_scalarised_risk(::SumScalariser, wu::AbstractMatrix, wk::AbstractVe
                              X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
-    for r ∈ rs
+    for r in rs
         fill!(wu, zero(eltype(X)))
         unitary_expected_risks!(wk, rku, r, X, fees)
         wu[lc, 1] .= inv.(view(rku, lc))
@@ -97,7 +97,7 @@ function hrp_scalarised_risk(::MaxScalariser, wu::AbstractMatrix, wk::AbstractVe
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
     trisk = typemin(eltype(X))
-    for r ∈ rs
+    for r in rs
         fill!(wu, zero(eltype(X)))
         unitary_expected_risks!(wk, rku, r, X, fees)
         wu[lc, 1] .= inv.(view(rku, lc))
@@ -122,7 +122,7 @@ function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::AbstractMatrix,
                              X::AbstractMatrix, fees::Union{Nothing, <:Fees})
     lrisk = zero(eltype(X))
     rrisk = zero(eltype(X))
-    for r ∈ rs
+    for r in rs
         fill!(wu, zero(eltype(X)))
         unitary_expected_risks!(wk, rku, r, X, fees)
         wu[lc, 1] .= inv.(view(rku, lc))
@@ -149,10 +149,10 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any,
     w = ones(eltype(pr.X), size(pr.X, 2))
     items = [clr.clustering.order]
     @inbounds while length(items) > 0
-        items = [i[j:k] for i ∈ items
-                 for (j, k) ∈ ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
+        items = [i[j:k] for i in items
+                 for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
                  if length(i) > 1]
-        for i ∈ 1:2:length(items)
+        for i in 1:2:length(items)
             lc = items[i]
             rc = items[i + 1]
             lrisk, rrisk = hrp_scalarised_risk(hrp.opt.sce, wu, wk, rku, lc, rc, r, pr.X,

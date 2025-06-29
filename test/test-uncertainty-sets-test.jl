@@ -2,7 +2,7 @@
     using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames, TimeSeries
     import PortfolioOptimisers: ucs_factory, ucs_view
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
-        for rtol ∈
+        for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -11,7 +11,7 @@
                 break
             end
         end
-        for atol ∈
+        for atol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -45,7 +45,7 @@
                                            bootstrap = CircularBootstrap(),
                                            seed = 987654321)]
         ues_t = CSV.read(joinpath(@__DIR__, "assets/Box-Uncertainty-Sets.csv"), DataFrame)
-        for (i, ue) ∈ enumerate(ues)
+        for (i, ue) in enumerate(ues)
             mu_set1, sigma_set1 = ucs(ue, transpose(X); dims = 2)
             mu1 = [mu_set1.lb; mu_set1.ub]
             sigma1 = [vec(sigma_set1.lb); vec(sigma_set1.ub)]
@@ -226,7 +226,7 @@
         uesigma_t = CSV.read(joinpath(@__DIR__,
                                       "assets/Ellipse-Uncertainty-Sets-Sigma.csv"),
                              DataFrame)
-        for (i, ue) ∈ enumerate(ues)
+        for (i, ue) in enumerate(ues)
             mu_set1, sigma_set1 = ucs(ue, transpose(X); dims = 2)
             mu1 = [vec(mu_set1.sigma); mu_set1.k]
             sigma1 = [vec(sigma_set1.sigma); sigma_set1.k]

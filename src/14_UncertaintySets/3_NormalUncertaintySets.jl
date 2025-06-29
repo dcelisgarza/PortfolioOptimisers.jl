@@ -43,8 +43,8 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorit
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     sigma_l = Matrix{eltype(sigma)}(undef, N, N)
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
-    for j ∈ 1:N
-        for i ∈ j:N
+    for j in 1:N
+        for i in j:N
             sigma_ij = getindex.(sigmas[:], i, j)
             sigma_l[j, i] = sigma_l[i, j] = quantile(sigma_ij, q)
             sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
@@ -81,8 +81,8 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetA
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     sigma_l = Matrix{eltype(sigma)}(undef, N, N)
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
-    for j ∈ 1:N
-        for i ∈ j:N
+    for j in 1:N
+        for i in j:N
             sigma_ij = getindex.(sigmas[:], i, j)
             sigma_l[j, i] = sigma_l[i, j] = quantile(sigma_ij, q)
             sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
@@ -106,7 +106,7 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
     X_mu = transpose(rand(ue.rng, MvNormal(mu, sigma), ue.n_sim))
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
-    for i ∈ axes(sigmas, 1)
+    for i in axes(sigmas, 1)
         X_sigma[:, :, i] = sigmas[i] - sigma
     end
     X_sigma = transpose(reshape(X_sigma, N^2, :))
@@ -239,7 +239,7 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     Random.seed!(ue.rng, ue.seed)
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
-    for i ∈ axes(sigmas, 1)
+    for i in axes(sigmas, 1)
         X_sigma[:, :, i] = sigmas[i] - sigma
     end
     X_sigma = transpose(reshape(X_sigma, N^2, :))

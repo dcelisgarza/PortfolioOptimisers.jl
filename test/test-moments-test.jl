@@ -2,7 +2,7 @@
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
           CSV, DataFrames, TimeSeries
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
-        for rtol ∈
+        for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -11,7 +11,7 @@
                 break
             end
         end
-        for atol ∈
+        for atol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -69,7 +69,7 @@
                EquilibriumExpectedReturns(), EquilibriumExpectedReturns(; l = 2),
                ExcessExpectedReturns(), ExcessExpectedReturns(; rf = rf)]
         ert = CSV.read(joinpath(@__DIR__, "./assets/Expected-Returns.csv"), DataFrame)
-        for i ∈ eachindex(mes)
+        for i in eachindex(mes)
             er = mean(mes[i], X)
             res = isapprox(er, reshape(ert[!, i], size(er)))
             if !res
@@ -234,7 +234,7 @@
         cvrt = CSV.read(joinpath(@__DIR__,
                                  "./assets/Covariance-and-Correlation-correctness.csv"),
                         DataFrame)
-        for (i, j) ∈ zip(1:length(ces), 1:2:(2 * length(ces)))
+        for (i, j) in zip(1:length(ces), 1:2:(2 * length(ces)))
             cv = cov(ces[i], Matrix(transpose(X)); dims = 2)
             cr = cor(ces[i], X)
             MN = size(cv)
@@ -287,7 +287,7 @@
     @testset "Coskewness" begin
         cses = [Coskewness(; alg = Full()), Coskewness(; alg = Semi())]
         sk_t = CSV.read(joinpath(@__DIR__, "./assets/CoskewnessEstimator.csv"), DataFrame)
-        for i ∈ eachindex(cses)
+        for i in eachindex(cses)
             sk, v = coskewness(cses[i], transpose(X); dims = 2)
             MN1 = size(sk)
             MN2 = size(v)
@@ -312,7 +312,7 @@
     @testset "Cokurtosis" begin
         kes = [Cokurtosis(; alg = Full()), Cokurtosis(; alg = Semi())]
         kt_t = CSV.read(joinpath(@__DIR__, "./assets/CokurtosisEstimator.csv"), DataFrame)
-        for i ∈ eachindex(kes)
+        for i in eachindex(kes)
             kt = cokurtosis(kes[i], transpose(X); dims = 2)
             MN = size(kt)
             res = isapprox(kt, reshape(kt_t[!, i], MN))
@@ -336,7 +336,7 @@
 
         dist_t = CSV.read(joinpath(@__DIR__, "./assets/Absolute-Distance.csv"), DataFrame)
         ce = PortfolioOptimisersCovariance()
-        for i ∈ eachindex(des)
+        for i in eachindex(des)
             dist1 = distance(des[i], ce, X)
             dist2 = distance(des[i], cov(ce, X), X)
             dist1g = distance(desg[i], ce, X)
@@ -396,7 +396,7 @@
         dist_t = CSV.read(joinpath(@__DIR__, "./assets/Canonical-Distance.csv"), DataFrame)
         de = Distance(; alg = CanonicalDistance())
         deg = GeneralDistance(; alg = CanonicalDistance())
-        for i ∈ eachindex(ces)
+        for i in eachindex(ces)
             dist1 = distance(de, ces[i], transpose(X); dims = 2)
             dist2 = if isa(ces[i], MutualInfoCovariance)
                 distance(Distance(;
@@ -481,7 +481,7 @@
                           DataFrame)
         de = DistanceDistance(; alg = CanonicalDistance())
         deg = GeneralDistanceDistance(; alg = CanonicalDistance())
-        for i ∈ eachindex(ces)
+        for i in eachindex(ces)
             dist1 = distance(de, ces[i], transpose(X); dims = 2)
             dist2 = if isa(ces[i], MutualInfoCovariance)
                 distance(DistanceDistance(;

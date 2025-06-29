@@ -9,7 +9,7 @@ function (::MaximumDrawdown)(x::AbstractVector)
     cs = cumsum(x)
     val = zero(eltype(x))
     peak = typemin(eltype(x))
-    for i ∈ cs
+    for i in cs
         if i > peak
             peak = i
         end
@@ -34,7 +34,7 @@ function (::RelativeMaximumDrawdown)(x::AbstractVector)
     cs = cumprod(x)
     val = zero(eltype(x))
     peak = typemin(eltype(x))
-    for i ∈ cs
+    for i in cs
         if i > peak
             peak = i
         end

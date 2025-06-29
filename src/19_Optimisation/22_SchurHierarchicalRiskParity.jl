@@ -73,7 +73,7 @@ function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     m = zeros(n1, n2)
     e = vcat(ones(1, n2) / n2, I(n2))
     m .+= e
-    for i ∈ 1:(n1 - 1)
+    for i in 1:(n1 - 1)
         e[i, :] .= view(e, i + 1, :)
         e[i + 1, :] .= view(e, i, :)
         m .+= e
@@ -116,10 +116,10 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector,
     w = ones(eltype(pr.X), size(pr.X, 2))
     flag = params.flag
     @inbounds while length(items) > 0
-        items = [i[j:k] for i ∈ items
-                 for (j, k) ∈ ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
+        items = [i[j:k] for i in items
+                 for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
                  if length(i) > 1]
-        for i ∈ 1:2:length(items)
+        for i in 1:2:length(items)
             lc = items[i]
             rc = items[i + 1]
             A = view(sigma, lc, lc)
@@ -151,7 +151,7 @@ end
 function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lrisk::Real,
                              tol::Real = 1e-4)
     iter = ceil(Int, log2((hgamma - lgamma) / tol) * 4 + 1)
-    for _ ∈ 1:iter
+    for _ in 1:iter
         mgamma = (lgamma + hgamma) * 0.5
         w, risk, hrisk = try
             objective(mgamma)..., objective(mgamma - tol)[2]
@@ -197,7 +197,7 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector,
     w, risk = objective(gammas[1])
     risks[1] = risk
     # First binary search, finds the point at which the risk starts to increase with gamma, if it exists.
-    for i ∈ 2:length(gammas)
+    for i in 2:length(gammas)
         w, risk = objective(gammas[i])
         risks[i] = risk
         if risk >= risks[i - 1]
@@ -236,7 +236,7 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
     params = sh.params
     gammas = Vector{eltype(pr.X)}(undef, length(params))
     w = zeros(eltype(pr.X), size(pr.X, 2))
-    for (i, ps) ∈ enumerate(params)
+    for (i, ps) in enumerate(params)
         wi, gamma = schur_weights(pr, items, wb, ps)
         w .+= ps.r.settings.scale * wi
         gammas[i] = gamma

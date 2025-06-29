@@ -49,7 +49,7 @@ end
 function no_bounds_returns_estimator(r::KellyReturn, args...)
     return KellyReturn(; w = r.w)
 end
-for r ∈ traverse_subtypes(JuMPReturnsEstimator)
+for r in traverse_subtypes(JuMPReturnsEstimator)
     eval(quote
              function bounds_returns_estimator(r::$(r), lb::Real)
                  pnames = setdiff(propertynames(r), (:lb,))

@@ -62,7 +62,7 @@ function errPDF(x, vals; kernel = AverageShiftedHistograms.Kernels.gaussian, m =
            sqrt.(clamp.((e_max .- rg) ⊙ (rg .- e_min), zero(x), typemax(x)))
     e_min, e_max = x * (1 - sqrt(1.0 / q))^2, x * (1 + sqrt(1.0 / q))^2
     res = ash(vals; rng = range(e_min, e_max; length = n), kernel = kernel, m = m)
-    pdf2 = [AverageShiftedHistograms.pdf(res, i) for i ∈ pdf1]
+    pdf2 = [AverageShiftedHistograms.pdf(res, i) for i in pdf1]
     pdf2[.!isfinite.(pdf2)] .= 0.0
     sse = sum((pdf2 - pdf1) .^ 2)
     return sse

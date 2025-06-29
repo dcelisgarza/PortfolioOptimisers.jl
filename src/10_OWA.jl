@@ -38,7 +38,7 @@ function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real)
     phis = Vector{eltype(weights)}(undef, N)
     e = 1
     #! https://juliafolds2.github.io/FLoops.jl/dev/howto/parallel/
-    for i ∈ eachindex(phis)
+    for i in eachindex(phis)
         e *= g + i - 1
         phis[i] = e / factorial(i + 1)
     end
@@ -46,7 +46,7 @@ function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real)
     a = weights * phis
     w = similar(a)
     w[1] = a[1]
-    for i ∈ 2:length(a)
+    for i in 2:length(a)
         w[i] = maximum(a[1:i])
     end
     return w
@@ -152,7 +152,7 @@ end
 function owa_wcvar(T::Integer, alphas::AbstractVector{<:Real},
                    weights::AbstractVector{<:Real})
     w = zeros(promote_type(eltype(alphas), eltype(weights)), T)
-    for (i, j) ∈ zip(alphas, weights)
+    for (i, j) in zip(alphas, weights)
         w .+= owa_cvar(T, i) * j
     end
     return w
@@ -164,7 +164,7 @@ function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Int
     n = length(alphas)
     w = Vector{typeof(alpha)}(undef, n)
     w[1] = alphas[2] * alphas[1] / alphas[n]^2
-    for i ∈ 2:(n - 1)
+    for i in 2:(n - 1)
         w[i] = (alphas[i + 1] - alphas[i - 1]) * alphas[i] / alphas[n]^2
     end
     w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]
@@ -202,9 +202,9 @@ end
 function owa_l_moment(T::Integer, k::Integer = 2)
     T, k = promote(T, k)
     w = Vector{typeof(inv(T * k))}(undef, T)
-    for i ∈ eachindex(w)
+    for i in eachindex(w)
         a = zero(k)
-        for j ∈ 0:(k - 1)
+        for j in 0:(k - 1)
             a += (-1)^j *
                  binomial(k - 1, j) *
                  binomial(i - 1, k - 1 - j) *
@@ -220,7 +220,7 @@ function owa_l_moment_crm(T::Integer; k::Integer = 2,
     @smart_assert(k >= 2)
     rg = 2:k
     weights = Matrix{typeof(inv(T * k))}(undef, T, length(rg))
-    for i ∈ rg
+    for i in rg
         wi = (-1)^i * owa_l_moment(T, i)
         weights[:, i - 1] .= wi
     end

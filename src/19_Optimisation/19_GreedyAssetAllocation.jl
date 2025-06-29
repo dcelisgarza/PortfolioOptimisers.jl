@@ -50,7 +50,7 @@ function greedy_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real
     unit = ga.unit
 
     # First loop
-    for (i, (wi, _pi)) ∈ enumerate(zip(w, p))
+    for (i, (wi, _pi)) in enumerate(zip(w, p))
         n_shares = roundmult(wi * cash / _pi, unit, ga.args...; ga.kwargs...)
         cost = n_shares * _pi
         if cost > acash

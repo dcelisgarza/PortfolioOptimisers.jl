@@ -116,7 +116,7 @@ function get_constraint_data(lc::LinearConstraintSide{<:AbstractVector, <:Abstra
                              strict::Bool = false)
     group_names = names(sets)
     A = Vector{eltype(lc.coef)}(undef, 0)
-    for (group, name, coef) ∈ zip(lc.group, lc.name, lc.coef)
+    for (group, name, coef) in zip(lc.group, lc.name, lc.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
             if all(iszero, idx)
@@ -156,7 +156,7 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
     B_ineq = Vector{datatype}(undef, 0)
     A_eq = Vector{datatype}(undef, 0)
     B_eq = Vector{datatype}(undef, 0)
-    for lc ∈ lcs
+    for lc in lcs
         A = get_constraint_data(lc.A, sets, strict)
         lhs_flag = isempty(A) || all(iszero, A)
         if lhs_flag

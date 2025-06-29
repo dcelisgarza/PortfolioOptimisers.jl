@@ -128,7 +128,7 @@ function weight_bounds_constraints(hcc::WeightBoundsConstraint{<:AbstractVector,
     N = nrow(sets)
     LB = zeros(promote_type(eltype(hcc.lb), eltype(hcc.ub)), N)
     UB = ones(promote_type(eltype(hcc.lb), eltype(hcc.ub)), N)
-    for (group, name, lb, ub) ∈ zip(hcc.group, hcc.name, hcc.lb, hcc.ub)
+    for (group, name, lb, ub) in zip(hcc.group, hcc.name, hcc.lb, hcc.ub)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
             LB[idx] .= lb

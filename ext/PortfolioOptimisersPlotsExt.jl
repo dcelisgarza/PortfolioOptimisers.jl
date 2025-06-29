@@ -49,7 +49,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::AbstractVector,
     ret = view(ret, :, idx)
     nx = view(nx, idx)
     f = plot(; f_kwargs...)
-    for i ∈ 1:N
+    for i in 1:N
         if !haskey(asset_kwargs, :label)
             asset_kwargs_i = (; label = nx[i], asset_kwargs...)
         end
@@ -123,18 +123,18 @@ function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractCl
     N = length(clr.clustering.order)
     nx = view(nx, clr.clustering.order)
     idx = cutree(clr.clustering; k = clr.k)
-    cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
+    cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     colours = palette(dend_theme, clr.k)
     dend1 = plot(clr.clustering; normalize = false, ylim = extrema(clr.clustering.heights),
                  xticks = (1:N, nx), dend_kwargs...)
-    for (i, cl) ∈ pairs(cls)
-        a = [findfirst(x -> x == c, clr.clustering.order) for c ∈ cl]
+    for (i, cl) in pairs(cls)
+        a = [findfirst(x -> x == c, clr.clustering.order) for c in cl]
         a = a[.!isnothing.(a)]
         xmin = minimum(a)
         xmax = xmin + length(cl)
-        i1 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 1)) for c ∈ cl]
+        i1 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 1)) for c in cl]
         i1 = i1[.!isnothing.(i1)]
-        i2 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 2)) for c ∈ cl]
+        i2 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 2)) for c in cl]
         i2 = i2[.!isnothing.(i2)]
         i3 = unique([i1; i2])
         h = min(maximum(clr.clustering.heights[i3]) * 1.1, 1)
@@ -168,7 +168,7 @@ function PortfolioOptimisers.plot_clusters(clr::PortfolioOptimisers.AbstractClus
     X = view(X, clr.clustering.order, clr.clustering.order)
     nx = view(nx, clr.clustering.order)
     idx = cutree(clr.clustering; k = clr.k)
-    cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
+    cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     colours = palette(dend_theme, clr.k)
     colgrad = cgrad(hmap_theme; hmap_theme_kwargs...)
     hmap = plot(X; st = :heatmap, yticks = (1:N, nx), xticks = (1:N, nx), xrotation = 90,
@@ -178,14 +178,14 @@ function PortfolioOptimisers.plot_clusters(clr::PortfolioOptimisers.AbstractClus
                  dend1_kwargs...)
     dend2 = plot(clr.clustering; yticks = false, xrotation = 90, orientation = :horizontal,
                  yflip = true, xlim = extrema(clr.clustering.heights), dend2_kwargs...)
-    for (i, cl) ∈ pairs(cls)
-        a = [findfirst(x -> x == c, clr.clustering.order) for c ∈ cl]
+    for (i, cl) in pairs(cls)
+        a = [findfirst(x -> x == c, clr.clustering.order) for c in cl]
         a = a[.!isnothing.(a)]
         xmin = minimum(a)
         xmax = xmin + length(cl)
-        i1 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 1)) for c ∈ cl]
+        i1 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 1)) for c in cl]
         i1 = i1[.!isnothing.(i1)]
-        i2 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 2)) for c ∈ cl]
+        i2 = [findfirst(x -> x == c, -view(clr.clustering.merges, :, 2)) for c in cl]
         i2 = i2[.!isnothing.(i2)]
         i3 = unique([i1; i2])
         h = min(maximum(clr.clustering.heights[i3]) * 1.1, 1)
@@ -264,7 +264,7 @@ function PortfolioOptimisers.plot_ptf_drawdowns(w::AbstractArray, X::AbstractArr
               "Maximum Drawdown: $(round(risks[7], digits = 2))%")
     colours = palette(theme, length(labels) + 1)
     f_dd = plot(ts, dd; color = colours[1], ylim = dd_func(dd), dd_kwargs...)
-    for (i, (risk, label)) ∈ enumerate(zip(risks, labels))
+    for (i, (risk, label)) in enumerate(zip(risks, labels))
         hline!(f_dd, [risk]; label = label, color = colours[i + 1], l_kwargs...)
     end
     f_ret = plot(ts, cret; color = colours[1], ret_kwargs...)

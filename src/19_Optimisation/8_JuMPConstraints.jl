@@ -648,11 +648,11 @@ function set_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     lb = wb.lb
     ub = wb.ub
     if !isnothing(lb) && w_finite_flag(lb)
-        lb = [sum(lb[view(smtx, i, :)]) for i ∈ axes(smtx, 1)]
+        lb = [sum(lb[view(smtx, i, :)]) for i in axes(smtx, 1)]
         @constraint(model, set_w_mip_lb, sc * (smtx_expr - lb .* i_smip) >= 0)
     end
     if !isnothing(ub) && w_finite_flag(ub)
-        ub = [sum(ub[view(smtx, i, :)]) for i ∈ axes(smtx, 1)]
+        ub = [sum(ub[view(smtx, i, :)]) for i in axes(smtx, 1)]
         @constraint(model, set_w_mip_ub, sc * (smtx_expr - ub .* i_smip) <= 0)
     end
     if card_flag
@@ -828,7 +828,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorRes
 end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
                                          tres::AbstractVector{AbstractTracking}, args...)
-    for (i, te) ∈ enumerate(tres)
+    for (i, te) in enumerate(tres)
         set_tracking_error_constraints!(model, i, pr, te, args...)
     end
     return nothing
@@ -861,7 +861,7 @@ function set_turnover_constraints!(model::JuMP.Model, tn::Turnover)
     return set_turnover_constraints!(model, 1, tn)
 end
 function set_turnover_constraints!(model::JuMP.Model, tns::AbstractVector{<:Turnover})
-    for (i, tn) ∈ enumerate(tns)
+    for (i, tn) in enumerate(tns)
         set_turnover_constraints!(model, i, tn)
     end
     return nothing

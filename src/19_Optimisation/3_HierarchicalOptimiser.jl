@@ -61,7 +61,7 @@ function unitary_expected_risks(r::OptimisationRiskMeasure, X::AbstractMatrix,
                                 fees::Union{Nothing, <:Fees} = nothing)
     wk = zeros(eltype(X), size(X, 2))
     rk = Vector{eltype(X)}(undef, size(X, 2))
-    for i ∈ eachindex(wk)
+    for i in eachindex(wk)
         wk[i] = one(eltype(X))
         rk[i] = expected_risk(r, wk, X, fees)
         wk[i] = zero(eltype(X))
@@ -72,7 +72,7 @@ function unitary_expected_risks!(wk::AbstractVector, rk::AbstractVector,
                                  r::OptimisationRiskMeasure, X::AbstractMatrix,
                                  fees::Union{Nothing, <:Fees} = nothing)
     fill!(rk, zero(eltype(X)))
-    for i ∈ eachindex(wk)
+    for i in eachindex(wk)
         wk[i] = one(eltype(X))
         rk[i] = expected_risk(r, wk, X, fees)
         wk[i] = zero(eltype(X))

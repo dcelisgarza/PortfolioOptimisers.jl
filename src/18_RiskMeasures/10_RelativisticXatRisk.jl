@@ -184,7 +184,7 @@ function (r::RelativisticDrawdownatRisk)(x::AbstractVector)
     cs = cumsum(x)
     peak = typemin(eltype(x))
     dd = similar(cs)
-    for (idx, i) ∈ pairs(cs)
+    for (idx, i) in pairs(cs)
         if i > peak
             peak = i
         end
@@ -222,7 +222,7 @@ function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
     cs = cumprod(x)
     peak = typemin(eltype(x))
     dd = similar(cs)
-    for (idx, i) ∈ pairs(cs)
+    for (idx, i) in pairs(cs)
         if i > peak
             peak = i
         end
@@ -232,7 +232,7 @@ function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     return RRM(dd, r.slv, r.alpha, r.kappa)
 end
-for r ∈ (RelativisticDrawdownatRisk, RelativeRelativisticDrawdownatRisk)
+for r in (RelativisticDrawdownatRisk, RelativeRelativisticDrawdownatRisk)
     eval(quote
              function factory(r::$(r), ::Any,
                               slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},

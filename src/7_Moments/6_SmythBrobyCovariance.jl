@@ -84,15 +84,15 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
+    @floop ce.threads for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
-        for i ∈ 1:j
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             mui = mean_vec[i]
             sigmai = std_vec[i]
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold * sigmai
@@ -124,11 +124,11 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
-        for i ∈ 1:j
+    @floop ce.threads for j in axes(X, 2)
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold
@@ -162,16 +162,16 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
+    @floop ce.threads for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
-        for i ∈ 1:j
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             nn = zero(eltype(X))
             mui = mean_vec[i]
             sigmai = std_vec[i]
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold * sigmai
@@ -205,12 +205,12 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
-        for i ∈ 1:j
+    @floop ce.threads for j in axes(X, 2)
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             nn = zero(eltype(X))
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold
@@ -247,15 +247,15 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
+    @floop ce.threads for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
-        for i ∈ 1:j
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             mui = mean_vec[i]
             sigmai = std_vec[i]
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold * sigmai
@@ -284,11 +284,11 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
-        for i ∈ 1:j
+    @floop ce.threads for j in axes(X, 2)
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold
@@ -319,17 +319,17 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
+    @floop ce.threads for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
-        for i ∈ 1:j
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             cneg = 0
             cpos = 0
             mui = mean_vec[i]
             sigmai = std_vec[i]
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold * sigmai
@@ -365,13 +365,13 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
-        for i ∈ 1:j
+    @floop ce.threads for j in axes(X, 2)
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             cneg = 0
             cpos = 0
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold
@@ -409,10 +409,10 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
+    @floop ce.threads for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
-        for i ∈ 1:j
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             nn = zero(eltype(X))
@@ -421,7 +421,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
             cnn = 0
             mui = mean_vec[i]
             sigmai = std_vec[i]
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold * sigmai
@@ -461,15 +461,15 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
-        for i ∈ 1:j
+    @floop ce.threads for j in axes(X, 2)
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             nn = zero(eltype(X))
             cneg = 0
             cpos = 0
             cnn = 0
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold
@@ -512,17 +512,17 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
+    @floop ce.threads for j in axes(X, 2)
         muj = mean_vec[j]
         sigmaj = std_vec[j]
-        for i ∈ 1:j
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             cneg = 0
             cpos = 0
             mui = mean_vec[i]
             sigmai = std_vec[i]
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold * sigmai
@@ -553,13 +553,13 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     c2 = ce.c2
     c3 = ce.c3
     n = ce.n
-    @floop ce.threads for j ∈ axes(X, 2)
-        for i ∈ 1:j
+    @floop ce.threads for j in axes(X, 2)
+        for i in 1:j
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             cneg = 0
             cpos = 0
-            for k ∈ 1:T
+            for k in 1:T
                 xi = X[k, i]
                 xj = X[k, j]
                 ti = threshold

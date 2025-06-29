@@ -101,7 +101,7 @@ function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
     else
         @expression(model, risk, zero(AffExpr))
     end
-    for risk_i ∈ risk_vec
+    for risk_i in risk_vec
         add_to_expression!(risk, risk_i)
     end
     return nothing
@@ -148,7 +148,7 @@ function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasu
                                            <:IntegerPhilogenyResult},
                                nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                            <:IntegerPhilogenyResult}, args...; kwargs...)
-    for (i, r) ∈ enumerate(rs)
+    for (i, r) in enumerate(rs)
         set_risk_constraints!(model, i, r, opt, pr, cplg, nplg, args...; kwargs...)
     end
     return nothing
@@ -165,15 +165,15 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                               datatype::Type = Float64)
     trials = Dict()
     success = false
-    for solver ∈ opt.opt.slv
+    for solver in opt.opt.slv
         try
             set_optimizer(model, solver.solver; add_bridges = solver.add_bridges)
         catch err
-            trials[solver.name] = Dict(:set_optimiser => err)
+            trials[solver.name] = Dict(:set_optimizer => err)
             continue
         end
         if !isnothing(solver.settings)
-            for (k, v) ∈ solver.settings
+            for (k, v) in solver.settings
                 set_attribute(model, k, v)
             end
         end

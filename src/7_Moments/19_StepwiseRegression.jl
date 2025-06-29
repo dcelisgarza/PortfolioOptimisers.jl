@@ -31,7 +31,7 @@ function add_best_asset_after_failure_pval!(target::RegressionTarget,
     excluded = setdiff(indices, included)
     best_pval = typemax(eltype(x))
     new_feature = 0
-    for i ∈ excluded
+    for i in excluded
         factors = [included; i]
         f1 = [ovec view(F, :, factors)]
         fri = fit(target, f1, x)
@@ -58,7 +58,7 @@ function regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVect
         excluded = setdiff(indices, included)
         best_pval = typemax(eltype(x))
         new_feature = 0
-        for i ∈ excluded
+        for i in excluded
             factors = [included; i]
             f1 = [ovec view(F, :, factors)]
             fri = fit(re.target, f1, x)
@@ -110,9 +110,9 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
     included = Vector{eltype(indices)}(undef, 0)
     excluded = collect(indices)
     value = Vector{promote_type(eltype(F), eltype(x))}(undef, N)
-    for _ ∈ eachindex(x)
+    for _ in eachindex(x)
         ni = length(excluded)
-        for i ∈ excluded
+        for i in excluded
             factors = copy(included)
             push!(factors, i)
             f1 = [ovec view(F, :, factors)]
@@ -185,9 +185,9 @@ function regression(re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegre
     criterion_func = regression_criterion_func(re.crit)
     threshold = criterion_func(fri)
     value = Vector{promote_type(eltype(F), eltype(x))}(undef, N)
-    for _ ∈ eachindex(x)
+    for _ in eachindex(x)
         ni = length(included)
-        for (i, factor) ∈ pairs(included)
+        for (i, factor) in pairs(included)
             factors = copy(included)
             popat!(factors, i)
             if !isempty(factors)
@@ -214,7 +214,7 @@ function regression(re::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix
     N, rows = size(X)
     ovec = range(; start = 1, stop = 1, length = N)
     loadings = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
-    for i ∈ axes(loadings, 1)
+    for i in axes(loadings, 1)
         included = regression(re, view(X, :, i), F)
         x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)
         fri = fit(re.target, x1, view(X, :, i))
@@ -223,7 +223,7 @@ function regression(re::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix
         if isempty(included)
             continue
         end
-        idx = [findfirst(x -> x == i, features) + 1 for i ∈ included]
+        idx = [findfirst(x -> x == i, features) + 1 for i in included]
         loadings[i, idx] .= params[2:end]
     end
     return RegressionResult(; b = view(loadings, :, 1), M = view(loadings, :, 2:cols))

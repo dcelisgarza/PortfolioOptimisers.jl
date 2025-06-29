@@ -24,7 +24,7 @@ struct JuMPEntropyPoolingEstimator{T1 <: Union{<:Solver, <:AbstractVector{<:Solv
     so::T3
 end
 function JuMPEntropyPoolingEstimator(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                                     sc::Real = 1, so::Real = 1,)
+                                     sc::Real = 1, so::Real = 1)
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
@@ -329,7 +329,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
     pe = factory(pe, w0)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     d_V = entropy_pooling_views(pr, pe.d_views, pe.sets; strict = strict)
-    for uvl ∈ uvls
+    for uvl in uvls
         # Freeze updated parameters, ie parameters which were free in the previous iteration plus the ones which were adjusted via views. If there were no views the previous iteration, the free parameters become the new updated parameters and therefore frozen. In the first iteration, there is nothing to freeze.
         constant_entropy_pooling_constraint!(pr, cache, [excluded;
                                                          included], views, pe.sets;

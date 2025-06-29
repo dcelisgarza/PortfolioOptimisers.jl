@@ -74,7 +74,7 @@ function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
     return rs
 end
 function factory(rs::AbstractVector{<:AbstractBaseRiskMeasure}, args...; kwargs...)
-    return [factory(r, args...; kwargs...) for r ∈ rs]
+    return [factory(r, args...; kwargs...) for r in rs]
 end
 function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
     return rs

@@ -126,7 +126,7 @@ function (r::EntropicDrawdownatRisk)(x::AbstractVector)
     cs = cumsum(x)
     peak = typemin(eltype(x))
     dd = similar(cs)
-    for (idx, i) ∈ pairs(cs)
+    for (idx, i) in pairs(cs)
         if i > peak
             peak = i
         end
@@ -162,7 +162,7 @@ function (r::RelativeEntropicDrawdownatRisk)(x::AbstractVector)
     cs = cumprod(x)
     peak = typemin(eltype(x))
     dd = similar(cs)
-    for (idx, i) ∈ pairs(cs)
+    for (idx, i) in pairs(cs)
         if i > peak
             peak = i
         end
@@ -172,7 +172,7 @@ function (r::RelativeEntropicDrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     return ERM(dd, r.slv, r.alpha)
 end
-for r ∈ (EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)
+for r in (EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)
     eval(quote
              function factory(r::$(r), ::Any,
                               slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},

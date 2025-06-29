@@ -2,7 +2,7 @@
     using PortfolioOptimisers, CSV, DataFrames, Clarabel, Test, Random, Logging
     Logging.disable_logging(Logging.Warn)
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
-        for rtol ∈
+        for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -11,7 +11,7 @@
                 break
             end
         end
-        for atol ∈
+        for atol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -39,7 +39,7 @@
                 OWAJuMPEstimator(; alg = MinimumSquareDistance(), slv = slv),
                 OWAJuMPEstimator(; alg = MinimumSquareDistance(), max_phi = 0.25,
                                  slv = slv)]
-        for i ∈ eachindex(owas)
+        for i in eachindex(owas)
             owa = owa_l_moment_crm(200; k = 5, method = owas[i])
             res = if i == 4
                 isapprox(owa, owa_t[!, i]; rtol = 0.05)
@@ -85,7 +85,7 @@
         w = Vector{typeof(alpha)}(undef, n)
 
         w[1] = alphas[2] * alphas[1] / alphas[n]^2
-        for i ∈ 2:(n - 1)
+        for i in 2:(n - 1)
             w[i] = (alphas[i + 1] - alphas[i - 1]) * alphas[i] / alphas[n]^2
         end
         w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]

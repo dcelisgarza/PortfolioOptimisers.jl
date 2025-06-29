@@ -25,7 +25,7 @@ function get_black_litterman_views_data(blve::LinearConstraintSide{<:AbstractVec
                                         sets::DataFrame, strict::Bool = false)
     group_names = names(sets)
     A = Vector{eltype(blve.coef)}(undef, 0)
-    for (group, name, coef) ∈ zip(blve.group, blve.name, blve.coef)
+    for (group, name, coef) in zip(blve.group, blve.name, blve.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
             if all(iszero, idx)
@@ -97,7 +97,7 @@ function black_litterman_views(blves::Union{<:BlackLittermanViewsEstimator,
     @smart_assert(!isempty(sets))
     P = Vector{datatype}(undef, 0)
     Q = Vector{datatype}(undef, 0)
-    for blve ∈ blves
+    for blve in blves
         blve_A = get_black_litterman_views_data(blve.A, sets, strict)
         if isempty(blve_A) || all(iszero, blve_A)
             continue

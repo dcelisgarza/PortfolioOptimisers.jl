@@ -56,13 +56,13 @@ end
 function to_tree(a::Hclust)
     N = length(a.order)
     d = Vector{ClusterNode}(undef, 2 * N - 1)
-    for i ∈ eachindex(a.order)
+    for i in eachindex(a.order)
         d[i] = ClusterNode(i)
     end
     merges = a.merges
     heights = a.heights
     nd = nothing
-    for (i, height) ∈ pairs(heights)
+    for (i, height) in pairs(heights)
         fi = merges[i, 1]
         fj = merges[i, 2]
         fi = ifelse(fi < zero(eltype(merges)), -fi, fi + N)
@@ -84,17 +84,17 @@ end
 function validate_k_value(clustering::Hclust, nodes::AbstractVector, k::Integer)
     idx = cutree(clustering; k = k)
     clusters = Vector{Vector{Int}}(undef, length(minimum(idx):maximum(idx)))
-    for i ∈ eachindex(clusters)
+    for i in eachindex(clusters)
         clusters[i] = findall(idx .== i)
     end
-    for i ∈ nodes[1:(k - 1)]
+    for i in nodes[1:(k - 1)]
         if is_leaf(i)
             continue
         end
         count = 0
         ln = pre_order(i.left)
         rn = pre_order(i.right)
-        for cluster ∈ clusters
+        for cluster in clusters
             if issubset(cluster, ln) || issubset(cluster, rn)
                 count += 1
             end
@@ -107,7 +107,7 @@ function validate_k_value(clustering::Hclust, nodes::AbstractVector, k::Integer)
 end
 function valid_k_clusters(clustering::Hclust, arr::AbstractVector)
     nodes = to_tree(clustering)[2]
-    heights = [i.height for i ∈ nodes]
+    heights = [i.height for i in nodes]
     nodes = nodes[sortperm(heights; rev = true)]
     while true
         k = all(!isfinite, arr) ? length(arr) : argmax(arr)
@@ -133,7 +133,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
         k = max_k
     end
     nodes = to_tree(clustering)[2]
-    heights = [i.height for i ∈ nodes]
+    heights = [i.height for i in nodes]
     nodes = nodes[sortperm(heights; rev = true)]
     flag = validate_k_value(clustering, nodes, k)
     if !flag
@@ -141,7 +141,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
         flagu = false
         du = 0
         ku = k
-        for i ∈ (k + 1):max_k
+        for i in (k + 1):max_k
             flagu = validate_k_value(clustering, nodes, i)
             if flagu
                 ku = i
@@ -155,7 +155,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
         flagl = false
         dl = 0
         kl = k
-        for i ∈ (k - 1):-1:1
+        for i in (k - 1):-1:1
             flagl = validate_k_value(clustering, nodes, i)
             if flagl
                 kl = i
@@ -185,14 +185,14 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
         max_k = ceil(Int, sqrt(N))
     end
     c1 = min(ceil(Int, sqrt(N)), max_k)
-    cluster_lvls = [cutree(clustering; k = i) for i ∈ 1:c1]
+    cluster_lvls = [cutree(clustering; k = i) for i in 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
-    for i ∈ 2:c1
+    for i in 2:c1
         lvl = cluster_lvls[i]
         c2 = maximum(unique(lvl))
         D_list = Vector{eltype(dist)}(undef, c2)
-        for j ∈ 1:c2
+        for j in 1:c2
             cluster = findall(lvl .== j)
             cluster_dist = dist[cluster, cluster]
             if isempty(cluster_dist)
@@ -201,8 +201,8 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
             M = size(cluster_dist, 1)
             C_list = Vector{eltype(dist)}(undef, Int(M * (M - 1) / 2))
             k = 1
-            for col ∈ 1:M
-                for row ∈ (col + 1):M
+            for col in 1:M
+                for row in (col + 1):M
                     C_list[k] = cluster_dist[row, col]
                     k += 1
                 end
@@ -226,10 +226,10 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
         max_k = ceil(Int, sqrt(N))
     end
     c1 = min(ceil(Int, sqrt(N)), max_k)
-    cluster_lvls = [cutree(clustering; k = i) for i ∈ 1:c1]
+    cluster_lvls = [cutree(clustering; k = i) for i in 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
-    for i ∈ 2:c1
+    for i in 2:c1
         lvl = cluster_lvls[i]
         sl = silhouettes(lvl, dist; metric = onc.alg.metric)
         msl = mean(sl)

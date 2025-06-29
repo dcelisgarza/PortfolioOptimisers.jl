@@ -3,7 +3,7 @@ function set_risk_budget!(rb::AbstractVector,
                                                      <:AbstractVector}, sets::DataFrame,
                           strict::Bool = false)
     group_names = names(sets)
-    for (group, name, coef) ∈ zip(plca.group, plca.name, plca.coef)
+    for (group, name, coef) in zip(plca.group, plca.name, plca.coef)
         if !(isnothing(group) || string(group) ∉ group_names)
             idx = sets[!, group] .== name
             if all(iszero, idx)
@@ -56,7 +56,7 @@ function risk_budget_constraints(plcas::Union{<:LinearConstraintSide,
     @smart_assert(!isempty(sets))
     rb = Vector{datatype}(undef, nrow(sets))
     fill!(rb, inv(nrow(sets)))
-    for plc ∈ plcas
+    for plc in plcas
         set_risk_budget!(rb, plc, sets, strict)
     end
     rb ./= sum(rb)

@@ -20,7 +20,7 @@ end
 function __coskewness(cskew, X, mp)
     N = size(cskew, 1)
     V = zeros(eltype(cskew), N, N)
-    for i ∈ 1:N
+    for i in 1:N
         j = (i - 1) * N + 1
         k = i * N
         coskew_jk = view(cskew, :, j:k)

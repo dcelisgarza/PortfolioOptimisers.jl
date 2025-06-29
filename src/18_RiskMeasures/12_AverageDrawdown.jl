@@ -12,7 +12,7 @@ function (::AverageDrawdown{<:Any, Nothing})(x::AbstractVector)
     cs = cumsum(x)
     val = zero(eltype(x))
     peak = typemin(eltype(x))
-    for i ∈ cs
+    for i in cs
         if i > peak
             peak = i
         end
@@ -30,7 +30,7 @@ function (r::AverageDrawdown{<:Any, <:AbstractWeights})(x::AbstractVector)
     cs = cumsum(x)
     val = zero(eltype(x))
     peak = typemin(eltype(x))
-    for (idx, i) ∈ pairs(cs)
+    for (idx, i) in pairs(cs)
         if i > peak
             peak = i
         end
@@ -59,7 +59,7 @@ function (r::RelativeAverageDrawdown{<:Any, Nothing})(x::AbstractVector)
     cs = cumprod(x)
     val = zero(eltype(x))
     peak = typemin(eltype(x))
-    for i ∈ cs
+    for i in cs
         if i > peak
             peak = i
         end
@@ -77,7 +77,7 @@ function (r::RelativeAverageDrawdown{<:Any, <:AbstractWeights})(x::AbstractVecto
     cs = cumprod(x)
     val = zero(eltype(x))
     peak = typemin(eltype(x))
-    for (idx, i) ∈ pairs(cs)
+    for (idx, i) in pairs(cs)
         if i > peak
             peak = i
         end
@@ -90,7 +90,7 @@ function (r::RelativeAverageDrawdown{<:Any, <:AbstractWeights})(x::AbstractVecto
     popfirst!(x)
     return val / sum(r.w)
 end
-for r ∈ (AverageDrawdown, RelativeAverageDrawdown)
+for r in (AverageDrawdown, RelativeAverageDrawdown)
     eval(quote
              function factory(r::$(r), prior::AbstractPriorResult, args...; kwargs...)
                  w = nothing_scalar_array_factory(r.w, prior.w)

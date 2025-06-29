@@ -42,9 +42,9 @@ end
 function cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
-    @floop ce.threads for j ∈ axes(X, 2)
+    @floop ce.threads for j in axes(X, 2)
         xj = view(X, :, j)
-        for i ∈ 1:j
+        for i in 1:j
             rho[j, i] = rho[i, j] = cor_distance(ce, view(X, :, i), xj)
         end
     end
@@ -79,9 +79,9 @@ end
 function cov_distance(ce::DistanceCovariance, X::AbstractMatrix)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
-    @floop ce.threads for j ∈ axes(X, 2)
+    @floop ce.threads for j in axes(X, 2)
         xj = view(X, :, j)
-        for i ∈ 1:j
+        for i in 1:j
             rho[j, i] = rho[i, j] = cov_distance(ce, view(X, :, i), xj)
         end
     end

@@ -1,4 +1,4 @@
-for r ∈ setdiff(traverse_subtypes(RiskMeasure), (UncertaintySetVariance,))
+for r in setdiff(traverse_subtypes(RiskMeasure), (UncertaintySetVariance,))
     eval(quote
              function no_bounds_risk_measure(r::$(r), args...)
                  pnames = setdiff(propertynames(r), (:settings,))
@@ -14,7 +14,7 @@ for r ∈ setdiff(traverse_subtypes(RiskMeasure), (UncertaintySetVariance,))
          end)
 end
 function no_bounds_risk_measure(rs::AbstractVector{<:RiskMeasure}, args...)
-    return [no_bounds_risk_measure(r, args...) for r ∈ rs]
+    return [no_bounds_risk_measure(r, args...) for r in rs]
 end
 function no_bounds_first_risk_measure(r::AbstractVector{<:RiskMeasure}, args...)
     return no_bounds_risk_measure(r[1], args...)
@@ -22,7 +22,7 @@ end
 function no_bounds_first_risk_measure(r::RiskMeasure, args...)
     return no_bounds_risk_measure(r, args...)
 end
-for r ∈ traverse_subtypes(RiskMeasure)
+for r in traverse_subtypes(RiskMeasure)
     eval(quote
              function no_bounds_no_risk_expr_risk_measure(r::$(r))
                  pnames = setdiff(propertynames(r), (:settings,))
@@ -59,7 +59,7 @@ end
 function bounds_first_risk_measure(r::RiskMeasure, ub::Real)
     return bounds_risk_measure_expression(r, ub)
 end
-for r ∈ traverse_subtypes(HierarchicalRiskMeasure)
+for r in traverse_subtypes(HierarchicalRiskMeasure)
     eval(quote
              function no_bounds_no_risk_expr_risk_measure(r::$(r))
                  return r

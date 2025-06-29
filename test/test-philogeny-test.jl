@@ -1,7 +1,7 @@
 @safetestset "Philogeny tests" begin
     using PortfolioOptimisers, Random, Test, Clustering, CSV, DataFrames, TimeSeries
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
-        for rtol ∈
+        for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -10,7 +10,7 @@
                 break
             end
         end
-        for atol ∈
+        for atol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -175,7 +175,7 @@
         df1 = CSV.read(joinpath(@__DIR__, "./assets/Centrality.csv"), DataFrame)
         df2 = CSV.read(joinpath(@__DIR__, "./assets/Average_Centrality.csv"), DataFrame)
         w = fill(inv(30), 30)
-        for (i, ce) ∈ enumerate(ces)
+        for (i, ce) in enumerate(ces)
             v1 = centrality_vector(CentralityEstimator(; cent = ce), X)
             res = isapprox(v1, df1[!, i])
             if !res
@@ -196,7 +196,7 @@
     @testset "Philogeny matrix" begin
         X = pr.X
         df = CSV.read(joinpath(@__DIR__, "./assets/Philogeny_Matrix_1.csv"), DataFrame)
-        for i ∈ 1:10
+        for i in 1:10
             A = philogeny_matrix(NetworkEstimator(; n = i), X)
             res = isapprox(vec(A), df[!, i])
             if !res
@@ -207,7 +207,7 @@
         end
 
         df = CSV.read(joinpath(@__DIR__, "./assets/Philogeny_Matrix_2.csv"), DataFrame)
-        for i ∈ 1:3
+        for i in 1:3
             A = philogeny_matrix(NetworkEstimator(; n = i,
                                                   alg = MaximumDistanceSimilarity()), X)
             res = isapprox(vec(A), df[!, i])

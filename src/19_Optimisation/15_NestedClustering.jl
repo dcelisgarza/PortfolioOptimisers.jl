@@ -145,11 +145,11 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
     clr = clusterise(nco.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
     idx = cutree(clr.clustering; k = clr.k)
-    cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
+    cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     wi = zeros(eltype(pr.X), size(pr.X, 2), clr.k)
     opti = nco.opti
     resi = Vector{OptimisationResult}(undef, clr.k)
-    @floop nco.threads for (i, cl) ∈ pairs(cls)
+    @floop nco.threads for (i, cl) in pairs(cls)
         if length(cl) == 1
             wi[cl, i] .= 1
             resi[i] = SingletonOptimisationResult(OptimisationSuccess(nothing))

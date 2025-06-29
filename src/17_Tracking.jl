@@ -78,7 +78,7 @@ function tracking_view(tracking::TrackingError, i::AbstractVector, args...)
                          err = tracking.err, formulation = tracking.formulation)
 end
 function tracking_view(tracking::AbstractVector{<:AbstractTracking}, args...)
-    return [tracking_view(t, args...) for t ∈ tracking]
+    return [tracking_view(t, args...) for t in tracking]
 end
 function factory(tracking::TrackingError, w::AbstractVector)
     return TrackingError(; tracking = factory(tracking.tracking, w), err = tracking.err,

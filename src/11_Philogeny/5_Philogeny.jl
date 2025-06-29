@@ -150,7 +150,7 @@ end
 function philogeny_matrix(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
     A = calc_adjacency(ne, X; dims = dims, kwargs...)
     P = zeros(Int, size(Matrix(A)))
-    for i ∈ 0:(ne.n)
+    for i in 0:(ne.n)
         P .+= A^i
     end
     P .= clamp!(P, 0, 1) - I
@@ -161,7 +161,7 @@ function philogeny_matrix(cle::ClusteringEstimator, X::AbstractMatrix;
     res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
     clusters = cutree(res.clustering; k = res.k)
     P = zeros(Int, size(X, 2), res.k)
-    for i ∈ axes(P, 2)
+    for i in axes(P, 2)
         idx = clusters .== i
         P[idx, i] .= one(eltype(P))
     end

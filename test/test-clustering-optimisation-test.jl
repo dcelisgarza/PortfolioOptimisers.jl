@@ -2,7 +2,7 @@
     using PortfolioOptimisers, CSV, DataFrames, Test, Random, Clarabel, StatsBase,
           TimeSeries, CovarianceEstimation, FLoops
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
-        for rtol ∈
+        for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -11,7 +11,7 @@
                 break
             end
         end
-        for atol ∈
+        for atol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -228,7 +228,7 @@
     @testset "Hierarchical Risk Parity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HRP.csv"), DataFrame)
         i = 1
-        for r ∈ rs
+        for r in rs
             w = optimise!(HierarchicalRiskParity(; r = r, opt = opt)).w
             rtol = if i == 63
                 0.5
@@ -253,7 +253,7 @@
     @testset "Hierarchical Equal Risk Contribution" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HERC-ri=ro.csv"), DataFrame)
         i = 1
-        for r ∈ rs
+        for r in rs
             w = optimise!(HierarchicalEqualRiskContribution(; ri = r, opt = opt)).w
             rtol = if i == 63
                 1
@@ -309,7 +309,7 @@
                 JuMP_ClusteringWeightFiniliser(;
                                                alg = SquareAbsoluteErrorClusteringWeightFiniliser(),
                                                slv = slv)]
-        for cwf ∈ cwfs
+        for cwf in cwfs
             opt = HierarchicalOptimiser(; pe = pr, cle = clr, cwf = cwf,
                                         wb = WeightBoundsResult(; lb = lb, ub = ub),
                                         slv = slv)

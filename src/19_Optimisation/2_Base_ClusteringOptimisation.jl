@@ -50,8 +50,8 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     so = model[:so]
     @variable(model, t)
     @constraint(model,
-                [sc * t; sc * (w ⊘ wi .- one(eltype(wi)))] in
-                MOI.NormOneCone(length(w) + 1))
+                [sc * t;
+                 sc * (w ⊘ wi .- one(eltype(wi)))] in MOI.NormOneCone(length(w) + 1))
     @objective(model, Min, so * t)
     return nothing
 end
@@ -124,7 +124,7 @@ function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wb::WeightBo
     end
     iter = cwf.iter
     s1 = sum(w)
-    for _ ∈ 1:iter
+    for _ in 1:iter
         if !(any(ub .< w) || any(lb .> w))
             break
         end

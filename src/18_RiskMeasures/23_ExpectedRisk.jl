@@ -61,7 +61,7 @@ function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,
 end
 function expected_risk(r::AbstractBaseRiskMeasure, w::AbstractVector{<:AbstractVector},
                        args...; kwargs...)
-    return [expected_risk(r, wi, args...; kwargs...) for wi ∈ w]
+    return [expected_risk(r, wi, args...; kwargs...) for wi in w]
 end
 function number_effective_assets(w::AbstractVector)
     return inv(dot(w, w))
@@ -75,7 +75,7 @@ function risk_contribution(r::AbstractBaseRiskMeasure, w::AbstractVector,
     ws = Matrix{eltype(w)}(undef, N, 2)
     ws .= w
     id2 = inv(2 * delta)
-    for i ∈ eachindex(w)
+    for i in eachindex(w)
         ws[i, 1] += delta
         ws[i, 2] -= delta
         r1 = expected_risk(r, view(ws, :, 1), X, fees; kwargs...)

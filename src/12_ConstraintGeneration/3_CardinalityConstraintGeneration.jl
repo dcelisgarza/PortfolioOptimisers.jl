@@ -24,7 +24,7 @@ function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFram
     sets = sets[!, smtx]
     unique_sets = unique(sets)
     A = BitMatrix(undef, length(sets), length(unique_sets))
-    for (i, s) ∈ pairs(unique_sets)
+    for (i, s) in pairs(unique_sets)
         A[:, i] = sets .== s
     end
     return transpose(A)

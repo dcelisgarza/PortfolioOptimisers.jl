@@ -9,9 +9,9 @@ function block_vec_pq(A, p, q)
     n = Int(nq / q)
 
     A_vec = Matrix{eltype(A)}(undef, m * n, p * q)
-    for j ∈ 0:(n - 1)
+    for j in 0:(n - 1)
         Aj = Matrix{eltype(A)}(undef, m, p * q)
-        for i ∈ 0:(m - 1)
+        for i in 0:(m - 1)
             Aij = vec(A[(1 + (i * p)):((i + 1) * p), (1 + (j * q)):((j + 1) * q)])
             Aj[i + 1, :] .= Aij
         end
@@ -21,22 +21,22 @@ function block_vec_pq(A, p, q)
     return A_vec
 end
 function duplication_matrix(n::Int, diag::Bool = true)
-    m   = div(n * (n + 1), 2)
+    m = div(n * (n + 1), 2)
     nsq = n^2
-    v   = zeros(Int, nsq)
-    r   = 1
-    a   = 1
-    for i ∈ 1:n
+    v = zeros(Int, nsq)
+    r = 1
+    a = 1
+    for i in 1:n
         b = i
-        for j ∈ 0:(i - 2)
+        for j in 0:(i - 2)
             v[r] = b
-            b    += n - j - 1
-            r    += 1
+            b += n - j - 1
+            r += 1
         end
 
-        for j ∈ 0:(n - i)
+        for j in 0:(n - i)
             v[r] = a + j
-            r    += 1
+            r += 1
         end
         a += n - i + 1
     end
@@ -49,11 +49,11 @@ function duplication_matrix(n::Int, diag::Bool = true)
         m = div(n * (n - 1), 2)
         rows = 1:nsq
         counts = Dict{Int, Int}()
-        for i ∈ v
+        for i in v
             !haskey(counts, i) ? counts[i] = 1 : counts[i] += 1
         end
         repeated_elem = Set{Int}()
-        for (key, value) ∈ counts
+        for (key, value) in counts
             if value > 1
                 push!(repeated_elem, key)
             end
@@ -62,12 +62,12 @@ function duplication_matrix(n::Int, diag::Bool = true)
 
         cols = Dict{Int, Int}()
         cntr = 0
-        for col ∈ repeated_elem
+        for col in repeated_elem
             cntr += 1
             cols[col] = cntr
         end
 
-        for i ∈ 1:nsq
+        for i in 1:nsq
             if !iszero(count(x -> x == v[i], repeated_elem))
                 push!(filtered_rows, rows[i])
                 push!(filtered_cols, cols[v[i]])
@@ -79,8 +79,8 @@ function duplication_matrix(n::Int, diag::Bool = true)
 end
 function elimination_matrix(n::Int, diag::Bool = true)
     nsq = n^2
-    r   = 1
-    a   = 1
+    r = 1
+    a = 1
 
     if diag
         m = div(n * (n + 1), 2)
@@ -93,8 +93,8 @@ function elimination_matrix(n::Int, diag::Bool = true)
     end
 
     v = zeros(Int, m)
-    for i ∈ rg
-        for j ∈ 0:(n - i)
+    for i in rg
+        for j in 0:(n - i)
             v[r] = a + j + b
             r += 1
         end
@@ -122,12 +122,12 @@ function summation_matrix(n::Int, diag::Bool = true)
         rg = 2:n
     end
 
-    for i ∈ rg
+    for i in rg
         r += i - 1
-        for j ∈ 0:(n - i)
+        for j in 0:(n - i)
             v1[r + j + 1] = a + j + b
         end
-        for j ∈ 1:(n - i)
+        for j in 1:(n - i)
             v2[r + j + 1] = a + j + b
             rows2[r + j + 1] = a + j
         end
@@ -149,23 +149,23 @@ function summation_matrix(n::Int, diag::Bool = true)
     end
 end
 function dup_elim_sum_matrices(n::Int)
-    m   = div(n * (n + 1), 2)
+    m = div(n * (n + 1), 2)
     nsq = n^2
-    v1  = zeros(Int, nsq)
-    v2  = zeros(Int, m)
-    r1  = 1
-    r2  = 1
-    a   = 1
-    b2  = 0
-    for i ∈ 1:n
+    v1 = zeros(Int, nsq)
+    v2 = zeros(Int, m)
+    r1 = 1
+    r2 = 1
+    a = 1
+    b2 = 0
+    for i in 1:n
         b1 = i
-        for j ∈ 0:(i - 2)
+        for j in 0:(i - 2)
             v1[r1] = b1
             b1 += n - j - 1
             r1 += 1
         end
 
-        for j ∈ 0:(n - i)
+        for j in 0:(n - i)
             v1[r1] = a + j
             v2[r2] = a + j + b2
             r1 += 1

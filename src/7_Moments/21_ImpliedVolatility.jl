@@ -88,7 +88,7 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::AbstractMat
     # r2s = Vector{promote_type(eltype(rv), eltype(iv))}(undef, N)
     rv_p = Vector{promote_type(eltype(rv), eltype(iv))}(undef, N)
     # fr = []
-    for i ∈ 1:N
+    for i in 1:N
         X = [view(iv, :, i) view(rv, :, i)]
         X_t = [ovec view(X, 1:(T2 - 1), :)]
         X_p = [one(eltype(X)) transpose(view(X, T2, :))]

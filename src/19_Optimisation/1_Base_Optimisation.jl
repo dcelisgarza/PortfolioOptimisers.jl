@@ -26,7 +26,7 @@ function opt_view(opt::OptimisationEstimator, args...)
     return opt
 end
 function opt_view(opt::AbstractVector{<:OptimisationEstimator}, args...)
-    return [opt_view(opti, args...) for opti ∈ opt]
+    return [opt_view(opti, args...) for opti in opt]
 end
 function optimise! end
 function optimise!(or::OptimisationResult, args...)

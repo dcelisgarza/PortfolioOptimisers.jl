@@ -113,7 +113,7 @@ function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:Risk
     flag = !isa(w_opt, AbstractVector{<:AbstractVector})
     risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
     risk_max = zero(datatype)
-    for r ∈ rs
+    for r in rs
         scale = r.settings.scale
         risk_min += expected_risk(r, w_min, X, fees) * scale
         risk_opt += expected_risk(r, w_opt, X, fees) * scale
@@ -135,7 +135,7 @@ function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
     risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
     risk_max = zero(datatype)
     gamma = scalarisation.gamma
-    for r ∈ rs
+    for r in rs
         scale = r.settings.scale * gamma
         risk_min += exp(expected_risk(r, w_min, X, fees) * scale)
         tmp = expected_risk(r, w_opt, X, fees) * scale
@@ -161,7 +161,7 @@ function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:Risk
     flag = !isa(w_opt, AbstractVector{<:AbstractVector})
     risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
     risk_max = typemin(datatype)
-    for r ∈ rs
+    for r in rs
         scale = r.settings.scale
         risk_min_i = expected_risk(r, w_min, X, fees) * scale
         risk_opt_i = expected_risk(r, w_opt, X, fees) * scale
@@ -324,7 +324,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     rt_opts::AbstractVector{<:Real}, opt::BaseJuMPOptimisationEstimator)
     retcodes = sizehint!(Vector{OptimisationReturnCode}(undef, 0), length(rk_opts))
     sols = sizehint!(Vector{JuMPOptimisationSolution}(undef, 0), length(rk_opts))
-    for (rk_opt, rt_opt) ∈ zip(rk_opts, rt_opts)
+    for (rk_opt, rt_opt) in zip(rk_opts, rt_opts)
         unregister_noc_variables!(model)
         set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
         retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
@@ -347,7 +347,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     ret_expr = model[:ret]
     retcodes = Vector{OptimisationReturnCode}(undef, length(rk_opts))
     sols = Vector{JuMPOptimisationSolution}(undef, length(rk_opts))
-    for (i, (rk_opt, rt_opt, lb)) ∈ enumerate(zip(rk_opts, rt_opts, lbs))
+    for (i, (rk_opt, rt_opt, lb)) in enumerate(zip(rk_opts, rt_opts, lbs))
         if i != 1
             delete(model, model[:ret_lb])
             unregister(model, :ret_lb)
@@ -371,7 +371,7 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector
                                idx::AbstractVector)
     risk_frontier = copy(risk_frontier)
     r = factory(view(noc.r, idx), pr, noc.opt.slv)
-    for (i, ri) ∈ zip(idx, r)
+    for (i, ri) in zip(idx, r)
         (; N, factor, flag) = risk_frontier[i].second[2]
         rk_min = expected_risk(ri, w_min, pr.X, noc.opt.fees)
         rk_max = expected_risk(ri, w_max, pr.X, noc.opt.fees)
@@ -415,7 +415,7 @@ function compute_risk_ubs(model::JuMP.Model,
                           w_max::AbstractVector)
     risk_frontier = model[:risk_frontier]
     idx = Vector{Int}(undef, 0)
-    for (i, rkf) ∈ enumerate(risk_frontier)
+    for (i, rkf) in enumerate(risk_frontier)
         if !isa(rkf.second[2], AbstractVector)
             push!(idx, i)
         end
@@ -435,15 +435,15 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, w_min, w_max)
     itrs = [(Iterators.repeated(rkf[1], length(rkf[2][2])),
              Iterators.repeated(rkf[2][1], length(rkf[2][2])), rkf[2][2])
-            for rkf ∈ risk_frontier]
+            for rkf in risk_frontier]
     pitrs = Iterators.product.(itrs...)
     retcodes = sizehint!(Vector{OptimisationReturnCode}(undef, 0), length(rk_opts))
     sols = sizehint!(Vector{JuMPOptimisationSolution}(undef, 0), length(rk_opts))
     sc = model[:sc]
-    for (keys, r_exprs, ubs, rk_opt, rt_opt) ∈
+    for (keys, r_exprs, ubs, rk_opt, rt_opt) in
         zip(pitrs[1], pitrs[2], pitrs[3], rk_opts, rt_opts)
         unregister_noc_variables!(model)
-        for (key, r_expr, ub) ∈ zip(keys, r_exprs, ubs)
+        for (key, r_expr, ub) in zip(keys, r_exprs, ubs)
             if haskey(model, key)
                 delete(model, model[key])
                 unregister(model, key)

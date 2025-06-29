@@ -60,7 +60,7 @@ function regression(re::DimensionReductionRegression, X::AbstractMatrix, F::Abst
     mu = mean(re.me, F; dims = 1)
     sigma = vec(std(re.ve, F; mean = mu, dims = 1))
     mu = vec(mu)
-    for i ∈ axes(loadings, 1)
+    for i in axes(loadings, 1)
         loadings[i, :] .= regression(re.retgt, view(X, :, i), mu, sigma, f1, Vp)
     end
     b = view(loadings, :, 1)

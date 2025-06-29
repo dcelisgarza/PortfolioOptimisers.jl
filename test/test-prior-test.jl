@@ -5,7 +5,7 @@
                                prior_view
     Logging.disable_logging(Logging.Warn)
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
-        for rtol ∈
+        for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -14,7 +14,7 @@
                 break
             end
         end
-        for atol ∈
+        for atol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -32,7 +32,7 @@
         rd = prices_to_returns(X[(end - 252):end], F[(end - 252):end])
         pes = [EmpiricalPriorEstimator(), EmpiricalPriorEstimator(; horizon = 252)]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Empirical-Prior.csv"), DataFrame)
-        for (i, pe) ∈ enumerate(pes)
+        for (i, pe) in enumerate(pes)
             pr = prior(pe, transpose(rd.X); dims = 2)
             mu_t = reshape(pet[1:30, i], size(pr.mu))
             sigma_t = reshape(pet[31:end, i], size(pr.sigma))
@@ -650,7 +650,7 @@
                BlackLittermanPriorEstimator(; views = views, sets = sets,
                                             views_conf = fill(1.0 - eps(), length(views)))]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Black-Litterman-Prior.csv"), DataFrame)
-        for i ∈ eachindex(pes)
+        for i in eachindex(pes)
             pr = prior(pes[i], transpose(X); dims = 2)
             mu_t = reshape(pet[1:10, i], size(pr.mu))
             sigma_t = reshape(pet[11:end, i], size(pr.sigma))
@@ -812,7 +812,7 @@
                                                                       length(views)))]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Bayesian-Black-Litterman-Prior.csv"),
                        DataFrame)
-        for i ∈ eachindex(pes)
+        for i in eachindex(pes)
             pr = prior(pes[i], transpose(X), transpose(F); dims = 2)
             X_t = reshape(pet[1:1000, i], size(pr.X))
             mu_t = reshape(pet[1001:1010, i], size(pr.mu))
@@ -936,7 +936,7 @@
         pm1_t = CSV.read(joinpath(@__DIR__,
                                   "./assets/Factor-Black-Litterman-Prior-No-Residuals.csv"),
                          DataFrame)
-        for (i, pe) ∈ enumerate(pes)
+        for (i, pe) in enumerate(pes)
             pr = prior(pe, transpose(X), transpose(F); dims = 2)
             X_t = reshape(view(pm1_t[!, i], 1:1000, 1), 100, 10)
             mu_t = view(pm1_t[!, i], 1001:1010, 1)
@@ -1034,7 +1034,7 @@
                                   "./assets/Factor-Black-Litterman-Prior-Residuals.csv"),
                          DataFrame)
 
-        for (i, pe) ∈ enumerate(pes)
+        for (i, pe) in enumerate(pes)
             pr = prior(pe, transpose(X), transpose(F); dims = 2)
             X_t = reshape(view(pm1_t[!, i], 1:1000, 1), 100, 10)
             mu_t = view(pm1_t[!, i], 1001:1010, 1)
@@ -1196,7 +1196,7 @@
         pm_t = CSV.read(joinpath(@__DIR__, "./assets/Augmented-Black-Litterman-Prior.csv"),
                         DataFrame)
 
-        for (i, pe) ∈ enumerate(pes)
+        for (i, pe) in enumerate(pes)
             pr = prior(pe, transpose(X), transpose(F); dims = 2)
             X_t = reshape(view(pm_t[!, i], 1:1000, 1), 100, 10)
             mu_t = view(pm_t[!, i], 1001:1010, 1)
@@ -1359,7 +1359,7 @@
         enss = (0.9678273553779563, 0.9698761687748948, 0.9698761708987229,
                 0.9678273545101254, 0.9698761680726742, 0.9698761676977143)
 
-        for (i, (pe, re_t, ens_t)) ∈ enumerate(zip(pes, ress, enss))
+        for (i, (pe, re_t, ens_t)) in enumerate(zip(pes, ress, enss))
             pr = prior(pe, transpose(X); dims = 2)
             res = isapprox(pr.mu[1], 0.1; rtol = 5e-8)
             if !res
@@ -1523,7 +1523,7 @@
         enss = (0.9678273553779563, 0.9698761687748948, 0.9698761708987229,
                 0.9678273545101254, 0.9698761680726742, 0.9698761676977143)
 
-        for (i, (pe, re_t, ens_t)) ∈ enumerate(zip(pes, ress, enss))
+        for (i, (pe, re_t, ens_t)) in enumerate(zip(pes, ress, enss))
             pr = prior(pe, transpose(X); dims = 2)
             res = isapprox(pr.mu[1], 0.1; rtol = 5e-8)
             if !res
@@ -1713,7 +1713,7 @@
 
         ress = (1.0759615986400306e-15, 1.0759615986400306e-15, 1.0759615986400306e-15)
         enss = (0.9999999999999989, 0.9999999999999989, 0.9999999999999989)
-        for (i, (pe, re_t, ens_t)) ∈ enumerate(zip(pes, ress, enss))
+        for (i, (pe, re_t, ens_t)) in enumerate(zip(pes, ress, enss))
             pr = prior(pe, transpose(X), transpose(F); dims = 2)
             res = cov2cor(pr.sigma)[10, 3] <= 0.217
             if !res

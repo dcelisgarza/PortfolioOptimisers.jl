@@ -51,7 +51,7 @@ function HighOrderDeviation(;
                             alg::AbstractHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderDeviation{typeof(ve), typeof(alg)}(ve, alg)
 end
-for alg ∈ (LowOrderDeviation, HighOrderDeviation)
+for alg in (LowOrderDeviation, HighOrderDeviation)
     eval(quote
              function factory(alg::$(alg), w::Union{Nothing, <:AbstractWeights} = nothing)
                  return $(alg)(; ve = factory(alg.ve, w), alg = alg.alg)
@@ -241,7 +241,7 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)
     return res / sigma^2
 end
-for rt ∈ (LowOrderMoment, HighOrderMoment)
+for rt in (LowOrderMoment, HighOrderMoment)
     eval(quote
              function factory(r::$(rt), prior::AbstractPriorResult, args...; kwargs...)
                  w = nothing_scalar_array_factory(r.w, prior.w)

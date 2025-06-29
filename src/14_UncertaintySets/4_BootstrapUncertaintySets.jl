@@ -45,7 +45,7 @@ function bootstrap_generator(ue::ARCHUncertaintySetEstimator, X::AbstractMatrix;
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
-    for (i, data) ∈ enumerate(gen.bootstrap(ue.n_sim))
+    for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
         X = pyconvert(Array, data)[1][1]
         mu = mean(ue.pe.me, X; dims = 1, kwargs...)
         mus[:, i] = vec(mu)
@@ -57,7 +57,7 @@ function mu_bootstrap_generator(ue::ARCHUncertaintySetEstimator, X::AbstractMatr
                                 kwargs...)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
-    for (i, data) ∈ enumerate(gen.bootstrap(ue.n_sim))
+    for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
         X = pyconvert(Array, data)[1][1]
         mu = mean(ue.pe.me, X; dims = 1, kwargs...)
         mus[:, i] .= vec(mu)
@@ -68,7 +68,7 @@ function sigma_bootstrap_generator(ue::ARCHUncertaintySetEstimator, X::AbstractM
                                    kwargs...)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
-    for (i, data) ∈ enumerate(gen.bootstrap(ue.n_sim))
+    for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
         X = pyconvert(Array, data)[1][1]
         mu = mean(ue.pe.me, X; dims = 1, kwargs...)
         sigmas[:, :, i] .= cov(ue.pe.ce, X; dims = 1, mean = mu, kwargs...)
@@ -86,11 +86,11 @@ function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm
     mu_u = Vector{eltype(pr.X)}(undef, N)
     sigma_l = Matrix{eltype(pr.X)}(undef, N, N)
     sigma_u = Matrix{eltype(pr.X)}(undef, N, N)
-    for j ∈ 1:N
+    for j in 1:N
         mu_j = mus[j, :]
         mu_l[j] = quantile(mu_j, q)
         mu_u[j] = quantile(mu_j, one(q) - q)
-        for i ∈ j:N
+        for i in j:N
             sigma_ij = sigmas[i, j, :]
             sigma_l[j, i] = sigma_l[i, j] = quantile(sigma_ij, q)
             sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
@@ -108,7 +108,7 @@ function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgori
     q = ue.q * 0.5
     mu_l = Vector{eltype(pr.X)}(undef, N)
     mu_u = Vector{eltype(pr.X)}(undef, N)
-    for j ∈ 1:N
+    for j in 1:N
         mu_j = mus[j, :]
         mu_l[j] = quantile(mu_j, q)
         mu_u[j] = quantile(mu_j, one(q) - q)
@@ -124,8 +124,8 @@ function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlg
     q = ue.q * 0.5
     sigma_l = Matrix{eltype(pr.X)}(undef, N, N)
     sigma_u = Matrix{eltype(pr.X)}(undef, N, N)
-    for j ∈ 1:N
-        for i ∈ j:N
+    for j in 1:N
+        for i in j:N
             sigma_ij = sigmas[i, j, :]
             sigma_l[j, i] = sigma_l[i, j] = quantile(sigma_ij, q)
             sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
@@ -141,7 +141,7 @@ function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgor
     mus, sigmas = bootstrap_generator(ue, pr.X; kwargs...)
     X_mu = Matrix{eltype(pr.X)}(undef, N, ue.n_sim)
     X_sigma = Matrix{eltype(pr.X)}(undef, N^2, ue.n_sim)
-    for i ∈ axes(X_mu, 2)
+    for i in axes(X_mu, 2)
         X_mu[:, i] = vec(mus[:, i] - pr.mu)
         X_sigma[:, i] = vec(sigmas[:, :, i] - pr.sigma)
     end
@@ -166,7 +166,7 @@ function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAl
     N = size(pr.X, 2)
     mus = mu_bootstrap_generator(ue, pr.X; kwargs...)
     X_mu = Matrix{eltype(pr.X)}(undef, N, ue.n_sim)
-    for i ∈ axes(X_mu, 2)
+    for i in axes(X_mu, 2)
         X_mu[:, i] = vec(mus[:, i] - pr.mu)
     end
     X_mu = transpose(X_mu)
@@ -186,7 +186,7 @@ function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySe
     N = size(pr.X, 2)
     sigmas = sigma_bootstrap_generator(ue, pr.X; kwargs...)
     X_sigma = Matrix{eltype(pr.X)}(undef, N^2, ue.n_sim)
-    for i ∈ axes(X_sigma, 2)
+    for i in axes(X_sigma, 2)
         X_sigma[:, i] = vec(sigmas[:, :, i] - pr.sigma)
     end
     X_sigma = transpose(X_sigma)

@@ -83,7 +83,7 @@ function parse_side(side::AbstractString, strict::Bool = true)
     variable_terms = Tuple{Float64, String}[]
     constant_value = 0.0
     pevious_factor = 1.0
-    for term ∈ terms
+    for term in terms
         # Skip empty terms
         if isempty(term)
             continue
@@ -233,12 +233,12 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
     var_coeffs = Dict{String, Float64}()
 
     # Add left-side variables
-    for (coef, var) ∈ lhs_terms
+    for (coef, var) in lhs_terms
         var_coeffs[var] = get(var_coeffs, var, 0.0) + coef
     end
 
     # Subtract right-side variables
-    for (coef, var) ∈ rhs_terms
+    for (coef, var) in rhs_terms
         var_coeffs[var] = get(var_coeffs, var, 0.0) - coef
     end
 
@@ -250,7 +250,7 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
     vars = String[]
     coefs = Float64[]
 
-    for var ∈ sorted_vars
+    for var in sorted_vars
         coef = var_coeffs[var]
         if !isapprox(coef, 0.0)  # Filter out essentially zero coefficients
             push!(vars, var)
@@ -260,7 +260,7 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
 
     # Format the equation string
     terms = String[]
-    for (i, var) ∈ enumerate(vars)
+    for (i, var) in enumerate(vars)
         coef = coefs[i]
         if isapprox(abs(coef), 1.0)
             term = coef > 0 ? var : "-$var"
@@ -277,7 +277,7 @@ function parse_constraint_equation(equation_str::AbstractString, strict::Bool = 
     else
         # Join terms with proper spacing and signs
         result = terms[1]
-        for i ∈ 2:length(terms)
+        for i in 2:length(terms)
             if startswith(terms[i], "-")
                 result *= " " * terms[i]
             else

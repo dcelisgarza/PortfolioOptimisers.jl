@@ -26,14 +26,14 @@ end
 function NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber2{typeof(me)}(me)
 end
-for alg ∈ (Gerber0, Gerber1, Gerber2)
+for alg in (Gerber0, Gerber1, Gerber2)
     eval(quote
              function factory(alg::$(alg), ::Any)
                  return alg
              end
          end)
 end
-for alg ∈ (NormalisedGerber0, NormalisedGerber1, NormalisedGerber2)
+for alg in (NormalisedGerber0, NormalisedGerber1, NormalisedGerber2)
     eval(quote
              function factory(alg::$(alg), w::Union{Nothing, <:AbstractWeights})
                  return $(alg)(; me = factory(alg.me, w))

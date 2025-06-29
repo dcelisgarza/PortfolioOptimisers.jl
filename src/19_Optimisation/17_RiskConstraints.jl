@@ -1659,7 +1659,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     vals_A = clamp.(real(vals_A), 0, Inf) .+ clamp.(imag(vals_A), 0, Inf)im
     Bi = Vector{Matrix{eltype(kt)}}(undef, Nf)
     N_eig = length(vals_A)
-    @inbounds for i ∈ 1:Nf
+    @inbounds for i in 1:Nf
         j = i - 1
         B = reshape(real(complex(sqrt(vals_A[end - j])) * view(vecs_A, :, N_eig - j)), N, N)
         Bi[i] = B
@@ -1804,7 +1804,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     owa_s = sum(owa_w)
     owa_l = minimum(owa_w)
     owa_h = maximum(owa_w)
-    owa_d = [norm(owa_w, p) for p ∈ owa_p]
+    owa_d = [norm(owa_w, p) for p in owa_p]
     aowa_risk, neg_owa_z_owa_p, owa_p_o_owa_pm1 = model[key], model[Symbol(:neg_owa_z_owa_p_, i)], model[Symbol(:owa_p_o_owa_pm1_, i)] = @expressions(model,
                                                                                                                                                       begin
                                                                                                                                                           owa_s *
@@ -1896,12 +1896,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     owa_l_s = sum(owa_l_w)
     owa_l_l = minimum(owa_l_w)
     owa_l_h = maximum(owa_l_w)
-    owa_l_d = [norm(owa_l_w, p) for p ∈ owa_p]
+    owa_l_d = [norm(owa_l_w, p) for p in owa_p]
     owa_h_w = isnothing(r.w2) ? reverse(owa_l_w) : -r.w2
     owa_h_s = sum(owa_h_w)
     owa_h_l = minimum(owa_h_w)
     owa_h_h = maximum(owa_h_w)
-    owa_h_d = [norm(owa_h_w, p) for p ∈ owa_p]
+    owa_h_d = [norm(owa_h_w, p) for p in owa_p]
     owa_l_risk, neg_owa_l_z_owa_p, owa_h_risk, neg_owa_h_z_owa_p, owa_p_o_owa_pm1 = model[Symbol(:owa_l_risk_, i)], model[Symbol(:neg_owa_l_z_owa_p_, i)], model[Symbol(:owa_h_risk_, i)], model[Symbol(:neg_owa_h_z_owa_p_, i)], model[Symbol(:owa_p_o_owa_pm1_, i)] = @expressions(model,
                                                                                                                                                                                                                                                                                      begin
                                                                                                                                                                                                                                                                                          owa_l_s *

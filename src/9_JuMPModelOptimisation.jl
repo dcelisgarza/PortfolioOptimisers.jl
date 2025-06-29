@@ -41,15 +41,15 @@ function optimise_JuMP_model!(model::JuMP.Model,
                               slv::Union{<:Solver, <:AbstractVector{<:Solver}})
     trials = Dict()
     success = false
-    for solver ∈ slv
+    for solver in slv
         try
             set_optimizer(model, solver.solver; add_bridges = solver.add_bridges)
         catch err
-            trials[solver.name] = Dict(:set_optimiser => err)
+            trials[solver.name] = Dict(:set_optimizer => err)
             continue
         end
         if !isnothing(solver.settings)
-            for (k, v) ∈ solver.settings
+            for (k, v) in solver.settings
                 set_attribute(model, k, v)
             end
         end

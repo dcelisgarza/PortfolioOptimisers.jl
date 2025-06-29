@@ -10,7 +10,7 @@ function drop_correlated(X::AbstractMatrix; threshold::Real = 0.95, absolute::Bo
     candidate_idx = findall(rho[tril_idx] .>= threshold)
     candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]
     to_remove = sizehint!(Set{Int}(), div(length(candidate_idx), 2))
-    for idx ∈ candidate_idx
+    for idx in candidate_idx
         i, j = tril_idx[idx][1], tril_idx[idx][2]
         if i ∉ to_remove && j ∉ to_remove
             if mean_rho[i] > mean_rho[j]
@@ -26,7 +26,7 @@ function drop_incomplete(X::AbstractMatrix, any_missing::Bool = true)
     N = size(X, 2)
     return if any_missing
         to_remove = Vector{Int}(undef, 0)
-        for i ∈ axes(X, 2)
+        for i in axes(X, 2)
             if any(isnan, view(X, :, i)) || any(ismissing, view(X, :, i))
                 push!(to_remove, i)
             end
@@ -211,9 +211,9 @@ function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector
                    index = ["Asset Allocation", "Security Selection", "Interaction",
                             "Total Excess Return"])
 
-    for class_i ∈ unique_classes
+    for class_i in unique_classes
         sets_i = BitVector(undef, 0)
-        for class_j ∈ classes
+        for class_j in classes
             push!(sets_i, class_i == class_j)
         end
 
@@ -316,7 +316,7 @@ function nothing_dataframe_getindex(x::AbstractDataFrame, i)
 end
 function fourth_moment_index_factory(N::Integer, i)
     idx = sizehint!(Int[], length(i)^2)
-    for c ∈ i
+    for c in i
         append!(idx, (((c - 1) * N + 1):(c * N))[i])
     end
     return idx
@@ -326,7 +326,7 @@ function traverse_subtypes(types, ctarr = nothing)
         ctarr = []
     end
     stypes = subtypes(types)
-    for stype ∈ stypes
+    for stype in stypes
         if !isstructtype(stype)
             traverse_subtypes(stype, ctarr)
         else

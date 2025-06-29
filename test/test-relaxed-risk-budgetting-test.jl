@@ -1,7 +1,7 @@
 @safetestset "Relaxed Risk Budgetting Optimisation" begin
     using PortfolioOptimisers, CSV, DataFrames, Test, Random, Clarabel, TimeSeries
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
-        for rtol ∈
+        for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -10,7 +10,7 @@
                 break
             end
         end
-        for atol ∈
+        for atol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
              5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
              1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
@@ -37,8 +37,8 @@
     rkbs = (nothing, 1:30)
     df = CSV.read(joinpath(@__DIR__, "./assets/Relaxed-Risk-Budgetting.csv"), DataFrame)
     i = 1
-    for alg ∈ algs
-        for rkb ∈ rkbs
+    for alg in algs
+        for rkb in rkbs
             rbe = RelaxedRiskBudgetting(; rkb = rkb, alg = alg, opt = opt)
             w = optimise!(rbe, rd).w
             wt = df[!, "$i"]

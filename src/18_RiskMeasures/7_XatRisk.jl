@@ -144,7 +144,7 @@ function (r::DrawdownatRisk)(x::AbstractVector)
     cs = cumsum(x)
     peak = typemin(eltype(x))
     dd = similar(cs)
-    for (idx, i) ∈ pairs(cs)
+    for (idx, i) in pairs(cs)
         if i > peak
             peak = i
         end
@@ -170,7 +170,7 @@ function (r::RelativeDrawdownatRisk)(x::AbstractVector)
     cs = cumprod(x)
     peak = typemin(eltype(x))
     dd = similar(cs)
-    for (idx, i) ∈ pairs(cs)
+    for (idx, i) in pairs(cs)
         if i > peak
             peak = i
         end

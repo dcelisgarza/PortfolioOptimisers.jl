@@ -75,7 +75,7 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     Ni = length(opti)
     wi = zeros(eltype(pr.X), size(pr.X, 2), Ni)
     resi = Vector{OptimisationResult}(undef, Ni)
-    @floop st.threads for (i, opt) ∈ pairs(opti)
+    @floop st.threads for (i, opt) in pairs(opti)
         res = optimise!(opt, rd; dims = dims, branchorder = branchorder,
                         str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?

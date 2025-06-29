@@ -43,7 +43,7 @@
         des = [nothing, Denoise(; alg = FixedDenoise()), Denoise(; alg = ShrunkDenoise()),
                Denoise(; alg = SpectralDenoise())]
         denoise_t = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv"), DataFrame)
-        for i ∈ eachindex(des)
+        for i in eachindex(des)
             sigma1 = copy(sigma)
             denoise!(des[i], PosDefEstimator(), sigma1, q)
             MN = size(sigma1)
@@ -57,7 +57,7 @@
     @testset "Detone" begin
         des = [nothing, Detone(), Detone(; n = 3)]
         detone_t = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv"), DataFrame)
-        for i ∈ eachindex(des)
+        for i in eachindex(des)
             sigma1 = copy(sigma)
             detone!(des[i], PosDefEstimator(), sigma1)
             MN = size(sigma1)
