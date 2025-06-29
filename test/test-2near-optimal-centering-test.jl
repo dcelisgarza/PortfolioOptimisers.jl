@@ -48,6 +48,187 @@
     opt = JuMPOptimiser(; pe = pr, slv = slv)
     objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf), MaximumReturn()]
     bins = [1, 5, 10, 20, nothing, 50]
+    @testset "Efficient Frontier" begin
+        rng = StableRNG(987456321)
+        ucs1 = sigma_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+                                                       rng = rng,
+                                                       alg = BoxUncertaintySetAlgorithm(),
+                                                       seed = 987654321), pr.X)
+        pw = pweights(collect(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
+                                    length = size(pr.X, 1))))
+        rets1 = [ArithmeticReturn(), KellyReturn()]
+        rets2 = [ArithmeticReturn(; lb = Frontier(; N = 3)),
+                 KellyReturn(; lb = Frontier(; N = 3))]
+        risks1 = [Variance(; formulation = QuadRiskExpr()),
+                  Variance(; settings = RiskMeasureSettings(;)),
+                  LowOrderMoment(;
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = SqrtRiskExpr()))),
+                  LowOrderMoment(;
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = QuadRiskExpr()))),
+                  LowOrderMoment(;
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = RSOCRiskExpr()))),
+                  LowOrderMoment(;
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = SOCRiskExpr()))),
+                  LowOrderMoment(;
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = SqrtRiskExpr()))),
+                  LowOrderMoment(;
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = QuadRiskExpr()))),
+                  LowOrderMoment(;
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = RSOCRiskExpr()))),
+                  LowOrderMoment(;
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = SOCRiskExpr()))),
+                  NegativeSkewness(; settings = RiskMeasureSettings(;)),
+                  NegativeSkewness(; alg = QuadRiskExpr()), ConditionalValueatRisk(;)]
+        risks2 = [Variance(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
+                           formulation = QuadRiskExpr()),
+                  Variance(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3))),
+                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = SqrtRiskExpr()))),
+                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = QuadRiskExpr()))),
+                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = RSOCRiskExpr()))),
+                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondLowerMoment(;
+                                                                                 formulation = SOCRiskExpr()))),
+                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = SqrtRiskExpr()))),
+                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = QuadRiskExpr()))),
+                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = RSOCRiskExpr()))),
+                  LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
+                                 alg = LowOrderDeviation(;
+                                                         alg = SecondCentralMoment(;
+                                                                                   formulation = SOCRiskExpr()))),
+                  NegativeSkewness(;
+                                   settings = RiskMeasureSettings(; ub = Frontier(; N = 3))),
+                  NegativeSkewness(;
+                                   settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
+                                   alg = QuadRiskExpr()),
+                  ConditionalValueatRisk(;
+                                         settings = RiskMeasureSettings(;
+                                                                        ub = Frontier(;
+                                                                                      N = 3)))]
+        i = 1
+        for (ret1, ret2) ∈ zip(rets1, rets2)
+            opt1 = JuMPOptimiser(; pe = pr, ret = ret1, slv = slv)
+            opt2 = JuMPOptimiser(; pe = pr, ret = ret2, slv = slv)
+            for (r1, r2) ∈ zip(risks1, risks2)
+                sol_min = optimise!(NearOptimalCentering(; r = r1, obj = MinimumRisk(),
+                                                         opt = opt1))
+                w_min = sol_min.w
+                sol_max = optimise!(NearOptimalCentering(; r = r1, obj = MaximumReturn(),
+                                                         opt = opt1))
+                w_max = sol_max.w
+                sol_fnt1 = optimise!(NearOptimalCentering(; r = r1, obj = MinimumRisk(),
+                                                          opt = opt2))
+                w_fnt1 = sol_fnt1.w
+                sol_fnt2 = optimise!(NearOptimalCentering(; r = r2, obj = MaximumReturn(),
+                                                          opt = opt1))
+                w_fnt2 = sol_fnt2.w
+                r1 = PortfolioOptimisers.factory(r1, pr, slv)
+                r2 = PortfolioOptimisers.factory(r2, pr, slv)
+                rk_min = expected_risk(r1, w_min, pr.X)
+                rk_max = expected_risk(r1, w_max, pr.X)
+                rk_fnt = expected_risk(r1, w_fnt1, pr.X)
+                rt_min = expected_return(ret1, w_min, pr)
+                rt_max = expected_return(ret1, w_max, pr)
+                rt_fnt = expected_return(ret1, w_fnt1, pr)
+                rk_rtol = if i ∈ (1, 4, 5, 7, 20, 26)
+                    5e-6
+                elseif i ∈ (6, 14, 24)
+                    1e-5
+                elseif i ∈ (8, 9, 10, 15, 17, 18, 19, 20)
+                    5e-5
+                elseif i == 12
+                    1e-4
+                elseif i ∈ (21, 22, 23)
+                    5e-4
+                elseif i == 25
+                    5e-2
+                else
+                    1e-6
+                end
+                rt_rtol = if i ∈ (1, 2, 12)
+                    1e-3
+                elseif i ∈ (7, 20)
+                    5e-5
+                elseif i == 26
+                    5e-6
+                elseif i ∈ (3, 8, 9, 10)
+                    5e-4
+                elseif i ∈ (4, 5, 6, 16, 21, 22, 23, 24)
+                    5e-3
+                elseif i == 11
+                    1e-4
+                elseif i ∈ (14, 15)
+                    1e-2
+                elseif i ∈ (17, 18, 19)
+                    5e-2
+                elseif i == 25
+                    1e-1
+                else
+                    1e-6
+                end
+                res = isapprox(rk_fnt[1], rk_min; rtol = rk_rtol)
+                if !res
+                    println(i)
+                    find_tol(rk_fnt[1], rk_min; name1 = "rk_fnt[1]", name2 = "rk_min")
+                end
+                @test res
+                @test rk_min <= rk_fnt[2] <= rk_max
+                res = isapprox(rk_fnt[3], rk_max; rtol = rk_rtol)
+                if !res
+                    find_tol(rk_fnt[3], rk_max; name1 = "rk_fnt[3]", name2 = "rk_max")
+                end
+                @test res
+                res = isapprox(rt_fnt[1], rt_min; rtol = rt_rtol)
+                if !res
+                    println(i)
+                    find_tol(rt_fnt[1], rt_min; name1 = "rt_fnt[1]", name2 = "rt_min")
+                end
+                @test res
+                @test rt_min <= rt_fnt[2] <= rt_max
+                res = isapprox(rt_fnt[3], rt_max; rtol = rt_rtol)
+                if !res
+                    println(i)
+                    find_tol(rt_fnt[3], rt_max; name1 = "rt_fnt[3]", name2 = "rt_max")
+                end
+                @test res
+                i += 1
+            end
+        end
+    end
     @testset "NearOptimalCentering" begin
         w_min = optimise!(MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(),
                                    opt = opt), rd).w

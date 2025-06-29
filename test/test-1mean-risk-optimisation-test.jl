@@ -223,22 +223,29 @@
                 end
                 res = isapprox(rk_fnt[1], rk_min; rtol = rk_rtol)
                 if !res
+                    println(i)
                     find_tol(rk_fnt[1], rk_min; name1 = "rk_fnt[1]", name2 = "rk_min")
                 end
+                @test res
                 @test rk_min <= rk_fnt[2] <= rk_max
                 res = isapprox(rk_fnt[3], rk_max; rtol = rk_rtol)
                 if !res
                     find_tol(rk_fnt[3], rk_max; name1 = "rk_fnt[3]", name2 = "rk_max")
                 end
+                @test res
                 res = isapprox(rt_fnt[1], rt_min; rtol = rt_rtol)
                 if !res
+                    println(i)
                     find_tol(rt_fnt[1], rt_min; name1 = "rt_fnt[1]", name2 = "rt_min")
                 end
+                @test res
                 @test rt_min <= rt_fnt[2] <= rt_max
                 res = isapprox(rt_fnt[3], rt_max; rtol = rt_rtol)
                 if !res
+                    println(i)
                     find_tol(rt_fnt[3], rt_max; name1 = "rt_fnt[3]", name2 = "rt_max")
                 end
+                @test res
                 i += 1
             end
         end
@@ -433,6 +440,7 @@
                     else
                         rtol
                     end
+                    res = isapprox(w, wt; rtol = _rtol)
                     if !res
                         println("$i failed:\n$(typeof(r))\n$(typeof(obj))\n$(typeof(ret)).")
                         find_tol(w, wt; name1 = :w, name2 = :wt)
