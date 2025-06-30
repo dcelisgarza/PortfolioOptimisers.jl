@@ -22,8 +22,8 @@
         end
     end
     function get_rtol(a, b)
-        for t in [1e-6, 5e-6, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2]
-            res = isapprox(a, b; rtol = t)
+        for rtol in [1e-6, 5e-6, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 5e-1]
+            res = isapprox(a, b; rtol = rtol)
             if res
                 return t
             end
@@ -172,6 +172,7 @@
                 @test rk_min <= rk_fnt_1[2] <= rk_max
                 res = isapprox(rk_fnt_1[3], rk_max; rtol = rk_rtol_1)
                 if !res
+                    println(i)
                     find_tol(rk_fnt_1[3], rk_max; name1 = "rk_fnt_1[3]", name2 = "rk_max")
                 end
                 @test res
