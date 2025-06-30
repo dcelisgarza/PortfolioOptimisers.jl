@@ -23,10 +23,10 @@
     end
     function get_rtol(a, b)
         rtol = 0.0
-        for rtol in [1e-6, 5e-6, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2]
+        for t in [1e-6, 5e-6, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2]
             res = isapprox(a, b; rtol = rtol)
             if res
-                rtol = _rtol
+                rtol = t
                 break
             end
         end

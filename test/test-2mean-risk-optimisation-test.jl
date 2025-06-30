@@ -46,6 +46,17 @@
         end
         return rrtol, aatol
     end
+    function get_rtol(a, b)
+        rtol = 0.0
+        for t in [1e-6, 5e-6, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2]
+            res = isapprox(a, b; rtol = rtol)
+            if res
+                rtol = t
+                break
+            end
+        end
+        return rtol
+    end
     X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
                   timestamp = :timestamp)
     F = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/factor_prices.csv"));
