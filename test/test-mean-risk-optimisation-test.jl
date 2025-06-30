@@ -210,14 +210,14 @@
                     find_tol(rk_fnt_1[3], rk_max; name1 = "rk_fnt_1[3]", name2 = "rk_max")
                 end
                 @test res
-                res = isapprox(rt_fnt_1[1], rt_min; rtol = rt_rtol_2)
+                res = isapprox(rt_fnt_1[1], rt_min; rtol = rt_rtol_1)
                 if !res
                     println(i)
                     find_tol(rt_fnt_1[1], rt_min; name1 = "rt_fnt_1[1]", name2 = "rt_min")
                 end
                 @test res
                 @test rt_min <= rt_fnt_1[2] <= rt_max
-                res = isapprox(rt_fnt_1[3], rt_max; rtol = rt_rtol_2)
+                res = isapprox(rt_fnt_1[3], rt_max; rtol = rt_rtol_1)
                 if !res
                     println(i)
                     find_tol(rt_fnt_1[3], rt_max; name1 = "rt_fnt_1[3]", name2 = "rt_max")
