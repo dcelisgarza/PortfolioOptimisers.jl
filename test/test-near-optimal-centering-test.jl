@@ -123,6 +123,10 @@
                 sol_fnt2 = optimise!(NearOptimalCentering(; r = r2, obj = MaximumReturn(),
                                                           opt = opt1))
                 w_fnt2 = sol_fnt2.w
+                @test isapprox(w_fnt2,
+                               optimise!(NearOptimalCentering(; r = [r2],
+                                                              obj = MaximumReturn(),
+                                                              opt = opt1)).w)
                 sol_fnt3 = optimise!(NearOptimalCentering(;
                                                           alg = ConstrainedNearOptimalCenteringAlgorithm(),
                                                           r = r1, obj = MinimumRisk(),
@@ -311,11 +315,19 @@
             sol_fnt_1 = optimise!(NearOptimalCentering(; r = r1, obj = MaximumReturn(),
                                                        opt = opt1))
             w_fnt_1 = sol_fnt_1.w
+            @test isapprox(w_fnt_1,
+                           optimise!(NearOptimalCentering(; r = [r1], obj = MaximumReturn(),
+                                                          opt = opt1)).w)
             sol_fnt_2 = optimise!(NearOptimalCentering(;
                                                        alg = ConstrainedNearOptimalCenteringAlgorithm(),
                                                        r = r1, obj = MaximumReturn(),
                                                        opt = opt1))
             w_fnt_2 = sol_fnt_2.w
+            @test isapprox(w_fnt_2,
+                           optimise!(NearOptimalCentering(;
+                                                          alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                                          r = [r1], obj = MaximumReturn(),
+                                                          opt = opt1)).w)
             r1 = PortfolioOptimisers.factory(r1, pr, slv)
             rk_fnt_1 = expected_risk(r1, w_fnt_1, pr.X)
             rk_fnt_2 = expected_risk(r1, w_fnt_2, pr.X)

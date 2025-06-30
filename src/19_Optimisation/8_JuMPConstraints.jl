@@ -909,7 +909,7 @@ function set_sdp_constraints!(model::JuMP.Model, w_key::Symbol = :w, W_key::Symb
         return model[W_key]
     end
     w = model[w_key]
-    k = haskey(model, :crkb) ? 1 : model[:k]
+    k = ifelse(haskey(model, :crkb), 1, model[:k])
     sc = model[:sc]
     N = length(w)
     W = model[W_key] = @variable(model, [1:N, 1:N], Symmetric)
