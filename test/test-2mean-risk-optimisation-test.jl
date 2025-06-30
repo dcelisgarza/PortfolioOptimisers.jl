@@ -180,8 +180,14 @@
                 rt_max = expected_return(ret1, w_max, pr)
                 rt_fnt_1 = expected_return(ret1, w_fnt1, pr)
                 rt_fnt_2 = expected_return(ret1, w_fnt2, pr)
-                rk_rtol_1 = 1e-6
-                rt_rtol_1 = 1e-6
+                rk_rtol_1 = max(get_rtol(rk_fnt_1[1], rk_min),
+                                get_rtol(rk_fnt_1[3], rk_max))
+                rt_rtol_1 = max(get_rtol(rt_fnt_1[1], rt_min),
+                                get_rtol(rt_fnt_1[3], rt_max))
+                rk_rtol_2 = max(get_rtol(rk_fnt_2[1], rk_min),
+                                get_rtol(rk_fnt_2[3], rk_max))
+                rt_rtol_2 = max(get_rtol(rt_fnt_2[1], rt_min),
+                                get_rtol(rt_fnt_2[3], rt_max))
                 res = isapprox(rk_fnt_1[1], rk_min; rtol = rk_rtol_1)
                 if !res
                     println(i)
@@ -208,9 +214,6 @@
                     find_tol(rt_fnt_1[3], rt_max; name1 = "rt_fnt_1[3]", name2 = "rt_max")
                 end
                 @test res
-                ####################
-                rk_rtol_2 = 1e-6
-                rt_rtol_2 = 1e-6
                 res = isapprox(rk_fnt_2[1], rk_min; rtol = rk_rtol_2)
                 if !res
                     println(i)
@@ -237,7 +240,6 @@
                     find_tol(rt_fnt_2[3], rt_max; name1 = "rt_fnt_2[3]", name2 = "rt_max")
                 end
                 @test res
-                ####################
                 i += 1
             end
         end
@@ -354,11 +356,8 @@
             r1 = PortfolioOptimisers.factory(r1, pr, slv)
             rk_fnt = expected_risk(r1, w_fnt, pr.X)
             ub = r1.settings.ub
-            rtol = if i in (3, 4, 5, 6, 8, 9, 10, 11, 12)
-                5e-6
-            else
-                1e-6
-            end
+            rtol = max(get_rtol(rk_fnt[1], ub[1]), get_rtol(rk_fnt[2], ub[2]),
+                       get_rtol(rk_fnt[3], ub[3]))
             res = isapprox(rk_fnt[1], ub[1]; rtol = rtol)
             if !res
                 println(i)

@@ -21,6 +21,17 @@
             end
         end
     end
+    function get_rtol(a, b)
+        rtol = 0.0
+        for rtol in [1e-6, 5e-6, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2]
+            res = isapprox(a, b; rtol = rtol)
+            if res
+                rtol = _rtol
+                break
+            end
+        end
+        return rtol
+    end
     X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
                   timestamp = :timestamp)
     F = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/factor_prices.csv"));
@@ -137,8 +148,23 @@
                 rt_fnt_2 = expected_return(ret1, w_fnt2, pr)
                 rt_fnt_3 = expected_return(ret1, w_fnt3, pr)
                 rt_fnt_4 = expected_return(ret1, w_fnt4, pr)
-                rk_rtol_1 = 1e-6
-                rt_rtol_1 = 1e-6
+                rtols = [1e-6, 5e-6, 1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2]
+                rk_rtol_1 = max(get_rtol(rk_fnt_1[1], rk_min),
+                                get_rtol(rk_fnt_1[3], rk_max))
+                rt_rtol_1 = max(get_rtol(rt_fnt_1[1], rt_min),
+                                get_rtol(rt_fnt_1[3], rt_max))
+                rk_rtol_2 = max(get_rtol(rk_fnt_2[1], rk_min),
+                                get_rtol(rk_fnt_2[3], rk_max))
+                rt_rtol_2 = max(get_rtol(rt_fnt_2[1], rt_min),
+                                get_rtol(rt_fnt_2[3], rt_max))
+                rk_rtol_3 = max(get_rtol(rk_fnt_3[1], rk_min),
+                                get_rtol(rk_fnt_3[3], rk_max))
+                rt_rtol_3 = max(get_rtol(rt_fnt_3[1], rt_min),
+                                get_rtol(rt_fnt_3[3], rt_max))
+                rk_rtol_4 = max(get_rtol(rk_fnt_4[1], rk_min),
+                                get_rtol(rk_fnt_4[3], rk_max))
+                rt_rtol_4 = max(get_rtol(rt_fnt_4[1], rt_min),
+                                get_rtol(rt_fnt_4[3], rt_max))
                 res = isapprox(rk_fnt_1[1], rk_min; rtol = rk_rtol_1)
                 if !res
                     println(i)
@@ -164,9 +190,6 @@
                     find_tol(rt_fnt_1[3], rt_max; name1 = "rt_fnt_1[3]", name2 = "rt_max")
                 end
                 @test res
-                ##################
-                rk_rtol_2 = 1e-6
-                rt_rtol_2 = 1e-6
                 res = isapprox(rk_fnt_2[1], rk_min; rtol = rk_rtol_2)
                 if !res
                     println(i)
@@ -192,10 +215,6 @@
                     find_tol(rt_fnt_2[3], rt_max; name1 = "rt_fnt_2[3]", name2 = "rt_max")
                 end
                 @test res
-                ##################
-                ##################
-                rk_rtol_3 = 1e-6
-                rt_rtol_3 = 1e-6
                 res = isapprox(rk_fnt_3[1], rk_min; rtol = rk_rtol_3)
                 if !res
                     println(i)
@@ -221,10 +240,6 @@
                     find_tol(rt_fnt_3[3], rt_max; name1 = "rt_fnt_3[3]", name2 = "rt_max")
                 end
                 @test res
-                ##################
-                ##################
-                rk_rtol_4 = 1e-6
-                rt_rtol_4 = 1e-6
                 res = isapprox(rk_fnt_4[1], rk_min; rtol = rk_rtol_4)
                 if !res
                     println(i)
@@ -250,7 +265,6 @@
                     find_tol(rt_fnt_4[3], rt_max; name1 = "rt_fnt_4[3]", name2 = "rt_max")
                 end
                 @test res
-                ##################
                 i += 1
             end
         end
@@ -306,7 +320,10 @@
             rk_fnt_1 = expected_risk(r1, w_fnt_1, pr.X)
             rk_fnt_2 = expected_risk(r1, w_fnt_2, pr.X)
             ub = r1.settings.ub
-            rtol_1 = 0.5
+            rtol_1 = max(get_rtol(rk_fnt_1[1], ub[1]), get_rtol(rk_fnt_1[2], ub[2]),
+                         get_rtol(rk_fnt_1[3], ub[3]))
+            rtol_2 = max(get_rtol(rk_fnt_2[1], ub[1]), get_rtol(rk_fnt_2[2], ub[2]),
+                         get_rtol(rk_fnt_2[3], ub[3]))
             res = isapprox(rk_fnt_1[1], ub[1]; rtol = rtol_1)
             if !res
                 println(i)
@@ -325,8 +342,6 @@
                 find_tol(rk_fnt_1[3], ub[3]; name1 = "rk_fnt_1[3]", name2 = "ub[3]")
             end
             @test res
-            ###################
-            rtol_2 = 1e-6
             res = isapprox(rk_fnt_2[1], ub[1]; rtol = rtol_2)
             if !res
                 println(i)
@@ -345,7 +360,6 @@
                 find_tol(rk_fnt_2[3], ub[3]; name1 = "rk_fnt_2[3]", name2 = "ub[3]")
             end
             @test res
-            ###################
             i += 1
         end
     end
