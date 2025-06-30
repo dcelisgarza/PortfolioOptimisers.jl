@@ -152,7 +152,7 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
     resi = Vector{OptimisationResult}(undef, clr.k)
     @floop nco.threads for (i, cl) in pairs(cls)
         if length(cl) == 1
-            wi[cl, i] .= 1
+            wi[cl, i] .= one(eltype(pr.X))
             resi[i] = SingletonOptimisationResult(OptimisationSuccess(nothing))
         else
             optic = opt_view(opti, cl, pr.X)

@@ -120,6 +120,10 @@
                 sol_fnt1 = optimise!(NearOptimalCentering(; r = r1, obj = MinimumRisk(),
                                                           opt = opt2))
                 w_fnt1 = sol_fnt1.w
+                @test isapprox(w_fnt1,
+                               optimise!(NearOptimalCentering(; r = [r1],
+                                                              obj = MinimumRisk(),
+                                                              opt = opt2)).w)
                 sol_fnt2 = optimise!(NearOptimalCentering(; r = r2, obj = MaximumReturn(),
                                                           opt = opt1))
                 w_fnt2 = sol_fnt2.w
