@@ -71,7 +71,7 @@ function PortfolioOptimisers.plot_composition(w::AbstractVector{<:Real},
                                               kwargs::NamedTuple = (title = "Portfolio Composition",
                                                                     xlabel = "Asset",
                                                                     ylabel = "Weight",
-                                                                    xrotation = 45,
+                                                                    xrotation = 90,
                                                                     legend = false))
     M = length(w)
     N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
@@ -83,6 +83,23 @@ function PortfolioOptimisers.plot_composition(w::AbstractVector{<:Real},
     else
         bar(w; xticks = (1:M, nx), kwargs...)
     end
+end
+function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
+                                                    w::AbstractVector,
+                                                    X::Union{<:AbstractMatrix,
+                                                             <:PortfolioOptimisers.AbstractPriorResult},
+                                                    fees::Union{Nothing, <:Fees} = nothing;
+                                                    nx::AbstractVector = 1:length(w),
+                                                    N::Union{Nothing, <:Real} = nothing,
+                                                    delta::Real = 1e-6,
+                                                    marginal::Bool = false,
+                                                    kwargs::NamedTuple = (title = "Risk Contribution",
+                                                                          xlabel = "Asset",
+                                                                          ylabel = "Risk Contribution",
+                                                                          xrotation = 90,
+                                                                          legend = false))
+    rc = risk_contribution(r, w, X, fees; delta = delta, marginal = marginal)
+    return PortfolioOptimisers.plot_composition(rc, nx; N = N, kwargs = kwargs)
 end
 function PortfolioOptimisers.plot_stacked_bar_composition(w::AbstractArray,
                                                           nx::AbstractVector = 1:size(w, 1);
