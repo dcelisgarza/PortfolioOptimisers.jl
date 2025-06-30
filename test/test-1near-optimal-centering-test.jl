@@ -113,71 +113,144 @@
                 sol_fnt2 = optimise!(NearOptimalCentering(; r = r2, obj = MaximumReturn(),
                                                           opt = opt1))
                 w_fnt2 = sol_fnt2.w
+                sol_fnt3 = optimise!(NearOptimalCentering(;
+                                                          alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                                          r = r1, obj = MinimumRisk(),
+                                                          opt = opt2))
+                w_fnt3 = sol_fnt3.w
+                sol_fnt4 = optimise!(NearOptimalCentering(;
+                                                          alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                                          r = r2, obj = MaximumReturn(),
+                                                          opt = opt1))
+                w_fnt4 = sol_fnt4.w
                 r1 = PortfolioOptimisers.factory(r1, pr, slv)
                 r2 = PortfolioOptimisers.factory(r2, pr, slv)
                 rk_min = expected_risk(r1, w_min, pr.X)
                 rk_max = expected_risk(r1, w_max, pr.X)
-                rk_fnt = expected_risk(r1, w_fnt1, pr.X)
+                rk_fnt_1 = expected_risk(r1, w_fnt1, pr.X)
+                rk_fnt_2 = expected_risk(r1, w_fnt2, pr.X)
+                rk_fnt_3 = expected_risk(r1, w_fnt3, pr.X)
+                rk_fnt_4 = expected_risk(r1, w_fnt4, pr.X)
                 rt_min = expected_return(ret1, w_min, pr)
                 rt_max = expected_return(ret1, w_max, pr)
-                rt_fnt = expected_return(ret1, w_fnt1, pr)
-                rk_rtol = if i in (1, 3, 6)
-                    5e-6
-                elseif i == 2
-                    1e-5
-                elseif i in (4, 8)
-                    5e-5
-                elseif i == 5
-                    5e-2
-                elseif i == 9
-                    5e-4
-                elseif i == 7
-                    1e-4
-                else
-                    1e-6
-                end
-                rt_rtol = if i == 10
-                    5e-6
-                elseif i in (2, 3, 9)
-                    5e-4
-                elseif i == 1
-                    1e-5
-                elseif i == 4
-                    5e-5
-                elseif i in (5, 8)
-                    5e-3
-                elseif i == 7
-                    5e-3
-                elseif i == 6
-                    1e-3
-                else
-                    1e-6
-                end
-                res = isapprox(rk_fnt[1], rk_min; rtol = rk_rtol)
+                rt_fnt_1 = expected_return(ret1, w_fnt1, pr)
+                rt_fnt_2 = expected_return(ret1, w_fnt2, pr)
+                rt_fnt_3 = expected_return(ret1, w_fnt3, pr)
+                rt_fnt_4 = expected_return(ret1, w_fnt4, pr)
+                rk_rtol_1 = 1e-6
+                rt_rtol_1 = 1e-6
+                res = isapprox(rk_fnt_1[1], rk_min; rtol = rk_rtol_1)
                 if !res
                     println(i)
-                    find_tol(rk_fnt[1], rk_min; name1 = "rk_fnt[1]", name2 = "rk_min")
+                    find_tol(rk_fnt_1[1], rk_min; name1 = "rk_fnt_1[1]", name2 = "rk_min")
                 end
                 @test res
-                @test rk_min <= rk_fnt[2] <= rk_max
-                res = isapprox(rk_fnt[3], rk_max; rtol = rk_rtol)
+                @test rk_min <= rk_fnt_1[2] <= rk_max
+                res = isapprox(rk_fnt_1[3], rk_max; rtol = rk_rtol_1)
                 if !res
-                    find_tol(rk_fnt[3], rk_max; name1 = "rk_fnt[3]", name2 = "rk_max")
+                    find_tol(rk_fnt_1[3], rk_max; name1 = "rk_fnt_1[3]", name2 = "rk_max")
                 end
                 @test res
-                res = isapprox(rt_fnt[1], rt_min; rtol = rt_rtol)
-                if !res
-                    println(i)
-                    find_tol(rt_fnt[1], rt_min; name1 = "rt_fnt[1]", name2 = "rt_min")
-                end
-                @test res
-                @test rt_min <= rt_fnt[2] <= rt_max
-                res = isapprox(rt_fnt[3], rt_max; rtol = rt_rtol)
+                res = isapprox(rt_fnt_1[1], rt_min; rtol = rt_rtol_1)
                 if !res
                     println(i)
-                    find_tol(rt_fnt[3], rt_max; name1 = "rt_fnt[3]", name2 = "rt_max")
+                    find_tol(rt_fnt_1[1], rt_min; name1 = "rt_fnt_1[1]", name2 = "rt_min")
                 end
                 @test res
+                @test rt_min <= rt_fnt_1[2] <= rt_max
+                res = isapprox(rt_fnt_1[3], rt_max; rtol = rt_rtol_1)
+                if !res
+                    println(i)
+                    find_tol(rt_fnt_1[3], rt_max; name1 = "rt_fnt_1[3]", name2 = "rt_max")
+                end
+                @test res
+                ##################
+                rk_rtol_2 = 1e-6
+                rt_rtol_2 = 1e-6
+                res = isapprox(rk_fnt_2[1], rk_min; rtol = rk_rtol_2)
+                if !res
+                    println(i)
+                    find_tol(rk_fnt_2[1], rk_min; name1 = "rk_fnt_2[1]", name2 = "rk_min")
+                end
+                @test res
+                @test rk_min <= rk_fnt_2[2] <= rk_max
+                res = isapprox(rk_fnt_2[3], rk_max; rtol = rk_rtol_2)
+                if !res
+                    find_tol(rk_fnt_2[3], rk_max; name1 = "rk_fnt_2[3]", name2 = "rk_max")
+                end
+                @test res
+                res = isapprox(rt_fnt_2[1], rt_min; rtol = rt_rtol_2)
+                if !res
+                    println(i)
+                    find_tol(rt_fnt_2[1], rt_min; name1 = "rt_fnt_2[1]", name2 = "rt_min")
+                end
+                @test res
+                @test rt_min <= rt_fnt_2[2] <= rt_max
+                res = isapprox(rt_fnt_2[3], rt_max; rtol = rt_rtol_2)
+                if !res
+                    println(i)
+                    find_tol(rt_fnt_2[3], rt_max; name1 = "rt_fnt_2[3]", name2 = "rt_max")
+                end
+                @test res
+                ##################
+                ##################
+                rk_rtol_3 = 1e-6
+                rt_rtol_3 = 1e-6
+                res = isapprox(rk_fnt_3[1], rk_min; rtol = rk_rtol_3)
+                if !res
+                    println(i)
+                    find_tol(rk_fnt_3[1], rk_min; name1 = "rk_fnt_3[1]", name2 = "rk_min")
+                end
+                @test res
+                @test rk_min <= rk_fnt_3[2] <= rk_max
+                res = isapprox(rk_fnt_3[3], rk_max; rtol = rk_rtol_3)
+                if !res
+                    find_tol(rk_fnt_3[3], rk_max; name1 = "rk_fnt_3[3]", name2 = "rk_max")
+                end
+                @test res
+                res = isapprox(rt_fnt_3[1], rt_min; rtol = rt_rtol_3)
+                if !res
+                    println(i)
+                    find_tol(rt_fnt_3[1], rt_min; name1 = "rt_fnt_3[1]", name2 = "rt_min")
+                end
+                @test res
+                @test rt_min <= rt_fnt_3[2] <= rt_max
+                res = isapprox(rt_fnt_3[3], rt_max; rtol = rt_rtol_3)
+                if !res
+                    println(i)
+                    find_tol(rt_fnt_3[3], rt_max; name1 = "rt_fnt_3[3]", name2 = "rt_max")
+                end
+                @test res
+                ##################
+                ##################
+                rk_rtol_4 = 1e-6
+                rt_rtol_4 = 1e-6
+                res = isapprox(rk_fnt_4[1], rk_min; rtol = rk_rtol_4)
+                if !res
+                    println(i)
+                    find_tol(rk_fnt_4[1], rk_min; name1 = "rk_fnt_4[1]", name2 = "rk_min")
+                end
+                @test res
+                @test rk_min <= rk_fnt_4[2] <= rk_max
+                res = isapprox(rk_fnt_4[3], rk_max; rtol = rk_rtol_4)
+                if !res
+                    find_tol(rk_fnt_4[3], rk_max; name1 = "rk_fnt_4[3]", name2 = "rk_max")
+                end
+                @test res
+                res = isapprox(rt_fnt_4[1], rt_min; rtol = rt_rtol_4)
+                if !res
+                    println(i)
+                    find_tol(rt_fnt_4[1], rt_min; name1 = "rt_fnt_4[1]", name2 = "rt_min")
+                end
+                @test res
+                @test rt_min <= rt_fnt_4[2] <= rt_max
+                res = isapprox(rt_fnt_4[3], rt_max; rtol = rt_rtol_4)
+                if !res
+                    println(i)
+                    find_tol(rt_fnt_4[3], rt_max; name1 = "rt_fnt_4[3]", name2 = "rt_max")
+                end
+                @test res
+                ##################
                 i += 1
             end
         end
@@ -221,31 +294,58 @@
         opt1 = JuMPOptimiser(; pe = pr, ret = ret1, slv = slv)
         i = 1
         for r1 in risks3
-            sol_fnt = optimise!(NearOptimalCentering(; r = r1, obj = MaximumReturn(),
-                                                     opt = opt1))
-            w_fnt = sol_fnt.w
+            sol_fnt_1 = optimise!(NearOptimalCentering(; r = r1, obj = MaximumReturn(),
+                                                       opt = opt1))
+            w_fnt_1 = sol_fnt_1.w
+            sol_fnt_2 = optimise!(NearOptimalCentering(;
+                                                       alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                                       r = r1, obj = MaximumReturn(),
+                                                       opt = opt1))
+            w_fnt_2 = sol_fnt_2.w
             r1 = PortfolioOptimisers.factory(r1, pr, slv)
-            rk_fnt = expected_risk(r1, w_fnt, pr.X)
+            rk_fnt_1 = expected_risk(r1, w_fnt_1, pr.X)
+            rk_fnt_2 = expected_risk(r1, w_fnt_2, pr.X)
             ub = r1.settings.ub
-            rtol = 0.5
-            res = isapprox(rk_fnt[1], ub[1]; rtol = rtol)
+            rtol_1 = 0.5
+            res = isapprox(rk_fnt_1[1], ub[1]; rtol = rtol_1)
             if !res
                 println(i)
-                find_tol(rk_fnt[1], ub[1]; name1 = "rk_fnt[1]", name2 = "ub[1]")
+                find_tol(rk_fnt_1[1], ub[1]; name1 = "rk_fnt_1[1]", name2 = "ub[1]")
             end
             @test res
-            res = isapprox(rk_fnt[2], ub[2]; rtol = rtol)
+            res = isapprox(rk_fnt_1[2], ub[2]; rtol = rtol_1)
             if !res
                 println(i)
-                find_tol(rk_fnt[2], ub[2]; name1 = "rk_fnt[2]", name2 = "ub[2]")
+                find_tol(rk_fnt_1[2], ub[2]; name1 = "rk_fnt_1[2]", name2 = "ub[2]")
             end
             @test res
-            res = isapprox(rk_fnt[3], ub[3]; rtol = rtol)
+            res = isapprox(rk_fnt_1[3], ub[3]; rtol = rtol_1)
             if !res
                 println(i)
-                find_tol(rk_fnt[3], ub[3]; name1 = "rk_fnt[3]", name2 = "ub[3]")
+                find_tol(rk_fnt_1[3], ub[3]; name1 = "rk_fnt_1[3]", name2 = "ub[3]")
             end
             @test res
+            ###################
+            rtol_2 = 1e-6
+            res = isapprox(rk_fnt_2[1], ub[1]; rtol = rtol_2)
+            if !res
+                println(i)
+                find_tol(rk_fnt_2[1], ub[1]; name1 = "rk_fnt_2[1]", name2 = "ub[1]")
+            end
+            @test res
+            res = isapprox(rk_fnt_2[2], ub[2]; rtol = rtol_2)
+            if !res
+                println(i)
+                find_tol(rk_fnt_2[2], ub[2]; name1 = "rk_fnt_2[2]", name2 = "ub[2]")
+            end
+            @test res
+            res = isapprox(rk_fnt_2[3], ub[3]; rtol = rtol_2)
+            if !res
+                println(i)
+                find_tol(rk_fnt_2[3], ub[3]; name1 = "rk_fnt_2[3]", name2 = "ub[3]")
+            end
+            @test res
+            ###################
             i += 1
         end
     end

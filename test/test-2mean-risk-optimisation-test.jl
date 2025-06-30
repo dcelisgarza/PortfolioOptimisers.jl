@@ -174,68 +174,70 @@
                 r2 = PortfolioOptimisers.factory(r2, pr, slv)
                 rk_min = expected_risk(r1, w_min, pr.X)
                 rk_max = expected_risk(r1, w_max, pr.X)
-                rk_fnt = expected_risk(r1, w_fnt1, pr.X)
+                rk_fnt_1 = expected_risk(r1, w_fnt1, pr.X)
+                rk_fnt_2 = expected_risk(r1, w_fnt2, pr.X)
                 rt_min = expected_return(ret1, w_min, pr)
                 rt_max = expected_return(ret1, w_max, pr)
-                rt_fnt = expected_return(ret1, w_fnt1, pr)
-                rk_rtol = if i in (1, 4, 5, 26)
-                    5e-6
-                elseif i in (6, 9, 10, 24)
-                    1e-5
-                elseif i in (12, 23)
-                    1e-4
-                elseif i in (14, 15, 17, 18, 19, 21, 22)
-                    5e-5
-                elseif i == 25
-                    5e-2
-                else
-                    1e-6
-                end
-                rt_rtol = if i in (1, 2, 7, 12)
-                    1e-3
-                elseif i == 3
-                    5e-4
-                elseif i in (4, 5, 6, 8, 16, 20, 24)
-                    5e-3
-                elseif i in (9, 10, 14, 15)
-                    1e-2
-                elseif i == 11
-                    1e-4
-                elseif i in (17, 18, 19, 21, 22, 23)
-                    5e-2
-                elseif i == 25
-                    1e-1
-                elseif i == 26
-                    5e-6
-                else
-                    1e-6
-                end
-                res = isapprox(rk_fnt[1], rk_min; rtol = rk_rtol)
+                rt_fnt_1 = expected_return(ret1, w_fnt1, pr)
+                rt_fnt_2 = expected_return(ret1, w_fnt2, pr)
+                rk_rtol_1 = 1e-6
+                rt_rtol_1 = 1e-6
+                res = isapprox(rk_fnt_1[1], rk_min; rtol = rk_rtol_1)
                 if !res
                     println(i)
-                    find_tol(rk_fnt[1], rk_min; name1 = "rk_fnt[1]", name2 = "rk_min")
+                    find_tol(rk_fnt_1[1], rk_min; name1 = "rk_fnt_1[1]", name2 = "rk_min")
                 end
                 @test res
-                @test rk_min <= rk_fnt[2] <= rk_max
-                res = isapprox(rk_fnt[3], rk_max; rtol = rk_rtol)
+                @test rk_min <= rk_fnt_1[2] <= rk_max
+                res = isapprox(rk_fnt_1[3], rk_max; rtol = rk_rtol_1)
                 if !res
                     println(i)
-                    find_tol(rk_fnt[3], rk_max; name1 = "rk_fnt[3]", name2 = "rk_max")
+                    find_tol(rk_fnt_1[3], rk_max; name1 = "rk_fnt_1[3]", name2 = "rk_max")
                 end
                 @test res
-                res = isapprox(rt_fnt[1], rt_min; rtol = rt_rtol)
+                res = isapprox(rt_fnt_1[1], rt_min; rtol = rt_rtol_2)
                 if !res
                     println(i)
-                    find_tol(rt_fnt[1], rt_min; name1 = "rt_fnt[1]", name2 = "rt_min")
+                    find_tol(rt_fnt_1[1], rt_min; name1 = "rt_fnt_1[1]", name2 = "rt_min")
                 end
                 @test res
-                @test rt_min <= rt_fnt[2] <= rt_max
-                res = isapprox(rt_fnt[3], rt_max; rtol = rt_rtol)
+                @test rt_min <= rt_fnt_1[2] <= rt_max
+                res = isapprox(rt_fnt_1[3], rt_max; rtol = rt_rtol_2)
                 if !res
                     println(i)
-                    find_tol(rt_fnt[3], rt_max; name1 = "rt_fnt[3]", name2 = "rt_max")
+                    find_tol(rt_fnt_1[3], rt_max; name1 = "rt_fnt_1[3]", name2 = "rt_max")
                 end
                 @test res
+                ####################
+                rk_rtol_2 = 1e-6
+                rt_rtol_2 = 1e-6
+                res = isapprox(rk_fnt_2[1], rk_min; rtol = rk_rtol_2)
+                if !res
+                    println(i)
+                    find_tol(rk_fnt_2[1], rk_min; name1 = "rk_fnt_2[1]", name2 = "rk_min")
+                end
+                @test res
+                @test rk_min <= rk_fnt_2[2] <= rk_max
+                res = isapprox(rk_fnt_2[3], rk_max; rtol = rk_rtol_2)
+                if !res
+                    println(i)
+                    find_tol(rk_fnt_2[3], rk_max; name1 = "rk_fnt_2[3]", name2 = "rk_max")
+                end
+                @test res
+                res = isapprox(rt_fnt_2[1], rt_min; rtol = rt_rtol_2)
+                if !res
+                    println(i)
+                    find_tol(rt_fnt_2[1], rt_min; name1 = "rt_fnt_2[1]", name2 = "rt_min")
+                end
+                @test res
+                @test rt_min <= rt_fnt_2[2] <= rt_max
+                res = isapprox(rt_fnt_2[3], rt_max; rtol = rt_rtol_2)
+                if !res
+                    println(i)
+                    find_tol(rt_fnt_2[3], rt_max; name1 = "rt_fnt_2[3]", name2 = "rt_max")
+                end
+                @test res
+                ####################
                 i += 1
             end
         end
