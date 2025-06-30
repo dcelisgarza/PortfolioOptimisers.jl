@@ -68,7 +68,7 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
     N = size(W, 1)
 
     @smart_assert(N >= 9)
-    @assert(all(W .>= zero(eltype(W))),
+    @assert(all(x -> x >= zero(x), W),
             "All entries in matrix must be greater than or equal to 0.")
 
     A = spzeros(N, N)  # Initialize adjacency matrix
@@ -355,10 +355,10 @@ function breadth(CIJ::AbstractMatrix{<:Real}, source::Integer)
         ns = findnz(CIJ[u, :])[1]
         for v in ns
             # This allows the `source` distance to itself to be recorded
-            if all(distance[v] .== 0)
+            if all(x -> x == zero(x), distance[v])
                 distance[v] = distance[u] + 1
             end
-            if all(color[v] .== white)
+            if all(x -> x == white, color[v])
                 color[v] = gray
                 distance[v] = distance[u] + 1
                 branch[v] = u

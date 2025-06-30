@@ -49,22 +49,22 @@ function BudgetCosts(; bgt::Union{<:Real, <:BudgetRange} = 1.0, w::AbstractVecto
                      un::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
     @smart_assert(!isempty(w))
     if isa(vp, AbstractVector)
-        @smart_assert(!isempty(vp) && all(vp .>= zero(eltype(vp))))
+        @smart_assert(!isempty(vp) && all(x -> x >= zero(x), vp))
     else
         @smart_assert(vp >= zero(vp))
     end
     if isa(vn, AbstractVector)
-        @smart_assert(!isempty(vn) && all(vn .>= zero(eltype(vn))))
+        @smart_assert(!isempty(vn) && all(x -> x >= zero(x), vn))
     else
         @smart_assert(vn >= zero(vn))
     end
     if isa(up, AbstractVector)
-        @smart_assert(!isempty(up) && all(up .>= zero(eltype(up))))
+        @smart_assert(!isempty(up) && all(x -> x >= zero(x), up))
     else
         @smart_assert(up >= zero(up))
     end
     if isa(un, AbstractVector)
-        @smart_assert(!isempty(un) && all(un .>= zero(eltype(un))))
+        @smart_assert(!isempty(un) && all(x -> x >= zero(x), un))
     else
         @smart_assert(un >= zero(un))
     end
@@ -102,22 +102,22 @@ function BudgetMarketImpact(; bgt::Union{<:Real, <:BudgetRange} = 1.0,
                             beta::Real = 2 / 3)
     @smart_assert(!isempty(w))
     if isa(vp, AbstractVector)
-        @smart_assert(!isempty(vp) && all(vp .>= zero(eltype(vp))))
+        @smart_assert(!isempty(vp) && all(x -> x >= zero(x), vp))
     else
         @smart_assert(vp >= zero(vp))
     end
     if isa(vn, AbstractVector)
-        @smart_assert(!isempty(vn) && all(vn .>= zero(eltype(vn))))
+        @smart_assert(!isempty(vn) && all(x -> x >= zero(x), vn))
     else
         @smart_assert(vn >= zero(vn))
     end
     if isa(up, AbstractVector)
-        @smart_assert(!isempty(up) && all(up .>= zero(eltype(up))))
+        @smart_assert(!isempty(up) && all(x -> x >= zero(x), up))
     else
         @smart_assert(up >= zero(up))
     end
     if isa(un, AbstractVector)
-        @smart_assert(!isempty(un) && all(un .>= zero(eltype(un))))
+        @smart_assert(!isempty(un) && all(x -> x >= zero(x), un))
     else
         @smart_assert(un >= zero(un))
     end
@@ -357,7 +357,7 @@ function w_neg_flag(wb::Real)
     return wb < zero(wb)
 end
 function w_neg_flag(wb::AbstractVector)
-    return any(wb .< zero(eltype(wb)))
+    return any(x -> x < zero(x), wb)
 end
 function w_finite_flag(wb::Real)
     return isfinite(wb)

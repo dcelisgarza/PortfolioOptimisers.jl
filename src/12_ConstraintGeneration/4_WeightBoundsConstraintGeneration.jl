@@ -17,18 +17,18 @@ function validate_bounds(lb::Real, ub::Real)
     return nothing
 end
 function validate_bounds(lb::AbstractVector, ub::Real)
-    @smart_assert(!isempty(lb) && all(lb .<= ub))
+    @smart_assert(!isempty(lb) && all(x -> x <= ub, lb))
     return nothing
 end
 function validate_bounds(lb::Real, ub::AbstractVector)
-    @smart_assert(!isempty(ub) && all(lb .<= ub))
+    @smart_assert(!isempty(ub) && all(x -> x <= ub, lb))
     return nothing
 end
 function validate_bounds(lb::AbstractVector, ub::AbstractVector)
     @smart_assert(!isempty(lb) &&
                   !isempty(ub) &&
                   length(lb) == length(ub) &&
-                  all(lb .<= ub))
+                  all(x -> x <= ub, lb))
     return nothing
 end
 function validate_bounds(lb::AbstractVector, ::Any)

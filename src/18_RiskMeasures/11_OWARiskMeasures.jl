@@ -6,7 +6,7 @@ struct ApproxOrderedWeightsArray{T1 <: AbstractVector{<:Real}} <:
 end
 function ApproxOrderedWeightsArray(; p::AbstractVector{<:Real} = Float64[2, 3, 4, 10, 50])
     @smart_assert(!isempty(p))
-    @smart_assert(all(p .> zero(eltype(p))))
+    @smart_assert(all(x -> x > zero(x), p))
     return ApproxOrderedWeightsArray{typeof(p)}(p)
 end
 struct OrderedWeightsArray{T1 <: RiskMeasureSettings,

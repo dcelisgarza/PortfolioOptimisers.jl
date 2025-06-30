@@ -156,7 +156,9 @@ function assert_finite_nonnegative_real_or_vec(val::Real)
     return nothing
 end
 function assert_finite_nonnegative_real_or_vec(val::AbstractVector{<:Real})
-    @smart_assert(any(isfinite, val) && any(val .> zero(val)) && all(val .>= zero(val)))
+    @smart_assert(any(isfinite, val) &&
+                  any(x -> x > zero(x), val) &&
+                  all(x -> x >= zero(x), val))
     return nothing
 end
 function JuMPOptimiser(;

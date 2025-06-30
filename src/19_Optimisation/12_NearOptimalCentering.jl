@@ -97,7 +97,7 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCenteringAlgorithm())
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
-        @smart_assert(!any(isa.(r, QuadExpressionRiskMeasures)))
+        @smart_assert(!any(x -> isa(x, QuadExpressionRiskMeasures), r))
     else
         @smart_assert(!isa(r, QuadExpressionRiskMeasures))
     end

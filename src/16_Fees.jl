@@ -32,16 +32,16 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
         @smart_assert(!isempty(fs))
     end
     if !isnothing(l)
-        @smart_assert(all(l .> zero(l)))
+        @smart_assert(all(x -> x > zero(x), l))
     end
     if !isnothing(s)
-        @smart_assert(all(s .> zero(s)))
+        @smart_assert(all(x -> x > zero(x), s))
     end
     if !isnothing(fl)
-        @smart_assert(all(fl .> zero(fl)))
+        @smart_assert(all(x -> x > zero(x), fl))
     end
     if !isnothing(fs)
-        @smart_assert(all(fs .> zero(fs)))
+        @smart_assert(all(x -> x > zero(x), fs))
     end
     return Fees{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
                 typeof(tol_kwargs)}(tn, l, s, fl, fs, tol_kwargs)

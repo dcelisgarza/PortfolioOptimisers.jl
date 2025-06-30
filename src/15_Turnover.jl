@@ -8,7 +8,7 @@ function Turnover(; w::AbstractVector{<:Real},
     if isa(val, AbstractVector)
         @smart_assert(!isempty(val))
         @smart_assert(length(val) == length(w))
-        @smart_assert(all(isfinite, val) && all(val .>= zero(eltype(val))))
+        @smart_assert(all(isfinite, val) && all(x -> x >= zero(x), val))
     else
         @smart_assert(isfinite(val) && val >= zero(eltype(val)))
     end

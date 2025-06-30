@@ -550,7 +550,7 @@ function DiscontinuousEntropyPoolingViewEstimator(;
     if isa(B, AbstractVector)
         @smart_assert(!isempty(B))
         idx = isa.(B, AbstractDiscontinuousEntropyPoolingConstraintEstimator)
-        @smart_assert(all(getproperty.(B[idx], :alpha) .== A.alpha))
+        @smart_assert(all(x -> x == A.alpha, getproperty.(B[idx], :alpha)))
     else
         @smart_assert(A.alpha == B.alpha)
     end

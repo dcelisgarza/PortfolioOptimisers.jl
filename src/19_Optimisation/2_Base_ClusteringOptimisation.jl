@@ -93,7 +93,7 @@ function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wb::WeightBounds
                            wi::AbstractVector)
     lb = wb.lb
     ub = wb.ub
-    if !(any(ub .< wi) || any(lb .> wi))
+    if !(any((x, y) -> x < y, (ub, wi)) || any((x, y) -> x > y, (lb, wi)))
         return wi
     end
     model = JuMP.Model()
@@ -119,13 +119,13 @@ function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wb::WeightBo
                            w::AbstractVector)
     lb = wb.lb
     ub = wb.ub
-    if !(any(ub .< w) || any(lb .> w))
+    if !(any((x, y) -> x < y, (ub, w)) || any((x, y) -> x > y, (lb, w)))
         return w
     end
     iter = cwf.iter
     s1 = sum(w)
     for _ in 1:iter
-        if !(any(ub .< w) || any(lb .> w))
+        if !(any((x, y) -> x < y, (ub, w)) || any((x, y) -> x > y, (lb, w)))
             break
         end
         old_w = copy(w)

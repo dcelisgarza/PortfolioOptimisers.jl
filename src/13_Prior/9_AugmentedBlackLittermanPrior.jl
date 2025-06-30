@@ -58,9 +58,7 @@ function AugmentedBlackLittermanPriorEstimator(;
         @smart_assert(!isempty(a_views))
         @smart_assert(!isempty(a_views_conf))
         @smart_assert(length(a_views) == length(a_views_conf))
-        @smart_assert(all(zero(eltype(a_views_conf)) .<
-                          a_views_conf .<
-                          one(eltype(a_views_conf))))
+        @smart_assert(all(x -> zero(x) < x < one(x), a_views_conf))
     else
         if isa(a_views, AbstractVector)
             @smart_assert(!isempty(a_views))
@@ -71,9 +69,7 @@ function AugmentedBlackLittermanPriorEstimator(;
         @smart_assert(!isempty(f_views))
         @smart_assert(!isempty(f_views_conf))
         @smart_assert(length(f_views) == length(f_views_conf))
-        @smart_assert(all(zero(eltype(f_views_conf)) .<
-                          f_views_conf .<
-                          one(eltype(f_views_conf))))
+        @smart_assert(all(x -> zero(x) < x < one(x), f_views_conf))
     else
         if isa(f_views, AbstractVector)
             @smart_assert(!isempty(f_views))

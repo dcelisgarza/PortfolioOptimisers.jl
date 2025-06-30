@@ -121,17 +121,18 @@ function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsResult,
                                      res::OptimisationResult, w::AbstractVector)
     wb = weight_bounds_constraints(wb, sets; N = length(w), strict = strict)
     retcode, w = clustering_optimisation_result(cwf, wb, w)
-    if isa(retcode, OptimisationFailure) ||
-       isa(res.retcode, OptimisationFailure) ||
-       any(isa.(getproperty.(resi, :retcode), OptimisationFailure))
+    wb_flag = isa(retcode, OptimisationFailure)
+    opto_flag = isa(res.retcode, OptimisationFailure)
+    resi_flag = any(x -> isa(x, OptimisationFailure), getproperty.(resi, :retcode))
+    if resi_flag || opto_flag || wb_flag
         msg = ""
-        if any(isa.(getproperty.(resi, :retcode), OptimisationFailure))
+        if resi_flag
             msg *= "opti failed.\n"
         end
-        if isa(res.retcode, OptimisationFailure)
+        if opto_flag
             msg *= "opto failed.\n"
         end
-        if isa(retcode, OptimisationFailure)
+        if wb_flag
             msg *= "Full optimisation failed.\n"
         end
         retcode = OptimisationFailure(; res = msg)

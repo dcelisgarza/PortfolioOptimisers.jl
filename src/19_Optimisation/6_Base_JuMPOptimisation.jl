@@ -96,7 +96,7 @@ function set_w!(model::JuMP.Model, X::AbstractMatrix, wi::Union{Nothing, <:Abstr
 end
 function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
     risk_vec = model[:risk_vec]
-    if any(isa.(risk_vec, QuadExpr))
+    if any(x -> isa(x, QuadExpr), risk_vec)
         @expression(model, risk, zero(QuadExpr))
     else
         @expression(model, risk, zero(AffExpr))
@@ -184,7 +184,8 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
             continue
         end
         all_finite_weights = all(isfinite, value.(model[:w]))
-        all_non_zero_weights = !all(isapprox.(abs.(value.(model[:w])), zero(datatype)))
+        all_non_zero_weights = !all(x -> isapprox(x, zero(datatype)),
+                                    abs.(value.(model[:w])))
         try
             assert_is_solved_and_feasible(model; solver.check_sol...)
             if all_finite_weights && all_non_zero_weights

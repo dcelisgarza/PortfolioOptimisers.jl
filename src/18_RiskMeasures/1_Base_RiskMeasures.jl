@@ -52,7 +52,7 @@ function RiskMeasureSettings(; scale::Real = 1.0,
     if isa(ub, Real)
         @smart_assert(isfinite(ub) && ub > zero(ub))
     elseif isa(ub, AbstractVector)
-        @smart_assert(!isempty(ub) && all(isfinite, ub) && all(ub .> zero(eltype(ub))))
+        @smart_assert(!isempty(ub) && all(isfinite, ub) && all(x -> x > zero(x), ub))
     end
     @smart_assert(isfinite(scale))
     return RiskMeasureSettings{typeof(scale), typeof(ub), typeof(rke)}(scale, ub, rke)

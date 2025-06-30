@@ -61,7 +61,7 @@ function IntegerPhilogenyConstraintEstimator(;
                                              scale::Real = 100_000.0)
     if isa(B, AbstractVector)
         @smart_assert(!isempty(B))
-        @smart_assert(all(B .>= zero(B)))
+        @smart_assert(all(x -> x >= zero(x), B))
         validate_length_integer_philogeny_constraint_B(pe, B)
     else
         @smart_assert(B >= zero(B))
@@ -84,9 +84,9 @@ function IntegerPhilogenyResult(; A::AbstractMatrix{<:Real},
     if isa(B, AbstractVector)
         @smart_assert(!isempty(B))
         @smart_assert(size(A, 1) == length(B))
-        @smart_assert(all(B .> zero(B)))
+        @smart_assert(all(x -> x >= zero(x), B))
     else
-        @smart_assert(B > zero(B))
+        @smart_assert(B >= zero(B))
     end
     return IntegerPhilogenyResult{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
 end

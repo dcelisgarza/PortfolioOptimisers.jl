@@ -30,7 +30,7 @@ function BayesianBlackLittermanPriorEstimator(;
         @smart_assert(!isempty(views))
         @smart_assert(!isempty(views_conf))
         @smart_assert(length(views) == length(views_conf))
-        @smart_assert(all(zero(eltype(views_conf)) .< views_conf .< one(eltype(views_conf))))
+        @smart_assert(all(x -> zero(x) < x < one(x), views_conf))
     else
         if isa(views, AbstractVector)
             @smart_assert(!isempty(views))
