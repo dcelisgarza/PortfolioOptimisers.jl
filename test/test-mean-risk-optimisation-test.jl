@@ -180,7 +180,7 @@
                 rt_fnt = expected_return(ret1, w_fnt1, pr)
                 rk_rtol = if i in (1, 4, 5, 26)
                     5e-6
-                elseif i in (6, 9, 10, 14, 24)
+                elseif i in (6, 9, 10, 24)
                     1e-5
                 elseif i in (12, 23)
                     1e-4
