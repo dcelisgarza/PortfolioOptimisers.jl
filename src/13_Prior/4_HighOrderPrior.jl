@@ -305,7 +305,7 @@ function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
 end
 function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)

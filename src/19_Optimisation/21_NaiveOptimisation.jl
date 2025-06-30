@@ -27,7 +27,7 @@ end
 struct EqualWeighted <: OptimisationEstimator end
 function optimise!(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @smart_assert(!isnothing(rd.X))
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
     N = size(rd.X, dims)
     return NaiveOptimisationResult(typeof(ew), nothing,
@@ -42,7 +42,7 @@ function RandomWeights(; rng::Union{Nothing, <:AbstractRNG} = nothing)
 end
 function optimise!(rw::RandomWeights, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @smart_assert(!isnothing(rd.X))
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
     N = size(rd.X, dims)
     w = isnothing(rw.rng) ? rand(Dirichlet(N, 1)) : rand(rw.rng, Dirichlet(N, 1))

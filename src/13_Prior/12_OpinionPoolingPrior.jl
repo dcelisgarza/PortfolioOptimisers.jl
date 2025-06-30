@@ -62,7 +62,7 @@ end
 function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)

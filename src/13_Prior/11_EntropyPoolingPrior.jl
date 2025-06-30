@@ -113,7 +113,7 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
     @constraints(model,
                  begin
                      sc * (sum(q) - one(eltype(w))) == 0
-                     [sc * t; fill(sc, S); sc * q] ∈ MOI.RelativeEntropyCone(2 * S + 1)
+                     [sc * t; fill(sc, S); sc * q] in MOI.RelativeEntropyCone(2 * S + 1)
                  end)
     @objective(model, Min, so * (t - dot(q, log_p)))
     # Solve the optimization problem
@@ -264,7 +264,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
                                                 <:Any, <:Any, <:H0_EntropyPooling},
                X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
@@ -303,7 +303,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
                                                         <:H2_EntropyPooling}},
                X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)

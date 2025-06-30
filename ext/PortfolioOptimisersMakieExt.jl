@@ -47,7 +47,7 @@ function plot_asset_cumulative_returns(w::AbstractVector, X::AbstractArray,
     N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
     ret = view(ret, :, idx)
     nx = view(nx, idx)
-    for i ∈ 1:N
+    for i in 1:N
         if !haskey(asset_kwargs, :label)
             asset_kwargs_i = (; label = nx[i], asset_kwargs...)
         end
@@ -101,7 +101,7 @@ function plot_stacked_bar_composition(w::AbstractArray, nx::AbstractVector = 1:s
     ax = Axis(f[fpos...]; ax_kwargs...)
     N = size(w, 1)
     M = size(w, 2)
-    category = collect(Iterators.flatten([Iterators.repeated(i, N) for i ∈ 1:M]))
+    category = collect(Iterators.flatten([Iterators.repeated(i, N) for i in 1:M]))
     height = vec(w)
     group = collect(Iterators.flatten(Iterators.repeated(1:N, M)))
     cmap = !haskey(bar_kwargs, :colormap) ? :viridis : bar_kwargs.colormap
@@ -111,7 +111,7 @@ function plot_stacked_bar_composition(w::AbstractArray, nx::AbstractVector = 1:s
         Makie.categorical_colors(cmap, N)
     end
     barplot!(ax, category, height; stack = group, color = group, bar_kwargs...)
-    elements = [PolyElement(; polycolor = colors[i]) for i ∈ 1:length(nx)]
+    elements = [PolyElement(; polycolor = colors[i]) for i in 1:length(nx)]
     Legend(f[lpos...], elements, string.(nx), "Assets")
     return f
 end
@@ -138,7 +138,7 @@ function plot_stacked_area_composition(w::AbstractArray, nx::AbstractVector = 1:
     catch err
         Makie.categorical_colors(cmap, N)
     end
-    for i ∈ axes(w, 1)
+    for i in axes(w, 1)
         if i == 1
             band!(ax, 1:M, zeros(M), cw[i, :]; label = nx[i], color = colors[i],
                   band_kwargs...)
@@ -147,7 +147,7 @@ function plot_stacked_area_composition(w::AbstractArray, nx::AbstractVector = 1:
                   band_kwargs...)
         end
     end
-    elements = [PolyElement(; polycolor = colors[i]) for i ∈ 1:length(nx)]
+    elements = [PolyElement(; polycolor = colors[i]) for i in 1:length(nx)]
     Legend(f[lpos...], elements, string.(nx), "Assets")
     return f
 end
@@ -155,9 +155,9 @@ end
 function hcl_nodes(hcl; useheight = false)
     nleaves = length(hcl.order)
     nodes = [Makie.DNode(i, Point2d(x, 0), nothing)
-             for (i, x) ∈ enumerate(invperm(hcl.order))]
+             for (i, x) in enumerate(invperm(hcl.order))]
 
-    for ((m1, m2), height) ∈ zip(eachrow(hcl.merges), hcl.heights)
+    for ((m1, m2), height) in zip(eachrow(hcl.merges), hcl.heights)
         m1 = ifelse(m1 < 0, -m1, m1 + nleaves)
         m2 = ifelse(m2 < 0, -m2, m2 + nleaves)
         push!(nodes,
@@ -217,17 +217,17 @@ function plot_clusters(clr::AbstractClusteringResult, X::AbstractMatrix,
     nx = view(nx, clr.clustering.order)
     ticks = (1:size(X, 1), string.(nx))
     idx = cutree(clr.clustering; k = clr.k)
-    cls = [findall(x -> x == i, idx) for i ∈ 1:(clr.k)]
+    cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
     ax = Axis(f[2, 2]; yticks = ticks, xticks = ticks, ax_kwargs...)
     heatmap!(ax, 1:N, 1:N, X; colorrange = colorrange, heatmap_kwargs...)
-    for (i, cl) ∈ pairs(cls)
-        a = [findfirst(x -> x == c, clr.clustering.order) for c ∈ cl]
+    for (i, cl) in pairs(cls)
+        a = [findfirst(x -> x == c, clr.clustering.order) for c in cl]
         a = a[.!isnothing.(a)]
         xmin = minimum(a)
         xmax = xmin + length(cl)
-        i1 = [findfirst(x -> x == c, -clr.clustering.merges[:, 1]) for c ∈ cl]
+        i1 = [findfirst(x -> x == c, -clr.clustering.merges[:, 1]) for c in cl]
         i1 = i1[.!isnothing.(i1)]
-        i2 = [findfirst(x -> x == c, -clr.clustering.merges[:, 2]) for c ∈ cl]
+        i2 = [findfirst(x -> x == c, -clr.clustering.merges[:, 2]) for c in cl]
         i2 = i2[.!isnothing.(i2)]
         i3 = unique([i1; i2])
         h = min(maximum(clr.clustering.heights[i3]) * 1.1, 1)

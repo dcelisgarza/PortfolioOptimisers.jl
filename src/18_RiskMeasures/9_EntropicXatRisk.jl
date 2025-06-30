@@ -14,13 +14,13 @@ function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:
     aT = if isnothing(w)
         @constraints(model, begin
                          sum(u) - z <= 0
-                         [i = 1:T], [-x[i] - t, z, u[i]] ∈ MOI.ExponentialCone()
+                         [i = 1:T], [-x[i] - t, z, u[i]] in MOI.ExponentialCone()
                      end)
         alpha * T
     else
         @constraints(model, begin
                          dot(w, u) - z <= 0
-                         [i = 1:T], [-x[i] - t, z, u[i]] ∈ MOI.ExponentialCone()
+                         [i = 1:T], [-x[i] - t, z, u[i]] in MOI.ExponentialCone()
                      end)
         alpha * sum(w)
     end

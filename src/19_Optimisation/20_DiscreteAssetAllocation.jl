@@ -51,7 +51,7 @@ function discrete_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Re
                  end)
     @constraints(model, begin
                      sc * r >= 0
-                     [sc * u; sc * eta] ∈ MOI.NormOneCone(N + 1)
+                     [sc * u; sc * eta] in MOI.NormOneCone(N + 1)
                  end)
     @objective(model, Min, so * (u + r))
     res = optimise_JuMP_model!(model, da.slv)

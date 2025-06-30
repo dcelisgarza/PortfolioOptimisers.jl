@@ -102,8 +102,8 @@ function owa_l_moment_crm(method::OWAJuMPEstimator{<:Any, <:Any, <:Any, <:Any,
                end)
     @constraints(model, begin
                      sc * (sum(x) - 1) == 0
-                     [sc * t; ovec; sc * x] ∈ MOI.RelativeEntropyCone(2 * T + 1)
-                     [i = 1:T], [sc * x[i]; sc * theta[i]] ∈ MOI.NormOneCone(2)
+                     [sc * t; ovec; sc * x] in MOI.RelativeEntropyCone(2 * T + 1)
+                     [i = 1:T], [sc * x[i]; sc * theta[i]] in MOI.NormOneCone(2)
                  end)
     @objective(model, Max, -so * t)
     return owa_model_solve(model, method, weights)
@@ -117,7 +117,7 @@ function owa_l_moment_crm(method::OWAJuMPEstimator{<:Any, <:Any, <:Any, <:Any,
     theta = model[:theta]
     @variable(model, t)
     @constraint(model,
-                [sc * t; sc * (theta[2:end] - theta[1:(end - 1)])] ∈ SecondOrderCone())
+                [sc * t; sc * (theta[2:end] - theta[1:(end - 1)])] in SecondOrderCone())
     @objective(model, Min, so * t)
     return owa_model_solve(model, method, weights)
 end
@@ -129,13 +129,13 @@ function owa_l_moment_crm(method::OWAJuMPEstimator{<:Any, <:Any, <:Any, <:Any,
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     @variable(model, t)
-    @constraint(model, [sc * t; sc * theta] ∈ SecondOrderCone())
+    @constraint(model, [sc * t; sc * theta] in SecondOrderCone())
     @objective(model, Min, so * t)
     return owa_model_solve(model, method, weights)
 end
 function owa_gmd(T::Integer)
     # w = Vector{typeof(inv(T))}(undef, T)
-    # for i ∈ eachindex(w)
+    # for i in eachindex(w)
     #     w[i] = 2 * i - 1 - T
     # end
     # w = 2 / (T * (T - 1)) * w

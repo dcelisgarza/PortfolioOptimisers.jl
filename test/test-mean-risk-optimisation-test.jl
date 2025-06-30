@@ -362,16 +362,19 @@
                 println(i)
                 find_tol(rk_fnt[1], ub[1]; name1 = "rk_fnt[1]", name2 = "ub[1]")
             end
+            @test res
             res = isapprox(rk_fnt[2], ub[2]; rtol = rtol)
             if !res
                 println(i)
                 find_tol(rk_fnt[2], ub[2]; name1 = "rk_fnt[2]", name2 = "ub[2]")
             end
+            @test res
             res = isapprox(rk_fnt[3], ub[3]; rtol = rtol)
             if !res
                 println(i)
                 find_tol(rk_fnt[3], ub[3]; name1 = "rk_fnt[3]", name2 = "ub[3]")
             end
+            @test res
             i += 1
         end
     end
@@ -542,25 +545,25 @@
                             break
                         end
                     end
-                    rtol = if i ∈ (371, 377, 557, 565)
+                    rtol = if i in (371, 377, 557, 565)
                         0.1
-                    elseif i ∈ (400, 516)
+                    elseif i in (400, 516)
                         0.25
                     elseif i == 407
                         0.5
-                    elseif i ∈ (486, 488, 494, 518, 520, 526, 528, 540, 542)
+                    elseif i in (486, 488, 494, 518, 520, 526, 528, 540, 542)
                         1.3
-                    elseif i ∈ (492, 524, 533, 544, 550, 554, 556, 558, 562, 564, 566)
+                    elseif i in (492, 524, 533, 544, 550, 554, 556, 558, 562, 564, 566)
                         1
-                    elseif i ∈ (496, 502, 504, 510, 512)
+                    elseif i in (496, 502, 504, 510, 512)
                         1.2
-                    elseif i ∈ (500, 508, 514, 555, 563)
+                    elseif i in (500, 508, 514, 555, 563)
                         0.05
-                    elseif i ∈ (532, 536)
+                    elseif i in (532, 536)
                         1.4
                     elseif i == 534
                         1.5
-                    elseif i ∈ (552, 560)
+                    elseif i in (552, 560)
                         1.1
                     else
                         rtol

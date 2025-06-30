@@ -20,7 +20,7 @@ function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} 
 end
 function StatsBase.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
                        kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -28,7 +28,7 @@ function StatsBase.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 
 end
 function StatsBase.cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
                        kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

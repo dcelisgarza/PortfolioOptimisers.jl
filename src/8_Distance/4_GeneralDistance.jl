@@ -67,7 +67,7 @@ function distance(de::GeneralDistance{<:Any, <:LogDistance}, rho::AbstractMatrix
 end
 function distance(de::GeneralDistance{<:Any, <:VariationInfoDistance}, ::Any,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

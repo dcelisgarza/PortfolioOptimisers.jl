@@ -51,7 +51,7 @@ function cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
     return rho
 end
 function StatsBase.cor(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -88,7 +88,7 @@ function cov_distance(ce::DistanceCovariance, X::AbstractMatrix)
     return rho
 end
 function StatsBase.cov(ce::DistanceCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

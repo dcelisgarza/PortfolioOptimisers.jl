@@ -82,7 +82,7 @@ function Base.getproperty(obj::FactorBlackLittermanPriorEstimator, sym::Symbol)
 end
 function prior(pe::FactorBlackLittermanPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         F = transpose(F)

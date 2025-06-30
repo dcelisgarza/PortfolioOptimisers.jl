@@ -27,7 +27,7 @@ function _cokurosis(X, mp)
 end
 function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1,
                     mean = nothing, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -37,7 +37,7 @@ function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Full}, X::AbstractMatrix; dim
 end
 function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1,
                     mean = nothing, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

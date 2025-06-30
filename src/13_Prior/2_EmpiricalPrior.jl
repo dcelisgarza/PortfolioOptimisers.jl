@@ -80,7 +80,7 @@ function factory(pe::EmpiricalPriorEstimator,
 end
 function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, Nothing}, X::AbstractMatrix,
                args...; dims::Int = 1, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -90,7 +90,7 @@ function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, Nothing}, X::AbstractMa
 end
 function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMatrix,
                args...; dims::Int = 1, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

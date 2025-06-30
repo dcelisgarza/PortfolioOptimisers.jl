@@ -331,12 +331,12 @@ function set_near_optimal_centering_constraints!(model::JuMP.Model, rk::Real, rt
     @constraints(model,
                  begin
                      clog_risk,
-                     [sc * log_risk, sc, sc * (rk - risk)] ∈ MOI.ExponentialCone()
-                     clog_ret, [sc * log_ret, sc, sc * (ret - rt)] ∈ MOI.ExponentialCone()
+                     [sc * log_risk, sc, sc * (rk - risk)] in MOI.ExponentialCone()
+                     clog_ret, [sc * log_ret, sc, sc * (ret - rt)] in MOI.ExponentialCone()
                      clog_w[i = 1:N],
-                     [sc * log_w[i], sc, sc * w[i]] ∈ MOI.ExponentialCone()
+                     [sc * log_w[i], sc, sc * w[i]] in MOI.ExponentialCone()
                      clog_delta_w[i = 1:N],
-                     [sc * log_delta_w[i], sc, sc * (w_ub[i] - w[i])] ∈
+                     [sc * log_delta_w[i], sc, sc * (w_ub[i] - w[i])] in
                      MOI.ExponentialCone()
                  end)
     @expression(model, obj_expr, -(log_ret + log_risk + sum(log_w + log_delta_w)))

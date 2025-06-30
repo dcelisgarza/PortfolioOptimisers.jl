@@ -128,9 +128,9 @@ function mutual_variation_info(X::AbstractMatrix,
 
     bin_width_func = get_bin_width_func(bins)
 
-    for j ∈ axes(X, 2)
+    for j in axes(X, 2)
         xj = view(X, :, j)
-        for i ∈ 1:j
+        for i in 1:j
             xi = view(X, :, i)
             nbins = calc_num_bins(bins, xj, xi, j, i, bin_width_func, T)
             ex, ey, hxy = calc_hist_data(xj, xi, nbins)

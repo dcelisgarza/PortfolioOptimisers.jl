@@ -14,7 +14,7 @@ function factory(ce::PortfolioOptimisersCovariance,
 end
 function StatsBase.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
                        kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -24,7 +24,7 @@ function StatsBase.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dim
 end
 function StatsBase.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
                        kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

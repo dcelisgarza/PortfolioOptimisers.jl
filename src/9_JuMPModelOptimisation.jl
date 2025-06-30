@@ -17,7 +17,7 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
                   typeof(add_bridges)}(name, solver, settings, check_sol, add_bridges)
 end
 # function Base.isequal(A::Solver, B::Solver)
-#     for property ∈ propertynames(A)
+#     for property in propertynames(A)
 #         prop_A = getproperty(A, property)
 #         prop_B = getproperty(B, property)
 #         if !isequal(prop_A, prop_B)

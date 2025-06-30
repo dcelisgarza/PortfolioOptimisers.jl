@@ -347,8 +347,8 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact,
                      sc * (wp ⊖ up) <= 0
                      sc * (wn ⊖ un) <= 0
                      sc * (w - wb - wp + wn) == 0
-                     [i = 1:N], [sc * wip[i], sc, sc * wp[i]] ∈ MOI.PowerCone(beta)
-                     [i = 1:N], [sc * win[i], sc, sc * wn[i]] ∈ MOI.PowerCone(beta)
+                     [i = 1:N], [sc * wip[i], sc, sc * wp[i]] in MOI.PowerCone(beta)
+                     [i = 1:N], [sc * win[i], sc, sc * wn[i]] in MOI.PowerCone(beta)
                  end)
     set_cost_budget_constraints!(model, wip, win, bgt.bgt, w)
     return nothing
@@ -687,7 +687,7 @@ function set_turnover_fees!(model::JuMP.Model, tn::Turnover)
                      x_ftn, w - wt * k
                      ftn, dot_scalar(val, t_ftn)
                  end)
-    @constraint(model, cftn[i = 1:N], [sc * t_ftn[i]; sc * x_ftn[i]] ∈ MOI.NormOneCone(2))
+    @constraint(model, cftn[i = 1:N], [sc * t_ftn[i]; sc * x_ftn[i]] in MOI.NormOneCone(2))
     add_to_fees!(model, ftn)
     return nothing
 end
@@ -740,7 +740,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
     model[Symbol(:cte_noc_, i)], model[Symbol(:cte_, i)] = @constraints(model,
                                                                         begin
                                                                             [sc * t_te;
-                                                                             sc * te] ∈
+                                                                             sc * te] in
                                                                             MOI.NormOneCone(1 +
                                                                                             T)
                                                                             sc *
@@ -764,7 +764,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
     model[Symbol(:cte_soc_, i)], model[Symbol(:cte_, i)] = @constraints(model,
                                                                         begin
                                                                             [sc * t_te;
-                                                                             sc * te] ∈
+                                                                             sc * te] in
                                                                             SecondOrderCone()
                                                                             sc *
                                                                             (t_te - f * k) <=
@@ -813,7 +813,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
     model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = @constraints(model,
                                                                           begin
                                                                               [sc * t_dr;
-                                                                               sc * dr] ∈
+                                                                               sc * dr] in
                                                                               MOI.NormOneCone(2)
                                                                               sc *
                                                                               (t_dr -
@@ -849,7 +849,7 @@ function set_turnover_constraints!(model::JuMP.Model, i::Any, tn::Turnover)
                                                                         begin
                                                                             [i = 1:N],
                                                                             [sc * t_tn[i];
-                                                                             sc * tn[i]] ∈
+                                                                             sc * tn[i]] in
                                                                             MOI.NormOneCone(2)
                                                                             sc *
                                                                             (t_tn ⊖ val * k) <=
@@ -875,7 +875,7 @@ function set_number_effective_assets!(model::JuMP.Model, val::Real)
     sc = model[:sc]
     @variable(model, nea)
     @constraints(model, begin
-                     cnea_soc, [sc * nea; sc * w] ∈ SecondOrderCone()
+                     cnea_soc, [sc * nea; sc * w] in SecondOrderCone()
                      cnea, sc * (nea * sqrt(val) - k) <= 0
                  end)
     return nothing
@@ -890,7 +890,7 @@ function set_l1_regularisation!(model::JuMP.Model, l1::Real)
     w = model[:w]
     sc = model[:sc]
     @variable(model, t_l1)
-    @constraint(model, cl1_noc, [sc * t_l1; sc * w] ∈ MOI.NormOneCone(1 + length(w)))
+    @constraint(model, cl1_noc, [sc * t_l1; sc * w] in MOI.NormOneCone(1 + length(w)))
     @expression(model, l1, l1 * t_l1)
     add_to_objective_penalty!(model, l1)
     return nothing
@@ -899,7 +899,7 @@ function set_l2_regularisation!(model::JuMP.Model, l2::Real)
     w = model[:w]
     sc = model[:sc]
     @variable(model, t_l2)
-    @constraint(model, cl2_soc, [sc * t_l2; sc * w] ∈ SecondOrderCone())
+    @constraint(model, cl2_soc, [sc * t_l2; sc * w] in SecondOrderCone())
     @expression(model, l2, l2 * t_l2)
     add_to_objective_penalty!(model, l2)
     return nothing
@@ -915,7 +915,7 @@ function set_sdp_constraints!(model::JuMP.Model, w_key::Symbol = :w, W_key::Symb
     W = model[W_key] = @variable(model, [1:N, 1:N], Symmetric)
     M = model[Symbol(W_key, :_M)] = @expression(model,
                                                 hcat(vcat(W, transpose(w)), vcat(w, k)))
-    model[Symbol(M, :_PSD)] = @constraint(model, sc * M ∈ PSDCone())
+    model[Symbol(M, :_PSD)] = @constraint(model, sc * M in PSDCone())
     return W
 end
 function set_sdp_frc_constraints!(model::JuMP.Model)
@@ -928,7 +928,7 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
     Nf = length(w1)
     @variable(model, W[1:Nf, 1:Nf], Symmetric)
     @expression(model, M, hcat(vcat(W, transpose(w1)), vcat(w1, k)))
-    @constraint(model, M_PSD, sc * M ∈ PSDCone())
+    @constraint(model, M_PSD, sc * M in PSDCone())
     return W
 end
 function set_sdp_philogeny_constraints!(args...)

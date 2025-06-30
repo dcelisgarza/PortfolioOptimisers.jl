@@ -79,7 +79,7 @@ function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     sd_risk = model[key] = @variable(model)
     model[Symbol(:csd_risk_soc_, i)] = @constraint(model,
-                                                   [sc * sd_risk; sc * G * w] ∈
+                                                   [sc * sd_risk; sc * G * w] in
                                                    SecondOrderCone())
     return sd_risk, key
 end
@@ -145,7 +145,7 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
     key_dev = Symbol(:dev_, i)
     dev = model[key_dev] = @variable(model)
     model[Symbol(key_dev, :_soc)] = @constraint(model,
-                                                [sc * dev; sc * G * w] ∈ SecondOrderCone())
+                                                [sc * dev; sc * G * w] in SecondOrderCone())
     return model[key] = @expression(model, dev^2)
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
@@ -158,7 +158,7 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     dev = model[Symbol(:dev_, i)] = @variable(model)
     model[Symbol(:cdev_soc_, i)] = @constraint(model,
-                                               [sc * dev; sc * G * w] ∈ SecondOrderCone())
+                                               [sc * dev; sc * G * w] in SecondOrderCone())
     return model[key] = @expression(model, dot(w, sigma, w))
 end
 function variance_risk_bounds_expr(model::JuMP.Model, i::Any, flag::Bool)
@@ -307,7 +307,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertain
         N = size(W, 1)
         @variable(model, E[1:N, 1:N], Symmetric)
         @expression(model, WpE, W + E)
-        @constraint(model, ceucs_variance, sc * E ∈ PSDCone())
+        @constraint(model, ceucs_variance, sc * E in PSDCone())
     end
     if !isnothing(r_sigma)
         sigma = r_sigma
@@ -327,7 +327,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertain
                                                                                          t_eucs
                                                                                      end)
     model[Symbol(:ge_soc, i)] = @constraint(model,
-                                            [sc * t_eucs; sc * x_eucs] ∈ SecondOrderCone())
+                                            [sc * t_eucs; sc * x_eucs] in SecondOrderCone())
     return ucs_variance_risk, key
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVariance,
@@ -396,7 +396,7 @@ function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, fact
     tsecond_moment = model[Symbol(keyt, i)] = @variable(model)
     model[Symbol(keyc, i)] = @constraint(model,
                                          [sc * tsecond_moment; 0.5;
-                                          sc * second_moment] ∈ RotatedSecondOrderCone())
+                                          sc * second_moment] in RotatedSecondOrderCone())
     return model[key] = @expression(model, factor * tsecond_moment), sqrt(factor)
 end
 function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, factor::Real,
@@ -465,7 +465,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                      [sc *
                                                                       sqrt_second_central_moment
                                                                       sc *
-                                                                      second_central_moment] ∈
+                                                                      second_central_moment] in
                                                                      SecondOrderCone())
     ub = second_moment_bound_val(r.alg.alg.formulation, r.settings.ub, factor)
     set_variance_risk_bounds_and_expression!(model, opt, sqrt_second_central_moment, ub,
@@ -515,7 +515,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                          [sc *
                                                                                                                           sqrt_second_lower_moment
                                                                                                                           sc *
-                                                                                                                          second_lower_moment] ∈
+                                                                                                                          second_lower_moment] in
                                                                                                                          SecondOrderCone()
                                                                                                                          sc *
                                                                                                                          ((net_X +
@@ -727,7 +727,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     g_var = model[Symbol(:g_var_, i)] = @variable(model)
     var_risk = model[key] = @expression(model, -dot(mu, w) + z * g_var)
     model[Symbol(:cvar_soc_, i)] = @constraint(model,
-                                               [sc * g_var; sc * G * w] ∈ SecondOrderCone())
+                                               [sc * g_var; sc * G * w] in
+                                               SecondOrderCone())
     set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, key)
     return nothing
 end
@@ -761,7 +762,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     var_range_risk = model[key] = @expression(model, var_risk_l - var_risk_h)
     model[Symbol(:cvar_range_soc_, i)] = @constraints(model,
                                                       begin
-                                                          [sc * g_var; sc * G * w] ∈
+                                                          [sc * g_var; sc * G * w] in
                                                           SecondOrderCone()
                                                       end)
     set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
@@ -1147,7 +1148,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
     end
     model[Symbol(:cevar_exp_cone_, i)] = @constraint(model, [i = 1:T],
                                                      [sc * (-net_X[i] - t_evar),
-                                                      sc * z_evar, sc * u_evar[i]] ∈
+                                                      sc * z_evar, sc * u_evar[i]] in
                                                      MOI.ExponentialCone())
     evar_risk = model[Symbol(:evar_risk_, i)] = @expression(model,
                                                             t_evar - z_evar * log(at))
@@ -1213,7 +1214,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                                                                                    sc *
                                                                                                    z_evar_l,
                                                                                                    sc *
-                                                                                                   u_evar_l[i]] ∈
+                                                                                                   u_evar_l[i]] in
                                                                                                   MOI.ExponentialCone()
                                                                                                   [i = 1:T],
                                                                                                   [sc *
@@ -1222,7 +1223,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                                                                                    -sc *
                                                                                                    z_evar_h,
                                                                                                    -sc *
-                                                                                                   u_evar_h[i]] ∈
+                                                                                                   u_evar_h[i]] in
                                                                                                   MOI.ExponentialCone()
                                                                                               end)
     evar_risk_l, evar_risk_h = model[Symbol(:evar_risk_l_, i)], model[Symbol(:evar_risk_h_, i)] = @expressions(model,
@@ -1286,7 +1287,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
                                                                                                                            opk *
                                                                                                                            ik,
                                                                                                                            sc *
-                                                                                                                           epsilon_rlvar[i]] ∈
+                                                                                                                           epsilon_rlvar[i]] in
                                                                                                                           MOI.PowerCone(iopk)
                                                                                                                           [i = 1:T],
                                                                                                                           [sc *
@@ -1297,7 +1298,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
                                                                                                                            ik,
                                                                                                                            -sc *
                                                                                                                            z_rlvar *
-                                                                                                                           ik2] ∈
+                                                                                                                           ik2] in
                                                                                                                           MOI.PowerCone(omk)
                                                                                                                           sc *
                                                                                                                           ((epsilon_rlvar +
@@ -1392,7 +1393,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
                                                                                                                                                                                                                                            opk_a *
                                                                                                                                                                                                                                            ik_a,
                                                                                                                                                                                                                                            sc *
-                                                                                                                                                                                                                                           epsilon_rlvar_l[i]] ∈
+                                                                                                                                                                                                                                           epsilon_rlvar_l[i]] in
                                                                                                                                                                                                                                           MOI.PowerCone(iopk_a)
                                                                                                                                                                                                                                           [i = 1:T],
                                                                                                                                                                                                                                           [sc *
@@ -1403,7 +1404,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
                                                                                                                                                                                                                                            ik_a,
                                                                                                                                                                                                                                            sc *
                                                                                                                                                                                                                                            -z_rlvar_l *
-                                                                                                                                                                                                                                           ik2_a] ∈
+                                                                                                                                                                                                                                           ik2_a] in
                                                                                                                                                                                                                                           MOI.PowerCone(omk_a)
                                                                                                                                                                                                                                           sc *
                                                                                                                                                                                                                                           ((epsilon_rlvar_l +
@@ -1421,7 +1422,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
                                                                                                                                                                                                                                            opk_b *
                                                                                                                                                                                                                                            ik_b,
                                                                                                                                                                                                                                            sc *
-                                                                                                                                                                                                                                           -epsilon_rlvar_h[i]] ∈
+                                                                                                                                                                                                                                           -epsilon_rlvar_h[i]] in
                                                                                                                                                                                                                                           MOI.PowerCone(iopk_b)
                                                                                                                                                                                                                                           [i = 1:T],
                                                                                                                                                                                                                                           [sc *
@@ -1432,7 +1433,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
                                                                                                                                                                                                                                            ik_b,
                                                                                                                                                                                                                                            sc *
                                                                                                                                                                                                                                            z_rlvar_h *
-                                                                                                                                                                                                                                           ik2_b] ∈
+                                                                                                                                                                                                                                           ik2_b] in
                                                                                                                                                                                                                                           MOI.PowerCone(omk_b)
                                                                                                                                                                                                                                           sc *
                                                                                                                                                                                                                                           ((epsilon_rlvar_h +
@@ -1502,7 +1503,7 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex,
     T = length(dd) - 1
     @variable(model, uci)
     @expression(model, uci_risk, uci / sqrt(T))
-    @constraint(model, cuci_soc, [sc * uci; sc * view(dd, 2:(T + 1))] ∈ SecondOrderCone())
+    @constraint(model, cuci_soc, [sc * uci; sc * view(dd, 2:(T + 1))] in SecondOrderCone())
     set_risk_bounds_and_expression!(model, opt, uci_risk, r.settings, :uci_risk)
     return nothing
 end
@@ -1558,7 +1559,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatR
                                                                                       sc *
                                                                                       z_edar,
                                                                                       sc *
-                                                                                      u_edar[i]] ∈
+                                                                                      u_edar[i]] in
                                                                                      MOI.ExponentialCone()
                                                                                  end)
     set_risk_bounds_and_expression!(model, opt, edar_risk, r.settings, key)
@@ -1608,7 +1609,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdow
                                                                                                                            opk *
                                                                                                                            ik,
                                                                                                                            sc *
-                                                                                                                           epsilon_rldar[i]] ∈
+                                                                                                                           epsilon_rldar[i]] in
                                                                                                                           MOI.PowerCone(iopk)
                                                                                                                           [i = 1:T],
                                                                                                                           [sc *
@@ -1619,7 +1620,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdow
                                                                                                                            ik,
                                                                                                                            -sc *
                                                                                                                            z_rldar *
-                                                                                                                           ik2] ∈
+                                                                                                                           ik2] in
                                                                                                                           MOI.PowerCone(omk)
                                                                                                                           sc *
                                                                                                                           ((epsilon_rldar +
@@ -1665,7 +1666,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                               [sc *
                                                                                                sqrt_kurtosis_risk
                                                                                                sc *
-                                                                                               x_kurt] ∈
+                                                                                               x_kurt] in
                                                                                               SecondOrderCone()
                                                                                               [i = 1:Nf],
                                                                                               sc *
@@ -1694,7 +1695,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     zkurt = model[Symbol(:zkurt_, i)] = @expression(model, L2 * vec(W))
     model[Symbol(:ckurt_soc_, i)] = @constraint(model,
                                                 [sc * sqrt_kurtosis_risk;
-                                                 sc * sqrt_sigma_4 * zkurt] ∈
+                                                 sc * sqrt_sigma_4 * zkurt] in
                                                 SecondOrderCone())
     set_risk_bounds_and_expression!(model, opt, sqrt_kurtosis_risk, r.settings, key)
     return nothing
@@ -1843,7 +1844,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                    owa_p_o_owa_pm1[i],
                                                                                                                    sc *
                                                                                                                    owa_epsilon[j,
-                                                                                                                               i]] ∈
+                                                                                                                               i]] in
                                                                                                                   MOI.PowerCone(inv(owa_p[i]))
                                                                                                               end)
     set_risk_bounds_and_expression!(model, opt, aowa_risk, r.settings, key)
@@ -1952,7 +1953,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                            owa_p_o_owa_pm1[i],
                                                                                                                                                                                                                            sc *
                                                                                                                                                                                                                            owa_l_epsilon[j,
-                                                                                                                                                                                                                                         i]] ∈
+                                                                                                                                                                                                                                         i]] in
                                                                                                                                                                                                                           MOI.PowerCone(inv(owa_p[i]))
                                                                                                                                                                                                                           sc *
                                                                                                                                                                                                                           ((-net_X -
@@ -1977,7 +1978,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                            owa_p_o_owa_pm1[i],
                                                                                                                                                                                                                            sc *
                                                                                                                                                                                                                            owa_h_epsilon[j,
-                                                                                                                                                                                                                                         i]] ∈
+                                                                                                                                                                                                                                         i]] in
                                                                                                                                                                                                                           MOI.PowerCone(inv(owa_p[i]))
                                                                                                                                                                                                                       end)
     aowa_range_risk = model[key] = @expression(model, owa_l_risk + owa_h_risk)
@@ -1990,7 +1991,7 @@ function set_brownian_distance_variance_constraints!(model::JuMP.Model,
     T = size(Dt, 1)
     sc = model[:sc]
     @constraint(model, cbdvariance_noc[j = 1:T, i = j:T],
-                [sc * Dt[i, j]; sc * Dx[i, j]] ∈ MOI.NormOneCone(2))
+                [sc * Dt[i, j]; sc * Dx[i, j]] in MOI.NormOneCone(2))
     return nothing
 end
 function set_brownian_distance_variance_constraints!(model::JuMP.Model,
@@ -2013,7 +2014,7 @@ function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::RSOCRiskExp
     sc = model[:sc]
     @variable(model, tDt)
     @constraint(model, rsoc_Dt, [sc * tDt; 0.5;
-                                 sc * vec(Dt)] ∈ RotatedSecondOrderCone())
+                                 sc * vec(Dt)] in RotatedSecondOrderCone())
     @expression(model, bdvariance_risk, iT2 * (tDt + iT2 * sum(Dt)^2))
     return bdvariance_risk
 end
@@ -2049,7 +2050,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     G = real(sqrt(V))
     nskew_risk = model[key] = @variable(model)
     model[Symbol(:cnskew_soc_, i)] = @constraint(model,
-                                                 [sc * nskew_risk; sc * G * w] ∈
+                                                 [sc * nskew_risk; sc * G * w] in
                                                  SecondOrderCone())
     set_risk_bounds_and_expression!(model, opt, nskew_risk, r.settings, key)
     return nothing
@@ -2067,7 +2068,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     G = real(sqrt(V))
     t_qnskew_risk = model[Symbol(:t_qnskew_risk_, i)] = @variable(model)
     model[Symbol(:cqnskew_soc_, i)] = @constraint(model,
-                                                  [sc * t_qnskew_risk; sc * G * w] ∈
+                                                  [sc * t_qnskew_risk; sc * G * w] in
                                                   SecondOrderCone())
     qnskew_risk = model[key] = @expression(model, t_qnskew_risk^2)
     ub = variance_risk_bounds_val(false, r.settings.ub)
@@ -2098,7 +2099,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     tracking_r = model[Symbol(:tracking_r_, i)] = @expression(model, net_X - benchmark * k)
     model[Symbol(:ctracking_r_noc_, i)] = @constraint(model,
                                                       [sc * t_tracking_risk;
-                                                       sc * tracking_r] ∈
+                                                       sc * tracking_r] in
                                                       MOI.NormOneCone(1 + T))
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return nothing
@@ -2121,7 +2122,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     tracking_r = model[Symbol(:tracking_r_, i)] = @expression(model, net_X - benchmark * k)
     model[Symbol(:ctracking_r_soc_, i)] = @constraint(model,
                                                       [sc * t_tracking_risk;
-                                                       sc * tracking_r] ∈ SecondOrderCone())
+                                                       sc * tracking_r] in
+                                                      SecondOrderCone())
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return nothing
 end
@@ -2166,7 +2168,7 @@ function set_risk!(model::JuMP.Model, i::Any,
     dr = model[Symbol(:rdr_, i)] = @expression(model, risk_expr - rb * k)
     model[Symbol(:crter_noc_, i)] = @constraint(model,
                                                 [sc * tracking_risk;
-                                                 sc * dr] ∈ MOI.NormOneCone(2))
+                                                 sc * dr] in MOI.NormOneCone(2))
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return nothing
 end
@@ -2184,7 +2186,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::TurnoverRiskMeasure
     turnover_r = model[Symbol(:turnover_r_, i)] = @expression(model, w - benchmark * k)
     model[Symbol(:cturnover_r_noc_, i)] = @constraint(model,
                                                       [sc * turnover_risk;
-                                                       sc * turnover_r] ∈
+                                                       sc * turnover_r] in
                                                       MOI.NormOneCone(1 + N))
     set_risk_bounds_and_expression!(model, opt, turnover_risk, r.settings, key)
     return nothing

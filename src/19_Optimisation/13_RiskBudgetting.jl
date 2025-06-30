@@ -83,7 +83,7 @@ function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgetting
     @constraints(model,
                  begin
                      clog_w[i = 1:N],
-                     [sc * log_w[i], sc, sc * w[i]] ∈ MOI.ExponentialCone()
+                     [sc * log_w[i], sc, sc * w[i]] in MOI.ExponentialCone()
                      crkb, sc * (dot(rkb, log_w) - c) >= 0
                  end)
     return nothing

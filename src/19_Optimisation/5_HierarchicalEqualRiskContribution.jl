@@ -452,14 +452,14 @@ function optimise!(hec::HierarchicalEqualRiskContribution,
         alpha = one(lrisk) - lrisk / risk
         # This implicitly multiplies the asset risks by the cluster risk. We eliminate the allocation of a vector of cluster weights, and a loop at the end.
         # wcl = ones(eltype(pr.X), clr.k)
-        # for i ∈ nd[1:(clr.k - 1)]
+        # for i in nd[1:(clr.k - 1)]
         #     ...
         #     <this loop>
         #     ...
         #     wcl[lc] *= alpha
         #     wcl[rc] *= one(alpha) - alpha
         # end
-        # for (i, cl) ∈ pairs(cls)
+        # for (i, cl) in pairs(cls)
         #     w[cl] *= view(rkcl, i)
         # end
         # because `ln` and `rn` contain `cl`.

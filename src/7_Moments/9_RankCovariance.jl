@@ -6,14 +6,14 @@ function KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return KendallCovariance{typeof(ve)}(ve)
 end
 function StatsBase.cor(::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
     return corkendall(X)
 end
 function StatsBase.cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -30,14 +30,14 @@ function SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return SpearmanCovariance{typeof(ve)}(ve)
 end
 function StatsBase.cor(::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
     return corspearman(X)
 end
 function StatsBase.cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @smart_assert(dims ∈ (1, 2))
+    @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

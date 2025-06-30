@@ -191,7 +191,7 @@ function constant_entropy_pooling_constraint!(pr::AbstractPriorResult, cache::Ab
                                                                                   length = size(pr.X,
                                                                                                 1))))
     for (i, epv) in zip(idx, view(epvs, idx))
-        if i ∈ cache
+        if i in cache
             continue
         end
         # Value at risk views are frozen in set_var_cvar_A_B from the start.
@@ -623,7 +623,7 @@ function _get_B_entropy_pooling_view_data(epv::C0_LinearEntropyPoolingConstraint
     alpha = epv.kind.alpha
     # X = view(pr.X, :, idx)
     # j = ceil(Int, alpha * size(X, 1))
-    # var = sum([-partialsort(view(X, :, i), j) for i ∈ idx])
+    # var = sum([-partialsort(view(X, :, i), j) for i in idx])
     # @smart_assert(all(var .>= zero(eltype(var))))
     X = pr.X
     idx = [sortperm(view(X, :, i)) for i in axes(X, 2)]

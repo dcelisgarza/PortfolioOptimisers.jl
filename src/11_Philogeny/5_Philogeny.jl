@@ -18,7 +18,7 @@ struct DegreeCentrality{T1 <: Integer, T2 <: NamedTuple} <: AbstractCentralityAl
     kwargs::T2
 end
 function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
-    @smart_assert(kind ∈ 0:2)
+    @smart_assert(kind in 0:2)
     return DegreeCentrality{typeof(kind), typeof(kwargs)}(kind, kwargs)
 end
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end

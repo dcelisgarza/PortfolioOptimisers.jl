@@ -34,10 +34,10 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
     @constraints(model,
                  begin
                      [i = 1:T],
-                     [z * opk * invk2, psi[i] * opk * invk, epsilon[i]] ∈
+                     [z * opk * invk2, psi[i] * opk * invk, epsilon[i]] in
                      MOI.PowerCone(invopk)
                      [i = 1:T],
-                     [omega[i] * invomk, theta[i] * invk, -z * invk2] ∈ MOI.PowerCone(omk)
+                     [omega[i] * invomk, theta[i] * invk, -z * invk2] in MOI.PowerCone(omk)
                      (epsilon + omega - x) .- t <= 0
                  end)
     @objective(model, Min, risk)
@@ -63,8 +63,8 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                          end)
         end
         @constraints(model, begin
-                         [i = 1:T], [nu[i], 1, z[i]] ∈ MOI.PowerCone(invopk)
-                         [i = 1:T], [z[i], 1, tau[i]] ∈ MOI.PowerCone(omk)
+                         [i = 1:T], [nu[i], 1, z[i]] in MOI.PowerCone(invopk)
+                         [i = 1:T], [z[i], 1, tau[i]] in MOI.PowerCone(omk)
                      end)
         @expression(model, risk, -dot(z, x))
         @objective(model, Max, risk)

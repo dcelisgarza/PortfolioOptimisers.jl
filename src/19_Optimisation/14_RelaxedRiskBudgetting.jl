@@ -47,7 +47,7 @@ function set_relaxed_risk_budgetting_alg_constraints!(::BasicRelaxedRiskBudgetti
     w = model[:w]
     psi = model[:psi]
     G = cholesky(sigma).U
-    @constraint(model, cbasic_rrp, [sc * psi; sc * G * w] ∈ SecondOrderCone())
+    @constraint(model, cbasic_rrp, [sc * psi; sc * G * w] in SecondOrderCone())
     return nothing
 end
 function set_relaxed_risk_budgetting_alg_constraints!(::RegularisationRelaxedRiskBudgettingAlgorithm,
@@ -62,8 +62,8 @@ function set_relaxed_risk_budgetting_alg_constraints!(::RegularisationRelaxedRis
                  begin
                      creg_rrp_soc_1,
                      [sc * 2 * psi; sc * 2 * G * w;
-                      sc * -2 * rho] ∈ SecondOrderCone()
-                     creg_rrp_soc_2, [sc * rho; sc * G * w] ∈ SecondOrderCone()
+                      sc * -2 * rho] in SecondOrderCone()
+                     creg_rrp_soc_2, [sc * rho; sc * G * w] in SecondOrderCone()
                  end)
     return nothing
 end
@@ -81,10 +81,10 @@ function set_relaxed_risk_budgetting_alg_constraints!(alg::RegularisationPenalty
                  begin
                      creg_pen_rrp_soc_1,
                      [sc * 2 * psi; sc * 2 * G * w;
-                      sc * -2 * rho] ∈ SecondOrderCone()
+                      sc * -2 * rho] in SecondOrderCone()
                      creg_pen_rrp_soc_2,
                      [sc * rho;
-                      sc * sqrt(p) * theta * w] ∈ SecondOrderCone()
+                      sc * sqrt(p) * theta * w] in SecondOrderCone()
                  end)
     return nothing
 end
@@ -113,7 +113,7 @@ function set_relaxed_risk_budgetting_constraints!(model::JuMP.Model,
                      crrp_soc[i = 1:N],
                      [sc * (w[i] + zeta[i])
                       sc * (2 * gamma * sqrt(rkb[i]))
-                      sc * (w[i] - zeta[i])] ∈ SecondOrderCone()
+                      sc * (w[i] - zeta[i])] in SecondOrderCone()
                  end)
     set_relaxed_risk_budgetting_alg_constraints!(rrb.alg, model, sigma)
     return nothing
