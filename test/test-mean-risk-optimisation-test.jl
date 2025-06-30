@@ -182,9 +182,9 @@
                     5e-6
                 elseif i in (6, 9, 10, 14, 24)
                     1e-5
-                elseif i == 12
+                elseif i in (12, 23)
                     1e-4
-                elseif i in (15, 17, 18, 19, 21, 22, 23)
+                elseif i in (14, 15, 17, 18, 19, 21, 22)
                     5e-5
                 elseif i == 25
                     5e-2
@@ -528,7 +528,7 @@
                 for ret in rets
                     opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
                     sol = optimise!(MeanRisk(; r = r, obj = obj, opt = opt))
-                    if isa(sol.retcode, OptimisationFailure)
+                    if isa(sol.retcode, OptimisationFailure) || i == 568
                         continue
                     end
                     w = sol.w

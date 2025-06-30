@@ -238,8 +238,9 @@ function cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int 
         cumsum(X; dims = dims)
     end
 end
-function drawdowns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
-    cX = cumulative_returns(X; compound = compound, dims = dims)
+function drawdowns(X::AbstractArray; cX::Bool = false, compound::Bool = false,
+                   dims::Int = 1)
+    cX = !cX ? cumulative_returns(X; compound = compound, dims = dims) : X
     if compound
         return cX ./ accumulate(max, cX; dims = dims) .- one(eltype(X))
     else

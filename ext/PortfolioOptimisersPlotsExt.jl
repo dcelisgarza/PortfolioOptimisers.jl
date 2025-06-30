@@ -237,7 +237,7 @@ function PortfolioOptimisers.plot_ptf_drawdowns(w::AbstractArray, X::AbstractArr
                                                                                      1.618))))
     ret = calc_net_returns(w, X, fees)
     cret = cumulative_returns(ret; compound = compound)
-    dd = drawdowns(cret; compound = compound)
+    dd = drawdowns(cret; cX = true, compound = compound)
     dd .*= 100
     risks = 100 * if !compound
                   [-AverageDrawdown(; w = rw)(ret), -UlcerIndex()(ret),
