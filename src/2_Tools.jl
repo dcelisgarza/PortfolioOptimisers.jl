@@ -343,4 +343,4 @@ function factory(::Nothing, args...; kwargs...)
 end
 
 export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns,
-       concrete_typed_array
+       concrete_typed_array, factory

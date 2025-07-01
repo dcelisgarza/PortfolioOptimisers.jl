@@ -95,6 +95,9 @@ function set_w!(model::JuMP.Model, X::AbstractMatrix, wi::Union{Nothing, <:Abstr
     return nothing
 end
 function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
+    if !haskey(model, :risk_vec)
+        return nothing
+    end
     risk_vec = model[:risk_vec]
     if any(x -> isa(x, QuadExpr), risk_vec)
         @expression(model, risk, zero(QuadExpr))
@@ -107,6 +110,9 @@ function scalarise_risk_expression!(model::JuMP.Model, ::SumScalariser)
     return nothing
 end
 function scalarise_risk_expression!(model::JuMP.Model, sce::LogSumExpScalariser)
+    if !haskey(model, :risk_vec)
+        return nothing
+    end
     risk_vec = model[:risk_vec]
     sc = model[:sc]
     N = length(risk_vec)
@@ -125,6 +131,9 @@ function scalarise_risk_expression!(model::JuMP.Model, sce::LogSumExpScalariser)
     return nothing
 end
 function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
+    if !haskey(model, :risk_vec)
+        return nothing
+    end
     risk_vec = model[:risk_vec]
     @variable(model, risk)
     @constraint(model, risk_ms, risk .- risk_vec .>= 0)

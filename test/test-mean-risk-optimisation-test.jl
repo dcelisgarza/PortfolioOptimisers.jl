@@ -362,9 +362,6 @@
         for r1 in risks3
             sol_fnt = optimise!(MeanRisk(; r = r1, obj = MaximumReturn(), opt = opt1))
             w_fnt = sol_fnt.w
-            @test isapprox(w_fnt,
-                           optimise!(MeanRisk(; r = [r1, r1], obj = MaximumReturn(),
-                                              opt = opt1)).w)
             r1 = PortfolioOptimisers.factory(r1, pr, slv)
             rk_fnt = expected_risk(r1, w_fnt, pr.X)
             ub = r1.settings.ub

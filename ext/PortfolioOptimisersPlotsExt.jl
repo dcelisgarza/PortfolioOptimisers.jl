@@ -11,9 +11,10 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(w::AbstractArray, X::Ab
                                                                                title = "Portfolio",
                                                                                xlabel = "Date",
                                                                                ylabel = "$(compound ? "Compound" : "Simple") Portfolio Cummulative Returns",
-                                                                               legend = false))
+                                                                               legend = false),
+                                                         ekwargs...)
     ret = cumulative_returns(calc_net_returns(w, X, fees); compound = compound)
-    return plot(ts, ret; kwargs...)
+    return plot(ts, ret; kwargs..., ekwargs...)
 end
 function compute_relevant_assets(w::AbstractVector, M::Real, N::Real)
     abs_w = abs.(w)
@@ -42,7 +43,8 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::AbstractVector,
                                                            summary_kwargs::NamedTuple = (;
                                                                                          label = "Others"),
                                                            legend_kwargs::NamedTuple = (;
-                                                                                        position = :auto))
+                                                                                        position = :auto),
+                                                           ekwargs...)
     ret = cumulative_returns(calc_net_asset_returns(w, X, fees); compound = compound)
     M = size(X, 2)
     N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
@@ -62,7 +64,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::AbstractVector,
                                  compound = compound)
         plot!(f, ts, ret; summary_kwargs...)
     end
-    plot!(f; legend_kwargs...)
+    plot!(f; legend_kwargs..., ekwargs...)
     return f
 end
 function PortfolioOptimisers.plot_composition(w::AbstractVector{<:Real},
@@ -72,16 +74,17 @@ function PortfolioOptimisers.plot_composition(w::AbstractVector{<:Real},
                                                                     xlabel = "Asset",
                                                                     ylabel = "Weight",
                                                                     xrotation = 90,
-                                                                    legend = false))
+                                                                    legend = false),
+                                              ekwargs...)
     M = length(w)
     N, idx = compute_relevant_assets(w, M, isnothing(N) ? inv(dot(w, w)) : N)
     return if M > N
         sort!(view(idx, 1:N))
         fidx = view(idx, 1:N)
         w = [view(w, fidx); sum(view(w, view(idx, (N + 1):M)))]
-        bar(w; xticks = (1:(N + 1), [nx[fidx]; "Others"]), kwargs...)
+        bar(w; xticks = (1:(N + 1), [nx[fidx]; "Others"]), kwargs..., ekwargs...)
     else
-        bar(w; xticks = (1:M, nx), kwargs...)
+        bar(w; xticks = (1:M, nx), kwargs..., ekwargs...)
     end
 end
 function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
@@ -97,9 +100,10 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                                           xlabel = "Asset",
                                                                           ylabel = "Risk Contribution",
                                                                           xrotation = 90,
-                                                                          legend = false))
+                                                                          legend = false),
+                                                    ekwargs...)
     rc = risk_contribution(r, w, X, fees; delta = delta, marginal = marginal)
-    return PortfolioOptimisers.plot_composition(rc, nx; N = N, kwargs = kwargs)
+    return PortfolioOptimisers.plot_composition(rc, nx; N = N, kwargs = kwargs, ekwargs...)
 end
 function PortfolioOptimisers.plot_stacked_bar_composition(w::AbstractArray,
                                                           nx::AbstractVector = 1:size(w, 1);
@@ -107,14 +111,15 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::AbstractArray,
                                                                                 xlabel = "Portfolios",
                                                                                 ylabel = "Weight",
                                                                                 title = "Portfolio Composition",
-                                                                                legend = :outerright))
+                                                                                legend = :outerright),
+                                                          ekwargs...)
     if isa(w, AbstractVector{<:AbstractVector})
         w = hcat(w...)
     end
     M = size(w, 2)
     ctg = repeat(nx; inner = M)
     return groupedbar(transpose(w); xticks = (1:M, 1:M), bar_position = :stack, group = ctg,
-                      kwargs...)
+                      kwargs..., ekwargs...)
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::AbstractArray,
                                                            nx::AbstractVector = 1:size(w, 1);
@@ -126,17 +131,18 @@ function PortfolioOptimisers.plot_stacked_area_composition(w::AbstractArray,
                                                                                  xticks = (1:size(w,
                                                                                                   2),
                                                                                            1:size(w,
-                                                                                                  2))))
+                                                                                                  2))),
+                                                           ekwargs...)
     if isa(w, AbstractVector{<:AbstractVector})
         w = hcat(w...)
     end
-    return areaplot(transpose(w); label = permutedims(nx), kwargs...)
+    return areaplot(transpose(w); label = permutedims(nx), kwargs..., ekwargs...)
 end
 function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractClusteringResult,
                                              nx::AbstractVector = 1:length(clr.clustering.order);
                                              dend_theme = :Spectral,
                                              dend_kwargs = (; xrotation = 90),
-                                             fig_kwargs = (; size = (600, 600)))
+                                             fig_kwargs = (; size = (600, 600)), ekwargs...)
     N = length(clr.clustering.order)
     nx = view(nx, clr.clustering.order)
     idx = cutree(clr.clustering; k = clr.k)
@@ -160,7 +166,7 @@ function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractCl
                xmin - 0.25, xmin - 0.25], [0, 0, 0, h, h, h, h, 0]; color = nothing,
               legend = false, fill = (0, 0.5, colours[(i - 1) % clr.k + 1]))
     end
-    return plot(dend1; fig_kwargs...)
+    return plot(dend1; fig_kwargs..., ekwargs...)
 end
 function PortfolioOptimisers.plot_clusters(clr::PortfolioOptimisers.AbstractClusteringResult,
                                            X::AbstractMatrix,
@@ -174,7 +180,7 @@ function PortfolioOptimisers.plot_clusters(clr::PortfolioOptimisers.AbstractClus
                                            dend1_kwargs = (;), dend2_kwargs = (;),
                                            hmap_kwargs = (;),
                                            line_kwargs = (; color = :black, linewidth = 3),
-                                           fig_kwargs = (; size = (600, 600)))
+                                           fig_kwargs = (; size = (600, 600)), ekwargs...)
     PortfolioOptimisers.issquare(X)
     iscov = any(!isone, diag(X))
     if iscov
@@ -223,7 +229,7 @@ function PortfolioOptimisers.plot_clusters(clr::PortfolioOptimisers.AbstractClus
     # https://docs.juliaplots.org/latest/generated/statsplots/#Dendrogram-on-the-right-side
     l = StatsPlots.grid(2, 2; heights = [0.2, 0.8], widths = [0.8, 0.2])
     return plot(dend1, plot(; ticks = nothing, border = :none, background_color = nothing),
-                hmap, dend2; layout = l, fig_kwargs...)
+                hmap, dend2; layout = l, fig_kwargs..., ekwargs...)
 end
 function PortfolioOptimisers.plot_ptf_drawdowns(w::AbstractArray, X::AbstractArray,
                                                 slv::Union{<:Solver,
@@ -251,7 +257,8 @@ function PortfolioOptimisers.plot_ptf_drawdowns(w::AbstractArray, X::AbstractArr
                                                                         size = (750,
                                                                                 ceil(Integer,
                                                                                      750 /
-                                                                                     1.618))))
+                                                                                     1.618))),
+                                                ekwargs...)
     ret = calc_net_returns(w, X, fees)
     cret = cumulative_returns(ret; compound = compound)
     dd = drawdowns(cret; cX = true, compound = compound)
@@ -285,7 +292,7 @@ function PortfolioOptimisers.plot_ptf_drawdowns(w::AbstractArray, X::AbstractArr
         hline!(f_dd, [risk]; label = label, color = colours[i + 1], l_kwargs...)
     end
     f_ret = plot(ts, cret; color = colours[1], ret_kwargs...)
-    return plot(f_ret, f_dd; layout = (2, 1), f_kwargs...)
+    return plot(f_ret, f_dd; layout = (2, 1), f_kwargs..., ekwargs...)
 end
 
 end
