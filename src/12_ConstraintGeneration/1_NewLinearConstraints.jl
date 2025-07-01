@@ -1,24 +1,20 @@
 # Recursively evaluate numeric functions
 function _eval_numeric_functions(expr)
-    if expr isa Number
-        return expr
-    elseif expr isa Symbol
-        return expr
-    elseif expr isa Expr
+    return if expr isa Expr
         if expr.head == :call
             fname = expr.args[1]
             # Only evaluate if all arguments are numeric
             args = [_eval_numeric_functions(arg) for arg in expr.args[2:end]]
             if all(x -> isa(x, Number), args)
-                return Base.invokelatest(getfield(Base, fname), args...)
+                Base.invokelatest(getfield(Base, fname), args...)
             else
-                return Expr(:call, fname, args...)
+                Expr(:call, fname, args...)
             end
         else
-            return Expr(expr.head, map(_eval_numeric_functions, expr.args)...)
+            Expr(expr.head, map(_eval_numeric_functions, expr.args)...)
         end
     else
-        return expr
+        expr
     end
 end
 # Collect terms: returns vector of (coefficient, variable::Union{String,Nothing})
@@ -70,12 +66,12 @@ function _collect_terms!(expr, coeff, terms)
     end
 end
 function _format_term(coeff, var)
-    if coeff == 1.0
-        return var
+    return if coeff == 1.0
+        var
     elseif coeff == -1.0
-        return "-$var"
+        "-$var"
     else
-        return "$(coeff)*$var"
+        "$(coeff)*$var"
     end
 end
 function _rethrow_parse_error(::Any, side = :lhs)
