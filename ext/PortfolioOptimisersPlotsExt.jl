@@ -231,34 +231,34 @@ function PortfolioOptimisers.plot_clusters(clr::PortfolioOptimisers.AbstractClus
     return plot(dend1, plot(; ticks = nothing, border = :none, background_color = nothing),
                 hmap, dend2; layout = l, fig_kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_ptf_drawdowns(w::AbstractArray, X::AbstractArray,
-                                                slv::Union{<:Solver,
-                                                           <:AbstractVector{<:Solver}},
-                                                fees::Union{Nothing, <:Fees} = nothing;
-                                                ts::AbstractVector = 1:size(X, 1),
-                                                compound::Bool = false, alpha::Real = 0.05,
-                                                kappa::Real = 0.3,
-                                                rw::Union{Nothing, <:AbstractWeights} = nothing,
-                                                theme::Symbol = :Dark2_5,
-                                                dd_kwargs = (;
-                                                             label = "$(compound ? "Compounded" : "Uncompounded") Drawdown",
-                                                             ylabel = "$(compound ? "Compounded" : "Uncompounded")\nDrawdown Percentage",
-                                                             xlabel = "Date", linewidth = 2,
-                                                             yguidefontsize = 10),
-                                                dd_func = x -> extrema(x) .* [1.2, 1.01],
-                                                l_kwargs::NamedTuple = (; linewidth = 2,
-                                                                        legend = true),
-                                                ret_kwargs::NamedTuple = (;
-                                                                          ylabel = "$(compound ? "Compounded" : "Uncompounded")\nCumulative Returns",
-                                                                          linewidth = 2,
-                                                                          legend = false,
-                                                                          yguidefontsize = 10),
-                                                f_kwargs::NamedTuple = (;
-                                                                        size = (750,
-                                                                                ceil(Integer,
-                                                                                     750 /
-                                                                                     1.618))),
-                                                ekwargs...)
+function PortfolioOptimisers.plot_drawdowns(w::AbstractArray, X::AbstractArray,
+                                            slv::Union{<:Solver,
+                                                       <:AbstractVector{<:Solver}},
+                                            fees::Union{Nothing, <:Fees} = nothing;
+                                            ts::AbstractVector = 1:size(X, 1),
+                                            compound::Bool = false, alpha::Real = 0.05,
+                                            kappa::Real = 0.3,
+                                            rw::Union{Nothing, <:AbstractWeights} = nothing,
+                                            theme::Symbol = :Dark2_5,
+                                            dd_kwargs = (;
+                                                         label = "$(compound ? "Compounded" : "Uncompounded") Drawdown",
+                                                         ylabel = "$(compound ? "Compounded" : "Uncompounded")\nDrawdown Percentage",
+                                                         xlabel = "Date", linewidth = 2,
+                                                         yguidefontsize = 10),
+                                            dd_func = x -> extrema(x) .* [1.2, 1.01],
+                                            l_kwargs::NamedTuple = (; linewidth = 2,
+                                                                    legend = true),
+                                            ret_kwargs::NamedTuple = (;
+                                                                      ylabel = "$(compound ? "Compounded" : "Uncompounded")\nCumulative Returns",
+                                                                      linewidth = 2,
+                                                                      legend = false,
+                                                                      yguidefontsize = 10),
+                                            f_kwargs::NamedTuple = (;
+                                                                    size = (750,
+                                                                            ceil(Integer,
+                                                                                 750 /
+                                                                                 1.618))),
+                                            ekwargs...)
     ret = calc_net_returns(w, X, fees)
     cret = cumulative_returns(ret; compound = compound)
     dd = drawdowns(cret; cX = true, compound = compound)
@@ -293,6 +293,45 @@ function PortfolioOptimisers.plot_ptf_drawdowns(w::AbstractArray, X::AbstractArr
     end
     f_ret = plot(ts, cret; color = colours[1], ret_kwargs...)
     return plot(f_ret, f_dd; layout = (2, 1), f_kwargs..., ekwargs...)
+end
+function PortfolioOptimisers.plot_measures(w::Union{<:AbstractVector{<:Real},
+                                                    <:AbstractVector{<:AbstractVector}},
+                                           pr::PortfolioOptimisers.AbstractPriorResult,
+                                           fees::Union{Nothing, <:Fees} = nothing;
+                                           x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
+                                           y::PortfolioOptimisers.AbstractBaseRiskMeasure = ReturnRiskMeasure(),
+                                           z::Union{Nothing,
+                                                    <:PortfolioOptimisers.AbstractBaseRiskMeasure} = nothing,
+                                           c::PortfolioOptimisers.AbstractBaseRiskMeasure = RatioRiskMeasure(;
+                                                                                                             rk = x,
+                                                                                                             rt = ArithmeticReturn(),
+                                                                                                             rf = 0),
+                                           slv::Union{Nothing, <:Solver,
+                                                      <:AbstractVector{<:Solver}} = nothing,
+                                           flag::Bool = true,
+                                           kwargs::NamedTuple = (title = "Pareto Frontier",
+                                                                 xlabel = "X", ylabel = "Y",
+                                                                 zlabel = "Z",
+                                                                 label = "Portfolio",
+                                                                 colorbar_title = "C",
+                                                                 legend = true,
+                                                                 xrotation = 0,
+                                                                 yrotation = 0))
+    if flag
+        x = factory(x, pr)
+        y = factory(y, pr)
+        z = isnothing(z) ? nothing : factory(z, pr, slv)
+        c = factory(c, pr)
+    end
+    xr = expected_risk(x, w, pr, fees)
+    yr = expected_risk(y, w, pr, fees)
+    zr = isnothing(z) ? nothing : expected_risk(z, w, pr, fees)
+    cr = expected_risk(c, w, pr, fees)
+    return if isnothing(zr)
+        scatter(xr, yr; zcolor = cr, kwargs...)
+    else
+        scatter(xr, yr, zr; zcolor = cr, kwargs...)
+    end
 end
 
 end
