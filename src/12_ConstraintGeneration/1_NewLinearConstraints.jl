@@ -96,6 +96,20 @@ struct ParsingResult{T1, T2, T3, T4, T5}
 end
 Base.length(res::ParsingResult) = 1
 Base.iterate(res::ParsingResult, state = 1) = state > 1 ? nothing : (res, state + 1)
+struct AssetSets{T1 <: AbstractString, T2 <: AbstractDict}
+    key::T1
+    dict::T2
+end
+function AssetSets(; key::AbstractString = "nx", dict::AbstractDict)
+    @smart_assert(!isempty(dict))
+    @smart_assert(haskey(dict, key))
+    return AssetSets(key, dict)
+end
+function asset_sets_view(sets::AssetSets, i::AbstractVector)
+    dict = Dict(k => v for (k, v) in sets.dict if k != sets.key)
+    dict[sets.key] = view(sets.dict[sets.key], i)
+    return AssetSets(; key = sets.key, dict = dict)
+end
 function parse_equation(eqn::AbstractString; datatype::DataType = Float64)
     if occursin("++", eqn)
         throw(Meta.ParseError("Invalid operator '++' detected in equation."))
@@ -154,8 +168,7 @@ function parse_equation(eqn::AbstractString; datatype::DataType = Float64)
 
     return ParsingResult(variables, coefficients, opstr, rhs_val, formatted)
 end
-function replace_group_by_assets(res::ParsingResult, sets::AbstractDict, flag::Bool = false)
-    @smart_assert(!isempty(sets))
+function replace_group_by_assets(res::ParsingResult, sets::AssetSets, flag::Bool = false)
     variables, coeffs = res.vars, res.coef
     variables_new = copy(variables)
     coeffs_new = copy(coeffs)
@@ -169,7 +182,7 @@ function replace_group_by_assets(res::ParsingResult, sets::AbstractDict, flag::B
         if isnothing(m)
             n = match(corr_pattern, v)
             if isnothing(n)
-                asset = get(sets, v, nothing)
+                asset = get(sets.dict, v, nothing)
                 if isnothing(asset)
                     continue
                 end
@@ -183,14 +196,14 @@ function replace_group_by_assets(res::ParsingResult, sets::AbstractDict, flag::B
                 end
                 assets12 = n.captures[1]
                 assets12 = split(assets12, ", ")
-                asset1 = get(sets, assets12[1], nothing)
-                b = get(sets, assets12[2], nothing)
-                if isnothing(asset1) && isnothing(b)
+                asset1 = get(sets.dict, assets12[1], nothing)
+                asset2 = get(sets.dict, assets12[2], nothing)
+                if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
-                @smart_assert(!isnothing(asset1) && !isnothing(b))
-                @smart_assert(length(asset1) == length(b))
-                variables_new[i] = "($(asset1[1]), $(b[1]))"
+                @smart_assert(!isnothing(asset1) && !isnothing(asset2))
+                @smart_assert(length(asset1) == length(asset2))
+                variables_new[i] = "($(asset1[1]), $(asset2[1]))"
             end
         else
             if !flag
@@ -198,7 +211,7 @@ function replace_group_by_assets(res::ParsingResult, sets::AbstractDict, flag::B
             end
             n = match(corr_pattern, v)
             if isnothing(n)
-                asset = get(sets, v[7:(end - 1)], nothing)
+                asset = get(sets.dict, v[7:(end - 1)], nothing)
                 if isnothing(asset)
                     continue
                 end
@@ -209,8 +222,8 @@ function replace_group_by_assets(res::ParsingResult, sets::AbstractDict, flag::B
             else
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
-                asset1 = get(sets, asset1, nothing)
-                asset2 = get(sets, asset2, nothing)
+                asset1 = get(sets.dict, asset1, nothing)
+                asset2 = get(sets.dict, asset2, nothing)
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
@@ -234,24 +247,23 @@ function replace_group_by_assets(res::ParsingResult, sets::AbstractDict, flag::B
 end
 function get_linear_constraints(lcs::Union{<:ParsingResult,
                                            <:AbstractVector{<:ParsingResult}},
-                                sets::AbstractDict, key::String = "nx";
-                                datatype::DataType = Float64, strict::Bool = false)
+                                sets::AssetSets; datatype::DataType = Float64,
+                                strict::Bool = false)
     if isa(lcs, AbstractVector)
         @smart_assert(!isempty(lcs))
     end
-    @smart_assert(haskey(sets, key))
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)
     A_eq = Vector{datatype}(undef, 0)
     B_eq = Vector{datatype}(undef, 0)
-    nx = sets[key]
+    nx = sets.dict[sets.key]
     At = Vector{datatype}(undef, length(nx))
     for lc in lcs
         fill!(At, zero(eltype(At)))
         for (v, c) in zip(lc.vars, lc.coef)
             Ai = (nx .== v)
             if !any(isone, Ai)
-                msg = "Linear constraint $(v) is empty in $(key)."
+                msg = "$(v) does not exist in $(sets.dict[sets.key])."
                 strict ? throw(ArgumentError(msg)) : @warn(msg)
             end
             At += Ai * c
@@ -292,19 +304,17 @@ end
 function build_linear_constraints(::Nothing, args...; kwargs...)
     return nothing
 end
-function build_linear_constraints(eqn::AbstractString, sets::AbstractDict,
-                                  key::String = "nx"; datatype::DataType = Float64,
-                                  strict::Bool = false)
+function build_linear_constraints(eqn::AbstractString, sets::AssetSets;
+                                  datatype::DataType = Float64, strict::Bool = false)
     lcs = parse_equation(eqn; datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets)
-    return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict)
+    return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
-function build_linear_constraints(eqn::AbstractVector{<:AbstractString}, sets::AbstractDict,
-                                  key::String = "nx"; datatype::DataType = Float64,
-                                  strict::Bool = false)
+function build_linear_constraints(eqn::AbstractVector{<:AbstractString}, sets::AssetSets;
+                                  datatype::DataType = Float64, strict::Bool = false)
     lcs = parse_equation.(eqn; datatype = datatype)
     lcs = replace_group_by_assets.(lcs, Ref(sets))
-    return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict)
+    return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
 
-export parse_equation, replace_group_by_assets, build_linear_constraints
+export parse_equation, replace_group_by_assets, build_linear_constraints, AssetSets
