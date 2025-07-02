@@ -51,82 +51,80 @@
     clr = clusterise(ClusteringEstimator(), rd.X)
     jopt = JuMPOptimiser(; slv = slv)
     hopt = HierarchicalOptimiser(; slv = slv)
-    @time res1 = optimise!(Stacking(; pe = pr,
-                                    opti = [Stacking(;
-                                                     opti = [MeanRisk(;
-                                                                      r = ConditionalValueatRisk(),
-                                                                      obj = MaximumRatio(;
-                                                                                         rf = rf),
-                                                                      opt = jopt),
-                                                             RiskBudgetting(;
-                                                                            r = LowOrderMoment(;
-                                                                                               alg = MeanAbsoluteDeviation()),
-                                                                            opt = jopt)],
-                                                     opto = HierarchicalRiskParity(;
-                                                                                   r = ConditionalDrawdownatRisk(),
-                                                                                   opt = hopt),
-                                                     threads = SequentialEx()),
-                                            InverseVolatility()],
-                                    opto = Stacking(;
-                                                    opti = [HierarchicalRiskParity(;
-                                                                                   r = ConditionalDrawdownatRisk(),
-                                                                                   opt = hopt),
-                                                            NestedClustering(;
-                                                                             opto = NearOptimalCentering(;
-                                                                                                         r = ConditionalValueatRisk(),
-                                                                                                         obj = MaximumRatio(;
-                                                                                                                            rf = rf),
-                                                                                                         opt = jopt),
-                                                                             opti = HierarchicalEqualRiskContribution(;
-                                                                                                                      ri = ConditionalDrawdownatRisk(),
-                                                                                                                      ro = StandardDeviation(),
-                                                                                                                      opt = hopt),
-                                                                             threads = SequentialEx())],
-                                                    opto = MeanRisk(;
-                                                                    r = ConditionalValueatRisk(),
-                                                                    obj = MaximumRatio(;
-                                                                                       rf = rf),
-                                                                    opt = jopt),
-                                                    threads = SequentialEx()),
-                                    threads = SequentialEx()), rd)
-    @time res2 = optimise!(Stacking(; pe = pr,
-                                    opti = [Stacking(;
-                                                     opti = [MeanRisk(;
-                                                                      r = ConditionalValueatRisk(),
-                                                                      obj = MaximumRatio(;
-                                                                                         rf = rf),
-                                                                      opt = jopt),
-                                                             RiskBudgetting(;
-                                                                            r = LowOrderMoment(;
-                                                                                               alg = MeanAbsoluteDeviation()),
-                                                                            opt = jopt)],
-                                                     opto = HierarchicalRiskParity(;
-                                                                                   r = ConditionalDrawdownatRisk(),
-                                                                                   opt = hopt),
-                                                     threads = ThreadedEx()),
-                                            InverseVolatility()],
-                                    opto = Stacking(;
-                                                    opti = [HierarchicalRiskParity(;
-                                                                                   r = ConditionalDrawdownatRisk(),
-                                                                                   opt = hopt),
-                                                            NestedClustering(;
-                                                                             opto = NearOptimalCentering(;
-                                                                                                         r = ConditionalValueatRisk(),
-                                                                                                         obj = MaximumRatio(;
-                                                                                                                            rf = rf),
-                                                                                                         opt = jopt),
-                                                                             opti = HierarchicalEqualRiskContribution(;
-                                                                                                                      ri = ConditionalDrawdownatRisk(),
-                                                                                                                      ro = StandardDeviation(),
-                                                                                                                      opt = hopt),
-                                                                             threads = ThreadedEx())],
-                                                    opto = MeanRisk(;
-                                                                    r = ConditionalValueatRisk(),
-                                                                    obj = MaximumRatio(;
-                                                                                       rf = rf),
-                                                                    opt = jopt),
-                                                    threads = ThreadedEx()),
-                                    threads = ThreadedEx()), rd)
+    res1 = optimise!(Stacking(; pe = pr,
+                              opti = [Stacking(;
+                                               opti = [MeanRisk(;
+                                                                r = ConditionalValueatRisk(),
+                                                                obj = MaximumRatio(;
+                                                                                   rf = rf),
+                                                                opt = jopt),
+                                                       RiskBudgetting(;
+                                                                      r = LowOrderMoment(;
+                                                                                         alg = MeanAbsoluteDeviation()),
+                                                                      opt = jopt)],
+                                               opto = HierarchicalRiskParity(;
+                                                                             r = ConditionalDrawdownatRisk(),
+                                                                             opt = hopt),
+                                               threads = SequentialEx()),
+                                      InverseVolatility()],
+                              opto = Stacking(;
+                                              opti = [HierarchicalRiskParity(;
+                                                                             r = ConditionalDrawdownatRisk(),
+                                                                             opt = hopt),
+                                                      NestedClustering(;
+                                                                       opto = NearOptimalCentering(;
+                                                                                                   r = ConditionalValueatRisk(),
+                                                                                                   obj = MaximumRatio(;
+                                                                                                                      rf = rf),
+                                                                                                   opt = jopt),
+                                                                       opti = HierarchicalEqualRiskContribution(;
+                                                                                                                ri = ConditionalDrawdownatRisk(),
+                                                                                                                ro = StandardDeviation(),
+                                                                                                                opt = hopt),
+                                                                       threads = SequentialEx())],
+                                              opto = MeanRisk(;
+                                                              r = ConditionalValueatRisk(),
+                                                              obj = MaximumRatio(; rf = rf),
+                                                              opt = jopt),
+                                              threads = SequentialEx()),
+                              threads = SequentialEx()), rd)
+    res2 = optimise!(Stacking(; pe = pr,
+                              opti = [Stacking(;
+                                               opti = [MeanRisk(;
+                                                                r = ConditionalValueatRisk(),
+                                                                obj = MaximumRatio(;
+                                                                                   rf = rf),
+                                                                opt = jopt),
+                                                       RiskBudgetting(;
+                                                                      r = LowOrderMoment(;
+                                                                                         alg = MeanAbsoluteDeviation()),
+                                                                      opt = jopt)],
+                                               opto = HierarchicalRiskParity(;
+                                                                             r = ConditionalDrawdownatRisk(),
+                                                                             opt = hopt),
+                                               threads = ThreadedEx()),
+                                      InverseVolatility()],
+                              opto = Stacking(;
+                                              opti = [HierarchicalRiskParity(;
+                                                                             r = ConditionalDrawdownatRisk(),
+                                                                             opt = hopt),
+                                                      NestedClustering(;
+                                                                       opto = NearOptimalCentering(;
+                                                                                                   r = ConditionalValueatRisk(),
+                                                                                                   obj = MaximumRatio(;
+                                                                                                                      rf = rf),
+                                                                                                   opt = jopt),
+                                                                       opti = HierarchicalEqualRiskContribution(;
+                                                                                                                ri = ConditionalDrawdownatRisk(),
+                                                                                                                ro = StandardDeviation(),
+                                                                                                                opt = hopt),
+                                                                       threads = ThreadedEx())],
+                                              opto = MeanRisk(;
+                                                              r = ConditionalValueatRisk(),
+                                                              obj = MaximumRatio(; rf = rf),
+                                                              opt = jopt),
+                                              threads = ThreadedEx()),
+                              threads = ThreadedEx()), rd)
     @test isapprox(res1.w,
                    [0.01059410362915954, 0.010640989138181081, 0.0063999742693907945,
                     0.015431859703639948, 0.012831666066042956, 0.009396976984868565,
@@ -141,80 +139,80 @@
                    rtol = 5e-6)
     @test isapprox(res1.w, res2.w)
 
-    @time res3 = optimise!(NestedClustering(; pe = pr, cle = clr,
-                                            opti = Stacking(;
-                                                            opti = [MeanRisk(;
-                                                                             r = ConditionalValueatRisk(),
-                                                                             obj = MaximumRatio(;
-                                                                                                rf = rf),
-                                                                             opt = jopt),
-                                                                    RiskBudgetting(;
-                                                                                   r = LowOrderMoment(;
-                                                                                                      alg = MeanAbsoluteDeviation()),
-                                                                                   opt = jopt)],
-                                                            opto = HierarchicalRiskParity(;
-                                                                                          r = ConditionalDrawdownatRisk(),
-                                                                                          opt = hopt),
-                                                            threads = SequentialEx()),
-                                            opto = Stacking(;
-                                                            opti = [HierarchicalRiskParity(;
-                                                                                           r = ConditionalDrawdownatRisk(),
-                                                                                           opt = hopt),
-                                                                    NestedClustering(;
-                                                                                     opto = NearOptimalCentering(;
-                                                                                                                 r = ConditionalValueatRisk(),
-                                                                                                                 obj = MaximumRatio(;
-                                                                                                                                    rf = rf),
-                                                                                                                 opt = jopt),
-                                                                                     opti = HierarchicalEqualRiskContribution(;
-                                                                                                                              ri = ConditionalDrawdownatRisk(),
-                                                                                                                              ro = StandardDeviation(),
-                                                                                                                              opt = hopt),
-                                                                                     threads = SequentialEx())],
-                                                            opto = MeanRisk(;
-                                                                            r = ConditionalValueatRisk(),
-                                                                            obj = MaximumRatio(;
-                                                                                               rf = rf),
-                                                                            opt = jopt),
-                                                            threads = SequentialEx()),
-                                            threads = SequentialEx()), rd)
-    @time res4 = optimise!(NestedClustering(; pe = pr, cle = clr,
-                                            opti = Stacking(;
-                                                            opti = [MeanRisk(;
-                                                                             r = ConditionalValueatRisk(),
-                                                                             obj = MaximumRatio(;
-                                                                                                rf = rf),
-                                                                             opt = jopt),
-                                                                    RiskBudgetting(;
-                                                                                   r = LowOrderMoment(;
-                                                                                                      alg = MeanAbsoluteDeviation()),
-                                                                                   opt = jopt)],
-                                                            opto = HierarchicalRiskParity(;
-                                                                                          r = ConditionalDrawdownatRisk(),
-                                                                                          opt = hopt),
-                                                            threads = ThreadedEx()),
-                                            opto = Stacking(;
-                                                            opti = [HierarchicalRiskParity(;
-                                                                                           r = ConditionalDrawdownatRisk(),
-                                                                                           opt = hopt),
-                                                                    NestedClustering(;
-                                                                                     opto = NearOptimalCentering(;
-                                                                                                                 r = ConditionalValueatRisk(),
-                                                                                                                 obj = MaximumRatio(;
-                                                                                                                                    rf = rf),
-                                                                                                                 opt = jopt),
-                                                                                     opti = HierarchicalEqualRiskContribution(;
-                                                                                                                              ri = ConditionalDrawdownatRisk(),
-                                                                                                                              ro = StandardDeviation(),
-                                                                                                                              opt = hopt),
-                                                                                     threads = ThreadedEx())],
-                                                            opto = MeanRisk(;
-                                                                            r = ConditionalValueatRisk(),
-                                                                            obj = MaximumRatio(;
-                                                                                               rf = rf),
-                                                                            opt = jopt),
-                                                            threads = ThreadedEx()),
-                                            threads = ThreadedEx()), rd)
+    res3 = optimise!(NestedClustering(; pe = pr, cle = clr,
+                                      opti = Stacking(;
+                                                      opti = [MeanRisk(;
+                                                                       r = ConditionalValueatRisk(),
+                                                                       obj = MaximumRatio(;
+                                                                                          rf = rf),
+                                                                       opt = jopt),
+                                                              RiskBudgetting(;
+                                                                             r = LowOrderMoment(;
+                                                                                                alg = MeanAbsoluteDeviation()),
+                                                                             opt = jopt)],
+                                                      opto = HierarchicalRiskParity(;
+                                                                                    r = ConditionalDrawdownatRisk(),
+                                                                                    opt = hopt),
+                                                      threads = SequentialEx()),
+                                      opto = Stacking(;
+                                                      opti = [HierarchicalRiskParity(;
+                                                                                     r = ConditionalDrawdownatRisk(),
+                                                                                     opt = hopt),
+                                                              NestedClustering(;
+                                                                               opto = NearOptimalCentering(;
+                                                                                                           r = ConditionalValueatRisk(),
+                                                                                                           obj = MaximumRatio(;
+                                                                                                                              rf = rf),
+                                                                                                           opt = jopt),
+                                                                               opti = HierarchicalEqualRiskContribution(;
+                                                                                                                        ri = ConditionalDrawdownatRisk(),
+                                                                                                                        ro = StandardDeviation(),
+                                                                                                                        opt = hopt),
+                                                                               threads = SequentialEx())],
+                                                      opto = MeanRisk(;
+                                                                      r = ConditionalValueatRisk(),
+                                                                      obj = MaximumRatio(;
+                                                                                         rf = rf),
+                                                                      opt = jopt),
+                                                      threads = SequentialEx()),
+                                      threads = SequentialEx()), rd)
+    res4 = optimise!(NestedClustering(; pe = pr, cle = clr,
+                                      opti = Stacking(;
+                                                      opti = [MeanRisk(;
+                                                                       r = ConditionalValueatRisk(),
+                                                                       obj = MaximumRatio(;
+                                                                                          rf = rf),
+                                                                       opt = jopt),
+                                                              RiskBudgetting(;
+                                                                             r = LowOrderMoment(;
+                                                                                                alg = MeanAbsoluteDeviation()),
+                                                                             opt = jopt)],
+                                                      opto = HierarchicalRiskParity(;
+                                                                                    r = ConditionalDrawdownatRisk(),
+                                                                                    opt = hopt),
+                                                      threads = ThreadedEx()),
+                                      opto = Stacking(;
+                                                      opti = [HierarchicalRiskParity(;
+                                                                                     r = ConditionalDrawdownatRisk(),
+                                                                                     opt = hopt),
+                                                              NestedClustering(;
+                                                                               opto = NearOptimalCentering(;
+                                                                                                           r = ConditionalValueatRisk(),
+                                                                                                           obj = MaximumRatio(;
+                                                                                                                              rf = rf),
+                                                                                                           opt = jopt),
+                                                                               opti = HierarchicalEqualRiskContribution(;
+                                                                                                                        ri = ConditionalDrawdownatRisk(),
+                                                                                                                        ro = StandardDeviation(),
+                                                                                                                        opt = hopt),
+                                                                               threads = ThreadedEx())],
+                                                      opto = MeanRisk(;
+                                                                      r = ConditionalValueatRisk(),
+                                                                      obj = MaximumRatio(;
+                                                                                         rf = rf),
+                                                                      opt = jopt),
+                                                      threads = ThreadedEx()),
+                                      threads = ThreadedEx()), rd)
     @test isapprox(res3.w,
                    [0.012607444682938344, 0.010808223770579987, 0.006596087610098528,
                     0.01791006029555872, 0.037621537748847245, 0.008014682964922727,

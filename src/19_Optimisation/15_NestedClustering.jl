@@ -17,9 +17,13 @@ struct NestedClustering{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorRes
                         T2 <: Union{<:ClusteringEstimator, <:AbstractClusteringResult},
                         T3 <:
                         Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
-                        T4 <: Union{Nothing, <:DataFrame}, T5 <: OptimisationEstimator,
-                        T6 <: OptimisationEstimator, T7 <: ClusteringWeightFinaliser,
-                        T8 <: Bool, T9 <: FLoops.Transducers.Executor} <:
+                        T4 <: Union{Nothing, <:AssetSets,
+                          #! Start: to delete
+                                    <:DataFrame
+                          #! End: to delete
+                          }, T5 <: OptimisationEstimator, T6 <: OptimisationEstimator,
+                        T7 <: ClusteringWeightFinaliser, T8 <: Bool,
+                        T9 <: FLoops.Transducers.Executor} <:
        ClusteringOptimisationEstimator
     pe::T1
     cle::T2
@@ -78,8 +82,11 @@ function NestedClustering(;
                           cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult} = ClusteringEstimator(),
                           wb::Union{Nothing, <:WeightBoundsResult,
                                     <:WeightBoundsConstraint} = nothing,
-                          sets::Union{Nothing, <:DataFrame} = nothing,
-                          opti::OptimisationEstimator = MeanRisk(),
+                          sets::Union{Nothing, <:AssetSets,
+                                      #! Start: to delete
+                                      <:DataFrame
+                                      #! End: to delete
+                                      } = nothing, opti::OptimisationEstimator = MeanRisk(),
                           opto::OptimisationEstimator = opti,
                           cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
                           strict::Bool = false,
@@ -89,7 +96,7 @@ function NestedClustering(;
         assert_internal_optimiser(opti)
     end
     if isa(wb, WeightBoundsConstraint)
-        @smart_assert(isa(sets, DataFrame) && !isempty(sets))
+        @smart_assert(!isnothing(sets))
     end
     return NestedClustering{typeof(pe), typeof(cle), typeof(wb), typeof(sets), typeof(opti),
                             typeof(opto), typeof(cwf), typeof(strict), typeof(threads)}(pe,
@@ -106,7 +113,7 @@ function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
     X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
     pe = prior_view(nco.pe, i)
     wb = weight_bounds_view(nco.wb, i)
-    sets = nothing_dataframe_view(nco.sets, i)
+    sets = nothing_asset_sets_view(nco.sets, i)
     opti = opt_view(nco.opti, i, X)
     opto = opt_view(nco.opto, i, X)
     return NestedClustering(; pe = pe, cle = nco.cle, wb = wb, sets = sets, opti = opti,
@@ -115,8 +122,12 @@ function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
 end
 function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsResult,
                                                <:WeightBoundsConstraint},
-                                     sets::Union{Nothing, <:DataFrame},
-                                     cwf::ClusteringWeightFinaliser, strict::Bool,
+                                     sets::Union{Nothing, <:AssetSets,
+                                                 #! Start: to delete
+                                                 <:DataFrame
+                                                 #! End: to delete
+                                                 }, cwf::ClusteringWeightFinaliser,
+                                     strict::Bool,
                                      resi::AbstractVector{<:OptimisationResult},
                                      res::OptimisationResult, w::AbstractVector)
     wb = weight_bounds_constraints(wb, sets; N = length(w), strict = strict)

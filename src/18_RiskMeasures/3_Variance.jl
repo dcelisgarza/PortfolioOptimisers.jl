@@ -7,7 +7,12 @@ struct SqrtRiskExpr <: SecondMomentFormulation end
 const QuadSqrtRiskExpr = Union{<:SqrtRiskExpr, <:QuadRiskExpr}
 struct Variance{T1 <: RiskMeasureSettings, T2 <: Union{Nothing, <:AbstractMatrix},
                 T3 <:
-                Union{Nothing, <:LinearConstraint, <:AbstractVector{<:LinearConstraint},
+                Union{Nothing, <:AbstractString, Expr, <:AbstractVector{<:AbstractString},
+                      <:AbstractVector{Expr},
+                      <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                      #! Start: to delete
+                      <:LinearConstraint, <:AbstractVector{<:LinearConstraint},
+                      #! End: to delete
                       <:LinearConstraintResult}, T4 <: VarianceFormulation} <:
        JuMPRiskContributionSigmaRiskMeasure
     settings::T1
@@ -17,8 +22,13 @@ struct Variance{T1 <: RiskMeasureSettings, T2 <: Union{Nothing, <:AbstractMatrix
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   sigma::Union{Nothing, <:AbstractMatrix} = nothing,
-                  rc::Union{Nothing, <:LinearConstraint,
-                            <:AbstractVector{<:LinearConstraint}, <:LinearConstraintResult} = nothing,
+                  rc::Union{Nothing, <:AbstractString, Expr,
+                            <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                            <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                            #! Start: to delete
+                            <:LinearConstraint, <:AbstractVector{<:LinearConstraint},
+                            #! End: to delete
+                            <:LinearConstraintResult} = nothing,
                   formulation::VarianceFormulation = SOCRiskExpr())
     if isa(sigma, AbstractMatrix)
         @smart_assert(!isempty(sigma))

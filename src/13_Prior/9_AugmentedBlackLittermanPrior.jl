@@ -3,11 +3,26 @@ struct AugmentedBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimato
                                              T3 <: AbstractMatrixProcessingEstimator,
                                              T4 <: AbstractRegressionEstimator,
                                              T5 <: AbstractVarianceEstimator,
-                                             T6 <: Union{<:BlackLittermanViewsEstimator,
-                                                         <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                             T7 <: Union{<:BlackLittermanViewsEstimator,
-                                                         <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                             T8 <: DataFrame, T9 <: DataFrame,
+                                             T6 <: Union{<:AbstractString, Expr,
+                                                         <:AbstractVector{<:AbstractString},
+                                                         <:AbstractVector{Expr},
+                                                         <:AbstractVector{<:Union{<:AbstractString,
+                                                                                  Expr}},
+                                               #! Start: to delete
+                                                         <:BlackLittermanViewsEstimator,
+                                                         <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                               #! End: to delete
+                                               },
+                                             T7 <: Union{<:AbstractString, Expr,
+                                                         <:AbstractVector{<:AbstractString},
+                                                         <:AbstractVector{Expr},
+                                                         <:AbstractVector{<:Union{<:AbstractString,
+                                                                                  Expr}},
+                                               #! Start: to delete
+                                                         <:BlackLittermanViewsEstimator,
+                                                         <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                               #! End: to delete
+                                               }, T8 <: DataFrame, T9 <: DataFrame,
                                              T10 <: Union{Nothing, <:AbstractVector},
                                              T11 <: Union{Nothing, <:AbstractVector},
                                              T12 <: Union{Nothing, <:AbstractVector},
@@ -36,12 +51,36 @@ function AugmentedBlackLittermanPriorEstimator(;
                                                mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                                re::AbstractRegressionEstimator = StepwiseRegression(),
                                                ve::AbstractVarianceEstimator = SimpleVariance(),
-                                               a_views::Union{<:BlackLittermanViewsEstimator,
-                                                              <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                               f_views::Union{<:BlackLittermanViewsEstimator,
-                                                              <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                               a_sets::DataFrame = DataFrame(),
-                                               f_sets::DataFrame = DataFrame(),
+                                               a_views::Union{<:AbstractString, Expr,
+                                                              <:AbstractVector{<:AbstractString},
+                                                              <:AbstractVector{Expr},
+                                                              <:AbstractVector{<:Union{<:AbstractString,
+                                                                                       Expr}},
+                                                              #! Start: to delete
+                                                              <:BlackLittermanViewsEstimator,
+                                                              <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                                              #! End: to delete
+                                                              },
+                                               f_views::Union{<:AbstractString, Expr,
+                                                              <:AbstractVector{<:AbstractString},
+                                                              <:AbstractVector{Expr},
+                                                              <:AbstractVector{<:Union{<:AbstractString,
+                                                                                       Expr}},
+                                                              #! Start: to delete
+                                                              <:BlackLittermanViewsEstimator,
+                                                              <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                                              #! End: to delete
+                                                              },
+                                               a_sets::Union{<:AssetSets,
+                                                             #! Start: to delete
+                                                             <:DataFrame
+                                                             #! End: to delete
+                                                             } = DataFrame(),
+                                               f_sets::Union{<:AssetSets,
+                                                             #! Start: to delete
+                                                             <:DataFrame
+                                                             #! End: to delete
+                                                             } = DataFrame(),
                                                a_views_conf::Union{Nothing,
                                                                    <:AbstractVector} = nothing,
                                                f_views_conf::Union{Nothing,

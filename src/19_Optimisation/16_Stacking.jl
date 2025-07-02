@@ -14,7 +14,11 @@ struct StackingResult{T1 <: Type, T2 <: AbstractPriorResult,
 end
 struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                 T2 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
-                T3 <: Union{Nothing, <:DataFrame},
+                T3 <: Union{Nothing, <:AssetSets,
+                  #! Start: to delete
+                            <:DataFrame
+                  #! End: to delete
+                  },
                 T4 <: Union{<:OptimisationResult, <:OptimisationEstimator,
                             <:AbstractVector{<:Union{<:OptimisationEstimator,
                                                      <:OptimisationResult}}},
@@ -43,7 +47,11 @@ end
 function Stacking(;
                   pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                   wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = nothing,
-                  sets::Union{Nothing, <:DataFrame} = nothing,
+                  sets::Union{Nothing, <:AssetSets,
+                              #! Start: to delete
+                              <:DataFrame
+                              #! End: to delete
+                              } = nothing,
                   opti::AbstractVector{<:Union{<:OptimisationEstimator,
                                                <:OptimisationResult}} = [MeanRisk()],
                   opto::OptimisationEstimator = MeanRisk(),
@@ -51,7 +59,7 @@ function Stacking(;
                   strict::Bool = false, threads::FLoops.Transducers.Executor = ThreadedEx())
     assert_external_optimiser(opto)
     if isa(wb, WeightBoundsConstraint)
-        @smart_assert(isa(sets, DataFrame) && !isempty(sets))
+        @smart_assert(!isnothing(sets))
     end
     return Stacking{typeof(pe), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
                     typeof(cwf), typeof(strict), typeof(threads)}(pe, wb, sets, opti, opto,
@@ -63,7 +71,7 @@ function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
     opti = opt_view(st.opti, i, X)
     opto = opt_view(st.opto, i, X)
     wb = weight_bounds_view(st.wb, i)
-    sets = nothing_dataframe_view(st.sets, i)
+    sets = nothing_asset_sets_view(st.sets, i)
     return Stacking(; pe = pe, opti = opti, opto = opto, wb = wb, cwf = st.cwf, sets = sets,
                     strict = st.strict, threads = st.threads)
 end

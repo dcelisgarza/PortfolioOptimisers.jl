@@ -1,9 +1,16 @@
 struct BlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
                                     T2 <: AbstractMatrixProcessingEstimator,
-                                    T3 <: Union{<:BlackLittermanViewsEstimator,
-                                                <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                    T4 <: DataFrame, T5 <: Union{Nothing, <:AbstractVector},
-                                    T6 <: Real, T7 <: Union{Nothing, <:Real}} <:
+                                    T3 <: Union{<:AbstractString, Expr,
+                                                <:AbstractVector{<:AbstractString},
+                                                <:AbstractVector{Expr},
+                                                <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                      #! Start: to delete
+                                                <:BlackLittermanViewsEstimator,
+                                                <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                      #! End: to delete
+                                      }, T4 <: DataFrame,
+                                    T5 <: Union{Nothing, <:AbstractVector}, T6 <: Real,
+                                    T7 <: Union{Nothing, <:Real}} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
     pe::T1
     mp::T2
@@ -26,9 +33,21 @@ function BlackLittermanPriorEstimator(;
                                       pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(;
                                                                                                               me = EquilibriumExpectedReturns()),
                                       mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                      views::Union{<:BlackLittermanViewsEstimator,
-                                                   <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                      sets::DataFrame = DataFrame(),
+                                      views::Union{<:AbstractString, Expr,
+                                                   <:AbstractVector{<:AbstractString},
+                                                   <:AbstractVector{Expr},
+                                                   <:AbstractVector{<:Union{<:AbstractString,
+                                                                            Expr}},
+                                                   #! Start: to delete
+                                                   <:BlackLittermanViewsEstimator,
+                                                   <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                                   #! End: to delete
+                                                   },
+                                      sets::Union{<:AssetSets,
+                                                  #! Start: to delete
+                                                  <:DataFrame
+                                                  #! End: to delete
+                                                  } = DataFrame(),
                                       views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                       rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
     if isa(views_conf, AbstractVector)

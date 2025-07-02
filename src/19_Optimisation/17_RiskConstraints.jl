@@ -258,8 +258,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                                                                       <:Any},
                                                                 <:Any, <:Any, <:Any, <:Any,
                                                                 <:Any, <:Any}}, ::Any,
-                               ::Any, b1::AbstractMatrix, sets::Union{Nothing, <:DataFrame},
-                               args...; kwargs...)
+                               ::Any, b1::AbstractMatrix,
+                               sets::Union{Nothing, <:AssetSets,
+                                           #! Start: to delete
+                                           <:DataFrame
+                                           #! End: to delete
+                                           }, args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end

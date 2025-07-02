@@ -92,18 +92,37 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T5 <: Union{Nothing, <:Real, <:BudgetRange},
                      T6 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                      T7 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                     T8 <: Union{Nothing, <:LinearConstraint,
-                                 <:AbstractVector{<:LinearConstraint}, <:LinearConstraintResult},
+                     T8 <: Union{Nothing, <:AbstractString, Expr,
+                                 <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                 <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                       #! Start: to delete
+                                 <:LinearConstraint, <:AbstractVector{<:LinearConstraint},
+                       #! End: to delete
+                                 <:LinearConstraintResult},
                      T9 <: Union{Nothing, <:LinearConstraintResult},
                      T10 <: Union{Nothing, <:CentralityConstraintEstimator,
                                   <:AbstractVector{<:CentralityConstraintEstimator},
                                   <:LinearConstraintResult},
-                     T11 <: Union{Nothing, <:LinearConstraint,
-                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintResult},
-                     T12 <: Union{Nothing, <:LinearConstraint,
-                                  <:AbstractVector{<:LinearConstraint}, <:LinearConstraintResult},
+                     T11 <: Union{Nothing, <:AbstractString, Expr,
+                                  <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                  <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                       #! Start: to delete
+                                  <:LinearConstraint, <:AbstractVector{<:LinearConstraint},
+                       #! End: to delete
+                                  <:LinearConstraintResult},
+                     T12 <: Union{Nothing, <:AbstractString, Expr,
+                                  <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                  <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                       #! Start: to delete
+                                  <:LinearConstraint, <:AbstractVector{<:LinearConstraint},
+                       #! End: to delete
+                                  <:LinearConstraintResult},
                      T13 <: Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix},
-                     T14 <: Union{Nothing, <:DataFrame},
+                     T14 <: Union{Nothing, <:AssetSets,
+                       #! Start: to delete
+                                  <:DataFrame
+                       #! End: to delete
+                       },
                      T15 <: Union{Nothing, <:PhilogenyConstraintEstimator,
                                   <:PhilogenyConstraintResult},
                      T16 <: Union{Nothing, <:PhilogenyConstraintEstimator,
@@ -169,21 +188,42 @@ function JuMPOptimiser(;
                        sbgt::Union{Nothing, <:Real, <:BudgetRange} = nothing,
                        lt::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                        st::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                       lcs::Union{Nothing, <:LinearConstraint,
-                                  <:AbstractVector{<:LinearConstraint},
+                       lcs::Union{Nothing, <:AbstractString, Expr,
+                                  <:AbstractVector{<:AbstractString},
+                                  <:AbstractVector{Expr},
+                                  <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                  #! Start: to delete
+                                  <:LinearConstraint, <:AbstractVector{<:LinearConstraint},
+                                  #! End: to delete
                                   <:LinearConstraintResult} = nothing,
                        lcm::Union{Nothing, <:LinearConstraintResult} = nothing,
                        cent::Union{Nothing, <:CentralityConstraintEstimator,
                                    <:AbstractVector{<:CentralityConstraintEstimator},
                                    <:LinearConstraintResult} = nothing,
-                       gcard::Union{Nothing, <:LinearConstraint,
+                       gcard::Union{Nothing, <:AbstractString, Expr,
+                                    <:AbstractVector{<:AbstractString},
+                                    <:AbstractVector{Expr},
+                                    <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                    #! Start: to delete
+                                    <:LinearConstraint,
                                     <:AbstractVector{<:LinearConstraint},
+                                    #! End: to delete
                                     <:LinearConstraintResult} = nothing,
-                       sgcard::Union{Nothing, <:LinearConstraint,
+                       sgcard::Union{Nothing, <:AbstractString, Expr,
+                                     <:AbstractVector{<:AbstractString},
+                                     <:AbstractVector{Expr},
+                                     <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                     #! Start: to delete
+                                     <:LinearConstraint,
                                      <:AbstractVector{<:LinearConstraint},
+                                     #! End: to delete
                                      <:LinearConstraintResult} = nothing,
                        smtx::Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix} = nothing,
-                       sets::Union{Nothing, <:DataFrame} = nothing,
+                       sets::Union{Nothing, <:AssetSets,
+                                   #! Start: to delete
+                                   <:DataFrame
+                                   #! End: to delete
+                                   } = nothing,
                        nplg::Union{Nothing, <:PhilogenyConstraintEstimator,
                                    <:PhilogenyConstraintResult} = nothing,
                        cplg::Union{Nothing, <:PhilogenyConstraintEstimator,
@@ -232,15 +272,22 @@ function JuMPOptimiser(;
         @smart_assert(!isempty(sgcard))
     end
     if isa(wb, WeightBoundsConstraint) ||
+       !isnothing(lcs) ||
+       #! Start: to delete
        isa(lcs, LinearConstraint) ||
        isa(lcs, AbstractVector{<:LinearConstraint}) ||
+       #! End: to delete
        isa(cent, CentralityConstraintEstimator) ||
        isa(cent, AbstractVector{<:CentralityConstraintEstimator}) ||
+       !isnothing(gcard) ||
+       !isnothing(sgcard) ||
+       #! Start: to delete
        isa(gcard, LinearConstraint) ||
        isa(gcard, AbstractVector{<:LinearConstraint}) ||
        isa(sgcard, LinearConstraint) ||
        isa(sgcard, AbstractVector{<:LinearConstraint})
-        @smart_assert(isa(sets, DataFrame) && !isempty(sets))
+        #! End: to delete
+        @smart_assert(!isnothing(sets))
     end
     if isa(sgcard, LinearConstraintResult) && isa(smtx, AbstractMatrix)
         N = size(smtx, 1)
@@ -291,7 +338,7 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     # gcard = linear_constraint_view(opt.gcard, i)
     # sgcard = linear_constraint_view(opt.sgcard, i)
     smtx = asset_sets_matrix_view(opt.smtx, i)
-    sets = nothing_dataframe_view(opt.sets, i)
+    sets = nothing_asset_sets_view(opt.sets, i)
     tn = turnover_view(opt.tn, i)
     te = tracking_view(opt.te, i, X)
     fees = fees_view(opt.fees, i)

@@ -9,9 +9,12 @@ struct FactorRiskContribution{T1 <: JuMPOptimiser,
                               T6 <:
                               Union{Nothing, <:SemiDefinitePhilogenyConstraintEstimator,
                                     <:SemiDefinitePhilogenyResult},
-                              T7 <: Union{Nothing, <:DataFrame},
-                              T8 <: Union{Nothing, <:AbstractVector{<:Real}}, T9 <: Bool} <:
-       JuMPOptimisationEstimator
+                              T7 <: Union{Nothing, <:AssetSets,
+                                #! Start: to delete
+                                          <:DataFrame
+                                #! End: to delete
+                                }, T8 <: Union{Nothing, <:AbstractVector{<:Real}},
+                              T9 <: Bool} <: JuMPOptimisationEstimator
     opt::T1
     re::T2
     r::T3
@@ -33,7 +36,11 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 cplg::Union{Nothing,
                                             <:SemiDefinitePhilogenyConstraintEstimator,
                                             <:SemiDefinitePhilogenyResult} = nothing,
-                                sets::Union{Nothing, <:DataFrame} = nothing,
+                                sets::Union{Nothing, <:AssetSets,
+                                            #! Start: to delete
+                                            <:DataFrame
+                                            #! Start: to delete
+                                            } = nothing,
                                 wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                 flag::Bool = true)
     if isa(r, AbstractVector)
@@ -57,7 +64,7 @@ function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMat
     opt = opt_view(frc.opt, i, X)
     re = regression_view(frc.re, i)
     r = risk_measure_view(frc.r, i, X)
-    sets = nothing_dataframe_view(frc.sets, i)
+    sets = nothing_asset_sets_view(frc.sets, i)
     wi = nothing_scalar_array_view(frc.wi, i)
     return FactorRiskContribution(; opt = opt, re = re, r = r, obj = frc.obj,
                                   nplg = frc.nplg, cplg = frc.cplg, sets = sets, wi = wi,

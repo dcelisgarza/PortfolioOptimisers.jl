@@ -302,10 +302,10 @@ end
 function nothing_scalar_array_getindex(x::AbstractMatrix, i, j)
     return x[i, j]
 end
-function nothing_dataframe_view(::Nothing, ::Any)
+function nothing_asset_sets_view(::Nothing, ::Any)
     return nothing
 end
-function nothing_dataframe_view(x::AbstractDataFrame, i)
+function nothing_asset_sets_view(x::AbstractDataFrame, i)
     return view(x, i, :)
 end
 function nothing_dataframe_getindex(::Nothing, i)

@@ -16,8 +16,11 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
                              T4 <: Union{Nothing, <:Fees},
                              T5 <:
                              Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
-                             T6 <: Union{Nothing, <:DataFrame},
-                             T7 <: ClusteringWeightFinaliser, T8 <: Scalariser,
+                             T6 <: Union{Nothing, <:AssetSets,
+                               #! Start: to delete
+                                         <:DataFrame
+                               #! End: to delete
+                               }, T7 <: ClusteringWeightFinaliser, T8 <: Scalariser,
                              T9 <: Bool} <: BaseClusteringOptimisationEstimator
     pe::T1
     cle::T2
@@ -37,11 +40,15 @@ function HierarchicalOptimiser(;
                                fees::Union{Nothing, <:Fees} = nothing,
                                wb::Union{Nothing, <:WeightBoundsResult,
                                          <:WeightBoundsConstraint} = WeightBoundsResult(),
-                               sets::Union{Nothing, <:DataFrame} = nothing,
+                               sets::Union{Nothing, <:AssetSets,
+                                           #! Start: to delete
+                                           <:DataFrame
+                                           #! End: to delete
+                                           } = nothing,
                                cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
                                sce::Scalariser = SumScalariser(), strict::Bool = false)
     if isa(wb, WeightBoundsConstraint)
-        @smart_assert(isa(sets, DataFrame) && !isempty(sets))
+        @smart_assert(!isnothing(sets))
     end
     return HierarchicalOptimiser{typeof(pe), typeof(cle), typeof(slv), typeof(fees),
                                  typeof(wb), typeof(sets), typeof(cwf), typeof(sce),
@@ -52,7 +59,7 @@ function opt_view(hco::HierarchicalOptimiser, i::AbstractVector)
     pe = prior_view(hco.pe, i)
     fees = fees_view(hco.fees, i)
     wb = weight_bounds_view(hco.wb, i)
-    sets = nothing_dataframe_view(hco.sets, i)
+    sets = nothing_asset_sets_view(hco.sets, i)
     return HierarchicalOptimiser(; pe = pe, cle = hco.cle, fees = fees, slv = hco.slv,
                                  sce = hco.sce, wb = wb, cwf = hco.cwf, sets = sets,
                                  strict = hco.strict)

@@ -3,9 +3,16 @@ struct FactorBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMa
                                           T3 <: AbstractMatrixProcessingEstimator,
                                           T4 <: AbstractRegressionEstimator,
                                           T5 <: AbstractVarianceEstimator,
-                                          T6 <: Union{<:BlackLittermanViewsEstimator,
-                                                      <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                          T7 <: DataFrame,
+                                          T6 <: Union{<:AbstractString, Expr,
+                                                      <:AbstractVector{<:AbstractString},
+                                                      <:AbstractVector{Expr},
+                                                      <:AbstractVector{<:Union{<:AbstractString,
+                                                                               Expr}},
+                                            #! Start: to delete
+                                                      <:BlackLittermanViewsEstimator,
+                                                      <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                            #! End: to delete
+                                            }, T7 <: DataFrame,
                                           T8 <: Union{Nothing, <:AbstractVector},
                                           T9 <: Union{Nothing, <:AbstractVector},
                                           T10 <: Real, T11 <: Union{Nothing, <:Real},
@@ -31,9 +38,21 @@ function FactorBlackLittermanPriorEstimator(;
                                             mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                             re::AbstractRegressionEstimator = StepwiseRegression(),
                                             ve::AbstractVarianceEstimator = SimpleVariance(),
-                                            views::Union{<:BlackLittermanViewsEstimator,
-                                                         <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                                            sets::DataFrame = DataFrame(),
+                                            views::Union{<:AbstractString, Expr,
+                                                         <:AbstractVector{<:AbstractString},
+                                                         <:AbstractVector{Expr},
+                                                         <:AbstractVector{<:Union{<:AbstractString,
+                                                                                  Expr}},
+                                                         #! Start: to delete
+                                                         <:BlackLittermanViewsEstimator,
+                                                         <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                                         #! End: to delete
+                                                         },
+                                            sets::Union{<:AssetSets,
+                                                        #! Start: to delete
+                                                        <:DataFrame
+                                                        #! End: to delete
+                                                        } = DataFrame(),
                                             views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                             w::Union{Nothing, <:AbstractVector} = nothing,
                                             rf::Real = 0.0,

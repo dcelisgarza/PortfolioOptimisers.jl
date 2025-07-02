@@ -215,7 +215,11 @@ function EntropyPoolingPriorEstimator(;
                                       d_views::Union{Nothing,
                                                      <:DiscontinuousEntropyPoolingViewEstimator,
                                                      <:AbstractVector{<:DiscontinuousEntropyPoolingViewEstimator}} = nothing,
-                                      sets::DataFrame = DataFrame(),
+                                      sets::Union{<:AssetSets,
+                                                  #! Start: to delete
+                                                  <:DataFrame
+                                                  #! End: to delete
+                                                  } = DataFrame(),
                                       opt::AbstractEntropyPoolingEstimator = OptimEntropyPoolingEstimator(),
                                       d_opt1::Union{Nothing,
                                                     <:OptimEntropyPoolingEstimator} = nothing,
