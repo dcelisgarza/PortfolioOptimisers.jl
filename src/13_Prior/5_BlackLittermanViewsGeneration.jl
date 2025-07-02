@@ -118,4 +118,55 @@ end
 function black_litterman_views(blves::BlackLittermanViewsResult, args...; kwargs...)
     return blves
 end
+
+function get_black_litterman_views(lcs::Union{<:ParsingResult,
+                                              <:AbstractVector{<:ParsingResult}},
+                                   sets::AssetSets; datatype::DataType = Float64,
+                                   strict::Bool = false)
+    if isa(lcs, AbstractVector)
+        @smart_assert(!isempty(lcs))
+    end
+    P = Vector{datatype}(undef, 0)
+    Q = Vector{datatype}(undef, 0)
+    nx = sets.dict[sets.key]
+    At = Vector{datatype}(undef, length(nx))
+    for lc in lcs
+        fill!(At, zero(eltype(At)))
+        for (v, c) in zip(lc.vars, lc.coef)
+            Ai = (nx .== v)
+            if !any(isone, Ai)
+                msg = "$(v) is not found in $(nx)."
+                strict ? throw(ArgumentError(msg)) : @warn(msg)
+                continue
+            end
+            Ai = if count(Ai) > one(eltype(Ai))
+                Ai = c * Ai
+                sc = sign(c)
+                Ai /= sum(Ai)
+                Ai *= sc
+            else
+                Ai * c
+            end
+            At += Ai
+        end
+        append!(P, At)
+        append!(Q, lc.rhs)
+    end
+    return if !isempty(P)
+        P = transpose(reshape(P, nrow(sets), :))
+        BlackLittermanViewsResult(; P = P, Q = Q)
+    else
+        nothing
+    end
+end
+function black_litterman_views(eqn::Union{<:AbstractString, Expr,
+                                          <:AbstractVector{<:AbstractString},
+                                          <:AbstractVector{Expr},
+                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                               sets::AssetSets; datatype::DataType = Float64,
+                               strict::Bool = false)
+    lcs = parse_equation(eqn; datatype = datatype)
+    lcs = replace_group_by_assets(lcs, sets)
+    return get_black_litterman_views(lcs, sets; datatype = datatype, strict = strict)
+end
 export black_litterman_views, BlackLittermanViewsEstimator, BlackLittermanViewsResult
