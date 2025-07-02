@@ -27,4 +27,4 @@ function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFram
     return transpose(A)
 end
 
-export CardinalityConstraintSide, CardinalityConstraint, asset_sets_matrix
+export CardinalityConstraintSide, CardinalityConstraint
