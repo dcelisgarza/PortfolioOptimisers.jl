@@ -421,7 +421,7 @@ function get_risk_budget_constraints(lcs::Union{<:ParsingResult,
                                      sets::AssetSets; datatype::DataType = Float64,
                                      strict::Bool = false)
     nx = sets.dict[sets.key]
-    rb = ones(promote_type(eltype(datatype), eltype(datatype)), length(nx))
+    rb = fill(inv(length(nx)), length(nx))
     At = falses(length(nx))
     for lc in lcs
         fill!(At, false)
