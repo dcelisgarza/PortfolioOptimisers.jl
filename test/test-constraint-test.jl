@@ -76,89 +76,30 @@
         @test isapprox(B_eq, B_eq_t)
     end
     @testset "Cardinality constraints" begin
-        assets = 1:10
-        sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-        constr = [CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(; group = :Assets,
-                                                                      name = 1),
-                                        comp = EQ()),
-                  CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(;
-                                                                      group = [:Assets,
-                                                                               :Assets,
-                                                                               :Assets],
-                                                                      name = [1, 1, 3],
-                                                                      coef = [1, 1, 1]),
-                                        B = 5, comp = LEQ()),
-                  CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(; group = :Assets,
-                                                                      name = 5), B = 1,
-                                        comp = EQ()),
-                  CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(;
-                                                                      group = [:Clusters,
-                                                                               :Clusters],
-                                                                      name = [3, 2],
-                                                                      coef = [1, 1]),
-                                        comp = GEQ()),
-                  CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(;
-                                                                      group = [:Clusters,
-                                                                               :Clusters,
-                                                                               :Clusters],
-                                                                      name = [1, 3, 2],
-                                                                      coef = [1, 1, 1]),
-                                        B = 3, comp = LEQ()),
-                  CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(;
-                                                                      group = [:Clusters,
-                                                                               :Assets],
-                                                                      name = [2, 7],
-                                                                      coef = [1, 1]), B = 7,
-                                        comp = EQ()),
-                  CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(; group = :Assets,
-                                                                      name = 1), B = 4,
-                                        comp = EQ()),
-                  CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(;
-                                                                      group = [:Assets,
-                                                                               :Assets,
-                                                                               :Assets],
-                                                                      name = [1, 1, 3],
-                                                                      coef = [1, 1, 1]),
-                                        B = 5, comp = LEQ()),
-                  CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(; group = :Assets,
-                                                                      name = 5), B = 3,
-                                        comp = EQ()),
-                  CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(;
-                                                                      group = [:Clusters,
-                                                                               :Clusters],
-                                                                      name = [3, 2],
-                                                                      coef = [1, 1]), B = 2,
-                                        comp = GEQ()),
-                  CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(;
-                                                                      group = [:Clusters,
-                                                                               :Clusters,
-                                                                               :Clusters],
-                                                                      name = [1, 3, 2],
-                                                                      coef = [1, 1, 1]),
-                                        B = 8, comp = LEQ()),
-                  CardinalityConstraint(;
-                                        A = CardinalityConstraintSide(;
-                                                                      group = [:Clusters,
-                                                                               :Assets],
-                                                                      name = [2, 7],
-                                                                      coef = [1, 1]), B = 9,
-                                        comp = EQ())]
+        assets1 = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                   "ten"]
+        clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3]
+        loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
+                             QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        sets1 = AssetSets(;
+                          dict = Dict("nx" => assets1, "c1" => assets1[clusters .== 1],
+                                      "c2" => assets1[clusters .== 2],
+                                      "c3" => assets1[clusters .== 3]))
+        scs = ["one == 1", "one + one + three <= 5", "five  == 1", "c3+c2>=1",
+               "-c1 -c3-c2>=-3", "c2 + seven==7", "one==4", "one +one<=5-three", "five==3",
+               "-c3+2c3+c2>=2", "-c1-c3-c2>=-8", "c2 + seven==9"]
+        ecs = [:(one == 1), :(one + one + three <= 5), :(five == 1), :(c3 + c2 >= 1),
+               :(-c1 - c3 - c2 >= -3), :(c2 + seven == 7), :(one == 4),
+               :(one + one <= 5 - three), :(five == 3), :(-c3 + 2c3 + c2 >= 2),
+               :(-c1 - c3 - c2 >= -8), :(c2 + seven == 9)]
 
-        constr_result = linear_constraints(constr, sets)
-        constr_result2 = linear_constraints(constr_result, sets)
-        @test constr_result === constr_result2
-        (; ineq, eq) = constr_result
+        lcs1 = linear_constraints(scs, sets1; datatype = Int)
+
+        @test lcs1.A_ineq == constr_result.A_ineq
+        @test lcs1.B_ineq == constr_result.B_ineq
+        @test lcs1.A_eq == constr_result.A_eq
+        @test lcs1.B_eq == constr_result.B_eq
+        (; ineq, eq) = lcs1
         A_ineq, B_ineq = ineq.A, ineq.B
         A_eq, B_eq = eq.A, eq.B
         A_ineq_t = reshape([2, 0, 1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 1, -1, 1, 1, -1, 1, 0, -1,
@@ -174,34 +115,6 @@
         @test isapprox(B_ineq, B_ineq_t)
         @test isapprox(A_eq, A_eq_t)
         @test isapprox(B_eq, B_eq_t)
-
-        @test isnothing(linear_constraints(CardinalityConstraint(;
-                                                                 A = CardinalityConstraintSide(;
-                                                                                               group = nothing,
-                                                                                               name = nothing)),
-                                           sets))
-
-        @test isnothing(linear_constraints(CardinalityConstraint(;
-                                                                 A = CardinalityConstraintSide(;
-                                                                                               group = [:Foo],
-                                                                                               name = [20],
-                                                                                               coef = [1]),
-                                                                 B = 5), sets))
-
-        @test_throws UndefKeywordError CardinalityConstraintSide(; name = [2])
-        lcs = CardinalityConstraintSide(; group = [nothing], name = [nothing], coef = [2])
-        @test isnothing(lcs.group[1])
-        @test isnothing(lcs.name[1])
-
-        lhs_1 = CardinalityConstraintSide(; group = :Asset, name = 1)
-        constr = CardinalityConstraint(; A = lhs_1, B = 2, comp = EQ())
-        @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
-
-        lhs_1 = CardinalityConstraintSide(; group = [:Asset, :Foo], name = [1, :Bar],
-                                          coef = [1, 1])
-        constr = CardinalityConstraint(; A = lhs_1, B = 9, comp = EQ())
-        @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
-        @test isnothing(linear_constraints(nothing))
     end
     @testset "Weight Bounds constraints" begin
         assets = 1:10
@@ -590,4 +503,100 @@ end
    constr = LinearConstraint(; A = lhs_1, B = 0.35, comp = EQ())
    @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
    @test isnothing(linear_constraints(nothing))
+
+   assets = 1:10
+sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+constr = [CardinalityConstraint(;
+                                A = CardinalityConstraintSide(; group = :Assets, name = 1),
+                                comp = EQ()),
+          CardinalityConstraint(;
+                                A = CardinalityConstraintSide(;
+                                                              group = [:Assets, :Assets,
+                                                                       :Assets],
+                                                              name = [1, 1, 3],
+                                                              coef = [1, 1, 1]), B = 5,
+                                comp = LEQ()),
+          CardinalityConstraint(;
+                                A = CardinalityConstraintSide(; group = :Assets, name = 5),
+                                B = 1, comp = EQ()),
+          CardinalityConstraint(;
+                                A = CardinalityConstraintSide(;
+                                                              group = [:Clusters,
+                                                                       :Clusters],
+                                                              name = [3, 2], coef = [1, 1]),
+                                comp = GEQ()),
+          CardinalityConstraint(;
+                                A = CardinalityConstraintSide(;
+                                                              group = [:Clusters, :Clusters,
+                                                                       :Clusters],
+                                                              name = [1, 3, 2],
+                                                              coef = [1, 1, 1]), B = 3,
+                                comp = LEQ()),
+          CardinalityConstraint(;
+                                A = CardinalityConstraintSide(;
+                                                              group = [:Clusters, :Assets],
+                                                              name = [2, 7], coef = [1, 1]),
+                                B = 7, comp = EQ()),
+          CardinalityConstraint(;
+                                A = CardinalityConstraintSide(; group = :Assets, name = 1),
+                                B = 4, comp = EQ()),
+          CardinalityConstraint(;
+                                A = CardinalityConstraintSide(;
+                                                              group = [:Assets, :Assets,
+                                                                       :Assets],
+                                                              name = [1, 1, 3],
+                                                              coef = [1, 1, 1]), B = 5,
+                                comp = LEQ()),
+          CardinalityConstraint(;
+                                A = CardinalityConstraintSide(; group = :Assets, name = 5),
+                                B = 3, comp = EQ()),
+          CardinalityConstraint(;
+                                A = CardinalityConstraintSide(;
+                                                              group = [:Clusters,
+                                                                       :Clusters],
+                                                              name = [3, 2], coef = [1, 1]),
+                                B = 2, comp = GEQ()),
+          CardinalityConstraint(;
+                                A = CardinalityConstraintSide(;
+                                                              group = [:Clusters, :Clusters,
+                                                                       :Clusters],
+                                                              name = [1, 3, 2],
+                                                              coef = [1, 1, 1]), B = 8,
+                                comp = LEQ()),
+          CardinalityConstraint(;
+                                A = CardinalityConstraintSide(;
+                                                              group = [:Clusters, :Assets],
+                                                              name = [2, 7], coef = [1, 1]),
+                                B = 9, comp = EQ())]
+@time constr_result = linear_constraints(constr, sets)
+constr_result2 = linear_constraints(constr_result, sets)
+@test constr_result === constr_result2
+(; ineq, eq) = constr_result
+
+@test isnothing(linear_constraints(CardinalityConstraint(;
+                                                         A = CardinalityConstraintSide(;
+                                                                                       group = nothing,
+                                                                                       name = nothing)),
+                                   sets))
+
+@test isnothing(linear_constraints(CardinalityConstraint(;
+                                                         A = CardinalityConstraintSide(;
+                                                                                       group = [:Foo],
+                                                                                       name = [20],
+                                                                                       coef = [1]),
+                                                         B = 5), sets))
+
+@test_throws UndefKeywordError CardinalityConstraintSide(; name = [2])
+lcs = CardinalityConstraintSide(; group = [nothing], name = [nothing], coef = [2])
+@test isnothing(lcs.group[1])
+@test isnothing(lcs.name[1])
+
+lhs_1 = CardinalityConstraintSide(; group = :Asset, name = 1)
+constr = CardinalityConstraint(; A = lhs_1, B = 2, comp = EQ())
+@test_throws ArgumentError linear_constraints(constr, sets, strict = true)
+
+lhs_1 = CardinalityConstraintSide(; group = [:Asset, :Foo], name = [1, :Bar], coef = [1, 1])
+constr = CardinalityConstraint(; A = lhs_1, B = 9, comp = EQ())
+@test_throws ArgumentError linear_constraints(constr, sets, strict = true)
+@test isnothing(linear_constraints(nothing))
    =#
