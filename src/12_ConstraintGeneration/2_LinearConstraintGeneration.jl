@@ -48,6 +48,8 @@ function _eval_numeric_functions(expr)
         else
             Expr(expr.head, map(_eval_numeric_functions, expr.args)...)
         end
+    elseif expr isa Symbol && expr == :Inf
+        Inf
     else
         expr
     end
@@ -414,10 +416,10 @@ function weight_bounds_constraints(eqn::Union{<:AbstractString, Expr,
     lcs = replace_group_by_assets(lcs, sets)
     return get_weight_bounds_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
-function get_risk_budget_bounds_constraints(lcs::Union{<:ParsingResult,
-                                                       <:AbstractVector{<:ParsingResult}},
-                                            sets::AssetSets; datatype::DataType = Float64,
-                                            strict::Bool = false)
+function get_risk_budget_constraints(lcs::Union{<:ParsingResult,
+                                                <:AbstractVector{<:ParsingResult}},
+                                     sets::AssetSets; datatype::DataType = Float64,
+                                     strict::Bool = false)
     nx = sets.dict[sets.key]
     rb = ones(promote_type(eltype(datatype), eltype(datatype)), length(nx))
     At = falses(length(nx))
@@ -450,8 +452,7 @@ function risk_budget_constraints(eqn::Union{<:AbstractString, Expr,
                                  strict::Bool = false)
     lcs = parse_equation(eqn; datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets)
-    return get_risk_budget_bounds_constraints(lcs, sets; datatype = datatype,
-                                              strict = strict)
+    return get_risk_budget_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
 function asset_sets_matrix(smtx::Union{Nothing, Symbol, <:AbstractString}, args...;
                            kwargs...)

@@ -76,15 +76,15 @@
         @test isapprox(B_eq, B_eq_t)
     end
     @testset "Cardinality constraints" begin
-        assets1 = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
-                   "ten"]
+        assets = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                  "ten"]
         clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3]
         loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-        sets1 = AssetSets(;
-                          dict = Dict("nx" => assets1, "c1" => assets1[clusters .== 1],
-                                      "c2" => assets1[clusters .== 2],
-                                      "c3" => assets1[clusters .== 3]))
+        sets = AssetSets(;
+                         dict = Dict("nx" => assets, "c1" => assets[clusters .== 1],
+                                     "c2" => assets[clusters .== 2],
+                                     "c3" => assets[clusters .== 3]))
         scs = ["one == 1", "one + one + three <= 5", "five  == 1", "c3+c2>=1",
                "-c1 -c3-c2>=-3", "c2 + seven==7", "one==4", "one +one<=5-three", "five==3",
                "-c3+2c3+c2>=2", "-c1-c3-c2>=-8", "c2 + seven==9"]
@@ -93,7 +93,7 @@
                :(one + one <= 5 - three), :(five == 3), :(-c3 + 2c3 + c2 >= 2),
                :(-c1 - c3 - c2 >= -8), :(c2 + seven == 9)]
 
-        lcs1 = linear_constraints(scs, sets1; datatype = Int)
+        lcs1 = linear_constraints(scs, sets; datatype = Int)
 
         @test lcs1.A_ineq == constr_result.A_ineq
         @test lcs1.B_ineq == constr_result.B_ineq
@@ -117,61 +117,62 @@
         @test isapprox(B_eq, B_eq_t)
     end
     @testset "Weight Bounds constraints" begin
-        assets = 1:10
-        sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        assets1 = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                   "ten"]
+        clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3]
+        loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
+                             QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        sets1 = AssetSets(;
+                          dict = Dict("nx" => assets1, "c1" => assets1[clusters .== 1],
+                                      "c2" => assets1[clusters .== 2],
+                                      "c3" => assets1[clusters .== 3]))
 
-        hcc_1 = WeightBoundsConstraint(; group = :Assets, name = 1, lb = 0.7, ub = 0.8)
-        wb_result = weight_bounds_constraints(hcc_1, sets)
-        wb_result2 = weight_bounds_constraints(wb_result, sets)
-        @test wb_result === wb_result2
-        (; lb, ub) = wb_result
+        scs = ["one >= 0.7", "one <= 0.8"]
+        ecs = [:(one >= 0.7), :(one <= 0.8)]
+        lcs1 = weight_bounds_constraints(scs, sets1)
+        lcs2 = weight_bounds_constraints(ecs, sets1)
+        @test lcs1.ub == lcs2.ub
+        @test lcs1.lb == lcs2.lb
+
+        lcs3 = weight_bounds_constraints(lcs1)
+        @test lcs1 === lcs3
+
+        (; lb, ub) = lcs1
         @test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         @test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
-        hcc_2 = WeightBoundsConstraint(; group = [:Assets, :Assets], name = [1, 5],
-                                       lb = [0.7, 0.3], ub = [0.8, 0.6])
-        (; lb, ub) = weight_bounds_constraints(hcc_2, sets)
-        @test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0])
-        @test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 0.6, 1.0, 1.0, 1.0, 1.0, 1.0])
-
-        hcc_3 = WeightBoundsConstraint(; group = :Clusters, name = 3, lb = 0.2, ub = 0.5)
-        (; lb, ub) = weight_bounds_constraints(hcc_3, sets)
+        scs = ["c3 >= 0.2", "c3 <= 0.5"]
+        ecs = [:(c3 >= 0.2), :(c3 <= 0.5)]
+        lcs1 = weight_bounds_constraints(scs, sets1)
+        lcs2 = weight_bounds_constraints(ecs, sets1)
+        @test lcs1.ub == lcs2.ub
+        @test lcs1.lb == lcs2.lb
+        (; lb, ub) = lcs1
         @test isapprox(lb, [0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2, 0.2])
         @test isapprox(ub, [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5])
 
-        hcc_4 = WeightBoundsConstraint(; group = :Assets, name = 1, lb = nothing,
-                                       ub = nothing)
-        (; lb, ub) = weight_bounds_constraints(hcc_4, sets; strict = true)
+        scs = ["one >= 0.7", "one <= 0.8", "five >= 0.3", "five <= 0.6"]
+        ecs = [:(one >= 0.7), :(one <= 0.8), :(five >= 0.3), :(five <= 0.6)]
+        lcs1 = weight_bounds_constraints(scs, sets1)
+        lcs2 = weight_bounds_constraints(ecs, sets1)
+        @test lcs1.ub == lcs2.ub
+        @test lcs1.lb == lcs2.lb
+        (; lb, ub) = lcs1
+        @test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0])
+        @test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 0.6, 1.0, 1.0, 1.0, 1.0, 1.0])
+
+        scs = ["one >= -Inf", "one <= Inf"]
+        ecs = [:(one >= -Inf), :(one <= Inf)]
+        lcs1 = weight_bounds_constraints(scs, sets1)
+        lcs2 = weight_bounds_constraints(ecs, sets1)
+        @test lcs1.ub == lcs2.ub
+        @test lcs1.lb == lcs2.lb
+        (; lb, ub) = lcs1
         @test isapprox(lb, [-Inf, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         @test isapprox(ub, [Inf, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
-        @test_throws UndefKeywordError WeightBoundsConstraint(group = :Asset)
-        hcc = WeightBoundsConstraint(; group = nothing, name = nothing)
-        @test isnothing(hcc.group)
-        @test isnothing(hcc.name)
-
-        @test_throws UndefKeywordError WeightBoundsConstraint(; group = [nothing], ub = [2],
-                                                              lb = [1])
-        lcs = WeightBoundsConstraint(; group = [nothing], name = [nothing], ub = [5],
-                                     lb = [3])
-        @test isnothing(lcs.group[1])
-        @test isnothing(lcs.name[1])
-
-        hcc_1 = WeightBoundsConstraint(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
-        @test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
-
-        hcc_1 = WeightBoundsConstraint(; group = [:Foo], name = [:Bar], lb = [0.7],
-                                       ub = [0.8])
-        @test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
-
-        (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
-        @test all(iszero, lb)
-        @test all(isone, ub)
-
-        hcc_1 = WeightBoundsConstraint(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
-        (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
-        @test all(iszero, lb)
-        @test all(isone, ub)
+        scs = ["foo >= -Inf"]
+        @test_throws ArgumentError weight_bounds_constraints(scs, sets1, strict = true)
 
         (; lb, ub) = weight_bounds_constraints(nothing; N = 5)
         @test lb == fill(-Inf, 5)
@@ -568,7 +569,7 @@ constr = [CardinalityConstraint(;
                                                               group = [:Clusters, :Assets],
                                                               name = [2, 7], coef = [1, 1]),
                                 B = 9, comp = EQ())]
-@time constr_result = linear_constraints(constr, sets)
+ constr_result = linear_constraints(constr, sets)
 constr_result2 = linear_constraints(constr_result, sets)
 @test constr_result === constr_result2
 (; ineq, eq) = constr_result
@@ -599,4 +600,57 @@ lhs_1 = CardinalityConstraintSide(; group = [:Asset, :Foo], name = [1, :Bar], co
 constr = CardinalityConstraint(; A = lhs_1, B = 9, comp = EQ())
 @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
 @test isnothing(linear_constraints(nothing))
+
+assets = 1:10
+sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+
+hcc_1 = WeightBoundsConstraint(; group = :Assets, name = 1, lb = 0.7, ub = 0.8)
+wb_result = weight_bounds_constraints(hcc_1, sets)
+wb_result2 = weight_bounds_constraints(wb_result, sets)
+@test wb_result === wb_result2
+(; lb, ub) = wb_result
+@test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+@test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+
+hcc_2 = WeightBoundsConstraint(; group = [:Assets, :Assets], name = [1, 5], lb = [0.7, 0.3],
+                               ub = [0.8, 0.6])
+(; lb, ub) = weight_bounds_constraints(hcc_2, sets)
+@test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0])
+@test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 0.6, 1.0, 1.0, 1.0, 1.0, 1.0])
+
+hcc_3 = WeightBoundsConstraint(; group = :Clusters, name = 3, lb = 0.2, ub = 0.5)
+(; lb, ub) = weight_bounds_constraints(hcc_3, sets)
+@test isapprox(lb, [0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2, 0.2])
+@test isapprox(ub, [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5])
+
+hcc_4 = WeightBoundsConstraint(; group = :Assets, name = 1, lb = nothing, ub = nothing)
+(; lb, ub) = weight_bounds_constraints(hcc_4, sets; strict = true)
+@test isapprox(lb, [-Inf, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+@test isapprox(ub, [Inf, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+
+@test_throws UndefKeywordError WeightBoundsConstraint(group = :Asset)
+hcc = WeightBoundsConstraint(; group = nothing, name = nothing)
+@test isnothing(hcc.group)
+@test isnothing(hcc.name)
+
+@test_throws UndefKeywordError WeightBoundsConstraint(; group = [nothing], ub = [2],
+                                                      lb = [1])
+lcs = WeightBoundsConstraint(; group = [nothing], name = [nothing], ub = [5], lb = [3])
+@test isnothing(lcs.group[1])
+@test isnothing(lcs.name[1])
+
+hcc_1 = WeightBoundsConstraint(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
+@test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
+
+hcc_1 = WeightBoundsConstraint(; group = [:Foo], name = [:Bar], lb = [0.7], ub = [0.8])
+@test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
+
+(; lb, ub) = weight_bounds_constraints(hcc_1, sets)
+@test all(iszero, lb)
+@test all(isone, ub)
+
+hcc_1 = WeightBoundsConstraint(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
+(; lb, ub) = weight_bounds_constraints(hcc_1, sets)
+@test all(iszero, lb)
+@test all(isone, ub)
    =#
