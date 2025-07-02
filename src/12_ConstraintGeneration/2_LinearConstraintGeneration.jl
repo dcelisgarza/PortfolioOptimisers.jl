@@ -224,7 +224,8 @@ function parse_equation(eqn::Union{<:AbstractVector{<:AbstractString},
                         datatype::DataType = Float64)
     return parse_equation.(eqn; datatype = datatype)
 end
-function replace_group_by_assets(res::ParsingResult, sets::AssetSets, flag::Bool = false)
+function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::Bool = false,
+                                 prior_flag::Bool = false)
     variables, coeffs = res.vars, res.coef
     variables_new = copy(variables)
     coeffs_new = copy(coeffs)
@@ -242,12 +243,12 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, flag::Bool
                 if isnothing(asset)
                     continue
                 end
-                c = coeffs[i]
+                c = !bl_flag ? coeffs[i] : coeffs[i] / length(asset)
                 append!(variables_tmp, asset)
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
                 push!(idx_rm, i)
             else
-                if !flag
+                if !prior_flag
                     throw(ArgumentError("`prior(a)` and `(a, b)` can only be used in entropy pooling."))
                 end
                 assets12 = n.captures[1]
@@ -262,7 +263,7 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, flag::Bool
                 variables_new[i] = "($(asset1[1]), $(asset2[1]))"
             end
         else
-            if !flag
+            if !prior_flag
                 throw(ArgumentError("`prior(a)` and `(a, b)` can only be used in entropy pooling."))
             end
             n = match(corr_pattern, v)
@@ -271,7 +272,7 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, flag::Bool
                 if isnothing(asset)
                     continue
                 end
-                c = coeffs[i]
+                c = !bl_flag ? coeffs[i] : coeffs[i] / length(asset)
                 append!(variables_tmp, ["prior($a)" for a in asset])
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
                 push!(idx_rm, i)
@@ -302,8 +303,8 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, flag::Bool
                          "$(eqn) $(res.op) $(res.rhs)")
 end
 function replace_group_by_assets(res::AbstractVector{<:ParsingResult}, sets::AssetSets,
-                                 flag::Bool = false)
-    return replace_group_by_assets.(res, Ref(sets), flag)
+                                 bl_flag::Bool = false, prior_flag::Bool = false)
+    return replace_group_by_assets.(res, Ref(sets), bl_flag, prior_flag)
 end
 function get_linear_constraints(lcs::Union{<:ParsingResult,
                                            <:AbstractVector{<:ParsingResult}},
@@ -370,9 +371,10 @@ function linear_constraints(eqn::Union{<:AbstractString, Expr,
                                        <:AbstractVector{Expr},
                                        <:AbstractVector{<:Union{<:AbstractString, Expr}}},
                             sets::AssetSets; datatype::DataType = Float64,
-                            strict::Bool = false)
+                            strict::Bool = false, bl_flag::Bool = false,
+                            prior_flag::Bool = false)
     lcs = parse_equation(eqn; datatype = datatype)
-    lcs = replace_group_by_assets(lcs, sets)
+    lcs = replace_group_by_assets(lcs, sets, bl_flag, prior_flag)
     return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
 function get_weight_bounds_constraints(lcs::Union{<:ParsingResult,
@@ -421,7 +423,8 @@ function get_risk_budget_constraints(lcs::Union{<:ParsingResult,
                                      sets::AssetSets; datatype::DataType = Float64,
                                      strict::Bool = false)
     nx = sets.dict[sets.key]
-    rb = fill(inv(length(nx)), length(nx))
+    rb = Vector{datatype}(undef, length(nx))
+    fill!(rb, inv(length(nx)))
     At = falses(length(nx))
     for lc in lcs
         fill!(At, false)

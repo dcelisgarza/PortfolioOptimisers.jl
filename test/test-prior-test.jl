@@ -247,40 +247,22 @@
         @test pv1.chol == view(pr1.chol, :, i)
     end
     @testset "Black Litterman Views" begin
-        assets = 1:10
-        sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-        vc_1 = BlackLittermanViewsEstimator(;
-                                            A = LinearConstraintSide(; group = :Asset,
-                                                                     name = 2, coef = 1.0),
-                                            B = 0.003)
-        vc_2 = BlackLittermanViewsEstimator(;
-                                            A = LinearConstraintSide(;
-                                                                     group = [:Asset,
-                                                                              :Asset],
-                                                                     name = [3, 8],
-                                                                     coef = [1.0, -1]),
-                                            B = -0.001)
-        vc_3 = BlackLittermanViewsEstimator(;
-                                            A = LinearConstraintSide(;
-                                                                     group = [:Clusters,
-                                                                              :Asset],
-                                                                     name = [3, 9],
-                                                                     coef = [1.0, -1]),
-                                            B = 0.002)
-        vc_4 = BlackLittermanViewsEstimator(;
-                                            A = LinearConstraintSide(;
-                                                                     group = [:Asset,
-                                                                              :Clusters],
-                                                                     name = [5, 1],
-                                                                     coef = [1.0, -1]),
-                                            B = 0.007)
-        vc_5 = BlackLittermanViewsEstimator(;
-                                            A = LinearConstraintSide(; group = :Clusters,
-                                                                     name = 2, coef = 1.0),
-                                            B = 0.001)
-        views = [vc_1, vc_2, vc_3, vc_4, vc_5]
-        blvr = black_litterman_views(views, sets)
-        @test isapprox(blvr.P,
+        assets = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                  "ten"]
+        clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3]
+        sets = AssetSets(;
+                         dict = Dict("nx" => assets, "c1" => assets[clusters .== 1],
+                                     "c2" => assets[clusters .== 2],
+                                     "c3" => assets[clusters .== 3]))
+        sc = ["two==0.003", "three - eight==-0.001", "c3-nine==0.002", "five - c1 == 0.007",
+              "c2==0.001"]
+        ec = [:(two == 0.003), :(three - eight == -0.001), :(c3 - nine == 0.002),
+              :(five - c1 == 0.007), :(c2 == 0.001)]
+        blv1 = black_litterman_views(sc, sets)
+        blv2 = black_litterman_views(ec, sets)
+        blv3 = black_litterman_views(blv1)
+        @test blv1 === blv3
+        @test isapprox(blv1.P,
                        reshape([0.0, 0.0, 0.0, -0.3333333333333333, 0.0, 1.0, 0.0, 0.0,
                                 -0.3333333333333333, 0.0, 0.0, 1.0, 0.25, 0.0, 0.0, 0.0,
                                 0.0, 0.0, 0.0, 0.3333333333333333, 0.0, 0.0, 0.25, 1.0, 0.0,
@@ -288,41 +270,8 @@
                                 0.3333333333333333, 0.0, -1.0, 0.0, -0.3333333333333333,
                                 0.0, 0.0, 0.0, -0.75, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0],
                                :, 10))
-        @test isapprox(blvr.Q, [0.003, -0.001, 0.002, 0.007, 0.001])
-        @test blvr === black_litterman_views(blvr)
-        @test isnothing(black_litterman_views(nothing))
-        @test isnothing(black_litterman_views(BlackLittermanViewsEstimator(;
-                                                                           A = LinearConstraintSide(;
-                                                                                                    group = nothing,
-                                                                                                    name = nothing)),
-                                              sets))
-        vc = BlackLittermanViewsEstimator(;
-                                          A = LinearConstraintSide(; group = :Asset,
-                                                                   name = -1, coef = 1.0),
-                                          B = 0.003)
-        @test isnothing(black_litterman_views(vc, sets))
-        @test_throws ArgumentError black_litterman_views(vc, sets, strict = true)
-
-        vc = BlackLittermanViewsEstimator(;
-                                          A = LinearConstraintSide(; group = [:Asset],
-                                                                   name = [-1],
-                                                                   coef = [1.0]), B = 0.003)
-        @test isnothing(black_litterman_views(vc, sets))
-        @test_throws ArgumentError black_litterman_views(vc, sets, strict = true)
-
-        vc = BlackLittermanViewsEstimator(;
-                                          A = LinearConstraintSide(; group = :Foo,
-                                                                   name = -1, coef = 1.0),
-                                          B = 0.003)
-        @test isnothing(black_litterman_views(vc, sets))
-        @test_throws ArgumentError black_litterman_views(vc, sets, strict = true)
-
-        vc = BlackLittermanViewsEstimator(;
-                                          A = LinearConstraintSide(; group = [:Foo],
-                                                                   name = [-1],
-                                                                   coef = [1.0]), B = 0.003)
-        @test isnothing(black_litterman_views(vc, sets))
-        @test_throws ArgumentError black_litterman_views(vc, sets, strict = true)
+        @test isapprox(blv1.Q, [0.003, -0.001, 0.002, 0.007, 0.001])
+        @test_throws ArgumentError black_litterman_views("foo==0.2", sets, strict = true)
     end
     @testset "Black Litteman type tests" begin
         pe1 = BayesianBlackLittermanPriorEstimator(; tau = 1,
@@ -1755,3 +1704,66 @@
         @test pv1.chol == view(pr1.chol, :, i)
     end
 end
+
+#=
+assets = 1:10
+sets = DataFrame(; Asset = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+vc_1 = BlackLittermanViewsEstimator(;
+                                    A = LinearConstraintSide(; group = :Asset, name = 2,
+                                                             coef = 1.0), B = 0.003)
+vc_2 = BlackLittermanViewsEstimator(;
+                                    A = LinearConstraintSide(; group = [:Asset, :Asset],
+                                                             name = [3, 8],
+                                                             coef = [1.0, -1]), B = -0.001)
+vc_3 = BlackLittermanViewsEstimator(;
+                                    A = LinearConstraintSide(; group = [:Clusters, :Asset],
+                                                             name = [3, 9],
+                                                             coef = [1.0, -1]), B = 0.002)
+vc_4 = BlackLittermanViewsEstimator(;
+                                    A = LinearConstraintSide(; group = [:Asset, :Clusters],
+                                                             name = [5, 1],
+                                                             coef = [1.0, -1]), B = 0.007)
+vc_5 = BlackLittermanViewsEstimator(;
+                                    A = LinearConstraintSide(; group = :Clusters, name = 2,
+                                                             coef = 1.0), B = 0.001)
+views = [vc_1, vc_2, vc_3, vc_4, vc_5]
+blvr = black_litterman_views(views, sets)
+@test isapprox(blvr.P,
+               reshape([0.0, 0.0, 0.0, -0.3333333333333333, 0.0, 1.0, 0.0, 0.0,
+                        -0.3333333333333333, 0.0, 0.0, 1.0, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0,
+                        0.0, 0.3333333333333333, 0.0, 0.0, 0.25, 1.0, 0.0, 0.0, 0.0, 0.0,
+                        0.0, 0.3333333333333333, 0.0, 0.0, 0.0, 0.0, 0.3333333333333333,
+                        0.0, -1.0, 0.0, -0.3333333333333333, 0.0, 0.0, 0.0, -0.75, 0.0, 0.0,
+                        0.0, 0.0, 0.25, 0.0, 0.0], :, 10))
+@test isapprox(blvr.Q, [0.003, -0.001, 0.002, 0.007, 0.001])
+@test blvr === black_litterman_views(blvr)
+@test isnothing(black_litterman_views(nothing))
+@test isnothing(black_litterman_views(BlackLittermanViewsEstimator(;
+                                                                   A = LinearConstraintSide(;
+                                                                                            group = nothing,
+                                                                                            name = nothing)),
+                                      sets))
+vc = BlackLittermanViewsEstimator(;
+                                  A = LinearConstraintSide(; group = :Asset, name = -1,
+                                                           coef = 1.0), B = 0.003)
+@test isnothing(black_litterman_views(vc, sets))
+@test_throws ArgumentError black_litterman_views(vc, sets, strict = true)
+
+vc = BlackLittermanViewsEstimator(;
+                                  A = LinearConstraintSide(; group = [:Asset], name = [-1],
+                                                           coef = [1.0]), B = 0.003)
+@test isnothing(black_litterman_views(vc, sets))
+@test_throws ArgumentError black_litterman_views(vc, sets, strict = true)
+
+vc = BlackLittermanViewsEstimator(;
+                                  A = LinearConstraintSide(; group = :Foo, name = -1,
+                                                           coef = 1.0), B = 0.003)
+@test isnothing(black_litterman_views(vc, sets))
+@test_throws ArgumentError black_litterman_views(vc, sets, strict = true)
+
+vc = BlackLittermanViewsEstimator(;
+                                  A = LinearConstraintSide(; group = [:Foo], name = [-1],
+                                                           coef = [1.0]), B = 0.003)
+@test isnothing(black_litterman_views(vc, sets))
+@test_throws ArgumentError black_litterman_views(vc, sets, strict = true)
+=#
