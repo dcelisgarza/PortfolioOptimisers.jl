@@ -358,6 +358,42 @@ function weight_bounds_constraints(eqn::Union{<:AbstractString,
     lcs = replace_group_by_assets(lcs, sets)
     return get_weight_bounds_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
+function get_risk_budget_bounds_constraints(lcs::Union{<:ParsingResult,
+                                                       <:AbstractVector{<:ParsingResult}},
+                                            sets::AssetSets; datatype::DataType = Float64,
+                                            strict::Bool = false)
+    nx = sets.dict[sets.key]
+    rb = ones(promote_type(eltype(datatype), eltype(datatype)), length(nx))
+    At = falses(length(nx))
+    for lc in lcs
+        fill!(At, false)
+        for v in lc.vars
+            Ai = (nx .== v)
+            if !any(isone, Ai)
+                msg = "$(v) is not found in $(nx)."
+                strict ? throw(ArgumentError(msg)) : @warn(msg)
+                continue
+            end
+            At .= At .|| Ai
+        end
+        if lc.rhs < 0
+            msg = "$(lc.eqn) has a negative risk budget."
+            strict ? throw(ArgumentError(msg)) : @warn(msg)
+            continue
+        end
+        rb[At] .= lc.rhs
+    end
+    return rb / sum(rb)
+end
+function risk_budget_constraints(eqn::Union{<:AbstractString,
+                                            <:AbstractVector{<:AbstractString}},
+                                 sets::AssetSets; datatype::DataType = Float64,
+                                 strict::Bool = false)
+    lcs = parse_equation(eqn; datatype = datatype)
+    lcs = replace_group_by_assets(lcs, sets)
+    return get_risk_budget_bounds_constraints(lcs, sets; datatype = datatype,
+                                              strict = strict)
+end
 function asset_sets_matrix(smtx::Union{Nothing, Symbol, <:AbstractString}, args...;
                            kwargs...)
     return smtx
