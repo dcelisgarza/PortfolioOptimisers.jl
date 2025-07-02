@@ -22,81 +22,40 @@
         end
     end
     @testset "Linear constraints" begin
-        assets = 1:10
-        sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+        assets = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                  "ten"]
+        clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3]
         loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-        constr = [LinearConstraint(; A = LinearConstraintSide(; group = :Assets, name = 1),
-                                   B = 0.35, comp = EQ()),
-                  LinearConstraint(;
-                                   A = LinearConstraintSide(;
-                                                            group = [:Assets, :Assets,
-                                                                     :Assets],
-                                                            name = [1, 1, 3],
-                                                            coef = [1, -0, -0.3]), B = 0.25,
-                                   comp = LEQ()),
-                  LinearConstraint(; A = LinearConstraintSide(; group = :Assets, name = 5),
-                                   B = 0.5, comp = EQ()),
-                  LinearConstraint(;
-                                   A = LinearConstraintSide(;
-                                                            group = [:Clusters, :Clusters],
-                                                            name = [3, 2], coef = [2, -3]),
-                                   comp = GEQ()),
-                  LinearConstraint(;
-                                   A = LinearConstraintSide(;
-                                                            group = [:Clusters, :Clusters,
-                                                                     :Clusters],
-                                                            name = [1, 3, 2],
-                                                            coef = [-1, 2, -3]), B = -0.1,
-                                   comp = LEQ()),
-                  LinearConstraint(;
-                                   A = LinearConstraintSide(; group = fill(:Assets, 20),
-                                                            name = [assets; assets],
-                                                            coef = [-loadings.MTUM;
-                                                                    loadings.QUAL]),
-                                   B = 0.9, comp = GEQ()),
-                  LinearConstraint(;
-                                   A = LinearConstraintSide(; group = [:Clusters, :Assets],
-                                                            name = [2, 7], coef = -[1, 1]),
-                                   B = 0.7, comp = EQ()),
-                  LinearConstraint(;
-                                   A = LinearConstraintSide(; group = :Assets, name = 1,
-                                                            coef = 1), B = 4, comp = EQ()),
-                  LinearConstraint(;
-                                   A = LinearConstraintSide(;
-                                                            group = [:Assets, :Assets,
-                                                                     :Assets],
-                                                            name = [1, 1, 3],
-                                                            coef = [1, -1, 1]), B = 5,
-                                   comp = LEQ()),
-                  LinearConstraint(; A = LinearConstraintSide(; group = :Assets, name = 5),
-                                   B = 7, comp = EQ()),
-                  LinearConstraint(;
-                                   A = LinearConstraintSide(;
-                                                            group = [:Clusters, :Clusters],
-                                                            name = [3, 2], coef = [1, -1]),
-                                   B = 3, comp = GEQ()),
-                  LinearConstraint(;
-                                   A = LinearConstraintSide(;
-                                                            group = [:Clusters, :Clusters,
-                                                                     :Clusters],
-                                                            name = [1, 3, 2],
-                                                            coef = -[1, 1, -1]), B = 7,
-                                   comp = LEQ()),
-                  LinearConstraint(;
-                                   A = LinearConstraintSide(; group = [:Clusters, :Assets],
-                                                            name = [2, 7], coef = [-1, -1]),
-                                   B = 8, comp = EQ())]
-        constr_result = linear_constraints(constr, sets)
-        constr_result2 = linear_constraints(constr_result, sets)
-        @test constr_result === constr_result2
-        (; ineq, eq) = constr_result
+        sets = AssetSets(;
+                         dict = Dict("nx" => assets, "c1" => assets[clusters .== 1],
+                                     "c2" => assets[clusters .== 2],
+                                     "c3" => assets[clusters .== 3]))
+        scs = ["one == 0.35", "1*one + -0*one -0.3*three <= 0.25", "five == 0.5",
+               "c3*2 - 3*c2>=0", "-c1 + 2*c3+ -3*c2<=-0.1",
+               join(["$(-loadings.MTUM[i]) * $(assets[i]) + $(loadings.QUAL[i]) * $(assets[i])"
+                     for i in 1:10], " ") * ">=0.9", "-c2 - seven==0.7", "one == 4",
+               "one - one + three <= 5", "five == 7", "c3 - 3 >= c2", "-c1+c2-14<=-7+c3",
+               "-8 == c2 + seven"]
+
+        ecs = [:(one == 0.35), :(1 * one + -0 * one - 0.3 * three <= 0.25), :(five == 0.5),
+               :(c3 * 2 - 3 * c2 >= 0), :(-c1 + 2 * c3 + -3 * c2 <= -0.1),
+               Meta.parse(join(["$(-loadings.MTUM[i]) * $(assets[i]) + $(loadings.QUAL[i]) * $(assets[i])"
+                                for i in 1:10], " ") * " >= 0.9"), :(-c2 - seven == 0.7),
+               :(one == 4), :(one - one + three <= 5), :(five == 7), :(c3 - 3 >= c2),
+               :(-c1 + c2 - 14 <= -7 + c3), :(-8 == c2 + seven)]
+
+        lcs1 = linear_constraints(scs, sets)
+        lcs2 = linear_constraints(ecs, sets)
+        lcs3 = linear_constraints(lcs1, sets)
+        @test lcs1 === lcs3
+        (; ineq, eq) = lcs1
         A_ineq, B_ineq = ineq.A, ineq.B
         A_eq, B_eq = eq.A, eq.B
-        @test A_ineq === constr_result.A_ineq
-        @test B_ineq === constr_result.B_ineq
-        @test A_eq === constr_result.A_eq
-        @test B_eq === constr_result.B_eq
+        @test A_ineq === lcs3.A_ineq
+        @test B_ineq === lcs3.B_ineq
+        @test A_eq === lcs3.A_eq
+        @test B_eq === lcs3.B_eq
         A_ineq_t = reshape([1.0, -0.0, -1.0, 2.0, 0.0, -0.0, -1.0, 0.0, -0.0, -1.0, 0.0,
                             0.0, -0.0, -1.0, -0.3, -2.0, 2.0, -2.0, 1.0, -1.0, -1.0, 0.0,
                             3.0, -3.0, 1.0, 0.0, 1.0, 1.0, 0.0, -2.0, 2.0, 1.0, 0.0, -1.0,
@@ -115,34 +74,6 @@
         @test isapprox(B_ineq, B_ineq_t)
         @test isapprox(A_eq, A_eq_t)
         @test isapprox(B_eq, B_eq_t)
-
-        @test isnothing(linear_constraints(LinearConstraint(;
-                                                            A = LinearConstraintSide(;
-                                                                                     group = nothing,
-                                                                                     name = nothing)),
-                                           sets))
-
-        @test isnothing(linear_constraints(LinearConstraint(;
-                                                            A = LinearConstraintSide(;
-                                                                                     group = [:Foo],
-                                                                                     name = [20],
-                                                                                     coef = [5]),
-                                                            B = 0.35), sets))
-
-        @test_throws UndefKeywordError LinearConstraintSide(; coef = [2])
-        lcs = LinearConstraintSide(; group = [nothing], name = [nothing], coef = [2])
-        @test isnothing(lcs.group[1])
-        @test isnothing(lcs.name[1])
-
-        lhs_1 = LinearConstraintSide(; group = :Asset, name = 1)
-        constr = LinearConstraint(; A = lhs_1, B = 0.35, comp = EQ())
-        @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
-
-        lhs_1 = LinearConstraintSide(; group = [:Asset, :Foo], name = [1, :Bar],
-                                     coef = [1, -1])
-        constr = LinearConstraint(; A = lhs_1, B = 0.35, comp = EQ())
-        @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
-        @test isnothing(linear_constraints(nothing))
     end
     @testset "Cardinality constraints" begin
         assets = 1:10
@@ -567,3 +498,96 @@
         @test isnothing(centrality_constraints(nothing))
     end
 end
+
+#=
+   assets = 1:10
+   sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
+   constr = [LinearConstraint(; A = LinearConstraintSide(; group = :Assets, name = 1),
+                              B = 0.35, comp = EQ()),
+             LinearConstraint(;
+                              A = LinearConstraintSide(; group = [:Assets, :Assets, :Assets],
+                                                       name = [1, 1, 3], coef = [1, -0, -0.3]),
+                              B = 0.25, comp = LEQ()),
+             LinearConstraint(; A = LinearConstraintSide(; group = :Assets, name = 5), B = 0.5,
+                              comp = EQ()),
+             LinearConstraint(;
+                              A = LinearConstraintSide(; group = [:Clusters, :Clusters],
+                                                       name = [3, 2], coef = [2, -3]),
+                              comp = GEQ()),
+             LinearConstraint(;
+                              A = LinearConstraintSide(;
+                                                       group = [:Clusters, :Clusters,
+                                                                :Clusters], name = [1, 3, 2],
+                                                       coef = [-1, 2, -3]), B = -0.1,
+                              comp = LEQ()),
+             LinearConstraint(;
+                              A = LinearConstraintSide(; group = fill(:Assets, 20),
+                                                       name = [assets; assets],
+                                                       coef = [-loadings.MTUM;
+                                                               loadings.QUAL]), B = 0.9,
+                              comp = GEQ()),
+             LinearConstraint(;
+                              A = LinearConstraintSide(; group = [:Clusters, :Assets],
+                                                       name = [2, 7], coef = -[1, 1]), B = 0.7,
+                              comp = EQ()),
+             LinearConstraint(;
+                              A = LinearConstraintSide(; group = :Assets, name = 1, coef = 1),
+                              B = 4, comp = EQ()),
+             LinearConstraint(;
+                              A = LinearConstraintSide(; group = [:Assets, :Assets, :Assets],
+                                                       name = [1, 1, 3], coef = [1, -1, 1]),
+                              B = 5, comp = LEQ()),
+             LinearConstraint(; A = LinearConstraintSide(; group = :Assets, name = 5), B = 7,
+                              comp = EQ()),
+             LinearConstraint(;
+                              A = LinearConstraintSide(; group = [:Clusters, :Clusters],
+                                                       name = [3, 2], coef = [1, -1]), B = 3,
+                              comp = GEQ()),
+             LinearConstraint(;
+                              A = LinearConstraintSide(;
+                                                       group = [:Clusters, :Clusters,
+                                                                :Clusters], name = [1, 3, 2],
+                                                       coef = -[1, 1, -1]), B = 7,
+                              comp = LEQ()),
+             LinearConstraint(;
+                              A = LinearConstraintSide(; group = [:Clusters, :Assets],
+                                                       name = [2, 7], coef = [-1, -1]), B = 8,
+                              comp = EQ())]
+   constr_result = linear_constraints(constr, sets)
+   constr_result2 = linear_constraints(constr_result, sets)
+   @test constr_result === constr_result2
+   (; ineq, eq) = constr_result
+   A_ineq, B_ineq = ineq.A, ineq.B
+   A_eq, B_eq = eq.A, eq.B
+   @test A_ineq === constr_result.A_ineq
+   @test B_ineq === constr_result.B_ineq
+   @test A_eq === constr_result.A_eq
+   @test B_eq === constr_result.B_eq
+
+   @test isnothing(linear_constraints(LinearConstraint(;
+                                                       A = LinearConstraintSide(;
+                                                                                group = nothing,
+                                                                                name = nothing)),
+                                      sets))
+
+   @test isnothing(linear_constraints(LinearConstraint(;
+                                                       A = LinearConstraintSide(;
+                                                                                group = [:Foo],
+                                                                                name = [20],
+                                                                                coef = [5]),
+                                                       B = 0.35), sets))
+
+   @test_throws UndefKeywordError LinearConstraintSide(; coef = [2])
+   lcs = LinearConstraintSide(; group = [nothing], name = [nothing], coef = [2])
+   @test isnothing(lcs.group[1])
+   @test isnothing(lcs.name[1])
+
+   lhs_1 = LinearConstraintSide(; group = :Asset, name = 1)
+   constr = LinearConstraint(; A = lhs_1, B = 0.35, comp = EQ())
+   @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
+
+   lhs_1 = LinearConstraintSide(; group = [:Asset, :Foo], name = [1, :Bar], coef = [1, -1])
+   constr = LinearConstraint(; A = lhs_1, B = 0.35, comp = EQ())
+   @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
+   @test isnothing(linear_constraints(nothing))
+   =#

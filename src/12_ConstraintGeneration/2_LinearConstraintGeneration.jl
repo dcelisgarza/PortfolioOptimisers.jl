@@ -146,19 +146,19 @@ function asset_sets_view(sets::AssetSets, i::AbstractVector)
     return AssetSets(; key = sets.key, dict = dict)
 end
 function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = Float64)
-    # 2. Evaluate numeric functions on both sides
+    # 3. Evaluate numeric functions on both sides
     lexpr = _eval_numeric_functions(lhs)
     _rethrow_parse_error(lexpr, :lhs)
     rexpr = _eval_numeric_functions(rhs)
     _rethrow_parse_error(rexpr, :rhs)
 
-    # 3. Move all terms to LHS: lhs - rhs == 0
+    # 4. Move all terms to LHS: lhs - rhs == 0
     diff_expr = :($lexpr - ($rexpr))
 
-    # 4. Expand and collect like terms
+    # 5. Expand and collect like terms
     terms = _collect_terms(diff_expr)
 
-    # 5. Separate variables and constant
+    # 6. Separate variables and constant
     varmap = Dict{String, Float64}()
     constant::datatype = 0.0
     for (coeff, var) in terms
@@ -169,12 +169,12 @@ function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = F
         end
     end
 
-    # 6. Move constant to RHS, variables to LHS
+    # 7. Move constant to RHS, variables to LHS
     variables = collect(keys(varmap))
     coefficients = [varmap[v] for v in variables]
     rhs_val = -constant
 
-    # 7. Format the simplified expression
+    # 8. Format the simplified expression
     lhs_str = join([_format_term(coeff, var)
                     for (coeff, var) in zip(coefficients, variables)], " + ")
     lhs_str = replace(lhs_str, "+ -" => "-", "  " => " ")
