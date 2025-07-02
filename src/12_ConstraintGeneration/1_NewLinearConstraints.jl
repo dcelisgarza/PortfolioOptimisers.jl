@@ -168,6 +168,9 @@ function parse_equation(eqn::AbstractString; datatype::DataType = Float64)
 
     return ParsingResult(variables, coefficients, opstr, rhs_val, formatted)
 end
+function parse_equation(eqn::AbstractVector{<:AbstractString}; datatype::DataType = Float64)
+    return parse_equation.(eqn; datatype = datatype)
+end
 function replace_group_by_assets(res::ParsingResult, sets::AssetSets, flag::Bool = false)
     variables, coeffs = res.vars, res.coef
     variables_new = copy(variables)
@@ -245,6 +248,10 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, flag::Bool
     return ParsingResult(variables_new, coeffs_new, res.op, res.rhs,
                          "$(eqn) $(res.op) $(res.rhs)")
 end
+function replace_group_by_assets(res::AbstractVector{<:ParsingResult}, sets::AssetSets,
+                                 flag::Bool = false)
+    return replace_group_by_assets.(res, Ref(sets), flag)
+end
 function get_linear_constraints(lcs::Union{<:ParsingResult,
                                            <:AbstractVector{<:ParsingResult}},
                                 sets::AssetSets; datatype::DataType = Float64,
@@ -263,8 +270,9 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
         for (v, c) in zip(lc.vars, lc.coef)
             Ai = (nx .== v)
             if !any(isone, Ai)
-                msg = "$(v) does not exist in $(sets.dict[sets.key])."
+                msg = "$(v) is not found in $(nx)."
                 strict ? throw(ArgumentError(msg)) : @warn(msg)
+                continue
             end
             At += Ai * c
         end
@@ -304,17 +312,81 @@ end
 function build_linear_constraints(::Nothing, args...; kwargs...)
     return nothing
 end
-function build_linear_constraints(eqn::AbstractString, sets::AssetSets;
-                                  datatype::DataType = Float64, strict::Bool = false)
+function build_linear_constraints(eqn::Union{<:AbstractString,
+                                             <:AbstractVector{<:AbstractString}},
+                                  sets::AssetSets; datatype::DataType = Float64,
+                                  strict::Bool = false)
     lcs = parse_equation(eqn; datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets)
     return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
-function build_linear_constraints(eqn::AbstractVector{<:AbstractString}, sets::AssetSets;
-                                  datatype::DataType = Float64, strict::Bool = false)
-    lcs = parse_equation.(eqn; datatype = datatype)
-    lcs = replace_group_by_assets.(lcs, Ref(sets))
-    return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
+function get_weight_bounds_constraints(lcs::Union{<:ParsingResult,
+                                                  <:AbstractVector{<:ParsingResult}},
+                                       sets::AssetSets; datatype::DataType = Float64,
+                                       strict::Bool = false)
+    nx = sets.dict[sets.key]
+    lb = zeros(promote_type(eltype(datatype), eltype(datatype)), length(nx))
+    ub = ones(promote_type(eltype(datatype), eltype(datatype)), length(nx))
+    At = falses(length(nx))
+    for lc in lcs
+        fill!(At, false)
+        for v in lc.vars
+            Ai = (nx .== v)
+            if !any(isone, Ai)
+                msg = "$(v) is not found in $(nx)."
+                strict ? throw(ArgumentError(msg)) : @warn(msg)
+                continue
+            end
+            At .= At .|| Ai
+        end
+        if lc.op == "<="
+            ub[At] .= lc.rhs
+        elseif lc.op == ">="
+            lb[At] .= lc.rhs
+        else
+            ub[At] .= lc.rhs
+            lb[At] .= lc.rhs
+        end
+    end
+    return WeightBoundsResult(; lb = lb, ub = ub)
+end
+function weight_bounds_constraints(eqn::Union{<:AbstractString,
+                                              <:AbstractVector{<:AbstractString}},
+                                   sets::AssetSets; datatype::DataType = Float64,
+                                   strict::Bool = false)
+    lcs = parse_equation(eqn; datatype = datatype)
+    lcs = replace_group_by_assets(lcs, sets)
+    return get_weight_bounds_constraints(lcs, sets; datatype = datatype, strict = strict)
+end
+function asset_sets_matrix(smtx::Union{Nothing, Symbol, <:AbstractString}, args...;
+                           kwargs...)
+    return smtx
+end
+function asset_sets_matrix(smtx::AbstractString, sets::AssetSets; strict::Bool = false)
+    @smart_assert(haskey(sets.dict, smtx))
+    nx = sets.dict[sets.key]
+    set_keys = unique!(sets.dict[smtx])
+    A = BitMatrix(undef, length(set_keys), length(nx))
+    for (i, key) in pairs(set_keys)
+        group = sets.dict[key]
+        for a in group
+            idx = findfirst(x -> x == a, nx)
+            if isnothing(idx)
+                msg = "$a is not found in $nx.\nIt belongs to $key, $group.\nWhich is referenced by $smtx, $set_keys."
+                strict ? throw(ArgumentError(msg)) : @warn(msg)
+                continue
+            end
+            A[i, idx] = true
+        end
+    end
+    return A
+end
+function asset_sets_matrix_view(smtx::Union{Nothing, Symbol, <:AbstractString}, ::Any;
+                                kwargs...)
+    return smtx
+end
+function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector; kwargs...)
+    return view(smtx, :, i)
 end
 
 export parse_equation, replace_group_by_assets, build_linear_constraints, AssetSets

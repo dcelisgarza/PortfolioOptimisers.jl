@@ -15,11 +15,8 @@ function CardinalityConstraint(; A::LinearConstraintSide, B::Integer = 1,
                                comp::ComparisonOperators = LEQ())
     return LinearConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
-function asset_sets_matrix(smtx::Union{Nothing, Symbol, <:AbstractString}, args...;
+function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFrame;
                            kwargs...)
-    return smtx
-end
-function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFrame)
     @smart_assert(!isempty(sets))
     sets = sets[!, smtx]
     unique_sets = unique(sets)
@@ -28,12 +25,6 @@ function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFram
         A[:, i] = sets .== s
     end
     return transpose(A)
-end
-function asset_sets_matrix_view(smtx::Union{Nothing, Symbol, <:AbstractString}, ::Any)
-    return smtx
-end
-function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector)
-    return view(smtx, :, i)
 end
 
 export CardinalityConstraintSide, CardinalityConstraint, asset_sets_matrix
