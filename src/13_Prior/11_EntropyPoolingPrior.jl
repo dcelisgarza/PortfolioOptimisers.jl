@@ -352,12 +352,63 @@ function factory(pe::EPPriorEstimator, w::Union{Nothing, <:AbstractWeights} = no
                             opt = pe.opt, w = nothing_scalar_array_factory(pe.w, w),
                             alg = pe.alg)
 end
-function ep_mu_views!(mu_views, fixed::AbstractVector, pr::AbstractPriorResult,
-                      sets::Nothing; strict::Bool = false)
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:mu})
+    return pr.mu[i]
+end
+function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
+                             key::Symbol, strict::Bool = false)
+    prior_pattern = r"prior\(([^()]*)\)"
+    nx = sets.dict[sets.key]
+    variables, coeffs = res.vars, res.coef
+    idx_rm = Vector{Int}(undef, 0)
+    rhs::typeof(res.rhs) = res.rhs
+    non_prior = false
+    for (i, (v, c)) in enumerate(zip(variables, coeffs))
+        m = match(prior_pattern, v)
+        if isnothing(m)
+            non_prior = true
+            continue
+        end
+        j = findfirst(x -> x == m.captures[1], nx)
+        if isnothing(j)
+            msg = "Asset $(m.captures[1]) not found in $nx."
+            strict ? throw(ArgumentError(msg)) : @warn(msg)
+            push!(idx_rm, i)
+            continue
+        end
+        rhs += get_pr_value(pr, j, Val(key)) * c
+        push!(idx_rm, i)
+    end
+    if isempty(idx_rm)
+        return res
+    end
+    if !non_prior
+        throw(ArgumentError("Priors in views are replaced by their prior value, thus they are essentially part of the constant of the view, so you need a non-prior view to serve as the variable.\n$(res)"))
+    end
+    idx = setdiff(1:length(variables), idx_rm)
+    variables_new = variables[idx]
+    coeffs_new = coeffs[idx]
+    eqn = replace(join(string.(coeffs_new) .* "*" .* variables_new, " + "))
+    return ParsingResult(variables_new, coeffs_new, res.op, rhs, "$(eqn) $(res.op) $(rhs)")
+end
+function replace_prior_views(res::AbstractVector{<:ParsingResult}, pr::AbstractPriorResult,
+                             sets::AssetSets, key::Symbol, strict::Bool = false)
+    return replace_prior_views.(res, pr, sets, key, strict)
+end
+function ep_mu_views!(mu_views::Nothing, args...; kwargs...)
     return nothing
 end
-function ep_mu_views!(mu_views, fixed::AbstractVector, pr::AbstractPriorResult,
-                      sets::AssetSets; strict::Bool = false) end
+function ep_mu_views!(mu_views::Union{<:AbstractString, Expr,
+                                      <:AbstractVector{<:AbstractString},
+                                      <:AbstractVector{Expr},
+                                      <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                      fixed::AbstractVector, pr::AbstractPriorResult, sets::AssetSets,
+                      strict::Bool = false)
+    mu_views = parse_equation(mu_views)
+    mu_views = replace_group_by_assets(mu_views, sets, false, true, false)
+    mu_views = replace_prior_views(mu_views, pr, sets, :mu, strict)
+    return mu_views
+end
 function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                     <:H0_EntropyPooling}, X::AbstractMatrix,

@@ -137,6 +137,8 @@ struct AssetSets{T1 <: AbstractString, T2 <: AbstractDict}
     key::T1
     dict::T2
 end
+Base.length(res::AssetSets) = 1
+Base.iterate(res::AssetSets, state = 1) = state > 1 ? nothing : (res, state + 1)
 function AssetSets(; key::AbstractString = "nx", dict::AbstractDict)
     @smart_assert(!isempty(dict))
     @smart_assert(haskey(dict, key))
@@ -319,7 +321,7 @@ end
 function replace_group_by_assets(res::AbstractVector{<:ParsingResult}, sets::AssetSets,
                                  bl_flag::Bool = false, prior_flag::Bool = false,
                                  rho_flag::Bool = false)
-    return replace_group_by_assets.(res, Ref(sets), bl_flag, prior_flag, rho_flag)
+    return replace_group_by_assets.(res, sets, bl_flag, prior_flag, rho_flag)
 end
 function get_linear_constraints(lcs::Union{<:ParsingResult,
                                            <:AbstractVector{<:ParsingResult}},
