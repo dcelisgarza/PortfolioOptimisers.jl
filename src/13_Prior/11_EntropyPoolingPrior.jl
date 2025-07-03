@@ -391,6 +391,18 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
     eqn = replace(join(string.(coeffs_new) .* "*" .* variables_new, " + "))
     return ParsingResult(variables_new, coeffs_new, res.op, rhs, "$(eqn) $(res.op) $(rhs)")
 end
+function add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::AbstractVector,
+                            key::Symbol)
+    scale = norm(lhs)
+    lhs /= scale
+    rhs /= scale
+    epc[key] = if !haskey(epc, key)
+        (lhs, rhs)
+    else
+        (vcat(epc[key][1], lhs), append!(epc[key][2], rhs))
+    end
+    return nothing
+end
 function replace_prior_views(res::AbstractVector{<:ParsingResult}, pr::AbstractPriorResult,
                              sets::AssetSets, key::Symbol, strict::Bool = false)
     return replace_prior_views.(res, pr, sets, key, strict)
@@ -402,16 +414,32 @@ function ep_mu_views!(mu_views::Union{<:AbstractString, Expr,
                                       <:AbstractVector{<:AbstractString},
                                       <:AbstractVector{Expr},
                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                      fixed::AbstractVector, pr::AbstractPriorResult, sets::AssetSets,
+                      epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets,
                       strict::Bool = false)
     mu_views = parse_equation(mu_views)
     mu_views = replace_group_by_assets(mu_views, sets, false, true, false)
     mu_views = replace_prior_views(mu_views, pr, sets, :mu, strict)
-    return mu_views
+    lcs = get_linear_constraints(mu_views, sets; datatype = eltype(pr.mu), strict = strict)
+    for p in propertynames(lcs)
+        if isnothing(getproperty(lcs, p))
+            continue
+        end
+        add_ep_constraint!(epc, getproperty(lcs, p).A * transpose(pr.X),
+                           getproperty(lcs, p).B, p)
+    end
+    return nothing
+end
+function fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVector,
+                 pr::AbstractPriorResult)
+    fix = to_fix .& .!fixed
+    if any(fix)
+        add_ep_constraint!(epc, transpose(pr.X[:, fix]), pr.mu[fix], :feq)
+        fixed .= fixed .| fix
+    end
 end
 function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                    <:H0_EntropyPooling}, X::AbstractMatrix,
+                                    <:H1_EntropyPooling}, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
     @smart_assert(dims in (1, 2))
@@ -431,7 +459,8 @@ function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:
     pe = factory(pe, w)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     fixed = falses(N, 4)
-    ep_mu_views!(pe.mu_views, view(fixed, :, 1), pr, pe.sets; strict = strict)
+    epc = Dict{Symbol, Tuple{<:AbstractMatrix, <:AbstractVector}}()
+    ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     # d_V = entropy_pooling_views(pr, pe.d_views, pe.sets; strict = strict)
     # views = entropy_pooling_views(pr, pe.views, pe.sets; strict = strict)
     # w = entropy_pooling(w, views, pe.opt, d_V, pe.d_views, pe.d_opt1, pe.d_opt2)
