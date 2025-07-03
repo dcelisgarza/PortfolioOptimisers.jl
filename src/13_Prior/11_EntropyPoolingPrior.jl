@@ -352,11 +352,10 @@ function factory(pe::EPPriorEstimator, w::Union{Nothing, <:AbstractWeights} = no
                             opt = pe.opt, w = nothing_scalar_array_factory(pe.w, w),
                             alg = pe.alg)
 end
-function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:mu})
-    return pr.mu[i]
-end
+function get_pr_value end
 function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
-                             key::Symbol, strict::Bool = false)
+                             key::Symbol, alpha::Union{Nothing, <:Real} = nothing;
+                             strict::Bool = false)
     prior_pattern = r"prior\(([^()]*)\)"
     nx = sets.dict[sets.key]
     variables, coeffs = res.vars, res.coef
@@ -376,7 +375,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
             push!(idx_rm, i)
             continue
         end
-        rhs += get_pr_value(pr, j, Val(key)) * c
+        rhs -= get_pr_value(pr, j, Val(key), alpha) * c
         push!(idx_rm, i)
     end
     if isempty(idx_rm)
@@ -404,8 +403,12 @@ function add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::Abstrac
     return nothing
 end
 function replace_prior_views(res::AbstractVector{<:ParsingResult}, pr::AbstractPriorResult,
-                             sets::AssetSets, key::Symbol, strict::Bool = false)
-    return replace_prior_views.(res, pr, sets, key, strict)
+                             sets::AssetSets, key::Symbol,
+                             alpha::Union{Nothing, <:Real} = nothing; strict::Bool = false)
+    return replace_prior_views.(res, pr, sets, key, alpha; strict = strict)
+end
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:mu}, args...)
+    return pr.mu[i]
 end
 function ep_mu_views!(mu_views::Nothing, args...; kwargs...)
     return nothing
@@ -414,12 +417,12 @@ function ep_mu_views!(mu_views::Union{<:AbstractString, Expr,
                                       <:AbstractVector{<:AbstractString},
                                       <:AbstractVector{Expr},
                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                      epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets,
+                      epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets;
                       strict::Bool = false)
     mu_views = parse_equation(mu_views)
     mu_views = replace_group_by_assets(mu_views, sets, false, true, false)
-    mu_views = replace_prior_views(mu_views, pr, sets, :mu, strict)
-    lcs = get_linear_constraints(mu_views, sets; datatype = eltype(pr.mu), strict = strict)
+    mu_views = replace_prior_views(mu_views, pr, sets, :mu; strict = strict)
+    lcs = get_linear_constraints(mu_views, sets; datatype = eltype(pr.X), strict = strict)
     for p in propertynames(lcs)
         if isnothing(getproperty(lcs, p))
             continue
@@ -436,6 +439,50 @@ function fix_mu!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVecto
         add_ep_constraint!(epc, transpose(pr.X[:, fix]), pr.mu[fix], :feq)
         fixed .= fixed .| fix
     end
+end
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:var}, alpha::Real)
+    return -partialsort(pr.X[:, i], ceil(Int, alpha * size(pr.X, 1)))
+end
+function ep_var_views!(var_views::Nothing, args...; kwargs...)
+    return nothing
+end
+function ep_var_views!(var_views::Union{<:AbstractString, Expr,
+                                        <:AbstractVector{<:AbstractString},
+                                        <:AbstractVector{Expr},
+                                        <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                       epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets,
+                       alpha::Real; strict::Bool = false)
+    var_views = parse_equation(var_views)
+    var_views = replace_group_by_assets(var_views, sets, false, true, false)
+    var_views = replace_prior_views(var_views, pr, sets, :var, alpha; strict = strict)
+    lcs = get_linear_constraints(var_views, sets; datatype = eltype(pr.X), strict = strict)
+    if !isnothing(lcs.ineq) && any(x -> x != 1, count(!iszero, lcs.A_ineq; dims = 2)) ||
+       !isnothing(lcs.eq) && any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2))
+        throw(ArgumentError("Cannot mix multiple assets in a single `var_view`."))
+    end
+    if !isnothing(lcs.eq) && any(x -> x < zero(eltype(x)), lcs.B_eq) ||
+       !isnothing(lcs.ineq) && any(x -> x < zero(eltype(x)), lcs.A_ineq .* lcs.B_ineq)
+        throw(ArgumentError("`var_view` cannot be negative."))
+    end
+    for p in propertynames(lcs)
+        if isnothing(getproperty(lcs, p))
+            continue
+        end
+        A = getproperty(lcs, p).A
+        B = getproperty(lcs, p).B
+        for i in eachindex(B)
+            j = .!iszero.(A[i, :])
+            idx = findall(x -> x <= -abs(B[i]), pr.X[:, j])
+            if isempty(idx)
+                throw(ArgumentError("View $(B[i]) is too extreme, the maximum viable for asset $(findfirst(x->x==true,j)) is $(minimum(pr.X[:,j])). Please lower it or use a different prior with fatter tails."))
+            end
+            sign = p == :eq || B[i] >= zero(eltype(B)) ? one(eltype(B)) : -one(eltype(B))
+            Ai = zeros(eltype(pr.X), 1, size(pr.X, 1))
+            Ai[1, idx] .= sign
+            add_ep_constraint!(epc, Ai, [sign * alpha], p)
+        end
+    end
+    return nothing
 end
 function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
