@@ -225,7 +225,13 @@ function parse_equation(eqn::Union{<:AbstractVector{<:AbstractString},
     return parse_equation.(eqn; datatype = datatype)
 end
 function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::Bool = false,
-                                 prior_flag::Bool = false)
+                                 prior_flag::Bool = false, rho_flag::Bool = false)
+    if bl_flag && (rho_flag || prior_flag)
+        throw(ArgumentError("`bl_flag` can only be used if `prior_flag` and `rho_flag` are false."))
+    end
+    if rho_flag && !prior_flag
+        throw(ArgumentError("`rho_flag` can only be used if `prior_flag` is also true."))
+    end
     variables, coeffs = res.vars, res.coef
     variables_new = copy(variables)
     coeffs_new = copy(coeffs)
@@ -248,23 +254,25 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
                 push!(idx_rm, i)
             else
-                if !prior_flag
-                    throw(ArgumentError("`prior(a)` and `(a, b)` can only be used in entropy pooling."))
+                if !(prior_flag && rho_flag)
+                    throw(ArgumentError("`(a, b)` can only be used for rho_views in entropy pooling."))
                 end
-                assets12 = n.captures[1]
-                assets12 = split(assets12, ", ")
-                asset1 = get(sets.dict, assets12[1], nothing)
-                asset2 = get(sets.dict, assets12[2], nothing)
+                asset1 = n.captures[1]
+                asset2 = n.captures[2]
+                asset1 = get(sets.dict, asset1, nothing)
+                asset2 = get(sets.dict, asset2, nothing)
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
                 @smart_assert(!isnothing(asset1) && !isnothing(asset2))
                 @smart_assert(length(asset1) == length(asset2))
-                variables_new[i] = "($(asset1[1]), $(asset2[1]))"
+                push!(variables_tmp, "([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
+                push!(coeffs_tmp, coeffs[i])
+                push!(idx_rm, i)
             end
         else
             if !prior_flag
-                throw(ArgumentError("`prior(a)` and `(a, b)` can only be used in entropy pooling."))
+                throw(ArgumentError("`prior(a)` can only be used in entropy pooling."))
             end
             n = match(corr_pattern, v)
             if isnothing(n)
@@ -277,6 +285,9 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 append!(coeffs_tmp, Iterators.repeated(c, length(asset)))
                 push!(idx_rm, i)
             else
+                if !rho_flag
+                    throw(ArgumentError("`prior(a, b)` can only be used for rho_views in entropy pooling."))
+                end
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
                 asset1 = get(sets.dict, asset1, nothing)
@@ -286,7 +297,10 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 end
                 @smart_assert(!isnothing(asset1) && !isnothing(asset2))
                 @smart_assert(length(asset1) == length(asset2))
-                variables_new[i] = "prior($(asset1[1]), $(asset2[1]))"
+                push!(variables_tmp,
+                      "prior([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
+                push!(coeffs_tmp, coeffs[i])
+                push!(idx_rm, i)
             end
         end
     end
@@ -303,8 +317,9 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                          "$(eqn) $(res.op) $(res.rhs)")
 end
 function replace_group_by_assets(res::AbstractVector{<:ParsingResult}, sets::AssetSets,
-                                 bl_flag::Bool = false, prior_flag::Bool = false)
-    return replace_group_by_assets.(res, Ref(sets), bl_flag, prior_flag)
+                                 bl_flag::Bool = false, prior_flag::Bool = false,
+                                 rho_flag::Bool = false)
+    return replace_group_by_assets.(res, Ref(sets), bl_flag, prior_flag, rho_flag)
 end
 function get_linear_constraints(lcs::Union{<:ParsingResult,
                                            <:AbstractVector{<:ParsingResult}},
@@ -371,10 +386,9 @@ function linear_constraints(eqn::Union{<:AbstractString, Expr,
                                        <:AbstractVector{Expr},
                                        <:AbstractVector{<:Union{<:AbstractString, Expr}}},
                             sets::AssetSets; datatype::DataType = Float64,
-                            strict::Bool = false, bl_flag::Bool = false,
-                            prior_flag::Bool = false)
+                            strict::Bool = false, bl_flag::Bool = false)
     lcs = parse_equation(eqn; datatype = datatype)
-    lcs = replace_group_by_assets(lcs, sets, bl_flag, prior_flag)
+    lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
 function get_weight_bounds_constraints(lcs::Union{<:ParsingResult,
