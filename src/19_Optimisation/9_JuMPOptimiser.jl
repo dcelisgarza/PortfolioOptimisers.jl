@@ -272,21 +272,37 @@ function JuMPOptimiser(;
         @smart_assert(!isempty(sgcard))
     end
     if isa(wb, WeightBoundsConstraint) ||
-       !isnothing(lcs) ||
-       #! Start: to delete
-       isa(lcs, LinearConstraint) ||
-       isa(lcs, AbstractVector{<:LinearConstraint}) ||
-       #! End: to delete
-       isa(cent, CentralityConstraintEstimator) ||
-       isa(cent, AbstractVector{<:CentralityConstraintEstimator}) ||
-       !isnothing(gcard) ||
-       !isnothing(sgcard) ||
-       #! Start: to delete
-       isa(gcard, LinearConstraint) ||
-       isa(gcard, AbstractVector{<:LinearConstraint}) ||
-       isa(sgcard, LinearConstraint) ||
-       isa(sgcard, AbstractVector{<:LinearConstraint})
-        #! End: to delete
+       isa(lcs,
+           Union{<:AbstractString, Expr, <:AbstractVector{<:AbstractString},
+                 <:AbstractVector{Expr}, <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                 #! Start: to delete
+                 <:LinearConstraint, <:AbstractVector{<:LinearConstraint}
+                 #! End: to delete
+                 }) ||
+       isa(cent,
+           Union{<:AbstractString, Expr, <:AbstractVector{<:AbstractString},
+                 <:AbstractVector{Expr}, <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                 #! Start: to delete
+                 <:CentralityConstraintEstimator,
+                 <:AbstractVector{<:CentralityConstraintEstimator}
+                 #! End: to delete
+                 }) ||
+       isa(gcard,
+           Union{<:AbstractString, Expr, <:AbstractVector{<:AbstractString},
+                 <:AbstractVector{Expr}, <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                 #! Start: to delete
+                 <:LinearConstraint, <:AbstractVector{<:LinearConstraint}
+                 #! End: to delete
+
+                 }) ||
+       isa(sgcard,
+           Union{<:AbstractString, Expr, <:AbstractVector{<:AbstractString},
+                 <:AbstractVector{Expr}, <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                 #! Start: to delete
+                 <:LinearConstraint, <:AbstractVector{<:LinearConstraint}
+                 #! End: to delete
+
+                 })
         @smart_assert(!isnothing(sets))
     end
     if isa(sgcard, LinearConstraintResult) && isa(smtx, AbstractMatrix)
