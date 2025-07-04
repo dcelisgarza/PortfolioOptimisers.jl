@@ -1,4 +1,4 @@
-abstract type AbstractEntropyPoolingEstimator <: AbstractEstimator end
+abstract type AbstractEntropyPoolingOptimiser <: AbstractEstimator end
 abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
 struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
@@ -14,7 +14,7 @@ function _get_epw(::H2_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
 end
 struct OptimEntropyPoolingEstimator{T1 <: Tuple, T2 <: NamedTuple, T3 <: Real, T4 <: Real,
                                     T5 <: AbstractEntropyPoolingOptAlgorithm} <:
-       AbstractEntropyPoolingEstimator
+       AbstractEntropyPoolingOptimiser
     args::T1
     kwargs::T2
     sc1::T3
@@ -32,7 +32,7 @@ end
 struct JuMPEntropyPoolingEstimator{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}},
                                    T2 <: Real, T3 <: Real, T4 <: Real,
                                    T5 <: AbstractEntropyPoolingOptAlgorithm} <:
-       AbstractEntropyPoolingEstimator
+       AbstractEntropyPoolingOptimiser
     slv::T1
     sc1::T2
     sc2::T3
@@ -51,66 +51,6 @@ function JuMPEntropyPoolingEstimator(; slv::Union{<:Solver, <:AbstractVector{<:S
     return JuMPEntropyPoolingEstimator{typeof(slv), typeof(sc1), typeof(sc2), typeof(so),
                                        typeof(alg)}(slv, sc1, sc2, so, alg)
 end
-# function entropy_pooling(w::AbstractVector, epc::Union{Nothing, <:LinearConstraintResult},
-#                          opt::Union{<:OptimEntropyPoolingEstimator,
-#                                       <:JuMPEntropyPoolingEstimator}, ::Nothing, ::Nothing,
-#                          ::Any, ::Any)
-#     return entropy_pooling(w, epc, opt)
-# end
-# function entropy_pooling(w::AbstractVector, epc::Union{Nothing, <:LinearConstraintResult},
-#                          opt::Union{<:OptimEntropyPoolingEstimator,
-#                                       <:JuMPEntropyPoolingEstimator},
-#                          d_epc::Union{Nothing, <:LinearConstraintResult},
-#                          d_views::Union{<:DiscontinuousEntropyPoolingViewEstimator,
-#                                         <:AbstractVector{<:DiscontinuousEntropyPoolingViewEstimator}},
-#                          ds_opt::Union{Nothing, <:OptimEntropyPoolingEstimator},
-#                          dm_opt::Union{Nothing, <:OptimEntropyPoolingEstimator})
-#     N = length(d_views)
-#     VN = Val(N)
-#     alpha, d_opt = if N == 1
-#         d_views.A.alpha, !isnothing(ds_opt) ? ds_opt : OptimEntropyPoolingEstimator()
-#     else
-#         getproperty.(getproperty.(d_views, :A), :alpha),
-#         !isnothing(dm_opt) ? dm_opt : OptimEntropyPoolingEstimator()
-#     end
-#     A = d_epc.A_eq
-#     B = d_epc.B_eq
-#     sc = d_opt.sc
-#     N = length(B)
-#     ialpha = inv(alpha)
-#     function g(x)
-#         @smart_assert(all(zero(eltype(x)) .< x .<= B))
-#         pos_part = max.(-A .- x, zero(eltype(x)))
-#         A_eq = vcat(epc.A_eq, pos_part * ialpha)
-#         B_eq = vcat(epc.B_eq, B .- x)
-#         epc2 = LinearConstraintResult(; ineq = epc.ineq,
-#                                        eq = PartialLinearConstraintResult(; A = A_eq,
-#                                                                           B = B_eq))
-#         return pos_part, entropy_pooling(w, epc2, opt)
-#     end
-#     function h(::Val{1}, _A, _B, _w, _pos_part)
-#         return sc * (sum(_w[.!iszero.(_pos_part)]) - alpha)
-#     end
-#     function h(::Any, _A, _B, _w, _pos_part)
-#         return sc * norm(cvar(transpose(_A), alpha, _w) - _B) / sqrt(N)
-#     end
-#     function f(x)
-#         pos_part, w = g(x)
-#         return h(VN, A, B, w, pos_part)
-#     end
-#     result = if N == 1
-#         Optim.optimize(f, zero(eltype(B)), B[1], d_opt.args...; d_opt.kwargs...)
-#     else
-#         Optim.optimize(f, zeros(N), B, 0.5 * B, d_opt.args...; d_opt.kwargs...)
-#     end
-#     x = if Optim.converged(result)
-#         # Compute posterior probabilities
-#         Optim.minimizer(result)
-#     else
-#         throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, or use a different prior."))
-#     end
-#     return g(x)
-# end
 function effective_number_scenarios(x::AbstractVector, y::AbstractVector)
     return exp(-kldivergence(x, y))
 end
@@ -139,7 +79,7 @@ struct EPPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
                         T9 <: Real, T10 <: Real, T11 <: Union{Nothing, <:AssetSets},
                         T12 <: Union{Nothing, <:OptimEntropyPoolingEstimator},
                         T13 <: Union{Nothing, <:OptimEntropyPoolingEstimator},
-                        T14 <: AbstractEntropyPoolingEstimator,
+                        T14 <: AbstractEntropyPoolingOptimiser,
                         T15 <: Union{Nothing, <:AbstractVector},
                         T16 <: AbstractEntropyPoolingAlgorithm} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
@@ -196,7 +136,7 @@ function EPPriorEstimator(;
                           sets::Union{Nothing, <:AssetSets} = nothing,
                           ds_opt::Union{Nothing, <:OptimEntropyPoolingEstimator} = nothing,
                           dm_opt::Union{Nothing, <:OptimEntropyPoolingEstimator} = nothing,
-                          opt::AbstractEntropyPoolingEstimator = OptimEntropyPoolingEstimator(),
+                          opt::AbstractEntropyPoolingOptimiser = OptimEntropyPoolingEstimator(),
                           w::Union{Nothing, AbstractVector} = nothing,
                           alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
     if isa(mu_views, AbstractVector)
@@ -234,7 +174,6 @@ function EPPriorEstimator(;
     end
     @smart_assert(zero(var_alpha) < var_alpha < one(var_alpha))
     @smart_assert(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha))
-
     return EPPriorEstimator{typeof(pe), typeof(mu_views), typeof(var_views),
                             typeof(cvar_views), typeof(sigma_views), typeof(sk_views),
                             typeof(kt_views), typeof(rho_views), typeof(var_alpha),
@@ -410,9 +349,6 @@ function ep_var_views!(var_views::Union{<:AbstractString, Expr,
     end
     return nothing
 end
-# function entropy_pooling(w::AbstractVector, ::Nothing, ::Any)
-#     return w
-# end
 function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                          opt::OptimEntropyPoolingEstimator{<:Any, <:Any, <:Any, <:Any,
                                                            <:ExpEntropyPooling})
@@ -616,6 +552,94 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     else
         throw(ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     end
+end
+# function entropy_pooling(w::AbstractVector, epc::Union{Nothing, <:LinearConstraintResult},
+#                          opt::Union{<:OptimEntropyPoolingEstimator,
+#                                       <:JuMPEntropyPoolingEstimator},
+#                          d_epc::Union{Nothing, <:LinearConstraintResult},
+#                          d_views::Union{<:DiscontinuousEntropyPoolingViewEstimator,
+#                                         <:AbstractVector{<:DiscontinuousEntropyPoolingViewEstimator}},
+#                          ds_opt::Union{Nothing, <:OptimEntropyPoolingEstimator},
+#                          dm_opt::Union{Nothing, <:OptimEntropyPoolingEstimator})
+#     N = length(d_views)
+#     VN = Val(N)
+#     alpha, d_opt = if N == 1
+#         d_views.A.alpha, !isnothing(ds_opt) ? ds_opt : OptimEntropyPoolingEstimator()
+#     else
+#         getproperty.(getproperty.(d_views, :A), :alpha),
+#         !isnothing(dm_opt) ? dm_opt : OptimEntropyPoolingEstimator()
+#     end
+#     A = d_epc.A_eq
+#     B = d_epc.B_eq
+#     sc = d_opt.sc
+#     N = length(B)
+#     ialpha = inv(alpha)
+#     function g(x)
+#         @smart_assert(all(zero(eltype(x)) .< x .<= B))
+#         pos_part = max.(-A .- x, zero(eltype(x)))
+#         A_eq = vcat(epc.A_eq, pos_part * ialpha)
+#         B_eq = vcat(epc.B_eq, B .- x)
+#         epc2 = LinearConstraintResult(; ineq = epc.ineq,
+#                                        eq = PartialLinearConstraintResult(; A = A_eq,
+#                                                                           B = B_eq))
+#         return pos_part, entropy_pooling(w, epc2, opt)
+#     end
+#     function h(::Val{1}, _A, _B, _w, _pos_part)
+#         return sc * (sum(_w[.!iszero.(_pos_part)]) - alpha)
+#     end
+#     function h(::Any, _A, _B, _w, _pos_part)
+#         return sc * norm(cvar(transpose(_A), alpha, _w) - _B) / sqrt(N)
+#     end
+#     function f(x)
+#         pos_part, w = g(x)
+#         return h(VN, A, B, w, pos_part)
+#     end
+#     result = if N == 1
+#         Optim.optimize(f, zero(eltype(B)), B[1], d_opt.args...; d_opt.kwargs...)
+#     else
+#         Optim.optimize(f, zeros(N), B, 0.5 * B, d_opt.args...; d_opt.kwargs...)
+#     end
+#     x = if Optim.converged(result)
+#         # Compute posterior probabilities
+#         Optim.minimizer(result)
+#     else
+#         throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, or use a different prior."))
+#     end
+#     return g(x)
+# end
+function ep_cvar_views_solve!(::Nothing, epc::AbstractDict, ::Any, ::Any, ::Any,
+                              w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser;
+                              kwargs...)
+    return entropy_pooling(w, epc, opt)
+end
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Real)
+    #! Don't use a view, use a copy, value at risk uses partialsort!
+    #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
+    return ConditionalValueatRisk(; alpha = alpha)(pr.X[:, i])
+end
+function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
+                                                <:AbstractVector{<:AbstractString},
+                                                <:AbstractVector{Expr},
+                                                <:AbstractVector{<:Union{<:AbstractString,
+                                                                         Expr}}},
+                              epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets,
+                              alpha::Real, w::AbstractWeights,
+                              opt::AbstractEntropyPoolingOptimiser; strict::Bool = false)
+    cvar_views = parse_equation(cvar_views)
+    cvar_views = replace_group_by_assets(cvar_views, sets, false, true, false)
+    cvar_views = replace_prior_views(cvar_views, pr, sets, :cvar, alpha; strict = strict)
+    lcs = get_linear_constraints(cvar_views, sets; datatype = eltype(pr.X), strict = strict)
+    @smart_assert(isnothing(lcs.ineq))
+    if any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2))
+        throw(ArgumentError("Cannot mix multiple assets in a single `cvar_view`."))
+    end
+    if any(x -> x < zero(eltype(x)), lcs.B_eq)
+        throw(ArgumentError("`cvar_view` cannot be negative."))
+    end
+    return lcs
+    #! check this
+    view(pr.X, :, dropdims(.!iszero.(sum(lcs.A_eq; dims = 1)); dims = 1))
+    return entropy_pooling(w, epc, opt)
 end
 function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

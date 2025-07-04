@@ -152,7 +152,7 @@ struct EntropyPoolingPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_
                                     T3 <: Union{Nothing,
                                                 <:DiscontinuousEntropyPoolingViewEstimator,
                                                 <:AbstractVector{<:DiscontinuousEntropyPoolingViewEstimator}},
-                                    T4 <: DataFrame, T5 <: AbstractEntropyPoolingEstimator,
+                                    T4 <: DataFrame, T5 <: AbstractEntropyPoolingOptimiser,
                                     T6 <: Union{Nothing, <:OptimEntropyPoolingEstimator},
                                     T7 <: Union{Nothing, <:OptimEntropyPoolingEstimator},
                                     T8 <: Union{Nothing, <:AbstractVector},
@@ -180,7 +180,7 @@ function EntropyPoolingPriorEstimator(;
                                                   <:DataFrame
                                                   #! End: to delete
                                                   } = DataFrame(),
-                                      opt::AbstractEntropyPoolingEstimator = OptimEntropyPoolingEstimator(),
+                                      opt::AbstractEntropyPoolingOptimiser = OptimEntropyPoolingEstimator(),
                                       d_opt1::Union{Nothing,
                                                     <:OptimEntropyPoolingEstimator} = nothing,
                                       d_opt2::Union{Nothing,
