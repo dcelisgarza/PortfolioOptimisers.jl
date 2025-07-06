@@ -563,6 +563,7 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::
     #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
     return ConditionalValueatRisk(; alpha = alpha)(pr.X[:, i])
 end
+#=
 function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
                                                 <:AbstractVector{<:AbstractString},
                                                 <:AbstractVector{Expr},
@@ -621,7 +622,7 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
     end
     function h(::Any, _X, _B, _w, _pos_part)
         return sc *
-               norm([ConditionalValueatRisk(; alpha = alpha, w = _w)(_X[:, i]) - _B[i]
+               norm([ConditionalValueatRisk(; alpha = alpha, w = _w)(_X[:, i]) .- _B[i]
                      for i in N]) / sqrt(N)
     end
     function f(x)
@@ -639,6 +640,81 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
         throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, or use a different prior."))
     end
     return g(x)[1]
+end
+=#
+function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
+                                                <:AbstractVector{<:AbstractString},
+                                                <:AbstractVector{Expr},
+                                                <:AbstractVector{<:Union{<:AbstractString,
+                                                                         Expr}}},
+                              epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets,
+                              alpha::Real, w::AbstractWeights,
+                              opt::AbstractEntropyPoolingOptimiser,
+                              ds_opt::Union{Nothing, <:OptimEntropyPoolingEstimator},
+                              dm_opt::Union{Nothing, <:OptimEntropyPoolingEstimator};
+                              strict::Bool = false)
+    cvar_views = parse_equation(cvar_views)
+    cvar_views = replace_group_by_assets(cvar_views, sets, false, true, false)
+    cvar_views = replace_prior_views(cvar_views, pr, sets, :cvar, alpha; strict = strict)
+    lcs = get_linear_constraints(cvar_views, sets; datatype = eltype(pr.X), strict = strict)
+    @smart_assert(isnothing(lcs.ineq), "`cvar_view` can only have equality constraints.")
+    if any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2))
+        throw(ArgumentError("Cannot mix multiple assets in a single `cvar_view`."))
+    end
+    if any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq)
+        throw(ArgumentError("`cvar_view` cannot be negative."))
+    end
+    idx = dropdims(.!iszero.(sum(lcs.A_eq; dims = 1)); dims = 1)
+    idx2 = .!iszero.(lcs.A_eq)
+    B = lcs.B_eq .* view(lcs.A_eq, idx2)
+    X = view(pr.X, :, idx) .* transpose(view(lcs.A_eq, idx2))
+    min_X = dropdims(-minimum(X; dims = 1); dims = 1)
+    invalid = B .>= min_X
+    if any(invalid)
+        msg = "The following views are too extreme, the maximum viable view for a given asset is its worst realisation:"
+        arr = [(v.eqn, m) for (v, m) in zip(cvar_views[invalid], min_X[invalid])]
+        for (v, m) in arr
+            msg *= "\n$v\t(> $m)."
+        end
+        msg *= "\nPlease lower the views or use a different prior with fatter tails."
+        throw(ArgumentError(msg))
+    end
+    N = length(B)
+    VN = Val(N)
+    d_opt = if N == one(N)
+        ifelse(!isnothing(ds_opt), ds_opt, OptimEntropyPoolingEstimator())
+    else
+        ifelse(!isnothing(dm_opt), dm_opt, OptimEntropyPoolingEstimator())
+    end
+    function func(etas)
+        delete!(epc, :cvar_eq)
+        pos_part = nothing
+        for i in eachindex(B)
+            pos_part = max.(-X[:, i] .- etas[i], zero(eltype(etas)))
+            add_ep_constraint!(epc, transpose(pos_part / alpha), [B[i] - etas[i]], :cvar_eq)
+        end
+        _w = entropy_pooling(w, epc, opt)
+        err = if N == 1
+            sum(_w[pos_part .!= zero(eltype(w))]) - alpha
+        else
+            norm([ConditionalValueatRisk(; alpha = alpha, w = _w)(X[:, i]) .- B[i]
+                  for i in N]) / sqrt(N)
+        end
+        return _w, err
+    end
+    result = if N == 1
+        Optim.optimize(x -> func(x)[2], zero(eltype(B)), B[1], d_opt.args...;
+                       d_opt.kwargs...)
+    else
+        Optim.optimize(x -> func(x)[2], zeros(N), B, 0.5 * B, d_opt.args...;
+                       d_opt.kwargs...)
+    end
+    x = if Optim.converged(result)
+        N == 1 ? [Optim.minimum(result)] : Optim.minimizer(result)
+    else
+        throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, or use a different prior."))
+    end
+    return func(x)[1], result
 end
 function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
