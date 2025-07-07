@@ -587,11 +587,14 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
     end
     idx = dropdims(.!iszero.(sum(lcs.A_eq; dims = 1)); dims = 1)
     idx2 = .!iszero.(lcs.A_eq)
-    B = lcs.B_eq .* view(lcs.A_eq, idx2)
-    X = view(pr.X, :, idx) .* transpose(view(lcs.A_eq, idx2))
+    B = lcs.B_eq ./ view(lcs.A_eq, idx2)
+    X = view(pr.X, :, idx)
     min_X = dropdims(-minimum(X; dims = 1); dims = 1)
     invalid = B .>= min_X
     if any(invalid)
+        if !isa(cvar_views, AbstractVector)
+            cvar_views = [cvar_views]
+        end
         msg = "The following views are too extreme, the maximum viable view for a given asset is its worst realisation:"
         arr = [(v.eqn, m) for (v, m) in zip(cvar_views[invalid], min_X[invalid])]
         for (v, m) in arr
@@ -601,40 +604,50 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
         throw(ArgumentError(msg))
     end
     N = length(B)
-    d_opt = if N == one(N)
-        ifelse(!isnothing(ds_opt), ds_opt, OptimEntropyPoolingEstimator())
-    else
-        ifelse(!isnothing(dm_opt), dm_opt, OptimEntropyPoolingEstimator())
+    VN = Val(N)
+    ialpha = inv(alpha)
+    function e(::Val{1})
+        return ifelse(!isnothing(ds_opt), ds_opt, OptimEntropyPoolingEstimator())
     end
-    function func(etas)
+    function e(::Any)
+        return ifelse(!isnothing(dm_opt), dm_opt, OptimEntropyPoolingEstimator())
+    end
+    d_opt = e(VN)
+    function f(x)
         delete!(epc, :cvar_eq)
-        pos_part = nothing
-        for i in eachindex(B)
-            pos_part = max.(-X[:, i] .- etas[i], zero(eltype(etas)))
-            add_ep_constraint!(epc, transpose(pos_part / alpha), [B[i] - etas[i]], :cvar_eq)
-        end
-        _w = entropy_pooling(w, epc, opt)
-        err = if N == 1
-            sum(_w[.!iszero.(pos_part)]) - alpha
+        pos_part = max.(-X .- transpose(x), zero(eltype(x)))
+        add_ep_constraint!(epc, transpose(pos_part * ialpha), B .- x, :cvar_eq)
+        return entropy_pooling(w, epc, opt), pos_part
+    end
+    function g(::Val{1}, wi, pos_part, X, B)
+        return sum(wi[.!iszero.(pos_part)]) - alpha
+    end
+    function g(::Any, wi, pos_part, X, B)
+        return norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(X[:, i]) .- B[i]
+                     for i in N]) / sqrt(N)
+    end
+    function h(x)
+        wi, pos_part = f(x)
+        err = g(VN, wi, pos_part, X, B)
+        return err
+    end
+    function j(::Val{1})
+        res = Optim.optimize(h, zero(eltype(B)), B[1], d_opt.args...; d_opt.kwargs...)
+        return if Optim.converged(res)
+            f([Optim.minimum(res)])[1]
         else
-            norm([ConditionalValueatRisk(; alpha = alpha, w = _w)(X[:, i]) .- B[i]
-                  for i in N]) / sqrt(N)
+            throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, use VaR views instead, or use a different prior."))
         end
-        return _w, err
     end
-    result = if N == 1
-        Optim.optimize(x -> func(x)[2], zero(eltype(B)), B[1], d_opt.args...;
-                       d_opt.kwargs...)
-    else
-        Optim.optimize(x -> func(x)[2], zeros(N), B, 0.5 * B, d_opt.args...;
-                       d_opt.kwargs...)
+    function j(::Any)
+        res = Optim.optimize(h, zeros(N), B, 0.5 * B, d_opt.args...; d_opt.kwargs...)
+        return if Optim.converged(res)
+            f(Optim.minimizer(res))[1]
+        else
+            throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, use VaR views instead, reduce the number of CVaR views, or use a different prior."))
+        end
     end
-    x = if Optim.converged(result)
-        N == 1 ? [Optim.minimum(result)] : Optim.minimizer(result)
-    else
-        throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, or use a different prior."))
-    end
-    return func(x)[1]
+    return j(VN)
 end
 function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
