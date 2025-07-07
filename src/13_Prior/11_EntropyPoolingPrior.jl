@@ -604,50 +604,44 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
         throw(ArgumentError(msg))
     end
     N = length(B)
-    VN = Val(N)
-    ialpha = inv(alpha)
-    function e(::Val{1})
-        return ifelse(!isnothing(ds_opt), ds_opt, OptimEntropyPoolingEstimator())
+    d_opt = if N == 1
+        ifelse(!isnothing(ds_opt), ds_opt, OptimEntropyPoolingEstimator())
+    else
+        ifelse(!isnothing(dm_opt), dm_opt, OptimEntropyPoolingEstimator())
     end
-    function e(::Any)
-        return ifelse(!isnothing(dm_opt), dm_opt, OptimEntropyPoolingEstimator())
-    end
-    d_opt = e(VN)
-    function f(x)
+    function func(etas)
         delete!(epc, :cvar_eq)
-        pos_part = max.(-X .- transpose(x), zero(eltype(x)))
-        add_ep_constraint!(epc, transpose(pos_part * ialpha), B .- x, :cvar_eq)
-        return entropy_pooling(w, epc, opt), pos_part
-    end
-    function g(::Val{1}, wi, pos_part, X, B)
-        return sum(wi[.!iszero.(pos_part)]) - alpha
-    end
-    function g(::Any, wi, pos_part, X, B)
-        return norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(X[:, i]) .- B[i]
-                     for i in N]) / sqrt(N)
-    end
-    function h(x)
-        wi, pos_part = f(x)
-        err = g(VN, wi, pos_part, X, B)
-        return err
-    end
-    function j(::Val{1})
-        res = Optim.optimize(h, zero(eltype(B)), B[1], d_opt.args...; d_opt.kwargs...)
-        return if Optim.converged(res)
-            f([Optim.minimum(res)])[1]
-        else
-            throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, use VaR views instead, or use a different prior."))
+        pos_part = nothing
+        for i in eachindex(B)
+            @smart_assert(zero(eltype(etas)) <= etas[i] <= B[i])
+            pos_part = max.(-X[:, i] .- etas[i], zero(eltype(X)))
+            add_ep_constraint!(epc, transpose(pos_part / alpha), [B[i] - etas[i]], :cvar_eq)
         end
+        wi = entropy_pooling(w, epc, opt)
+        err = if N == 1
+            sum(wi[.!iszero.(pos_part)]) - alpha
+        else
+            norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(X[:, i]) for i in 1:N]) /
+            sqrt(N)
+        end
+        return wi, err
     end
-    function j(::Any)
-        res = Optim.optimize(h, zeros(N), B, 0.5 * B, d_opt.args...; d_opt.kwargs...)
-        return if Optim.converged(res)
-            f(Optim.minimizer(res))[1]
+    return if N == 1
+        try
+            res = find_zero(x -> func(x)[2], (0, B[1]), Roots.Brent())
+            func([res])[1]
+        catch e
+            throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
+        end
+    else
+        res = Optim.optimize(x -> func(x)[2], zeros(N), B, 0.5 * B, d_opt.args...;
+                             d_opt.kwargs...)
+        if Optim.converged(res)
+            func(Optim.minimizer(res))[1]
         else
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, use VaR views instead, reduce the number of CVaR views, or use a different prior."))
         end
     end
-    return j(VN)
 end
 function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
