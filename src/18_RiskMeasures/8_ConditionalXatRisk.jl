@@ -66,20 +66,18 @@ end
 function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, <:AbstractWeights},
                    <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
                                                                   <:Any, <:AbstractWeights}})(x::AbstractVector)
-    idx = sortperm(x)
     sw = sum(r.w)
-    w = r.w[idx]
-    cw = cumsum(w)
-    alpha = r.alpha * sw
-    i = findfirst(x -> x > alpha, cw)
-    if isnothing(i)
-        i = length(x)
-    end
-    return -if isone(i)
-        x[idx[1]]
+    order = sortperm(x)
+    sorted_x = x[order]
+    sorted_w = r.w[order]
+    cum_w = cumsum(sorted_w)
+    alpha = sw * r.alpha
+    idx = searchsortedfirst(cum_w, alpha)
+    if idx == 1
+        -sorted_x[1]
     else
-        (dot(view(x, view(idx, 1:(i - 1))), view(w, view(idx, 1:(i - 1)))) +
-         x[idx[i]] * (alpha - cw[i - 1])) / alpha
+        -(dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
+          sorted_x[idx] * (alpha - cum_w[idx - 1])) / (alpha)
     end
 end
 struct ConditionalValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
@@ -178,37 +176,32 @@ function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, <:Abstract
                                                                        <:Any, <:Any, <:Any,
                                                                        <:Any,
                                                                        <:AbstractWeights}})(x::AbstractVector)
-    idx = sortperm(x)
     sw = sum(r.w)
-    w = r.w[idx]
-    cw = cumsum(w)
-    alpha = r.alpha * sw
-    i = findfirst(x -> x > alpha, cw)
-    if isnothing(i)
-        i = length(x)
-    end
-    loss = -if isone(i)
-        x[idx[1]]
+    order = sortperm(x)
+    sorted_x = x[order]
+    sorted_w = r.w[order]
+    cum_w = cumsum(sorted_w)
+    alpha = sw * r.alpha
+    idx = searchsortedfirst(cum_w, alpha)
+    loss = if idx == 1
+        -sorted_x[1]
     else
-        (dot(view(x, view(idx, 1:(i - 1))), view(w, view(idx, 1:(i - 1)))) +
-         x[idx[i]] * (alpha - cw[i - 1])) / alpha
+        -(dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
+          sorted_x[idx] * (alpha - cum_w[idx - 1])) / (alpha)
     end
 
-    idx = reverse(idx)
-    w = reverse(w)
-    cw = cumsum(w)
-    beta = r.beta * sw
-    i = findfirst(x -> x > beta, cw)
-    if isnothing(i)
-        i = length(x)
-    end
-    gain = -if isone(i)
-        x[idx[1]]
+    order = sortperm(x; rev = true)
+    sorted_x = x[order]
+    sorted_w = r.w[order]
+    cum_w = cumsum(sorted_w)
+    beta = sw * r.beta
+    idx = searchsortedfirst(cum_w, beta)
+    gain = if idx == 1
+        -sorted_x[1]
     else
-        (dot(view(x, view(idx, 1:(i - 1))), view(w, view(idx, 1:(i - 1)))) +
-         x[idx[i]] * (beta - cw[i - 1])) / beta
+        -(dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
+          sorted_x[idx] * (beta - cum_w[idx - 1])) / (beta)
     end
-
     return loss - gain
 end
 struct ConditionalDrawdownatRisk{T1 <: RiskMeasureSettings, T2 <: Real} <: RiskMeasure

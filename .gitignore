@@ -11,6 +11,7 @@ docs/build/
 env
 node_modules
 bestietemplate/*
+*io/*
 *.CondaPkg/*
 /test/.CondaPkg/*
 *NOTRACK*
