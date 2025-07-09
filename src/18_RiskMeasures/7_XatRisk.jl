@@ -66,16 +66,13 @@ function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::AbstractVector)
     return -partialsort!(x, ceil(Int, r.alpha * length(x)))
 end
 function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
-    idx = sortperm(x)
-    sw = sum(r.w)
-    w = r.w[idx]
-    cw = cumsum(w)
-    alpha = r.alpha * sw
-    i = findfirst(x -> x > alpha, cw)
-    if isnothing(i)
-        i = length(x)
-    end
-    return -x[idx[i]]
+    w = r.w
+    order = sortperm(x)
+    sorted_r = x[order]
+    sorted_w = w[order]
+    cum_w = cumsum(sorted_w)
+    idx = searchsortedfirst(cum_w, r.alpha)
+    return -sorted_r[idx]
 end
 struct ValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
                         T4 <: Union{Nothing, <:AbstractWeights},
@@ -109,24 +106,22 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
     return loss + gain
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
-    idx = sortperm(x)
-    sw = sum(r.w)
-    w = r.w[idx]
-    cwa = cumsum(w)
-    cwb = cumsum(reverse(w))
-    alpha = r.alpha * sw
-    ia = findfirst(x -> x > alpha, cwa)
-    if isnothing(ia)
-        ia = length(x)
-    end
-    beta = r.beta * sw
-    ib = findfirst(x -> x > beta, cwb)
-    if isnothing(ib)
-        ib = length(x)
-    end
-    loss = -x[idx[ia]]
-    gain = x[reverse(idx)[ib]]
-    return loss + gain
+    w = r.w
+    order = sortperm(x)
+    sorted_r = x[order]
+    sorted_w = w[order]
+    cum_w = cumsum(sorted_w)
+    idx = searchsortedfirst(cum_w, r.alpha)
+    loss = -sorted_r[idx]
+
+    order = reverse(order)
+    sorted_r = x[order]
+    sorted_w = w[order]
+    cum_w = cumsum(sorted_w)
+    idx = searchsortedfirst(cum_w, r.beta)
+    gain = -sorted_r[idx]
+
+    return loss - gain
 end
 struct DrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real} <:
        HierarchicalRiskMeasure

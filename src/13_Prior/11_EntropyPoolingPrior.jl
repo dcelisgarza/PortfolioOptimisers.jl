@@ -12,6 +12,15 @@ end
 function _get_epw(::H2_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return wi
 end
+struct CVaREntropyPoolingEstimator{T1 <: Tuple, T2 <: NamedTuple} <:
+       AbstractEntropyPoolingOptimiser
+    args::T1
+    kwargs::T2
+end
+function CVaREntropyPoolingEstimator(; args::Tuple = (Roots.Brent(),),
+                                     kwargs::NamedTuple = (;))
+    return CVaREntropyPoolingEstimator{typeof(args), typeof(kwargs)}(args, kwargs)
+end
 struct OptimEntropyPoolingEstimator{T1 <: Tuple, T2 <: NamedTuple, T3 <: Real, T4 <: Real,
                                     T5 <: AbstractEntropyPoolingOptAlgorithm} <:
        AbstractEntropyPoolingOptimiser
@@ -77,9 +86,10 @@ struct EPPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
                                     <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
                                     <:AbstractVector{<:Union{<:AbstractString, Expr}}},
                         T9 <: Real, T10 <: Real, T11 <: Union{Nothing, <:AssetSets},
-                        T12 <: Union{Nothing, <:OptimEntropyPoolingEstimator},
+                        T12 <: Union{Nothing, <:CVaREntropyPoolingEstimator},
                         T13 <: Union{Nothing, <:OptimEntropyPoolingEstimator},
-                        T14 <: AbstractEntropyPoolingOptimiser,
+                        T14 <: Union{<:OptimEntropyPoolingEstimator,
+                                     <:JuMPEntropyPoolingEstimator},
                         T15 <: Union{Nothing, <:AbstractVector},
                         T16 <: AbstractEntropyPoolingAlgorithm} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
@@ -134,9 +144,10 @@ function EPPriorEstimator(;
                                            <:AbstractVector{<:Union{<:AbstractString, Expr}}} = nothing,
                           var_alpha::Real = 0.05, cvar_alpha::Real = 0.05,
                           sets::Union{Nothing, <:AssetSets} = nothing,
-                          ds_opt::Union{Nothing, <:OptimEntropyPoolingEstimator} = nothing,
+                          ds_opt::Union{Nothing, <:CVaREntropyPoolingEstimator} = nothing,
                           dm_opt::Union{Nothing, <:OptimEntropyPoolingEstimator} = nothing,
-                          opt::AbstractEntropyPoolingOptimiser = OptimEntropyPoolingEstimator(),
+                          opt::Union{<:OptimEntropyPoolingEstimator,
+                                     <:JuMPEntropyPoolingEstimator} = OptimEntropyPoolingEstimator(),
                           w::Union{Nothing, AbstractVector} = nothing,
                           alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
     if isa(mu_views, AbstractVector)
@@ -338,7 +349,7 @@ function ep_var_views!(var_views::Union{<:AbstractString, Expr,
             #! Figure out a way to include pr.w, probably see how it's implemented in ValueatRisk.
             idx = findall(x -> x <= -abs(B[i]), view(pr.X, :, j))
             if isempty(idx)
-                throw(ArgumentError("View `$(var_views[i].eqn)` is too extreme, the maximum viable for asset $(findfirst(x -> x == true, j)) is $(minimum(pr.X[:,j])). Please lower it or use a different prior with fatter tails."))
+                throw(ArgumentError("View `$(var_views[i].eqn)` is too extreme, the maximum viable for asset $(findfirst(x -> x == true, j)) is $(-minimum(pr.X[:,j])). Please lower it or use a different prior with fatter tails."))
             end
             sign = ifelse(p == :eq || B[i] >= zero(eltype(B)), one(eltype(B)),
                           -one(eltype(B)))
@@ -571,7 +582,7 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
                               epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets,
                               alpha::Real, w::AbstractWeights,
                               opt::AbstractEntropyPoolingOptimiser,
-                              ds_opt::Union{Nothing, <:OptimEntropyPoolingEstimator},
+                              ds_opt::Union{Nothing, <:CVaREntropyPoolingEstimator},
                               dm_opt::Union{Nothing, <:OptimEntropyPoolingEstimator};
                               strict::Bool = false)
     cvar_views = parse_equation(cvar_views)
@@ -605,7 +616,7 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
     end
     N = length(B)
     d_opt = if N == 1
-        ifelse(!isnothing(ds_opt), ds_opt, OptimEntropyPoolingEstimator())
+        ifelse(!isnothing(ds_opt), ds_opt, CVaREntropyPoolingEstimator())
     else
         ifelse(!isnothing(dm_opt), dm_opt, OptimEntropyPoolingEstimator())
     end
@@ -628,7 +639,7 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
     end
     return if N == 1
         try
-            res = find_zero(x -> func(x)[2], (0, B[1]), Roots.Brent())
+            res = find_zero(x -> func(x)[2], (0, B[1]), d_opt.args...; d_opt.kwargs...)
             func([res])[1]
         catch e
             throw(ErrorException("CVaR entropy pooling optimisation failed. Relax the view, incrase alpha, use different solver parameters, use VaR views instead, or use a different prior.\n$(e)"))
