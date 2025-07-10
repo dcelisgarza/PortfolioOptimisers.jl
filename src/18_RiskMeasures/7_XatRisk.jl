@@ -68,11 +68,11 @@ end
 function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
     w = r.w
     order = sortperm(x)
-    sorted_r = x[order]
-    sorted_w = w[order]
+    sorted_x = view(x, order)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, r.alpha)
-    return -sorted_r[idx]
+    return -sorted_x[idx]
 end
 struct ValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
                         T4 <: Union{Nothing, <:AbstractWeights},
@@ -102,25 +102,23 @@ function factory(r::ValueatRiskRange, prior::AbstractPriorResult, args...; kwarg
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
     loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))
-    gain = partialsort!(x, ceil(Int, r.beta * length(x)); rev = true)
-    return loss + gain
+    gain = -partialsort!(x, ceil(Int, r.beta * length(x)); rev = true)
+    return loss - gain
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
     w = r.w
     order = sortperm(x)
-    sorted_r = x[order]
-    sorted_w = w[order]
+    sorted_x = view(x, order)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, r.alpha)
-    loss = -sorted_r[idx]
+    loss = -sorted_x[idx]
 
-    order = reverse(order)
-    sorted_r = x[order]
-    sorted_w = w[order]
+    sorted_x = reverse(sorted_x)
+    sorted_w = reverse(sorted_w)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, r.beta)
-    gain = -sorted_r[idx]
-
+    gain = -sorted_x[idx]
     return loss - gain
 end
 struct DrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real} <:

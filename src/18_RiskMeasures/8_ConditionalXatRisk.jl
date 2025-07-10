@@ -190,9 +190,8 @@ function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, <:Abstract
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / (alpha)
     end
 
-    order = sortperm(x; rev = true)
-    sorted_x = x[order]
-    sorted_w = r.w[order]
+    sorted_x = reverse(sorted_x)
+    sorted_w = reverse(sorted_w)
     cum_w = cumsum(sorted_w)
     beta = sw * r.beta
     idx = searchsortedfirst(cum_w, beta)

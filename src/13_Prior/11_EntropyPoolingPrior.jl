@@ -618,7 +618,11 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
     d_opt = if N == 1
         ifelse(!isnothing(ds_opt), ds_opt, CVaREntropyPoolingEstimator())
     else
-        ifelse(!isnothing(dm_opt), dm_opt, OptimEntropyPoolingEstimator())
+        ifelse(!isnothing(dm_opt), dm_opt,
+               OptimEntropyPoolingEstimator(;
+                                            args = (Optim.Fminbox(),
+                                                    Optim.Options(; outer_x_abstol = 1e-4,
+                                                                  x_abstol = 1e-4))))
     end
     function func(etas)
         delete!(epc, :cvar_eq)
@@ -632,8 +636,8 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
         err = if N == 1
             sum(wi[.!iszero.(pos_part)]) - alpha
         else
-            norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(X[:, i]) for i in 1:N]) /
-            sqrt(N)
+            norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(X[:, i]) - B[i]
+                  for i in 1:N]) / sqrt(N)
         end
         return wi, err
     end
@@ -681,6 +685,7 @@ function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:
     ep_var_views!(pe.mu_views, epc, pr, pe.sets, pe.var_alpha; strict = strict)
     ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha, w, pe.opt,
                          pe.ds_opt, pe.dm_opt; strict = strict)
+    ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
     # d_V = entropy_pooling_views(pr, pe.d_views, pe.sets; strict = strict)
     # views = entropy_pooling_views(pr, pe.views, pe.sets; strict = strict)
     # w = entropy_pooling(w, views, pe.opt, d_V, pe.d_views, pe.d_opt1, pe.d_opt2)
