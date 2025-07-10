@@ -124,15 +124,24 @@ function _rethrow_parse_error(expr::Expr, side = :lhs)
     end
     return nothing
 end
-struct ParsingResult{T1, T2, T3, T4, T5}
+abstract type AbstractParsingResult <: AbstractResult end
+struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
     vars::T1
     coef::T2
     op::T3
     rhs::T4
     eqn::T5
 end
-Base.length(res::ParsingResult) = 1
-Base.iterate(res::ParsingResult, state = 1) = state > 1 ? nothing : (res, state + 1)
+struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
+    vars::T1
+    coef::T2
+    op::T3
+    rhs::T4
+    eqn::T5
+    ij::T6
+end
+Base.length(res::AbstractParsingResult) = 1
+Base.iterate(res::AbstractParsingResult, state = 1) = state > 1 ? nothing : (res, state + 1)
 struct AssetSets{T1 <: AbstractString, T2 <: AbstractDict}
     key::T1
     dict::T2
@@ -246,7 +255,7 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
         m = match(prior_pattern, v)
         if isnothing(m)
             n = match(corr_pattern, v)
-            if isnothing(n)
+            if isnothing(n) && !rho_flag
                 asset = get(sets.dict, v, nothing)
                 if isnothing(asset)
                     continue
@@ -258,6 +267,9 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
             else
                 if !(prior_flag && rho_flag)
                     throw(ArgumentError("`(a, b)` can only be used for rho_views in entropy pooling."))
+                end
+                if isnothing(n)
+                    throw(ArgumentError("Correlation views can only be of the form `(a, b)`."))
                 end
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
@@ -277,7 +289,7 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 throw(ArgumentError("`prior(a)` can only be used in entropy pooling."))
             end
             n = match(corr_pattern, v)
-            if isnothing(n)
+            if isnothing(n) && !rho_flag
                 asset = get(sets.dict, v[7:(end - 1)], nothing)
                 if isnothing(asset)
                     continue
@@ -289,6 +301,9 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
             else
                 if !rho_flag
                     throw(ArgumentError("`prior(a, b)` can only be used for rho_views in entropy pooling."))
+                end
+                if isnothing(n)
+                    throw(ArgumentError("Correlation views can only be of the form `(a, b)`."))
                 end
                 asset1 = n.captures[1]
                 asset2 = n.captures[2]
@@ -319,9 +334,8 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                          "$(eqn) $(res.op) $(res.rhs)")
 end
 function replace_group_by_assets(res::AbstractVector{<:ParsingResult}, sets::AssetSets,
-                                 bl_flag::Bool = false, prior_flag::Bool = false,
-                                 rho_flag::Bool = false)
-    return replace_group_by_assets.(res, sets, bl_flag, prior_flag, rho_flag)
+                                 args...)
+    return replace_group_by_assets.(res, sets, args...)
 end
 function get_linear_constraints(lcs::Union{<:ParsingResult,
                                            <:AbstractVector{<:ParsingResult}},

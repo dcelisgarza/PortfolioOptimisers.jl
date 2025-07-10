@@ -225,6 +225,18 @@ function factory(pe::EPPriorEstimator, w::Union{Nothing, <:AbstractWeights} = no
                             alg = pe.alg)
 end
 function get_pr_value end
+function add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::AbstractVector,
+                            key::Symbol)
+    sc = norm(lhs)
+    lhs /= sc
+    rhs /= sc
+    epc[key] = if !haskey(epc, key)
+        (lhs, rhs)
+    else
+        (vcat(epc[key][1], lhs), append!(epc[key][2], rhs))
+    end
+    return nothing
+end
 function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
                              key::Symbol, alpha::Union{Nothing, <:Real} = nothing;
                              strict::Bool = false)
@@ -262,22 +274,8 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
     eqn = replace(join(string.(coeffs_new) .* "*" .* variables_new, " + "))
     return ParsingResult(variables_new, coeffs_new, res.op, rhs, "$(eqn) $(res.op) $(rhs)")
 end
-function add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::AbstractVector,
-                            key::Symbol)
-    sc = norm(lhs)
-    lhs /= sc
-    rhs /= sc
-    epc[key] = if !haskey(epc, key)
-        (lhs, rhs)
-    else
-        (vcat(epc[key][1], lhs), append!(epc[key][2], rhs))
-    end
-    return nothing
-end
-function replace_prior_views(res::AbstractVector{<:ParsingResult}, pr::AbstractPriorResult,
-                             sets::AssetSets, key::Symbol,
-                             alpha::Union{Nothing, <:Real} = nothing; strict::Bool = false)
-    return replace_prior_views.(res, pr, sets, key, alpha; strict = strict)
+function replace_prior_views(res::AbstractVector{<:ParsingResult}, args...; kwargs...)
+    return replace_prior_views.(res, args...; kwargs...)
 end
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:mu}, args...)
     return pr.mu[i]
@@ -631,7 +629,7 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
         delete!(epc, :cvar_eq)
         @smart_assert(all(zero(eltype(etas)) .<= etas .<= B))
         pos_part = max.(-X .- transpose(etas), zero(eltype(X)))
-        add_ep_constraint!(epc, transpose(pos_part / alpha), B - etas, :cvar_eq)
+        add_ep_constraint!(epc, transpose(pos_part / alpha), B .- etas, :cvar_eq)
         wi = entropy_pooling(w, epc, opt)
         err = if N == 1
             sum(wi[.!iszero.(pos_part)]) - alpha
@@ -693,11 +691,109 @@ function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVe
     sigma = diag(pr.sigma)
     fix = to_fix .& .!fixed
     if any(fix)
-        add_ep_constraint!(epc, transpose(pr.X[:, fix]) .- transpose(pr.mu[fix]) .^ 2,
+        add_ep_constraint!(epc, transpose(pr.X[:, fix] .- transpose(pr.mu[fix])) .^ 2,
                            sigma[fix], :feq)
         fixed .= fixed .| fix
     end
     return nothing
+end
+function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets;
+                             strict::Bool = false)
+    prior_pattern = r"prior\(([^()]*)\)"
+    prior_corr_pattern = r"prior\(\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*,\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*\)"
+    corr_pattern = r"\(\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*,\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*\)"
+    nx = sets.dict[sets.key]
+    variables, coeffs = res.vars, res.coef
+    jk_idx = Vector{Union{Tuple{Int, Int}, Tuple{Vector{Int}, Vector{Int}}}}(undef, 0)
+    idx_rm = Vector{Int}(undef, 0)
+    rhs::typeof(res.rhs) = res.rhs
+    non_prior = false
+    for (i, (v, c)) in enumerate(zip(variables, coeffs))
+        m = match(prior_pattern, v)
+        if isnothing(m)
+            non_prior = true
+            n = match(corr_pattern, v)
+            if isnothing(n)
+                throw(ArgumentError("Correlation prior view $(v) must be of the form `(a, b)`."))
+            else
+                asset1 = n.captures[1]
+                asset2 = n.captures[2]
+                if startswith(asset1, "[") && endswith(asset1, "]")
+                    asset1 = split(n.captures[1][2:(end - 1)], ", ")
+                    asset2 = split(n.captures[2][2:(end - 1)], ", ")
+                    j = [findfirst(x -> x == a1, nx) for a1 in asset1]
+                    k = [findfirst(x -> x == a2, nx) for a2 in asset2]
+                else
+                    j = findfirst(x -> x == asset1, nx)
+                    k = findfirst(x -> x == asset2, nx)
+                    if isnothing(j)
+                        msg = "Asset $(asset1) not found in $nx."
+                        strict ? throw(ArgumentError(msg)) : @warn(msg)
+                    end
+                    if isnothing(k)
+                        msg = "Asset $(asset2) not found in $nx."
+                        strict ? throw(ArgumentError(msg)) : @warn(msg)
+                    end
+                    if isnothing(j) || isnothing(k)
+                        push!(idx_rm, i)
+                        continue
+                    end
+                end
+                push!(jk_idx, (j, k))
+            end
+            continue
+        end
+        n = match(prior_corr_pattern, v)
+        if isnothing(n)
+            throw(ArgumentError("Correlation prior view $(v) must be of the form `prior(a, b)`."))
+        else
+            asset1 = n.captures[1]
+            asset2 = n.captures[2]
+            if startswith(asset1, "[") && endswith(asset1, "]")
+                asset1 = split(n.captures[1][2:(end - 1)], ", ")
+                asset2 = split(n.captures[2][2:(end - 1)], ", ")
+                j = [findfirst(x -> x == a1, nx) for a1 in asset1]
+                k = [findfirst(x -> x == a2, nx) for a2 in asset2]
+            else
+                j = findfirst(x -> x == asset1, nx)
+                k = findfirst(x -> x == asset2, nx)
+                if isnothing(j)
+                    msg = "Asset $(asset1) not found in $nx."
+                    strict ? throw(ArgumentError(msg)) : @warn(msg)
+                end
+                if isnothing(k)
+                    msg = "Asset $(asset2) not found in $nx."
+                    strict ? throw(ArgumentError(msg)) : @warn(msg)
+                end
+                if isnothing(j) || isnothing(k)
+                    push!(idx_rm, i)
+                    continue
+                end
+            end
+            rhs -= get_pr_value(pr, j, k) * c
+            push!(idx_rm, i)
+            push!(jk_idx, (j, k))
+        end
+    end
+    if isempty(idx_rm)
+        return RhoParsingResult(res.vars, res.coef, res.op, res.rhs, res.eqn, jk_idx)
+    end
+    if !non_prior
+        throw(ArgumentError("Priors in views are replaced by their prior value, thus they are essentially part of the constant of the view, so you need a non-prior view to serve as the variable.\n$(res)"))
+    end
+    idx = setdiff(1:length(variables), idx_rm)
+    variables_new = variables[idx]
+    coeffs_new = coeffs[idx]
+    eqn = replace(join(string.(coeffs_new) .* "*" .* variables_new, " + "))
+    return RhoParsingResult(variables_new, coeffs_new, res.op, rhs,
+                            "$(eqn) $(res.op) $(rhs)", jk_idx)
+end
+function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, args...)
+    return cov2cor(pr.sigma)[i, j]
+end
+function get_pr_value(pr::AbstractPriorResult, i::AbstractVector{<:Integer},
+                      j::AbstractVector{<:Integer}, args...)
+    return norm(cov2cor(pr.sigma)[i, j]) / length(i)
 end
 function ep_rho_views!(rho_views::Nothing, args...; kwargs...)
     return nothing
@@ -709,10 +805,29 @@ function ep_rho_views!(rho_views::Union{<:AbstractString, Expr,
                        epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets;
                        strict::Bool = false)
     rho_views = parse_equation(rho_views)
-    return rho_views = replace_group_by_assets(rho_views, sets, false, true, false)
-    # rho_views = replace_prior_views(rho_views, pr, sets, :rho; strict = strict)
-    # return lcs = get_linear_constraints(rho_views, sets; datatype = eltype(pr.X),
-    #                                     strict = strict)
+    rho_views = replace_group_by_assets(rho_views, sets, false, true, true)
+    rho_views = replace_prior_views(rho_views, pr, sets; strict = strict)
+    to_fix = falses(size(pr.X, 2))
+    for rho_view in rho_views
+        println(rho_view.rhs)
+        @smart_assert(-one(eltype(pr.X)) <= rho_view.rhs <= one(eltype(pr.X)),
+                      "Correlation prior rho_view $(rho_view.eqn) must be in [-1, 1].")
+        d = ifelse(rho_view.op == ">=", -1, 1)
+        for (i, j) in rho_view.ij
+            sigma = diag(pr.sigma)
+            sigma = if !isa(i, AbstractVector)
+                sqrt(sigma[i] * sigma[j])
+            else
+                norm(sigma[i] .* sigma[j])
+            end
+            Ai = d * view(pr.X, :, i) .* view(pr.X, :, j)
+            Bi = d * pr.mu[i] ⊙ pr.mu[j] ⊕ rho_view.rhs ⊙ sigma
+            add_ep_constraint!(epc, transpose(Ai), [Bi],
+                               ifelse(rho_view.op == "==", :eq, :ineq))
+            to_fix[union(i, j)] .= true
+        end
+    end
+    return to_fix
 end
 function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -746,13 +861,16 @@ function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:
     # Fix sigma
     pe = factory(pe, w)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
-    to_fix_mu = ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
-    fix_mu!(epc, view(fixed, :, 1), to_fix_mu, pr)
+    to_fix = ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
+    fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
     w = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha, w, pe.opt,
                              pe.ds_opt, pe.dm_opt; strict = strict)
     # Fix rho
     pe = factory(pe, w)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    to_fix = ep_rho_views!(pe.rho_views, epc, pr, pe.sets; strict = strict)
+    fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
+    fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
 
     # pe = factory(pe, w)
     # (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = prior(pe.pe, X, F; strict = strict,

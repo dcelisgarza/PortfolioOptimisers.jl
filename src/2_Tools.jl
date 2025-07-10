@@ -243,6 +243,7 @@ outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A),
 ⊙(A::AbstractArray, B::AbstractArray) = A .* B
 ⊙(A::AbstractArray, B) = A * B
 ⊙(A, B::AbstractArray) = A * B
+⊙(A::Real, B::Real) = A * B
 ⊘(A::AbstractArray, B::AbstractArray) = A ./ B
 ⊘(A::AbstractArray, B) = A / B
 ⊘(A, B::AbstractArray) = A ./ B
