@@ -772,7 +772,6 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
             end
             rhs -= get_pr_value(pr, j, k) * c
             push!(idx_rm, i)
-            push!(jk_idx, (j, k))
         end
     end
     if isempty(idx_rm)
@@ -808,21 +807,24 @@ function ep_rho_views!(rho_views::Union{<:AbstractString, Expr,
     rho_views = replace_group_by_assets(rho_views, sets, false, true, true)
     rho_views = replace_prior_views(rho_views, pr, sets; strict = strict)
     to_fix = falses(size(pr.X, 2))
+    sigma = diag(pr.sigma)
     for rho_view in rho_views
-        println(rho_view.rhs)
         @smart_assert(-one(eltype(pr.X)) <= rho_view.rhs <= one(eltype(pr.X)),
                       "Correlation prior rho_view $(rho_view.eqn) must be in [-1, 1].")
         d = ifelse(rho_view.op == ">=", -1, 1)
-        for (i, j) in rho_view.ij
-            sigma = diag(pr.sigma)
-            sigma = if !isa(i, AbstractVector)
+        #! cycle ij, coef to a single rhs
+        for (coef, (i, j)) in zip(rho_view.coef, rho_view.ij)
+            sigma_ij = if !isa(i, AbstractVector)
                 sqrt(sigma[i] * sigma[j])
             else
                 norm(sigma[i] .* sigma[j])
             end
-            Ai = d * view(pr.X, :, i) .* view(pr.X, :, j)
-            Bi = d * pr.mu[i] ⊙ pr.mu[j] ⊕ rho_view.rhs ⊙ sigma
-            add_ep_constraint!(epc, transpose(Ai), [Bi],
+            Ai = d * coef * view(pr.X, :, i) .* view(pr.X, :, j)
+            Bi = d * pr.mu[i] ⊙ pr.mu[j] ⊕ rho_view.rhs ⊙ sigma_ij
+            if !isa(Bi, AbstractVector)
+                Bi = [Bi]
+            end
+            add_ep_constraint!(epc, transpose(Ai), Bi,
                                ifelse(rho_view.op == "==", :eq, :ineq))
             to_fix[union(i, j)] .= true
         end
