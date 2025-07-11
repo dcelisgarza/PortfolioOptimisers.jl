@@ -6,10 +6,10 @@ struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 abstract type AbstractEntropyPoolingOptAlgorithm <: AbstractAlgorithm end
 struct LogEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
-function _get_epw(::H1_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
+function get_epw(::H1_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return w0
 end
-function _get_epw(::H2_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
+function get_epw(::H2_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return wi
 end
 struct CVaREntropyPoolingEstimator{T1 <: Tuple, T2 <: NamedTuple} <:
@@ -565,9 +565,9 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
         throw(ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     end
 end
-function ep_cvar_views_solve!(::Nothing, epc::AbstractDict, ::Any, ::Any, ::Any,
-                              w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser;
-                              kwargs...)
+function ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Real,
+                              w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
+                              ::Any, ::Any; kwargs...)
     return entropy_pooling(w, epc, opt)
 end
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Real)
@@ -659,9 +659,6 @@ end
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:sigma}, args...)
     return diag(pr.sigma)[i]
 end
-function ep_sigma_views!(sigma_views::Nothing, args...; kwargs...)
-    return nothing
-end
 function ep_sigma_views!(sigma_views::Union{<:AbstractString, Expr,
                                             <:AbstractVector{<:AbstractString},
                                             <:AbstractVector{Expr},
@@ -674,14 +671,14 @@ function ep_sigma_views!(sigma_views::Union{<:AbstractString, Expr,
     sigma_views = replace_prior_views(sigma_views, pr, sets, :sigma; strict = strict)
     lcs = get_linear_constraints(sigma_views, sets; datatype = eltype(pr.X),
                                  strict = strict)
+    tmp = transpose((pr.X .- transpose(pr.mu)) .^ 2)
     to_fix = falses(size(pr.X, 2))
     for p in propertynames(lcs)
         if isnothing(getproperty(lcs, p))
             continue
         end
         A = getproperty(lcs, p).A
-        add_ep_constraint!(epc, A * transpose((pr.X .- transpose(pr.mu)) .^ 2),
-                           getproperty(lcs, p).B, p)
+        add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B, p)
         to_fix .= to_fix .| dropdims(any(.!iszero.(A); dims = 1); dims = 1)
     end
     return to_fix
@@ -794,9 +791,6 @@ function get_pr_value(pr::AbstractPriorResult, i::AbstractVector{<:Integer},
                       j::AbstractVector{<:Integer}, args...)
     return norm(cov2cor(pr.sigma)[i, j]) / length(i)
 end
-function ep_rho_views!(rho_views::Nothing, args...; kwargs...)
-    return nothing
-end
 function ep_rho_views!(rho_views::Union{<:AbstractString, Expr,
                                         <:AbstractVector{<:AbstractString},
                                         <:AbstractVector{Expr},
@@ -832,41 +826,145 @@ function ep_rho_views!(rho_views::Union{<:AbstractString, Expr,
 end
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, args...)
     #! Think about how to include pr.w
-    return Skewness()(pr.X[:, i])
+    return Skewness()([1], reshape(pr.X[:, i], :, 1))
 end
-function ep_skew_views!(sigma_views::Nothing, args...; kwargs...)
-    return nothing
-end
-function ep_skew_views!(skew_views::Union{<:AbstractString, Expr,
-                                          <:AbstractVector{<:AbstractString},
-                                          <:AbstractVector{Expr},
-                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                        epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets;
-                        strict::Bool = false)
+function ep_sk_views!(skew_views::Union{<:AbstractString, Expr,
+                                        <:AbstractVector{<:AbstractString},
+                                        <:AbstractVector{Expr},
+                                        <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                      epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets;
+                      strict::Bool = false)
     skew_views = parse_equation(skew_views)
     skew_views = replace_group_by_assets(skew_views, sets, false, true, false)
     skew_views = replace_prior_views(skew_views, pr, sets, :skew; strict = strict)
     lcs = get_linear_constraints(skew_views, sets; datatype = eltype(pr.X), strict = strict)
     sigma = diag(pr.sigma)
-    sigma_1p5 = sigma .* sqrt.(sigma)
+    tmp = transpose((pr.X .^ 3 .- transpose(pr.mu) .^ 3 .- 3 * transpose(pr.mu .* sigma)) ./
+                    transpose(sigma .* sqrt.(sigma)))
     to_fix = falses(size(pr.X, 2))
     for p in propertynames(lcs)
         if isnothing(getproperty(lcs, p))
             continue
         end
         A = getproperty(lcs, p).A
-        add_ep_constraint!(epc,
-                           getproperty(lcs, p).A * transpose((pr.X .^ 3 .-
-                                                              transpose(pr.mu .^ 3 .- 3 * pr.mu .* sigma)) ./
-                                                             transpose(sigma_1p5)),
-                           getproperty(lcs, p).B, p)
+        add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B, p)
+        to_fix .= to_fix .| dropdims(any(.!iszero.(A); dims = 1); dims = 1)
+    end
+    return to_fix
+end
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, args...)
+    #! Think about how to include pr.w
+    return HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()))([1],
+                                                                                      reshape(pr.X[:,
+                                                                                                   i],
+                                                                                              :,
+                                                                                              1))
+end
+function ep_kt_views!(kurtosis_views::Union{<:AbstractString, Expr,
+                                            <:AbstractVector{<:AbstractString},
+                                            <:AbstractVector{Expr},
+                                            <:AbstractVector{<:Union{<:AbstractString,
+                                                                     Expr}}},
+                      epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets;
+                      strict::Bool = false)
+    kurtosis_views = parse_equation(kurtosis_views)
+    kurtosis_views = replace_group_by_assets(kurtosis_views, sets, false, true, false)
+    kurtosis_views = replace_prior_views(kurtosis_views, pr, sets, :kurtosis;
+                                         strict = strict)
+    lcs = get_linear_constraints(kurtosis_views, sets; datatype = eltype(pr.X),
+                                 strict = strict)
+    X_sq = pr.X .^ 2
+    mu_sq = pr.mu .^ 2
+    tmp = transpose((X_sq .* X_sq .- 4 * transpose(pr.mu) .* X_sq .* pr.X .+
+                     6 * transpose(mu_sq) .* X_sq .- 3 * transpose(mu_sq .* mu_sq)) ./
+                    transpose(diag(pr.sigma)) .^ 2)
+    to_fix = falses(size(pr.X, 2))
+    for p in propertynames(lcs)
+        if isnothing(getproperty(lcs, p))
+            continue
+        end
+        A = getproperty(lcs, p).A
+        add_ep_constraint!(epc, A * tmp, getproperty(lcs, p).B, p)
         to_fix .= to_fix .| dropdims(any(.!iszero.(A); dims = 1); dims = 1)
     end
     return to_fix
 end
 function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                    <:H1_EntropyPooling}, X::AbstractMatrix,
+                                    <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
+               X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
+               dims::Int = 1, strict::Bool = false, kwargs...)
+    @smart_assert(dims in (1, 2))
+    if dims == 2
+        X = transpose(X)
+        if !isnothing(F)
+            F = transpose(F)
+        end
+    end
+    T, N = size(X)
+    w1 = w0 = if isnothing(pe.w)
+        pweights(range(; start = inv(T), stop = inv(T), length = T))
+    else
+        @smart_assert(length(pe.w) == T)
+        pweights(pe.w)
+    end
+    fixed = falses(N, 2)
+    epc = Dict{Symbol, Tuple{<:AbstractMatrix, <:AbstractVector}}()
+
+    # mu and VaR
+    pe = factory(pe, w0)
+    pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
+    ep_var_views!(pe.var_views, epc, pr, pe.sets, pe.var_alpha; strict = strict)
+    if !isnothing(pe.mu_views) || !isnothing(pe.var_views)
+        w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha, w0,
+                                  pe.opt, pe.ds_opt, pe.dm_opt; strict = strict)
+        pe = factory(pe, w1)
+        pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    end
+    # sigma
+    if !isnothing(pe.sigma_views)
+        to_fix = ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
+        fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
+        w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha,
+                                  get_epw(pe.alg, w0, w1), pe.opt, pe.ds_opt, pe.dm_opt;
+                                  strict = strict)
+        pe = factory(pe, w1)
+        pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    end
+    if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
+        # skew
+        if !isnothing(pe.sk_views)
+            to_fix = ep_sk_views!(pe.sk_views, epc, pr, pe.sets; strict = strict)
+            fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
+            fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
+        end
+        # kurtosis
+        if !isnothing(pe.kt_views)
+            to_fix = ep_kt_views!(pe.kt_views, epc, pr, pe.sets; strict = strict)
+            fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
+            fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
+        end
+        # rho
+        if !isnothing(pe.rho_views)
+            to_fix = ep_rho_views!(pe.rho_views, epc, pr, pe.sets; strict = strict)
+            fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
+            fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
+        end
+        w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha,
+                                  get_epw(pe.alg, w0, w1), pe.opt, pe.ds_opt, pe.dm_opt;
+                                  strict = strict)
+        pe = factory(pe, w1)
+        pr = prior(pe.pe, X, F; strict = strict, kwargs...)
+    end
+    (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = pr
+    return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1,
+                               loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
+                               f_w = !isnothing(loadings) ? w1 : nothing)
+end
+function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                    <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                    <:H0_EntropyPooling}, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
     @smart_assert(dims in (1, 2))
@@ -876,55 +974,45 @@ function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:
             F = transpose(F)
         end
     end
-    T, N = size(X)
-    w = if isnothing(pe.w)
+    T = size(X, 1)
+    w0 = if isnothing(pe.w)
         pweights(range(; start = inv(T), stop = inv(T), length = T))
     else
         @smart_assert(length(pe.w) == T)
         pweights(pe.w)
     end
-    fixed = falses(N, 2)
     epc = Dict{Symbol, Tuple{<:AbstractMatrix, <:AbstractVector}}()
-
-    # Fix mu and VaR
-    pe = factory(pe, w)
+    # mu and VaR
+    pe = factory(pe, w0)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
-    ep_var_views!(pe.mu_views, epc, pr, pe.sets, pe.var_alpha; strict = strict)
-    w = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha, w, pe.opt,
-                             pe.ds_opt, pe.dm_opt; strict = strict)
-    # Fix sigma
-    pe = factory(pe, w)
+    ep_var_views!(pe.var_views, epc, pr, pe.sets, pe.var_alpha; strict = strict)
+    # sigma
+    if !isnothing(pe.sigma_views)
+        ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
+    end
+    if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
+        # skew
+        if !isnothing(pe.sk_views)
+            ep_sk_views!(pe.sk_views, epc, pr, pe.sets; strict = strict)
+        end
+        # kurtosis
+        if !isnothing(pe.kt_views)
+            ep_kt_views!(pe.kt_views, epc, pr, pe.sets; strict = strict)
+        end
+        # rho
+        if !isnothing(pe.rho_views)
+            ep_rho_views!(pe.rho_views, epc, pr, pe.sets; strict = strict)
+        end
+    end
+    w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha, w0, pe.opt,
+                              pe.ds_opt, pe.dm_opt; strict = strict)
+    pe = factory(pe, w1)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
-    to_fix = ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
-    if !isnothing(to_fix)
-        fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
-    end
-    w = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha, w, pe.opt,
-                             pe.ds_opt, pe.dm_opt; strict = strict)
-    # Fix rho
-    pe = factory(pe, w)
-    pr = prior(pe.pe, X, F; strict = strict, kwargs...)
-    to_fix = ep_rho_views!(pe.rho_views, epc, pr, pe.sets; strict = strict)
-    if !isnothing(to_fix)
-        fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
-        fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
-    end
-
-    # Fix skew
-    to_fix = ep_skew_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
-    if !isnothing(to_fix)
-        fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
-        fix_sigma!(epc, view(fixed, :, 2), to_fix, pr)
-    end
-
-    # pe = factory(pe, w)
-    # (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = prior(pe.pe, X, F; strict = strict,
-    #                                                         kwargs...)
-    # return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma, chol = chol, w = w,
-    #                            loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
-    #                            f_w = !isnothing(loadings) ? w : nothing)
-    return nothing
+    (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = pr
+    return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1,
+                               loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
+                               f_w = !isnothing(loadings) ? w1 : nothing)
 end
 
-export LogEntropyPooling, ExpEntropyPooling
+export LogEntropyPooling, ExpEntropyPooling, EPPriorEstimator

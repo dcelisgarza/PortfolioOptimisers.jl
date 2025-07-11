@@ -112,34 +112,5 @@ function (r::Skewness)(w::AbstractVector, X::AbstractMatrix,
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)
     return res / sigma^3
 end
-function (r::Skewness)(x::AbstractVector)
-    sigma = StatsBase.std(r.ve, x; mean = zero(eltype(x)))
-    x .= x .^ 3
-    res = isnothing(r.w) ? mean(x) : mean(x, r.w)
-    return res / sigma^3
-end
-function factory(r::Kurtosis, prior::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_factory(r.w, prior.w)
-    mu = nothing_scalar_array_factory(r.mu, prior.mu)
-    return Kurtosis(; ve = factory(r.ve, w), w = w, mu = mu)
-end
-function risk_measure_view(r::Kurtosis, i::AbstractVector, args...)
-    mu = nothing_scalar_array_view(r.mu, i)
-    return Kurtosis(; ve = r.ve, w = r.w, mu = mu)
-end
-function (r::Kurtosis)(w::AbstractVector, X::AbstractMatrix,
-                       fees::Union{Nothing, <:Fees} = nothing)
-    val = calc_moment_val(r, w, X, fees)
-    sigma = StatsBase.var(r.ve, val; mean = zero(eltype(val)))
-    val .= val .^ 4
-    res = isnothing(r.w) ? mean(val) : mean(val, r.w)
-    return res / sigma^2
-end
-function (r::Kurtosis)(x::AbstractVector)
-    sigma = StatsBase.var(r.ve, x; mean = zero(eltype(x)))
-    x .= x .^ 4
-    res = isnothing(r.w) ? mean(x) : mean(x, r.w)
-    return res / sigma^2
-end
 
 export MeanReturn, ThirdCentralMoment, Skewness, Kurtosis
