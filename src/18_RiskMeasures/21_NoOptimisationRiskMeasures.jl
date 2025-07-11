@@ -42,23 +42,42 @@ function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
     end
     return Skewness{typeof(ve), typeof(w), typeof(mu)}(ve, w, mu)
 end
+struct Kurtosis{T1 <: AbstractVarianceEstimator, T2 <: Union{Nothing, <:AbstractWeights},
+                T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
+       AbstractMomentNoOptimisationRiskMeasure
+    ve::T1
+    w::T2
+    mu::T3
+end
+function Kurtosis(; ve::AbstractVarianceEstimator = SimpleVariance(),
+                  w::Union{Nothing, <:AbstractWeights} = nothing,
+                  mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+    if isa(mu, AbstractVector)
+        @smart_assert(!isempty(mu))
+    end
+    return Kurtosis{typeof(ve), typeof(w), typeof(mu)}(ve, w, mu)
+end
 function calc_moment_target(::Union{<:ThirdCentralMoment{Nothing, Nothing},
-                                    <:Skewness{<:Any, Nothing, Nothing}}, ::Any,
+                                    <:Skewness{<:Any, Nothing, Nothing},
+                                    <:Kurtosis{<:Any, Nothing, Nothing}}, ::Any,
                             x::AbstractVector)
     return mean(x)
 end
 function calc_moment_target(r::Union{<:ThirdCentralMoment{<:AbstractWeights, Nothing},
-                                     <:Skewness{<:Any, <:AbstractWeights, Nothing}}, ::Any,
+                                     <:Skewness{<:Any, <:AbstractWeights, Nothing},
+                                     <:Kurtosis{<:Any, <:AbstractWeights, Nothing}}, ::Any,
                             x::AbstractVector)
     return mean(x, r.w)
 end
 function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:AbstractVector},
-                                     <:Skewness{<:Any, <:Any, <:AbstractVector}},
+                                     <:Skewness{<:Any, <:Any, <:AbstractVector},
+                                     <:Kurtosis{<:Any, <:Any, <:AbstractVector}},
                             w::AbstractVector, ::Any)
     return dot(w, r.mu)
 end
 function calc_moment_target(r::Union{<:ThirdCentralMoment{<:Any, <:Real},
-                                     <:Skewness{<:Any, <:Any, <:Real}}, ::Any, ::Any)
+                                     <:Skewness{<:Any, <:Any, <:Real},
+                                     <:Kurtosis{<:Any, <:Any, <:Real}}, ::Any, ::Any)
     return r.mu
 end
 function factory(r::ThirdCentralMoment, prior::AbstractPriorResult, args...; kwargs...)
@@ -93,5 +112,34 @@ function (r::Skewness)(w::AbstractVector, X::AbstractMatrix,
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)
     return res / sigma^3
 end
+function (r::Skewness)(x::AbstractVector)
+    sigma = StatsBase.std(r.ve, x; mean = zero(eltype(x)))
+    x .= x .^ 3
+    res = isnothing(r.w) ? mean(x) : mean(x, r.w)
+    return res / sigma^3
+end
+function factory(r::Kurtosis, prior::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_factory(r.w, prior.w)
+    mu = nothing_scalar_array_factory(r.mu, prior.mu)
+    return Kurtosis(; ve = factory(r.ve, w), w = w, mu = mu)
+end
+function risk_measure_view(r::Kurtosis, i::AbstractVector, args...)
+    mu = nothing_scalar_array_view(r.mu, i)
+    return Kurtosis(; ve = r.ve, w = r.w, mu = mu)
+end
+function (r::Kurtosis)(w::AbstractVector, X::AbstractMatrix,
+                       fees::Union{Nothing, <:Fees} = nothing)
+    val = calc_moment_val(r, w, X, fees)
+    sigma = StatsBase.var(r.ve, val; mean = zero(eltype(val)))
+    val .= val .^ 4
+    res = isnothing(r.w) ? mean(val) : mean(val, r.w)
+    return res / sigma^2
+end
+function (r::Kurtosis)(x::AbstractVector)
+    sigma = StatsBase.var(r.ve, x; mean = zero(eltype(x)))
+    x .= x .^ 4
+    res = isnothing(r.w) ? mean(x) : mean(x, r.w)
+    return res / sigma^2
+end
 
-export MeanReturn, ThirdCentralMoment, Skewness
+export MeanReturn, ThirdCentralMoment, Skewness, Kurtosis
