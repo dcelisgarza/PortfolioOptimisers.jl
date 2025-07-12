@@ -40,7 +40,7 @@ for alg in (NormalisedGerber0, NormalisedGerber1, NormalisedGerber2)
              end
          end)
 end
-struct GerberCovariance{T1 <: StatsBase.CovarianceEstimator, T2 <: PosDefEstimator,
+struct GerberCovariance{T1 <: StatsBase.CovarianceEstimator, T2 <: PosdefEstimator,
                         T3 <: Real, T4 <: GerberCovarianceAlgorithm} <: BaseGerberCovariance
     ve::T1
     pdm::T2
@@ -49,7 +49,7 @@ struct GerberCovariance{T1 <: StatsBase.CovarianceEstimator, T2 <: PosDefEstimat
 end
 function GerberCovariance(; alg::GerberCovarianceAlgorithm = Gerber1(),
                           ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                          pdm::Union{Nothing, <:PosDefEstimator} = PosDefEstimator(),
+                          pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator(),
                           threshold::Real = 0.5)
     @smart_assert(zero(threshold) < threshold < one(threshold))
     return GerberCovariance{typeof(ve), typeof(pdm), typeof(threshold), typeof(alg)}(ve,

@@ -37,7 +37,7 @@ struct NormalisedSmythBrobyGerber1 <: NormalisedSmythBrobyCovarianceAlgorithm en
 struct NormalisedSmythBrobyGerber2 <: NormalisedSmythBrobyCovarianceAlgorithm end
 
 struct SmythBrobyCovariance{T1 <: AbstractExpectedReturnsEstimator,
-                            T2 <: StatsBase.CovarianceEstimator, T3 <: PosDefEstimator,
+                            T2 <: StatsBase.CovarianceEstimator, T3 <: PosdefEstimator,
                             T4 <: Real, T5 <: Real, T6 <: Real, T7 <: Real, T8 <: Real,
                             T9 <: SmythBrobyCovarianceAlgorithm,
                             T10 <: FLoops.Transducers.Executor} <: BaseSmythBrobyCovariance
@@ -55,7 +55,7 @@ end
 function SmythBrobyCovariance(;
                               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                               ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                              pdm::Union{Nothing, <:PosDefEstimator} = PosDefEstimator(),
+                              pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator(),
                               threshold::Real = 0.5, c1::Real = 0.5, c2::Real = 0.5,
                               c3::Real = 4.0, n::Real = 2.0,
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),

@@ -12,7 +12,8 @@ end
 function detone(::Nothing, args...)
     return nothing
 end
-function detone!(ce::Detone, pdm::Union{Nothing, <:PosDefEstimator}, X::AbstractMatrix)
+function detone!(ce::Detone, X::AbstractMatrix,
+                 pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
     n = ce.n
     @smart_assert(one(size(X, 1)) <= n <= size(X, 1))
     n -= 1
@@ -33,9 +34,10 @@ function detone!(ce::Detone, pdm::Union{Nothing, <:PosDefEstimator}, X::Abstract
     end
     return nothing
 end
-function detone(ce::Detone, pdm::Union{Nothing, <:PosDefEstimator}, X::AbstractMatrix)
+function detone(ce::Detone, X::AbstractMatrix,
+                pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator)
     X = copy(X)
-    detone!(ce, pdm, X)
+    detone!(ce, X, pdm)
     return X
 end
 

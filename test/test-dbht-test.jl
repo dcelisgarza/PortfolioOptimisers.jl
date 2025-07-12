@@ -394,10 +394,10 @@
             sigma2 = copy(sigma)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i]),
-                                                             PosDefEstimator(), sigma1, X)
+                                                             PosdefEstimator(), sigma1, X)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = desg[i]),
-                                                             PosDefEstimator(), sigma2, X)
+                                                             PosdefEstimator(), sigma2, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -446,11 +446,11 @@
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i],
                                                                                       sim = ExponentialSimilarity()),
-                                                             PosDefEstimator(), sigma1, X)
+                                                             PosdefEstimator(), sigma1, X)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = desg[i],
                                                                                       sim = ExponentialSimilarity()),
-                                                             PosDefEstimator(), sigma2, X)
+                                                             PosdefEstimator(), sigma2, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1

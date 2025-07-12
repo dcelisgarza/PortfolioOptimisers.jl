@@ -12,7 +12,7 @@ end
 function matrix_processing(::Nothing, args...; kwargs...)
     return nothing
 end
-struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:PosDefEstimator},
+struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:PosdefEstimator},
                                T2 <: Union{Nothing, <:Denoise},
                                T3 <: Union{Nothing, <:Detone},
                                T4 <: Union{Nothing, <:AbstractMatrixProcessingAlgorithm}} <:
@@ -23,7 +23,7 @@ struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:PosDefEstimator},
     alg::T4
 end
 function DefaultMatrixProcessing(;
-                                 pdm::Union{Nothing, <:PosDefEstimator} = PosDefEstimator(),
+                                 pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator(),
                                  denoise::Union{Nothing, <:Denoise} = nothing,
                                  detone::Union{Nothing, <:Detone} = nothing,
                                  alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
@@ -34,8 +34,8 @@ function matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
                             X::AbstractMatrix, args...; kwargs...)
     T, N = size(X)
     posdef!(mp.pdm, sigma)
-    denoise!(mp.denoise, mp.pdm, sigma, T / N)
-    detone!(mp.detone, mp.pdm, sigma)
+    denoise!(mp.denoise, sigma, T / N, mp.pdm)
+    detone!(mp.detone, sigma, mp.pdm)
     matrix_processing_algorithm!(mp.alg, mp.pdm, sigma, X; kwargs...)
     return nothing
 end
@@ -65,8 +65,8 @@ function matrix_processing!(mp::NonPositiveDefiniteMatrixProcessing, sigma::Abst
                             X::AbstractMatrix, args...; kwargs...)
     T, N = size(X)
     posdef!(nothing, sigma)
-    denoise!(mp.denoise, nothing, sigma, T / N)
-    detone!(mp.detone, nothing, sigma)
+    denoise!(mp.denoise, sigma, T / N, nothing)
+    detone!(mp.detone, sigma, nothing)
     matrix_processing_algorithm!(mp.alg, nothing, sigma, X; kwargs...)
     return nothing
 end

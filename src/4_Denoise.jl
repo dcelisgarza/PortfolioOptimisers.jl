@@ -1,14 +1,165 @@
+"""
+    AbstractDenoiseEstimator <: AbstractEstimator
+
+Abstract supertype for all denoising estimator types in PortfolioOptimisers.jl.
+
+All concrete types that implement denoising of covariance or correlation matrices (e.g., via spectral, fixed, or shrinkage methods) should subtype `AbstractDenoiseEstimator`. This enables a consistent interface for denoising routines throughout the package.
+
+# Related
+
+  - [`AbstractEstimator`](@ref)
+  - [`Denoise`](@ref)
+  - [`denoise!`](@ref)
+  - [`denoise`](@ref)
+"""
 abstract type AbstractDenoiseEstimator <: AbstractEstimator end
+
+"""
+    AbstractDenoiseAlgorithm <: AbstractAlgorithm
+
+Abstract supertype for all denoising algorithm types in PortfolioOptimisers.jl.
+
+All concrete types that implement a specific denoising algorithm (e.g., spectral, fixed, shrinkage) should subtype `AbstractDenoiseAlgorithm`. This enables flexible extension and dispatch of denoising routines.
+
+# Related
+
+  - [`AbstractAlgorithm`](@ref)
+  - [`SpectralDenoise`](@ref)
+  - [`FixedDenoise`](@ref)
+  - [`ShrunkDenoise`](@ref)
+"""
 abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
+
+"""
+    SpectralDenoise <: AbstractDenoiseAlgorithm
+
+A denoising algorithm that sets the smallest `num_factors` eigenvalues of a covariance or correlation matrix to zero, effectively removing the principal components relating to random noise according to random matrix theory-based approaches.
+
+# Usage
+
+```jldoctest
+julia> alg = SpectralDenoise()
+SpectralDenoise()
+```
+
+# Related
+
+  - [`AbstractDenoiseAlgorithm`](@ref)
+  - [`denoise!`](@ref)
+  - [`Denoise`](@ref)
+"""
 struct SpectralDenoise <: AbstractDenoiseAlgorithm end
+
+"""
+    FixedDenoise <: AbstractDenoiseAlgorithm
+
+A denoising algorithm that replaces the smallest `num_factors` eigenvalues of a covariance or correlation matrix with their average, effectively averaging the principal components relating to random noise according to random matrix theory-based approaches.
+
+# Usage
+
+```jldoctest
+julia> alg = FixedDenoise()
+FixedDenoise()
+```
+
+# Related
+
+  - [`AbstractDenoiseAlgorithm`](@ref)
+  - [`denoise!`](@ref)
+  - [`Denoise`](@ref)
+"""
 struct FixedDenoise <: AbstractDenoiseAlgorithm end
+
+"""
+    struct ShrunkDenoise{T1 <: Real} <: AbstractDenoiseAlgorithm
+        alpha::T1
+    end
+
+A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a covariance or correlation matrix towards their diagonal, controlled by the shrinkage parameter `alpha`. This approach interpolates between no shrinkage (`alpha = 0`) and full shrinkage (`alpha = 1`), providing a flexible way to regularize noisy eigenvalues.
+
+# Constructor
+
+    ShrunkDenoise(; alpha::Real = 0.0)
+
+Creates a new `ShrunkDenoise` with the specified shrinkage parameter `alpha`.
+
+# Related
+
+  - [`AbstractDenoiseAlgorithm`](@ref)
+  - [`denoise!`](@ref)
+  - [`Denoise`](@ref)
+"""
 struct ShrunkDenoise{T1 <: Real} <: AbstractDenoiseAlgorithm
     alpha::T1
 end
+function Base.show(io::IO, alg::ShrunkDenoise)
+    println(io, "ShrunkDenoise")
+    return println(io, "  alg | ", typeof(alg.alpha), ": ", repr(alg.alpha))
+end
+"""
+    ShrunkDenoise(; alpha::Real = 0.0)
+
+Constructor for [`ShrunkDenoise`](@ref). See above for details.
+
+# Validation
+
+  - Throws an error if `alpha` is not in `[0, 1]`.
+
+# Examples
+
+```jldoctest
+julia> alg = ShrunkDenoise(; alpha = 0.5)
+ShrunkDenoise{Float64}(0.5)
+```
+"""
 function ShrunkDenoise(; alpha::Real = 0.0)
     @smart_assert(zero(alpha) <= alpha <= one(alpha))
     return ShrunkDenoise{typeof(alpha)}(alpha)
 end
+"""
+    struct Denoise{T1, T2 <: Tuple, T3 <: NamedTuple, T4 <: AbstractDenoiseAlgorithm,
+                   T5 <: Integer, T6 <: Integer} <: AbstractDenoiseEstimator
+        kernel::T1
+        args::T2
+        kwargs::T3
+        alg::T4
+        m::T5
+        n::T6
+    end
+
+A flexible container type for configuring and applying denoising algorithms to covariance or correlation matrices in PortfolioOptimisers.jl.
+
+`Denoise` encapsulates all parameters required for matrix denoising, including the kernel and its arguments for spectral density estimation, the denoising algorithm, and matrix dimensions. It is the standard estimator type for denoising routines and supports a variety of algorithms (e.g., spectral, fixed, shrinkage).
+
+# Fields
+
+  - `kernel::Any`: Kernel function for spectral density estimation (e.g., `AverageShiftedHistograms.Kernels.gaussian`).
+  - `args::Tuple`: Positional arguments for the kernel function.
+  - `kwargs::NamedTuple`: Keyword arguments for the kernel function.
+  - `alg::AbstractDenoiseAlgorithm`: Denoising algorithm (e.g., `SpectralDenoise`, `FixedDenoise`, `ShrunkDenoise`).
+  - `m::Integer`: Number of bins or smoothing parameter for the kernel estimator.
+  - `n::Integer`: Number of points for spectral density estimation.
+
+# Constructor
+
+    Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
+             m::Integer = 10,
+             n::Integer = 1000,
+             kernel = AverageShiftedHistograms.Kernels.gaussian,
+             args::Tuple = (),
+             kwargs::NamedTuple = (;))
+
+Keyword arguments correspond to the fields above. The constructor infers types and sets defaults for robust denoising.
+
+# Related
+
+  - [`AbstractDenoiseEstimator`](@ref)
+  - [`SpectralDenoise`](@ref)
+  - [`FixedDenoise`](@ref)
+  - [`ShrunkDenoise`](@ref)
+  - [`denoise!`](@ref)
+  - [`denoise`](@ref)
+"""
 struct Denoise{T1, T2 <: Tuple, T3 <: NamedTuple, T4 <: AbstractDenoiseAlgorithm,
                T5 <: Integer, T6 <: Integer} <: AbstractDenoiseEstimator
     kernel::T1
@@ -18,11 +169,79 @@ struct Denoise{T1, T2 <: Tuple, T3 <: NamedTuple, T4 <: AbstractDenoiseAlgorithm
     m::T5
     n::T6
 end
-function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), m::Integer = 10,
-                 n::Integer = 1000, kernel = AverageShiftedHistograms.Kernels.gaussian,
-                 args::Tuple = (), kwargs::NamedTuple = (;))
+"""
+    Denoise(; kernel = AverageShiftedHistograms.Kernels.gaussian,
+              args::Tuple = (),
+              kwargs::NamedTuple = (;),
+              alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
+              m::Integer = 10,
+              n::Integer = 1000)
+
+Construct a [`Denoise`](@ref) object, configuring all parameters for matrix denoising in PortfolioOptimisers.jl.
+
+# Arguments
+
+  - `kernel`: Kernel function for spectral density estimation.
+  - `args::Tuple`: Positional arguments for the kernel function. Default: `()`.
+  - `kwargs::NamedTuple`: Keyword arguments for the kernel function. Default: `NamedTuple()`.
+  - `alg::AbstractDenoiseAlgorithm`: Denoising algorithm to use (e.g., [`SpectralDenoise`](@ref), [`FixedDenoise`](@ref), [`ShrunkDenoise`](@ref)).
+  - `m::Integer`: Number of bins or smoothing parameter for the kernel estimator.
+  - `n::Integer`: Number of points for spectral density estimation.
+
+# Validation
+
+  - Types are inferred from provided arguments.
+  - All keyword arguments correspond to fields in [`Denoise`](@ref).
+
+# Example
+
+```jldoctest
+julia> de = Denoise(; alg = SpectralDenoise(), m = 20, n = 500)
+Denoise{...}(...)
+```
+
+# Related
+
+  - [`Denoise`](@ref)
+  - [`AbstractDenoiseEstimator`](@ref)
+  - [`SpectralDenoise`](@ref)
+  - [`FixedDenoise`](@ref)
+  - [`ShrunkDenoise`](@ref)
+  - [`denoise!`](@ref)
+  - [`denoise`](@ref)
+"""
+function Denoise(; kernel = AverageShiftedHistograms.Kernels.gaussian, args::Tuple = (),
+                 kwargs::NamedTuple = (;), alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
+                 m::Integer = 10, n::Integer = 1000)
     return Denoise{typeof(kernel), typeof(args), typeof(kwargs), typeof(alg), typeof(m),
                    typeof(n)}(kernel, args, kwargs, alg, m, n)
+end
+function Base.show(io::IO, de::Denoise)
+    println(io, "Denoise")
+    for field in fieldnames(typeof(de))
+        val = getfield(de, field)
+        print(io, "  ", lpad(string(field), 7), " ")
+        if isnothing(val)
+            println(io, "| nothing")
+        elseif isa(val, AbstractDenoiseAlgorithm)
+            ioalg = IOBuffer()
+            show(ioalg, val)
+            algstr = String(take!(ioalg))
+            alglines = split(algstr, '\n')
+            println(io, "| ", alglines[1])
+            for l in alglines[2:(end - 1)]
+                println(io, "          |", l)
+            end
+        elseif isa(val, AbstractVector) && length(val) ≤ 6
+            println(io, "| $(typeof(val)): ", repr(val))
+        elseif isa(val, AbstractVector)
+            println(io, "| $(length(val))-element $(typeof(val))")
+        elseif isa(val, NamedTuple)
+            println(io, "| $(typeof(val)): ", repr(val))
+        else
+            println(io, "| $(typeof(val)): ", repr(val))
+        end
+    end
 end
 function denoise!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
                   vecs::AbstractMatrix, num_factors::Integer)
@@ -75,14 +294,54 @@ function find_max_eval(vals, q; kernel = AverageShiftedHistograms.Kernels.gaussi
     e_max = x * (1.0 + sqrt(1.0 / q))^2
     return e_max, x
 end
+
+"""
+    denoise!(de::Denoise, X::AbstractMatrix, q::Real, pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
+    denoise!(::Nothing, args...)
+
+In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
+
+  - If `de` is `nothing`, this is a no-op and returns `nothing`.
+  - If `de` is a [`Denoise`](@ref) object, the specified denoising algorithm is applied to `X` in-place. Optionally, a [`PosdefEstimator`](@ref) can be provided to ensure the output is positive definite.
+
+# Arguments
+
+  - `de::Denoise`: The denoising estimator specifying the algorithm and kernel parameters.
+  - `pdm::Union{Nothing, <:PosdefEstimator}`: Optional positive definite matrix estimator. If provided, ensures the output is positive definite.
+  - `X::AbstractMatrix`: The covariance or correlation matrix to be denoised (modified in-place).
+  - `q::Real`: The effective sample ratio (e.g., `n_obs / n_assets`), used for spectral thresholding.
+
+# Returns
+
+  - `nothing`. The input matrix `X` is modified in-place.
+
+# Validation
+
+  - If `X` is a covariance matrix, it is internally converted to a correlation matrix for denoising and then rescaled.
+  - The number of factors is determined automatically from the spectrum and kernel parameters.
+  - If `pdm` is provided, the result is projected to the nearest positive definite matrix.
+
+# Examples
+
+```jldoctest
+julia> X
+de = Denoise(; alg = SpectralDenoise())
+```
+
+# Related
+
+  - [`denoise`](@ref)
+  - [`Denoise`](@ref)
+  - [`SpectralDenoise`](@ref)
+  - [`FixedDenoise`](@ref)
+  - [`ShrunkDenoise`](@ref)
+  - [`posdef!`](@ref)
+"""
 function denoise!(::Nothing, args...)
     return nothing
 end
-function denoise(::Nothing, args...)
-    return nothing
-end
-function denoise!(de::Denoise, pdm::Union{Nothing, <:PosDefEstimator}, X::AbstractMatrix,
-                  q::Real)
+function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
+                  pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
     s = diag(X)
     iscov = any(!isone, s)
     if iscov
@@ -100,10 +359,55 @@ function denoise!(de::Denoise, pdm::Union{Nothing, <:PosDefEstimator}, X::Abstra
     end
     return nothing
 end
-function denoise(de::Denoise, pdm::Union{Nothing, <:PosDefEstimator}, X::AbstractMatrix,
-                 q::Real)
+
+"""
+    denoise(de::Denoise, X::AbstractMatrix, q::Real, pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
+    denoise(::Nothing, args...)
+
+Same as [`denoise!`](@ref), but returns a new matrix instead of modifying `X` in-place.
+
+  - If `de` is `nothing`, this is a no-op and returns `nothing`.
+
+# Arguments
+
+  - `de::Denoise`: The denoising estimator specifying the algorithm and kernel parameters.
+  - `pdm::Union{Nothing, <:PosdefEstimator}`: Optional positive definite matrix estimator. If provided, ensures the output is positive definite.
+  - `X::AbstractMatrix`: The covariance or correlation matrix to be denoised.
+  - `q::Real`: The effective sample ratio (e.g., `n_obs / n_assets`), used for spectral thresholding.
+
+# Returns
+
+  - The denoised matrix as a new `AbstractMatrix`.
+
+# Validation
+
+  - If `X` is a covariance matrix, it is internally converted to a correlation matrix for denoising and then rescaled.
+  - The number of factors is determined automatically from the spectrum and kernel parameters.
+  - If `pdm` is provided, the result is projected to the nearest positive definite matrix.
+
+# Examples
+
+```jldoctest
+julia> Xd
+de = Denoise(; alg = SpectralDenoise())
+```
+
+# Related
+
+  - [`denoise!`](@ref)
+  - [`Denoise`](@ref)
+  - [`SpectralDenoise`](@ref)
+  - [`FixedDenoise`](@ref)
+  - [`ShrunkDenoise`](@ref)
+  - [`posdef`](@ref)
+"""
+function denoise(::Nothing, args...)
+    return nothing
+end
+function denoise(de::Denoise, X::AbstractMatrix, q::Real,
+                 pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
     X = copy(X)
-    denoise!(de, pdm, X, q)
+    denoise!(de, X, q, pdm)
     return X
 end
 

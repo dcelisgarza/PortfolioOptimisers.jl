@@ -17,6 +17,7 @@ PortfolioOptimisers.jl is a modular Julia package for portfolio optimization, su
     
       + Use [EditorConfig](https://editorconfig.org) and [pre-commit](https://pre-commit.com) with JuliaFormatter.jl.
       + Run all hooks: `pre-commit run -a`.
+
   - **Testing:**
     
       + From Julia REPL: `] activate .` then `] test`.
@@ -35,6 +36,7 @@ PortfolioOptimisers.jl is a modular Julia package for portfolio optimization, su
     
       + Source files are prefixed numerically to indicate load order and logical grouping.
       + Test files must be named `test-*.jl` for auto-discovery.
+
   - **Commit/PR Practices:**
     
       + Use imperative, informative commit messages.

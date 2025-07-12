@@ -121,19 +121,19 @@ struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
 end
 function Base.show(io::IO, rr::ReturnsResult)
     println(io, "ReturnsResult")
-    for (name, val) in zip((:nx, :X, :nf, :F, :ts, :iv, :ivpa),
-                           (rr.nx, rr.X, rr.nf, rr.F, rr.ts, rr.iv, rr.ivpa))
-        print(io, "  ", lpad(string(name), 4), " ")
+    for field in fieldnames(typeof(rr))
+        val = getfield(rr, field)
+        print(io, "  ", lpad(string(field), 4), " ")
         if isnothing(val)
-            println(io, ":: nothing")
+            println(io, "| nothing")
         elseif isa(val, AbstractMatrix)
-            println(io, ":: $(size(val,1))×$(size(val,2)) $(typeof(val))")
+            println(io, "| $(size(val,1))×$(size(val,2)) $(typeof(val))")
         elseif isa(val, AbstractVector) && length(val) ≤ 6
-            println(io, ":: $(typeof(val)): ", repr(val))
+            println(io, "| $(typeof(val)): ", repr(val))
         elseif isa(val, AbstractVector)
-            println(io, ":: $(length(val))-element $(typeof(val))")
+            println(io, "| $(length(val))-element $(typeof(val))")
         else
-            println(io, ":: $(typeof(val)): ", repr(val))
+            println(io, "| $(typeof(val)): ", repr(val))
         end
     end
 end
@@ -155,8 +155,8 @@ Construct a [`ReturnsResult`](@ref) object, validating dimensions and types for 
   - `nf::Union{Nothing, AbstractVector}`: Factor names or identifiers.
   - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix.
   - `ts::Union{Nothing, AbstractVector}`: Time series (e.g., timestamps).
-  - `iv::Union{Nothing, AbstractMatrix}`: Instrument variance matrix.
-  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: Instrument variance per asset (scalar or vector).
+  - `iv::Union{Nothing, AbstractMatrix}`: Implied volatility matrix.
+  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: Implied volatility per asset (scalar or vector).
 
 # Validation
 

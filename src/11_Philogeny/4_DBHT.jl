@@ -1262,7 +1262,7 @@ end
 function LoGo_dist_assert(args...)
     return nothing
 end
-function logo!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator}, sigma::AbstractMatrix,
+function logo!(je::LoGo, pdm::Union{Nothing, <:PosdefEstimator}, sigma::AbstractMatrix,
                X::AbstractMatrix; dims::Int = 1, kwargs...)
     assert_matrix_issquare(sigma)
     LoGo_dist_assert(je.dist, sigma, X)
@@ -1281,7 +1281,7 @@ function logo!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator}, sigma::Abstract
     posdef!(pdm, sigma)
     return nothing
 end
-function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator},
+function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:PosdefEstimator},
                                       sigma::AbstractMatrix, X::AbstractMatrix;
                                       dims::Int = 1, kwargs...)
     return logo!(je, pdm, sigma, X; dims = dims, kwargs...)

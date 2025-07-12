@@ -14,7 +14,7 @@ end PortfolioOptimisers
 
 include("./1_Base.jl")
 include("./2_Tools.jl")
-include("./3_PosDefMatrix.jl")
+include("./3_PosdefMatrix.jl")
 include("./4_Denoise.jl")
 include("./5_Detone.jl")
 include("./6_MatrixProcessing.jl")
