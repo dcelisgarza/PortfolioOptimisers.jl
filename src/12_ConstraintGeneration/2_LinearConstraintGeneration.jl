@@ -142,6 +142,7 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
 end
 Base.length(res::AbstractParsingResult) = 1
 Base.iterate(res::AbstractParsingResult, state = 1) = state > 1 ? nothing : (res, state + 1)
+Base.getindex(res::AbstractParsingResult, i) = i == 1 ? res : throw(BoundsError(res, i))
 struct AssetSets{T1 <: AbstractString, T2 <: AbstractDict}
     key::T1
     dict::T2

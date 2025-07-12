@@ -329,9 +329,13 @@ function ep_var_views!(var_views::Union{<:AbstractString, Expr,
     var_views = replace_group_by_assets(var_views, sets, false, true, false)
     var_views = replace_prior_views(var_views, pr, sets, :var, alpha; strict = strict)
     lcs = get_linear_constraints(var_views, sets; datatype = eltype(pr.X), strict = strict)
+    if !isnothing(lcs.ineq) && any(x -> (!iszero(x) || !isone(x)), lcs.A_ineq) ||
+       !isnothing(lcs.eq) && any(x -> (!iszero(x) || isone(x)), lcs.A_eq)
+        throw(ArgumentError("`var_view` only supports coefficients of 1."))
+    end
     if !isnothing(lcs.ineq) && any(x -> x != 1, count(!iszero, lcs.A_ineq; dims = 2)) ||
        !isnothing(lcs.eq) && any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2))
-        throw(ArgumentError("Cannot mix multiple assets in a single `var_view`."))
+        throw(ArgumentError("Cannot mix multiple assets in a single `var_view`\n$var_views."))
     end
     if !isnothing(lcs.eq) && any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq) ||
        !isnothing(lcs.ineq) && any(x -> x < zero(eltype(x)), lcs.A_ineq .* lcs.B_ineq)
@@ -916,7 +920,7 @@ function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     ep_var_views!(pe.var_views, epc, pr, pe.sets, pe.var_alpha; strict = strict)
-    if !isnothing(pe.mu_views) || !isnothing(pe.var_views)
+    if !isnothing(pe.mu_views) || !isnothing(pe.var_views) || !isnothing(pe.cvar_views)
         w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha, w0,
                                   pe.opt, pe.ds_opt, pe.dm_opt; strict = strict)
         pe = factory(pe, w1)
