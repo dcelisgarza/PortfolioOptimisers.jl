@@ -362,6 +362,7 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
             end
             At += Ai * c
         end
+        @smart_assert(any(x -> !iszero(x), At))
         d = ifelse(lc.op == ">=", -1, 1)
         flag = d == -1 || lc.op == "<="
         A = At .* d

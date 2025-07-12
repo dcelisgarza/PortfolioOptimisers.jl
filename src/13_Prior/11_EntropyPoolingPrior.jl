@@ -329,17 +329,17 @@ function ep_var_views!(var_views::Union{<:AbstractString, Expr,
     var_views = replace_group_by_assets(var_views, sets, false, true, false)
     var_views = replace_prior_views(var_views, pr, sets, :var, alpha; strict = strict)
     lcs = get_linear_constraints(var_views, sets; datatype = eltype(pr.X), strict = strict)
-    if !isnothing(lcs.ineq) && any(x -> (!iszero(x) || !isone(x)), lcs.A_ineq) ||
-       !isnothing(lcs.eq) && any(x -> (!iszero(x) || isone(x)), lcs.A_eq)
-        throw(ArgumentError("`var_view` only supports coefficients of 1."))
+    if !isnothing(lcs.ineq) && !all(x -> (iszero(x) || isone(x)), lcs.A_ineq) ||
+       !isnothing(lcs.eq) && !all(x -> (iszero(x) || isone(x)), lcs.A_eq)
+        throw(ArgumentError("`var_view` only supports coefficients of 1.\n$var_views"))
     end
     if !isnothing(lcs.ineq) && any(x -> x != 1, count(!iszero, lcs.A_ineq; dims = 2)) ||
        !isnothing(lcs.eq) && any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2))
-        throw(ArgumentError("Cannot mix multiple assets in a single `var_view`\n$var_views."))
+        throw(ArgumentError("Cannot mix multiple assets in a single `var_view`.\n$var_views"))
     end
     if !isnothing(lcs.eq) && any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq) ||
        !isnothing(lcs.ineq) && any(x -> x < zero(eltype(x)), lcs.A_ineq .* lcs.B_ineq)
-        throw(ArgumentError("`var_view` cannot be negative."))
+        throw(ArgumentError("`var_view` cannot be negative.\n$var_views"))
     end
     for p in propertynames(lcs)
         if isnothing(getproperty(lcs, p))
