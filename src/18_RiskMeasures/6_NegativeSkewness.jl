@@ -22,7 +22,7 @@ function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(
         @smart_assert(!isempty(sk))
         @smart_assert(!isempty(V))
         @smart_assert(size(sk, 1)^2 == size(sk, 2))
-        issquare(V)
+        assert_matrix_issquare(V)
     end
     return NegativeSkewness{typeof(settings), typeof(mp), typeof(sk), typeof(V),
                             typeof(alg)}(settings, mp, sk, V, alg)

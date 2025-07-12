@@ -126,6 +126,14 @@ We try to keep a linear history in this repo, so it is important to keep your br
     ```
   - Then you can open a pull request and work with the reviewer to address any issues.
 
+## Writing documentation
+
+  - Please document new features. The documentation must include:
+    
+      + Links to related functions and types.
+      + Exhaustive descriptions of the arguments, keyword arguments, type information, and data validation.
+      + Exhaustive usage examples as REPL-style `jldoctest` blocks, they should maximize code coverage.
+
 ## Building and viewing the documentation locally
 
 Following the latest suggestions, we recommend using `LiveServer` to build the documentation.

@@ -81,7 +81,7 @@ function distance(de::GeneralDistance{<:Any, <:CorrelationDistance},
 end
 function distance(de::GeneralDistance{<:Any, <:CorrelationDistance}, rho::AbstractMatrix,
                   args...; kwargs...)
-    issquare(rho)
+    assert_matrix_issquare(rho)
     s = diag(rho)
     iscov = any(!isone, s)
     if iscov

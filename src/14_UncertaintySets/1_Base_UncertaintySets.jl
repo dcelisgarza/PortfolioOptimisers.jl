@@ -88,7 +88,7 @@ end
 function EllipseUncertaintySetResult(; sigma::AbstractMatrix, k::Real,
                                      class::AbstractEllipseUncertaintySetResultClass)
     @smart_assert(!isempty(sigma))
-    issquare(sigma)
+    assert_matrix_issquare(sigma)
     @smart_assert(zero(k) < k)
     return EllipseUncertaintySetResult{typeof(sigma), typeof(k), typeof(class)}(sigma, k,
                                                                                 class)

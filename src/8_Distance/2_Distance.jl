@@ -68,7 +68,7 @@ function distance(::Distance{<:CorrelationDistance}, ce::StatsBase.CovarianceEst
 end
 function distance(::Distance{<:CorrelationDistance}, rho::AbstractMatrix, args...;
                   kwargs...)
-    issquare(rho)
+    assert_matrix_issquare(rho)
     s = diag(rho)
     iscov = any(!isone, s)
     if iscov

@@ -210,7 +210,7 @@ function HighOrderPriorResult(; pr::AbstractPriorResult,
     if kt_flag || L2_flag || S2_flag
         @smart_assert(kt_flag && L2_flag && S2_flag)
         @smart_assert(!isempty(kt) && !isempty(L2) && !isempty(S2))
-        issquare(kt)
+        assert_matrix_issquare(kt)
         N = length(pr.mu)
         @smart_assert(length(pr.mu)^2 == size(kt, 1))
         @smart_assert(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
@@ -223,7 +223,7 @@ function HighOrderPriorResult(; pr::AbstractPriorResult,
     end
     if V_flag
         @smart_assert(!isempty(V))
-        issquare(V)
+        assert_matrix_issquare(V)
     end
     if sk_flag || V_flag
         @smart_assert(sk_flag && V_flag,

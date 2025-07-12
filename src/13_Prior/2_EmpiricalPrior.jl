@@ -24,7 +24,7 @@ function LowOrderPriorResult(; X::AbstractMatrix, mu::AbstractVector, sigma::Abs
                              f_w::Union{Nothing, <:AbstractVector} = nothing)
     @smart_assert(!isempty(X) && !isempty(mu) && !isempty(sigma))
     @smart_assert(size(X, 2) == length(mu))
-    issquare(sigma)
+    assert_matrix_issquare(sigma)
     if !isnothing(w)
         @smart_assert(!isempty(w))
         @smart_assert(length(w) == size(X, 1))
@@ -35,7 +35,7 @@ function LowOrderPriorResult(; X::AbstractMatrix, mu::AbstractVector, sigma::Abs
     if loadings_flag || f_mu_flag || f_sigma_flag
         @smart_assert(loadings_flag && f_mu_flag && f_sigma_flag)
         @smart_assert(!isempty(f_mu) && !isempty(f_sigma))
-        issquare(f_sigma)
+        assert_matrix_issquare(f_sigma)
         @smart_assert(size(loadings.M, 2) == length(f_mu) == size(f_sigma, 1))
         @smart_assert(size(loadings.M, 1) == length(mu))
         if !isnothing(chol)

@@ -181,7 +181,7 @@ function PortfolioOptimisers.plot_clusters(clr::PortfolioOptimisers.AbstractClus
                                            hmap_kwargs = (;),
                                            line_kwargs = (; color = :black, linewidth = 3),
                                            fig_kwargs = (; size = (600, 600)), ekwargs...)
-    PortfolioOptimisers.issquare(X)
+    PortfolioOptimisers.assert_matrix_issquare(X)
     iscov = any(!isone, diag(X))
     if iscov
         X = cov2cor(X)

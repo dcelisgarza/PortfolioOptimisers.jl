@@ -206,7 +206,7 @@ function plot_clusters(clr::AbstractClusteringResult, X::AbstractMatrix,
                                                                         k = clr.k),
                                                         origin = Point2d(0,
                                                                          clr.clustering.heights[end])))
-    issquare(X)
+    assert_matrix_issquare(X)
     iscov = any(!isone, diag(X))
     if iscov
         X = cov2cor(X)

@@ -1,5 +1,25 @@
+"""
+    AbstractReturnsResult <: AbstractResult
+
+Abstract supertype for all returns result types in PortfolioOptimisers.jl.
+
+All concrete types representing the result of returns calculations (e.g., asset returns, factor returns)
+should subtype `AbstractReturnsResult`. This enables a consistent interface for downstream analysis
+and optimization routines.
+
+# Related
+
+  - [`AbstractResult`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
 abstract type AbstractReturnsResult <: AbstractResult end
-function issquare(A::AbstractMatrix)
+
+"""
+    assert_matrix_issquare(A::AbstractMatrix)
+
+Assert that `A` is a square matrix.
+"""
+function assert_matrix_issquare(A::AbstractMatrix)
     @smart_assert(size(A, 1) == size(A, 2))
 end
 function drop_correlated(X::AbstractMatrix; threshold::Real = 0.95, absolute::Bool = false)
@@ -38,6 +58,51 @@ function drop_incomplete(X::AbstractMatrix, any_missing::Bool = true)
     end
 end
 function select_kextremes(X::AbstractMatrix) end
+
+"""
+    struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
+                         T2 <: Union{Nothing, <:AbstractMatrix},
+                         T3 <: Union{Nothing, <:AbstractVector},
+                         T4 <: Union{Nothing, <:AbstractMatrix},
+                         T5 <: Union{Nothing, <:AbstractVector},
+                         T6 <: Union{Nothing, <:AbstractMatrix},
+                         T7 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
+           AbstractReturnsResult
+        nx::T1
+        X::T2
+        nf::T3
+        F::T4
+        ts::T5
+        iv::T6
+        ivpa::T7
+    end
+
+A flexible container type for storing the results of asset and factor returns calculations in PortfolioOptimisers.jl.
+
+`ReturnsResult` is the standard result type returned by returns-processing routines, such as [`prices_to_returns`](@ref).
+It supports both asset and factor returns, as well as optional time series and implied volatility information, and is designed for downstream compatibility with optimization and analysis routines.
+
+# Fields
+
+  - `nx::Union{Nothing, AbstractVector}`: Names or identifiers of asset columns. `nothing` if not present.
+  - `X::Union{Nothing, AbstractMatrix}`: Asset returns matrix (observations × assets). `nothing` if not present.
+  - `nf::Union{Nothing, AbstractVector}`: Names or identifiers of factor columns. `nothing` if not present.
+  - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix (observations × factors). `nothing` if not present.
+  - `ts::Union{Nothing, AbstractVector}`: Optional time series (e.g., timestamps) for each observation. `nothing` if not present.
+  - `iv::Union{Nothing, AbstractMatrix}`: Implied volatilities or other per-asset, per-time information. `nothing` if not present.
+  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: Implied volatility per asset (vector or scalar), or `nothing`.
+
+# Constructor
+
+    ReturnsResult(; nx=nothing, X=nothing, nf=nothing, F=nothing, ts=nothing, iv=nothing, ivpa=nothing)
+
+Keyword arguments correspond to the fields above. The constructor performs internal consistency checks (e.g., matching dimensions, non-emptiness, positivity for variances).
+
+# Related
+
+  - [`AbstractReturnsResult`](@ref)
+  - [`prices_to_returns`](@ref)
+"""
 struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
                      T2 <: Union{Nothing, <:AbstractMatrix},
                      T3 <: Union{Nothing, <:AbstractVector},
@@ -54,6 +119,65 @@ struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
     iv::T6
     ivpa::T7
 end
+function Base.show(io::IO, rr::ReturnsResult)
+    println(io, "ReturnsResult")
+    for (name, val) in zip((:nx, :X, :nf, :F, :ts, :iv, :ivpa),
+                           (rr.nx, rr.X, rr.nf, rr.F, rr.ts, rr.iv, rr.ivpa))
+        print(io, "  ", lpad(string(name), 4), " ")
+        if isnothing(val)
+            println(io, ":: nothing")
+        elseif isa(val, AbstractMatrix)
+            println(io, ":: $(size(val,1))×$(size(val,2)) $(typeof(val))")
+        elseif isa(val, AbstractVector) && length(val) ≤ 6
+            println(io, ":: $(typeof(val)): ", repr(val))
+        elseif isa(val, AbstractVector)
+            println(io, ":: $(length(val))-element $(typeof(val))")
+        else
+            println(io, ":: $(typeof(val)): ", repr(val))
+        end
+    end
+end
+"""
+    ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
+                    X::Union{Nothing, <:AbstractMatrix} = nothing,
+                    nf::Union{Nothing, <:AbstractVector} = nothing,
+                    F::Union{Nothing, <:AbstractMatrix} = nothing,
+                    ts::Union{Nothing, <:AbstractVector} = nothing,
+                    iv::Union{Nothing, <:AbstractMatrix} = nothing,
+                    ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+
+Construct a [`ReturnsResult`](@ref) object, validating dimensions and types for asset and factor returns, time series, and instrument variance data.
+
+# Arguments
+
+  - `nx::Union{Nothing, AbstractVector}`: Asset names or identifiers.
+  - `X::Union{Nothing, AbstractMatrix}`: Asset returns matrix.
+  - `nf::Union{Nothing, AbstractVector}`: Factor names or identifiers.
+  - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix.
+  - `ts::Union{Nothing, AbstractVector}`: Time series (e.g., timestamps).
+  - `iv::Union{Nothing, AbstractMatrix}`: Instrument variance matrix.
+  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: Instrument variance per asset (scalar or vector).
+
+# Validation
+
+  - If `nx` or `X` is provided, both must be non-empty and `length(nx) == size(X, 2)`.
+  - If `nf` or `F` is provided, both must be non-empty and `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
+  - If `ts` is provided, must be non-empty and `length(ts) == size(X, 1)`.
+  - If `iv` is provided, must be non-empty, positive, and `size(iv) == size(X)`.
+  - If `ivpa` is provided, must be positive and finite; if a vector, `length(ivpa) == size(iv, 2)`.
+
+# Example
+
+```jldoctest
+julia> ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4])
+ReturnsResult{Vector{String}, Matrix{Float64}, Nothing, Nothing, Nothing, Nothing, Nothing}(["A", "B"], [0.1 0.2; 0.3 0.4], nothing, nothing, nothing, nothing, nothing)
+```
+
+# Related
+
+  - [`ReturnsResult`](@ref)
+  - [`prices_to_returns`](@ref)
+"""
 function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                        X::Union{Nothing, <:AbstractMatrix} = nothing,
                        nf::Union{Nothing, <:AbstractVector} = nothing,
@@ -189,19 +313,16 @@ end
 function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
                              asset_classes::DataFrame, col, date0 = nothing,
                              date1 = nothing)
-    #! Make this efficient with filter.
-    # sort!(filter!(:timestamp => x -> date0 <= x <= date1, prices), :timestamp)
+    # Efficient filtering of date range
     idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
         timestamps = timestamp(X)
-        idx = DateTime(date0) .<= timestamps .<= DateTime(date1)
+        idx = (DateTime(date0) .<= timestamps) .& (timestamps .<= DateTime(date1))
         findfirst(idx), findlast(idx)
     else
         1, length(X)
     end
 
     ret = vec(values(X[idx2]) ./ values(X[idx1]) .- 1)
-
-    # ret_w = dot(ret, w)
     ret_b = dot(ret, wb)
 
     classes = asset_classes[!, col]
@@ -211,11 +332,11 @@ function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector
                    index = ["Asset Allocation", "Security Selection", "Interaction",
                             "Total Excess Return"])
 
-    for class_i in unique_classes
-        sets_i = BitVector(undef, 0)
-        for class_j in classes
-            push!(sets_i, class_i == class_j)
-        end
+    # Precompute class membership matrix for efficiency
+    sets_mat = [class_j == class_i for class_j in classes, class_i in unique_classes]
+
+    for (i, class_i) in enumerate(unique_classes)
+        sets_i = view(sets_mat, :, i)
 
         w_i = dot(sets_i, w)
         wb_i = dot(sets_i, wb)
@@ -238,23 +359,150 @@ function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector
 
     return df
 end
+"""
+    ⊗(A::AbstractArray, B::AbstractArray)
+
+Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
+
+# Example
+
+```jldoctest
+julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
+2×2 Matrix{Int64}:
+ 3  4
+ 6  8
+```
+"""
 ⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
-outer_prod(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
+
+"""
+    ⊙(A, B)
+
+Elementwise multiplication.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.:⊙([1, 2], [3, 4])
+2-element Vector{Int64}:
+ 3
+ 8
+
+julia> PortfolioOptimisers.:⊙([1, 2], 2)
+2-element Vector{Int64}:
+ 2
+ 4
+
+julia> PortfolioOptimisers.:⊙(2, [3, 4])
+2-element Vector{Int64}:
+ 6
+ 8
+
+julia> PortfolioOptimisers.:⊙(2, 3)
+6
+```
+"""
 ⊙(A::AbstractArray, B::AbstractArray) = A .* B
 ⊙(A::AbstractArray, B) = A * B
 ⊙(A, B::AbstractArray) = A * B
-⊙(A::Real, B::Real) = A * B
+⊙(A, B) = A * B
+
+"""
+    ⊘(A, B)
+
+Elementwise division.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.:⊘([4, 9], [2, 3])
+2-element Vector{Float64}:
+ 2.0
+ 3.0
+
+julia> PortfolioOptimisers.:⊘([4, 6], 2)
+2-element Vector{Float64}:
+ 2.0
+ 3.0
+
+julia> PortfolioOptimisers.:⊘(8, [2, 4])
+2-element Vector{Float64}:
+ 4.0
+ 2.0
+
+julia> PortfolioOptimisers.:⊘(8, 2)
+4.0
+```
+"""
 ⊘(A::AbstractArray, B::AbstractArray) = A ./ B
 ⊘(A::AbstractArray, B) = A / B
 ⊘(A, B::AbstractArray) = A ./ B
+⊘(A, B) = A / B
+
+"""
+    ⊕(A, B)
+
+Elementwise addition.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.:⊕([1, 2], [3, 4])
+2-element Vector{Int64}:
+ 4
+ 6
+
+julia> PortfolioOptimisers.:⊕([1, 2], 2)
+2-element Vector{Int64}:
+ 3
+ 4
+
+julia> PortfolioOptimisers.:⊕(2, [3, 4])
+2-element Vector{Int64}:
+ 5
+ 6
+
+julia> PortfolioOptimisers.:⊕(2, 3)
+5
+```
+"""
 ⊕(A::AbstractArray, B::AbstractArray) = A .+ B
-⊕(A::Real, B::AbstractArray) = A .+ B
-⊕(A::AbstractArray, B::Real) = A .+ B
+⊕(A::AbstractArray, B) = A .+ B
+⊕(A, B::AbstractArray) = A .+ B
 ⊕(A, B) = A + B
+
+"""
+    ⊖(A, B)
+
+Elementwise subtraction.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.:⊖([4, 6], [1, 2])
+2-element Vector{Int64}:
+ 3
+ 4
+
+julia> PortfolioOptimisers.:⊖([4, 6], 2)
+2-element Vector{Int64}:
+ 2
+ 4
+
+julia> PortfolioOptimisers.:⊖(8, [2, 4])
+2-element Vector{Int64}:
+ 6
+ 4
+
+julia> PortfolioOptimisers.:⊖(8, 2)
+6
+```
+"""
 ⊖(A::AbstractArray, B::AbstractArray) = A - B
 ⊖(A::AbstractArray, B) = A .- B
 ⊖(A, B::AbstractArray) = A .- B
 ⊖(A, B) = A - B
+
 function dot_scalar(a::Real, b::AbstractVector)
     return a * sum(b)
 end
@@ -322,20 +570,78 @@ function fourth_moment_index_factory(N::Integer, i)
     end
     return idx
 end
-function traverse_subtypes(types, ctarr = nothing)
+
+"""
+    traverse_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} = nothing)
+
+Recursively traverse all subtypes of the given abstract type `t` and collect all concrete struct types into `ctarr`.
+
+# Arguments
+
+  - `t`: An abstract type whose subtypes will be traversed.
+  - `ctarr::Union{Nothing, <:AbstractVector}`: (Optional) An array to collect the concrete types. If not provided, a new empty array is created.
+
+# Returns
+
+An array containing all concrete struct types that are subtypes (direct or indirect) of `types`.
+
+# Example
+
+```jldoctest
+julia> abstract type MyAbstract end
+
+julia> struct MyConcrete1 <: MyAbstract end
+
+julia> struct MyConcrete2 <: MyAbstract end
+
+julia> PortfolioOptimisers.traverse_subtypes(MyAbstract)
+2-element Vector{Any}:
+ MyConcrete1
+ MyConcrete2
+```
+"""
+function traverse_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} = nothing)
     if isnothing(ctarr)
         ctarr = []
     end
-    stypes = subtypes(types)
-    for stype in stypes
-        if !isstructtype(stype)
-            traverse_subtypes(stype, ctarr)
+    sts = subtypes(t)
+    for st in sts
+        if !isstructtype(st)
+            traverse_subtypes(st, ctarr)
         else
-            push!(ctarr, stype)
+            push!(ctarr, st)
         end
     end
     return ctarr
 end
+
+"""
+    concrete_typed_array(A::AbstractArray)
+
+Convert an `AbstractArray` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
+
+This is useful for converting arrays with abstract element types to arrays with concrete element types, which can improve performance in some cases.
+
+# Arguments
+
+  - `A::AbstractArray`: The input array.
+
+# Returns
+
+A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
+
+# Example
+
+```jldoctest
+julia> A = Any[1, 2.0, 3];
+
+julia> PortfolioOptimisers.concrete_typed_array(A)
+3-element Vector{Union{Float64, Int64}}:
+ 1
+ 2.0
+ 3
+```
+"""
 function concrete_typed_array(A::AbstractArray)
     return reshape(Union{typeof.(A)...}[A...], size(A))
 end

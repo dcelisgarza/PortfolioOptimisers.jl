@@ -32,7 +32,7 @@ function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   formulation::VarianceFormulation = SOCRiskExpr())
     if isa(sigma, AbstractMatrix)
         @smart_assert(!isempty(sigma))
-        issquare(sigma)
+        assert_matrix_issquare(sigma)
     end
     return Variance{typeof(settings), typeof(sigma), typeof(rc), typeof(formulation)}(settings,
                                                                                       sigma,
@@ -64,7 +64,7 @@ function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings
                            sigma::Union{Nothing, <:AbstractMatrix} = nothing)
     if isa(sigma, AbstractMatrix)
         @smart_assert(!isempty(sigma))
-        issquare(sigma)
+        assert_matrix_issquare(sigma)
     end
     return StandardDeviation{typeof(settings), typeof(sigma)}(settings, sigma)
 end

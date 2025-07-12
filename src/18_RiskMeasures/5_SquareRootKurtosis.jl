@@ -24,7 +24,7 @@ function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSetting
     end
     if kt_flag
         @smart_assert(!isempty(kt))
-        issquare(kt)
+        assert_matrix_issquare(kt)
     end
     if mu_flag && kt_flag
         @smart_assert(length(mu)^2 == size(kt, 2))

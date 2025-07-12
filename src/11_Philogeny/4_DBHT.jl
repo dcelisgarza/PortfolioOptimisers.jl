@@ -1264,7 +1264,7 @@ function LoGo_dist_assert(args...)
 end
 function logo!(je::LoGo, pdm::Union{Nothing, <:PosDefEstimator}, sigma::AbstractMatrix,
                X::AbstractMatrix; dims::Int = 1, kwargs...)
-    issquare(sigma)
+    assert_matrix_issquare(sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
     iscov = any(!isone, s)
