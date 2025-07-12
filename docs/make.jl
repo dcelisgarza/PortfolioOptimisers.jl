@@ -9,13 +9,14 @@ const numbered_pages = [file
                         for file in readdir(joinpath(@__DIR__, "src"))
                         if file != "index.md" && splitext(file)[2] == ".md"]
 
-makedocs(; modules = [PortfolioOptimisers],
+makedocs(; #modules = [PortfolioOptimisers],
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
          sitename = "PortfolioOptimisers.jl",
          format = Documenter.HTML(;
                                   canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl",),
-         pages = ["index.md"; numbered_pages],
+         pages = ["index.md"; numbered_pages[2:end];
+                  "API" => [numbered_pages[1], numbered_pages[2]]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 

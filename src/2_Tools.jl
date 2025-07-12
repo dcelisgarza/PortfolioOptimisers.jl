@@ -166,11 +166,18 @@ Construct a [`ReturnsResult`](@ref) object, validating dimensions and types for 
   - If `iv` is provided, must be non-empty, positive, and `size(iv) == size(X)`.
   - If `ivpa` is provided, must be positive and finite; if a vector, `length(ivpa) == size(iv, 2)`.
 
-# Example
+# Examples
 
 ```jldoctest
 julia> ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4])
-ReturnsResult{Vector{String}, Matrix{Float64}, Nothing, Nothing, Nothing, Nothing, Nothing}(["A", "B"], [0.1 0.2; 0.3 0.4], nothing, nothing, nothing, nothing, nothing)
+ReturnsResult
+    nx | Vector{String}: ["A", "B"]
+     X | 2×2 Matrix{Float64}
+    nf | nothing
+     F | nothing
+    ts | nothing
+    iv | nothing
+  ivpa | nothing
 ```
 
 # Related
@@ -229,6 +236,19 @@ function returns_result_view(rd::ReturnsResult, i::AbstractVector)
     return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts, iv = iv,
                          ivpa = ivpa)
 end
+
+"""
+    prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
+                      iv::Union{Nothing, <:TimeArray} = nothing,
+                      ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                      ret_method::Symbol = :simple, padding::Bool = false,
+                      missing_col_percent::Real = 1.0,
+                      missing_row_percent::Union{Nothing, <:Real} = 1.0,
+                      collapse_args::Tuple = (),
+                      map_func::Union{Nothing, Function} = nothing,
+                      join_method::Symbol = :outer,
+                      impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
+"""
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                            iv::Union{Nothing, <:TimeArray} = nothing,
                            ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
@@ -310,6 +330,11 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = values(iv),
                          ivpa = ivpa)
 end
+"""
+    brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
+                        asset_classes::DataFrame, col, date0 = nothing,
+                        date1 = nothing)
+"""
 function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
                              asset_classes::DataFrame, col, date0 = nothing,
                              date1 = nothing)
@@ -364,7 +389,7 @@ end
 
 Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
 
-# Example
+# Examples
 
 ```jldoctest
 julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
@@ -585,9 +610,9 @@ Recursively traverse all subtypes of the given abstract type `t` and collect all
 
 An array containing all concrete struct types that are subtypes (direct or indirect) of `types`.
 
-# Example
+# Examples
 
-```jldoctest
+```julia
 julia> abstract type MyAbstract end
 
 julia> struct MyConcrete1 <: MyAbstract end
@@ -630,13 +655,13 @@ This is useful for converting arrays with abstract element types to arrays with 
 
 A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
 
-# Example
+# Examples
 
 ```jldoctest
 julia> A = Any[1, 2.0, 3];
 
 julia> PortfolioOptimisers.concrete_typed_array(A)
-3-element Vector{Union{Float64, Int64}}:
+3-element reshape(::Vector{Union{Float64, Int64}}, 3) with eltype Union{Float64, Int64}:
  1
  2.0
  3
@@ -650,4 +675,4 @@ function factory(::Nothing, args...; kwargs...)
 end
 
 export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns,
-       concrete_typed_array, factory
+       brinson_attribution, factory

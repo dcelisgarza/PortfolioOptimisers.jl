@@ -28,6 +28,6 @@ Pages = ["95-reference.md"]
 Pages = ["95-reference.md"]
 ```
 
-```@autodocs
+<!-- ```@autodocs
 Modules = [PortfolioOptimisers]
-```
+``` -->

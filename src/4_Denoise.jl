@@ -109,7 +109,8 @@ Constructor for [`ShrunkDenoise`](@ref). See above for details.
 
 ```jldoctest
 julia> alg = ShrunkDenoise(; alpha = 0.5)
-ShrunkDenoise{Float64}(0.5)
+ShrunkDenoise
+  alg | Float64: 0.5
 ```
 """
 function ShrunkDenoise(; alpha::Real = 0.0)
@@ -193,11 +194,27 @@ Construct a [`Denoise`](@ref) object, configuring all parameters for matrix deno
   - Types are inferred from provided arguments.
   - All keyword arguments correspond to fields in [`Denoise`](@ref).
 
-# Example
+# Examples
 
 ```jldoctest
+julia> de = Denoise(;)
+Denoise
+   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+     args | Tuple{}: ()
+   kwargs | @NamedTuple{}: NamedTuple()
+      alg | ShrunkDenoise
+          |  alg | Float64: 0.0
+        m | Int64: 10
+        n | Int64: 1000
+
 julia> de = Denoise(; alg = SpectralDenoise(), m = 20, n = 500)
-Denoise{...}(...)
+Denoise
+   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+     args | Tuple{}: ()
+   kwargs | @NamedTuple{}: NamedTuple()
+      alg | SpectralDenoise()
+        m | Int64: 20
+        n | Int64: 500
 ```
 
 # Related
@@ -324,8 +341,29 @@ In-place denoising of a covariance or correlation matrix using a [`Denoise`](@re
 # Examples
 
 ```jldoctest
+julia> using StableRNGs
+
+julia> rng = StableRNG(123456789);
+
+julia> X = rand(rng, 10, 5);
+
+julia> X = X' * X
+5×5 Matrix{Float64}:
+ 3.29494  2.0765   1.73334  2.01524  1.77493
+ 2.0765   2.46967  1.39953  1.97242  2.07886
+ 1.73334  1.39953  1.90712  1.17071  1.30459
+ 2.01524  1.97242  1.17071  2.24818  1.87091
+ 1.77493  2.07886  1.30459  1.87091  2.44414
+
+julia> denoise!(Denoise(), X, 10 / 5)
+
 julia> X
-de = Denoise(; alg = SpectralDenoise())
+5×5 Matrix{Float64}:
+ 3.29494  2.28883  1.70633  2.12343  2.17377
+ 2.28883  2.46967  1.59575  1.98583  2.0329
+ 1.70633  1.59575  1.90712  1.48044  1.51553
+ 2.12343  1.98583  1.48044  2.24818  1.886
+ 2.17377  2.0329   1.51553  1.886    2.44414
 ```
 
 # Related
@@ -342,6 +380,7 @@ function denoise!(::Nothing, args...)
 end
 function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
                   pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
+    assert_matrix_issquare(X)
     s = diag(X)
     iscov = any(!isone, s)
     if iscov
@@ -368,28 +407,30 @@ Same as [`denoise!`](@ref), but returns a new matrix instead of modifying `X` in
 
   - If `de` is `nothing`, this is a no-op and returns `nothing`.
 
-# Arguments
-
-  - `de::Denoise`: The denoising estimator specifying the algorithm and kernel parameters.
-  - `pdm::Union{Nothing, <:PosdefEstimator}`: Optional positive definite matrix estimator. If provided, ensures the output is positive definite.
-  - `X::AbstractMatrix`: The covariance or correlation matrix to be denoised.
-  - `q::Real`: The effective sample ratio (e.g., `n_obs / n_assets`), used for spectral thresholding.
-
-# Returns
-
-  - The denoised matrix as a new `AbstractMatrix`.
-
-# Validation
-
-  - If `X` is a covariance matrix, it is internally converted to a correlation matrix for denoising and then rescaled.
-  - The number of factors is determined automatically from the spectrum and kernel parameters.
-  - If `pdm` is provided, the result is projected to the nearest positive definite matrix.
-
 # Examples
 
 ```jldoctest
-julia> Xd
-de = Denoise(; alg = SpectralDenoise())
+julia> using StableRNGs
+
+julia> rng = StableRNG(123456789);
+
+julia> X = rand(rng, 10, 5);
+
+julia> X = X' * X
+5×5 Matrix{Float64}:
+ 3.29494  2.0765   1.73334  2.01524  1.77493
+ 2.0765   2.46967  1.39953  1.97242  2.07886
+ 1.73334  1.39953  1.90712  1.17071  1.30459
+ 2.01524  1.97242  1.17071  2.24818  1.87091
+ 1.77493  2.07886  1.30459  1.87091  2.44414
+
+julia> Xd = denoise(Denoise(), X, 10 / 5)
+5×5 Matrix{Float64}:
+ 3.29494  2.28883  1.70633  2.12343  2.17377
+ 2.28883  2.46967  1.59575  1.98583  2.0329
+ 1.70633  1.59575  1.90712  1.48044  1.51553
+ 2.12343  1.98583  1.48044  2.24818  1.886
+ 2.17377  2.0329   1.51553  1.886    2.44414
 ```
 
 # Related
