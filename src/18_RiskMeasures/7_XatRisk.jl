@@ -72,6 +72,7 @@ function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
     sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, r.alpha)
+    idx = ifelse(idx > length(x), idx - 1, idx)
     return -sorted_x[idx]
 end
 struct ValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
@@ -112,12 +113,14 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::Abstra
     sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, r.alpha)
+    idx = ifelse(idx > length(x), idx - 1, idx)
     loss = -sorted_x[idx]
 
     sorted_x = reverse(sorted_x)
     sorted_w = reverse(sorted_w)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, r.beta)
+    idx = ifelse(idx > length(x), idx - 1, idx)
     gain = -sorted_x[idx]
     return loss - gain
 end

@@ -76,8 +76,9 @@ function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, <:AbstractWeights},
     if idx == 1
         -sorted_x[1]
     else
+        idx = ifelse(idx > length(x), idx - 1, idx)
         -(dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
-          sorted_x[idx] * (alpha - cum_w[idx - 1])) / (alpha)
+          sorted_x[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end
 struct ConditionalValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
@@ -186,6 +187,7 @@ function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, <:Abstract
     loss = if idx == 1
         -sorted_x[1]
     else
+        idx = ifelse(idx > length(x), idx - 1, idx)
         -(dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / (alpha)
     end
@@ -198,6 +200,7 @@ function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, <:Abstract
     gain = if idx == 1
         -sorted_x[1]
     else
+        idx = ifelse(idx > length(x), idx - 1, idx)
         -(dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_x[idx] * (beta - cum_w[idx - 1])) / (beta)
     end
