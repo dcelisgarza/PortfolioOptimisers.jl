@@ -134,7 +134,7 @@ julia> mp = DefaultMatrixProcessing()
 DefaultMatrixProcessing
        pdm | PosdefEstimator
            |   alg | UnionAll: NearestCorrelationMatrix.Newton
-           | 
+           |
    denoise | nothing
     detone | nothing
        alg | nothing
@@ -143,20 +143,20 @@ julia> mp = DefaultMatrixProcessing(; denoise = Denoise(), detone = Detone(; n =
 DefaultMatrixProcessing
        pdm | PosdefEstimator
            |   alg | UnionAll: NearestCorrelationMatrix.Newton
-           | 
+           |
    denoise | Denoise
            |       alg | ShrunkDenoise
            |           |   alg | Float64: 0.0
-           |           | 
+           |           |
            |      args | Tuple{}: ()
            |    kwargs | @NamedTuple{}: NamedTuple()
            |    kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
            |         m | Int64: 10
            |         n | Int64: 1000
-           | 
+           |
     detone | Detone
            |   n | Int64: 2
-           | 
+           |
        alg | nothing
 ```
 
@@ -267,16 +267,16 @@ NonPositiveDefiniteMatrixProcessing
    denoise | Denoise
            |       alg | ShrunkDenoise
            |           |   alg | Float64: 0.0
-           |           | 
+           |           |
            |      args | Tuple{}: ()
            |    kwargs | @NamedTuple{}: NamedTuple()
            |    kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
            |         m | Int64: 10
            |         n | Int64: 1000
-           | 
+           |
     detone | Detone
            |   n | Int64: 2
-           | 
+           |
        alg | nothing
 ```
 

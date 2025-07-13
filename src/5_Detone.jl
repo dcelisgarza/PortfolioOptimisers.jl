@@ -14,9 +14,9 @@ All concrete types representing detoning estimators (such as [`Detone`](@ref)) s
 abstract type AbstractDetoneEstimator <: AbstractEstimator end
 
 """
-struct Detone{T1 <: Integer} <: AbstractDetoneEstimator
-n::T1
-end
+    struct Detone{T1 <: Integer} <: AbstractDetoneEstimator
+        n::T1
+    end
 
 A concrete detoning estimator for removing the top `n` principal components (market modes) from a covariance or correlation matrix.
 

@@ -10,6 +10,14 @@ function SOCTracking(; ddof::Integer = 1)
     @smart_assert(ddof > 0)
     return SOCTracking{typeof(ddof)}(ddof)
 end
+function Base.show(io::IO, soc::SOCTracking)
+    println(io, "SOCTracking")
+    for field in fieldnames(typeof(soc))
+        val = getfield(soc, field)
+        print(io, lpad(string(field), 6), " ")
+        println(io, "| $(typeof(val)): ", repr(val))
+    end
+end
 struct NOCTracking <: NormTracking end
 function norm_tracking(f::SOCTracking, a, b, N = nothing)
     factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
@@ -29,18 +37,43 @@ struct WeightsTracking{T1 <: Union{Nothing, <:Fees}, T2 <: AbstractVector{<:Real
     fees::T1
     w::T2
 end
-function factory(tracking::WeightsTracking, w::AbstractVector)
-    return WeightsTracking(; fees = factory(tracking.fees, tracking.w), w = w)
-end
 function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing,
                          w::AbstractVector{<:Real})
     @smart_assert(!isempty(w))
     return WeightsTracking{typeof(fees), typeof(w)}(fees, w)
 end
+function Base.show(io::IO, wt::WeightsTracking)
+    println(io, "WeightsTracking")
+    for field in fieldnames(typeof(wt))
+        val = getfield(wt, field)
+        print(io, "  ", lpad(string(field), 5), " ")
+        if isnothing(val)
+            println(io, "| nothing")
+        elseif field == :fees && !isnothing(val)
+            io_fees = IOBuffer()
+            show(io_fees, val)
+            feesstr = String(take!(io_fees))
+            feeslines = split(feesstr, '\n')
+            println(io, "| ", feeslines[1])
+            for l in feeslines[2:end]
+                println(io, "        | ", l)
+            end
+        elseif isa(val, AbstractVector) && length(val) ≤ 6
+            println(io, "| $(typeof(val)): ", repr(val))
+        elseif isa(val, AbstractVector)
+            println(io, "| $(length(val))-element $(typeof(val))")
+        else
+            println(io, "| $(typeof(val)): ", repr(val))
+        end
+    end
+end
+function factory(tracking::WeightsTracking, w::AbstractVector)
+    return WeightsTracking(; fees = factory(tracking.fees, tracking.w), w = w)
+end
 function tracking_view(tracking::WeightsTracking, i::AbstractVector)
     fees = fees_view(tracking.fees, i)
     w = view(tracking.w, i)
-    return WeightsTracking(; w = w, fees = fees)
+    return WeightsTracking(; fees = fees, w = w)
 end
 function tracking_benchmark(tracking::WeightsTracking, X::AbstractMatrix{<:Real})
     return calc_net_returns(tracking.w, X, tracking.fees)

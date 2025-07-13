@@ -9,16 +9,14 @@ struct Fees{T1 <: Union{Nothing, <:Turnover},
     s::T3
     fl::T4
     fs::T5
-    tol_kwargs::T6
+    kwargs::T6
 end
-Base.length(::Fees) = 1
-Base.iterate(::Fees, i = 1) = i <= 1 ? (i, nothing) : nothing
 function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
               l::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
               s::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
               fl::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
               fs::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-              tol_kwargs::NamedTuple = (; atol = 1e-8))
+              kwargs::NamedTuple = (; atol = 1e-8))
     if isa(l, AbstractVector)
         @smart_assert(!isempty(l))
     end
@@ -43,8 +41,41 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
     if !isnothing(fs)
         @smart_assert(all(x -> x > zero(x), fs))
     end
-    return Fees{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
-                typeof(tol_kwargs)}(tn, l, s, fl, fs, tol_kwargs)
+    return Fees{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(kwargs)}(tn,
+                                                                                          l,
+                                                                                          s,
+                                                                                          fl,
+                                                                                          fs,
+                                                                                          kwargs)
+end
+Base.length(::Fees) = 1
+Base.iterate(::Fees, i = 1) = i <= 1 ? (i, nothing) : nothing
+function Base.show(io::IO, fees::Fees)
+    println(io, "Fees")
+    for field in fieldnames(typeof(fees))
+        val = getfield(fees, field)
+        print(io, "  ", lpad(string(field), 6), " ")
+        if isnothing(val)
+            println(io, "| nothing")
+        elseif isa(val, Turnover)
+            io_tn = IOBuffer()
+            show(io_tn, val)
+            tnstr = String(take!(io_tn))
+            tnlines = split(tnstr, '\n')
+            println(io, "| ", tnlines[1])
+            for l in tnlines[2:end]
+                println(io, "         | ", l)
+            end
+        elseif isa(val, AbstractVector) && length(val) ≤ 6
+            println(io, "| $(typeof(val)): ", repr(val))
+        elseif isa(val, AbstractVector)
+            println(io, "| $(length(val))-element $(typeof(val))")
+        elseif isa(val, NamedTuple)
+            println(io, "| $(typeof(val)): ", repr(val))
+        else
+            println(io, "| $(typeof(val)): ", repr(val))
+        end
+    end
 end
 function fees_view(::Nothing, ::Any)
     return nothing
@@ -55,11 +86,11 @@ function fees_view(fees::Fees, i::AbstractVector)
     s = nothing_scalar_array_view(fees.s, i)
     fl = nothing_scalar_array_view(fees.fl, i)
     fs = nothing_scalar_array_view(fees.fs, i)
-    return Fees(; tn = tn, l = l, s = s, fl = fl, fs = fs, tol_kwargs = fees.tol_kwargs)
+    return Fees(; tn = tn, l = l, s = s, fl = fl, fs = fs, kwargs = fees.kwargs)
 end
 function factory(fees::Fees, w::AbstractVector)
     return Fees(; tn = factory(fees.tn, w), l = fees.l, s = fees.s, fl = fees.fl,
-                fs = fees.fs, tol_kwargs = fees.tol_kwargs)
+                fs = fees.fs, kwargs = fees.kwargs)
 end
 function calc_fees(w::AbstractVector, p::AbstractVector, ::Nothing, ::Function)
     return zero(promote_type(eltype(w), eltype(p)))
@@ -86,8 +117,8 @@ end
 function calc_fees(w::AbstractVector, p::AbstractVector, fees::Fees)
     fees_long = calc_fees(w, p, fees.l, .>=)
     fees_short = -calc_fees(w, p, fees.s, .<)
-    fees_fixed_long = calc_fixed_fees(w, fees.fl, fees.tol_kwargs, .>=)
-    fees_fixed_short = calc_fixed_fees(w, fees.fs, fees.tol_kwargs, .<)
+    fees_fixed_long = calc_fixed_fees(w, fees.fl, fees.kwargs, .>=)
+    fees_fixed_short = calc_fixed_fees(w, fees.fs, fees.kwargs, .<)
     fees_turnover = calc_fees(w, p, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
@@ -111,26 +142,25 @@ end
 function calc_fees(w::AbstractVector, ::Nothing)
     return zero(eltype(w))
 end
-function calc_fixed_fees(w::AbstractVector, ::Nothing, tol_kwargs::NamedTuple, op::Function)
+function calc_fixed_fees(w::AbstractVector, ::Nothing, kwargs::NamedTuple, op::Function)
     return zero(eltype(w))
 end
-function calc_fixed_fees(w::AbstractVector, fees::Real, tol_kwargs::NamedTuple,
-                         op::Function)
+function calc_fixed_fees(w::AbstractVector, fees::Real, kwargs::NamedTuple, op::Function)
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); tol_kwargs...)
+    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
     return fees * sum(idx2)
 end
 function calc_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
-                         tol_kwargs::NamedTuple, op::Function)
+                         kwargs::NamedTuple, op::Function)
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); tol_kwargs...)
+    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
     return sum(fees[idx1][idx2])
 end
 function calc_fees(w::AbstractVector, fees::Fees)
     fees_long = calc_fees(w, fees.l, .>=)
     fees_short = -calc_fees(w, fees.s, .<)
-    fees_fixed_long = calc_fixed_fees(w, fees.fl, fees.tol_kwargs, .>=)
-    fees_fixed_short = calc_fixed_fees(w, fees.fs, fees.tol_kwargs, .<)
+    fees_fixed_long = calc_fixed_fees(w, fees.fl, fees.kwargs, .>=)
+    fees_fixed_short = calc_fixed_fees(w, fees.fs, fees.kwargs, .<)
     fees_turnover = calc_fees(w, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
@@ -161,27 +191,27 @@ end
 function calc_asset_fixed_fees(w::AbstractVector, ::Nothing, ::NamedTuple, ::Function)
     return zeros(eltype(w), length(w))
 end
-function calc_asset_fixed_fees(w::AbstractVector, fees::Real, tol_kwargs::NamedTuple,
+function calc_asset_fixed_fees(w::AbstractVector, fees::Real, kwargs::NamedTuple,
                                op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); tol_kwargs...)
+    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
     fees_w[idx1] .= fees * idx2
     return fees_w
 end
 function calc_asset_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
-                               tol_kwargs::NamedTuple, op::Function)
+                               kwargs::NamedTuple, op::Function)
     fees_w = zeros(promote_type(eltype(w), eltype(fees)), length(w))
     idx1 = op(w, zero(promote_type(eltype(w), eltype(fees))))
-    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); tol_kwargs...)
+    idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
     fees_w[idx1] .= fees[idx1][idx2]
     return fees_w
 end
 function calc_asset_fees(w::AbstractVector, fees::Fees)
     fees_long = calc_asset_fees(w, fees.l, .>=)
     fees_short = -calc_asset_fees(w, fees.s, .<)
-    fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.tol_kwargs, .>=)
-    fees_fixed_short = calc_asset_fixed_fees(w, fees.fs, fees.tol_kwargs, .<)
+    fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.kwargs, .>=)
+    fees_fixed_short = calc_asset_fixed_fees(w, fees.fs, fees.kwargs, .<)
     fees_turnover = calc_asset_fees(w, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
@@ -214,8 +244,8 @@ end
 function calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::Fees)
     fees_long = calc_asset_fees(w, p, fees.l, .>=)
     fees_short = -calc_asset_fees(w, p, fees.s, .<)
-    fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.tol_kwargs, .>=)
-    fees_fixed_short = calc_asset_fixed_fees(w, fees.fs, fees.tol_kwargs, .<)
+    fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.kwargs, .>=)
+    fees_fixed_short = calc_asset_fixed_fees(w, fees.fs, fees.kwargs, .<)
     fees_turnover = calc_asset_fees(w, p, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end

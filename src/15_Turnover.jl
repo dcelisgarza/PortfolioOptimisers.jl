@@ -15,6 +15,22 @@ function Turnover(; w::AbstractVector{<:Real},
     @smart_assert(!isempty(w))
     return Turnover{typeof(w), typeof(val)}(w, val)
 end
+function Base.show(io::IO, tn::Turnover)
+    println(io, "Turnover")
+    for field in fieldnames(typeof(tn))
+        val = getfield(tn, field)
+        print(io, "  ", lpad(string(field), 3), " ")
+        if isnothing(val)
+            println(io, "| nothing")
+        elseif isa(val, AbstractVector) && length(val) ≤ 6
+            println(io, "| $(typeof(val)): ", repr(val))
+        elseif isa(val, AbstractVector)
+            println(io, "| $(length(val))-element $(typeof(val))")
+        else
+            println(io, "| $(typeof(val)): ", repr(val))
+        end
+    end
+end
 function turnover_view(::Nothing, ::Any)
     return nothing
 end
