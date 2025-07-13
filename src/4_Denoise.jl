@@ -328,6 +328,37 @@ function _denoise!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
     X .= corr0 + de.alpha * corr1 + (one(de.alpha) - de.alpha) * Diagonal(corr1)
     return nothing
 end
+
+"""
+    errPDF(x, vals; kernel = AverageShiftedHistograms.Kernels.gaussian, m = 10, n = 1000, q = 1000)
+
+Compute the sum of squared errors (SSE) between the theoretical Marčenko–Pastur (MP) eigenvalue density and the empirical eigenvalue density estimated from observed eigenvalues.
+
+This function is used internally to fit the MP distribution to the observed spectrum, as part of the denoising procedure.
+
+# Arguments
+
+  - `x`: Scale parameter for the MP distribution `[0, 1]`.
+  - `vals::AbstractVector`: Observed eigenvalues.
+  - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+  - `m::Integer`: Number of adjacent histograms to smooth over.
+  - `n::Integer`: Number of points in the range of eigenvalues for density estimation.
+  - `q::Real`: Effective sample ratio (e.g., `n_obs / n_assets`).
+
+# Returns
+
+  - `sse::Real`: The sum of squared errors between the empirical and theoretical densities.
+
+# Validation
+
+  - Assumes `vals` are eigenvalues of a correlation or covariance matrix.
+  - The empirical density is estimated using average shifted histograms.
+
+# Related
+
+  - [`find_max_eval`](@ref)
+  - [`Denoise`](@ref)
+"""
 function errPDF(x, vals; kernel = AverageShiftedHistograms.Kernels.gaussian, m = 10,
                 n = 1000, q = 1000)
     e_min, e_max = x * (1 - sqrt(1.0 / q))^2, x * (1 + sqrt(1.0 / q))^2
@@ -341,6 +372,38 @@ function errPDF(x, vals; kernel = AverageShiftedHistograms.Kernels.gaussian, m =
     sse = sum((pdf2 - pdf1) .^ 2)
     return sse
 end
+
+"""
+    find_max_eval(vals, q; kernel = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10, n::Integer = 1000, args = (), kwargs = (;))
+
+Estimate the upper edge of the Marčenko–Pastur (MP) distribution for a set of eigenvalues, used to separate signal from noise in random matrix denoising.
+
+This function fits the MP distribution to the observed spectrum by minimizing the sum of squared errors between the empirical and theoretical densities, and returns the estimated maximum eigenvalue for noise.
+
+# Arguments
+
+  - `vals::AbstractVector`: Observed eigenvalues (typically sorted in ascending order).
+  - `q::Real`: Effective sample ratio (e.g., `n_obs / n_assets`).
+  - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+  - `m::Integer`: Number of adjacent histograms to smooth over.
+  - `n::Integer`: Number of points in the range of eigenvalues for density estimation.
+  - `args`: Additional positional arguments for [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+  - `kwargs`: Additional keyword arguments for [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+
+# Returns
+
+  - `(e_max, x)`: Tuple containing the estimated upper edge of the noise eigenvalue spectrum (`e_max`) and the fitted scale parameter (`x`).
+
+# Validation
+
+  - Uses [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl) to fit the MP distribution.
+  - Assumes `vals` are eigenvalues of a correlation or covariance matrix.
+
+# Related
+
+  - [`errPDF`](@ref)
+  - [`Denoise`](@ref)
+"""
 function find_max_eval(vals, q; kernel = AverageShiftedHistograms.Kernels.gaussian,
                        m::Integer = 10, n::Integer = 1000, args = (), kwargs = (;))
     res = Optim.optimize(x -> errPDF(x, vals; kernel = kernel, m = m, n = n, q = q), 0.0,

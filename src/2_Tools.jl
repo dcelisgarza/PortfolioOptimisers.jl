@@ -256,16 +256,16 @@ Returns a [`ReturnsResult`](@ref) containing asset and factor returns, time seri
 # Arguments
 
   - `X::TimeArray`: Asset price data (timestamps × assets).
-  - `F::TimeArray`: (Optional) Factor price data (timestamps × factors). Default: empty.
+  - `F::TimeArray`: (Optional) Factor price data (timestamps × factors).
   - `iv::Union{Nothing, TimeArray}`: (Optional) Implied volatility data.
   - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: (Optional) Implied volatility risk premium adjustment.
-  - `ret_method::Symbol`: Return calculation method (`:simple` or `:log`). Default: `:simple`.
-  - `padding::Bool`: Whether to pad missing values in returns calculation. Default: `false`.
-  - `missing_col_percent::Real`: Maximum allowed fraction of missing values per column (asset/factor). Default: `1.0`.
-  - `missing_row_percent::Union{Nothing, Real}`: Maximum allowed fraction of missing values per row (timestamp). Default: `1.0`.
-  - `collapse_args::Tuple`: Arguments for collapsing the time series (e.g., to lower frequency). Default: `()`.
+  - `ret_method::Symbol`: Return calculation method (`:simple` or `:log`).
+  - `padding::Bool`: Whether to pad missing values in returns calculation.
+  - `missing_col_percent::Real`: Maximum allowed fraction of missing values per column (asset/factor).
+  - `missing_row_percent::Union{Nothing, Real}`: Maximum allowed fraction of missing values per row (timestamp).
+  - `collapse_args::Tuple`: Arguments for collapsing the time series (e.g., to lower frequency).
   - `map_func::Union{Nothing, Function}`: Optional function to apply to the data before returns calculation.
-  - `join_method::Symbol`: How to join asset and factor data (`:outer`, `:inner`, etc.). Default: `:outer`.
+  - `join_method::Symbol`: How to join asset and factor data (`:outer`, `:inner`, etc.).
   - `impute_method::Union{Nothing, Impute.Imputor}`: Optional imputation method for missing data.
 
 # Returns
@@ -285,6 +285,14 @@ julia> using TimeSeries
 
 julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100 101; 102 103; 104 105],
                      ["A", "B"])
+3×2 TimeSeries.TimeArray{Int64, 2, Dates.Date, Matrix{Int64}} 2020-01-01 to 2020-01-03
+┌────────────┬─────┬─────┐
+│            │ A   │ B   │
+├────────────┼─────┼─────┤
+│ 2020-01-01 │ 100 │ 101 │
+│ 2020-01-02 │ 102 │ 103 │
+│ 2020-01-03 │ 104 │ 105 │
+└────────────┴─────┴─────┘
 
 julia> rr = prices_to_returns(X)
 ReturnsResult
@@ -292,7 +300,7 @@ ReturnsResult
      X | 2×2 Matrix{Float64}
     nf | nothing
      F | nothing
-    ts | nothing
+    ts | Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
     iv | nothing
   ivpa | nothing
 ```
@@ -648,16 +656,19 @@ Utility for safely viewing or indexing into possibly `nothing`, scalar, or array
 
 ```jldoctest
 julia> PortfolioOptimisers.nothing_scalar_array_view(nothing, 1:2)
-nothing
 
 julia> PortfolioOptimisers.nothing_scalar_array_view(3.0, 1:2)
 3.0
 
 julia> PortfolioOptimisers.nothing_scalar_array_view([1.0, 2.0, 3.0], 2:3)
-view([1.0, 2.0, 3.0], 2:3)
+2-element view(::Vector{Float64}, 2:3) with eltype Float64:
+ 2.0
+ 3.0
 
 julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
-view.([[1, 2], [3, 4]], Ref(1))
+2-element Vector{SubArray{Int64, 0, Vector{Int64}, Tuple{Int64}, true}}:
+ fill(1)
+ fill(3)
 ```
 """
 function nothing_scalar_array_view(::Nothing, ::Any)
@@ -697,10 +708,10 @@ Utility for safely viewing or indexing into possibly `nothing` or array values w
 
 ```jldoctest
 julia> PortfolioOptimisers.nothing_scalar_array_view_odd_order(nothing, 1, 2)
-nothing
 
 julia> PortfolioOptimisers.nothing_scalar_array_view_odd_order([1 2; 3 4], 1, 2)
-view([1 2; 3 4], 1, 2)
+0-dimensional view(::Matrix{Int64}, 1, 2) with eltype Int64:
+2
 ```
 """
 function nothing_scalar_array_view_odd_order(::Nothing, i, j)
@@ -734,7 +745,6 @@ Utility for safely indexing into possibly `nothing`, scalar, vector, or array va
 
 ```jldoctest
 julia> PortfolioOptimisers.nothing_scalar_array_getindex(nothing, 1)
-nothing
 
 julia> PortfolioOptimisers.nothing_scalar_array_getindex(3.0, 1)
 3.0
