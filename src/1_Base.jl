@@ -16,10 +16,10 @@ abstract type AbstractEstimator end
 """
     AbstractAlgorithm
 
-Abstract supertype for all optimization algorithm types in PortfolioOptimisers.jl.
+Abstract supertype for all algorithm types in PortfolioOptimisers.jl.
 
-All optimization algorithms (e.g., solvers, metaheuristics) should subtype `AbstractAlgorithm`.
-This allows for flexible extension and dispatch of optimization routines.
+All algorithms (e.g., solvers, metaheuristics) should subtype `AbstractAlgorithm`.
+This allows for flexible extension and dispatch of routines.
 
 # Related
 
@@ -34,7 +34,7 @@ abstract type AbstractAlgorithm end
 Abstract supertype for all result types returned by optimizers in PortfolioOptimisers.jl.
 
 All result objects (e.g., optimization outputs, solution summaries) should subtype `AbstractResult`.
-This ensures a unified interface for accessing results across different algorithms.
+This ensures a unified interface for accessing results across different estimators and algorithms.
 
 # Related
 

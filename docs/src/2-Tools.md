@@ -1,12 +1,12 @@
 # Tools
 
 ```@docs
-PortfolioOptimisers.AbstractReturnsResult
-PortfolioOptimisers.assert_matrix_issquare
 ReturnsResult
 ReturnsResult()
 prices_to_returns
 brinson_attribution
+PortfolioOptimisers.AbstractReturnsResult
+PortfolioOptimisers.assert_matrix_issquare
 PortfolioOptimisers.:⊗
 PortfolioOptimisers.:⊙
 PortfolioOptimisers.:⊘
@@ -14,4 +14,10 @@ PortfolioOptimisers.:⊕
 PortfolioOptimisers.:⊖
 PortfolioOptimisers.traverse_subtypes
 PortfolioOptimisers.concrete_typed_array
+PortfolioOptimisers.dot_scalar
+PortfolioOptimisers.nothing_scalar_array_view
+PortfolioOptimisers.nothing_scalar_array_view_odd_order
+PortfolioOptimisers.nothing_scalar_array_getindex
+PortfolioOptimisers.nothing_asset_sets_view
+PortfolioOptimisers.fourth_moment_index_factory
 ```

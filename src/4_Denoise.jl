@@ -99,7 +99,7 @@ end
 """
     ShrunkDenoise(; alpha::Real = 0.0)
 
-Constructor for [`ShrunkDenoise`](@ref). See above for details.
+Constructor for [`ShrunkDenoise`](@ref).
 
 # Validation
 
@@ -118,28 +118,28 @@ function ShrunkDenoise(; alpha::Real = 0.0)
     return ShrunkDenoise{typeof(alpha)}(alpha)
 end
 """
-    struct Denoise{T1, T2 <: Tuple, T3 <: NamedTuple, T4 <: AbstractDenoiseAlgorithm,
+    struct Denoise{T1 <: AbstractDenoiseAlgorithm, T2 <: Tuple, T3 <: NamedTuple, T4,
                    T5 <: Integer, T6 <: Integer} <: AbstractDenoiseEstimator
-        kernel::T1
+        alg::T1
         args::T2
         kwargs::T3
-        alg::T4
+        kernel::T4
         m::T5
         n::T6
     end
 
 A flexible container type for configuring and applying denoising algorithms to covariance or correlation matrices in PortfolioOptimisers.jl.
 
-`Denoise` encapsulates all parameters required for matrix denoising, including the kernel and its arguments for spectral density estimation, the denoising algorithm, and matrix dimensions. It is the standard estimator type for denoising routines and supports a variety of algorithms (e.g., spectral, fixed, shrinkage).
+`Denoise` encapsulates all parameters required for matrix denoising, including the kernel and its arguments for spectral density estimation, the denoising algorithm, and matrix dimensions. It is the standard estimator type for denoising routines and supports a variety of algorithms ([`SpectralDenoise`](@ref), [`FixedDenoise`](@ref), [`ShrunkDenoise`](@ref)).
 
 # Fields
 
-  - `kernel::Any`: Kernel function for spectral density estimation (e.g., `AverageShiftedHistograms.Kernels.gaussian`).
-  - `args::Tuple`: Positional arguments for the kernel function.
-  - `kwargs::NamedTuple`: Keyword arguments for the kernel function.
-  - `alg::AbstractDenoiseAlgorithm`: Denoising algorithm (e.g., `SpectralDenoise`, `FixedDenoise`, `ShrunkDenoise`).
-  - `m::Integer`: Number of bins or smoothing parameter for the kernel estimator.
-  - `n::Integer`: Number of points for spectral density estimation.
+  - `alg::AbstractDenoiseAlgorithm`: Denoising algorithm ([`SpectralDenoise`](@ref), [`FixedDenoise`](@ref), [`ShrunkDenoise`](@ref)).
+  - `args::Tuple`: Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+  - `kwargs::NamedTuple`: Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+  - `kernel::Any`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+  - `m::Integer`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+  - `n::Integer`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
 
 # Constructor
 
@@ -161,12 +161,12 @@ Keyword arguments correspond to the fields above. The constructor infers types a
   - [`denoise!`](@ref)
   - [`denoise`](@ref)
 """
-struct Denoise{T1, T2 <: Tuple, T3 <: NamedTuple, T4 <: AbstractDenoiseAlgorithm,
+struct Denoise{T1 <: AbstractDenoiseAlgorithm, T2 <: Tuple, T3 <: NamedTuple, T4,
                T5 <: Integer, T6 <: Integer} <: AbstractDenoiseEstimator
-    kernel::T1
+    alg::T1
     args::T2
     kwargs::T3
-    alg::T4
+    kernel::T4
     m::T5
     n::T6
 end
@@ -182,12 +182,12 @@ Construct a [`Denoise`](@ref) object, configuring all parameters for matrix deno
 
 # Arguments
 
-  - `kernel`: Kernel function for spectral density estimation.
-  - `args::Tuple`: Positional arguments for the kernel function. Default: `()`.
-  - `kwargs::NamedTuple`: Keyword arguments for the kernel function. Default: `NamedTuple()`.
   - `alg::AbstractDenoiseAlgorithm`: Denoising algorithm to use (e.g., [`SpectralDenoise`](@ref), [`FixedDenoise`](@ref), [`ShrunkDenoise`](@ref)).
-  - `m::Integer`: Number of bins or smoothing parameter for the kernel estimator.
-  - `n::Integer`: Number of points for spectral density estimation.
+  - `args::Tuple`: Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+  - `kwargs::NamedTuple`: Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+  - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+  - `m::Integer`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+  - `n::Integer`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
 
 # Validation
 
@@ -199,20 +199,20 @@ Construct a [`Denoise`](@ref) object, configuring all parameters for matrix deno
 ```jldoctest
 julia> de = Denoise(;)
 Denoise
-   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+      alg | ShrunkDenoise
+          |   alg | Float64: 0.0
      args | Tuple{}: ()
    kwargs | @NamedTuple{}: NamedTuple()
-      alg | ShrunkDenoise
-          |  alg | Float64: 0.0
+   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
         m | Int64: 10
         n | Int64: 1000
 
 julia> de = Denoise(; alg = SpectralDenoise(), m = 20, n = 500)
 Denoise
-   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+      alg | SpectralDenoise()
      args | Tuple{}: ()
    kwargs | @NamedTuple{}: NamedTuple()
-      alg | SpectralDenoise()
+   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
         m | Int64: 20
         n | Int64: 500
 ```
@@ -227,11 +227,12 @@ Denoise
   - [`denoise!`](@ref)
   - [`denoise`](@ref)
 """
-function Denoise(; kernel = AverageShiftedHistograms.Kernels.gaussian, args::Tuple = (),
-                 kwargs::NamedTuple = (;), alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
-                 m::Integer = 10, n::Integer = 1000)
-    return Denoise{typeof(kernel), typeof(args), typeof(kwargs), typeof(alg), typeof(m),
-                   typeof(n)}(kernel, args, kwargs, alg, m, n)
+function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple = (),
+                 kwargs::NamedTuple = (;),
+                 kernel = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
+                 n::Integer = 1000)
+    return Denoise{typeof(alg), typeof(args), typeof(kwargs), typeof(kernel), typeof(m),
+                   typeof(n)}(alg, args, kwargs, kernel, m, n)
 end
 function Base.show(io::IO, de::Denoise)
     println(io, "Denoise")
@@ -247,7 +248,7 @@ function Base.show(io::IO, de::Denoise)
             alglines = split(algstr, '\n')
             println(io, "| ", alglines[1])
             for l in alglines[2:(end - 1)]
-                println(io, "          |", l)
+                println(io, "          | ", l)
             end
         elseif isa(val, AbstractVector) && length(val) ≤ 6
             println(io, "| $(typeof(val)): ", repr(val))
@@ -260,22 +261,59 @@ function Base.show(io::IO, de::Denoise)
         end
     end
 end
-function denoise!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
-                  vecs::AbstractMatrix, num_factors::Integer)
+
+"""
+    _denoise!(alg::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)
+    _denoise!(alg::FixedDenoise, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)
+    _denoise!(alg::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)
+
+In-place denoising of a covariance or correlation matrix using a specific denoising algorithm.
+
+These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) when a [`Denoise`](@ref) estimator is used, and should not typically be called directly.
+
+# Arguments
+
+  - `alg::SpectralDenoise`: Sets the smallest `num_factors` eigenvalues to zero.
+  - `alg::FixedDenoise`: Replaces the smallest `num_factors` eigenvalues with their average.
+  - `alg::ShrunkDenoise`: Shrinks the smallest `num_factors` eigenvalues towards the diagonal, controlled by `alg.alpha`.
+  - `X::AbstractMatrix`: The matrix to be denoised (modified in-place).
+  - `vals::AbstractVector`: Eigenvalues of `X`, sorted in ascending order.
+  - `vecs::AbstractMatrix`: Corresponding eigenvectors of `X`.
+  - `num_factors::Integer`: Number of eigenvalues to treat as noise.
+
+# Returns
+
+  - `nothing`. The input matrix `X` is modified in-place.
+
+# Validation
+
+  - Assumes `vals` and `vecs` are from the eigendecomposition of a correlation matrix.
+  - The denoised matrix is projected back to correlation space.
+
+# Related
+
+  - [`denoise!`](@ref)
+  - [`Denoise`](@ref)
+  - [`SpectralDenoise`](@ref)
+  - [`FixedDenoise`](@ref)
+  - [`ShrunkDenoise`](@ref)
+"""
+function _denoise!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
+                   vecs::AbstractMatrix, num_factors::Integer)
     _vals = copy(vals)
     _vals[1:num_factors] .= zero(eltype(X))
     X .= cov2cor(vecs * Diagonal(_vals) * transpose(vecs))
     return nothing
 end
-function denoise!(::FixedDenoise, X::AbstractMatrix, vals::AbstractVector,
-                  vecs::AbstractMatrix, num_factors::Integer)
+function _denoise!(::FixedDenoise, X::AbstractMatrix, vals::AbstractVector,
+                   vecs::AbstractMatrix, num_factors::Integer)
     _vals = copy(vals)
     _vals[1:num_factors] .= sum(_vals[1:num_factors]) / num_factors
     X .= cov2cor(vecs * Diagonal(_vals) * transpose(vecs))
     return nothing
 end
-function denoise!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
-                  vecs::AbstractMatrix, num_factors::Integer)
+function _denoise!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
+                   vecs::AbstractMatrix, num_factors::Integer)
     # Small
     vals_l = vals[1:num_factors]
     vecs_l = vecs[:, 1:num_factors]
@@ -391,7 +429,7 @@ function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
     max_val = find_max_eval(vals, q; kernel = de.kernel, m = de.m, n = de.n, args = de.args,
                             kwargs = de.kwargs)[1]
     num_factors = findlast(vals .< max_val)
-    denoise!(de.alg, X, vals, vecs, num_factors)
+    _denoise!(de.alg, X, vals, vecs, num_factors)
     posdef!(pdm, X)
     if iscov
         StatsBase.cor2cov!(X, s)

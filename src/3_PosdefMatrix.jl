@@ -85,8 +85,12 @@ For covariance matrices, the function internally converts to a correlation matri
 
 # Examples
 
-```jldoctest; setup = :(using LinearAlgebra)
-julia> est = PosdefEstimator();
+```jldoctest
+julia> using LinearAlgebra
+
+julia> est = PosdefEstimator()
+PosdefEstimator
+  alg | UnionAll: NearestCorrelationMatrix.Newton
 
 julia> X = [1.0 0.9; 0.9 1.0];
 
@@ -142,7 +146,9 @@ Same as [`posdef!`](@ref), but returns a new matrix instead of modifying `X` in-
 
 # Examples
 
-```jldoctest; setup = :(using LinearAlgebra)
+```jldoctest
+julia> using LinearAlgebra
+
 julia> est = PosdefEstimator();
 
 julia> X = [1.0 2.0; 0.9 1.0];  # Not PD

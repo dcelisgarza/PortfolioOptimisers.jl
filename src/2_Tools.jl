@@ -84,13 +84,13 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Fields
 
-  - `nx::Union{Nothing, AbstractVector}`: Names or identifiers of asset columns. `nothing` if not present.
-  - `X::Union{Nothing, AbstractMatrix}`: Asset returns matrix (observations × assets). `nothing` if not present.
-  - `nf::Union{Nothing, AbstractVector}`: Names or identifiers of factor columns. `nothing` if not present.
-  - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix (observations × factors). `nothing` if not present.
-  - `ts::Union{Nothing, AbstractVector}`: Optional time series (e.g., timestamps) for each observation. `nothing` if not present.
-  - `iv::Union{Nothing, AbstractMatrix}`: Implied volatilities or other per-asset, per-time information. `nothing` if not present.
-  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: Implied volatility per asset (vector or scalar), or `nothing`.
+  - `nx::Union{Nothing, AbstractVector}`: Names or identifiers of asset columns.
+  - `X::Union{Nothing, AbstractMatrix}`: Asset returns matrix (observations × assets).
+  - `nf::Union{Nothing, AbstractVector}`: Names or identifiers of factor columns.
+  - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix (observations × factors).
+  - `ts::Union{Nothing, AbstractVector}`: Optional time series (e.g., timestamps) for each observation.
+  - `iv::Union{Nothing, AbstractMatrix}`: Implied volatilities matrix.
+  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: Implied volatility risk premium adjustment.
 
 # Constructor
 
@@ -156,7 +156,7 @@ Construct a [`ReturnsResult`](@ref) object, validating dimensions and types for 
   - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix.
   - `ts::Union{Nothing, AbstractVector}`: Time series (e.g., timestamps).
   - `iv::Union{Nothing, AbstractMatrix}`: Implied volatility matrix.
-  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: Implied volatility per asset (scalar or vector).
+  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: Implied volatility risk premium adjustment.
 
 # Validation
 
@@ -248,6 +248,58 @@ end
                       map_func::Union{Nothing, Function} = nothing,
                       join_method::Symbol = :outer,
                       impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
+
+Convert price data (and optionally factor data) in `TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
+
+Returns a [`ReturnsResult`](@ref) containing asset and factor returns, time series, and optional implied volatility data, suitable for downstream portfolio optimization.
+
+# Arguments
+
+  - `X::TimeArray`: Asset price data (timestamps × assets).
+  - `F::TimeArray`: (Optional) Factor price data (timestamps × factors). Default: empty.
+  - `iv::Union{Nothing, TimeArray}`: (Optional) Implied volatility data.
+  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: (Optional) Implied volatility risk premium adjustment.
+  - `ret_method::Symbol`: Return calculation method (`:simple` or `:log`). Default: `:simple`.
+  - `padding::Bool`: Whether to pad missing values in returns calculation. Default: `false`.
+  - `missing_col_percent::Real`: Maximum allowed fraction of missing values per column (asset/factor). Default: `1.0`.
+  - `missing_row_percent::Union{Nothing, Real}`: Maximum allowed fraction of missing values per row (timestamp). Default: `1.0`.
+  - `collapse_args::Tuple`: Arguments for collapsing the time series (e.g., to lower frequency). Default: `()`.
+  - `map_func::Union{Nothing, Function}`: Optional function to apply to the data before returns calculation.
+  - `join_method::Symbol`: How to join asset and factor data (`:outer`, `:inner`, etc.). Default: `:outer`.
+  - `impute_method::Union{Nothing, Impute.Imputor}`: Optional imputation method for missing data.
+
+# Returns
+
+  - [`ReturnsResult`](@ref): Struct containing asset/factor returns, names, time series, and optional implied volatility data.
+
+# Validation
+
+  - Ensures consistency of asset/factor names and dimensions.
+  - Handles missing data according to specified thresholds and imputation method.
+  - Validates implied volatility and risk premium adjustment if provided.
+
+# Examples
+
+```jldoctest
+julia> using TimeSeries
+
+julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100 101; 102 103; 104 105],
+                     ["A", "B"])
+
+julia> rr = prices_to_returns(X)
+ReturnsResult
+    nx | Vector{String}: ["A", "B"]
+     X | 2×2 Matrix{Float64}
+    nf | nothing
+     F | nothing
+    ts | nothing
+    iv | nothing
+  ivpa | nothing
+```
+
+# Related
+
+  - [`ReturnsResult`](@ref)
 """
 function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                            iv::Union{Nothing, <:TimeArray} = nothing,
@@ -384,6 +436,7 @@ function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector
 
     return df
 end
+
 """
     ⊗(A::AbstractArray, B::AbstractArray)
 
@@ -528,6 +581,39 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 ⊖(A, B::AbstractArray) = A .- B
 ⊖(A, B) = A - B
 
+"""
+    dot_scalar(a::Real, b::AbstractVector)
+    dot_scalar(a::AbstractVector, b::Real)
+    dot_scalar(a::AbstractVector, b::AbstractVector)
+
+Efficient scalar and vector dot product utility.
+
+  - If one argument is a scalar and the other a vector, returns the scalar times the sum of the vector.
+  - If both arguments are vectors, returns their dot product.
+
+# Arguments
+
+  - `a::Real`, `b::AbstractVector`: Multiplies `a` by the sum of `b`.
+  - `a::AbstractVector`, `b::Real`: Multiplies the sum of `a` by `b`.
+  - `a::AbstractVector`, `b::AbstractVector`: Computes the dot product of `a` and `b`.
+
+# Returns
+
+  - `Real`: The resulting scalar.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.dot_scalar(2.0, [1.0, 2.0, 3.0])
+12.0
+
+julia> PortfolioOptimisers.dot_scalar([1.0, 2.0, 3.0], 2.0)
+12.0
+
+julia> PortfolioOptimisers.dot_scalar([1.0, 2.0, 3.0], [4.0, 5.0, 6.0])
+32.0
+```
+"""
 function dot_scalar(a::Real, b::AbstractVector)
     return a * sum(b)
 end
@@ -537,6 +623,43 @@ end
 function dot_scalar(a::AbstractVector, b::AbstractVector)
     return dot(a, b)
 end
+
+"""
+    nothing_scalar_array_view(x, i)
+
+Utility for safely viewing or indexing into possibly `nothing`, scalar, or array values.
+
+  - If `x` is `nothing`, returns `nothing`.
+  - If `x` is a scalar, returns `x`.
+  - If `x` is a vector, returns `view(x, i)`.
+  - If `x` is a vector of vectors, returns `view.(x, Ref(i))`.
+  - If `x` is a matrix or higher array, returns `view(x, i, i)`.
+
+# Arguments
+
+  - `x`: Input value, which may be `nothing`, a scalar, vector, or array.
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - The corresponding view or value, or `nothing` if `x` is `nothing`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.nothing_scalar_array_view(nothing, 1:2)
+nothing
+
+julia> PortfolioOptimisers.nothing_scalar_array_view(3.0, 1:2)
+3.0
+
+julia> PortfolioOptimisers.nothing_scalar_array_view([1.0, 2.0, 3.0], 2:3)
+view([1.0, 2.0, 3.0], 2:3)
+
+julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
+view.([[1, 2], [3, 4]], Ref(1))
+```
+"""
 function nothing_scalar_array_view(::Nothing, ::Any)
     return nothing
 end
@@ -552,12 +675,80 @@ end
 function nothing_scalar_array_view(x::AbstractArray, i)
     return view(x, i, i)
 end
+
+"""
+    nothing_scalar_array_view_odd_order(x, i, j)
+
+Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
+
+  - If `x` is `nothing`, returns `nothing`.
+  - Otherwise, returns `view(x, i, j)`.
+
+# Arguments
+
+  - `x`: Input value, which may be `nothing` or an array.
+  - `i`, `j`: Indices to view.
+
+# Returns
+
+  - The corresponding view or `nothing`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.nothing_scalar_array_view_odd_order(nothing, 1, 2)
+nothing
+
+julia> PortfolioOptimisers.nothing_scalar_array_view_odd_order([1 2; 3 4], 1, 2)
+view([1 2; 3 4], 1, 2)
+```
+"""
 function nothing_scalar_array_view_odd_order(::Nothing, i, j)
     return nothing
 end
 function nothing_scalar_array_view_odd_order(x::AbstractArray, i, j)
     return view(x, i, j)
 end
+
+"""
+    nothing_scalar_array_getindex(x, i)
+    nothing_scalar_array_getindex(x, i, j)
+
+Utility for safely indexing into possibly `nothing`, scalar, vector, or array values.
+
+  - If `x` is `nothing`, returns `nothing`.
+  - If `x` is a scalar, returns `x`.
+  - If `x` is a vector, returns `x[i]`.
+  - If `x` is a matrix, returns `x[i, i]` or `x[i, j]`.
+
+# Arguments
+
+  - `x`: Input value, which may be `nothing`, a scalar, vector, or matrix.
+  - `i`, `j`: Indices.
+
+# Returns
+
+  - The corresponding value or `nothing`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.nothing_scalar_array_getindex(nothing, 1)
+nothing
+
+julia> PortfolioOptimisers.nothing_scalar_array_getindex(3.0, 1)
+3.0
+
+julia> PortfolioOptimisers.nothing_scalar_array_getindex([1.0, 2.0, 3.0], 2)
+2.0
+
+julia> PortfolioOptimisers.nothing_scalar_array_getindex([1 2; 3 4], 2)
+4
+
+julia> PortfolioOptimisers.nothing_scalar_array_getindex([1 2; 3 4], 1, 2)
+2
+```
+"""
 function nothing_scalar_array_getindex(x::Real, ::Any)
     return x
 end
@@ -576,18 +767,81 @@ end
 function nothing_scalar_array_getindex(x::AbstractMatrix, i, j)
     return x[i, j]
 end
+
+"""
+    nothing_asset_sets_view(x, i)
+
+Utility for safely viewing or indexing into possibly `nothing` or DataFrame values.
+
+  - If `x` is `nothing`, returns `nothing`.
+  - If `x` is a DataFrame, returns `view(x, i, :)`.
+
+# Arguments
+
+  - `x`: Input value, which may be `nothing` or a DataFrame.
+  - `i`: Indices.
+
+# Returns
+
+  - The corresponding view or `nothing`.
+
+# Examples
+
+```jldoctest
+julia> using DataFrames
+
+julia> df = DataFrame(; A = 1:5, B = 6:10, C = 11:15)
+5×3 DataFrame
+ Row │ A      B      C
+     │ Int64  Int64  Int64
+─────┼─────────────────────
+   1 │     1      6     11
+   2 │     2      7     12
+   3 │     3      8     13
+   4 │     4      9     14
+   5 │     5     10     15
+
+julia> PortfolioOptimisers.nothing_asset_sets_view(df, 1:2)
+2×3 SubDataFrame
+ Row │ A      B      C
+     │ Int64  Int64  Int64
+─────┼─────────────────────
+   1 │     1      6     11
+   2 │     2      7     12
+```
+"""
 function nothing_asset_sets_view(::Nothing, ::Any)
     return nothing
 end
 function nothing_asset_sets_view(x::AbstractDataFrame, i)
     return view(x, i, :)
 end
-function nothing_dataframe_getindex(::Nothing, i)
-    return nothing
-end
-function nothing_dataframe_getindex(x::AbstractDataFrame, i)
-    return x[i, :]
-end
+
+"""
+    fourth_moment_index_factory(N::Integer, i::AbstractVector)
+
+Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N × N`.
+
+# Arguments
+
+  - `N::Integer`: Size of the full covariance matrix.
+  - `i::AbstractVector`: Indices of the variables of interest.
+
+# Returns
+
+  - `Vector{Int}`: Indices for extracting the fourth moment submatrix.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.fourth_moment_index_factory(3, [1, 2])
+4-element Vector{Int64}:
+ 1
+ 2
+ 4
+ 5
+```
+"""
 function fourth_moment_index_factory(N::Integer, i)
     idx = sizehint!(Int[], length(i)^2)
     for c in i
