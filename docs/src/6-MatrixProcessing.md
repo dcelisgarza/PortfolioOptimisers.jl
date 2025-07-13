@@ -1,0 +1,14 @@
+# Matrix Processing
+
+```@docs
+DefaultMatrixProcessing
+DefaultMatrixProcessing()
+NonPositiveDefiniteMatrixProcessing
+NonPositiveDefiniteMatrixProcessing()
+matrix_processing!
+matrix_processing
+PortfolioOptimisers.AbstractMatrixProcessingEstimator
+PortfolioOptimisers.AbstractMatrixProcessingAlgorithm
+PortfolioOptimisers.matrix_processing_algorithm!
+PortfolioOptimisers.matrix_processing_algorithm
+```

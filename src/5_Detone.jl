@@ -163,6 +163,8 @@ end
 
 Same as [`detone!`](@ref), but returns a new matrix instead of modifying `X` in-place.
 
+  - If `dt` is `nothing`, this is a no-op and returns `nothing`.
+
 # Examples
 
 ```jldoctest

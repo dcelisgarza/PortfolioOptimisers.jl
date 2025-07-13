@@ -35,7 +35,7 @@ abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
 
 A denoising algorithm that sets the smallest `num_factors` eigenvalues of a covariance or correlation matrix to zero, effectively removing the principal components relating to random noise according to random matrix theory-based approaches.
 
-# Usage
+# Examples
 
 ```jldoctest
 julia> alg = SpectralDenoise()
@@ -55,7 +55,7 @@ struct SpectralDenoise <: AbstractDenoiseAlgorithm end
 
 A denoising algorithm that replaces the smallest `num_factors` eigenvalues of a covariance or correlation matrix with their average, effectively averaging the principal components relating to random noise according to random matrix theory-based approaches.
 
-# Usage
+# Examples
 
 ```jldoctest
 julia> alg = FixedDenoise()
@@ -201,6 +201,7 @@ julia> de = Denoise(;)
 Denoise
       alg | ShrunkDenoise
           |   alg | Float64: 0.0
+          |
      args | Tuple{}: ()
    kwargs | @NamedTuple{}: NamedTuple()
    kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
@@ -247,7 +248,7 @@ function Base.show(io::IO, de::Denoise)
             algstr = String(take!(ioalg))
             alglines = split(algstr, '\n')
             println(io, "| ", alglines[1])
-            for l in alglines[2:(end - 1)]
+            for l in alglines[2:end]
                 println(io, "          | ", l)
             end
         elseif isa(val, AbstractVector) && length(val) ≤ 6
