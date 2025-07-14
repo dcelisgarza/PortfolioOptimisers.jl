@@ -46,7 +46,7 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::AbstractMatrix; di
     if dims == 2
         X = transpose(X)
     end
-    mu = isnothing(mean) ? StatsBase.mean(ske.me, X; kwargs...) : mean
+    mu = isnothing(mean) ? Statistics.mean(ske.me, X; kwargs...) : mean
     y = X .- mu
     return _coskewness(y, X, ske.mp)
 end
@@ -56,7 +56,7 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:Semi}, X::AbstractMatrix; di
     if dims == 2
         X = transpose(X)
     end
-    mu = isnothing(mean) ? StatsBase.mean(ske.me, X; kwargs...) : mean
+    mu = isnothing(mean) ? Statistics.mean(ske.me, X; kwargs...) : mean
     y = min.(X .- mu, zero(eltype(X)))
     return _coskewness(y, X, ske.mp)
 end

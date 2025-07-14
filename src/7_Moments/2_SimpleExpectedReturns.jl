@@ -24,7 +24,7 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator with optional observation 
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`StatsBase.mean`](@ref)
+  - [`mean`](@ref)
 """
 struct SimpleExpectedReturns{T1 <: Union{Nothing, <:AbstractWeights}} <:
        AbstractExpectedReturnsEstimator
@@ -64,14 +64,14 @@ julia> w = Weights([0.2, 0.3, 0.5]);
 
 julia> ser = SimpleExpectedReturns(; w = w)
 SimpleExpectedReturns
-  w | Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+  w | StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
 ```
 
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.mean`](@ref)
+  - [`mean`](@ref)
 """
 function SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(w, AbstractWeights)
@@ -129,7 +129,7 @@ julia> w = Weights([0.2, 0.8]);
 
 julia> serw = SimpleExpectedReturns(; w = w)
 SimpleExpectedReturns
-  w | Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.8]
+  w | StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.8]
 
 julia> mean(serw, X)
 1×2 Matrix{Float64}:
@@ -139,10 +139,10 @@ julia> mean(serw, X)
 # Related
 
   - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
+  - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
-function StatsBase.mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1,
-                        kwargs...)
+function Statistics.mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1,
+                         kwargs...)
     return isnothing(me.w) ? mean(X; dims = dims) : mean(X, me.w; dims = dims)
 end
 

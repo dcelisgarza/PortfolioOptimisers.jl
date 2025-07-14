@@ -107,7 +107,7 @@ end
 function (r::Skewness)(w::AbstractVector, X::AbstractMatrix,
                        fees::Union{Nothing, <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
-    sigma = StatsBase.std(r.ve, val; mean = zero(eltype(val)))
+    sigma = Statistics.std(r.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)
     return res / sigma^3

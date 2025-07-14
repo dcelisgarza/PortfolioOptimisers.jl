@@ -54,8 +54,8 @@ function target_mean(::MeanSquareError, mu::AbstractArray, sigma::AbstractMatrix
                      T::Integer, kwargs...)
     return fill(tr(sigma) / T, length(mu))
 end
-function StatsBase.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein},
-                        X::AbstractArray; dims::Int = 1, kwargs...)
+function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein},
+                         X::AbstractArray; dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -69,8 +69,8 @@ function StatsBase.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein},
     alpha = (N * mean(evals) - 2 * maximum(evals)) / dot(mb, mb) / T
     return (one(alpha) - alpha) * mu + alpha * b
 end
-function StatsBase.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein},
-                        X::AbstractArray; dims::Int = 1, kwargs...)
+function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein},
+                         X::AbstractArray; dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -84,8 +84,8 @@ function StatsBase.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein},
     alpha = (N + 2) / ((N + 2) + T * dot(mb, isigma, mb))
     return (one(alpha) - alpha) * mu + alpha * b
 end
-function StatsBase.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
-                        X::AbstractArray; dims::Int = 1, kwargs...)
+function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
+                         X::AbstractArray; dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)

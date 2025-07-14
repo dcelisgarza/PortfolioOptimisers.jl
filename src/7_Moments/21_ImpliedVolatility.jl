@@ -48,9 +48,9 @@ function realised_vol(ce::AbstractVarianceEstimator, X::AbstractMatrix, ws::Inte
         T, N = size(X)
         chunk = div(T, ws)
     end
-    return dropdims(StatsBase.std(ce,
-                                  reshape(view(X, (1 + T - chunk * ws):T, :), ws, chunk, N);
-                                  dims = 1); dims = 1)
+    return dropdims(Statistics.std(ce,
+                                   reshape(view(X, (1 + T - chunk * ws):T, :), ws, chunk,
+                                           N); dims = 1); dims = 1)
 end
 function implied_vol(X::AbstractMatrix, ws::Integer,
                      chunk::Union{Nothing, <:Integer} = nothing,
@@ -105,10 +105,10 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::AbstractMat
     #, RegressionResult(; b = view(reg, :, 1), M = view(reg, :, 2:3)), r2s, fr
     return rv_p
 end
-function StatsBase.cov(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
-                       mean = nothing, iv::AbstractMatrix,
-                       ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                       kwargs...)
+function Statistics.cov(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
+                        mean = nothing, iv::AbstractMatrix,
+                        ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                        kwargs...)
     sigma = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)
@@ -116,10 +116,10 @@ function StatsBase.cov(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
     matrix_processing!(ce.mp, sigma, X; kwargs...)
     return sigma
 end
-function StatsBase.cor(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
-                       mean = nothing, iv::AbstractMatrix,
-                       ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                       kwargs...)
+function Statistics.cor(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
+                        mean = nothing, iv::AbstractMatrix,
+                        ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                        kwargs...)
     rho = cor(ce.ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
     iv = iv / sqrt(ce.af)
     iv = predict_realised_vols(ce.alg, X, iv, ivpa)

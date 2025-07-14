@@ -150,7 +150,7 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                                                               fees::Union{Nothing,
                                                                                                           <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
-    return StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
+    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:LowOrderDeviation{<:Any, <:SecondLowerMoment}})(w::AbstractVector,
@@ -158,7 +158,7 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                                               fees::Union{Nothing,
                                                                                           <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
-    return StatsBase.var(r.alg.ve, val; mean = zero(eltype(val)))
+    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:LowOrderDeviation{<:Any,
@@ -167,7 +167,7 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                                                          fees::Union{Nothing,
                                                                                                      <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
-    return StatsBase.std(r.alg.ve, val; mean = zero(eltype(val)))
+    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                             <:LowOrderDeviation{<:Any, <:SecondCentralMoment}})(w::AbstractVector,
@@ -175,7 +175,7 @@ function (r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                                                 fees::Union{Nothing,
                                                                                             <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
-    return StatsBase.var(r.alg.ve, val; mean = zero(eltype(val)))
+    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation})(w::AbstractVector,
                                                                            X::AbstractMatrix,
@@ -214,7 +214,7 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
                                                                                fees::Union{Nothing,
                                                                                            <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
-    sigma = StatsBase.var(r.alg.ve, val; mean = zero(eltype(val)))
+    sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3
     res = isnothing(r.w) ? -mean(val) : -mean(val, r.w)
     return res / (sigma * sqrt(sigma))
@@ -225,7 +225,7 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
                                                                                 fees::Union{Nothing,
                                                                                             <:Fees} = nothing)
     val = min.(calc_moment_val(r, w, X, fees), zero(eltype(X)))
-    sigma = StatsBase.var(r.alg.ve, val; mean = zero(eltype(val)))
+    sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)
     return res / sigma^2
@@ -236,7 +236,7 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
                                                                                   fees::Union{Nothing,
                                                                                               <:Fees} = nothing)
     val = calc_moment_val(r, w, X, fees)
-    sigma = StatsBase.var(r.alg.ve, val; mean = zero(eltype(val)))
+    sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
     res = isnothing(r.w) ? mean(val) : mean(val, r.w)
     return res / sigma^2

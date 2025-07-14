@@ -12,8 +12,8 @@ function factory(ce::PortfolioOptimisersCovariance,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
-function StatsBase.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
-                       kwargs...)
+function Statistics.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
+                        kwargs...)
     @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -22,8 +22,8 @@ function StatsBase.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dim
     matrix_processing!(ce.mp, sigma, X; kwargs...)
     return sigma
 end
-function StatsBase.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
-                       kwargs...)
+function Statistics.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
+                        kwargs...)
     @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)

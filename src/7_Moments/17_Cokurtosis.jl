@@ -31,7 +31,7 @@ function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Full}, X::AbstractMatrix; dim
     if dims == 2
         X = transpose(X)
     end
-    mu = isnothing(mean) ? StatsBase.mean(ke.me, X; kwargs...) : mean
+    mu = isnothing(mean) ? Statistics.mean(ke.me, X; kwargs...) : mean
     X = X .- mu
     return _cokurosis(X, ke.mp)
 end
@@ -41,7 +41,7 @@ function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dim
     if dims == 2
         X = transpose(X)
     end
-    mu = isnothing(mean) ? StatsBase.mean(ke.me, X; kwargs...) : mean
+    mu = isnothing(mean) ? Statistics.mean(ke.me, X; kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
     return _cokurosis(X, ke.mp)
 end

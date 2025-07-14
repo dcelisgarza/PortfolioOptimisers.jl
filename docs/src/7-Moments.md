@@ -16,8 +16,8 @@ PortfolioOptimisers.robust_cor
 
 ## Mean
 
-<!-- ```@docs
-overload Statistics
+```@docs
 SimpleExpectedReturns
-StatsBase.mean
-``` -->
+SimpleExpectedReturns()
+mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)
+```

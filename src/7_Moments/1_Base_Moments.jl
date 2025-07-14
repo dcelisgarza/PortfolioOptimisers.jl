@@ -114,7 +114,7 @@ This function attempts to compute the weighted covariance matrix using the provi
 # Related
 
   - [`robust_cor`](@ref)
-  - [`StatsBase.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
+  - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                     mean = nothing, kwargs...)
@@ -156,7 +156,7 @@ This function attempts to compute the weighted correlation matrix using the prov
 # Related
 
   - [`robust_cov`](@ref)
-  - [`StatsBase.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
+  - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                     mean = nothing, kwargs...)
@@ -195,4 +195,4 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix,
     end
 end
 
-export Full, Semi
+export Full, Semi, mean, cov, cor, std, var
