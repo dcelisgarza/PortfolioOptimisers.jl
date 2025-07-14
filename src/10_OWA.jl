@@ -15,7 +15,7 @@ function Base.show(io::IO, ncrra::NormalisedConstantRelativeRiskAversion)
     println(io, "NormalisedConstantRelativeRiskAversion")
     for field in fieldnames(typeof(ncrra))
         val = getfield(ncrra, field)
-        print(io, lpad(string(field), 3), " ")
+        print(io, "  ", string(field), " ")
         println(io, "| $(typeof(val)): ", repr(val))
     end
 end

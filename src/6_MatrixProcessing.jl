@@ -132,32 +132,32 @@ Construct a [`DefaultMatrixProcessing`](@ref) object, configuring all steps for 
 ```jldoctest
 julia> mp = DefaultMatrixProcessing()
 DefaultMatrixProcessing
-       pdm | PosdefEstimator
-           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-           |
-   denoise | nothing
-    detone | nothing
-       alg | nothing
+      pdm | PosdefEstimator
+          |   alg | UnionAll: NearestCorrelationMatrix.Newton
+          |
+  denoise | nothing
+   detone | nothing
+      alg | nothing
 
 julia> mp = DefaultMatrixProcessing(; denoise = Denoise(), detone = Detone(; n = 2))
 DefaultMatrixProcessing
-       pdm | PosdefEstimator
-           |   alg | UnionAll: NearestCorrelationMatrix.Newton
-           |
-   denoise | Denoise
-           |       alg | ShrunkDenoise
-           |           |   alg | Float64: 0.0
-           |           |
-           |      args | Tuple{}: ()
-           |    kwargs | @NamedTuple{}: NamedTuple()
-           |    kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-           |         m | Int64: 10
-           |         n | Int64: 1000
-           |
-    detone | Detone
-           |   n | Int64: 2
-           |
-       alg | nothing
+      pdm | PosdefEstimator
+          |   alg | UnionAll: NearestCorrelationMatrix.Newton
+          |
+  denoise | Denoise
+          |      alg | ShrunkDenoise
+          |          |   alg | Float64: 0.0
+          |          |
+          |     args | Tuple{}: ()
+          |   kwargs | @NamedTuple{}: NamedTuple()
+          |   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+          |        m | Int64: 10
+          |        n | Int64: 1000
+          |
+   detone | Detone
+          |   n | Int64: 2
+          |
+      alg | nothing
 ```
 
 # Related
@@ -178,7 +178,7 @@ function Base.show(io::IO, mp::DefaultMatrixProcessing)
     println(io, "DefaultMatrixProcessing")
     for field in fieldnames(typeof(mp))
         val = getfield(mp, field)
-        print(io, "  ", lpad(string(field), 8), " ")
+        print(io, "  ", lpad(string(field), 7), " ")
         if isnothing(val)
             println(io, "| nothing")
         elseif isa(val, AbstractPosdefEstimator) ||
@@ -191,7 +191,7 @@ function Base.show(io::IO, mp::DefaultMatrixProcessing)
             alglines = split(algstr, '\n')
             println(io, "| ", alglines[1])
             for l in alglines[2:end]
-                println(io, "           | ", l)
+                println(io, "          | ", l)
             end
         else
             println(io, "| $(typeof(val)): ", repr(val))
@@ -258,26 +258,26 @@ Construct a [`NonPositiveDefiniteMatrixProcessing`](@ref) object, configuring ma
 ```jldoctest
 julia> mp = NonPositiveDefiniteMatrixProcessing()
 NonPositiveDefiniteMatrixProcessing
-   denoise | nothing
-    detone | nothing
-       alg | nothing
+  denoise | nothing
+   detone | nothing
+      alg | nothing
 
 julia> mp = NonPositiveDefiniteMatrixProcessing(; denoise = Denoise(), detone = Detone(; n = 2))
 NonPositiveDefiniteMatrixProcessing
-   denoise | Denoise
-           |       alg | ShrunkDenoise
-           |           |   alg | Float64: 0.0
-           |           |
-           |      args | Tuple{}: ()
-           |    kwargs | @NamedTuple{}: NamedTuple()
-           |    kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-           |         m | Int64: 10
-           |         n | Int64: 1000
-           |
-    detone | Detone
-           |   n | Int64: 2
-           |
-       alg | nothing
+  denoise | Denoise
+          |      alg | ShrunkDenoise
+          |          |   alg | Float64: 0.0
+          |          |
+          |     args | Tuple{}: ()
+          |   kwargs | @NamedTuple{}: NamedTuple()
+          |   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+          |        m | Int64: 10
+          |        n | Int64: 1000
+          |
+   detone | Detone
+          |   n | Int64: 2
+          |
+      alg | nothing
 ```
 
 # Related
@@ -297,7 +297,7 @@ function Base.show(io::IO, mp::NonPositiveDefiniteMatrixProcessing)
     println(io, "NonPositiveDefiniteMatrixProcessing")
     for field in fieldnames(typeof(mp))
         val = getfield(mp, field)
-        print(io, "  ", lpad(string(field), 8), " ")
+        print(io, "  ", lpad(string(field), 7), " ")
         if isnothing(val)
             println(io, "| nothing")
         elseif isa(val, AbstractDenoiseEstimator) ||
@@ -309,7 +309,7 @@ function Base.show(io::IO, mp::NonPositiveDefiniteMatrixProcessing)
             alglines = split(algstr, '\n')
             println(io, "| ", alglines[1])
             for l in alglines[2:end]
-                println(io, "           | ", l)
+                println(io, "          | ", l)
             end
         else
             println(io, "| $(typeof(val)): ", repr(val))

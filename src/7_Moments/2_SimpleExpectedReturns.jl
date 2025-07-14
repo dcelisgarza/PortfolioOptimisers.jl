@@ -19,7 +19,7 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator with optional observation 
 
 # Fields
 
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional weights for each observation (default: `nothing`).
+  - `w::Union{Nothing, <:AbstractWeights}`: Optional weights for each observation.
 
 # Related
 
@@ -37,7 +37,7 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator for computing expected ret
 
 # Arguments
 
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional observation weights. If `nothing` (default), the unweighted mean is used. If provided, must be non-empty.
+  - `w::Union{Nothing, <:AbstractWeights}`: Optional observation weights. If `nothing`, the unweighted mean is used. If provided, must be non-empty.
 
 # Returns
 
@@ -83,7 +83,7 @@ function Base.show(io::IO, ser::SimpleExpectedReturns)
     println(io, "SimpleExpectedReturns")
     for field in fieldnames(typeof(ser))
         val = getfield(ser, field)
-        print(io, lpad(string(field), 3), " ")
+        print(io, "  ", string(field), " ")
         if isnothing(val)
             println(io, "| nothing")
         else
@@ -103,8 +103,8 @@ This method computes the expected returns as the sample mean of the input data `
 
   - `me::SimpleExpectedReturns`: The expected returns estimator.
   - `X::AbstractArray`: Data array of asset returns (observations × assets).
-  - `dims::Int=1`: Dimension along which to compute the mean (default: 1).
-  - `kwargs...`: Additional keyword arguments passed to `mean`.
+  - `dims::Int=1`: Dimension along which to compute the mean.
+  - `kwargs...`: Additional keyword arguments passed to [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean).
 
 # Returns
 

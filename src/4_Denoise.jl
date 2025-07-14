@@ -92,10 +92,6 @@ Creates a new `ShrunkDenoise` with the specified shrinkage parameter `alpha`.
 struct ShrunkDenoise{T1 <: Real} <: AbstractDenoiseAlgorithm
     alpha::T1
 end
-function Base.show(io::IO, alg::ShrunkDenoise)
-    println(io, "ShrunkDenoise")
-    return println(io, "  alg | ", typeof(alg.alpha), ": ", repr(alg.alpha))
-end
 """
     ShrunkDenoise(; alpha::Real = 0.0)
 
@@ -117,6 +113,11 @@ function ShrunkDenoise(; alpha::Real = 0.0)
     @smart_assert(zero(alpha) <= alpha <= one(alpha))
     return ShrunkDenoise{typeof(alpha)}(alpha)
 end
+function Base.show(io::IO, alg::ShrunkDenoise)
+    println(io, "ShrunkDenoise")
+    return println(io, "  alg | ", typeof(alg.alpha), ": ", repr(alg.alpha))
+end
+
 """
     struct Denoise{T1 <: AbstractDenoiseAlgorithm, T2 <: Tuple, T3 <: NamedTuple, T4,
                    T5 <: Integer, T6 <: Integer} <: AbstractDenoiseEstimator
@@ -199,23 +200,23 @@ Construct a [`Denoise`](@ref) object, configuring all parameters for matrix deno
 ```jldoctest
 julia> de = Denoise(;)
 Denoise
-      alg | ShrunkDenoise
-          |   alg | Float64: 0.0
-          |
-     args | Tuple{}: ()
-   kwargs | @NamedTuple{}: NamedTuple()
-   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-        m | Int64: 10
-        n | Int64: 1000
+     alg | ShrunkDenoise
+         |   alg | Float64: 0.0
+         |
+    args | Tuple{}: ()
+  kwargs | @NamedTuple{}: NamedTuple()
+  kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+       m | Int64: 10
+       n | Int64: 1000
 
 julia> de = Denoise(; alg = SpectralDenoise(), m = 20, n = 500)
 Denoise
-      alg | SpectralDenoise()
-     args | Tuple{}: ()
-   kwargs | @NamedTuple{}: NamedTuple()
-   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
-        m | Int64: 20
-        n | Int64: 500
+     alg | SpectralDenoise()
+    args | Tuple{}: ()
+  kwargs | @NamedTuple{}: NamedTuple()
+  kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
+       m | Int64: 20
+       n | Int64: 500
 ```
 
 # Related
@@ -239,7 +240,7 @@ function Base.show(io::IO, de::Denoise)
     println(io, "Denoise")
     for field in fieldnames(typeof(de))
         val = getfield(de, field)
-        print(io, "  ", lpad(string(field), 7), " ")
+        print(io, "  ", lpad(string(field), 6), " ")
         if isnothing(val)
             println(io, "| nothing")
         elseif isa(val, AbstractDenoiseAlgorithm)
@@ -249,7 +250,7 @@ function Base.show(io::IO, de::Denoise)
             alglines = split(algstr, '\n')
             println(io, "| ", alglines[1])
             for l in alglines[2:end]
-                println(io, "          | ", l)
+                println(io, "         | ", l)
             end
         elseif isa(val, AbstractVector) && length(val) ≤ 6
             println(io, "| $(typeof(val)): ", repr(val))

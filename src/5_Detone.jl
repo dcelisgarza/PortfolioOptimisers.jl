@@ -68,7 +68,7 @@ function Base.show(io::IO, dt::Detone)
     println(io, "Detone")
     for field in fieldnames(typeof(dt))
         val = getfield(dt, field)
-        print(io, lpad(string(field), 3), " ")
+        print(io, "  ", string(field), " ")
         println(io, "| $(typeof(val)): ", repr(val))
     end
 end

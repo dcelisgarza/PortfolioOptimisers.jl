@@ -14,7 +14,7 @@ function Base.show(io::IO, soc::SOCTracking)
     println(io, "SOCTracking")
     for field in fieldnames(typeof(soc))
         val = getfield(soc, field)
-        print(io, lpad(string(field), 6), " ")
+        print(io, "  ", string(field), " ")
         println(io, "| $(typeof(val)): ", repr(val))
     end
 end
@@ -89,7 +89,7 @@ function Base.show(io::IO, rt::ReturnsTracking)
     println(io, "ReturnsTracking")
     for field in fieldnames(typeof(rt))
         val = getfield(rt, field)
-        print(io, lpad(string(field), 3), " ")
+        print(io, "  ", string(field), " ")
         if isa(val, AbstractVector) && length(val) ≤ 6
             println(io, "| $(typeof(val)): ", repr(val))
         elseif isa(val, AbstractVector)
