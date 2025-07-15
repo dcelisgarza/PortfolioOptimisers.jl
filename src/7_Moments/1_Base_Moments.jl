@@ -103,7 +103,7 @@ This function attempts to compute the weighted covariance matrix using the provi
   - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use.
   - `X::AbstractMatrix`: Data matrix.
   - `w::AbstractWeights`: Optional weights for each observation.
-  - `dims::Int=1`: Dimension along which to compute the covariance (default: 1).
+  - `dims`: Dimension along which to compute the covariance.
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cov`.
 
@@ -136,7 +136,7 @@ end
 """
     robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, [w::AbstractWeights]; dims::Int = 1, mean = nothing, kwargs...)
 
-Compute the weighted correlation matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
+Compute the correlation matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
 This function attempts to compute the weighted correlation matrix using the provided estimator and keyword arguments. If an error occurs, it falls back to computing the weighted covariance matrix and then converts it to a correlation matrix. This ensures robust weighted correlation estimation across different estimator types and StatsBase versions.
 
@@ -145,7 +145,7 @@ This function attempts to compute the weighted correlation matrix using the prov
   - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use.
   - `X::AbstractMatrix`: Data matrix.
   - `w::AbstractWeights`: Optional weights for each observation.
-  - `dims::Int=1`: Dimension along which to compute the correlation (default: 1).
+  - `dims`: Dimension along which to compute the correlation.
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cor`.
 

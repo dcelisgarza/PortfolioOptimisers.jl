@@ -245,9 +245,9 @@ Construct a [`NonPositiveDefiniteMatrixProcessing`](@ref) object, configuring ma
 
 # Arguments
 
-  - `denoise::Union{Nothing, <:Denoise}`: Denoising estimator (default: `nothing`).
-  - `detone::Union{Nothing, <:Detone}`: Detoning estimator (default: `nothing`).
-  - `alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm}`: Optional custom matrix processing algorithm (default: `nothing`).
+  - `denoise::Union{Nothing, <:Denoise} = nothing`: Denoising estimator.
+  - `detone::Union{Nothing, <:Detone} = nothing`: Detoning estimator.
+  - `alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing`: Optional custom matrix processing algorithm.
 
 # Returns
 

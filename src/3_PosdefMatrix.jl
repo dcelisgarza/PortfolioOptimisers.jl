@@ -21,7 +21,7 @@ abstract type AbstractPosdefEstimator <: AbstractEstimator end
 
 A concrete estimator type for projecting a matrix to the nearest positive definite (PD) matrix, typically used for covariance or correlation matrices.
 
-# Arguments
+# Fields
 
   - `alg`: The algorithm used for the nearest correlation matrix projection.
 
@@ -48,6 +48,10 @@ end
     PosdefEstimator(; alg = NearestCorrelationMatrix.Newton)
 
 Constructor for [`PosdefEstimator`](@ref). Defaults to the [`NearestCorrelationMatrix.Newton`](https://github.com/adknudson/NearestCorrelationMatrix.jl) algorithm.
+
+# Arguments
+
+  - `alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm}`: The algorithm used for the nearest correlation matrix projection.
 
 # Related
 

@@ -97,6 +97,10 @@ end
 
 Constructor for [`ShrunkDenoise`](@ref).
 
+# Arguments
+
+  - `alpha`: The shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues. Must be in the range `[0, 1]`, where `0` means no shrinkage and `1` means full shrinkage.
+
 # Validation
 
   - Throws an error if `alpha` is not in `[0, 1]`.
