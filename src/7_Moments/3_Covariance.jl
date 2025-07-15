@@ -58,14 +58,14 @@ julia> using StatsBase
 
 julia> gwc = GeneralWeightedCovariance()
 GeneralWeightedCovariance
-  ce | StatsBase.SimpleCovariance: SimpleCovariance(true)
+  ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
    w | nothing
 
 julia> w = Weights([0.1, 0.2, 0.7]);
 
 julia> gwc = GeneralWeightedCovariance(; w = w)
 GeneralWeightedCovariance
-  ce | StatsBase.SimpleCovariance: SimpleCovariance(true)
+  ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
    w | StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
 ```
 
@@ -166,6 +166,42 @@ function factory(ce::GeneralWeightedCovariance,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return GeneralWeightedCovariance(; ce = ce.ce, w = isnothing(w) ? ce.w : w)
 end
+
+"""
+    struct Covariance{T1 <: AbstractExpectedReturnsEstimator,
+                      T2 <: StatsBase.CovarianceEstimator,
+                      T3 <: AbstractMomentAlgorithm} <: AbstractCovarianceEstimator
+        me::T1
+        ce::T2
+        alg::T3
+    end
+
+A flexible container type for configuring and applying joint expected returns and covariance estimation in PortfolioOptimisers.jl.
+
+`Covariance` encapsulates all components required for estimating the mean vector and covariance matrix of asset returns, including the expected returns estimator, the covariance estimator, and the moment algorithm. This enables modular and extensible workflows for portfolio optimization and risk modeling.
+
+# Fields
+
+  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator.
+  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
+  - `alg::AbstractMomentAlgorithm`: Moment algorithm.
+
+# Constructor
+
+    Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance(),
+                alg::AbstractMomentAlgorithm = Full())
+
+Construct a `Covariance` estimator with the specified expected returns estimator, covariance estimator, and moment algorithm.
+
+# Related
+
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`GeneralWeightedCovariance`](@ref)
+  - [`SimpleExpectedReturns`](@ref)
+  - [`Full`](@ref)
+  - [`Semi`](@ref)
+"""
 struct Covariance{T1 <: AbstractExpectedReturnsEstimator,
                   T2 <: StatsBase.CovarianceEstimator, T3 <: AbstractMomentAlgorithm} <:
        AbstractCovarianceEstimator
@@ -173,6 +209,49 @@ struct Covariance{T1 <: AbstractExpectedReturnsEstimator,
     ce::T2
     alg::T3
 end
+"""
+    Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance(),
+                alg::AbstractMomentAlgorithm = Full())
+
+Construct a [`Covariance`](@ref) estimator for joint mean and covariance estimation.
+
+This constructor creates a `Covariance` object using the specified expected returns estimator, covariance estimator, and moment algorithm. Defaults are provided for each component to enable robust and extensible estimation workflows.
+
+# Arguments
+
+  - `me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns()`: Expected returns estimator.
+  - `ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance()`: Covariance estimator.
+  - `alg::AbstractMomentAlgorithm = Full()`: Moment algorithm.
+
+# Returns
+
+  - `Covariance`: A configured joint mean and covariance estimator.
+
+# Examples
+
+```jldoctest
+julia> cov_est = Covariance()
+Covariance
+   me | SimpleExpectedReturns
+      |   w | nothing
+      |
+   ce | GeneralWeightedCovariance
+      |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      |    w | nothing
+      |
+  alg | Full()
+```
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`GeneralWeightedCovariance`](@ref)
+  - [`SimpleExpectedReturns`](@ref)
+  - [`Full`](@ref)
+  - [`Semi`](@ref)
+"""
 function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance(),
                     alg::AbstractMomentAlgorithm = Full())
@@ -204,21 +283,83 @@ end
 function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
+
+"""
+    cov(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+    cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+
+Compute the covariance matrix using a [`Covariance`](@ref) estimator with either a `Full` or `Semi` moment algorithm.
+
+  - For `Full`, the covariance is computed using the mean estimated by `ce.me` (unless `mean` is provided), and the covariance estimator `ce.ce`.
+  - For `Semi`, the covariance is computed using only the negative deviations from the mean (i.e., semi-covariance), with the mean estimated by `ce.me` (unless `mean` is provided), and the covariance estimator `ce.ce`.
+
+# Arguments
+
+  - `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with `Full` moment algorithm.
+  - `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with `Semi` moment algorithm.
+  - `X::AbstractMatrix`: Data matrix (observations × assets).
+  - `dims::Int`: Dimension along which to compute the covariance.
+  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
+  - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
+
+# Returns
+
+  - Covariance matrix as computed by the estimator and moment algorithm.
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`GeneralWeightedCovariance`](@ref)
+  - [`Full`](@ref)
+  - [`Semi`](@ref)
+"""
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
                         dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     return cov(ce.ce, X; dims = dims, mean = mu, kwargs...)
-end
-function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
-                        dims::Int = 1, mean = nothing, kwargs...)
-    mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
-    return cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
                         dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
     return cov(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
+end
+
+"""
+    cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+    cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+
+Compute the correlation matrix using a [`Covariance`](@ref) estimator with either a `Full` or `Semi` moment algorithm.
+
+  - For `Full`, the correlation is computed using the mean estimated by `ce.me` (unless `mean` is provided), and the correlation estimator `ce.ce`.
+  - For `Semi`, the correlation is computed using only the negative deviations from the mean (i.e., semi-correlation), with the mean estimated by `ce.me` (unless `mean` is provided), and the correlation estimator `ce.ce`.
+
+# Arguments
+
+  - `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with `Full` moment algorithm.
+  - `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with `Semi` moment algorithm.
+  - `X::AbstractMatrix`: Data matrix (observations × assets).
+  - `dims::Int`: Dimension along which to compute the correlation.
+  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
+  - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
+
+# Returns
+
+  - Covariance matrix as computed by the estimator and moment algorithm.
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`GeneralWeightedCovariance`](@ref)
+  - [`Full`](@ref)
+  - [`Semi`](@ref)
+"""
+function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
+                        dims::Int = 1, mean = nothing, kwargs...)
+    mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
+    return cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
                         dims::Int = 1, mean = nothing, kwargs...)
