@@ -125,6 +125,7 @@ Implements the original Gerber covariance algorithm on Z-transformed data.
 
   - [`NormalisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
+  - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
   - [`NormalisedGerber1`](@ref)
   - [`NormalisedGerber2`](@ref)
@@ -159,8 +160,8 @@ NormalisedGerber0
 # Related
 
   - [`NormalisedGerber0`](@ref)
-  - [`NormalisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
+  - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
 """
 function NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
@@ -221,7 +222,6 @@ NormalisedGerber1
 # Related
 
   - [`NormalisedGerber1`](@ref)
-  - [`NormalisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
@@ -286,7 +286,6 @@ NormalisedGerber2
 # Related
 
   - [`NormalisedGerber2`](@ref)
-  - [`NormalisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
@@ -847,7 +846,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 
   - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm}`: Gerber covariance estimator.
   - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int = 1`: Dimension along which to compute the covariance.
+  - `dims::Int`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
 # Returns
@@ -935,7 +934,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 
   - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm}`: Gerber covariance estimator.
   - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int = 1`: Dimension along which to compute the covariance.
+  - `dims::Int`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
 # Returns

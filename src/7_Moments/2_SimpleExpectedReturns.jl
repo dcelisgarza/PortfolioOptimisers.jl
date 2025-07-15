@@ -24,6 +24,7 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator with optional observation 
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)`](@ref)
 """
 struct SimpleExpectedReturns{T1 <: Union{Nothing, <:AbstractWeights}} <:
@@ -70,6 +71,7 @@ SimpleExpectedReturns
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`SimpleExpectedReturns`](@ref)
   - [`mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)`](@ref)
 """

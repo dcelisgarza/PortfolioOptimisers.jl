@@ -23,7 +23,9 @@ Construct a `SimpleVariance` estimator with the specified expected returns estim
 # Related
 
   - [`AbstractVarianceEstimator`](@ref)
+  - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`std(ve::SimpleVariance, X::AbstractVector; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
@@ -87,7 +89,9 @@ SimpleVariance
 
   - [`SimpleVariance`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
+  - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`std(ve::SimpleVariance, X::AbstractVector; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
