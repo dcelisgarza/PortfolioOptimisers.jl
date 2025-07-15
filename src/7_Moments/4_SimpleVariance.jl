@@ -139,7 +139,7 @@ This method computes the standard deviation of the input array `X` using the con
 
   - `ve::SimpleVariance`: Variance estimator specifying the mean estimator, weights, and bias correction.
   - `X::AbstractArray`: Data array (vector or matrix) for which to compute the standard deviation.
-  - `dims::Int = 1`: Dimension along which to compute the standard deviation (for matrices).
+  - `dims::Int`: Dimension along which to compute the standard deviation (for matrices).
   - `mean`: Optional mean value or vector for centering. If not provided, estimated using `ve.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
@@ -260,7 +260,7 @@ This method computes the variance of the input array `X` using the configuration
 
   - `ve::SimpleVariance`: Variance estimator specifying the mean estimator, weights, and bias correction.
   - `X::AbstractArray`: Data array (vector or matrix) for which to compute the variance.
-  - `dims::Int = 1`: Dimension along which to compute the variance (for matrices).
+  - `dims::Int`: Dimension along which to compute the variance (for matrices).
   - `mean`: Optional mean value or vector for centering. If not provided, estimated using `ve.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
