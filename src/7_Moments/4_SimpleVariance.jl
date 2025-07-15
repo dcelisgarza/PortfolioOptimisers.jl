@@ -8,7 +8,7 @@ A flexible variance estimator for PortfolioOptimisers.jl supporting optional exp
 
 # Fields
 
-  - `me::Union{Nothing, <:AbstractExpectedReturnsEstimator}`: Optional expected returns estimator (e.g., `SimpleExpectedReturns`). If `nothing`, the mean is not estimated.
+  - `me::Union{Nothing, <:AbstractExpectedReturnsEstimator}`: Optional expected returns estimator. If `nothing`, the mean is not estimated.
   - `w::Union{Nothing, <:AbstractWeights}`: Optional observation weights. If `nothing`, the estimator is unweighted.
   - `corrected::Bool`: Whether to apply Bessel's correction (unbiased variance).
 

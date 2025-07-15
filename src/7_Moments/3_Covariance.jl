@@ -4,11 +4,11 @@
 
 A flexible covariance estimator for PortfolioOptimisers.jl supporting arbitrary covariance estimators and optional observation weights.
 
-`GeneralWeightedCovariance` allows users to specify both the covariance estimation method (e.g., sample, shrinkage) and optional observation weights. This enables robust and extensible covariance estimation workflows.
+`GeneralWeightedCovariance` allows users to specify both the covariance estimation method and optional observation weights. This enables robust and extensible covariance estimation workflows.
 
 # Fields
 
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator (e.g., `SimpleCovariance`, `LedoitWolfCovariance`).
+  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
   - `w::Union{Nothing, <:AbstractWeights}`: Optional weights for each observation. If `nothing`, the estimator is unweighted.
 
 # Constructor
@@ -21,6 +21,7 @@ Construct a `GeneralWeightedCovariance` estimator with the specified covariance 
 # Related
 
   - [`AbstractCovarianceEstimator`](@ref)
+  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 struct GeneralWeightedCovariance{T1 <: StatsBase.CovarianceEstimator,
@@ -73,6 +74,7 @@ GeneralWeightedCovariance
 
   - [`GeneralWeightedCovariance`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
+  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function GeneralWeightedCovariance(;

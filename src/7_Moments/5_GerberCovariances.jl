@@ -17,7 +17,7 @@ abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
 
 Abstract supertype for all Gerber covariance algorithm types in PortfolioOptimisers.jl.
 
-All concrete types implementing specific Gerber covariance algorithms (e.g., Gerber0, Gerber1, Gerber2) should subtype `GerberCovarianceAlgorithm`. This enables flexible extension and dispatch of Gerber covariance routines.
+All concrete types implementing specific Gerber covariance algorithms should subtype `GerberCovarianceAlgorithm`. This enables flexible extension and dispatch of Gerber covariance routines.
 
 These types are used to specify the algorithm when constructing a [`GerberCovariance`](@ref) estimator.
 
@@ -35,7 +35,7 @@ abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 
 Abstract supertype for all unnormalised Gerber covariance algorithm types.
 
-Concrete types implementing unnormalised Gerber covariance algorithms (e.g., `Gerber0`, `Gerber1`, `Gerber2`) should subtype `UnNormalisedGerberCovarianceAlgorithm`.
+Concrete types implementing unnormalised Gerber covariance algorithms should subtype `UnNormalisedGerberCovarianceAlgorithm`.
 
 # Related
 
@@ -52,7 +52,7 @@ abstract type UnNormalisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm
 
 Abstract supertype for all normalised Gerber covariance algorithm types. These Z-transform the data before applying the Gerber covariance algorithm.
 
-Concrete types implementing normalised Gerber covariance algorithms (e.g., `NormalisedGerber0`, `NormalisedGerber1`, `NormalisedGerber2`) should subtype `NormalisedGerberCovarianceAlgorithm`.
+Concrete types implementing normalised Gerber covariance algorithms should subtype `NormalisedGerberCovarianceAlgorithm`.
 
 # Related
 
@@ -186,6 +186,7 @@ Implements the first variant of the Gerber covariance algorithm on Z-transformed
 
   - [`NormalisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
+  - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
   - [`NormalisedGerber0`](@ref)
   - [`NormalisedGerber2`](@ref)
@@ -222,6 +223,7 @@ NormalisedGerber1
   - [`NormalisedGerber1`](@ref)
   - [`NormalisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
+  - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
 """
 function NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
@@ -249,6 +251,7 @@ These types are used to specify the algorithm when constructing a [`GerberCovari
 
   - [`NormalisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
+  - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
   - [`NormalisedGerber0`](@ref)
   - [`NormalisedGerber1`](@ref)
@@ -285,6 +288,7 @@ NormalisedGerber2
   - [`NormalisedGerber2`](@ref)
   - [`NormalisedGerberCovarianceAlgorithm`](@ref)
   - [`GerberCovariance`](@ref)
+  - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
 """
 function NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
@@ -345,10 +349,10 @@ A flexible container type for configuring and applying Gerber covariance estimat
 
 # Fields
 
-  - `ve::StatsBase.CovarianceEstimator`: Variance estimator (e.g., `SimpleVariance`).
+  - `ve::StatsBase.CovarianceEstimator`: Variance estimator.
   - `pdm::PosdefEstimator`: Positive definite matrix estimator (see [`PosdefEstimator`](@ref)).
   - `threshold::Real`: Threshold parameter for Gerber covariance computation (typically in (0, 1)).
-  - `alg::GerberCovarianceAlgorithm`: Gerber covariance algorithm variant (e.g., [`Gerber0`](@ref), [`Gerber1`](@ref), [`Gerber2`](@ref), [`NormalisedGerber0`](@ref), etc.).
+  - `alg::GerberCovarianceAlgorithm`: Gerber covariance algorithm variant.
 
 # Constructor
 
@@ -363,6 +367,7 @@ Construct a `GerberCovariance` estimator with the specified algorithm, variance 
 
   - [`BaseGerberCovariance`](@ref)
   - [`GerberCovarianceAlgorithm`](@ref)
+  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`SimpleVariance`](@ref)
   - [`PosdefEstimator`](@ref)
   - [`Gerber0`](@ref)
@@ -387,7 +392,7 @@ end
 
 Construct a [`GerberCovariance`](@ref) estimator for robust Gerber-based covariance or correlation estimation.
 
-This constructor creates a `GerberCovariance` object using the specified Gerber algorithm, variance estimator, positive definite matrix estimator, and threshold parameter. The estimator is highly modular, allowing users to select from different Gerber algorithm variants (e.g., [`Gerber0`](@ref), [`Gerber1`](@ref), [`NormalisedGerber0`](@ref)), variance estimators (e.g., [`SimpleVariance`](@ref)), and positive definite projections.
+This constructor creates a `GerberCovariance` object using the specified Gerber algorithm, variance estimator, positive definite matrix estimator, and threshold parameter. The estimator is highly modular, allowing users to select from different Gerber algorithm variants, and positive definite projections.
 
 # Arguments
 
@@ -427,6 +432,7 @@ GerberCovariance
 
   - [`GerberCovariance`](@ref)
   - [`GerberCovarianceAlgorithm`](@ref)
+  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`SimpleVariance`](@ref)
   - [`PosdefEstimator`](@ref)
   - [`Gerber0`](@ref)
@@ -793,7 +799,7 @@ end
 
 Compute the Gerber correlation matrix using an unnormalised Gerber covariance estimator.
 
-This method computes the Gerber correlation matrix for the input data matrix `X` using the specified unnormalised Gerber covariance estimator (e.g., [`Gerber0`](@ref), [`Gerber1`](@ref), [`Gerber2`](@ref)). The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is then computed via [`gerber`](@ref).
+This method computes the Gerber correlation matrix for the input data matrix `X` using the specified unnormalised Gerber covariance estimator. The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is then computed via [`gerber`](@ref).
 
 # Arguments
 
@@ -835,7 +841,7 @@ end
 
 Compute the Gerber covariance matrix using an unnormalised Gerber covariance estimator.
 
-This method computes the Gerber covariance matrix for the input data matrix `X` using the specified unnormalised Gerber covariance estimator (e.g., [`Gerber0`](@ref), [`Gerber1`](@ref), [`Gerber2`](@ref)). The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is computed via [`gerber`](@ref), and the result is rescaled to a covariance matrix using the standard deviation vector.
+This method computes the Gerber covariance matrix for the input data matrix `X` using the specified unnormalised Gerber covariance estimator. The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is computed via [`gerber`](@ref), and the result is rescaled to a covariance matrix using the standard deviation vector.
 
 # Arguments
 
@@ -877,7 +883,7 @@ end
 
 Compute the Gerber correlation matrix using a normalised Gerber covariance estimator.
 
-This method computes the Gerber correlation matrix for the input data matrix `X` using the specified normalised Gerber covariance estimator (e.g., [`Gerber0`](@ref), [`Gerber1`](@ref), [`Gerber2`](@ref)). The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is then computed via [`gerber`](@ref).
+This method computes the Gerber correlation matrix for the input data matrix `X` using the specified normalised Gerber covariance estimator. The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is then computed via [`gerber`](@ref).
 
 # Arguments
 
@@ -923,7 +929,7 @@ end
 
 Compute the Gerber covariance matrix using a normalised Gerber covariance estimator.
 
-This method computes the Gerber covariance matrix for the input data matrix `X` using the specified normalised Gerber covariance estimator (e.g., [`NormalisedGerber0`](@ref), [`NormalisedGerber1`](@ref), [`NormalisedGerber2`](@ref)). The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is computed via [`gerber`](@ref), and the result is rescaled to a covariance matrix using the standard deviation vector.
+This method computes the Gerber covariance matrix for the input data matrix `X` using the specified normalised Gerber covariance estimator. The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is computed via [`gerber`](@ref), and the result is rescaled to a covariance matrix using the standard deviation vector.
 
 # Arguments
 
