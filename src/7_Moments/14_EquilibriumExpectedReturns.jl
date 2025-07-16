@@ -14,29 +14,6 @@ function EquilibriumExpectedReturns(;
     end
     return EquilibriumExpectedReturns{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
 end
-#=
-function Base.show(io::IO, eer::EquilibriumExpectedReturns)
-    println(io, "EquilibriumExpectedReturns")
-    for field in fieldnames(typeof(eer))
-        val = getfield(eer, field)
-        print(io, "  ", lpad(string(field), 2), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, StatsBase.CovarianceEstimator)
-            ioalg = IOBuffer()
-            show(ioalg, val)
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
-            for l in alglines[2:end]
-                println(io, "     | ", l)
-            end
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 function Statistics.mean(me::EquilibriumExpectedReturns, X::AbstractArray; dims::Int = 1,
                          kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)

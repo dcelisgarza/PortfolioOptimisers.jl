@@ -307,6 +307,7 @@ Construct a `SmythBrobyCovariance` estimator with the specified algorithm, estim
   - [`NormalisedSmythBrobyGerber0`](@ref)
   - [`NormalisedSmythBrobyGerber1`](@ref)
   - [`NormalisedSmythBrobyGerber2`](@ref)
+  - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
 struct SmythBrobyCovariance{T1 <: AbstractExpectedReturnsEstimator,
                             T2 <: StatsBase.CovarianceEstimator, T3 <: PosdefEstimator,
@@ -391,7 +392,6 @@ SmythBrobyCovariance
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
-
   - [`BaseSmythBrobyCovariance`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
@@ -411,7 +411,7 @@ SmythBrobyCovariance
   - [`NormalisedSmythBrobyGerber0`](@ref)
   - [`NormalisedSmythBrobyGerber1`](@ref)
   - [`NormalisedSmythBrobyGerber2`](@ref)
-  - [`ThreadedEx`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
+  - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
 function SmythBrobyCovariance(;
                               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),

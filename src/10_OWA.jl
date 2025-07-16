@@ -11,16 +11,6 @@ function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
     @smart_assert(zero(g) < g < one(g))
     return NormalisedConstantRelativeRiskAversion{typeof(g)}(g)
 end
-#=
-function Base.show(io::IO, ncrra::NormalisedConstantRelativeRiskAversion)
-    println(io, "NormalisedConstantRelativeRiskAversion")
-    for field in fieldnames(typeof(ncrra))
-        val = getfield(ncrra, field)
-        print(io, "  ", string(field), " ")
-        println(io, "| $(typeof(val)): ", repr(val))
-    end
-end
-=#
 struct OWAJuMPEstimator{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T2 <: Real,
                         T3 <: Real, T4 <: Real,
                         T5 <: AbstractOrderedWeightsArrayAlgorithm} <:
@@ -43,29 +33,6 @@ function OWAJuMPEstimator(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = S
     return OWAJuMPEstimator{typeof(slv), typeof(max_phi), typeof(sc), typeof(so),
                             typeof(alg)}(slv, max_phi, sc, so, alg)
 end
-#=
-function Base.show(io::IO, owa::OWAJuMPEstimator)
-    println(io, "OWAJuMPEstimator")
-    for field in fieldnames(typeof(owa))
-        val = getfield(owa, field)
-        print(io, "  ", lpad(string(field), 7), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, Solver) || isa(val, AbstractVector{<:Solver})
-            ioalg = IOBuffer()
-            show(ioalg, val)
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
-            for l in alglines[2:end]
-                println(io, "          | ", l)
-            end
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real)
     N = size(weights, 2)
     phis = Vector{eltype(weights)}(undef, N)

@@ -117,12 +117,6 @@ function ShrunkDenoise(; alpha::Real = 0.0)
     @smart_assert(zero(alpha) <= alpha <= one(alpha))
     return ShrunkDenoise{typeof(alpha)}(alpha)
 end
-#=
-function Base.show(io::IO, alg::ShrunkDenoise)
-    println(io, "ShrunkDenoise")
-    return println(io, "  alg | ", typeof(alg.alpha), ": ", repr(alg.alpha))
-end
-=#
 
 """
     struct Denoise{T1 <: AbstractDenoiseAlgorithm, T2 <: Tuple, T3 <: NamedTuple, T4,

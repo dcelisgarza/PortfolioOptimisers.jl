@@ -1,6 +1,7 @@
 abstract type AbstractJuMPResult <: AbstractResult end
 struct Solver{T1 <: Union{Symbol, <:AbstractString}, T2,
-              T3 <: Union{Nothing, <:AbstractDict}, T4 <: NamedTuple, T5 <: Bool}
+              T3 <: Union{Nothing, <:AbstractDict}, T4 <: NamedTuple, T5 <: Bool} <:
+       AbstractEstimator
     name::T1
     solver::T2
     settings::T3
@@ -16,28 +17,6 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
     return Solver{typeof(name), typeof(solver), typeof(settings), typeof(check_sol),
                   typeof(add_bridges)}(name, solver, settings, check_sol, add_bridges)
 end
-#=
-function Base.show(io::IO, slv::Solver)
-    println(io, "Solver")
-    for field in fieldnames(typeof(slv))
-        val = getfield(slv, field)
-        print(io, "  ", lpad(string(field), 11), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, AbstractDict)
-            if isempty(val)
-                println(io, "| $(typeof(val)): Dict{Any, Any}()")
-            else
-                println(io, "| $(typeof(val)): ", repr(val))
-            end
-        elseif isa(val, NamedTuple)
-            println(io, "| $(typeof(val)): ", repr(val))
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 Base.iterate(S::Solver, state = 1) = state > 1 ? nothing : (S, state + 1)
 struct JuMPResult{T1 <: AbstractDict, T2 <: Bool} <: AbstractJuMPResult
     trials::T1
@@ -49,26 +28,6 @@ function JuMPResult(; trials::AbstractDict, success::Bool)
     end
     return JuMPResult{typeof(trials), typeof(success)}(trials, success)
 end
-#=
-function Base.show(io::IO, res::JuMPResult)
-    println(io, "JuMPResult")
-    for field in fieldnames(typeof(res))
-        val = getfield(res, field)
-        print(io, "  ", lpad(string(field), 7), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, AbstractDict)
-            if isempty(val)
-                println(io, "| $(typeof(val)): Dict()")
-            else
-                println(io, "| $(typeof(val)): ", repr(val))
-            end
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 function optimise_JuMP_model!(model::JuMP.Model,
                               slv::Union{<:Solver, <:AbstractVector{<:Solver}})
     trials = Dict()

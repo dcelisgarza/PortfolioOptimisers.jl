@@ -25,17 +25,6 @@ end
 function BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return BodnarOkhrinParolya{typeof(target)}(target)
 end
-#=
-function Base.show(io::IO, me::AbstractShrunkExpectedReturnsAlgorithm)
-    name = string(typeof(me))
-    name = name[1:(findfirst(x -> x == '{', name) - 1)]
-    println(io, name)
-    val = me.target
-    print(io, "  target ")
-    println(io, "| $(typeof(val)): ", repr(val))
-    return nothing
-end
-=#
 struct ShrunkExpectedReturns{T1 <: AbstractExpectedReturnsEstimator,
                              T2 <: StatsBase.CovarianceEstimator,
                              T3 <: AbstractShrunkExpectedReturnsAlgorithm} <:
@@ -50,23 +39,6 @@ function ShrunkExpectedReturns(;
                                alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
     return ShrunkExpectedReturns{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)
 end
-#=
-function Base.show(io::IO, me::ShrunkExpectedReturns)
-    println(io, "ShrunkExpectedReturns")
-    for field in fieldnames(typeof(me))
-        val = getfield(me, field)
-        print(io, "  ", lpad(string(field), 3), " ")
-        ioalg = IOBuffer()
-        show(ioalg, val)
-        algstr = String(take!(ioalg))
-        alglines = split(algstr, '\n')
-        println(io, "| ", alglines[1])
-        for l in alglines[2:end]
-            println(io, "      | ", l)
-        end
-    end
-end
-=#
 function target_mean(::GrandMean, mu::AbstractArray, sigma::AbstractMatrix; kwargs...)
     return fill(mean(mu), length(mu))
 end

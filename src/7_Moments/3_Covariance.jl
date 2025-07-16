@@ -247,31 +247,6 @@ function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Covariance{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)
 end
-#=
-function Base.show(io::IO, cov::Covariance)
-    println(io, "Covariance")
-    for field in fieldnames(typeof(cov))
-        val = getfield(cov, field)
-        print(io, "  ", lpad(string(field), 3), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, AbstractExpectedReturnsEstimator) ||
-               isa(val, AbstractCovarianceEstimator) ||
-               isa(val, AbstractMomentAlgorithm)
-            ioalg = IOBuffer()
-            show(ioalg, val)
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
-            for l in alglines[2:end]
-                println(io, "      | ", l)
-            end
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end

@@ -261,31 +261,6 @@ function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise
     return NonPositiveDefiniteMatrixProcessing{typeof(denoise), typeof(detone),
                                                typeof(alg)}(denoise, detone, alg)
 end
-#=
-function Base.show(io::IO, mp::NonPositiveDefiniteMatrixProcessing)
-    println(io, "NonPositiveDefiniteMatrixProcessing")
-    for field in fieldnames(typeof(mp))
-        val = getfield(mp, field)
-        print(io, "  ", lpad(string(field), 7), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, AbstractDenoiseEstimator) ||
-               isa(val, AbstractDetoneEstimator) ||
-               isa(val, AbstractMatrixProcessingAlgorithm)
-            ioalg = IOBuffer()
-            show(ioalg, val)
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
-            for l in alglines[2:end]
-                println(io, "          | ", l)
-            end
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 
 """
     matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix, X::AbstractMatrix, args...; kwargs...)

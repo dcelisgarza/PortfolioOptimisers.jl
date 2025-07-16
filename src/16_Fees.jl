@@ -50,35 +50,6 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
 end
 Base.length(::Fees) = 1
 Base.iterate(::Fees, i = 1) = i <= 1 ? (i, nothing) : nothing
-#=
-function Base.show(io::IO, fees::Fees)
-    println(io, "Fees")
-    for field in fieldnames(typeof(fees))
-        val = getfield(fees, field)
-        print(io, "  ", lpad(string(field), 6), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, Turnover)
-            io_tn = IOBuffer()
-            show(io_tn, val)
-            tnstr = String(take!(io_tn))
-            tnlines = split(tnstr, '\n')
-            println(io, "| ", tnlines[1])
-            for l in tnlines[2:end]
-                println(io, "         | ", l)
-            end
-        elseif isa(val, AbstractVector) && length(val) ≤ 6
-            println(io, "| $(typeof(val)): ", repr(val))
-        elseif isa(val, AbstractVector)
-            println(io, "| $(length(val))-element $(typeof(val))")
-        elseif isa(val, NamedTuple)
-            println(io, "| $(typeof(val)): ", repr(val))
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 function fees_view(::Nothing, ::Any)
     return nothing
 end
