@@ -10,6 +10,29 @@ function LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
     @smart_assert(zero(alpha) < alpha < one(alpha))
     return LTDCovariance{typeof(ve), typeof(alpha), typeof(threads)}(ve, alpha, threads)
 end
+function Base.show(io::IO, ce::LTDCovariance)
+    println(io, "LTDCovariance")
+    for field in fieldnames(typeof(ce))
+        val = getfield(ce, field)
+        print(io, "  ", lpad(string(field), 7), " ")
+        if isnothing(val)
+            println(io, "| nothing")
+        elseif isa(val, AbstractVarianceEstimator)
+            ioalg = IOBuffer()
+            show(ioalg, val)
+            algstr = String(take!(ioalg))
+            alglines = split(algstr, '\n')
+            println(io, "| ", alglines[1])
+            for l in alglines[2:end]
+                println(io, "          | ", l)
+            end
+        elseif isa(val, Real)
+            println(io, "| $(typeof(val)): ", repr(val))
+        else
+            println(io, "| $(typeof(val)): ", repr(val))
+        end
+    end
+end
 function factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return LTDCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha, threads = ce.threads)
 end
