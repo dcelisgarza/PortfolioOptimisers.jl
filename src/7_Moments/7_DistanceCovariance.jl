@@ -94,6 +94,7 @@ function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
     return DistanceCovariance{typeof(dist), typeof(args), typeof(kwargs), typeof(w),
                               typeof(threads)}(dist, args, kwargs, w, threads)
 end
+#=
 function Base.show(io::IO, ce::DistanceCovariance)
     println(io, "DistanceCovariance")
     for field in fieldnames(typeof(ce))
@@ -106,6 +107,7 @@ function Base.show(io::IO, ce::DistanceCovariance)
         end
     end
 end
+=#
 function factory(ce::DistanceCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs,
                               w = isnothing(w) ? ce.w : w, threads = ce.threads)

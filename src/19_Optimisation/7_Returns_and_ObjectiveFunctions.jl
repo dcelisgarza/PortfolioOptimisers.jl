@@ -36,7 +36,7 @@ struct KellyReturn{T1 <: Union{Nothing, <:AbstractWeights},
 end
 function KellyReturn(; w::Union{Nothing, <:AbstractWeights} = nothing,
                      lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:Frontier} = nothing)
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     if isa(lb, Real)

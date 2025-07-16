@@ -25,14 +25,14 @@ function OpinionPoolingPrior(;
                              pe1::Union{Nothing, <:AbstractLowOrderPriorEstimator_1o2_1o2} = nothing,
                              pe2::Union{Nothing, <:AbstractLowOrderPriorEstimator_1o2_1o2} = nothing,
                              p::Union{Nothing, <:Real} = nothing,
-                             w::Union{Nothing, <:AbstractVector} = nothing,
+                             w::Union{Nothing, <:AbstractWeights} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
                              threads::FLoops.Transducers.Executor = ThreadedEx())
     @smart_assert(!isempty(pes))
     if !isnothing(p)
         @smart_assert(p > zero(p))
     end
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w) && length(w) == length(pes))
         @smart_assert(sum(w) <= one(eltype(w)))
     end

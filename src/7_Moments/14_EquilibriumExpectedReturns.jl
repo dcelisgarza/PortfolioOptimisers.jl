@@ -1,5 +1,5 @@
 struct EquilibriumExpectedReturns{T1 <: StatsBase.CovarianceEstimator,
-                                  T2 <: Union{Nothing, <:AbstractVector}, T3 <: Real} <:
+                                  T2 <: Union{Nothing, <:AbstractWeights}, T3 <: Real} <:
        AbstractShrunkExpectedReturnsEstimator
     ce::T1
     w::T2
@@ -7,13 +7,36 @@ struct EquilibriumExpectedReturns{T1 <: StatsBase.CovarianceEstimator,
 end
 function EquilibriumExpectedReturns(;
                                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                    w::Union{Nothing, <:AbstractVector} = nothing,
+                                    w::Union{Nothing, <:AbstractWeights} = nothing,
                                     l::Real = 1.0)
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     return EquilibriumExpectedReturns{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
 end
+#=
+function Base.show(io::IO, eer::EquilibriumExpectedReturns)
+    println(io, "EquilibriumExpectedReturns")
+    for field in fieldnames(typeof(eer))
+        val = getfield(eer, field)
+        print(io, "  ", lpad(string(field), 2), " ")
+        if isnothing(val)
+            println(io, "| nothing")
+        elseif isa(val, StatsBase.CovarianceEstimator)
+            ioalg = IOBuffer()
+            show(ioalg, val)
+            algstr = String(take!(ioalg))
+            alglines = split(algstr, '\n')
+            println(io, "| ", alglines[1])
+            for l in alglines[2:end]
+                println(io, "     | ", l)
+            end
+        else
+            println(io, "| $(typeof(val)): ", repr(val))
+        end
+    end
+end
+=#
 function Statistics.mean(me::EquilibriumExpectedReturns, X::AbstractArray; dims::Int = 1,
                          kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)

@@ -88,6 +88,7 @@ function GeneralWeightedCovariance(;
     end
     return GeneralWeightedCovariance{typeof(ce), typeof(w)}(ce, w)
 end
+#=
 function Base.show(io::IO, gwc::GeneralWeightedCovariance)
     println(io, "GeneralWeightedCovariance")
     for field in fieldnames(typeof(gwc))
@@ -100,7 +101,7 @@ function Base.show(io::IO, gwc::GeneralWeightedCovariance)
         end
     end
 end
-
+=#
 """
     cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 
@@ -261,6 +262,7 @@ function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Covariance{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)
 end
+#=
 function Base.show(io::IO, cov::Covariance)
     println(io, "Covariance")
     for field in fieldnames(typeof(cov))
@@ -284,6 +286,7 @@ function Base.show(io::IO, cov::Covariance)
         end
     end
 end
+=#
 function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end

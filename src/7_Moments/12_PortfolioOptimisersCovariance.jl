@@ -8,6 +8,7 @@ function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covar
                                        mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
     return PortfolioOptimisersCovariance{typeof(ce), typeof(mp)}(ce, mp)
 end
+#=
 function Base.show(io::IO, ce::PortfolioOptimisersCovariance)
     println(io, "PortfolioOptimisersCovariance")
     for field in fieldnames(typeof(ce))
@@ -23,6 +24,7 @@ function Base.show(io::IO, ce::PortfolioOptimisersCovariance)
         end
     end
 end
+=#
 function factory(ce::PortfolioOptimisersCovariance,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)

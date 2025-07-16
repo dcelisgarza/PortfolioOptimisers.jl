@@ -18,9 +18,9 @@ struct OrderedWeightsArray{T1 <: RiskMeasureSettings,
     formulation::T3
 end
 function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                             w::Union{Nothing, <:AbstractVector} = nothing,
+                             w::Union{Nothing, <:AbstractWeights} = nothing,
                              formulation::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     return OrderedWeightsArray{typeof(settings), typeof(w), typeof(formulation)}(settings,

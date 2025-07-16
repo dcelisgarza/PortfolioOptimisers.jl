@@ -54,7 +54,7 @@ function FactorBlackLittermanPriorEstimator(;
                                                         #! End: to delete
                                                         } = DataFrame(),
                                             views_conf::Union{Nothing, <:AbstractVector} = nothing,
-                                            w::Union{Nothing, <:AbstractVector} = nothing,
+                                            w::Union{Nothing, <:AbstractWeights} = nothing,
                                             rf::Real = 0.0,
                                             l::Union{Nothing, <:Real} = nothing,
                                             tau::Union{Nothing, <:Real} = nothing,

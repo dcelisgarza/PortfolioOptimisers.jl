@@ -119,6 +119,7 @@ struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
     iv::T6
     ivpa::T7
 end
+#=
 function Base.show(io::IO, rr::ReturnsResult)
     println(io, "ReturnsResult")
     for field in fieldnames(typeof(rr))
@@ -137,6 +138,7 @@ function Base.show(io::IO, rr::ReturnsResult)
         end
     end
 end
+=#
 """
     ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                     X::Union{Nothing, <:AbstractMatrix} = nothing,

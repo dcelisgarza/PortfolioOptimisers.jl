@@ -27,20 +27,6 @@ All concrete types that implement a specific algorithm for expected returns esti
 abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
 
 """
-    AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator
-
-Abstract supertype for all covariance estimator types in PortfolioOptimisers.jl.
-
-All concrete types that implement covariance estimation (e.g., sample covariance, shrinkage estimators) should subtype `AbstractCovarianceEstimator`. This enables a consistent interface for covariance estimation routines throughout the package.
-
-# Related
-
-  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
-  - [`AbstractMomentAlgorithm`](@ref)
-"""
-abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
-
-"""
     AbstractMomentAlgorithm <: AbstractAlgorithm
 
 Abstract supertype for all moment algorithm types in PortfolioOptimisers.jl.
@@ -77,19 +63,6 @@ struct Full <: AbstractMomentAlgorithm end
   - [`Full`](@ref)
 """
 struct Semi <: AbstractMomentAlgorithm end
-
-"""
-    AbstractVarianceEstimator <: AbstractCovarianceEstimator
-
-Abstract supertype for all variance estimator types in PortfolioOptimisers.jl.
-
-All concrete types that implement variance estimation (e.g., sample variance, robust variance estimators) should subtype `AbstractVarianceEstimator`. This enables a consistent interface for variance estimation routines and allows for flexible extension and dispatch within the package.
-
-# Related
-
-  - [`AbstractCovarianceEstimator`](@ref)
-"""
-abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 
 """
     robust_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, [w::AbstractWeights]; dims::Int = 1, mean = nothing, kwargs...)

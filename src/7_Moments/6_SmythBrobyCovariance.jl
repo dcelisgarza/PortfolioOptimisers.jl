@@ -433,6 +433,7 @@ function SmythBrobyCovariance(;
                                 typeof(threads)}(me, ve, pdm, threshold, c1, c2, c3, n, alg,
                                                  threads)
 end
+#=
 function Base.show(io::IO, ce::SmythBrobyCovariance)
     println(io, "SmythBrobyCovariance")
     for field in fieldnames(typeof(ce))
@@ -459,6 +460,7 @@ function Base.show(io::IO, ce::SmythBrobyCovariance)
         end
     end
 end
+=#
 function factory(ce::SmythBrobyCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return SmythBrobyCovariance(; me = factory(ce.me, w), ve = factory(ce.ve, w),
                                 pdm = ce.pdm, threshold = ce.threshold, c1 = ce.c1,

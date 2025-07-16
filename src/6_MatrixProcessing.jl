@@ -174,6 +174,7 @@ function DefaultMatrixProcessing(;
     return DefaultMatrixProcessing{typeof(pdm), typeof(denoise), typeof(detone),
                                    typeof(alg)}(pdm, denoise, detone, alg)
 end
+#=
 function Base.show(io::IO, mp::DefaultMatrixProcessing)
     println(io, "DefaultMatrixProcessing")
     for field in fieldnames(typeof(mp))
@@ -198,6 +199,7 @@ function Base.show(io::IO, mp::DefaultMatrixProcessing)
         end
     end
 end
+=#
 
 """
     struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
@@ -293,6 +295,7 @@ function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise
     return NonPositiveDefiniteMatrixProcessing{typeof(denoise), typeof(detone),
                                                typeof(alg)}(denoise, detone, alg)
 end
+#=
 function Base.show(io::IO, mp::NonPositiveDefiniteMatrixProcessing)
     println(io, "NonPositiveDefiniteMatrixProcessing")
     for field in fieldnames(typeof(mp))
@@ -316,6 +319,7 @@ function Base.show(io::IO, mp::NonPositiveDefiniteMatrixProcessing)
         end
     end
 end
+=#
 
 """
     matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix, X::AbstractMatrix, args...; kwargs...)

@@ -197,7 +197,7 @@ function EntropyPoolingPriorEstimator(;
     else
         @smart_assert(isnothing(d_opt1) && isnothing(d_opt2))
     end
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     return EntropyPoolingPriorEstimator{typeof(pe), typeof(views), typeof(d_views),

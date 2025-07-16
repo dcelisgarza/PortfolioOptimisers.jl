@@ -90,7 +90,7 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           formulation::ValueatRiskFormulation = MIPValueatRisk())
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(beta) < beta < one(beta))
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     return ValueatRiskRange{typeof(settings), typeof(alpha), typeof(beta), typeof(w),

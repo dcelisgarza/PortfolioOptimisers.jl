@@ -16,6 +16,7 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
     return Solver{typeof(name), typeof(solver), typeof(settings), typeof(check_sol),
                   typeof(add_bridges)}(name, solver, settings, check_sol, add_bridges)
 end
+#=
 function Base.show(io::IO, slv::Solver)
     println(io, "Solver")
     for field in fieldnames(typeof(slv))
@@ -36,6 +37,7 @@ function Base.show(io::IO, slv::Solver)
         end
     end
 end
+=#
 Base.iterate(S::Solver, state = 1) = state > 1 ? nothing : (S, state + 1)
 struct JuMPResult{T1 <: AbstractDict, T2 <: Bool} <: AbstractJuMPResult
     trials::T1
@@ -47,6 +49,7 @@ function JuMPResult(; trials::AbstractDict, success::Bool)
     end
     return JuMPResult{typeof(trials), typeof(success)}(trials, success)
 end
+#=
 function Base.show(io::IO, res::JuMPResult)
     println(io, "JuMPResult")
     for field in fieldnames(typeof(res))
@@ -65,6 +68,7 @@ function Base.show(io::IO, res::JuMPResult)
         end
     end
 end
+=#
 function optimise_JuMP_model!(model::JuMP.Model,
                               slv::Union{<:Solver, <:AbstractVector{<:Solver}})
     trials = Dict()

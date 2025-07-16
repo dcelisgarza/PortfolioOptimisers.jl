@@ -293,6 +293,7 @@ NormalisedGerber2
 function NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber2{typeof(me)}(me)
 end
+#=
 function Base.show(io::IO, ng::NormalisedGerberCovarianceAlgorithm)
     name = string(typeof(ng))
     name = name[1:(findfirst(x -> x == '{', name) - 1)]
@@ -316,6 +317,7 @@ function Base.show(io::IO, ng::NormalisedGerberCovarianceAlgorithm)
         end
     end
 end
+=#
 for alg in (Gerber0, Gerber1, Gerber2)
     eval(quote
              function factory(alg::$(alg), ::Any)
@@ -450,6 +452,7 @@ function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance()
                                                                                      threshold,
                                                                                      alg)
 end
+#=
 function Base.show(io::IO, gc::GerberCovariance)
     println(io, "GerberCovariance")
     for field in fieldnames(typeof(gc))
@@ -476,6 +479,7 @@ function Base.show(io::IO, gc::GerberCovariance)
         end
     end
 end
+=#
 
 """
     gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix, std_vec::AbstractArray)

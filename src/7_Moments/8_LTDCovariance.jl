@@ -10,6 +10,7 @@ function LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
     @smart_assert(zero(alpha) < alpha < one(alpha))
     return LTDCovariance{typeof(ve), typeof(alpha), typeof(threads)}(ve, alpha, threads)
 end
+#=
 function Base.show(io::IO, ce::LTDCovariance)
     println(io, "LTDCovariance")
     for field in fieldnames(typeof(ce))
@@ -33,6 +34,7 @@ function Base.show(io::IO, ce::LTDCovariance)
         end
     end
 end
+=#
 function factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return LTDCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha, threads = ce.threads)
 end

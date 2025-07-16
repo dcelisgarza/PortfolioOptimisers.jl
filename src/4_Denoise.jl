@@ -117,10 +117,12 @@ function ShrunkDenoise(; alpha::Real = 0.0)
     @smart_assert(zero(alpha) <= alpha <= one(alpha))
     return ShrunkDenoise{typeof(alpha)}(alpha)
 end
+#=
 function Base.show(io::IO, alg::ShrunkDenoise)
     println(io, "ShrunkDenoise")
     return println(io, "  alg | ", typeof(alg.alpha), ": ", repr(alg.alpha))
 end
+=#
 
 """
     struct Denoise{T1 <: AbstractDenoiseAlgorithm, T2 <: Tuple, T3 <: NamedTuple, T4,
@@ -240,6 +242,7 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
     return Denoise{typeof(alg), typeof(args), typeof(kwargs), typeof(kernel), typeof(m),
                    typeof(n)}(alg, args, kwargs, kernel, m, n)
 end
+#=
 function Base.show(io::IO, de::Denoise)
     println(io, "Denoise")
     for field in fieldnames(typeof(de))
@@ -267,7 +270,7 @@ function Base.show(io::IO, de::Denoise)
         end
     end
 end
-
+=#
 """
     _denoise!(alg::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)
     _denoise!(alg::FixedDenoise, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)

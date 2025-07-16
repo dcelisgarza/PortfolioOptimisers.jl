@@ -1,4 +1,4 @@
-abstract type CoskewnessEstimator end
+abstract type CoskewnessEstimator <: AbstractEstimator end
 function coskewness(::Nothing, args...; kwargs...)
     return nothing, nothing
 end
@@ -14,6 +14,29 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Coskewness{typeof(me), typeof(mp), typeof(alg)}(me, mp, alg)
 end
+#=
+function Base.show(io::IO, csk::Coskewness)
+    println(io, "Coskewness")
+    for field in fieldnames(typeof(csk))
+        val = getfield(csk, field)
+        print(io, "  ", lpad(string(field), 3), " ")
+        if isa(val, AbstractExpectedReturnsEstimator) ||
+           isa(val, AbstractMatrixProcessingEstimator) ||
+           isa(val, AbstractMomentAlgorithm)
+            ioalg = IOBuffer()
+            show(ioalg, val)
+            algstr = String(take!(ioalg))
+            alglines = split(algstr, '\n')
+            println(io, "| ", alglines[1])
+            for l in alglines[2:end]
+                println(io, "      | ", l)
+            end
+        else
+            println(io, "| $(typeof(val)): ", repr(val))
+        end
+    end
+end
+=#
 function factory(ce::Coskewness, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end

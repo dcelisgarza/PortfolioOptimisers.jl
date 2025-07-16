@@ -85,11 +85,11 @@ function AugmentedBlackLittermanPriorEstimator(;
                                                                    <:AbstractVector} = nothing,
                                                f_views_conf::Union{Nothing,
                                                                    <:AbstractVector} = nothing,
-                                               w::Union{Nothing, <:AbstractVector} = nothing,
+                                               w::Union{Nothing, <:AbstractWeights} = nothing,
                                                rf::Real = 0.0,
                                                l::Union{Nothing, <:Real} = nothing,
                                                tau::Union{Nothing, <:Real} = nothing)
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     if isa(a_views_conf, AbstractVector)

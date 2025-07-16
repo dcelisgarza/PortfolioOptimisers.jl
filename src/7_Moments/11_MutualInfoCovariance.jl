@@ -14,6 +14,7 @@ function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance()
     return MutualInfoCovariance{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins,
                                                                              normalise)
 end
+#=
 function Base.show(io::IO, ce::MutualInfoCovariance)
     println(io, "MutualInfoCovariance")
     for field in fieldnames(typeof(ce))
@@ -35,6 +36,7 @@ function Base.show(io::IO, ce::MutualInfoCovariance)
         end
     end
 end
+=#
 function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,
                                 normalise = ce.normalise)

@@ -171,7 +171,7 @@ function EPPriorEstimator(;
     if isa(rho_views, AbstractVector)
         @smart_assert(!isempty(rho_views))
     end
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     if !isnothing(mu_views) ||

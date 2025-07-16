@@ -40,10 +40,12 @@ Creates a new `PosdefEstimator` with the specified algorithm.
 struct PosdefEstimator{T1} <: AbstractPosdefEstimator
     alg::T1
 end
+#=
 function Base.show(io::IO, est::PosdefEstimator)
     println(io, "PosdefEstimator")
     return println(io, "  alg | ", typeof(est.alg), ": ", repr(est.alg))
 end
+=#
 """
     PosdefEstimator(; alg = NearestCorrelationMatrix.Newton)
 

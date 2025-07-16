@@ -1,4 +1,4 @@
-abstract type CokurtosisEstimator end
+abstract type CokurtosisEstimator <: AbstractEstimator end
 function cokurtosis(::Nothing, args...; kwargs...)
     return nothing
 end
@@ -14,6 +14,29 @@ function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Cokurtosis{typeof(me), typeof(mp), typeof(alg)}(me, mp, alg)
 end
+#=
+function Base.show(io::IO, ck::Cokurtosis)
+    println(io, "Cokurtosis")
+    for field in fieldnames(typeof(ck))
+        val = getfield(ck, field)
+        print(io, "  ", lpad(string(field), 3), " ")
+        if isa(val, AbstractExpectedReturnsEstimator) ||
+           isa(val, AbstractMatrixProcessingEstimator) ||
+           isa(val, AbstractMomentAlgorithm)
+            ioalg = IOBuffer()
+            show(ioalg, val)
+            algstr = String(take!(ioalg))
+            alglines = split(algstr, '\n')
+            println(io, "| ", alglines[1])
+            for l in alglines[2:end]
+                println(io, "      | ", l)
+            end
+        else
+            println(io, "| $(typeof(val)): ", repr(val))
+        end
+    end
+end
+=#
 function factory(ce::Cokurtosis, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Cokurtosis(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end

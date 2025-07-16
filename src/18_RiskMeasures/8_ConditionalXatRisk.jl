@@ -6,9 +6,9 @@ struct ConditionalValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
 end
 function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 alpha::Real = 0.05,
-                                w::Union{Nothing, <:AbstractVector} = nothing)
+                                w::Union{Nothing, <:AbstractWeights} = nothing)
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     return ConditionalValueatRisk{typeof(settings), typeof(alpha), typeof(w)}(settings,
@@ -34,7 +34,7 @@ function DistributionallyRobustConditionalValueatRisk(;
                                                       r::Real = 0.02,
                                                       w::Union{Nothing, <:AbstractWeights} = nothing)
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     return DistributionallyRobustConditionalValueatRisk{typeof(settings), typeof(alpha),
@@ -94,7 +94,7 @@ function ConditionalValueatRiskRange(;
                                      w::Union{Nothing, <:AbstractWeights} = nothing)
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(beta) < beta < one(beta))
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     return ConditionalValueatRiskRange{typeof(settings), typeof(alpha), typeof(beta),
@@ -127,7 +127,7 @@ function DistributionallyRobustConditionalValueatRiskRange(;
                                                                     <:AbstractWeights} = nothing)
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(beta) < beta < one(beta))
-    if isa(w, AbstractVector)
+    if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     return DistributionallyRobustConditionalValueatRiskRange{typeof(settings),

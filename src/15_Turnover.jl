@@ -15,6 +15,7 @@ function Turnover(; w::AbstractVector{<:Real},
     @smart_assert(!isempty(w))
     return Turnover{typeof(w), typeof(val)}(w, val)
 end
+#=
 function Base.show(io::IO, tn::Turnover)
     println(io, "Turnover")
     for field in fieldnames(typeof(tn))
@@ -31,6 +32,7 @@ function Base.show(io::IO, tn::Turnover)
         end
     end
 end
+=#
 function turnover_view(::Nothing, ::Any)
     return nothing
 end

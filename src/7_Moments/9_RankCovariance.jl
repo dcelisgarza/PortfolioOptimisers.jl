@@ -47,6 +47,7 @@ end
 function factory(ce::SpearmanCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return SpearmanCovariance(; ve = factory(ce.ve, w))
 end
+#=
 function Base.show(io::IO, ce::RankCovarianceEstimator)
     name = string(typeof(ce))
     name = name[1:(findfirst(x -> x == '{', name) - 1)]
@@ -70,5 +71,6 @@ function Base.show(io::IO, ce::RankCovarianceEstimator)
         end
     end
 end
+=#
 
 export KendallCovariance, SpearmanCovariance

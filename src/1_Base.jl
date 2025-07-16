@@ -42,3 +42,72 @@ This ensures a unified interface for accessing results across different estimato
   - [`AbstractAlgorithm`](@ref)
 """
 abstract type AbstractResult end
+
+"""
+    AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator
+
+Abstract supertype for all covariance estimator types in PortfolioOptimisers.jl.
+
+All concrete types that implement covariance estimation (e.g., sample covariance, shrinkage estimators) should subtype `AbstractCovarianceEstimator`. This enables a consistent interface for covariance estimation routines throughout the package.
+
+# Related
+
+  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
+  - [`AbstractMomentAlgorithm`](@ref)
+"""
+abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
+
+"""
+    AbstractVarianceEstimator <: AbstractCovarianceEstimator
+
+Abstract supertype for all variance estimator types in PortfolioOptimisers.jl.
+
+All concrete types that implement variance estimation (e.g., sample variance, robust variance estimators) should subtype `AbstractVarianceEstimator`. This enables a consistent interface for variance estimation routines and allows for flexible extension and dispatch within the package.
+
+# Related
+
+  - [`AbstractCovarianceEstimator`](@ref)
+"""
+abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
+
+function Base.show(io::IO,
+                   ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
+                              <:AbstractCovarianceEstimator})
+    name = string(typeof(ear))
+    fields = propertynames(ear)
+    if isempty(fields)
+        return println(io, string(typeof(ear), "()"))
+    end
+    name = name[1:(findfirst(x -> (x == '{' || x == '('), name) - 1)]
+    println(io, name)
+    padding = maximum(map(length, map(string, fields))) + 2
+    for field in fields
+        val = getfield(ear, field)
+        print(io, lpad(string(field), padding), " ")
+        if isnothing(val)
+            println(io, "| nothing")
+        elseif isa(val, AbstractMatrix)
+            println(io, "| $(size(val,1))×$(size(val,2)) $(typeof(val))")
+        elseif isa(val, AbstractVector) && length(val) > 6
+            println(io, "| $(length(val))-element $(typeof(val))")
+        elseif isa(val,
+                   Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
+                         <:AbstractCovarianceEstimator})
+            ioalg = IOBuffer()
+            show(ioalg, val)
+            algstr = String(take!(ioalg))
+            alglines = split(algstr, '\n')
+            println(io, "| ", alglines[1])
+            for l in alglines[2:end]
+                if isempty(l) || l == '\n'
+                    continue
+                end
+                println(io, lpad("| ", padding + 3), l)
+            end
+        else
+            println(io, "| $(typeof(val)): ", repr(val))
+        end
+    end
+
+    return nothing
+end

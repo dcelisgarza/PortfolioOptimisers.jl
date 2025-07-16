@@ -81,6 +81,7 @@ function SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
     end
     return SimpleExpectedReturns(w)
 end
+#=
 function Base.show(io::IO, ser::SimpleExpectedReturns)
     println(io, "SimpleExpectedReturns")
     for field in fieldnames(typeof(ser))
@@ -93,6 +94,7 @@ function Base.show(io::IO, ser::SimpleExpectedReturns)
         end
     end
 end
+=#
 
 """
     mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)

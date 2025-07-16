@@ -50,6 +50,7 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
 end
 Base.length(::Fees) = 1
 Base.iterate(::Fees, i = 1) = i <= 1 ? (i, nothing) : nothing
+#=
 function Base.show(io::IO, fees::Fees)
     println(io, "Fees")
     for field in fieldnames(typeof(fees))
@@ -77,6 +78,7 @@ function Base.show(io::IO, fees::Fees)
         end
     end
 end
+=#
 function fees_view(::Nothing, ::Any)
     return nothing
 end

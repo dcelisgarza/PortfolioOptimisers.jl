@@ -106,6 +106,7 @@ function SimpleVariance(;
     end
     return SimpleVariance{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
 end
+#=
 function Base.show(io::IO, sv::SimpleVariance)
     println(io, "SimpleVariance")
     for field in fieldnames(typeof(sv))
@@ -131,6 +132,7 @@ function Base.show(io::IO, sv::SimpleVariance)
         end
     end
 end
+=#
 
 """
     std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)

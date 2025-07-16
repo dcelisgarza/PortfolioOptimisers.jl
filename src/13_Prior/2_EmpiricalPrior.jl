@@ -17,7 +17,7 @@ struct LowOrderPriorResult{T1 <: AbstractMatrix, T2 <: AbstractVector, T3 <: Abs
 end
 function LowOrderPriorResult(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
                              chol::Union{Nothing, <:AbstractMatrix} = nothing,
-                             w::Union{Nothing, <:AbstractVector} = nothing,
+                             w::Union{Nothing, <:AbstractWeights} = nothing,
                              loadings::Union{Nothing, <:RegressionResult} = nothing,
                              f_mu::Union{Nothing, <:AbstractVector} = nothing,
                              f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,

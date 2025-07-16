@@ -10,6 +10,7 @@ function SOCTracking(; ddof::Integer = 1)
     @smart_assert(ddof > 0)
     return SOCTracking{typeof(ddof)}(ddof)
 end
+#=
 function Base.show(io::IO, soc::SOCTracking)
     println(io, "SOCTracking")
     for field in fieldnames(typeof(soc))
@@ -18,6 +19,7 @@ function Base.show(io::IO, soc::SOCTracking)
         println(io, "| $(typeof(val)): ", repr(val))
     end
 end
+=#
 struct NOCTracking <: NormTracking end
 function norm_tracking(f::SOCTracking, a, b, N = nothing)
     factor = isnothing(N) ? 1 : sqrt(N - f.ddof)
@@ -42,6 +44,7 @@ function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing,
     @smart_assert(!isempty(w))
     return WeightsTracking{typeof(fees), typeof(w)}(fees, w)
 end
+#=
 function Base.show(io::IO, wt::WeightsTracking)
     println(io, "WeightsTracking")
     for field in fieldnames(typeof(wt))
@@ -67,6 +70,7 @@ function Base.show(io::IO, wt::WeightsTracking)
         end
     end
 end
+=#
 function factory(tracking::WeightsTracking, w::AbstractVector)
     return WeightsTracking(; fees = factory(tracking.fees, tracking.w), w = w)
 end
@@ -85,6 +89,7 @@ function ReturnsTracking(; w::AbstractVector{<:Real})
     @smart_assert(!isempty(w))
     return ReturnsTracking{typeof(w)}(w)
 end
+#=
 function Base.show(io::IO, rt::ReturnsTracking)
     println(io, "ReturnsTracking")
     for field in fieldnames(typeof(rt))
@@ -99,6 +104,7 @@ function Base.show(io::IO, rt::ReturnsTracking)
         end
     end
 end
+=#
 function tracking_view(tracking::ReturnsTracking, ::Any)
     return tracking
 end
@@ -120,6 +126,7 @@ function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
     return TrackingError{typeof(tracking), typeof(err), typeof(formulation)}(tracking, err,
                                                                              formulation)
 end
+#=
 function Base.show(io::IO, te::TrackingError)
     println(io, "TrackingError")
     for field in fieldnames(typeof(te))
@@ -141,6 +148,7 @@ function Base.show(io::IO, te::TrackingError)
         end
     end
 end
+=#
 function tracking_view(tracking::TrackingError, i::AbstractVector, args...)
     return TrackingError(; tracking = tracking_view(tracking.tracking, i),
                          err = tracking.err, formulation = tracking.formulation)
