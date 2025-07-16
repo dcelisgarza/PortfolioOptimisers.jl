@@ -110,7 +110,7 @@ Constructor for [`ShrunkDenoise`](@ref).
 ```jldoctest
 julia> alg = ShrunkDenoise(; alpha = 0.5)
 ShrunkDenoise
-  alg | Float64: 0.5
+  alpha | Float64: 0.5
 ```
 """
 function ShrunkDenoise(; alpha::Real = 0.0)
@@ -207,8 +207,7 @@ Construct a [`Denoise`](@ref) object, configuring all parameters for matrix deno
 julia> de = Denoise(;)
 Denoise
      alg | ShrunkDenoise
-         |   alg | Float64: 0.0
-         |
+         |   alpha | Float64: 0.0
     args | Tuple{}: ()
   kwargs | @NamedTuple{}: NamedTuple()
   kernel | typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
@@ -242,35 +241,7 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
     return Denoise{typeof(alg), typeof(args), typeof(kwargs), typeof(kernel), typeof(m),
                    typeof(n)}(alg, args, kwargs, kernel, m, n)
 end
-#=
-function Base.show(io::IO, de::Denoise)
-    println(io, "Denoise")
-    for field in fieldnames(typeof(de))
-        val = getfield(de, field)
-        print(io, "  ", lpad(string(field), 6), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, AbstractDenoiseAlgorithm)
-            ioalg = IOBuffer()
-            show(ioalg, val)
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
-            for l in alglines[2:end]
-                println(io, "         | ", l)
-            end
-        elseif isa(val, AbstractVector) && length(val) ≤ 6
-            println(io, "| $(typeof(val)): ", repr(val))
-        elseif isa(val, AbstractVector)
-            println(io, "| $(length(val))-element $(typeof(val))")
-        elseif isa(val, NamedTuple)
-            println(io, "| $(typeof(val)): ", repr(val))
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
+
 """
     _denoise!(alg::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)
     _denoise!(alg::FixedDenoise, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)

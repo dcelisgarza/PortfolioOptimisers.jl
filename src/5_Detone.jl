@@ -64,16 +64,6 @@ function Detone(; n::Integer = 1)
     @smart_assert(n >= zero(n))
     return Detone{typeof(n)}(n)
 end
-#=
-function Base.show(io::IO, dt::Detone)
-    println(io, "Detone")
-    for field in fieldnames(typeof(dt))
-        val = getfield(dt, field)
-        print(io, "  ", string(field), " ")
-        println(io, "| $(typeof(val)): ", repr(val))
-    end
-end
-=#
 
 """
     detone!(dt::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())

@@ -372,17 +372,13 @@ julia> ce = SmythBrobyCovariance()
 SmythBrobyCovariance
          me | SimpleExpectedReturns
             |   w | nothing
-            |
          ve | SimpleVariance
             |          me | SimpleExpectedReturns
             |             |   w | nothing
-            |             |
             |           w | nothing
             |   corrected | Bool: true
-            |
         pdm | PosdefEstimator
             |   alg | UnionAll: NearestCorrelationMatrix.Newton
-            |
   threshold | Float64: 0.5
          c1 | Float64: 0.5
          c2 | Float64: 0.5
@@ -433,34 +429,7 @@ function SmythBrobyCovariance(;
                                 typeof(threads)}(me, ve, pdm, threshold, c1, c2, c3, n, alg,
                                                  threads)
 end
-#=
-function Base.show(io::IO, ce::SmythBrobyCovariance)
-    println(io, "SmythBrobyCovariance")
-    for field in fieldnames(typeof(ce))
-        val = getfield(ce, field)
-        print(io, "  ", lpad(string(field), 9), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, AbstractExpectedReturnsEstimator) ||
-               isa(val, AbstractCovarianceEstimator) ||
-               isa(val, AbstractPosdefEstimator) ||
-               isa(val, SmythBrobyCovarianceAlgorithm)
-            ioalg = IOBuffer()
-            show(ioalg, val)
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
-            for l in alglines[2:end]
-                println(io, "            | ", l)
-            end
-        elseif isa(val, Real)
-            println(io, "| $(typeof(val)): ", repr(val))
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
+
 function factory(ce::SmythBrobyCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return SmythBrobyCovariance(; me = factory(ce.me, w), ve = factory(ce.ve, w),
                                 pdm = ce.pdm, threshold = ce.threshold, c1 = ce.c1,

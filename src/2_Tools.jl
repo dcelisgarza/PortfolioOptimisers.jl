@@ -119,26 +119,6 @@ struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
     iv::T6
     ivpa::T7
 end
-#=
-function Base.show(io::IO, rr::ReturnsResult)
-    println(io, "ReturnsResult")
-    for field in fieldnames(typeof(rr))
-        val = getfield(rr, field)
-        print(io, "  ", lpad(string(field), 4), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, AbstractMatrix)
-            println(io, "| $(size(val,1))×$(size(val,2)) $(typeof(val))")
-        elseif isa(val, AbstractVector) && length(val) ≤ 6
-            println(io, "| $(typeof(val)): ", repr(val))
-        elseif isa(val, AbstractVector)
-            println(io, "| $(length(val))-element $(typeof(val))")
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 """
     ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                     X::Union{Nothing, <:AbstractMatrix} = nothing,

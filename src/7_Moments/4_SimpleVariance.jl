@@ -70,7 +70,6 @@ julia> sv = SimpleVariance()
 SimpleVariance
          me | SimpleExpectedReturns
             |   w | nothing
-            |
           w | nothing
   corrected | Bool: true
 
@@ -80,7 +79,6 @@ julia> svw = SimpleVariance(; w = w, corrected = false)
 SimpleVariance
          me | SimpleExpectedReturns
             |   w | nothing
-            |
           w | StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
   corrected | Bool: false
 ```
@@ -106,33 +104,6 @@ function SimpleVariance(;
     end
     return SimpleVariance{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
 end
-#=
-function Base.show(io::IO, sv::SimpleVariance)
-    println(io, "SimpleVariance")
-    for field in fieldnames(typeof(sv))
-        val = getfield(sv, field)
-        print(io, "  ", lpad(string(field), 9), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, AbstractExpectedReturnsEstimator)
-            ioalg = IOBuffer()
-            show(ioalg, val)
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
-            for l in alglines[2:end]
-                println(io, "            | ", l)
-            end
-        elseif isa(val, AbstractWeights)
-            println(io, "| $(typeof(val)): ", repr(val))
-        elseif isa(val, Bool)
-            println(io, "| Bool: ", repr(val))
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 
 """
     std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)
@@ -160,7 +131,6 @@ julia> sv = SimpleVariance()
 SimpleVariance
          me | SimpleExpectedReturns
             |   w | nothing
-            |
           w | nothing
   corrected | Bool: true
 
@@ -216,7 +186,6 @@ julia> sv = SimpleVariance()
 SimpleVariance
          me | SimpleExpectedReturns
             |   w | nothing
-            |
           w | nothing
   corrected | Bool: true
 
@@ -231,7 +200,6 @@ julia> svw = SimpleVariance(; w = w, corrected = false)
 SimpleVariance
          me | SimpleExpectedReturns
             |   w | nothing
-            |
           w | StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
   corrected | Bool: false
 
@@ -281,7 +249,6 @@ julia> sv = SimpleVariance()
 SimpleVariance
          me | SimpleExpectedReturns
             |   w | nothing
-            |
           w | nothing
   corrected | Bool: true
 
@@ -335,7 +302,6 @@ julia> sv = SimpleVariance()
 SimpleVariance
          me | SimpleExpectedReturns
             |   w | nothing
-            |
           w | nothing
   corrected | Bool: true
 
@@ -350,7 +316,6 @@ julia> svw = SimpleVariance(; w = w, corrected = false)
 SimpleVariance
          me | SimpleExpectedReturns
             |   w | nothing
-            |
           w | StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
   corrected | Bool: false
 

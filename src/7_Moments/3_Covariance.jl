@@ -88,20 +88,7 @@ function GeneralWeightedCovariance(;
     end
     return GeneralWeightedCovariance{typeof(ce), typeof(w)}(ce, w)
 end
-#=
-function Base.show(io::IO, gwc::GeneralWeightedCovariance)
-    println(io, "GeneralWeightedCovariance")
-    for field in fieldnames(typeof(gwc))
-        val = getfield(gwc, field)
-        print(io, "  ", lpad(string(field), 2), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
+
 """
     cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 
@@ -240,11 +227,9 @@ julia> cov_est = Covariance()
 Covariance
    me | SimpleExpectedReturns
       |   w | nothing
-      |
    ce | GeneralWeightedCovariance
       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       |    w | nothing
-      |
   alg | Full()
 ```
 

@@ -154,7 +154,6 @@ julia> ng0 = NormalisedGerber0()
 NormalisedGerber0
   me | SimpleExpectedReturns
      |   w | nothing
-     |
 ```
 
 # Related
@@ -216,7 +215,6 @@ julia> ng0 = NormalisedGerber1()
 NormalisedGerber1
   me | SimpleExpectedReturns
      |   w | nothing
-     |
 ```
 
 # Related
@@ -280,7 +278,6 @@ julia> ng0 = NormalisedGerber2()
 NormalisedGerber2
   me | SimpleExpectedReturns
      |   w | nothing
-     |
 ```
 
 # Related
@@ -293,31 +290,6 @@ NormalisedGerber2
 function NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber2{typeof(me)}(me)
 end
-#=
-function Base.show(io::IO, ng::NormalisedGerberCovarianceAlgorithm)
-    name = string(typeof(ng))
-    name = name[1:(findfirst(x -> x == '{', name) - 1)]
-    println(io, name)
-    for field in fieldnames(typeof(ng))
-        val = getfield(ng, field)
-        print(io, "  ", string(field), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, AbstractExpectedReturnsEstimator)
-            ioalg = IOBuffer()
-            show(ioalg, val)
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
-            for l in alglines[2:end]
-                println(io, "     | ", l)
-            end
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 for alg in (Gerber0, Gerber1, Gerber2)
     eval(quote
              function factory(alg::$(alg), ::Any)
@@ -418,13 +390,10 @@ GerberCovariance
          ve | SimpleVariance
             |          me | SimpleExpectedReturns
             |             |   w | nothing
-            |             |
             |           w | nothing
             |   corrected | Bool: true
-            |
         pdm | PosdefEstimator
             |   alg | UnionAll: NearestCorrelationMatrix.Newton
-            |
   threshold | Float64: 0.5
         alg | Gerber1()
 ```
@@ -452,34 +421,6 @@ function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance()
                                                                                      threshold,
                                                                                      alg)
 end
-#=
-function Base.show(io::IO, gc::GerberCovariance)
-    println(io, "GerberCovariance")
-    for field in fieldnames(typeof(gc))
-        val = getfield(gc, field)
-        print(io, "  ", lpad(string(field), 9), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, AbstractExpectedReturnsEstimator) ||
-               isa(val, AbstractCovarianceEstimator) ||
-               isa(val, AbstractPosdefEstimator) ||
-               isa(val, GerberCovarianceAlgorithm)
-            ioalg = IOBuffer()
-            show(ioalg, val)
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
-            for l in alglines[2:end]
-                println(io, "            | ", l)
-            end
-        elseif isa(val, Real)
-            println(io, "| $(typeof(val)): ", repr(val))
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 
 """
     gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix, std_vec::AbstractArray)

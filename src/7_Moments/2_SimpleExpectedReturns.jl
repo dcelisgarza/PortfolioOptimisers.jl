@@ -81,20 +81,6 @@ function SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
     end
     return SimpleExpectedReturns(w)
 end
-#=
-function Base.show(io::IO, ser::SimpleExpectedReturns)
-    println(io, "SimpleExpectedReturns")
-    for field in fieldnames(typeof(ser))
-        val = getfield(ser, field)
-        print(io, "  ", string(field), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 
 """
     mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)

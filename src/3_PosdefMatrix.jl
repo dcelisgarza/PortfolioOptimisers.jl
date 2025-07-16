@@ -40,12 +40,6 @@ Creates a new `PosdefEstimator` with the specified algorithm.
 struct PosdefEstimator{T1} <: AbstractPosdefEstimator
     alg::T1
 end
-#=
-function Base.show(io::IO, est::PosdefEstimator)
-    println(io, "PosdefEstimator")
-    return println(io, "  alg | ", typeof(est.alg), ": ", repr(est.alg))
-end
-=#
 """
     PosdefEstimator(; alg = NearestCorrelationMatrix.Newton)
 
@@ -54,6 +48,16 @@ Constructor for [`PosdefEstimator`](@ref). Defaults to the [`NearestCorrelationM
 # Arguments
 
   - `alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm}`: The algorithm used for the nearest correlation matrix projection.
+
+# Examples
+
+```jldoctest
+julia> using LinearAlgebra
+
+julia> est = PosdefEstimator()
+PosdefEstimator
+  alg | UnionAll: NearestCorrelationMatrix.Newton
+```
 
 # Related
 

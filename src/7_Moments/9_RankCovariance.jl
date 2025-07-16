@@ -47,30 +47,5 @@ end
 function factory(ce::SpearmanCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return SpearmanCovariance(; ve = factory(ce.ve, w))
 end
-#=
-function Base.show(io::IO, ce::RankCovarianceEstimator)
-    name = string(typeof(ce))
-    name = name[1:(findfirst(x -> x == '{', name) - 1)]
-    println(io, name)
-    for field in fieldnames(typeof(ce))
-        val = getfield(ce, field)
-        print(io, "  ", string(field), " ")
-        if isnothing(val)
-            println(io, "| nothing")
-        elseif isa(val, AbstractVarianceEstimator)
-            ioalg = IOBuffer()
-            show(ioalg, val)
-            algstr = String(take!(ioalg))
-            alglines = split(algstr, '\n')
-            println(io, "| ", alglines[1])
-            for l in alglines[2:end]
-                println(io, "     | ", l)
-            end
-        else
-            println(io, "| $(typeof(val)): ", repr(val))
-        end
-    end
-end
-=#
 
 export KendallCovariance, SpearmanCovariance
