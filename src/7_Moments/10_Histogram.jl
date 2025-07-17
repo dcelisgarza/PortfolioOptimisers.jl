@@ -1,17 +1,202 @@
+"""
+Abstract supertype for all histogram binning algorithms.
+
+`AbstractBins` is the abstract type for all binning algorithm types used in histogram-based calculations within PortfolioOptimisers.jl, such as mutual information and variation of information analysis. Concrete subtypes implement specific binning strategies (e.g., Knuth, Freedman-Diaconis, Scott, Hacine-Gharbi-Ravier) and provide a consistent interface for bin selection.
+
+# Related
+
+  - [`AstroPyBins`](@ref)
+  - [`Knuth`](@ref)
+  - [`FreedmanDiaconis`](@ref)
+  - [`Scott`](@ref)
+  - [`HacineGharbiRavier`](@ref)
+"""
 abstract type AbstractBins <: AbstractAlgorithm end
+
+"""
+    abstract type AstroPyBins <: AbstractBins end
+
+Abstract supertype for all histogram binning algorithms implemented using AstroPy's bin width selection methods.
+
+`AstroPyBins` is the abstract type for all binning algorithm types that rely on bin width selection functions from the [AstroPy](https://www.astropy.org/) Python library, such as Knuth, Freedman-Diaconis, and Scott. Concrete subtypes implement specific binning strategies and provide a consistent interface for bin selection in histogram-based calculations within PortfolioOptimisers.jl.
+
+# Related
+
+  - [`Knuth`](@ref)
+  - [`FreedmanDiaconis`](@ref)
+  - [`Scott`](@ref)
+  - [`AbstractBins`](@ref)
+"""
 abstract type AstroPyBins <: AbstractBins end
+
+"""
+    Knuth <: AstroPyBins
+
+Histogram binning algorithm using Knuth's rule.
+
+`Knuth` implements Knuth's rule for selecting the optimal number of bins in a histogram, as provided by the [AstroPy](https://www.astropy.org/) library. This method aims to maximize the posterior probability of the histogram given the data, resulting in an adaptive binning strategy that balances bias and variance.
+
+# Related
+
+  - [`AstroPyBins`](@ref)
+  - [`FreedmanDiaconis`](@ref)
+  - [`Scott`](@ref)
+  - [`HacineGharbiRavier`](@ref)
+  - [`get_bin_width_func`](@ref)
+"""
 struct Knuth <: AstroPyBins end
+"""
+    FreedmanDiaconis <: AstroPyBins
+
+Histogram binning algorithm using the Freedman-Diaconis rule.
+
+`FreedmanDiaconis` implements the Freedman-Diaconis rule for selecting the number of bins in a histogram, as provided by the [AstroPy](https://www.astropy.org/) library. This method determines bin width based on the interquartile range (IQR) and the number of data points, making it robust to outliers and suitable for skewed distributions.
+
+# Related
+
+  - [`AstroPyBins`](@ref)
+  - [`Knuth`](@ref)
+  - [`Scott`](@ref)
+  - [`HacineGharbiRavier`](@ref)
+  - [`get_bin_width_func`](@ref)
+"""
+struct FreedmanDiaconis <: AstroPyBins end
+"""
+    Scott <: AstroPyBins
+
+Histogram binning algorithm using Scott's rule.
+
+`Scott` implements Scott's rule for selecting the number of bins in a histogram, as provided by the [AstroPy](https://www.astropy.org/) library. This method chooses bin width based on the standard deviation of the data and the number of observations, providing a good default for normally distributed data.
+
+# Related
+
+  - [`AstroPyBins`](@ref)
+  - [`Knuth`](@ref)
+  - [`FreedmanDiaconis`](@ref)
+  - [`HacineGharbiRavier`](@ref)
+  - [`get_bin_width_func`](@ref)
+"""
+struct Scott <: AstroPyBins end
+"""
+    HacineGharbiRavier <: AbstractBins
+
+Histogram binning algorithm using the Hacine-Gharbi–Ravier rule.
+
+`HacineGharbiRavier` implements the Hacine-Gharbi–Ravier rule for selecting the number of bins in a histogram. This method adapts the bin count based on the correlation structure and sample size, and is particularly useful for information-theoretic measures such as mutual information and variation of information.
+
+# Related
+
+  - [`AbstractBins`](@ref)
+  - [`AstroPyBins`](@ref)
+  - [`Knuth`](@ref)
+  - [`FreedmanDiaconis`](@ref)
+  - [`Scott`](@ref)
+  - [`get_bin_width_func`](@ref)
+"""
+struct HacineGharbiRavier <: AbstractBins end
+
+"""
+    get_bin_width_func(bins::Knuth)
+    get_bin_width_func(bins::FreedmanDiaconis)
+    get_bin_width_func(bins::Scott)
+    get_bin_width_func(bins::Union{<:HacineGharbiRavier, <:Integer})
+
+Return the bin width selection function associated with a histogram binning algorithm.
+
+This utility dispatches on the binning algorithm type and returns the corresponding bin width function from the [AstroPy](https://www.astropy.org/) Python library for `Knuth`, `FreedmanDiaconis`, and `Scott`. For `HacineGharbiRavier` and integer bin counts, it returns `nothing`, as these strategies do not use a bin width function.
+
+# Arguments
+
+  - `bins::Knuth`: Use Knuth's rule (`astropy.stats.knuth_bin_width`).
+  - `bins::FreedmanDiaconis`: Use the Freedman-Diaconis rule (`astropy.stats.freedman_bin_width`).
+  - `bins::Scott`: Use Scott's rule (`astropy.stats.scott_bin_width`).
+  - `bins::Union{<:HacineGharbiRavier, <:Integer}`: No bin width function (returns `nothing`).
+
+# Returns
+
+  - `bin_width_func`: The corresponding bin width function (callable), or `nothing` if not applicable.
+
+# Examples
+
+```jldoctest; filter = r"0x[0-9a-fA-F]+" => s"..."
+julia> PortfolioOptimisers.get_bin_width_func(Knuth())
+Python: <function knuth_bin_width at 0x7da1178e0fe0>
+
+julia> PortfolioOptimisers.get_bin_width_func(FreedmanDiaconis())
+Python: <function freedman_bin_width at 0x7da1178e0fe0>
+
+julia> PortfolioOptimisers.get_bin_width_func(Scott())
+Python: <function scott_bin_width at 0x7da1178e0fe0>
+
+julia> PortfolioOptimisers.get_bin_width_func(HacineGharbiRavier())
+
+julia> PortfolioOptimisers.get_bin_width_func(10)
+
+```
+
+# Related
+
+  - [`Knuth`](@ref)
+  - [`FreedmanDiaconis`](@ref)
+  - [`Scott`](@ref)
+  - [`HacineGharbiRavier`](@ref)
+"""
 function get_bin_width_func(::Knuth)
     return pyimport("astropy.stats").knuth_bin_width
 end
-struct FreedmanDiaconis <: AstroPyBins end
 function get_bin_width_func(::FreedmanDiaconis)
     return pyimport("astropy.stats").freedman_bin_width
 end
-struct Scott <: AstroPyBins end
 function get_bin_width_func(::Scott)
     return pyimport("astropy.stats").scott_bin_width
 end
+function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})
+    return nothing
+end
+
+"""
+    calc_num_bins(bins::AstroPyBins,
+                  xj::AbstractVector, xi::AbstractVector, j::Integer, i::Integer,
+                  bin_width_func, T::Integer)
+    calc_num_bins(bins::HacineGharbiRavier,
+                  xj::AbstractVector, xi::AbstractVector, j::Integer, i::Integer,
+                  bin_width_func, T::Integer)
+    calc_num_bins(bins::Integer,
+                  xj::AbstractVector, xi::AbstractVector, j::Integer, i::Integer,
+                  bin_width_func, T::Integer)
+
+Compute the number of histogram bins for a pair of variables using a specified binning algorithm.
+
+This function determines the number of bins to use for histogram-based calculations (such as mutual information or variation of information) between two variables, based on the selected binning strategy. It dispatches on the binning algorithm type and uses the appropriate method for each:
+
+  - For `AstroPyBins` (e.g., `Knuth`, `FreedmanDiaconis`, `Scott`), it computes the bin width using the provided `bin_width_func` and calculates the number of bins as the range divided by the bin width, rounding to the nearest integer. For off-diagonal pairs, it uses the maximum of the two variables' bin counts.
+  - For `HacineGharbiRavier`, it uses the Hacine-Gharbi–Ravier rule, which adapts the bin count based on the correlation and sample size.
+  - For an integer, it returns the specified number of bins directly.
+
+# Arguments
+
+  - `bins::AstroPyBins`: Binning algorithm type (e.g., `Knuth`, `FreedmanDiaconis`, `Scott`).
+  - `bins::HacineGharbiRavier`: Use the Hacine-Gharbi–Ravier rule.
+  - `bins::Integer`: Use a fixed number of bins.
+  - `xj::AbstractVector`: Data vector for variable `j`.
+  - `xi::AbstractVector`: Data vector for variable `i`.
+  - `j::Integer`: Index of variable `j`.
+  - `i::Integer`: Index of variable `i`.
+  - `bin_width_func`: Bin width selection function (from `get_bin_width_func`), or `nothing`.
+  - `T::Integer`: Number of observations (used by some algorithms).
+
+# Returns
+
+  - `nbins::Int`: The computed number of bins for the variable pair.
+
+# Related
+
+  - [`get_bin_width_func`](@ref)
+  - [`Knuth`](@ref)
+  - [`FreedmanDiaconis`](@ref)
+  - [`Scott`](@ref)
+  - [`HacineGharbiRavier`](@ref)
+"""
 function calc_num_bins(::AstroPyBins, xj::AbstractVector, xi::AbstractVector, j::Integer,
                        i::Integer, bin_width_func, ::Any)
     xjl, xju = extrema(xj)
@@ -26,10 +211,6 @@ function calc_num_bins(::AstroPyBins, xj::AbstractVector, xi::AbstractVector, j:
                      k1
                  end)
 end
-struct HacineGharbiRavier <: AbstractBins end
-function get_bin_width_func(::HacineGharbiRavier)
-    return nothing
-end
 function calc_num_bins(::HacineGharbiRavier, xj::AbstractVector, xi::AbstractVector,
                        j::Integer, i::Integer, ::Any, T::Integer)
     corr = cor(xj, xi)
@@ -40,12 +221,40 @@ function calc_num_bins(::HacineGharbiRavier, xj::AbstractVector, xi::AbstractVec
                      sqrt(1 + sqrt(1 + 24 * T / (1 - corr^2))) / sqrt(2)
                  end)
 end
-function get_bin_width_func(::Integer)
-    return nothing
-end
 function calc_num_bins(bins::Integer, args...)
     return bins
 end
+
+"""
+    calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
+
+Compute histogram-based marginal and joint distributions for two variables.
+
+This function computes the normalised histograms (probability mass functions) for two variables `xj` and `xi` using the specified number of bins, as well as their joint histogram. It returns the marginal entropies and the joint histogram, which are used in mutual information and variation of information calculations.
+
+# Arguments
+
+  - `xj::AbstractVector`: Data vector for variable `j`.
+  - `xi::AbstractVector`: Data vector for variable `i`.
+  - `bins::Integer`: Number of bins to use for the histograms.
+
+# Returns
+
+  - `ex::Float64`: Entropy of `xj`.
+  - `ey::Float64`: Entropy of `xi`.
+  - `hxy::Matrix{Float64}`: Joint histogram (counts, not normalised to probability).
+
+# Details
+
+  - The histograms are computed using `StatsBase.fit(Histogram, ...)` over the range of each variable, with bin edges expanded slightly using `eps` to ensure all data is included.
+  - The marginal histograms are normalised to sum to 1 before entropy calculation.
+  - The joint histogram is not normalised, as it is used directly in mutual information calculations.
+
+# Related
+
+  - [`variation_info`](@ref)
+  - [`mutual_info`](@ref)
+"""
 function calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
     bp1 = bins + one(bins)
 
@@ -70,6 +279,34 @@ function calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
 
     return ex, ey, hxy
 end
+
+"""
+    intrinsic_mutual_info(X::AbstractMatrix)
+
+Compute the intrinsic mutual information from a joint histogram.
+
+This function calculates the mutual information between two variables given their joint histogram matrix `X`. It is used as a core step in information-theoretic measures such as mutual information and variation of information.
+
+# Arguments
+
+  - `X::AbstractMatrix`: Joint histogram matrix (typically from `calc_hist_data`).
+
+# Returns
+
+  - `mi::Float64`: The intrinsic mutual information between the two variables.
+
+# Details
+
+  - The function computes marginal distributions by summing over rows and columns.
+  - Only nonzero entries in the joint histogram are considered.
+  - The mutual information is computed as the sum over all nonzero joint probabilities of `p(x, y) * log(p(x, y) / (p(x) * p(y)))`, with careful handling of log and normalisation.
+
+# Related
+
+  - [`calc_hist_data`](@ref)
+  - [`variation_info`](@ref)
+  - [`mutual_info`](@ref)
+"""
 function intrinsic_mutual_info(X::AbstractMatrix)
     p_i = vec(sum(X; dims = 2))
     p_j = vec(sum(X; dims = 1))
@@ -93,6 +330,39 @@ function intrinsic_mutual_info(X::AbstractMatrix)
 
     return sum(mi)
 end
+
+"""
+    variation_info(X::AbstractMatrix,
+                   bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                   normalise::Bool = true)
+
+Compute the variation of information (VI) matrix for a set of variables.
+
+This function calculates the pairwise variation of information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. VI quantifies the amount of information lost and gained when moving from one variable to another, and is a true metric on the space of discrete distributions.
+
+# Arguments
+
+  - `X::AbstractMatrix`: Data matrix (observations × variables).
+  - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins (default: `HacineGharbiRavier()`).
+  - `normalise::Bool`: Whether to normalise the VI by the joint entropy (default: `true`).
+
+# Returns
+
+  - `var_mtx::Matrix{Float64}`: Symmetric matrix of pairwise variation of information values.
+
+# Details
+
+  - For each pair of variables, the function computes marginal entropies and the joint histogram using `calc_hist_data`.
+  - The mutual information is computed using `intrinsic_mutual_info`.
+  - VI is calculated as `H(X) + H(Y) - 2 * I(X, Y)`. If `normalise` is `true`, it is divided by the joint entropy.
+  - The result is clamped to `[0, typemax(eltype(X))]` and is symmetric.
+
+# Related
+
+  - [`mutual_info`](@ref)
+  - [`calc_hist_data`](@ref)
+  - [`intrinsic_mutual_info`](@ref)
+"""
 function variation_info(X::AbstractMatrix,
                         bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                         normalise::Bool = true)
@@ -161,6 +431,39 @@ function mutual_variation_info(X::AbstractMatrix,
     return mut_mtx, var_mtx
 end
 =#
+
+"""
+    mutual_info(X::AbstractMatrix,
+                bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                normalise::Bool = true)
+
+Compute the mutual information (MI) matrix for a set of variables.
+
+This function calculates the pairwise mutual information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. MI quantifies the amount of shared information between pairs of variables, and is widely used in information-theoretic analysis of dependencies.
+
+# Arguments
+
+  - `X::AbstractMatrix`: Data matrix (observations × variables).
+  - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins (default: `HacineGharbiRavier()`).
+  - `normalise::Bool`: Whether to normalise the MI by the minimum marginal entropy (default: `true`).
+
+# Returns
+
+  - `mut_mtx::Matrix{Float64}`: Symmetric matrix of pairwise mutual information values.
+
+# Details
+
+  - For each pair of variables, the function computes marginal entropies and the joint histogram using [`calc_hist_data`](@ref).
+  - The mutual information is computed using [`intrinsic_mutual_info`](@ref).
+  - If `normalise` is `true`, the MI is divided by the minimum of the two marginal entropies.
+  - The result is clamped to `[0, typemax(eltype(X))]` and is symmetric.
+
+# Related
+
+  - [`variation_info`](@ref)
+  - [`calc_hist_data`](@ref)
+  - [`intrinsic_mutual_info`](@ref)
+"""
 function mutual_info(X::AbstractMatrix,
                      bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                      normalise::Bool = true)

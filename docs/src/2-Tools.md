@@ -12,7 +12,7 @@ PortfolioOptimisers.:⊙
 PortfolioOptimisers.:⊘
 PortfolioOptimisers.:⊕
 PortfolioOptimisers.:⊖
-PortfolioOptimisers.traverse_subtypes
+traverse_concrete_subtypes
 PortfolioOptimisers.concrete_typed_array
 PortfolioOptimisers.dot_scalar
 PortfolioOptimisers.nothing_scalar_array_view
