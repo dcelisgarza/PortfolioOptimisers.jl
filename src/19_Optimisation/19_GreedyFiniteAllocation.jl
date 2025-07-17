@@ -1,6 +1,6 @@
 struct GreedyAllocationResult{T1, T2 <: AbstractVector, T3 <: AbstractVector,
-                              T4 <: AbstractVector, T5 <: OptimisationResult, T6 <: Real} <:
-       OptimisationResult
+                              T4 <: AbstractVector, T5 <: OptimisationReturnCode,
+                              T6 <: Real} <: OptimisationResult
     oe::T1
     shares::T2
     cost::T3
@@ -9,7 +9,7 @@ struct GreedyAllocationResult{T1, T2 <: AbstractVector, T3 <: AbstractVector,
     cash::T6
 end
 struct GreedyAllocation{T1 <: Real, T2 <: Tuple, T3 <: NamedTuple} <:
-       BaseAssetAllocationOptimisationEstimator
+       BaseFiniteAllocationOptimisationEstimator
     unit::T1
     args::T2
     kwargs::T3

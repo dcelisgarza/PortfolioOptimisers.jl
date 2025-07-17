@@ -37,25 +37,25 @@ function postprocess(cont)
            """ * cont
 end
 
-# example_path = joinpath(@__DIR__, "../examples/")
-# build_path_md = joinpath(@__DIR__, "src", "examples/")
-# files = readdir(example_path)
-# code_files = filter(x -> endswith(x, ".jl"), files)
-# data_files = filter(x -> endswith(x, ".csv"), files)
-# examples_nav = fix_suffix_md.("./examples/" .* code_files)
+example_path = joinpath(@__DIR__, "../examples/")
+build_path_md = joinpath(@__DIR__, "src", "examples/")
+files = readdir(example_path)
+code_files = filter(x -> endswith(x, ".jl"), files)
+data_files = filter(x -> (endswith(x, ".csv") || endswith(x, ".csv.gz")), files)
+examples_nav = fix_suffix_md.("./examples/" .* code_files)
 
-# for file in data_files
-#     cp(joinpath(@__DIR__, "../examples/" * file),
-#        joinpath(@__DIR__, "src/examples/" * file); force = true)
-# end
+for file in data_files
+    cp(joinpath(@__DIR__, "../examples/" * file),
+       joinpath(@__DIR__, "src/examples/" * file); force = true)
+end
 
-# for file in code_files
-#     Literate.markdown(example_path * file, build_path_md;
-#                       preprocess = pre_process_content_md, postprocess = postprocess,
-#                       documenter = true, credit = true)
-#     Literate.notebook(example_path * file, example_path;
-#                       preprocess = pre_process_content_nb, documenter = true, credit = true)
-# end
+for file in code_files
+    Literate.markdown(example_path * file, build_path_md;
+                      preprocess = pre_process_content_md, postprocess = postprocess,
+                      documenter = true, credit = true)
+    Literate.notebook(example_path * file, example_path;
+                      preprocess = pre_process_content_nb, documenter = true, credit = true)
+end
 
 const page_rename = Dict("developer.md" => "Developer docs") # Without the numbers
 const numbered_pages = [file
@@ -68,9 +68,9 @@ makedocs(; #modules = [PortfolioOptimisers],
          sitename = "PortfolioOptimisers.jl",
          format = Documenter.HTML(;
                                   canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl",),
-         pages = ["index.md"; #"Examples" => examples_nav; 
-                  numbered_pages[16:end];
-                  "API" => [numbered_pages[1:6]; "Moments" => numbered_pages[7:15]]],
+         pages = ["index.md"; "Examples" => examples_nav;
+                  numbered_pages[18:end];
+                  "API" => [numbered_pages[1:6]; "Moments" => numbered_pages[7:17]]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 

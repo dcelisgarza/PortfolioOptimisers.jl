@@ -1,16 +1,23 @@
 struct DiscreteAllocationResult{T1, T2 <: AbstractVector, T3 <: AbstractVector,
-                                T4 <: AbstractVector, T5, T6, T7 <: Real} <:
+                                T4 <: AbstractVector, T5 <: OptimisationReturnCode,
+                                T6 <: Union{Nothing, <:OptimisationReturnCode},
+                                T7 <: Union{Nothing, <:OptimisationReturnCode},
+                                T8 <: Union{Nothing, <:JuMP.Model},
+                                T9 <: Union{Nothing, <:JuMP.Model}, T10 <: Real} <:
        OptimisationResult
     oe::T1
     shares::T2
     cost::T3
     w::T4
     retcode::T5
-    model::T6
-    cash::T7
+    s_retcode::T6
+    l_retcode::T7
+    s_model::T8
+    l_model::T9
+    cash::T10
 end
 struct DiscreteAllocation{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T2 <: Real,
-                          T3 <: Real} <: BaseAssetAllocationOptimisationEstimator
+                          T3 <: Real} <: BaseFiniteAllocationOptimisationEstimator
     slv::T1
     sc::T2
     so::T3
@@ -97,9 +104,17 @@ function optimise!(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
     res[sidx, 2] = -scost
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
+    retcode = if isnothing(sretcode) && isa(lretcode, OptimisationSuccess) ||
+                 isnothing(lretcode) && isa(sretcode, OptimisationSuccess) ||
+                 isa(sretcode, OptimisationSuccess) && isa(lretcode, OptimisationSuccess)
+        OptimisationSuccess(nothing)
+    else
+        OptimisationFailure(nothing)
+    end
     return DiscreteAllocationResult(typeof(da), view(res, :, 1), view(res, :, 2),
-                                    view(res, :, 3), (sretcode, lretcode),
-                                    ifelse(save, (smodel, lmodel), nothing), lcash)
+                                    view(res, :, 3), retcode, sretcode, lretcode,
+                                    ifelse(save, smodel, nothing),
+                                    ifelse(save, lmodel, nothing), lcash)
 end
 
 export DiscreteAllocationResult, DiscreteAllocation

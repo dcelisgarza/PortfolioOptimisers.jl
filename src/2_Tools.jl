@@ -843,7 +843,7 @@ function fourth_moment_index_factory(N::Integer, i)
 end
 
 """
-    traverse_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} = nothing)
+    traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} = nothing)
 
 Recursively traverse all subtypes of the given abstract type `t` and collect all concrete struct types into `ctarr`.
 
@@ -865,20 +865,20 @@ julia> struct MyConcrete1 <: MyAbstract end
 
 julia> struct MyConcrete2 <: MyAbstract end
 
-julia> PortfolioOptimisers.traverse_subtypes(MyAbstract)
+julia> traverse_concrete_subtypes(MyAbstract)
 2-element Vector{Any}:
  MyConcrete1
  MyConcrete2
 ```
 """
-function traverse_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} = nothing)
+function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} = nothing)
     if isnothing(ctarr)
         ctarr = []
     end
     sts = subtypes(t)
     for st in sts
         if !isstructtype(st)
-            traverse_subtypes(st, ctarr)
+            traverse_concrete_subtypes(st, ctarr)
         else
             push!(ctarr, st)
         end
@@ -921,4 +921,4 @@ function factory(::Nothing, args...; kwargs...)
 end
 
 export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns,
-       brinson_attribution, factory
+       brinson_attribution, factory, traverse_concrete_subtypes

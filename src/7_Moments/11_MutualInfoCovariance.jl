@@ -10,7 +10,7 @@ Covariance estimator based on mutual information.
 
   - `ve::AbstractVarianceEstimator`: Variance estimator used to compute marginal standard deviations.
   - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins for histogram-based MI estimation.
-  - `normalise::Bool`: Whether to normalise the MI matrix (default: `true`).
+  - `normalise::Bool`: Whether to normalise the MI matrix.
 
 # Constructor
 
@@ -43,9 +43,9 @@ This constructor creates a `MutualInfoCovariance` object using the specified var
 
 # Arguments
 
-  - `ve::AbstractVarianceEstimator`: Variance estimator (default: `SimpleVariance()`).
-  - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins for MI estimation (default: `HacineGharbiRavier()`).
-  - `normalise::Bool`: Whether to normalise the MI matrix (default: `true`).
+  - `ve::AbstractVarianceEstimator`: Variance estimator.
+  - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins for MI estimation.
+  - `normalise::Bool`: Whether to normalise the MI matrix.
 
 # Returns
 
@@ -100,7 +100,7 @@ This method computes the pairwise mutual information correlation matrix for the 
 
   - `ce::MutualInfoCovariance`: Mutual information-based covariance estimator.
   - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation (1 = columns/assets, 2 = rows). Default is `1`.
+  - `dims::Int`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments (currently unused).
 
 # Returns
@@ -141,7 +141,7 @@ This method computes the pairwise mutual information covariance matrix for the i
 
   - `ce::MutualInfoCovariance`: Mutual information-based covariance estimator.
   - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance (1 = columns/assets, 2 = rows). Default is `1`.
+  - `dims::Int`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
 # Returns

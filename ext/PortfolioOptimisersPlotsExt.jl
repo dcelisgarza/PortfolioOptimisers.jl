@@ -264,12 +264,12 @@ function PortfolioOptimisers.plot_drawdowns(w::AbstractArray, X::AbstractArray,
     dd = drawdowns(cret; cX = true, compound = compound)
     dd .*= 100
     risks = 100 * if !compound
-                  [-AverageDrawdown(; w = rw)(ret), -UlcerIndex()(ret),
-                   -DrawdownatRisk(; alpha = alpha)(ret),
-                   -ConditionalDrawdownatRisk(; alpha = alpha)(ret),
-                   -EntropicDrawdownatRisk(; slv = slv, alpha = alpha)(ret),
-                   -RelativisticDrawdownatRisk(; slv = slv, alpha = alpha, kappa = kappa)(ret),
-                   -MaximumDrawdown()(ret)]
+                  [-AverageDrawdown(; w = rw)(copy(ret)), -UlcerIndex()(copy(ret)),
+                   -DrawdownatRisk(; alpha = alpha)(copy(ret)),
+                   -ConditionalDrawdownatRisk(; alpha = alpha)(copy(ret)),
+                   -EntropicDrawdownatRisk(; slv = slv, alpha = alpha)(copy(ret)),
+                   -RelativisticDrawdownatRisk(; slv = slv, alpha = alpha, kappa = kappa)(copy(ret)),
+                   -MaximumDrawdown()(copy(ret))]
                   else
                   [-RelativeAverageDrawdown(; w = rw)(copy(ret)), -RelativeUlcerIndex()(copy(ret)),
                    -RelativeDrawdownatRisk(; alpha = alpha)(copy(ret)),

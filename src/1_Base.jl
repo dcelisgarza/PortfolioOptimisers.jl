@@ -92,7 +92,7 @@ function Base.show(io::IO,
             println(io, "| $(length(val))-element $(typeof(val))")
         elseif isa(val,
                    Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                         <:AbstractCovarianceEstimator})
+                         <:AbstractCovarianceEstimator, <:JuMP.Model})
             ioalg = IOBuffer()
             show(ioalg, val)
             algstr = String(take!(ioalg))
@@ -104,6 +104,13 @@ function Base.show(io::IO,
                 end
                 println(io, lpad("| ", padding + 3), l)
             end
+        elseif isa(val, DataType)
+            tval = typeof(val)
+            val = repr(val)
+            if !isnothing(match(r"[\(\{]", val))
+                val = val[1:(findfirst(x -> (x == '{' || x == '('), val) - 1)]
+            end
+            println(io, "| $(tval): ", val)
         else
             println(io, "| $(typeof(val)): ", repr(val))
         end

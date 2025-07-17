@@ -169,13 +169,13 @@ Compute the number of histogram bins for a pair of variables using a specified b
 
 This function determines the number of bins to use for histogram-based calculations (such as mutual information or variation of information) between two variables, based on the selected binning strategy. It dispatches on the binning algorithm type and uses the appropriate method for each:
 
-  - For `AstroPyBins` (e.g., `Knuth`, `FreedmanDiaconis`, `Scott`), it computes the bin width using the provided `bin_width_func` and calculates the number of bins as the range divided by the bin width, rounding to the nearest integer. For off-diagonal pairs, it uses the maximum of the two variables' bin counts.
+  - For `AstroPyBins`, it computes the bin width using the provided `bin_width_func` and calculates the number of bins as the range divided by the bin width, rounding to the nearest integer. For off-diagonal pairs, it uses the maximum of the two variables' bin counts.
   - For `HacineGharbiRavier`, it uses the Hacine-Gharbi–Ravier rule, which adapts the bin count based on the correlation and sample size.
   - For an integer, it returns the specified number of bins directly.
 
 # Arguments
 
-  - `bins::AstroPyBins`: Binning algorithm type (e.g., `Knuth`, `FreedmanDiaconis`, `Scott`).
+  - `bins::AstroPyBins`: Binning algorithm type.
   - `bins::HacineGharbiRavier`: Use the Hacine-Gharbi–Ravier rule.
   - `bins::Integer`: Use a fixed number of bins.
   - `xj::AbstractVector`: Data vector for variable `j`.
@@ -343,8 +343,8 @@ This function calculates the pairwise variation of information between all colum
 # Arguments
 
   - `X::AbstractMatrix`: Data matrix (observations × variables).
-  - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins (default: `HacineGharbiRavier()`).
-  - `normalise::Bool`: Whether to normalise the VI by the joint entropy (default: `true`).
+  - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins.
+  - `normalise::Bool`: Whether to normalise the VI by the joint entropy.
 
 # Returns
 
@@ -444,8 +444,8 @@ This function calculates the pairwise mutual information between all columns of 
 # Arguments
 
   - `X::AbstractMatrix`: Data matrix (observations × variables).
-  - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins (default: `HacineGharbiRavier()`).
-  - `normalise::Bool`: Whether to normalise the MI by the minimum marginal entropy (default: `true`).
+  - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins.
+  - `normalise::Bool`: Whether to normalise the MI by the minimum marginal entropy.
 
 # Returns
 

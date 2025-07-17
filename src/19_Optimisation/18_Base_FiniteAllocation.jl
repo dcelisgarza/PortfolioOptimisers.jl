@@ -1,5 +1,5 @@
-abstract type BaseAssetAllocationOptimisationEstimator <: BaseOptimisationEstimator end
-abstract type AssetAllocationOptimisationAlgorithm <: OptimisationAlgorithm end
+abstract type BaseFiniteAllocationOptimisationEstimator <: BaseOptimisationEstimator end
+abstract type FiniteAllocationOptimisationAlgorithm <: OptimisationAlgorithm end
 function setup_alloc_optim(w::AbstractVector, p::AbstractVector, cash::Real,
                            T::Union{Nothing, <:Real} = nothing,
                            fees::Union{Nothing, <:Fees} = nothing)
