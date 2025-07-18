@@ -43,7 +43,7 @@ rd = prices_to_returns(X)
 
 ## 2. Efficient frontier
 
-We have two mutually exclusive ways to compute the efficient frontier. We can do so from the perspective of minimising the risk with a return lower bound, or maximising the return with a risk upper bound. It is possible to provide explicit bounds, or a `Frontier` object which automatically computes the bounds based on the problem and constraints. All four combinations have their use cases. We will only show the use of `Frontier` because it is more convenient for our example.
+We have two mutually exclusive ways to compute the efficient frontier. We can do so from the perspective of minimising the risk with a return lower bound, or maximising the return with a risk upper bound. It is possible to provide explicit bounds, or a `Frontier` object which automatically computes the bounds based on the problem and constraints. All four combinations have their use cases. In this example we will only show the use of `Frontier` as a lower bound on the portfolio return.
 
 Since we will be performing various optimistions, we will provide a vector of solver settings because we don't know if a single set of settings will work in all cases.
 
@@ -92,7 +92,7 @@ pretty_table(DataFrame([rd.nx ws], Symbol.([:assets; 1:30])); formatters = resfm
 Perhaps it is time to introduce some visualisations, which are implemented as a package extesion. For this we need to import the `Plots` and `GraphRecipes` packages.
 
 ````@example 3-Efficient-Frontier
-using Plots, GraphRecipes
+using StatsPlots, GraphRecipes
 
 plot_stacked_area_composition(res1.w, rd.nx)
 ````
