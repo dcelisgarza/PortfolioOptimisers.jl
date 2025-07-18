@@ -32,8 +32,10 @@ end
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::AbstractVector,
                                                            X::AbstractArray,
                                                            fees::Union{Nothing, <:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X, 1),
-                                                           nx::AbstractVector = 1:size(X, 2),
+                                                           ts::AbstractVector = 1:size(X,
+                                                                                       1),
+                                                           nx::AbstractVector = 1:size(X,
+                                                                                       2),
                                                            N::Union{Nothing, <:Real} = nothing,
                                                            compound::Bool = false,
                                                            f_kwargs::NamedTuple = (;
@@ -105,7 +107,8 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
     rc = risk_contribution(r, w, X, fees; delta = delta, marginal = marginal)
     return PortfolioOptimisers.plot_composition(rc, nx; N = N, kwargs = kwargs, ekwargs...)
 end
-function PortfolioOptimisers.plot_stacked_bar_composition(w::AbstractArray,
+function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:AbstractVector{<:Real},
+                                                                   <:AbstractVector{<:AbstractVector}},
                                                           nx::AbstractVector = 1:size(w, 1);
                                                           kwargs::NamedTuple = (;
                                                                                 xlabel = "Portfolios",
@@ -121,22 +124,22 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::AbstractArray,
     return groupedbar(transpose(w); xticks = (1:M, 1:M), bar_position = :stack, group = ctg,
                       kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_stacked_area_composition(w::AbstractArray,
-                                                           nx::AbstractVector = 1:size(w, 1);
+function PortfolioOptimisers.plot_stacked_area_composition(w::Union{<:AbstractVector{<:Real},
+                                                                    <:AbstractVector{<:AbstractVector}},
+                                                           nx::AbstractVector = 1:size(w,
+                                                                                       1);
                                                            kwargs::NamedTuple = (;
                                                                                  xlabel = "Portfolios",
                                                                                  ylabel = "Weight",
                                                                                  title = "Portfolio Composition",
-                                                                                 legend = :outerright,
-                                                                                 xticks = (1:size(w,
-                                                                                                  2),
-                                                                                           1:size(w,
-                                                                                                  2))),
+                                                                                 legend = :outerright),
                                                            ekwargs...)
     if isa(w, AbstractVector{<:AbstractVector})
         w = hcat(w...)
     end
-    return areaplot(transpose(w); label = permutedims(nx), kwargs..., ekwargs...)
+    M = size(w, 2)
+    return areaplot(transpose(w); xticks = (1:M, 1:M), label = permutedims(nx), kwargs...,
+                    ekwargs...)
 end
 function PortfolioOptimisers.plot_dendrogram(clr::PortfolioOptimisers.AbstractClusteringResult,
                                              nx::AbstractVector = 1:length(clr.clustering.order);
@@ -312,11 +315,11 @@ function PortfolioOptimisers.plot_measures(w::Union{<:AbstractVector{<:Real},
                                            kwargs::NamedTuple = (title = "Pareto Frontier",
                                                                  xlabel = "X", ylabel = "Y",
                                                                  zlabel = "Z",
-                                                                 label = "Portfolio",
+                                                                 label = nothing,
                                                                  colorbar_title = "C",
                                                                  legend = true,
                                                                  xrotation = 0,
-                                                                 yrotation = 0))
+                                                                 yrotation = 0), ekwargs...)
     if flag
         x = factory(x, pr)
         y = factory(y, pr)
@@ -328,9 +331,9 @@ function PortfolioOptimisers.plot_measures(w::Union{<:AbstractVector{<:Real},
     zr = isnothing(z) ? nothing : expected_risk(z, w, pr, fees)
     cr = expected_risk(c, w, pr, fees)
     return if isnothing(zr)
-        scatter(xr, yr; zcolor = cr, kwargs...)
+        scatter(xr, yr; zcolor = cr, kwargs..., ekwargs...)
     else
-        scatter(xr, yr, zr; zcolor = cr, kwargs...)
+        scatter(xr, yr, zr; zcolor = cr, kwargs..., ekwargs...)
     end
 end
 
