@@ -58,11 +58,11 @@ This constructor creates a `DistanceCovariance` object using the specified dista
 
 # Arguments
 
-  - `dist::Distances.Metric`: Distance metric used for pairwise computations (default: `Distances.Euclidean()`).
-  - `args::Tuple`: Additional positional arguments for the distance metric (default: `()`).
-  - `kwargs::NamedTuple`: Additional keyword arguments for the distance metric (default: `(; )`).
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional weights for observations (default: `nothing`).
-  - `threads::FLoops.Transducers.Executor`: Parallel execution strategy (default: `ThreadedEx()`).
+  - `dist::Distances.Metric`: Distance metric used for pairwise computations.
+  - `args::Tuple`: Additional positional arguments for the distance metric.
+  - `kwargs::NamedTuple`: Additional keyword arguments for the distance metric.
+  - `w::Union{Nothing, <:AbstractWeights}`: Optional weights for observations.
+  - `threads::FLoops.Transducers.Executor`: Parallel execution strategy.
 
 # Returns
 

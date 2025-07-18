@@ -437,7 +437,7 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
   - `me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}`: Use the Bayes-Stein algorithm.
   - `me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}`: Use the Bodnar-Okhrin-Parolya algorithm.
   - `X::AbstractArray`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the mean (default: `1`).
+  - `dims::Int`: Dimension along which to compute the mean.
   - `kwargs...`: Additional keyword arguments passed to the mean and covariance estimators.
 
 # Returns

@@ -179,9 +179,7 @@ end
     coskewness(ske::Coskewness{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
     coskewness(::Nothing, args...; kwargs...)
 
-Compute the full coskewness tensor and processed matrix for a dataset.
-
-This method computes the coskewness tensor and applies matrix processing using the estimator's matrix processing algorithm. The coskewness is calculated using the centered data, and the processed matrix is obtained via eigenvalue decomposition and clamping.
+Compute the full coskewness tensor and processed matrix for a dataset. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.
 
 # Arguments
 
@@ -189,14 +187,14 @@ This method computes the coskewness tensor and applies matrix processing using t
   - `ske::Coskewness{<:Any, <:Any, <:Semi}`: Coskewness estimator with `Semi` moment algorithm.
   - `ske::Nothing`: No-op coskewness computation, returns `(nothing, nothing)`.
   - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the mean (default: `1`).
+  - `dims::Int`: Dimension along which to compute the mean.
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 # Returns
 
-  - `cskew::Matrix`: Coskewness tensor.
-  - `V::Matrix`: Processed coskewness matrix.
+  - `cskew::Matrix`: Coskewness tensor (observations × assets^2).
+  - `V::Matrix`: Processed coskewness matrix (assets × assets).
 
 # Examples
 
