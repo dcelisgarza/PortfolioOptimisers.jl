@@ -6,10 +6,24 @@ CurrentModule = PortfolioOptimisers
 
 Documentation for [PortfolioOptimisers](https://github.com/dcelisgarza/PortfolioOptimisers.jl).
 
+## Design philosophy
+
 There are three overarching design choices in `PortfolioOptimisers.jl`:
 
- 1. Well-defined type hierarchy. This lets us define interfaces and leverage multiple dispatch to easily and quickly add new features.
- 2. Strongly typed immutable structs. Which reduce runtime dispatches and allow the compiler to aggressively optimise. And it means there is always a single source of truth for each process, minimising bugs and ensuring valid structures throughout program execution.
- 3. Compositional design. There are many interactions within `PortfolioOptimisers.jl`, and we want to decouple them as much as possible. This is achieved by defining small, self-contained units that can be composed together to form more complex structures. This allows us to build complex workflows without introducing unnecessary complexity. It also makes development and testing easier and fearless, as each component can be tested in isolation. It also means the only way to break existing functionality is to modify an existing structure/function.
+ 1. Well-defined type hierarchies:
+    
+     1. lets us define interfaces and leverage multiple dispatch to easily and quickly add new features.
+ 2. Strongly typed immutable structs:
+    
+     1. reduces runtime dispatch;
+     2. allows the compiler to perform aggressive optimisations via specialisation and constant propagation;
+     3. there is always a single source of truth for every process, minimising bugs and ensuring valid structures throughout program execution.
+ 3. Compositional design:
+    
+     1. there are many interactions within `PortfolioOptimisers.jl`, by using composition we can decouple and compartmentalise processes into self-contained units;
+     2. complexity arises by combining these logical subunits, their immutability means that performing assertions at variable instantiation ensures their correctness throughout the program lifetime;
+     3. makes development and testing easier and fearless, as each component can be tested in isolation;
+     4. ensures the only way to break existing functionality is to modify an existing structure/function;
+     5. we try to keep the most basal parameters in the most basal data structures, improving code reusability and maintainability, reduces the memory footprint, and allows for more flexibility.
 
-These design choices increase usage and development friction by raising the skill floor and lowering convenience, but ensure correctness and performance.
+These design choices increase initial usage and development friction by raising the skill floor and lowering convenience, but ensures correctness, robustness, performance, and maintainability.
