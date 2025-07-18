@@ -111,10 +111,6 @@ This method computes the pairwise mutual information correlation matrix for the 
 
   - Asserts that `dims` is either `1` or `2`.
 
-# Details
-
-If `dims == 2`, the input matrix is transposed before computation. The correlation matrix is computed using [`mutual_info`](@ref), which estimates the pairwise mutual information between all variables, optionally normalised.
-
 # Related
 
   - [`MutualInfoCovariance`](@ref)
@@ -151,10 +147,6 @@ This method computes the pairwise mutual information covariance matrix for the i
 # Validation
 
   - Asserts that `dims` is either `1` or `2`.
-
-# Details
-
-If `dims == 2`, the input matrix is transposed before computation. The covariance matrix is computed as the elementwise product of the MI correlation matrix and the outer product of marginal standard deviations.
 
 # Examples
 

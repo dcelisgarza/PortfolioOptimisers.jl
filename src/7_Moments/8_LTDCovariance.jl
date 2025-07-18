@@ -158,10 +158,6 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
 
   - Asserts that `dims` is either `1` or `2`.
 
-# Details
-
-If `dims == 2`, the input matrix is transposed before computation. The correlation matrix is computed using [`lower_tail_dependence`](@ref), which estimates the joint probability of both assets being in their respective lower tails.
-
 # Related
 
   - [`LTDCovariance`](@ref)
@@ -195,10 +191,6 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
 # Validation
 
   - Asserts that `dims` is either `1` or `2`.
-
-# Details
-
-If `dims == 2`, the input matrix is transposed before computation. The covariance matrix is computed as the elementwise product of the LTD correlation matrix and the outer product of marginal standard deviations, as estimated by the variance estimator in `ce`.
 
 # Related
 

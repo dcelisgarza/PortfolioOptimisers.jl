@@ -13,6 +13,7 @@ There are three overarching design choices in `PortfolioOptimisers.jl`:
  1. Well-defined type hierarchies:
     
      1. lets us define interfaces and leverage multiple dispatch to easily and quickly add new features.
+
  2. Strongly typed immutable structs:
     
      1. reduces runtime dispatch;

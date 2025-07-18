@@ -100,10 +100,6 @@ This method computes the pairwise Kendall's tau rank correlation matrix for the 
 
   - Asserts that `dims` is either `1` or `2`.
 
-# Details
-
-If `dims == 2`, the input matrix is transposed before computation. The correlation matrix is computed using `corkendall`, which estimates the pairwise Kendall's tau coefficients.
-
 # Related
 
   - [`KendallCovariance`](@ref)
@@ -138,10 +134,6 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 # Validation
 
   - Asserts that `dims` is either `1` or `2`.
-
-# Details
-
-If `dims == 2`, the input matrix is transposed before computation. The covariance matrix is computed as the elementwise product of the Kendall's tau correlation matrix and the outer product of marginal standard deviations.
 
 # Related
 
@@ -246,10 +238,6 @@ This method computes the pairwise Spearman's rho rank correlation matrix for the
 
   - Asserts that `dims` is either `1` or `2`.
 
-# Details
-
-If `dims == 2`, the input matrix is transposed before computation. The correlation matrix is computed using `corspearman`, which estimates the pairwise Spearman's rho coefficients.
-
 # Related
 
   - [`SpearmanCovariance`](@ref)
@@ -284,10 +272,6 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 # Validation
 
   - Asserts that `dims` is either `1` or `2`.
-
-# Details
-
-If `dims == 2`, the input matrix is transposed before computation. The covariance matrix is computed as the elementwise product of the Spearman's rho correlation matrix and the outer product of marginal standard deviations.
 
 # Related
 

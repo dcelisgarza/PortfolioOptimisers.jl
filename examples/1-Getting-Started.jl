@@ -60,7 +60,7 @@ The `MeanRisk` estimator defines a mean-risk optimisation problem. It is a `JuMP
 using Clarabel
 
 #=
-We have to define a `Solver` object, which contains the optimiser we wish to use, an optional name for logging purposes, optional solver settings, and optional kwargs for [`JuMP.assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#assert_is_solved_and_feasible). 
+We have to define a `Solver` object, which contains the optimiser we wish to use, an optional name for logging purposes, optional solver settings, and optional kwargs for [`JuMP.assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#assert_is_solved_and_feasible).
 
 Given the vast range of optimisation options and types, it is often useful to try different solver and settings combinations. To this aim, it is also possible to provide a vector of `Solver` objects, which is iterated over until one succeeds or all fail. The classic Markowitz optimisation is rather simple, so we will use a single solver instance.
 =#
@@ -132,4 +132,10 @@ pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip
 We can see that the mip weights do not exactly match the optimal ones, but that is because we only have finite resources. Note that the sum of the costs minus the initial cash is equal to the `cash` property of the result. This changes when we introduce fees, which will be shown in a future example.
 =#
 
-isapprox(mip_res.cash, 4206.9 - sum(mip_res.cost))
+println(isapprox(mip_res.cash, 4206.9 - sum(mip_res.cost)))
+
+#=
+We can also see that the cost of each asset is equal to the number of shares times its price.
+=#
+
+println(all(isapprox.(mip_res.shares .* vec(values(X[end])), mip_res.cost)))

@@ -105,10 +105,6 @@ This method computes the covariance matrix for the input data matrix `X` using t
 
   - Asserts that `dims` is either `1` or `2`.
 
-# Details
-
-If `dims == 2`, the input matrix is transposed before computation. The covariance matrix is first computed using `cov(ce.ce, X; ...)`, then modified in-place by `matrix_processing!(ce.mp, sigma, X; ...)`.
-
 # Related
 
   - [`PortfolioOptimisersCovariance`](@ref)
@@ -147,10 +143,6 @@ This method computes the correlation matrix for the input data matrix `X` using 
 # Validation
 
   - Asserts that `dims` is either `1` or `2`.
-
-# Details
-
-If `dims == 2`, the input matrix is transposed before computation. The correlation matrix is first computed using `cor(ce.ce, X; ...)`, then modified in-place by `matrix_processing!(ce.mp, rho, X; ...)`.
 
 # Related
 
