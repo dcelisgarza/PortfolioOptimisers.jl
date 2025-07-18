@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Example 3: Efficient frontier · PortfolioOptimisers.jl</title><meta name="title" content="Example 3: Efficient frontier · PortfolioOptimisers.jl"/><meta property="og:title" content="Example 3: Efficient frontier · PortfolioOptimisers.jl"/><meta property="twitter:title" content="Example 3: Efficient frontier · PortfolioOptimisers.jl"/><meta name="description" content="Documentation for PortfolioOptimisers.jl."/><meta property="og:description" content="Documentation for PortfolioOptimisers.jl."/><meta property="twitter:description" content="Documentation for PortfolioOptimisers.jl."/><meta property="og:url" content="https://dcelisgarza.github.io/PortfolioOptimisers.jl/examples/3-Efficient-Frontier/"/><meta property="twitter:url" content="https://dcelisgarza.github.io/PortfolioOptimisers.jl/examples/3-Efficient-Frontier/"/><link rel="canonical" href="https://dcelisgarza.github.io/PortfolioOptimisers.jl/examples/3-Efficient-Frontier/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="PortfolioOptimisers.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">PortfolioOptimisers.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">PortfolioOptimisers</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../1-Getting-Started/">Example 1: Simple <code>MeanRisk</code> optimisation</a></li><li><a class="tocitem" href="../2-Mean-Risk-Objectives/">Example 2: <code>MeanRisk</code> objectives</a></li><li class="is-active"><a class="tocitem" href>Example 3: Efficient frontier</a><ul class="internal"><li><a class="tocitem" href="#1.-Returns-data"><span>1. Returns data</span></a></li><li><a class="tocitem" href="#2.-Efficient-frontier"><span>2. Efficient frontier</span></a></li><li><a class="tocitem" href="#3.-Visualising-the-efficient-frontier"><span>3. Visualising the efficient frontier</span></a></li></ul></li><li><a class="tocitem" href="../4-Pareto-Surface/">Example 4: Pareto surface</a></li></ul></li><li><a class="tocitem" href="../../7-18-Moments/">Regression</a></li><li><a class="tocitem" href="../../90-contributing/">Contributing guidelines</a></li><li><a class="tocitem" href="../../91-developer/">Developer documentation</a></li><li><a class="tocitem" href="../../95-reference/">Reference</a></li><li><span class="tocitem">API</span><ul><li><a class="tocitem" href="../../1-Base/">Base</a></li><li><a class="tocitem" href="../../2-Tools/">Tools</a></li><li><a class="tocitem" href="../../3-PosdefMatrix/">PosdefMatrix</a></li><li><a class="tocitem" href="../../4-Denoise/">Denoise</a></li><li><a class="tocitem" href="../../5-Detone/">Detone</a></li><li><a class="tocitem" href="../../6-MatrixProcessing/">Matrix Processing</a></li><li><input class="collapse-toggle" id="menuitem-7-7" type="checkbox"/><label class="tocitem" for="menuitem-7-7"><span class="docs-label">Moments</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../7-01-Moments/">Base Moments</a></li><li><a class="tocitem" href="../../7-02-Moments/">Mean</a></li><li><a class="tocitem" href="../../7-03-Moments/">Covariance</a></li><li><a class="tocitem" href="../../7-04-Moments/">Variance and Standard Deviation</a></li><li><a class="tocitem" href="../../7-05-Moments/">Gerber Covariance</a></li><li><a class="tocitem" href="../../7-06-Moments/">Smyth-Broby Covariance</a></li><li><a class="tocitem" href="../../7-07-Moments/">Distance Covariance</a></li><li><a class="tocitem" href="../../7-08-Moments/">Lower Tail Dependence Covariance</a></li><li><a class="tocitem" href="../../7-09-Moments/">Rank Covariances</a></li><li><a class="tocitem" href="../../7-10-Moments/">Histogram</a></li><li><a class="tocitem" href="../../7-11-Moments/">Mutual Information Covariance</a></li><li><a class="tocitem" href="../../7-12-Moments/">PortfolioOptimisersCovariance</a></li><li><a class="tocitem" href="../../7-13-Moments/">Shrunk expected returns</a></li><li><a class="tocitem" href="../../7-14-Moments/">Equilibrium expected returns</a></li><li><a class="tocitem" href="../../7-15-Moments/">Excess expected returns</a></li><li><a class="tocitem" href="../../7-16-Moments/">Coskewness</a></li><li><a class="tocitem" href="../../7-17-Moments/">Cokurtosis</a></li></ul></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Example 3: Efficient frontier</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Example 3: Efficient frontier</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/examples/3-Efficient-Frontier.jl#" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><p>The source files for all examples can be found in <a href="https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/">/examples</a>.</p><h1 id="Example-3:-Efficient-frontier"><a class="docs-heading-anchor" href="#Example-3:-Efficient-frontier">Example 3: Efficient frontier</a><a id="Example-3:-Efficient-frontier-1"></a><a class="docs-heading-anchor-permalink" href="#Example-3:-Efficient-frontier" title="Permalink"></a></h1><p>In this example we will show how to compute efficient frontiers using the <code>MeanRisk</code> and <code>NearOptimalCentering</code> estimators.</p><pre><code class="language-julia hljs">using PortfolioOptimisers, PrettyTables
+# Format for pretty tables.
+tsfmt = (v, i, j) -&gt; begin
+    if j == 1
+        return Date(v)
+    else
+        return v
+    end
+end;
+resfmt = (v, i, j) -&gt; begin
+    if j == 1
+        return v
+    else
+        return isa(v, Number) ? &quot;$(round(v*100, digits=3)) %&quot; : v
+    end
+end;</code></pre><h2 id="1.-Returns-data"><a class="docs-heading-anchor" href="#1.-Returns-data">1. Returns data</a><a id="1.-Returns-data-1"></a><a class="docs-heading-anchor-permalink" href="#1.-Returns-data" title="Permalink"></a></h2><p>We will use the same data as the previous example.</p><pre><code class="language-julia hljs">using CSV, TimeSeries, DataFrames
+
+X = TimeArray(CSV.File(joinpath(@__DIR__, &quot;SP500.csv.gz&quot;)); timestamp = :Date)[(end - 252):end]
+pretty_table(X[(end - 5):end]; formatters = tsfmt)
+
+# Compute the returns
+rd = prices_to_returns(X)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">ReturnsResult
+    nx | 20-element Vector{String}
+     X | 252×20 Matrix{Float64}
+    nf | nothing
+     F | nothing
+    ts | 252-element Vector{Dates.Date}
+    iv | nothing
+  ivpa | nothing
+</code></pre><h2 id="2.-Efficient-frontier"><a class="docs-heading-anchor" href="#2.-Efficient-frontier">2. Efficient frontier</a><a id="2.-Efficient-frontier-1"></a><a class="docs-heading-anchor-permalink" href="#2.-Efficient-frontier" title="Permalink"></a></h2><p>We have two mutually exclusive ways to compute the efficient frontier. We can do so from the perspective of minimising the risk with a return lower bound, or maximising the return with a risk upper bound. It is possible to provide explicit bounds, or a <code>Frontier</code> object which automatically computes the bounds based on the problem and constraints. All four combinations have their use cases. In this example we will only show the use of <code>Frontier</code> as a lower bound on the portfolio return.</p><p>Since we will be performing various optimistions, we will provide a vector of solver settings because we don&#39;t know if a single set of settings will work in all cases.</p><pre><code class="language-julia hljs">using Clarabel
+slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+              settings = Dict(&quot;verbose&quot; =&gt; false),
+              check_sol = (; allow_local = true, allow_almost = true)),
+       Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
+              settings = Dict(&quot;verbose&quot; =&gt; false, &quot;max_step_fraction&quot; =&gt; 0.75),
+              check_sol = (; allow_local = true, allow_almost = true))]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Solver{Symbol, UnionAll, T3, @NamedTuple{allow_local::Bool, allow_almost::Bool}, Bool} where T3&lt;:(Union{Nothing, var&quot;#s234&quot;} where var&quot;#s234&quot;&lt;:AbstractDict)}:
+ Solver
+         name | Symbol: :clarabel1
+       solver | UnionAll: Clarabel.MOIwrapper.Optimizer
+     settings | Dict{String, Bool}: Dict{String, Bool}(&quot;verbose&quot; =&gt; 0)
+    check_sol | @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
+  add_bridges | Bool: true
+
+ Solver
+         name | Symbol: :clarabel2
+       solver | UnionAll: Clarabel.MOIwrapper.Optimizer
+     settings | Dict{String, Real}: Dict{String, Real}(&quot;verbose&quot; =&gt; false, &quot;max_step_fraction&quot; =&gt; 0.75)
+    check_sol | @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
+  add_bridges | Bool: true
+</code></pre><p>This time we will use the <code>ConditionalValueatRisk</code> measure and we will once again precompute prior.</p><pre><code class="language-julia hljs">r = ConditionalValueatRisk()
+pr = prior(EmpiricalPriorEstimator(), rd)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LowOrderPriorResult
+         X | 252×20 Matrix{Float64}
+        mu | 20-element Vector{Float64}
+     sigma | 20×20 Matrix{Float64}
+      chol | nothing
+         w | nothing
+  loadings | nothing
+      f_mu | nothing
+   f_sigma | nothing
+       f_w | nothing
+</code></pre><p>Lets create the efficient frontier by setting returns lower bounds and minimising the risk. We will compute a 30-point frontier.</p><pre><code class="language-julia hljs">opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 30)))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">JuMPOptimiser
+      pe | LowOrderPriorResult
+         |          X | 252×20 Matrix{Float64}
+         |         mu | 20-element Vector{Float64}
+         |      sigma | 20×20 Matrix{Float64}
+         |       chol | nothing
+         |          w | nothing
+         |   loadings | nothing
+         |       f_mu | nothing
+         |    f_sigma | nothing
+         |        f_w | nothing
+     slv | Vector{Solver{Symbol, UnionAll, T3, @NamedTuple{allow_local::Bool, allow_almost::Bool}, Bool} where T3&lt;:(Union{Nothing, var&quot;#s234&quot;} where var&quot;#s234&quot;&lt;:AbstractDict)}: Solver{Symbol, UnionAll, T3, @NamedTuple{allow_local::Bool, allow_almost::Bool}, Bool} where T3&lt;:(Union{Nothing, var&quot;#s234&quot;} where var&quot;#s234&quot;&lt;:AbstractDict)[Solver
+         name | Symbol: :clarabel1
+       solver | UnionAll: Clarabel.MOIwrapper.Optimizer
+     settings | Dict{String, Bool}: Dict{String, Bool}(&quot;verbose&quot; =&gt; 0)
+    check_sol | @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
+  add_bridges | Bool: true
+, Solver
+         name | Symbol: :clarabel2
+       solver | UnionAll: Clarabel.MOIwrapper.Optimizer
+     settings | Dict{String, Real}: Dict{String, Real}(&quot;verbose&quot; =&gt; false, &quot;max_step_fraction&quot; =&gt; 0.75)
+    check_sol | @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
+  add_bridges | Bool: true
+]
+      wb | WeightBoundsResult
+         |   lb | Float64: 0.0
+         |   ub | Float64: 1.0
+     bgt | Float64: 1.0
+    sbgt | nothing
+      lt | nothing
+      st | nothing
+     lcs | nothing
+     lcm | nothing
+    cent | nothing
+   gcard | nothing
+  sgcard | nothing
+    smtx | nothing
+    sets | nothing
+    nplg | nothing
+    cplg | nothing
+      tn | nothing
+      te | nothing
+    fees | nothing
+     ret | ArithmeticReturn
+         |   ucs | nothing
+         |    lb | Frontier
+         |       |        N | Int64: 30
+         |       |   factor | Int64: 1
+         |       |     flag | Bool: true
+     sce | SumScalariser: SumScalariser()
+    ccnt | nothing
+    cobj | nothing
+      sc | Int64: 1
+      so | Int64: 1
+    card | nothing
+   scard | nothing
+     nea | nothing
+      l1 | nothing
+      l2 | nothing
+      ss | nothing
+  strict | Bool: false
+</code></pre><p>We can now use <code>opt</code> to create the <code>MeanRisk</code> estimator. In order to get the entire frontier, we need to minimise the risk (which is the default value).</p><pre><code class="language-julia hljs">mr = MeanRisk(; opt = opt, r = r)
+res1 = optimise!(mr)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">JuMPOptimisationResult
+       oe | DataType: MeanRisk
+       pr | LowOrderPriorResult
+          |          X | 252×20 Matrix{Float64}
+          |         mu | 20-element Vector{Float64}
+          |      sigma | 20×20 Matrix{Float64}
+          |       chol | nothing
+          |          w | nothing
+          |   loadings | nothing
+          |       f_mu | nothing
+          |    f_sigma | nothing
+          |        f_w | nothing
+       wb | WeightBoundsResult
+          |   lb | 20-element StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}
+          |   ub | 20-element StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}
+      lcs | nothing
+     cent | nothing
+    gcard | nothing
+   sgcard | nothing
+     smtx | nothing
+     nplg | nothing
+     cplg | nothing
+      ret | ArithmeticReturn
+          |   ucs | nothing
+          |    lb | Frontier
+          |       |        N | Int64: 30
+          |       |   factor | Int64: 1
+          |       |     flag | Bool: true
+  retcode | 30-element Vector{PortfolioOptimisers.OptimisationReturnCode}
+      sol | 30-element Vector{PortfolioOptimisers.JuMPOptimisationSolution}
+    model | A JuMP Model
+          | ├ solver: Clarabel
+          | ├ objective_sense: MIN_SENSE
+          | │ └ objective_function_type: JuMP.AffExpr
+          | ├ num_variables: 273
+          | ├ num_constraints: 257
+          | │ ├ JuMP.AffExpr in MOI.EqualTo{Float64}: 1
+          | │ ├ JuMP.AffExpr in MOI.GreaterThan{Float64}: 1
+          | │ ├ Vector{JuMP.AffExpr} in MOI.Nonnegatives: 2
+          | │ ├ Vector{JuMP.AffExpr} in MOI.Nonpositives: 1
+          | │ └ JuMP.VariableRef in MOI.GreaterThan{Float64}: 252
+          | └ Names registered in the model
+          |   └ :X, :bgt, :ccvar_1, :cvar_risk_1, :k, :lw, :net_X, :obj_expr, :ret, :ret_frontier, :ret_lb, :risk, :risk_vec, :sc, :so, :var_1, :w, :w_lb, :w_ub, :z_cvar_1
+</code></pre><p>Note that <code>retcode</code> and <code>sol</code> are now vectors. This is because there is one per point in the frontier. Since we didn&#39;t get any warnings that any optimisations failed we can proceed without checking the return codes.</p><p>We can view how the weights evolve along the frontier.</p><pre><code class="language-julia hljs">ws = hcat(res1.w...)
+
+pretty_table(DataFrame([rd.nx ws], Symbol.([:assets; 1:30])); formatters = resfmt)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬─────────┬─────────┬─────────┐
+│ assets │        1 │        2 │        3 │        4 │        5 │        6 │        7 │        8 │        9 │       10 │       11 │       12 │       13 │       14 │       15 │       16 │       17 │       18 │       19 │       20 │       21 │       22 │       23 │       24 │       25 │       26 │       27 │      28 │      29 │      30 │
+│    Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │      Any │     Any │     Any │     Any │
+├────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼─────────┼─────────┼─────────┤
+│   AAPL │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │  -0.0 % │  -0.0 % │   0.0 % │
+│    AMD │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │  -0.0 % │  -0.0 % │   0.0 % │
+│    BAC │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │  -0.0 % │  -0.0 % │   0.0 % │
+│    BBY │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   -0.0 % │  -0.0 % │  -0.0 % │   0.0 % │
+│    CVX │ 13.167 % │ 12.757 % │  9.552 % │  3.037 % │  1.821 % │  0.159 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   0.0 % │   0.0 % │   0.0 % │
+│     GE │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │  -0.0 % │  -0.0 % │   0.0 % │
+│     HD │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │  -0.0 % │  -0.0 % │   0.0 % │
+│    JNJ │ 45.342 % │ 40.238 % │ 37.261 % │ 32.596 % │ 29.384 % │ 26.772 % │ 25.171 % │ 20.067 % │ 16.324 % │ 14.245 % │ 12.166 % │ 10.087 % │  8.008 % │  6.101 % │  1.996 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   0.0 % │   0.0 % │   0.0 % │
+│    JPM │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │  -0.0 % │  -0.0 % │   0.0 % │
+│     KO │ 13.285 % │ 14.244 % │ 14.767 % │ 18.327 % │ 17.772 % │ 17.332 % │ 15.194 % │ 16.637 % │ 16.595 % │ 14.902 % │ 13.209 % │ 11.516 % │  9.823 % │  8.064 % │  8.415 % │  6.517 % │  2.705 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   0.0 % │   0.0 % │   0.0 % │
+│    LLY │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   0.0 % │   0.0 % │   0.0 % │
+│    MRK │ 20.556 % │ 25.205 % │ 27.696 % │ 29.897 % │ 33.915 % │ 36.555 % │ 39.437 % │ 42.723 % │ 46.016 % │ 48.955 % │ 51.893 % │ 54.832 % │  57.77 % │ 60.441 % │ 63.737 % │ 66.926 % │ 69.546 % │ 69.717 % │ 63.907 % │ 58.098 % │ 52.288 % │ 46.478 % │ 40.668 % │ 34.859 % │ 29.049 % │ 23.239 % │ 17.429 % │ 11.62 % │  5.81 % │   0.0 % │
+│   MSFT │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │  -0.0 % │  -0.0 % │   0.0 % │
+│    PEP │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   0.0 % │   0.0 % │   0.0 % │
+│    PFE │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │   -0.0 % │  -0.0 % │  -0.0 % │   0.0 % │
+│     PG │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   0.0 % │   0.0 % │   0.0 % │
+│    RRC │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   0.0 % │   0.0 % │   0.0 % │
+│    UNH │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   0.0 % │   0.0 % │   0.0 % │
+│    WMT │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │    0.0 % │   0.0 % │   0.0 % │   0.0 % │
+│    XOM │   7.65 % │  7.556 % │ 10.724 % │ 16.142 % │ 17.108 % │ 19.183 % │ 20.197 % │ 20.573 % │ 21.065 % │ 21.898 % │ 22.732 % │ 23.565 % │ 24.399 % │ 25.394 % │ 25.853 % │ 26.557 % │ 27.749 % │ 30.283 % │ 36.093 % │ 41.902 % │ 47.712 % │ 53.522 % │ 59.332 % │ 65.141 % │ 70.951 % │ 76.761 % │ 82.571 % │ 88.38 % │ 94.19 % │ 100.0 % │
+└────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴─────────┴─────────┴─────────┘</code></pre><h2 id="3.-Visualising-the-efficient-frontier"><a class="docs-heading-anchor" href="#3.-Visualising-the-efficient-frontier">3. Visualising the efficient frontier</a><a id="3.-Visualising-the-efficient-frontier-1"></a><a class="docs-heading-anchor-permalink" href="#3.-Visualising-the-efficient-frontier" title="Permalink"></a></h2><p>Perhaps it is time to introduce some visualisations, which are implemented as a package extesion. For this we need to import the <code>Plots</code> and <code>GraphRecipes</code> packages.</p><pre><code class="language-julia hljs">using StatsPlots, GraphRecipes
+
+plot_stacked_area_composition(res1.w, rd.nx)</code></pre><img src="18ba2656.svg" alt="Example block output"/><p>The efficient frontier is just a special case of a pareto front, we have a function that can plot pareto fronts and surfaces. We have to provide the weights and the prior. There are optional keyword parameters for the risk measure for the X-axis, Y-axis, Z-axis, and colourbar. Here we will use the Conditional Value at Risk as the X-axis, the arithmetic return, and the risk-return ratio as the colourbar.</p><pre><code class="language-julia hljs">plot_measures(res1.w, res1.pr; x = r, y = ReturnRiskMeasure(; rt = res1.ret),
+              c = RatioRiskMeasure(; rt = res1.ret, rk = r, rf = 0.042 / 100 / 252),
+              title = &quot;Efficient Frontier&quot;, xlabel = &quot;CVaR&quot;, ylabel = &quot;Arithmetic Return&quot;,
+              colorbar_title = &quot;\nRisk/Return Ratio&quot;, right_margin = 6Plots.mm)</code></pre><img src="6d574ede.svg" alt="Example block output"/><p>The <code>plot_measures</code> function can plot all sorts of pareto fronts. We can even use the ratio of two risk measures as the colourbar.</p><pre><code class="language-julia hljs">plot_measures(res1.w, res1.pr; x = r, y = ConditionalDrawdownatRisk(),
+              c = RiskRatioRiskMeasure(; rk1 = ConditionalDrawdownatRisk(), rk2 = r),
+              title = &quot;Pareto Front&quot;, xlabel = &quot;CVaR&quot;, ylabel = &quot;CDaR&quot;,
+              colorbar_title = &quot;\nCDaR/CVaR Ratio&quot;, right_margin = 6Plots.mm)</code></pre><img src="fbf9d110.svg" alt="Example block output"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../2-Mean-Risk-Objectives/">« Example 2: <code>MeanRisk</code> objectives</a><a class="docs-footer-nextpage" href="../4-Pareto-Surface/">Example 4: Pareto surface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Friday 18 July 2025 23:09">Friday 18 July 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
