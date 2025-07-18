@@ -14,19 +14,17 @@ function expected_return(ret::JuMPReturnsEstimator, w::AbstractVector{<:Abstract
                          pr::AbstractPriorResult, fees::Union{Nothing, Fees} = nothing)
     return [expected_return(ret, wi, pr, fees) for wi in w]
 end
-function expected_sharpe_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
-                               w::AbstractVector, pr::AbstractPriorResult,
-                               fees::Union{Nothing, Fees} = nothing; rf::Real = 0,
-                               kwargs...)
+function expected_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
+                        w::AbstractVector, pr::AbstractPriorResult,
+                        fees::Union{Nothing, Fees} = nothing; rf::Real = 0, kwargs...)
     rk = expected_risk(r, w, pr.X, fees; kwargs...)
     rt = expected_return(ret, w, pr, fees; kwargs...)
     return (rt - rf) / rk
 end
-function expected_risk_ret_sharpe_ratio(r::AbstractBaseRiskMeasure,
-                                        ret::JuMPReturnsEstimator, w::AbstractVector,
-                                        pr::AbstractPriorResult,
-                                        fees::Union{Nothing, Fees} = nothing; rf::Real = 0,
-                                        kwargs...)
+function expected_risk_ret_ratio(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
+                                 w::AbstractVector, pr::AbstractPriorResult,
+                                 fees::Union{Nothing, Fees} = nothing; rf::Real = 0,
+                                 kwargs...)
     rk = expected_risk(r, w, pr.X, fees; kwargs...)
     rt = expected_return(ret, w, pr, fees; kwargs...)
     return rk, rt, (rt - rf) / rk
@@ -35,7 +33,7 @@ function expected_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
                        w::AbstractVector, pr::AbstractPriorResult,
                        fees::Union{Nothing, Fees} = nothing; rf::Real = 0, kwargs...)
     T, N = size(pr.X)
-    sr = expected_sharpe_ratio(r, ret, w, pr; fees = fees, rf = rf, kwargs...)
+    sr = expected_ratio(r, ret, w, pr; fees = fees, rf = rf, kwargs...)
     return sr - N / (T * sr)
 end
 function expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEstimator,
@@ -43,8 +41,7 @@ function expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEsti
                                 fees::Union{Nothing, Fees} = nothing; rf::Real = 0,
                                 kwargs...)
     T, N = size(pr.X)
-    rk, rt, sr = expected_risk_ret_sharpe_ratio(r, ret, w, pr; fees = fees, rf = rf,
-                                                kwargs...)
+    rk, rt, sr = expected_risk_ret_ratio(r, ret, w, pr; fees = fees, rf = rf, kwargs...)
     return rk, rt, sr - N / (T * sr)
 end
 struct ReturnRiskMeasure{T1 <: JuMPReturnsEstimator} <: NoOptimisationRiskMeasure
@@ -86,8 +83,8 @@ end
 function expected_risk(r::RatioRiskMeasure, w::AbstractVector{<:Real},
                        pr::AbstractPriorResult, fees::Union{Nothing, <:Fees} = nothing;
                        kwargs...)
-    return expected_sharpe_ratio(r.rk, r.rt, w, pr, fees; rf = r.rf, kwargs...)
+    return expected_ratio(r.rk, r.rt, w, pr, fees; rf = r.rf, kwargs...)
 end
 
-export expected_return, expected_sharpe_ratio, expected_risk_ret_sharpe_ratio,
-       expected_sric, expected_risk_ret_sric, RatioRiskMeasure, ReturnRiskMeasure
+export expected_return, expected_ratio, expected_risk_ret_ratio, expected_sric,
+       expected_risk_ret_sric, RatioRiskMeasure, ReturnRiskMeasure

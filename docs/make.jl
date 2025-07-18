@@ -69,8 +69,8 @@ makedocs(; #modules = [PortfolioOptimisers],
          format = Documenter.HTML(;
                                   canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl",),
          pages = ["index.md"; "Examples" => examples_nav;
-                  numbered_pages[23:end];
-                  "API" => [numbered_pages[1:6]; "Moments" => numbered_pages[7:22]]],
+                  numbered_pages[24:end];
+                  "API" => [numbered_pages[1:6]; "Moments" => numbered_pages[7:23]]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 

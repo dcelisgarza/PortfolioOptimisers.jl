@@ -9,17 +9,17 @@ struct Forward <: AbstractStepwiseRegressionAlgorithm end
 struct Backward <: AbstractStepwiseRegressionAlgorithm end
 struct StepwiseRegression{T1 <: AbstractStepwiseRegressionCriterion,
                           T2 <: AbstractStepwiseRegressionAlgorithm,
-                          T3 <: RegressionTarget} <: AbstractRegressionEstimator
+                          T3 <: AbstractRegressionTarget} <: AbstractRegressionEstimator
     crit::T1
     alg::T2
     target::T3
 end
 function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = Forward(),
-                            target::RegressionTarget = LinearModel())
+                            target::AbstractRegressionTarget = LinearModel())
     return StepwiseRegression{typeof(crit), typeof(alg), typeof(target)}(crit, alg, target)
 end
-function add_best_asset_after_failure_pval!(target::RegressionTarget,
+function add_best_asset_after_failure_pval!(target::AbstractRegressionTarget,
                                             included::AbstractVector, F::AbstractMatrix,
                                             x::AbstractVector)
     if !isempty(included)

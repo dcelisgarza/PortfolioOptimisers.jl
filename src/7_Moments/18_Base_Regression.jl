@@ -1,10 +1,94 @@
+"""
+    abstract type AbstractRegressionEstimator <: AbstractEstimator end
+
+Abstract supertype for all regression estimator types in PortfolioOptimisers.jl.
+
+All concrete types implementing regression estimation algorithms should subtype `AbstractRegressionEstimator`. This enables a consistent interface for regression-based moment estimation throughout the package.
+
+# Related
+
+  - [`AbstractEstimator`](@ref)
+  - [`AbstractRegressionAlgorithm`](@ref)
+  - [`AbstractRegressionResult`](@ref)
+"""
 abstract type AbstractRegressionEstimator <: AbstractEstimator end
-abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
+
+"""
+    abstract type AbstractRegressionResult <: AbstractResult end
+
+Abstract supertype for all regression result types in PortfolioOptimisers.jl.
+
+All concrete types representing the output of regression-based moment estimation should subtype `AbstractRegressionResult`. This enables a consistent interface for handling regression results, such as fitted parameters, loadings, and intercepts, throughout the package.
+
+# Related
+
+  - [`AbstractResult`](@ref)
+  - [`RegressionResult`](@ref)
+  - [`AbstractRegressionEstimator`](@ref)
+"""
 abstract type AbstractRegressionResult <: AbstractResult end
+
+"""
+    abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
+
+Abstract supertype for all regression algorithm types in PortfolioOptimisers.jl.
+
+All concrete types implementing specific regression algorithms should subtype `AbstractRegressionAlgorithm`. This enables flexible extension and dispatch of regression routines for moment estimation.
+
+These types are used to specify the algorithm when constructing a regression estimator.
+
+# Related
+
+  - [`AbstractEstimator`](@ref)
+  - [`AbstractRegressionAlgorithm`](@ref)
+  - [`AbstractStepwiseRegressionAlgorithm`](@ref)
+  - [`AbstractStepwiseRegressionCriterion`](@ref)
+  - [`AbstractRegressionTarget`](@ref)
+"""
+abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
+
+"""
+    abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
+
+Abstract supertype for all stepwise regression algorithm types in PortfolioOptimisers.jl.
+
+All concrete types implementing stepwise regression algorithms should subtype `AbstractStepwiseRegressionAlgorithm`. This enables modular extension and dispatch for stepwise regression routines, commonly used for variable selection and model refinement in regression-based moment estimation.
+
+# Related
+
+  - [`AbstractRegressionAlgorithm`](@ref)
+  - [`AbstractStepwiseRegressionCriterion`](@ref)
+  - [`AbstractRegressionTarget`](@ref)
+"""
 abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
+
+"""
+    abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
+
+Abstract supertype for all stepwise regression criterion types in PortfolioOptimisers.jl.
+
+All concrete types representing criteria for stepwise regression algorithms should subtype `AbstractStepwiseRegressionCriterion`. These criteria are used to evaluate model quality and guide variable selection during stepwise regression, such as AIC, BIC, or R².
+
+# Related
+
+  - [`AbstractStepwiseRegressionAlgorithm`](@ref)
+  - [`AbstractRegressionTarget`](@ref)
+"""
 abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
-abstract type RegressionTarget <: AbstractRegressionAlgorithm end
-struct LinearModel{T1 <: NamedTuple} <: RegressionTarget
+
+"""
+    abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
+
+Abstract supertype for all regression target types in PortfolioOptimisers.jl.
+
+All concrete types representing regression targets (such as linear or generalised linear models) should subtype `AbstractRegressionTarget`. This enables flexible specification and dispatch of regression targets when constructing regression estimators.
+
+# Related
+
+  - [`AbstractRegressionAlgorithm`](@ref)
+"""
+abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
+struct LinearModel{T1 <: NamedTuple} <: AbstractRegressionTarget
     kwargs::T1
 end
 function LinearModel(; kwargs::NamedTuple = (;))
@@ -13,7 +97,7 @@ end
 function GLM.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
     return GLM.fit(GLM.LinearModel, X, y; target.kwargs...)
 end
-struct GeneralisedLinearModel{T1 <: Tuple, T2 <: NamedTuple} <: RegressionTarget
+struct GeneralisedLinearModel{T1 <: Tuple, T2 <: NamedTuple} <: AbstractRegressionTarget
     args::T1
     kwargs::T2
 end
@@ -53,6 +137,9 @@ end
 function regression_threshold(::AbstractMaxValStepwiseRegressionCriteria)
     return -Inf
 end
+
+"""
+"""
 struct RegressionResult{T1 <: AbstractMatrix, T2 <: Union{Nothing, <:AbstractMatrix},
                         T3 <: Union{Nothing, <:AbstractVector}} <: AbstractRegressionResult
     M::T1

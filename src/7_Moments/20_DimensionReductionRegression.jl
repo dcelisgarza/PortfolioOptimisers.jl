@@ -20,7 +20,8 @@ end
 struct DimensionReductionRegression{T1 <: AbstractExpectedReturnsEstimator,
                                     T2 <: AbstractVarianceEstimator,
                                     T3 <: DimensionReductionTarget,
-                                    T4 <: RegressionTarget} <: AbstractRegressionEstimator
+                                    T4 <: AbstractRegressionTarget} <:
+       AbstractRegressionEstimator
     me::T1
     ve::T2
     drtgt::T3
@@ -30,7 +31,7 @@ function DimensionReductionRegression(;
                                       me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                       ve::AbstractVarianceEstimator = SimpleVariance(),
                                       drtgt::DimensionReductionTarget = PCA(),
-                                      retgt::RegressionTarget = LinearModel())
+                                      retgt::AbstractRegressionTarget = LinearModel())
     return DimensionReductionRegression{typeof(me), typeof(ve), typeof(drtgt),
                                         typeof(retgt)}(me, ve, drtgt, retgt)
 end
@@ -43,7 +44,7 @@ function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
     x1 = [ones(eltype(X), N) Xp]
     return x1, Vp
 end
-function regression(retgt::RegressionTarget, y::AbstractVector, mu::AbstractVector,
+function regression(retgt::AbstractRegressionTarget, y::AbstractVector, mu::AbstractVector,
                     sigma::AbstractVector, x1::AbstractMatrix, Vp::AbstractMatrix)
     fit_result = fit(retgt, x1, y)
     beta_pc = coef(fit_result)[2:end]

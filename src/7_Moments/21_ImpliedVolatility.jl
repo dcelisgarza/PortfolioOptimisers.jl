@@ -11,7 +11,7 @@ end
 function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                      ws::Real = 20,
                                      #  crit::AbstractStepwiseRegressionCriterion = RSquared(),
-                                     re::RegressionTarget = LinearModel())
+                                     re::AbstractRegressionTarget = LinearModel())
     @smart_assert(ws > 2)
     return ImpliedVolatilityRegression{typeof(ve), typeof(ws),
                                        # typeof(crit),
