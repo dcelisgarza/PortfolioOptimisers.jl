@@ -36,7 +36,7 @@ function greedy_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real
                                 ga::GreedyAllocation)
     if isempty(w)
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
-               Vector{eltype(w)}(undef, 0), zero(eltype(w))
+               Vector{eltype(w)}(undef, 0), cash
     end
 
     idx = sortperm(w; rev = true)

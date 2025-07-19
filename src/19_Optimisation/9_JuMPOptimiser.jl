@@ -243,7 +243,7 @@ function JuMPOptimiser(;
                        l2::Union{Nothing, <:Real} = nothing,
                        ss::Union{Nothing, <:Real} = nothing, strict::Bool = false)
     if isa(bgt, Real)
-        @smart_assert(isfinite(bgt) && bgt >= 0)
+        @smart_assert(isfinite(bgt))
     elseif isa(bgt, BudgetCostEstimator)
         @smart_assert(isnothing(sbgt))
     end

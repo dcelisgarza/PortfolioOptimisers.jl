@@ -93,7 +93,7 @@ pe = HighOrderPriorEstimator(;
                              # Estimator for cokurtosis
                              kte = Cokurtosis(; mp = mp),
                              # Estimator for coskewness
-                             ske = Coskewness(;))
+                             ske = Coskewness())
 ````
 
 Lets compute the prior statistics.

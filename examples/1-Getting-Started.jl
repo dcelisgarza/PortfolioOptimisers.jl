@@ -132,10 +132,10 @@ pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip
 We can see that the mip weights do not exactly match the optimal ones, but that is because we only have finite resources. Note that the sum of the costs minus the initial cash is equal to the `cash` property of the result. This changes when we introduce fees, which will be shown in a future example.
 =#
 
-println(isapprox(mip_res.cash, 4206.9 - sum(mip_res.cost)))
+println("used cash ≈ available cash: $(isapprox(mip_res.cash, 4206.9 - sum(mip_res.cost)))")
 
 #=
 We can also see that the cost of each asset is equal to the number of shares times its price.
 =#
 
-println(all(isapprox.(mip_res.shares .* vec(values(X[end])), mip_res.cost)))
+println("cost of shares ≈ cost of portfolio: $(all(isapprox.(mip_res.shares .* vec(values(X[end])), mip_res.cost)))")

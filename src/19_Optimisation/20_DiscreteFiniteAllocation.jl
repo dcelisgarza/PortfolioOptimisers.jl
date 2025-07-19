@@ -36,7 +36,7 @@ function discrete_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Re
                                   str_names::Bool = false)
     if isempty(w)
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
-               Vector{eltype(w)}(undef, 0), zero(eltype(w)), nothing, nothing
+               Vector{eltype(w)}(undef, 0), cash, nothing, nothing
     end
     sc = da.sc
     so = da.so

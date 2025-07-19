@@ -101,6 +101,7 @@ function prior(pe::EmpiricalPriorEstimator{<:Any, <:Any, <:Real}, X::AbstractMat
     sigma .*= pe.horizon
     mu .= exp.(mu + 0.5 * diag(sigma))
     sigma .= (mu ⊗ mu) ⊙ (exp.(sigma) .- one(eltype(sigma)))
+    mu .-= one(eltype(mu))
     return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma)
 end
 
