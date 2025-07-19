@@ -79,15 +79,15 @@ Here we will showcase various budget constraints. We will start simple, with a s
 
 ### 3.1 Strict budget constraints
 
-#### 3.1.1 Fully invested long only
+#### 3.1.1 Fully invested long-only portfolio
 
-First the default case, where the budget is equal to 1, `bgt = 1`. This means we are fully invested.
+First the default case, where the budget is equal to 1, `bgt = 1`. This means the portfolio will be fully invested.
 =#
 opt1 = JuMPOptimiser(; pe = pr, slv = slv)
 mr1 = MeanRisk(; r = r, opt = opt1)
 
 #=
-You can see that `wb` is of type `WeightBoundsResult`, `lb = 0.0` (asset weights lower bound), and `ub = 1.0` (asset weights upper bound), and the `bgt = 1.0` (budget).
+You can see that `wb` is of type `WeightBoundsResult`, `lb = 0.0` (asset weights lower bound), and `ub = 1.0` (asset weights upper bound), and `bgt = 1.0` (budget).
 
 We can check that the constraints were satisfied.
 =#
@@ -115,15 +115,11 @@ println("used cash ≈ available cash: $(isapprox(sum(mip_res1.cost) + mip_res1.
 #=
 #### 3.1.2 Maximum risk-return ratio market neutral portfolio
 
-Now lets create a maximum risk-return ratio market neutral portfolio. In order to do this we need to set the short budget and lower the weight bounds constraints. If we simply set the budget to `0`, the solver will return all zeros.
+We will now create a maximum risk-return ratio market neutral portfolio. For a market neutral portfolio, the weights must sum to zero, which means the budget is zero. This means the long and short budgets must be equal in magnitude but opposite sign. In order to avoid all zero weights, we need to set a non-zero short budget, and negative lower weight bounds.
 
-For a market neutral portfolio, the portfolio weights must sum to `0`. This means the long and short budgets must be equal but opposite in sign. We also need to remember to allow the weights lower bounds to be negative, otherwise we will get all zeros as well.
+The short budget is given as an absolute value (simplifies implementation details). The weight bounds can be negative. We will set the maximum weight bounds to `±1`, the short budget to `1` (-1 in practice), and the portfolio budget to `0`, therefore the long budget is `1`.
 
-Lets do the simple case where the long and short budgets are `1`, and the weights bounds are `±1`. 
-
-Both The short budget `sbgt` has to be given as an absolute value (it simplifies implementation details), but the weight lower bounds can be negative.
-
-Minimising the risk under these constraints without additional constraints often yields all zeros. So we will maximise the risk-return ratio.
+Minimising the risk under without additional constraints often yields all zeros. So we will maximise the risk-return ratio.
 =#
 rf = 4.2 / 100 / 252
 opt2 = JuMPOptimiser(; pe = pr, slv = slv,
@@ -139,9 +135,9 @@ println("short budget: $(sum(res2.w[res2.w .< zero(eltype(res2.w))]))")
 println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res2.w))")
 
 #=
-Lets see what happens when we allocate a finite amount of capital. Because we made the long and short budgets equal to 1, the entire available cash will be invested in both long and short positions.
+Lets allocate a finite amount of capital. Since we set the long and short budgets equal to 1, the cost of the long and short positions will be approximately equal to the allocated value of `4206.9`, and the sum of the costs will be close to zero. The discrepancies are due to the fact that we are allocating a finite amount of capital.
 
-There is a small variation due to the discrete nature of the allocation, but we can verify the statement above.
+The discrete allocation procedure automatically adjusts the cash amount depending on the optimal long and short weights, so there is no need to split the cash amount into long and short allocations.
 =#
 mip_res2 = optimise!(da, res2.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res2.shares, :cost => mip_res2.cost,
@@ -182,13 +178,9 @@ println("remaining cash: $(mip_res3.cash)")
 println("used cash ≈ available cash: $(isapprox(sum(mip_res3.cost) - mip_res3.cash, 4206.9 * sum(res3.w)))")
 
 #=
-#### 3.1.4 Over and under leveraged portfolios
+#### 3.1.4 Leveraged portfolios
 
-The discrete allocation procedure automatically adjusts the cash amount depending on the optimal long and short weights, so there is no need to split the cash amount into long and short allocations. This means we can fearlessly under and overleverage the portfolio, and the discrete allocation will follow suit.
-
-We can do this regardless of what combination of budget, short budget and weight bounds constraints we use. Lets try an overleveraged long-only portfolio and an underleveraged long-short portfolio.
-
-Lets try the overleveraged long-only portfolio first.
+Lets try a leveraged long-only portfolio.
 =#
 opt4 = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1.3)
 mr4 = MeanRisk(; r = r, opt = opt4)
@@ -209,9 +201,11 @@ println("remaining cash: $(mip_res4.cash)")
 println("used cash ≈ available cash: $(isapprox(sum(mip_res4.cost) + mip_res4.cash, 4206.9 * sum(res4.w)))")
 
 #=
-Lets try the underleveraged long-short portfolio next. Note that the short budget is not satisfied, that's because it is a relaxation constraint of the short weights. The the portfolio budget constraint satisfied, however. That is because it is an exact constraint. Later we will show how to set budget bounds constraint for the short budget as well as the portfolio budget. We will show these later.
+We will now optimise an underleveraged long-short portfolio.
 
-We will be able to invest around half of our available cash (due to our finite resources), the rest will come from the short positions.
+Note that the short budget is not satisfied, this is because it is implemented as an equality constraint on a relaxation variable stand-in for the short weights. However, the portfolio budget constraint is satisfied because it is an equality constraint on the actual weights.
+
+It is also possible to set budget bounds for the short and portfolio bugets. They are implemented in the same way as the equality constraints. We will explore them later.
 =#
 opt5 = JuMPOptimiser(; pe = pr, slv = slv,
                      ## Budget and short budget absolute values.
@@ -225,6 +219,9 @@ println("long budget: $(sum(res5.w[res5.w .>= zero(eltype(res5.w))]))")
 println("short budget: $(sum(res5.w[res5.w .< zero(eltype(res5.w))]))")
 println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res5.w))")
 
+#=
+For this portfolio, the sum of the long and short cost will be approximately equal to half the allocated value of `4206.9`. Any discrepancies are due to the fact we are allocating a finite amount.
+=#
 mip_res5 = optimise!(da, res5.w, vec(values(X[end])), 4506.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res5.shares, :cost => mip_res5.cost,
                        :opt_weights => res5.w, :mip_weights => mip_res5.w);
