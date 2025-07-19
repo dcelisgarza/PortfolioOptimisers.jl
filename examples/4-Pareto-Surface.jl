@@ -34,7 +34,7 @@ pretty_table(X[(end - 5):end]; formatters = tsfmt)
 rd = prices_to_returns(X)
 
 #=
-## 2.1 Pareto surface
+## 2. Preparing solvers for pareto surface
 
 The pareto surface is a generalisation of the efficient frontier, in fact, we can even think of hypersurfaces if we provide more parameters, but that would be difficult to visualise, so we will stick to a 2D surface in 3D space.
 
@@ -64,7 +64,7 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               check_sol = (; allow_local = true, allow_almost = true))];
 
 #=
-## 2.2 High order prior statistics
+## 3. High order prior statistics
 
 We will once again precompute the prior statistics because otherwise they'd have to be recomputed a few times.
 
@@ -82,7 +82,7 @@ pe = HighOrderPriorEstimator(;
                              ## Estimator for cokurtosis
                              kte = Cokurtosis(; mp = mp),
                              ## Estimator for coskewness
-                             ske = Coskewness(;))
+                             ske = Coskewness())
 
 #=
 Lets compute the prior statistics.
@@ -98,9 +98,9 @@ r1 = NegativeSkewness()
 r2 = SquareRootKurtosis()
 
 #=
-## 2.2 Near optimal centering
+## 4. Near optimal centering pareto surface
 
-First we need to get the bounds of our pareto frontier. We can do this in many different ways, the simplest are:
+First we need to get the bounds of our pareto surface. We can do this in many different ways, the simplest are:
 
   - Minimise the risk using both risk measures simultaneously subject to optional constraints.
   - Maximise the return, utility or ratio subject to optional constraints.
@@ -180,6 +180,8 @@ The `NearOptimalCentering` estimator contains various return codes because it ma
 isa(res3.retcode, OptimisationSuccess)
 
 #=
+## 5. Visualising the pareto surface
+
 Lets view how the weights evolve along the pareto surface.
 =#
 using StatsPlots, GraphRecipes
