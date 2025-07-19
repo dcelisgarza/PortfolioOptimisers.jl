@@ -1,4 +1,5 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
+
 ```@meta
 EditURL = "../../../examples/1-Getting-Started.jl"
 ```
@@ -151,7 +152,6 @@ We can also see that the cost of each asset is equal to the number of shares tim
 println(all(isapprox.(mip_res.shares .* vec(values(X[end])), mip_res.cost)))
 ````
 
----
+* * *
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-

@@ -1,4 +1,5 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
+
 ```@meta
 EditURL = "../../../examples/2-Mean-Risk-Objectives.jl"
 ```
@@ -80,7 +81,7 @@ Here we define the estimators for different objective functions.
 mr1 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)
 # Maximum utility with risk aversion parameter 2
 mr2 = MeanRisk(; r = r, obj = MaximumUtility(), opt = opt)
-# Maximum risk-return ratio with risk-free rate 4.2/100/252
+# Risk-free rate of 4.2/100/252
 rf = 4.2 / 100 / 252
 mr3 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
 # Maximum return
@@ -110,11 +111,12 @@ In order to confirm that the objective functions do what they say on the tin, we
 Due to the fact that we provide different expected portfolio return measures, any function that computes the expected portfolio return also needs to know which return type to compute. We will be consistent with the returns we used in the optimisation.
 
 ````@example 2-Mean-Risk-Objectives
-rk1, rt1, rr1 = expected_risk_ret_ratio(r, res1.ret, res1.w, res1.pr; rf = rf)
-rk2, rt2, rr2 = expected_risk_ret_ratio(r, res2.ret, res2.w, res2.pr; rf = rf)
-rk3, rt3, rr3 = expected_risk_ret_ratio(r, res3.ret, res3.w, res3.pr; rf = rf)
-rk4, rt4, rr4 = expected_risk_ret_ratio(r, res4.ret, res4.w, res4.pr; rf = rf)
-rk0, rt0, rr0 = expected_risk_ret_ratio(r, ArithmeticReturn(), res0.w, res0.pr; rf = rf)
+rk1, rt1, rr1 = expected_risk_ret_ratio(r, res1.ret, res1.w, res1.pr; rf = rf);
+rk2, rt2, rr2 = expected_risk_ret_ratio(r, res2.ret, res2.w, res2.pr; rf = rf);
+rk3, rt3, rr3 = expected_risk_ret_ratio(r, res3.ret, res3.w, res3.pr; rf = rf);
+rk4, rt4, rr4 = expected_risk_ret_ratio(r, res4.ret, res4.w, res4.pr; rf = rf);
+rk0, rt0, rr0 = expected_risk_ret_ratio(r, ArithmeticReturn(), res0.w, res0.pr; rf = rf);
+nothing #hide
 ````
 
 Lets make sure the results are what we expect.
@@ -129,7 +131,6 @@ pretty_table(DataFrame(;
 
 We can seee that indeed, the minimum risk produces the portfolio with minimum risk, the maximum ratio produces the portfolio with the maximum risk-return ratio, and the maximum return portfolio produces the portfolio with the maximum return.
 
----
+* * *
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-

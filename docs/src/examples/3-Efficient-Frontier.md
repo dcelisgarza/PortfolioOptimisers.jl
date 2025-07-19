@@ -1,4 +1,5 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
+
 ```@meta
 EditURL = "../../../examples/3-Efficient-Frontier.jl"
 ```
@@ -77,14 +78,17 @@ mr = MeanRisk(; opt = opt, r = r)
 res1 = optimise!(mr)
 ````
 
-Note that `retcode` and `sol` are now vectors. This is because there is one per point in the frontier. Since we didn't get any warnings that any optimisations failed we can proceed without checking the return codes.
+Note that `retcode` and `sol` are now vectors. This is because there is one per point in the frontier. Since we didn't get any warnings that any optimisations failed we can proceed without checking the return codes. Regardless, lets check that all optimisations succeeded.
+
+````@example 3-Efficient-Frontier
+all(x -> isa(x, OptimisationSuccess), res1.retcode)
+````
 
 We can view how the weights evolve along the frontier.
 
 ````@example 3-Efficient-Frontier
-ws = hcat(res1.w...)
-
-pretty_table(DataFrame([rd.nx ws], Symbol.([:assets; 1:30])); formatters = resfmt)
+pretty_table(DataFrame([rd.nx hcat(res1.w...)], Symbol.([:assets; 1:30]));
+             formatters = resfmt)
 ````
 
 ## 3. Visualising the efficient frontier
@@ -100,8 +104,9 @@ plot_stacked_area_composition(res1.w, rd.nx)
 The efficient frontier is just a special case of a pareto front, we have a function that can plot pareto fronts and surfaces. We have to provide the weights and the prior. There are optional keyword parameters for the risk measure for the X-axis, Y-axis, Z-axis, and colourbar. Here we will use the Conditional Value at Risk as the X-axis, the arithmetic return, and the risk-return ratio as the colourbar.
 
 ````@example 3-Efficient-Frontier
+# Risk-free rate of 4.2/100/252
 plot_measures(res1.w, res1.pr; x = r, y = ReturnRiskMeasure(; rt = res1.ret),
-              c = RatioRiskMeasure(; rt = res1.ret, rk = r, rf = 0.042 / 100 / 252),
+              c = RatioRiskMeasure(; rt = res1.ret, rk = r, rf = 4.2 / 100 / 252),
               title = "Efficient Frontier", xlabel = "CVaR", ylabel = "Arithmetic Return",
               colorbar_title = "\nRisk/Return Ratio", right_margin = 6Plots.mm)
 ````
@@ -115,7 +120,6 @@ plot_measures(res1.w, res1.pr; x = r, y = ConditionalDrawdownatRisk(),
               colorbar_title = "\nCDaR/CVaR Ratio", right_margin = 6Plots.mm)
 ````
 
----
+* * *
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-

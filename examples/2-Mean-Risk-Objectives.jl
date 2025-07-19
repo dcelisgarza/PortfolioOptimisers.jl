@@ -36,7 +36,7 @@ rd = prices_to_returns(X)
 #=
 ## 2. MeanRisk objectives
 
-Here we will show the different objective functions available in `MeanRisk`. We will also use the semi-standard deviation risk measure. 
+Here we will show the different objective functions available in `MeanRisk`. We will also use the semi-standard deviation risk measure.
 =#
 using Clarabel
 slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
@@ -51,7 +51,7 @@ r = LowOrderMoment(;
                                                                    formulation = SqrtRiskExpr())))
 
 #=
-Since we will perform various optimisations on the same data, there's no need to redo work. Lets precompute the prior statistics using the `EmpiricalPriorEstimator` to avoid recomputing them every time we call the optimisation. 
+Since we will perform various optimisations on the same data, there's no need to redo work. Lets precompute the prior statistics using the `EmpiricalPriorEstimator` to avoid recomputing them every time we call the optimisation.
 =#
 pr = prior(EmpiricalPriorEstimator(), rd)
 
@@ -68,7 +68,7 @@ Here we define the estimators for different objective functions.
 mr1 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)
 ## Maximum utility with risk aversion parameter 2
 mr2 = MeanRisk(; r = r, obj = MaximumUtility(), opt = opt)
-## Maximum risk-return ratio with risk-free rate 4.2/100/252
+## Risk-free rate of 4.2/100/252
 rf = 4.2 / 100 / 252
 mr3 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
 ## Maximum return
@@ -97,11 +97,11 @@ In order to confirm that the objective functions do what they say on the tin, we
 Due to the fact that we provide different expected portfolio return measures, any function that computes the expected portfolio return also needs to know which return type to compute. We will be consistent with the returns we used in the optimisation.
 =#
 
-rk1, rt1, rr1 = expected_risk_ret_ratio(r, res1.ret, res1.w, res1.pr; rf = rf)
-rk2, rt2, rr2 = expected_risk_ret_ratio(r, res2.ret, res2.w, res2.pr; rf = rf)
-rk3, rt3, rr3 = expected_risk_ret_ratio(r, res3.ret, res3.w, res3.pr; rf = rf)
-rk4, rt4, rr4 = expected_risk_ret_ratio(r, res4.ret, res4.w, res4.pr; rf = rf)
-rk0, rt0, rr0 = expected_risk_ret_ratio(r, ArithmeticReturn(), res0.w, res0.pr; rf = rf)
+rk1, rt1, rr1 = expected_risk_ret_ratio(r, res1.ret, res1.w, res1.pr; rf = rf);
+rk2, rt2, rr2 = expected_risk_ret_ratio(r, res2.ret, res2.w, res2.pr; rf = rf);
+rk3, rt3, rr3 = expected_risk_ret_ratio(r, res3.ret, res3.w, res3.pr; rf = rf);
+rk4, rt4, rr4 = expected_risk_ret_ratio(r, res4.ret, res4.w, res4.pr; rf = rf);
+rk0, rt0, rr0 = expected_risk_ret_ratio(r, ArithmeticReturn(), res0.w, res0.pr; rf = rf);
 
 #=
 Lets make sure the results are what we expect.
