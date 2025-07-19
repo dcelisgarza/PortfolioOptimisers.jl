@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Example 5: Weight constraints · PortfolioOptimisers.jl</title><meta name="title" content="Example 5: Weight constraints · PortfolioOptimisers.jl"/><meta property="og:title" content="Example 5: Weight constraints · PortfolioOptimisers.jl"/><meta property="twitter:title" content="Example 5: Weight constraints · PortfolioOptimisers.jl"/><meta name="description" content="Documentation for PortfolioOptimisers.jl."/><meta property="og:description" content="Documentation for PortfolioOptimisers.jl."/><meta property="twitter:description" content="Documentation for PortfolioOptimisers.jl."/><meta property="og:url" content="https://dcelisgarza.github.io/PortfolioOptimisers.jl/examples/5-Weight-Constraints/"/><meta property="twitter:url" content="https://dcelisgarza.github.io/PortfolioOptimisers.jl/examples/5-Weight-Constraints/"/><link rel="canonical" href="https://dcelisgarza.github.io/PortfolioOptimisers.jl/examples/5-Weight-Constraints/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="PortfolioOptimisers.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">PortfolioOptimisers.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">PortfolioOptimisers</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../1-Getting-Started/">Example 1: Simple <code>MeanRisk</code> optimisation</a></li><li><a class="tocitem" href="../2-Mean-Risk-Objectives/">Example 2: <code>MeanRisk</code> objectives</a></li><li><a class="tocitem" href="../3-Efficient-Frontier/">Example 3: Efficient frontier</a></li><li><a class="tocitem" href="../4-Pareto-Surface/">Example 4: Pareto surface</a></li><li class="is-active"><a class="tocitem" href>Example 5: Weight constraints</a><ul class="internal"><li><a class="tocitem" href="#1.-Returns-data"><span>1. Returns data</span></a></li><li><a class="tocitem" href="#2.-Preparatory-steps"><span>2. Preparatory steps</span></a></li><li><a class="tocitem" href="#3.-Budget-constraints"><span>3. Budget constraints</span></a></li></ul></li></ul></li><li><a class="tocitem" href="../../7-18-Moments/">Regression</a></li><li><a class="tocitem" href="../../90-contributing/">Contributing guidelines</a></li><li><a class="tocitem" href="../../91-developer/">Developer documentation</a></li><li><a class="tocitem" href="../../95-reference/">Reference</a></li><li><span class="tocitem">API</span><ul><li><a class="tocitem" href="../../1-Base/">Base</a></li><li><a class="tocitem" href="../../2-Tools/">Tools</a></li><li><a class="tocitem" href="../../3-PosdefMatrix/">PosdefMatrix</a></li><li><a class="tocitem" href="../../4-Denoise/">Denoise</a></li><li><a class="tocitem" href="../../5-Detone/">Detone</a></li><li><a class="tocitem" href="../../6-MatrixProcessing/">Matrix Processing</a></li><li><input class="collapse-toggle" id="menuitem-7-7" type="checkbox"/><label class="tocitem" for="menuitem-7-7"><span class="docs-label">Moments</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../7-01-Moments/">Base Moments</a></li><li><a class="tocitem" href="../../7-02-Moments/">Mean</a></li><li><a class="tocitem" href="../../7-03-Moments/">Covariance</a></li><li><a class="tocitem" href="../../7-04-Moments/">Variance and Standard Deviation</a></li><li><a class="tocitem" href="../../7-05-Moments/">Gerber Covariance</a></li><li><a class="tocitem" href="../../7-06-Moments/">Smyth-Broby Covariance</a></li><li><a class="tocitem" href="../../7-07-Moments/">Distance Covariance</a></li><li><a class="tocitem" href="../../7-08-Moments/">Lower Tail Dependence Covariance</a></li><li><a class="tocitem" href="../../7-09-Moments/">Rank Covariances</a></li><li><a class="tocitem" href="../../7-10-Moments/">Histogram</a></li><li><a class="tocitem" href="../../7-11-Moments/">Mutual Information Covariance</a></li><li><a class="tocitem" href="../../7-12-Moments/">PortfolioOptimisersCovariance</a></li><li><a class="tocitem" href="../../7-13-Moments/">Shrunk expected returns</a></li><li><a class="tocitem" href="../../7-14-Moments/">Equilibrium expected returns</a></li><li><a class="tocitem" href="../../7-15-Moments/">Excess expected returns</a></li><li><a class="tocitem" href="../../7-16-Moments/">Coskewness</a></li><li><a class="tocitem" href="../../7-17-Moments/">Cokurtosis</a></li></ul></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Example 5: Weight constraints</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Example 5: Weight constraints</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/examples/5-Weight-Constraints.jl#" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><p>The source files for all examples can be found in <a href="https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/">/examples</a>.</p><h1 id="Example-5:-Weight-constraints"><a class="docs-heading-anchor" href="#Example-5:-Weight-constraints">Example 5: Weight constraints</a><a id="Example-5:-Weight-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#Example-5:-Weight-constraints" title="Permalink"></a></h1><p>This example deals with the use of basic weight and budget constraints.</p><pre><code class="language-julia hljs">using PortfolioOptimisers, PrettyTables
+# Format for pretty tables.
+tsfmt = (v, i, j) -&gt; begin
+    if j == 1
+        return Date(v)
+    else
+        return v
+    end
+end;
+resfmt = (v, i, j) -&gt; begin
+    if j == 1
+        return v
+    else
+        return isa(v, Number) ? &quot;$(round(v*100, digits=3)) %&quot; : v
+    end
+end;
+mipresfmt = (v, i, j) -&gt; begin
+    if j ∈ (1, 2, 3)
+        return v
+    else
+        return isa(v, Number) ? &quot;$(round(v*100, digits=3)) %&quot; : v
+    end
+end;</code></pre><h2 id="1.-Returns-data"><a class="docs-heading-anchor" href="#1.-Returns-data">1. Returns data</a><a id="1.-Returns-data-1"></a><a class="docs-heading-anchor-permalink" href="#1.-Returns-data" title="Permalink"></a></h2><p>We will use the same data as the previous example.</p><pre><code class="language-julia hljs">using CSV, TimeSeries, DataFrames
+
+X = TimeArray(CSV.File(joinpath(@__DIR__, &quot;SP500.csv.gz&quot;)); timestamp = :Date)[(end - 252):end]
+pretty_table(X[(end - 5):end]; formatters = tsfmt)
+
+# Compute the returns
+rd = prices_to_returns(X)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">ReturnsResult
+    nx | 20-element Vector{String}
+     X | 252×20 Matrix{Float64}
+    nf | nothing
+     F | nothing
+    ts | 252-element Vector{Dates.Date}
+    iv | nothing
+  ivpa | nothing
+</code></pre><h2 id="2.-Preparatory-steps"><a class="docs-heading-anchor" href="#2.-Preparatory-steps">2. Preparatory steps</a><a id="2.-Preparatory-steps-1"></a><a class="docs-heading-anchor-permalink" href="#2.-Preparatory-steps" title="Permalink"></a></h2><p>We&#39;ll provide a vector of continuous solvers beacause the optimisation type we&#39;ll be using is more complex, and will contain various constraints. We will also use a more exotic risk measure.</p><p>For the mixed interger solvers, we can use a single one.</p><pre><code class="language-julia hljs">using Clarabel, HiGHS
+slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+              settings = Dict(&quot;verbose&quot; =&gt; false),
+              check_sol = (; allow_local = true, allow_almost = true)),
+       Solver(; name = :clarabel3, solver = Clarabel.Optimizer,
+              settings = Dict(&quot;verbose&quot; =&gt; false, &quot;max_step_fraction&quot; =&gt; 0.9),
+              check_sol = (; allow_local = true, allow_almost = true)),
+       Solver(; name = :clarabel5, solver = Clarabel.Optimizer,
+              settings = Dict(&quot;verbose&quot; =&gt; false, &quot;max_step_fraction&quot; =&gt; 0.8),
+              check_sol = (; allow_local = true, allow_almost = true)),
+       Solver(; name = :clarabel7, solver = Clarabel.Optimizer,
+              settings = Dict(&quot;verbose&quot; =&gt; false, &quot;max_step_fraction&quot; =&gt; 0.70),
+              check_sol = (; allow_local = true, allow_almost = true))];
+mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
+                 settings = Dict(&quot;log_to_console&quot; =&gt; false),
+                 check_sol = (; allow_local = true, allow_almost = true));</code></pre><p>This time we will use the <code>EntropicValueatRisk</code> measure and we will once again precompute prior.</p><pre><code class="language-julia hljs">r = EntropicValueatRisk()
+pr = prior(EmpiricalPriorEstimator(), rd)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LowOrderPriorResult
+         X | 252×20 Matrix{Float64}
+        mu | 20-element Vector{Float64}
+     sigma | 20×20 Matrix{Float64}
+      chol | nothing
+         w | nothing
+  loadings | nothing
+      f_mu | nothing
+   f_sigma | nothing
+       f_w | nothing
+</code></pre><h2 id="3.-Budget-constraints"><a class="docs-heading-anchor" href="#3.-Budget-constraints">3. Budget constraints</a><a id="3.-Budget-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#3.-Budget-constraints" title="Permalink"></a></h2><p>The <code>budget</code> is the value of the sum of a portfolio&#39;s weights.</p><p>Here we will showcase various budget constraints. We will start simple, with a strict budget constraint. We will also show the impact this has on the finite allocation.</p><h3 id="3.1-Strict-budget-constraints"><a class="docs-heading-anchor" href="#3.1-Strict-budget-constraints">3.1 Strict budget constraints</a><a id="3.1-Strict-budget-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#3.1-Strict-budget-constraints" title="Permalink"></a></h3><h4 id="3.1.1-Fully-invested-long-only"><a class="docs-heading-anchor" href="#3.1.1-Fully-invested-long-only">3.1.1 Fully invested long only</a><a id="3.1.1-Fully-invested-long-only-1"></a><a class="docs-heading-anchor-permalink" href="#3.1.1-Fully-invested-long-only" title="Permalink"></a></h4><p>First the default case, where the budget is equal to 1, <code>bgt = 1</code>. This means we are fully invested.</p><pre><code class="language-julia hljs">opt1 = JuMPOptimiser(; pe = pr, slv = slv)
+mr1 = MeanRisk(; r = r, opt = opt1)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">MeanRisk
+  opt | JuMPOptimiser
+      |       pe | LowOrderPriorResult
+      |          |          X | 252×20 Matrix{Float64}
+      |          |         mu | 20-element Vector{Float64}
+      |          |      sigma | 20×20 Matrix{Float64}
+      |          |       chol | nothing
+      |          |          w | nothing
+      |          |   loadings | nothing
+      |          |       f_mu | nothing
+      |          |    f_sigma | nothing
+      |          |        f_w | nothing
+      |      slv | Vector{Solver{Symbol, UnionAll, T3, @NamedTuple{allow_local::Bool, allow_almost::Bool}, Bool} where T3&lt;:(Union{Nothing, var&quot;#s234&quot;} where var&quot;#s234&quot;&lt;:AbstractDict)}: Solver{Symbol, UnionAll, T3, @NamedTuple{allow_local::Bool, allow_almost::Bool}, Bool} where T3&lt;:(Union{Nothing, var&quot;#s234&quot;} where var&quot;#s234&quot;&lt;:AbstractDict)[Solver
+      |          name | Symbol: :clarabel1
+      |        solver | UnionAll: Clarabel.MOIwrapper.Optimizer
+      |      settings | Dict{String, Bool}: Dict{String, Bool}(&quot;verbose&quot; =&gt; 0)
+      |     check_sol | @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
+      |   add_bridges | Bool: true
+      | , Solver
+      |          name | Symbol: :clarabel3
+      |        solver | UnionAll: Clarabel.MOIwrapper.Optimizer
+      |      settings | Dict{String, Real}: Dict{String, Real}(&quot;verbose&quot; =&gt; false, &quot;max_step_fraction&quot; =&gt; 0.9)
+      |     check_sol | @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
+      |   add_bridges | Bool: true
+      | , Solver
+      |          name | Symbol: :clarabel5
+      |        solver | UnionAll: Clarabel.MOIwrapper.Optimizer
+      |      settings | Dict{String, Real}: Dict{String, Real}(&quot;verbose&quot; =&gt; false, &quot;max_step_fraction&quot; =&gt; 0.8)
+      |     check_sol | @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
+      |   add_bridges | Bool: true
+      | , Solver
+      |          name | Symbol: :clarabel7
+      |        solver | UnionAll: Clarabel.MOIwrapper.Optimizer
+      |      settings | Dict{String, Real}: Dict{String, Real}(&quot;verbose&quot; =&gt; false, &quot;max_step_fraction&quot; =&gt; 0.7)
+      |     check_sol | @NamedTuple{allow_local::Bool, allow_almost::Bool}: (allow_local = true, allow_almost = true)
+      |   add_bridges | Bool: true
+      | ]
+      |       wb | WeightBoundsResult
+      |          |   lb | Float64: 0.0
+      |          |   ub | Float64: 1.0
+      |      bgt | Float64: 1.0
+      |     sbgt | nothing
+      |       lt | nothing
+      |       st | nothing
+      |      lcs | nothing
+      |      lcm | nothing
+      |     cent | nothing
+      |    gcard | nothing
+      |   sgcard | nothing
+      |     smtx | nothing
+      |     sets | nothing
+      |     nplg | nothing
+      |     cplg | nothing
+      |       tn | nothing
+      |       te | nothing
+      |     fees | nothing
+      |      ret | ArithmeticReturn
+      |          |   ucs | nothing
+      |          |    lb | nothing
+      |      sce | SumScalariser: SumScalariser()
+      |     ccnt | nothing
+      |     cobj | nothing
+      |       sc | Int64: 1
+      |       so | Int64: 1
+      |     card | nothing
+      |    scard | nothing
+      |      nea | nothing
+      |       l1 | nothing
+      |       l2 | nothing
+      |       ss | nothing
+      |   strict | Bool: false
+    r | EntropicValueatRisk
+      |   settings | RiskMeasureSettings
+      |            |   scale | Float64: 1.0
+      |            |      ub | nothing
+      |            |     rke | Bool: true
+      |        slv | nothing
+      |      alpha | Float64: 0.05
+      |          w | nothing
+  obj | MinimumRisk()
+   wi | nothing
+</code></pre><p>You can see that <code>wb</code> is of type <code>WeightBoundsResult</code>, <code>lb = 0.0</code> (asset weights lower bound), and <code>ub = 1.0</code> (asset weights upper bound), and the <code>bgt = 1.0</code> (budget).</p><p>We can check that the constraints were satisfied.</p><pre><code class="language-julia hljs">res1 = optimise!(mr1)
+println(&quot;budget: $(sum(res1.w))&quot;)
+println(&quot;long budget: $(sum(res1.w[res1.w .&gt;= zero(eltype(res1.w))]))&quot;)
+println(&quot;short budget: $(sum(res1.w[res1.w .&lt; zero(eltype(res1.w))]))&quot;)
+println(&quot;weight bounds: $(all(x -&gt; zero(x) &lt;= x &lt;= one(x), res1.w))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: 0.9999999998112562
+long budget: 0.9999999998112562
+short budget: 0.0
+weight bounds: true</code></pre><p>Now lets allocate a finite amount of capital, <code>4206.9</code>, to this portfolio.</p><pre><code class="language-julia hljs">da = DiscreteAllocation(; slv = mip_slv)
+mip_res1 = optimise!(da, res1.w, vec(values(X[end])), 4206.9)
+pretty_table(DataFrame(:assets =&gt; rd.nx, :shares =&gt; mip_res1.shares, :cost =&gt; mip_res1.cost,
+                       :opt_weights =&gt; res1.w, :mip_weights =&gt; mip_res1.w);
+             formatters = mipresfmt)
+println(&quot;long cost + short cost = cost: $(sum(mip_res1.cost))&quot;)
+println(&quot;long cost: $(sum(mip_res1.cost[mip_res1.cost .&gt;= zero(eltype(mip_res1.cost))]))&quot;)
+println(&quot;short cost: $(sum(mip_res1.cost[mip_res1.cost .&lt; zero(eltype(mip_res1.cost))]))&quot;)
+println(&quot;remaining cash: $(mip_res1.cash)&quot;)
+println(&quot;used cash ≈ available cash: $(isapprox(sum(mip_res1.cost) + mip_res1.cash, 4206.9 * sum(res1.w)))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌────────┬─────────┬─────────┬─────────────┬─────────────┐
+│ assets │  shares │    cost │ opt_weights │ mip_weights │
+│ String │ Float64 │ Float64 │     Float64 │     Float64 │
+├────────┼─────────┼─────────┼─────────────┼─────────────┤
+│   AAPL │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    AMD │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    BAC │     1.0 │  32.301 │       0.0 % │     0.768 % │
+│    BBY │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    CVX │     5.0 │  868.64 │    21.386 % │    20.655 % │
+│     GE │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│     HD │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    JNJ │    13.0 │ 2263.11 │    55.414 % │    53.815 % │
+│    JPM │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│     KO │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    LLY │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    MRK │     8.0 │ 876.648 │    21.207 % │    20.846 % │
+│   MSFT │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    PEP │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    PFE │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│     PG │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    RRC │     1.0 │  24.497 │       0.0 % │     0.583 % │
+│    UNH │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    WMT │     1.0 │ 140.181 │     1.993 % │     3.333 % │
+│    XOM │     0.0 │     0.0 │       0.0 % │       0.0 % │
+└────────┴─────────┴─────────┴─────────────┴─────────────┘
+long cost + short cost = cost: 4205.372
+long cost: 4205.372
+short cost: 0.0
+remaining cash: 1.527999206081347
+used cash ≈ available cash: true</code></pre><h4 id="3.1.2-Maximum-risk-return-ratio-market-neutral-portfolio"><a class="docs-heading-anchor" href="#3.1.2-Maximum-risk-return-ratio-market-neutral-portfolio">3.1.2 Maximum risk-return ratio market neutral portfolio</a><a id="3.1.2-Maximum-risk-return-ratio-market-neutral-portfolio-1"></a><a class="docs-heading-anchor-permalink" href="#3.1.2-Maximum-risk-return-ratio-market-neutral-portfolio" title="Permalink"></a></h4><p>Now lets create a maximum risk-return ratio market neutral portfolio. In order to do this we need to set the short budget and lower the weight bounds constraints. If we simply set the budget to <code>0</code>, the solver will return all zeros.</p><p>For a market neutral portfolio, the portfolio weights must sum to <code>0</code>. This means the long and short budgets must be equal but opposite in sign. We also need to remember to allow the weights lower bounds to be negative, otherwise we will get all zeros as well.</p><p>Lets do the simple case where the long and short budgets are <code>1</code>, and the weights bounds are <code>±1</code>.</p><p>Both The short budget <code>sbgt</code> has to be given as an absolute value (it simplifies implementation details), but the weight lower bounds can be negative.</p><p>Minimising the risk under these constraints without additional constraints often yields all zeros. So we will maximise the risk-return ratio.</p><pre><code class="language-julia hljs">rf = 4.2 / 100 / 252
+opt2 = JuMPOptimiser(; pe = pr, slv = slv,
+                     # Budget and short budget absolute values.
+                     bgt = 0, sbgt = 1,
+                     # Weight bounds.
+                     wb = WeightBoundsResult(; lb = -1.0, ub = 1.0))
+mr2 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt2)
+res2 = optimise!(mr2)
+println(&quot;budget: $(sum(res2.w))&quot;)
+println(&quot;long budget: $(sum(res2.w[res2.w .&gt;= zero(eltype(res2.w))]))&quot;)
+println(&quot;short budget: $(sum(res2.w[res2.w .&lt; zero(eltype(res2.w))]))&quot;)
+println(&quot;weight bounds: $(all(x -&gt; -one(x) &lt;= x &lt;= one(x), res2.w))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: -1.0089443539131439e-16
+long budget: 0.9999936641090608
+short budget: -0.999993664109061
+weight bounds: true</code></pre><p>Lets see what happens when we allocate a finite amount of capital. Because we made the long and short budgets equal to 1, the entire available cash will be invested in both long and short positions.</p><p>There is a small variation due to the discrete nature of the allocation, but we can verify the statement above.</p><pre><code class="language-julia hljs">mip_res2 = optimise!(da, res2.w, vec(values(X[end])), 4206.9)
+pretty_table(DataFrame(:assets =&gt; rd.nx, :shares =&gt; mip_res2.shares, :cost =&gt; mip_res2.cost,
+                       :opt_weights =&gt; res2.w, :mip_weights =&gt; mip_res2.w);
+             formatters = mipresfmt)
+println(&quot;long cost + short cost = cost: $(sum(mip_res2.cost))&quot;)
+println(&quot;long cost: $(sum(mip_res2.cost[mip_res2.cost .&gt;= zero(eltype(mip_res2.cost))]))&quot;)
+println(&quot;short cost: $(sum(mip_res2.cost[mip_res2.cost .&lt; zero(eltype(mip_res2.cost))]))&quot;)
+println(&quot;remaining cash: $(mip_res2.cash)&quot;)
+println(&quot;used cash ≈ available cash: $(isapprox(sum(abs.(mip_res2.cost)) + mip_res2.cash, 4206.9 * sum(abs.(res2.w))))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌────────┬─────────┬──────────┬─────────────┬─────────────┐
+│ assets │  shares │     cost │ opt_weights │ mip_weights │
+│ String │ Float64 │  Float64 │     Float64 │     Float64 │
+├────────┼─────────┼──────────┼─────────────┼─────────────┤
+│   AAPL │    -1.0 │ -125.674 │    -2.526 % │    -2.999 % │
+│    AMD │    -2.0 │  -125.14 │    -3.226 % │    -2.986 % │
+│    BAC │   -21.0 │ -678.321 │   -16.732 % │   -16.188 % │
+│    BBY │     1.0 │   78.279 │     0.837 % │     1.857 % │
+│    CVX │     0.0 │      0.0 │     0.001 % │       0.0 % │
+│     GE │     6.0 │  383.298 │     8.532 % │     9.093 % │
+│     HD │     0.0 │     -0.0 │    -3.235 % │      -0.0 % │
+│    JNJ │    -4.0 │  -696.34 │   -17.975 % │   -16.618 % │
+│    JPM │     3.0 │  388.725 │     8.858 % │     9.222 % │
+│     KO │    23.0 │  1440.01 │    33.949 % │    34.163 % │
+│    LLY │     0.0 │      0.0 │     3.536 % │       0.0 % │
+│    MRK │    16.0 │   1753.3 │    39.716 % │    41.595 % │
+│   MSFT │    -1.0 │ -233.434 │    -7.632 % │    -5.571 % │
+│    PEP │    -6.0 │ -1075.67 │    -26.22 % │   -25.671 % │
+│    PFE │   -12.0 │   -591.0 │   -13.952 % │   -14.104 % │
+│     PG │     0.0 │     -0.0 │      -0.0 % │      -0.0 % │
+│    RRC │     7.0 │  171.479 │     4.572 % │     4.068 % │
+│    UNH │    -1.0 │ -524.422 │    -7.253 % │   -12.515 % │
+│    WMT │    -1.0 │ -140.181 │    -1.248 % │    -3.345 % │
+│    XOM │     0.0 │      0.0 │       0.0 % │       0.0 % │
+└────────┴─────────┴──────────┴─────────────┴─────────────┘
+long cost + short cost = cost: 24.904000000000252
+long cost: 4215.084000000001
+short cost: -4190.179999999999
+remaining cash: 8.482691080815641
+used cash ≈ available cash: true</code></pre><h4 id="3.1.3-Short-only-portfolio"><a class="docs-heading-anchor" href="#3.1.3-Short-only-portfolio">3.1.3 Short-only portfolio</a><a id="3.1.3-Short-only-portfolio-1"></a><a class="docs-heading-anchor-permalink" href="#3.1.3-Short-only-portfolio" title="Permalink"></a></h4><p>We will now create and discretely allocate a short-only portfolio. This is in general an anti-pattern but oen can use various combinations of budget, weight bounds and short budget constraints to create hedging portfolios.</p><pre><code class="language-julia hljs">opt3 = JuMPOptimiser(; pe = pr, slv = slv,
+                     # Budget and short budget absolute values.
+                     bgt = -1, sbgt = 1,
+                     # Weight bounds.
+                     wb = WeightBoundsResult(; lb = -1.0, ub = 0.0))
+mr3 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt3)
+res3 = optimise!(mr3)
+println(&quot;budget: $(sum(res3.w))&quot;)
+println(&quot;long budget: $(sum(res3.w[res3.w .&gt;= zero(eltype(res3.w))]))&quot;)
+println(&quot;short budget: $(sum(res3.w[res3.w .&lt; zero(eltype(res3.w))]))&quot;)
+println(&quot;weight bounds: $(all(x -&gt; -one(x) &lt;= x &lt;= zero(x), res3.w))&quot;)
+
+mip_res3 = optimise!(da, res3.w, vec(values(X[end])), 4206.9)
+pretty_table(DataFrame(:assets =&gt; rd.nx, :shares =&gt; mip_res3.shares, :cost =&gt; mip_res3.cost,
+                       :opt_weights =&gt; res3.w, :mip_weights =&gt; mip_res3.w);
+             formatters = mipresfmt)
+println(&quot;long cost + short cost = cost: $(sum(mip_res3.cost))&quot;)
+println(&quot;long cost: $(sum(mip_res3.cost[mip_res3.cost .&gt;= zero(eltype(mip_res3.cost))]))&quot;)
+println(&quot;short cost: $(sum(mip_res3.cost[mip_res3.cost .&lt; zero(eltype(mip_res3.cost))]))&quot;)
+println(&quot;remaining cash: $(mip_res3.cash)&quot;)
+println(&quot;used cash ≈ available cash: $(isapprox(sum(mip_res3.cost) - mip_res3.cash, 4206.9 * sum(res3.w)))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: -0.9999999995925778
+long budget: 0.0
+short budget: -0.9999999995925778
+weight bounds: true
+┌────────┬─────────┬──────────┬─────────────┬─────────────┐
+│ assets │  shares │     cost │ opt_weights │ mip_weights │
+│ String │ Float64 │  Float64 │     Float64 │     Float64 │
+├────────┼─────────┼──────────┼─────────────┼─────────────┤
+│   AAPL │     0.0 │     -0.0 │      -0.0 % │      -0.0 % │
+│    AMD │     0.0 │     -0.0 │      -0.0 % │      -0.0 % │
+│    BAC │    -1.0 │  -32.301 │      -0.0 % │    -0.768 % │
+│    BBY │     0.0 │     -0.0 │      -0.0 % │      -0.0 % │
+│    CVX │     0.0 │     -0.0 │      -0.0 % │      -0.0 % │
+│     GE │    -3.0 │ -191.649 │    -4.404 % │    -4.558 % │
+│     HD │    -1.0 │  -311.22 │    -5.068 % │    -7.401 % │
+│    JNJ │    -2.0 │  -348.17 │     -9.44 % │     -8.28 % │
+│    JPM │     0.0 │     -0.0 │      -0.0 % │      -0.0 % │
+│     KO │     0.0 │     -0.0 │      -0.0 % │      -0.0 % │
+│    LLY │     0.0 │     -0.0 │    -4.646 % │      -0.0 % │
+│    MRK │    -1.0 │ -109.581 │    -3.636 % │    -2.606 % │
+│   MSFT │     0.0 │     -0.0 │      -0.0 % │      -0.0 % │
+│    PEP │    -8.0 │ -1434.22 │    -31.89 % │   -34.108 % │
+│    PFE │    -7.0 │  -344.75 │    -7.611 % │    -8.199 % │
+│     PG │     0.0 │     -0.0 │      -0.0 % │      -0.0 % │
+│    RRC │    -7.0 │ -171.479 │    -3.988 % │    -4.078 % │
+│    UNH │     0.0 │     -0.0 │      -0.0 % │      -0.0 % │
+│    WMT │    -9.0 │ -1261.63 │   -29.317 % │   -30.003 % │
+│    XOM │     0.0 │     -0.0 │      -0.0 % │      -0.0 % │
+└────────┴─────────┴──────────┴─────────────┴─────────────┘
+long cost + short cost = cost: -4205.003000000001
+long cost: -0.0
+short cost: -4205.003
+remaining cash: 1.8969982860141954
+used cash ≈ available cash: true</code></pre><h4 id="3.1.4-Over-and-under-leveraged-portfolios"><a class="docs-heading-anchor" href="#3.1.4-Over-and-under-leveraged-portfolios">3.1.4 Over and under leveraged portfolios</a><a id="3.1.4-Over-and-under-leveraged-portfolios-1"></a><a class="docs-heading-anchor-permalink" href="#3.1.4-Over-and-under-leveraged-portfolios" title="Permalink"></a></h4><p>The discrete allocation procedure automatically adjusts the cash amount depending on the optimal long and short weights, so there is no need to split the cash amount into long and short allocations. This means we can fearlessly under and overleverage the portfolio, and the discrete allocation will follow suit.</p><p>We can do this regardless of what combination of budget, short budget and weight bounds constraints we use. Lets try an overleveraged long-only portfolio and an underleveraged long-short portfolio.</p><p>Lets try the overleveraged long-only portfolio first.</p><pre><code class="language-julia hljs">opt4 = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1.3)
+mr4 = MeanRisk(; r = r, opt = opt4)
+res4 = optimise!(mr4)
+println(&quot;budget: $(sum(res4.w))&quot;)
+println(&quot;long budget: $(sum(res4.w[res4.w .&gt;= zero(eltype(res4.w))]))&quot;)
+println(&quot;short budget: $(sum(res4.w[res4.w .&lt; zero(eltype(res4.w))]))&quot;)
+println(&quot;weight bounds: $(all(x -&gt; zero(x) &lt;= x &lt;= one(x), res4.w))&quot;)
+
+mip_res4 = optimise!(da, res4.w, vec(values(X[end])), 4206.9)
+pretty_table(DataFrame(:assets =&gt; rd.nx, :shares =&gt; mip_res4.shares, :cost =&gt; mip_res4.cost,
+                       :opt_weights =&gt; res4.w, :mip_weights =&gt; mip_res4.w);
+             formatters = mipresfmt)
+println(&quot;long cost + short cost = cost: $(sum(mip_res4.cost))&quot;)
+println(&quot;long cost: $(sum(mip_res4.cost[mip_res4.cost .&gt;= zero(eltype(mip_res4.cost))]))&quot;)
+println(&quot;short cost: $(sum(mip_res4.cost[mip_res4.cost .&lt; zero(eltype(mip_res4.cost))]))&quot;)
+println(&quot;remaining cash: $(mip_res4.cash)&quot;)
+println(&quot;used cash ≈ available cash: $(isapprox(sum(mip_res4.cost) + mip_res4.cash, 4206.9 * sum(res4.w)))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: 1.2999999997828973
+long budget: 1.2999999997828973
+short budget: 0.0
+weight bounds: true
+┌────────┬─────────┬─────────┬─────────────┬─────────────┐
+│ assets │  shares │    cost │ opt_weights │ mip_weights │
+│ String │ Float64 │ Float64 │     Float64 │     Float64 │
+├────────┼─────────┼─────────┼─────────────┼─────────────┤
+│   AAPL │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    AMD │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    BAC │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    BBY │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    CVX │     5.0 │  868.64 │    27.802 % │    20.661 % │
+│     GE │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│     HD │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    JNJ │    22.0 │ 3829.87 │    72.032 % │    91.094 % │
+│    JPM │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│     KO │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    LLY │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    MRK │     7.0 │ 767.067 │    27.574 % │    18.245 % │
+│   MSFT │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    PEP │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    PFE │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│     PG │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    RRC │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    UNH │     0.0 │     0.0 │       0.0 % │       0.0 % │
+│    WMT │     0.0 │     0.0 │     2.592 % │       0.0 % │
+│    XOM │     0.0 │     0.0 │       0.0 % │       0.0 % │
+└────────┴─────────┴─────────┴─────────────┴─────────────┘
+long cost + short cost = cost: 5465.577
+long cost: 5465.577
+short cost: 0.0
+remaining cash: 3.3929990866695334
+used cash ≈ available cash: true</code></pre><p>Lets try the underleveraged long-short portfolio next. Note that the short budget is not satisfied, that&#39;s because it is a relaxation constraint of the short weights. The the portfolio budget constraint satisfied, however. That is because it is an exact constraint. Later we will show how to set budget bounds constraint for the short budget as well as the portfolio budget. We will show these later.</p><p>We will be able to invest around half of our available cash (due to our finite resources), the rest will come from the short positions.</p><pre><code class="language-julia hljs">opt5 = JuMPOptimiser(; pe = pr, slv = slv,
+                     # Budget and short budget absolute values.
+                     bgt = 0.5, sbgt = 1,
+                     # Weight bounds.
+                     wb = WeightBoundsResult(; lb = -1.0, ub = 1.0))
+mr5 = MeanRisk(; r = r, opt = opt5)
+res5 = optimise!(mr5)
+println(&quot;budget: $(sum(res5.w))&quot;)
+println(&quot;long budget: $(sum(res5.w[res5.w .&gt;= zero(eltype(res5.w))]))&quot;)
+println(&quot;short budget: $(sum(res5.w[res5.w .&lt; zero(eltype(res5.w))]))&quot;)
+println(&quot;weight bounds: $(all(x -&gt; -one(x) &lt;= x &lt;= one(x), res5.w))&quot;)
+
+mip_res5 = optimise!(da, res5.w, vec(values(X[end])), 4506.9)
+pretty_table(DataFrame(:assets =&gt; rd.nx, :shares =&gt; mip_res5.shares, :cost =&gt; mip_res5.cost,
+                       :opt_weights =&gt; res5.w, :mip_weights =&gt; mip_res5.w);
+             formatters = mipresfmt)
+println(&quot;long cost + short cost = cost: $(sum(mip_res5.cost))&quot;)
+println(&quot;long cost: $(sum(mip_res5.cost[mip_res5.cost .&gt;= zero(eltype(mip_res5.cost))]))&quot;)
+println(&quot;short cost: $(sum(mip_res5.cost[mip_res5.cost .&lt; zero(eltype(mip_res5.cost))]))&quot;)
+println(&quot;remaining cash: $(mip_res5.cash)&quot;)
+println(&quot;used cash ≈ available cash: $(isapprox(sum(abs.(mip_res5.cost)) + mip_res5.cash, 4506.9 * sum(abs.(res5.w))))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: 0.49999999995657685
+long budget: 1.143177143743185
+short budget: -0.643177143786608
+weight bounds: true
+┌────────┬─────────┬──────────┬─────────────┬─────────────┐
+│ assets │  shares │     cost │ opt_weights │ mip_weights │
+│ String │ Float64 │  Float64 │     Float64 │     Float64 │
+├────────┼─────────┼──────────┼─────────────┼─────────────┤
+│   AAPL │    -3.0 │ -377.022 │    -5.861 % │    -8.419 % │
+│    AMD │     2.0 │   125.14 │     2.652 % │     2.771 % │
+│    BAC │   -15.0 │ -484.515 │   -16.678 % │   -10.819 % │
+│    BBY │     0.0 │      0.0 │     1.085 % │       0.0 % │
+│    CVX │     2.0 │  347.456 │     9.537 % │     7.695 % │
+│     GE │    -3.0 │ -191.649 │    -2.542 % │     -4.28 % │
+│     HD │    -1.0 │  -311.22 │    -4.712 % │     -6.95 % │
+│    JNJ │    12.0 │  2089.02 │    39.908 % │    46.262 % │
+│    JPM │     7.0 │  907.025 │    19.622 % │    20.086 % │
+│     KO │     8.0 │  500.872 │    10.332 % │    11.092 % │
+│    LLY │    -1.0 │ -363.098 │    -4.609 % │    -8.108 % │
+│    MRK │     4.0 │  438.324 │    10.104 % │     9.707 % │
+│   MSFT │     1.0 │  233.434 │      5.78 % │     5.169 % │
+│    PEP │    -4.0 │ -717.112 │    -20.16 % │   -16.013 % │
+│    PFE │    -6.0 │   -295.5 │    -9.128 % │    -6.599 % │
+│     PG │     3.0 │  447.399 │     9.067 % │     9.908 % │
+│    RRC │     3.0 │   73.491 │     1.789 % │     1.627 % │
+│    UNH │     0.0 │      0.0 │     4.271 % │       0.0 % │
+│    WMT │    -1.0 │ -140.181 │    -0.627 % │     -3.13 % │
+│    XOM │     0.0 │      0.0 │      0.17 % │       0.0 % │
+└────────┴─────────┴──────────┴─────────────┴─────────────┘
+long cost + short cost = cost: 2281.863999999999
+long cost: 5162.161
+short cost: -2880.297
+remaining cash: 8.462138467990926
+used cash ≈ available cash: true</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../4-Pareto-Surface/">« Example 4: Pareto surface</a><a class="docs-footer-nextpage" href="../../7-18-Moments/">Regression »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Saturday 19 July 2025 18:50">Saturday 19 July 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
