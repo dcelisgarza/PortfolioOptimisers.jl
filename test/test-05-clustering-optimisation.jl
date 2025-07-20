@@ -1,5 +1,5 @@
 @safetestset "Clustering optimisation" begin
-    using PortfolioOptimisers, CSV, Test, TimeSeries, Clarabel, DataFrames
+    using PortfolioOptimisers, CSV, Test, TimeSeries, Clarabel, DataFrames, FLoops
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -132,6 +132,30 @@
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
         res = optimise!(HierarchicalEqualRiskContribution(; ri = Variance(),
+                                                          ro = [Variance()], opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, w1)
+
+        res = optimise!(HierarchicalEqualRiskContribution(; threads = FLoops.SequentialEx(),
+                                                          opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, w1)
+        res = optimise!(HierarchicalEqualRiskContribution(; threads = FLoops.SequentialEx(),
+                                                          ri = [Variance()], opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, w1)
+        res = optimise!(HierarchicalEqualRiskContribution(; threads = FLoops.SequentialEx(),
+                                                          ri = [Variance()],
+                                                          ro = [Variance()], opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, w1)
+        res = optimise!(HierarchicalEqualRiskContribution(; threads = FLoops.SequentialEx(),
+                                                          ri = [Variance()],
+                                                          ro = Variance(), opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, w1)
+        res = optimise!(HierarchicalEqualRiskContribution(; threads = FLoops.SequentialEx(),
+                                                          ri = Variance(),
                                                           ro = [Variance()], opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
