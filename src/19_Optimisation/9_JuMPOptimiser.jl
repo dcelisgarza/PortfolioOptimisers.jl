@@ -249,6 +249,21 @@ function JuMPOptimiser(;
     end
     if isa(sbgt, Real)
         @smart_assert(isfinite(sbgt) && sbgt >= 0)
+    elseif isa(sbgt, BudgetRange)
+        lb = sbgt.lb
+        ub = sbgt.ub
+        lb_flag = isnothing(lb)
+        ub_flag = isnothing(ub)
+        @smart_assert(lb_flag ⊼ ub_flag)
+        if !lb_flag
+            @smart_assert(lb >= zero(lb))
+        end
+        if !ub_flag
+            @smart_assert(ub >= zero(ub))
+        end
+        if !lb_flag && !ub_flag
+            @smart_assert(lb <= ub)
+        end
     end
     if isa(lcs, AbstractVector)
         @smart_assert(!isempty(lcs))

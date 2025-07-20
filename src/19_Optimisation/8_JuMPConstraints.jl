@@ -14,10 +14,10 @@ function BudgetRange(; lb::Union{Nothing, <:Real} = 1.0, ub::Union{Nothing, <:Re
     ub_flag = isnothing(ub)
     @smart_assert(lb_flag ⊼ ub_flag)
     if !lb_flag
-        @smart_assert(isfinite(lb) && lb >= 0)
+        @smart_assert(isfinite(lb))
     end
     if !ub_flag
-        @smart_assert(isfinite(ub) && ub >= 0)
+        @smart_assert(isfinite(ub))
     end
     if !lb_flag && !ub_flag
         @smart_assert(lb <= ub)

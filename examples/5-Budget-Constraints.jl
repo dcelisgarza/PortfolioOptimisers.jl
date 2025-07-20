@@ -1,7 +1,9 @@
 #=
-# Example 5: Weight constraints
+# Example 5: Budget constraints
 
-This example deals with the use of basic weight and budget constraints.
+This example shows how to use basic budget constraints.
+
+Before starting it is worth mentioning that portfolio budget constraints are implemented on the actual weights, while the short budget constraints are implemented on a relaxation variable stand-in for the short weights. This means that in some cases, it may appear the short budget constraints are not satisfied when they actually are. This is because the relaxation variables that stand in for the short weights can take on a range of values as long as they are greater than or equal to the absolute value of the actual negative weights, and still satify the budget constraint placed on them.
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -71,7 +73,7 @@ r = EntropicValueatRisk()
 pr = prior(EmpiricalPriorEstimator(), rd)
 
 #=
-## 3. Budget constraints
+## 3. Exact budget constraints
 
 The `budget` is the value of the sum of a portfolio's weights.
 
@@ -205,7 +207,7 @@ We will now optimise an underleveraged long-short portfolio.
 
 Note that the short budget is not satisfied, this is because it is implemented as an equality constraint on a relaxation variable stand-in for the short weights. However, the portfolio budget constraint is satisfied because it is an equality constraint on the actual weights.
 
-It is also possible to set budget bounds for the short and portfolio bugets. They are implemented in the same way as the equality constraints. We will explore them later.
+It is also possible to set budget bounds for the short and portfolio bugets. They are implemented in the same way as the equality constraints. We will explore them in the next section.
 =#
 opt5 = JuMPOptimiser(; pe = pr, slv = slv,
                      ## Budget and short budget absolute values.
@@ -231,3 +233,45 @@ println("long cost: $(sum(mip_res5.cost[mip_res5.cost .>= zero(eltype(mip_res5.c
 println("short cost: $(sum(mip_res5.cost[mip_res5.cost .< zero(eltype(mip_res5.cost))]))")
 println("remaining cash: $(mip_res5.cash)")
 println("used cash ≈ available cash: $(isapprox(sum(abs.(mip_res5.cost)) + mip_res5.cash, 4506.9 * sum(abs.(res5.w))))")
+
+#=
+# 4. Budget range
+
+The other type of buget constraint we will explore in this example is the budget range constraint, `BudgetRange`. It allows the user to define upper and lower bounds on the budget and short budget. When using a `BudgetRange`, it is necessary to provide both the upper and lower bounds.
+
+We mentioned at the start of this example that the interaction between budget and short budget constraints might be unintuitive due to how the constraints are implemented. The following example will illustrate this.
+=#
+
+opt6 = JuMPOptimiser(; pe = pr, slv = slv,
+                     ## Budget range.
+                     bgt = BudgetRange(; lb = -0.6, ub = 0.6),
+                     ## Exact short budget
+                     sbgt = 0.5,
+                     ## Weight bounds.
+                     wb = WeightBoundsResult(; lb = -1.0, ub = 1.0))
+mr6 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt6)
+res6 = optimise!(mr6)
+println("budget: $(sum(res6.w))")
+println("long budget: $(sum(res6.w[res6.w .>= zero(eltype(res6.w))]))")
+println("short budget: $(sum(res6.w[res6.w .< zero(eltype(res6.w))]))")
+println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res6.w))")
+
+#=
+As you can see, the budget and weight constraints are satisfied, but not the short budget constraint. This happens even if we do not provide a short budget. This is a reflection of the fact that the weight and budget constraints are constraints on the actual weights. While the short budget constraints are constraints on relaxation variables, whose value must be greater than or equal to the absolute value of the negative weights. This gives them room to without violating the constraints and without directly constraining the short weights.
+
+In order to remedy this, we can provide a `BudgetRange` to the short budget which eliminates the slack on the relaxation variables. It is worth noting that when providing a `BudgetRange` to the short budget, the bounds cannot be negative.
+=#
+
+opt7 = JuMPOptimiser(; pe = pr, slv = slv,
+                     ## Budget range.
+                     bgt = BudgetRange(; lb = -0.6, ub = 0.6),
+                     ## Remove the slack from the short budget.
+                     sbgt = BudgetRange(; lb = 0.5, ub = 0.5),
+                     ## Weight bounds.
+                     wb = WeightBoundsResult(; lb = -1.0, ub = 1.0))
+mr7 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt7)
+res7 = optimise!(mr7)
+println("budget: $(sum(res7.w))")
+println("long budget: $(sum(res7.w[res7.w .>= zero(eltype(res7.w))]))")
+println("short budget: $(sum(res7.w[res7.w .< zero(eltype(res7.w))]))")
+println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res7.w))")
