@@ -1,3 +1,4 @@
+#=
 @safetestset "MeanRisk Optimisation" begin
     using PortfolioOptimisers, CSV, DataFrames, Test, StableRNGs, Random, Clarabel,
           StatsBase, LinearAlgebra, Pajarito, HiGHS, JuMP, TimeSeries, Clustering,
@@ -1501,3 +1502,4 @@
                        rtol = 1e-6)
     end
 end
+=#

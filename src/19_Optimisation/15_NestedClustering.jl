@@ -154,7 +154,7 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
     pr = prior(nco.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
-    clr = clusterise(nco.cle, rd.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(nco.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
     idx = cutree(clr.clustering; k = clr.k)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]

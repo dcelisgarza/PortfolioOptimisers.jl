@@ -1,4 +1,5 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
+
 ```@meta
 EditURL = "../../../examples/5-Budget-Constraints.jl"
 ```
@@ -294,7 +295,6 @@ println("short budget: $(sum(res7.w[res7.w .< zero(eltype(res7.w))]))")
 println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res7.w))")
 ````
 
----
+* * *
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-

@@ -59,32 +59,20 @@ function expected_risk(r::Union{<:StandardDeviation, <:NegativeSkewness,
                        kwargs...)
     return r(w)
 end
-function expected_risk(r::AbstractBaseRiskMeasure, w::AbstractVector{<:AbstractVector},
-                       args...; kwargs...)
-    return [expected_risk(r, wi, args...; kwargs...) for wi in w]
-end
-struct RiskRatioRiskMeasure{T1 <: AbstractBaseRiskMeasure, T2 <: AbstractBaseRiskMeasure} <:
-       HierarchicalRiskMeasure
-    rk1::T1
-    rk2::T2
-end
-function RiskRatioRiskMeasure(; rk1::AbstractBaseRiskMeasure = Variance(),
-                              rk2::AbstractBaseRiskMeasure = ConditionalValueatRisk())
-    return RiskRatioRiskMeasure{typeof(rk1), typeof(rk2)}(rk1, rk2)
-end
-function factory(r::RiskRatioRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
-    rk1 = factory(r.rk1, prior, args...; kwargs...)
-    rk2 = factory(r.rk2, prior, args...; kwargs...)
-    return RiskRatioRiskMeasure(; rk1 = rk1, rk2 = rk2)
-end
-function factory(r::RiskRatioRiskMeasure, w::AbstractVector)
-    return RiskRatioRiskMeasure(; rk1 = factory(r.rk1, w), rk2 = factory(r.rk2, w))
+function expected_risk(r::RiskRatioRiskMeasure, w::AbstractVector{<:Real},
+                       X::AbstractMatrix, fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+    return expected_risk(r.r1, w, X, fees; kwargs...) /
+           expected_risk(r.r2, w, X, fees; kwargs...)
 end
 function expected_risk(r::RiskRatioRiskMeasure, w::AbstractVector{<:Real},
                        pr::AbstractPriorResult, fees::Union{Nothing, <:Fees} = nothing;
                        kwargs...)
-    return expected_risk(r.rk1, w, pr.X, fees; kwargs...) /
-           expected_risk(r.rk2, w, pr.X, fees; kwargs...)
+    return expected_risk(r.r1, w, pr.X, fees; kwargs...) /
+           expected_risk(r.r2, w, pr.X, fees; kwargs...)
+end
+function expected_risk(r::AbstractBaseRiskMeasure, w::AbstractVector{<:AbstractVector},
+                       args...; kwargs...)
+    return [expected_risk(r, wi, args...; kwargs...) for wi in w]
 end
 function number_effective_assets(w::AbstractVector)
     return inv(dot(w, w))

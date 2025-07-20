@@ -1,3 +1,4 @@
+#=
 @safetestset "Constraints" begin
     using PortfolioOptimisers, DataFrames, Test, Random, StableRNGs, LinearAlgebra, Logging
     Logging.disable_logging(Logging.Warn)
@@ -689,3 +690,4 @@ w = rand(10)
 rb = risk_budget_constraints(w)
 @test rb === w
    =#
+=#

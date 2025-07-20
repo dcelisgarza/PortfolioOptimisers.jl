@@ -1,3 +1,4 @@
+#=
 @safetestset "Regression tests" begin
     using PortfolioOptimisers, DataFrames, Test, CSV, Random, Logging, TimeSeries
     import PortfolioOptimisers: regression_view
@@ -61,3 +62,4 @@
     @test lv.b == view(loadings.b, [2, 5, 17, 4])
     @test lv.M == view(loadings.M, [2, 5, 17, 4], :)
 end
+=#

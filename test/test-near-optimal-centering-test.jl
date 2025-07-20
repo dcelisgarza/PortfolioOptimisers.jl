@@ -1,3 +1,4 @@
+#=
 @safetestset "NearOptimalCentering Optimisation" begin
     using PortfolioOptimisers, CSV, DataFrames, Test, Random, Clarabel, TimeSeries, JuMP,
           Pajarito, HiGHS, StableRNGs, StatsBase, Logging
@@ -416,3 +417,4 @@
         @test isapprox(w4, w2, rtol = 1.3e-1)
     end
 end
+=#

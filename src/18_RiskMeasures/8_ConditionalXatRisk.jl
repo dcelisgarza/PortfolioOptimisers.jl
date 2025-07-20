@@ -100,6 +100,12 @@ function ConditionalValueatRiskRange(;
     return ConditionalValueatRiskRange{typeof(settings), typeof(alpha), typeof(beta),
                                        typeof(w)}(settings, alpha, beta, w)
 end
+function factory(r::ConditionalValueatRiskRange, prior::AbstractPriorResult, args...;
+                 kwargs...)
+    w = nothing_scalar_array_factory(r.w, prior.w)
+    return ConditionalValueatRiskRange(; settings = r.settings, alpha = r.alpha,
+                                       beta = r.beta, w = w)
+end
 struct DistributionallyRobustConditionalValueatRiskRange{T1 <: RiskMeasureSettings,
                                                          T2 <: Real, T3 <: Real, T4 <: Real,
                                                          T5 <: Real, T6 <: Real, T7 <: Real,

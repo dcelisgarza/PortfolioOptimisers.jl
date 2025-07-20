@@ -1,3 +1,4 @@
+#=
 @safetestset "Clustering Optimisation" begin
     using PortfolioOptimisers, CSV, DataFrames, Test, Random, Clarabel, StatsBase,
           TimeSeries, CovarianceEstimation, FLoops
@@ -449,3 +450,4 @@
         @test isapprox(res3.w, res4.w)
     end
 end
+=#

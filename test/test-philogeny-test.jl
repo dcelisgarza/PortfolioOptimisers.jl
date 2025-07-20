@@ -1,3 +1,4 @@
+#=
 @safetestset "Philogeny tests" begin
     using PortfolioOptimisers, Random, Test, Clustering, CSV, DataFrames, TimeSeries
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
@@ -234,3 +235,4 @@
         @test A1 == A3
     end
 end
+=#

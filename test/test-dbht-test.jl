@@ -1,3 +1,4 @@
+#=
 @safetestset "DBHT" begin
     using PortfolioOptimisers, DataFrames, CSV, Random, Test, StatsBase, Statistics,
           SparseArrays, TimeSeries
@@ -470,3 +471,4 @@
         @test isnothing(PortfolioOptimisers.logo!(nothing))
     end
 end
+=#

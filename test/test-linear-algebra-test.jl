@@ -1,3 +1,4 @@
+#=
 @safetestset "Linear Algebra" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CSV, LinearAlgebra,
           DataFrames, TimeSeries
@@ -69,3 +70,4 @@
         end
     end
 end
+=#

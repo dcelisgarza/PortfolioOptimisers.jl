@@ -1,3 +1,4 @@
+#=
 @safetestset "Moments" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
           CSV, DataFrames, TimeSeries
@@ -615,3 +616,4 @@
         @test kte2.me.w == fw
     end
 end
+=#

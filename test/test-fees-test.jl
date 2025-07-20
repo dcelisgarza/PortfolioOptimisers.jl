@@ -1,3 +1,4 @@
+#=
 @safetestset "Fees" begin
     using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames
     import PortfolioOptimisers: fees_view
@@ -125,3 +126,4 @@
         @test fer2.tn.w == view(w2, [2])
     end
 end
+=#

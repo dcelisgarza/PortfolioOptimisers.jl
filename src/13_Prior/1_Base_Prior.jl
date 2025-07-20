@@ -27,5 +27,26 @@ end
 function prior(pr::AbstractPriorResult, args...; kwargs...)
     return pr
 end
+function clusterise(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
+                    pr::AbstractPriorResult; kwargs...)
+    return clusterise(cle, pr.X; kwargs...)
+end
+function philogeny_matrix(necle::Union{<:NetworkEstimator, <:ClusteringEstimator},
+                          pr::AbstractPriorResult; kwargs...)
+    return philogeny_matrix(necle, pr.X; kwargs...)
+end
+function centrality_vector(necte::Union{<:NetworkEstimator, <:CentralityEstimator},
+                           cent::AbstractCentralityAlgorithm, pr::AbstractPriorResult;
+                           kwargs...)
+    return centrality_vector(necte, pr.X; kwargs...)
+end
+function average_centrality(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
+                            w::AbstractVector, pr::AbstractPriorResult; kwargs...)
+    return dot(centrality_vector(ne, cent, pr.X; kwargs...), w)
+end
+function average_centrality(cte::CentralityEstimator, w::AbstractVector,
+                            pr::AbstractPriorResult; kwargs...)
+    return average_centrality(cte.ne, cte.cent, w, pr.X; kwargs...)
+end
 
 export prior

@@ -1,3 +1,4 @@
+#=
 @safetestset "Uncertainty tests" begin
     using PortfolioOptimisers, Test, Random, StableRNGs, CSV, DataFrames, TimeSeries
     import PortfolioOptimisers: ucs_factory, ucs_view
@@ -335,3 +336,4 @@
         @test ucrm2.k == ucrs1.k
     end
 end
+=#

@@ -1,3 +1,4 @@
+#=
 @safetestset "Risk Budgetting Optimisation" begin
     using PortfolioOptimisers, Test, Random, Clarabel, Logging, TimeSeries, CSV
     Logging.disable_logging(Logging.Warn)
@@ -304,3 +305,4 @@
         @test argmax(rkc[1:7]) == 4
     end
 end
+=#

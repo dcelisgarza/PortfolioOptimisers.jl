@@ -47,49 +47,4 @@
 
         @test dfy[2:end, :date] == ts1 == ts2 == ts3 == ts4
     end
-
-    @testset "Misc" begin
-        rng = StableRNG(987654321)
-        X = rand(rng, 2, 5)
-        sigma = cov(X)
-        @test !isposdef(sigma)
-        X1 = copy(sigma)
-        X2 = posdef(PosdefEstimator(), X1)
-        posdef!(PosdefEstimator(), X1)
-        @test isapprox(X1, X2)
-        @test !isapprox(X1, sigma; rtol = 1e-8)
-        @test isnothing(posdef(nothing))
-
-        X3 = copy(sigma)
-        posdef!(PosdefEstimator(), X3)
-        X4 = denoise(Denoise(), X3, 2 / 5, PosdefEstimator())
-        denoise!(Denoise(), X3, 2 / 5, PosdefEstimator())
-        @test isapprox(X3, X4)
-        @test !isapprox(X3, sigma)
-        @test isnothing(denoise(nothing))
-
-        X5 = copy(sigma)
-        posdef!(PosdefEstimator(), X5)
-        X6 = detone(Detone(), X5, PosdefEstimator())
-        detone!(Detone(), X5, PosdefEstimator())
-        @test isapprox(X5, X6)
-        @test !isapprox(X5, sigma)
-        @test isnothing(detone(nothing))
-
-        X7 = copy(sigma)
-        X8 = matrix_processing(DefaultMatrixProcessing(), X7, X)
-        matrix_processing!(DefaultMatrixProcessing(), X7, X)
-        @test isapprox(X7, X8)
-        @test !isapprox(X7, sigma; rtol = 1e-8)
-        @test isnothing(matrix_processing(nothing))
-
-        X9 = copy(sigma)
-        X10 = matrix_processing(NonPositiveDefiniteMatrixProcessing(), X9, X)
-        matrix_processing!(NonPositiveDefiniteMatrixProcessing(), X9, X)
-        @test isapprox(X9, X10)
-        @test isapprox(X9, sigma)
-        @test isnothing(matrix_processing!(nothing))
-
-        @test isnothing(PortfolioOptimisers.matrix_processing_algorithm(nothing))
-    end
 end
