@@ -277,7 +277,7 @@ println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res6.w))")
 
 As you can see, the budget and weight constraints are satisfied, but not the short budget constraint. This happens even if we do not provide a short budget. This is a reflection of the fact that the weight and budget constraints are constraints on the actual weights. While the short budget constraints are constraints on relaxation variables, whose value must be greater than or equal to the absolute value of the negative weights. This gives them room to without violating the constraints and without directly constraining the short weights.
 
-In order to remedy this, we can provide a `BudgetRange` to the short budget. For the short budget, the `BudgetRange` bounds again cannot be negative.
+In order to remedy this, we can provide a `BudgetRange` to the short budget which eliminates the slack on the relaxation variables. It is worth noting that when providing a `BudgetRange` to the short budget, the bounds cannot be negative.
 
 ````@example 5-Budget-Constraints
 opt7 = JuMPOptimiser(; pe = pr, slv = slv,

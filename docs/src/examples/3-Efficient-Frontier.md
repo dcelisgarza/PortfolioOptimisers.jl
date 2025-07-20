@@ -115,7 +115,7 @@ The `plot_measures` function can plot all sorts of pareto fronts. We can even us
 
 ````@example 3-Efficient-Frontier
 plot_measures(res1.w, res1.pr; x = r, y = ConditionalDrawdownatRisk(),
-              c = RiskRatioRiskMeasure(; rk1 = ConditionalDrawdownatRisk(), rk2 = r),
+              c = RiskRatioRiskMeasure(; r1 = ConditionalDrawdownatRisk(), r2 = r),
               title = "Pareto Front", xlabel = "CVaR", ylabel = "CDaR",
               colorbar_title = "\nCDaR/CVaR Ratio", right_margin = 6Plots.mm)
 ````

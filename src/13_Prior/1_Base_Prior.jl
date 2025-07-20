@@ -27,8 +27,7 @@ end
 function prior(pr::AbstractPriorResult, args...; kwargs...)
     return pr
 end
-function clusterise(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
-                    pr::AbstractPriorResult; kwargs...)
+function clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...)
     return clusterise(cle, pr.X; kwargs...)
 end
 function philogeny_matrix(necle::Union{<:NetworkEstimator, <:ClusteringEstimator},

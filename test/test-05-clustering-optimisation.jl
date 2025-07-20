@@ -80,11 +80,11 @@
         for (i, r) in pairs(rs)
             res = optimise!(HierarchicalRiskParity(; r = r, opt = opt))
             @test isa(res.retcode, OptimisationSuccess)
-            res = isapprox(res.w, df[!, i])
-            if !res
+            success = isapprox(res.w, df[!, i])
+            if !success
                 find_tol(res.w, df[!, i]; name1 = :lhs, name2 = :rhs)
             end
-            @test res
+            @test success
         end
     end
 end
