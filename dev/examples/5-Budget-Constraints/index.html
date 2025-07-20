@@ -249,9 +249,10 @@ res3 = optimise!(mr3)
 println(&quot;budget: $(sum(res3.w))&quot;)
 println(&quot;long budget: $(sum(res3.w[res3.w .&gt;= zero(eltype(res3.w))]))&quot;)
 println(&quot;short budget: $(sum(res3.w[res3.w .&lt; zero(eltype(res3.w))]))&quot;)
-println(&quot;weight bounds: $(all(x -&gt; -one(x) &lt;= x &lt;= zero(x), res3.w))&quot;)
-
-mip_res3 = optimise!(da, res3.w, vec(values(X[end])), 4206.9)
+println(&quot;weight bounds: $(all(x -&gt; -one(x) &lt;= x &lt;= zero(x), res3.w))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: -0.9999999995925778
+long budget: 0.0
+short budget: -0.9999999995925778
+weight bounds: true</code></pre><p>We can confirm that the finite allocation behaves as expected.</p><pre><code class="language-julia hljs">mip_res3 = optimise!(da, res3.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets =&gt; rd.nx, :shares =&gt; mip_res3.shares, :cost =&gt; mip_res3.cost,
                        :opt_weights =&gt; res3.w, :mip_weights =&gt; mip_res3.w);
              formatters = mipresfmt)
@@ -259,11 +260,7 @@ println(&quot;long cost + short cost = cost: $(sum(mip_res3.cost))&quot;)
 println(&quot;long cost: $(sum(mip_res3.cost[mip_res3.cost .&gt;= zero(eltype(mip_res3.cost))]))&quot;)
 println(&quot;short cost: $(sum(mip_res3.cost[mip_res3.cost .&lt; zero(eltype(mip_res3.cost))]))&quot;)
 println(&quot;remaining cash: $(mip_res3.cash)&quot;)
-println(&quot;used cash ≈ available cash: $(isapprox(sum(mip_res3.cost) - mip_res3.cash, 4206.9 * sum(res3.w)))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: -0.9999999995925778
-long budget: 0.0
-short budget: -0.9999999995925778
-weight bounds: true
-┌────────┬─────────┬──────────┬─────────────┬─────────────┐
+println(&quot;used cash ≈ available cash: $(isapprox(sum(mip_res3.cost) - mip_res3.cash, 4206.9 * sum(res3.w)))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌────────┬─────────┬──────────┬─────────────┬─────────────┐
 │ assets │  shares │     cost │ opt_weights │ mip_weights │
 │ String │ Float64 │  Float64 │     Float64 │     Float64 │
 ├────────┼─────────┼──────────┼─────────────┼─────────────┤
@@ -298,9 +295,10 @@ res4 = optimise!(mr4)
 println(&quot;budget: $(sum(res4.w))&quot;)
 println(&quot;long budget: $(sum(res4.w[res4.w .&gt;= zero(eltype(res4.w))]))&quot;)
 println(&quot;short budget: $(sum(res4.w[res4.w .&lt; zero(eltype(res4.w))]))&quot;)
-println(&quot;weight bounds: $(all(x -&gt; zero(x) &lt;= x &lt;= one(x), res4.w))&quot;)
-
-mip_res4 = optimise!(da, res4.w, vec(values(X[end])), 4206.9)
+println(&quot;weight bounds: $(all(x -&gt; zero(x) &lt;= x &lt;= one(x), res4.w))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: 1.2999999997828973
+long budget: 1.2999999997828973
+short budget: 0.0
+weight bounds: true</code></pre><p>Again, the finite allocation respects the budget constraints.</p><pre><code class="language-julia hljs">mip_res4 = optimise!(da, res4.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets =&gt; rd.nx, :shares =&gt; mip_res4.shares, :cost =&gt; mip_res4.cost,
                        :opt_weights =&gt; res4.w, :mip_weights =&gt; mip_res4.w);
              formatters = mipresfmt)
@@ -308,11 +306,7 @@ println(&quot;long cost + short cost = cost: $(sum(mip_res4.cost))&quot;)
 println(&quot;long cost: $(sum(mip_res4.cost[mip_res4.cost .&gt;= zero(eltype(mip_res4.cost))]))&quot;)
 println(&quot;short cost: $(sum(mip_res4.cost[mip_res4.cost .&lt; zero(eltype(mip_res4.cost))]))&quot;)
 println(&quot;remaining cash: $(mip_res4.cash)&quot;)
-println(&quot;used cash ≈ available cash: $(isapprox(sum(mip_res4.cost) + mip_res4.cash, 4206.9 * sum(res4.w)))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: 1.2999999997828973
-long budget: 1.2999999997828973
-short budget: 0.0
-weight bounds: true
-┌────────┬─────────┬─────────┬─────────────┬─────────────┐
+println(&quot;used cash ≈ available cash: $(isapprox(sum(mip_res4.cost) + mip_res4.cash, 4206.9 * sum(res4.w)))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌────────┬─────────┬─────────┬─────────────┬─────────────┐
 │ assets │  shares │    cost │ opt_weights │ mip_weights │
 │ String │ Float64 │ Float64 │     Float64 │     Float64 │
 ├────────┼─────────┼─────────┼─────────────┼─────────────┤
@@ -421,4 +415,4 @@ println(&quot;short budget: $(sum(res7.w[res7.w .&lt; zero(eltype(res7.w))]))&qu
 println(&quot;weight bounds: $(all(x -&gt; -one(x) &lt;= x &lt;= one(x), res7.w))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: 0.2742952851977851
 long budget: 0.7742943517521373
 short budget: -0.4999990665543521
-weight bounds: true</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../4-Pareto-Surface/">« Example 4: Pareto surface</a><a class="docs-footer-nextpage" href="../../7-18-Moments/">Regression »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Sunday 20 July 2025 21:54">Sunday 20 July 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+weight bounds: true</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../4-Pareto-Surface/">« Example 4: Pareto surface</a><a class="docs-footer-nextpage" href="../../7-18-Moments/">Regression »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Sunday 20 July 2025 23:09">Sunday 20 July 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
