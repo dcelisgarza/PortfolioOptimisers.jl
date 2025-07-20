@@ -56,7 +56,6 @@
                                   "reduced_tol_infeas_rel" => 1e-4))]
     pr = prior(HighOrderPriorEstimator(), rd)
     clr = clusterise(ClusteringEstimator(), pr)
-    opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
                length = size(pr.X, 2))
 
@@ -77,9 +76,30 @@
     @testset "HierarchicalRiskParity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity1.csv.gz"),
                       DataFrame)
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
         for (i, r) in pairs(rs)
             res = optimise!(HierarchicalRiskParity(; r = r, opt = opt))
             @test isa(res.retcode, OptimisationSuccess)
+            success = isapprox(res.w, df[!, i]; rtol = 5e-7)
+            if !success
+                find_tol(res.w, df[!, i]; name1 = :lhs, name2 = :rhs)
+            end
+            @test success
+        end
+    end
+    @testset "HierarchicalRiskParity vector rm" begin
+        sces = [SumScalariser(), MaxScalariser(), LogSumExpScalariser(; gamma = 1.2e2),
+                LogSumExpScalariser(; gamma = 1e6)]
+        df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity2.csv.gz"),
+                      DataFrame)
+        for (i, sce) in pairs(sces)
+            opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sce = sce)
+            res = optimise!(HierarchicalRiskParity(;
+                                                   r = [ConditionalValueatRisk(),
+                                                        Variance(;
+                                                                 settings = RiskMeasureSettings(;
+                                                                                                scale = 2e2))],
+                                                   opt = opt))
             success = isapprox(res.w, df[!, i])
             if !success
                 find_tol(res.w, df[!, i]; name1 = :lhs, name2 = :rhs)

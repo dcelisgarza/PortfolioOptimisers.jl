@@ -120,9 +120,9 @@ function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::AbstractMatrix,
                              rc::AbstractVector,
                              rs::AbstractVector{<:OptimisationRiskMeasure},
                              X::AbstractMatrix, fees::Union{Nothing, <:Fees})
-    lrisk = zero(eltype(X))
-    rrisk = zero(eltype(X))
-    for r in rs
+    lrisk = Vector{eltype(X)}(undef, length(rs))
+    rrisk = Vector{eltype(X)}(undef, length(rs))
+    for (i, r) in enumerate(rs)
         fill!(wu, zero(eltype(X)))
         unitary_expected_risks!(wk, rku, r, X, fees)
         wu[lc, 1] .= inv.(view(rku, lc))
@@ -130,10 +130,10 @@ function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::AbstractMatrix,
         wu[rc, 2] .= inv.(view(rku, rc))
         wu[rc, 2] ./= sum(view(wu, rc, 2))
         scale = r.settings.scale * sce.gamma
-        lrisk += expected_risk(r, view(wu, :, 1), X, fees) * scale
-        rrisk += expected_risk(r, view(wu, :, 2), X, fees) * scale
+        lrisk[i] = expected_risk(r, view(wu, :, 1), X, fees) * scale
+        rrisk[i] = expected_risk(r, view(wu, :, 2), X, fees) * scale
     end
-    return log(exp(lrisk)) / sce.gamma, log(exp(rrisk)) / sce.gamma
+    return logsumexp(lrisk) / sce.gamma, logsumexp(rrisk) / sce.gamma
 end
 function optimise!(hrp::HierarchicalRiskParity{<:Any,
                                                <:AbstractVector{<:OptimisationRiskMeasure}},
