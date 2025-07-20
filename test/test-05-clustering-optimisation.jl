@@ -93,13 +93,13 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity2.csv.gz"),
                       DataFrame)
         for (i, sce) in pairs(sces)
-            opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sce = sce)
+            opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
             res = optimise!(HierarchicalRiskParity(;
                                                    r = [ConditionalValueatRisk(),
                                                         Variance(;
                                                                  settings = RiskMeasureSettings(;
                                                                                                 scale = 2e2))],
-                                                   opt = opt))
+                                                   opt = opt, sce = sce))
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i])
             if !success

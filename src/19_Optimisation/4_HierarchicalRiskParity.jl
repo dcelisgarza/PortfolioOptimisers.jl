@@ -1,23 +1,25 @@
 struct HierarchicalRiskParity{T1 <: HierarchicalOptimiser,
                               T2 <: Union{<:OptimisationRiskMeasure,
-                                          <:AbstractVector{<:OptimisationRiskMeasure}}} <:
-       ClusteringOptimisationEstimator
+                                          <:AbstractVector{<:OptimisationRiskMeasure}},
+                              T3 <: Scalariser} <: ClusteringOptimisationEstimator
     opt::T1
     r::T2
+    sce::T3
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::Union{<:OptimisationRiskMeasure,
-                                         <:AbstractVector{<:OptimisationRiskMeasure}} = Variance())
+                                         <:AbstractVector{<:OptimisationRiskMeasure}} = Variance(),
+                                sce::Scalariser = SumScalariser())
     if isa(r, AbstractVector)
         @smart_assert(!isempty(r))
     end
-    return HierarchicalRiskParity{typeof(opt), typeof(r)}(opt, r)
+    return HierarchicalRiskParity{typeof(opt), typeof(r), typeof(sce)}(opt, r, sce)
 end
 function opt_view(hrp::HierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = risk_measure_view(hrp.r, i, X)
     opt = opt_view(hrp.opt, i)
-    return HierarchicalRiskParity(; r = r, opt = opt)
+    return HierarchicalRiskParity(; r = r, opt = opt, sce = hrp.sce)
 end
 function split_factor_weight_constraints(alpha::Real, wb::WeightBoundsResult,
                                          w::AbstractVector, lc::AbstractVector,
@@ -155,7 +157,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any,
         for i in 1:2:length(items)
             lc = items[i]
             rc = items[i + 1]
-            lrisk, rrisk = hrp_scalarised_risk(hrp.opt.sce, wu, wk, rku, lc, rc, r, pr.X,
+            lrisk, rrisk = hrp_scalarised_risk(hrp.sce, wu, wk, rku, lc, rc, r, pr.X,
                                                hrp.opt.fees)
             # Allocate weight to clusters.
             alpha = one(lrisk) - lrisk / (lrisk + rrisk)

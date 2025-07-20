@@ -20,8 +20,8 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
                                #! Start: to delete
                                          <:DataFrame
                                #! End: to delete
-                               }, T7 <: ClusteringWeightFinaliser, T8 <: Scalariser,
-                             T9 <: Bool} <: BaseClusteringOptimisationEstimator
+                               }, T7 <: ClusteringWeightFinaliser, T8 <: Bool} <:
+       BaseClusteringOptimisationEstimator
     pe::T1
     cle::T2
     slv::T3
@@ -29,8 +29,7 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
     wb::T5
     sets::T6
     cwf::T7
-    sce::T8
-    strict::T9
+    strict::T8
 end
 function HierarchicalOptimiser(;
                                pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
@@ -46,14 +45,19 @@ function HierarchicalOptimiser(;
                                            #! End: to delete
                                            } = nothing,
                                cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
-                               sce::Scalariser = SumScalariser(), strict::Bool = false)
+                               strict::Bool = false)
     if isa(wb, WeightBoundsConstraint)
         @smart_assert(!isnothing(sets))
     end
     return HierarchicalOptimiser{typeof(pe), typeof(cle), typeof(slv), typeof(fees),
-                                 typeof(wb), typeof(sets), typeof(cwf), typeof(sce),
-                                 typeof(strict)}(pe, cle, slv, fees, wb, sets, cwf, sce,
-                                                 strict)
+                                 typeof(wb), typeof(sets), typeof(cwf), typeof(strict)}(pe,
+                                                                                        cle,
+                                                                                        slv,
+                                                                                        fees,
+                                                                                        wb,
+                                                                                        sets,
+                                                                                        cwf,
+                                                                                        strict)
 end
 function opt_view(hco::HierarchicalOptimiser, i::AbstractVector)
     pe = prior_view(hco.pe, i)
@@ -61,8 +65,7 @@ function opt_view(hco::HierarchicalOptimiser, i::AbstractVector)
     wb = weight_bounds_view(hco.wb, i)
     sets = nothing_asset_sets_view(hco.sets, i)
     return HierarchicalOptimiser(; pe = pe, cle = hco.cle, fees = fees, slv = hco.slv,
-                                 sce = hco.sce, wb = wb, cwf = hco.cwf, sets = sets,
-                                 strict = hco.strict)
+                                 wb = wb, cwf = hco.cwf, sets = sets, strict = hco.strict)
 end
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::AbstractMatrix,
                                 fees::Union{Nothing, <:Fees} = nothing)
