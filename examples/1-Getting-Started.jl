@@ -3,11 +3,13 @@
 
 Here we show a simple example of how to use `PortfolioOptimisers`. We will perform the classic Markowitz optimisation.
 =#
+
 using PortfolioOptimisers
 
 #=
 PrettyTables is used to format the example output.
 =#
+
 using PrettyTables
 
 ## Format for pretty tables.
@@ -38,6 +40,7 @@ end;
 
 Import the S&P500 data from a compressed `.csv` file. We will only use the last 253 observations.
 =#
+
 using CSV, TimeSeries, DataFrames
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -46,6 +49,7 @@ pretty_table(X[(end - 5):end]; formatters = tsfmt)
 #=
 First we must compute the returns from the prices. The `ReturnsResult` struct stores the asset names in `nx`, asset returns in `X`, and timestamps in `ts`. The other fields are used in other applications which we will not be showcasing here.
 =#
+
 rd = prices_to_returns(X)
 
 #=
@@ -57,6 +61,7 @@ All optimisations require some prior statistics to be computed. This can either 
 
 The `MeanRisk` estimator defines a mean-risk optimisation problem. It is a `JuMPOptimisationEstimator`, which means it requires a `JuMP`-compatible optimiser, which in this case will be `Clarabel`.
 =#
+
 using Clarabel
 
 #=
@@ -64,6 +69,7 @@ We have to define a `Solver` object, which contains the optimiser we wish to use
 
 Given the vast range of optimisation options and types, it is often useful to try different solver and settings combinations. To this aim, it is also possible to provide a vector of `Solver` objects, which is iterated over until one succeeds or all fail. The classic Markowitz optimisation is rather simple, so we will use a single solver instance.
 =#
+
 slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
              check_sol = (; allow_local = true, allow_almost = true))

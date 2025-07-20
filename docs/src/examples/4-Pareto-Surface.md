@@ -216,8 +216,6 @@ plot_stacked_area_composition(res3.w, rd.nx)
 Now we can view the parteo surface using the PlotlyJS backend. For the z-axis and colourbar, we will use the conditional drawdown at risk to return ratio.
 
 ````@example 4-Pareto-Surface
-using PlotlyJS
-plotlyjs()
 plot_measures(res3.w, pr; x = r1, y = r2,
               z = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
                                    rt = ArithmeticReturn(), rf = rf),

@@ -3,6 +3,7 @@
 
 In this example we will show the different objective functions available in `MeanRisk`, and compare them to a benchmark.
 =#
+
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
@@ -25,6 +26,7 @@ end;
 
 We will use the same data as the previous example.
 =#
+
 using CSV, TimeSeries, DataFrames
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -38,6 +40,7 @@ rd = prices_to_returns(X)
 
 Here we will show the different objective functions available in `MeanRisk`. We will also use the semi-standard deviation risk measure.
 =#
+
 using Clarabel
 slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
@@ -45,6 +48,7 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 #=
 Here we encounter another consequence of the design philosophy of `PortfolioOptimisers`. An entire class of risk measures can be categorised and consistently implemented as `LowOrderMoment` risk measures with different internal algorithms. This corresponds to the semi-standard deviation.
 =#
+
 r = LowOrderMoment(;
                    alg = LowOrderDeviation(;
                                            alg = SecondLowerMoment(;
@@ -53,11 +57,13 @@ r = LowOrderMoment(;
 #=
 Since we will perform various optimisations on the same data, there's no need to redo work. Lets precompute the prior statistics using the `EmpiricalPriorEstimator` to avoid recomputing them every time we call the optimisation.
 =#
+
 pr = prior(EmpiricalPriorEstimator(), rd)
 
 #=
 We can provide the prior result to `JuMPOptimiser`.
 =#
+
 opt = JuMPOptimiser(; pe = pr, slv = slv)
 
 #=

@@ -5,6 +5,7 @@ This example shows how to use basic budget constraints.
 
 Before starting it is worth mentioning that portfolio budget constraints are implemented on the actual weights, while the short budget constraints are implemented on a relaxation variable stand-in for the short weights. This means that in some cases, it may appear the short budget constraints are not satisfied when they actually are. This is because the relaxation variables that stand in for the short weights can take on a range of values as long as they are greater than or equal to the absolute value of the actual negative weights, and still satify the budget constraint placed on them.
 =#
+
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
@@ -34,6 +35,7 @@ end;
 
 We will use the same data as the previous example.
 =#
+
 using CSV, TimeSeries, DataFrames
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -49,6 +51,7 @@ We'll provide a vector of continuous solvers beacause the optimisation type we'l
 
 For the mixed interger solvers, we can use a single one.
 =#
+
 using Clarabel, HiGHS
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               settings = Dict("verbose" => false),
@@ -69,6 +72,7 @@ mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
 #=
 This time we will use the `EntropicValueatRisk` measure and we will once again precompute prior.
 =#
+
 r = EntropicValueatRisk()
 pr = prior(EmpiricalPriorEstimator(), rd)
 
@@ -85,6 +89,7 @@ Here we will showcase various budget constraints. We will start simple, with a s
 
 First the default case, where the budget is equal to 1, `bgt = 1`. This means the portfolio will be fully invested.
 =#
+
 opt1 = JuMPOptimiser(; pe = pr, slv = slv)
 mr1 = MeanRisk(; r = r, opt = opt1)
 
@@ -93,6 +98,7 @@ You can see that `wb` is of type `WeightBoundsResult`, `lb = 0.0` (asset weights
 
 We can check that the constraints were satisfied.
 =#
+
 res1 = optimise!(mr1)
 println("budget: $(sum(res1.w))")
 println("long budget: $(sum(res1.w[res1.w .>= zero(eltype(res1.w))]))")
@@ -123,6 +129,7 @@ The short budget is given as an absolute value (simplifies implementation detail
 
 Minimising the risk under without additional constraints often yields all zeros. So we will maximise the risk-return ratio.
 =#
+
 rf = 4.2 / 100 / 252
 opt2 = JuMPOptimiser(; pe = pr, slv = slv,
                      ## Budget and short budget absolute values.
@@ -141,6 +148,7 @@ Lets allocate a finite amount of capital. Since we set the long and short budget
 
 The discrete allocation procedure automatically adjusts the cash amount depending on the optimal long and short weights, so there is no need to split the cash amount into long and short allocations.
 =#
+
 mip_res2 = optimise!(da, res2.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res2.shares, :cost => mip_res2.cost,
                        :opt_weights => res2.w, :mip_weights => mip_res2.w);
@@ -169,6 +177,10 @@ println("long budget: $(sum(res3.w[res3.w .>= zero(eltype(res3.w))]))")
 println("short budget: $(sum(res3.w[res3.w .< zero(eltype(res3.w))]))")
 println("weight bounds: $(all(x -> -one(x) <= x <= zero(x), res3.w))")
 
+#=
+We can confirm that the finite allocation behaves as expected.
+=#
+
 mip_res3 = optimise!(da, res3.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res3.shares, :cost => mip_res3.cost,
                        :opt_weights => res3.w, :mip_weights => mip_res3.w);
@@ -184,6 +196,7 @@ println("used cash ≈ available cash: $(isapprox(sum(mip_res3.cost) - mip_res3.
 
 Lets try a leveraged long-only portfolio.
 =#
+
 opt4 = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1.3)
 mr4 = MeanRisk(; r = r, opt = opt4)
 res4 = optimise!(mr4)
@@ -191,6 +204,10 @@ println("budget: $(sum(res4.w))")
 println("long budget: $(sum(res4.w[res4.w .>= zero(eltype(res4.w))]))")
 println("short budget: $(sum(res4.w[res4.w .< zero(eltype(res4.w))]))")
 println("weight bounds: $(all(x -> zero(x) <= x <= one(x), res4.w))")
+
+#=
+Again, the finite allocation respects the budget constraints.
+=#
 
 mip_res4 = optimise!(da, res4.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res4.shares, :cost => mip_res4.cost,
@@ -209,6 +226,7 @@ Note that the short budget is not satisfied, this is because it is implemented a
 
 It is also possible to set budget bounds for the short and portfolio bugets. They are implemented in the same way as the equality constraints. We will explore them in the next section.
 =#
+
 opt5 = JuMPOptimiser(; pe = pr, slv = slv,
                      ## Budget and short budget absolute values.
                      bgt = 0.5, sbgt = 1,
@@ -224,6 +242,7 @@ println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res5.w))")
 #=
 For this portfolio, the sum of the long and short cost will be approximately equal to half the allocated value of `4206.9`. Any discrepancies are due to the fact we are allocating a finite amount.
 =#
+
 mip_res5 = optimise!(da, res5.w, vec(values(X[end])), 4506.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res5.shares, :cost => mip_res5.cost,
                        :opt_weights => res5.w, :mip_weights => mip_res5.w);

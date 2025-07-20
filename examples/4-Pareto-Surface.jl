@@ -3,6 +3,7 @@
 
 This example kicks up the complexity a couple of notches. We will introduce a new optimisation estimator, `NearOptimalCentering` optimiser.
 =#
+
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
@@ -25,6 +26,7 @@ end;
 
 We will use the same data as the previous example.
 =#
+
 using CSV, TimeSeries, DataFrames
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -40,6 +42,7 @@ The pareto surface is a generalisation of the efficient frontier, in fact, we ca
 
 We'll provide a vector of solvers beacause the optimisation type we'll be using is more complex, and will contain various constraints.
 =#
+
 using Clarabel
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               settings = Dict("verbose" => false),
@@ -72,6 +75,7 @@ We will be using high order risk measures, so we need to compute high order mome
 
 Note how many options this estimator contains.
 =#
+
 de = Denoise(; alg = SpectralDenoise(;))
 mp = DefaultMatrixProcessing(; denoise = de)
 pe = HighOrderPriorEstimator(;
@@ -87,6 +91,7 @@ pe = HighOrderPriorEstimator(;
 #=
 Lets compute the prior statistics.
 =#
+
 pr = prior(pe, rd)
 
 #=
@@ -94,6 +99,7 @@ In order to generate a pareto surface/hyper-surface, we need more dimensions tha
 
 We will use the square root `NegativeSkewness` and `SquareRootKurtosis`.
 =#
+
 r1 = NegativeSkewness()
 r2 = SquareRootKurtosis()
 
@@ -109,6 +115,7 @@ We will simply maximise the risk-return ratio for both risk measures on their ow
 
 The `NearOptimalCentering` estimator will not return the portfolio which satisfies the traditional `MeanRisk` constraints, but rather a portfolio which is at the centre of an analytical region (neighbourhood) around the optimal solution. The region is parametrised by binning the efficient frontier, we will use the automatic bins here, but it is possible to define them manually.
 =#
+
 ## Risk-free rate of 4.2/100/252
 rf = 4.2 / 100 / 252
 opt = JuMPOptimiser(; pe = pr, slv = slv)
@@ -121,18 +128,21 @@ Note the number of options in the estimator. In particular the `alg` property. W
 
 Lets optimise the portfolios.
 =#
+
 res1 = optimise!(opt1)
 res2 = optimise!(opt2)
 
 #=
 In order to allow for multiple risk measures in optimisations, certain measures can take different parameters. In this case, `NegativeSkewness` and `SquareRootKurtosis` take the moment matrices, which are used to compute the risk measures. We can use the `factory` function to create a new risk measure with the same parameters as the original, but with the moment matrices from the prior. Other risk measures require a solver, and this function is also used in those cases.
 =#
+
 r1 = factory(r1, pr)
 r2 = factory(r2, pr)
 
 #=
 Lets compute the risk bounds for the pareto surface. We need to compute four risks because we have two risk measures and two optimisations. This will let us pick the lower and upper bounds for each risk measure, as we explore the pareto surface from one optimisation to the other.
 =#
+
 sk_rk1 = expected_risk(r1, res1.w, pr.X);
 kt_rk1 = expected_risk(r2, res1.w, pr.X);
 sk_rk2 = expected_risk(r1, res2.w, pr.X);
@@ -143,6 +153,7 @@ We will now create new risk measures bounded by these values. We will also use f
 
 Since we don't know which `sk_rk1` or `sk_r2`, `kt_rk1` or `kt_rk2` is bigger or smaller, we need to use `min`, `max`.
 =#
+
 r1 = factory(NegativeSkewness(;
                               settings = RiskMeasureSettings(;
                                                              ## Risk upper bounds go from the minimum to maximum risk given the optimisations.
@@ -165,11 +176,13 @@ Now we only need to maximise the return given both risk measures. Internally, th
 
 Since we are using an unconstrained `NearOptimalCentering`, the risk bound constraints will not be satisfied by the solution. If we wish to satisfy them, we can provide `alg = ConstrainedNearOptimalCenteringAlgorithm()`, but would also make the optimisations harder, which may cause them to fail.
 =#
+
 opt3 = NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(), opt = opt)
 
 #=
 See how `r` is a vector of risk measures with populated properties. We can now optimise the porftolios.
 =#
+
 res3 = optimise!(opt3)
 
 #=
@@ -177,6 +190,7 @@ As expected, there are `5 × 5 = 25` solutions. Thankfully there are no warnings
 
 The `NearOptimalCentering` estimator contains various return codes because it may need to compute some `MeanRisk` optimisations, it has a `retcode` which summarises whether all other optimisations succeeded. We can check this to make sure it was a success.
 =#
+
 isa(res3.retcode, OptimisationSuccess)
 
 #=
@@ -184,14 +198,14 @@ isa(res3.retcode, OptimisationSuccess)
 
 Lets view how the weights evolve along the pareto surface.
 =#
+
 using StatsPlots, GraphRecipes
 plot_stacked_area_composition(res3.w, rd.nx)
 
 #=
 Now we can view the parteo surface using the PlotlyJS backend. For the z-axis and colourbar, we will use the conditional drawdown at risk to return ratio.
 =#
-using PlotlyJS
-plotlyjs()
+
 plot_measures(res3.w, pr; x = r1, y = r2,
               z = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),
                                    rt = ArithmeticReturn(), rf = rf),
@@ -203,6 +217,7 @@ plot_measures(res3.w, pr; x = r1, y = r2,
 #=
 We can view it in 2D as well.
 =#
+
 gr()
 plot_measures(res3.w, pr; x = r1, y = r2,
               c = RatioRiskMeasure(; rk = ConditionalDrawdownatRisk(),

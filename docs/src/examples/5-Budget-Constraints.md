@@ -183,7 +183,11 @@ println("budget: $(sum(res3.w))")
 println("long budget: $(sum(res3.w[res3.w .>= zero(eltype(res3.w))]))")
 println("short budget: $(sum(res3.w[res3.w .< zero(eltype(res3.w))]))")
 println("weight bounds: $(all(x -> -one(x) <= x <= zero(x), res3.w))")
+````
 
+We can confirm that the finite allocation behaves as expected.
+
+````@example 5-Budget-Constraints
 mip_res3 = optimise!(da, res3.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res3.shares, :cost => mip_res3.cost,
                        :opt_weights => res3.w, :mip_weights => mip_res3.w);
@@ -207,7 +211,11 @@ println("budget: $(sum(res4.w))")
 println("long budget: $(sum(res4.w[res4.w .>= zero(eltype(res4.w))]))")
 println("short budget: $(sum(res4.w[res4.w .< zero(eltype(res4.w))]))")
 println("weight bounds: $(all(x -> zero(x) <= x <= one(x), res4.w))")
+````
 
+Again, the finite allocation respects the budget constraints.
+
+````@example 5-Budget-Constraints
 mip_res4 = optimise!(da, res4.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res4.shares, :cost => mip_res4.cost,
                        :opt_weights => res4.w, :mip_weights => mip_res4.w);
