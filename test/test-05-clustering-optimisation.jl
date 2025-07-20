@@ -58,6 +58,7 @@
     clr = clusterise(ClusteringEstimator(), pr)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
                length = size(pr.X, 2))
+    opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
 
     rs = [EqualRiskMeasure(), Variance(), StandardDeviation(), UncertaintySetVariance(),
           LowOrderMoment(), HighOrderMoment(), SquareRootKurtosis(), NegativeSkewness(),
@@ -73,7 +74,6 @@
           RiskTrackingRiskMeasure(; r = StandardDeviation(),
                                   tracking = WeightsTracking(; w = w0)),
           RiskRatioRiskMeasure()]
-    opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
     @testset "HierarchicalRiskParity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity1.csv.gz"),
                       DataFrame)
@@ -171,6 +171,19 @@
                                                                              settings = RiskMeasureSettings(;
                                                                                                             scale = 1e1))],
                                                               opt = opt, scei = sce))
+            @test isa(res.retcode, OptimisationSuccess)
+            success = isapprox(res.w, df[!, i])
+            if !success
+                find_tol(res.w, df[!, i])
+            end
+            @test success
+            res = optimise!(HierarchicalEqualRiskContribution(;
+                                                              ri = [ConditionalValueatRisk(),
+                                                                    Variance(;
+                                                                             settings = RiskMeasureSettings(;
+                                                                                                            scale = 1e1))],
+                                                              opt = opt, scei = sce,
+                                                              threads = FLoops.SequentialEx()))
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i])
             if !success
