@@ -73,16 +73,16 @@
           RiskTrackingRiskMeasure(; r = StandardDeviation(),
                                   tracking = WeightsTracking(; w = w0)),
           RiskRatioRiskMeasure()]
+    opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
     @testset "HierarchicalRiskParity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity1.csv.gz"),
                       DataFrame)
-        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
         for (i, r) in pairs(rs)
             res = optimise!(HierarchicalRiskParity(; r = r, opt = opt))
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i]; rtol = 5e-7)
             if !success
-                find_tol(res.w, df[!, i]; name1 = :lhs, name2 = :rhs)
+                find_tol(res.w, df[!, i])
             end
             @test success
         end
@@ -93,7 +93,6 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity2.csv.gz"),
                       DataFrame)
         for (i, sce) in pairs(sces)
-            opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
             res = optimise!(HierarchicalRiskParity(;
                                                    r = [ConditionalValueatRisk(),
                                                         Variance(;
@@ -103,13 +102,12 @@
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i])
             if !success
-                find_tol(res.w, df[!, i]; name1 = :lhs, name2 = :rhs)
+                find_tol(res.w, df[!, i])
             end
             @test success
         end
     end
     @testset "HierarchicalEqualRiskContribution" begin
-        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
         w1 = [0.00908374873880388, 0.0030813159109630405, 0.010918199959460204,
               0.005595309855503248, 0.022247736637590203, 0.009462220791969355,
               0.01173118247048863, 0.15335141162301058, 0.012897796620250668,
@@ -159,5 +157,26 @@
                                                           ro = [Variance()], opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
+    end
+    @testset "HierarchicalEqualRiskContribution scalarisers" begin
+        sces = [SumScalariser(), MaxScalariser(), LogSumExpScalariser(; gamma = 1e-3),
+                LogSumExpScalariser(; gamma = 1e2)]
+        df = CSV.read(joinpath(@__DIR__,
+                               "./assets/HierarchicalEqualRiskContribution2.csv.gz"),
+                      DataFrame)
+        for (i, sce) in pairs(sces)
+            res = optimise!(HierarchicalEqualRiskContribution(;
+                                                              ri = [ConditionalValueatRisk(),
+                                                                    Variance(;
+                                                                             settings = RiskMeasureSettings(;
+                                                                                                            scale = 1e1))],
+                                                              opt = opt, scei = sce))
+            @test isa(res.retcode, OptimisationSuccess)
+            success = isapprox(res.w, df[!, i])
+            if !success
+                find_tol(res.w, df[!, i])
+            end
+            @test success
+        end
     end
 end
