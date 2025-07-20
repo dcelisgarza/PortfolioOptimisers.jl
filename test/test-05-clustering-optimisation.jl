@@ -100,11 +100,40 @@
                                                                  settings = RiskMeasureSettings(;
                                                                                                 scale = 2e2))],
                                                    opt = opt))
+            @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i])
             if !success
                 find_tol(res.w, df[!, i]; name1 = :lhs, name2 = :rhs)
             end
             @test success
         end
+    end
+    @testset "HierarchicalEqualRiskContribution" begin
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
+        w1 = [0.00908374873880388, 0.0030813159109630405, 0.010918199959460204,
+              0.005595309855503248, 0.022247736637590203, 0.009462220791969355,
+              0.01173118247048863, 0.15335141162301058, 0.012897796620250668,
+              0.1202420807244618, 0.06262619007540955, 0.11709370371475523,
+              0.009275523953337955, 0.12297190754199298, 0.06382989742924242,
+              0.09641530015038421, 0.006088453496011643, 0.0783381784854751,
+              0.06517803092186192, 0.01957181089902754]
+        res = optimise!(HierarchicalEqualRiskContribution(; opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, w1)
+        res = optimise!(HierarchicalEqualRiskContribution(; ri = [Variance()], opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, w1)
+        res = optimise!(HierarchicalEqualRiskContribution(; ri = [Variance()],
+                                                          ro = [Variance()], opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, w1)
+        res = optimise!(HierarchicalEqualRiskContribution(; ri = [Variance()],
+                                                          ro = Variance(), opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, w1)
+        res = optimise!(HierarchicalEqualRiskContribution(; ri = Variance(),
+                                                          ro = [Variance()], opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, w1)
     end
 end
