@@ -39,16 +39,15 @@ function _Frontier(; N::Integer = 20, factor::Real, flag::Bool)
     return Frontier{typeof(N), typeof(factor), typeof(flag)}(N, factor, flag)
 end
 struct RiskMeasureSettings{T1 <: Real,
-                           T2 <:
-                           Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:Frontier},
+                           T2 <: Union{Nothing, <:Real, <:AbstractVector, <:Frontier},
                            T3 <: Bool} <: AbstractRiskMeasureSettings
     scale::T1
     ub::T2
     rke::T3
 end
 function RiskMeasureSettings(; scale::Real = 1.0,
-                             ub::Union{Nothing, <:Real, <:AbstractVector{<:Real},
-                                       <:Frontier} = nothing, rke::Bool = true)
+                             ub::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing,
+                             rke::Bool = true)
     if isa(ub, Real)
         @smart_assert(isfinite(ub) && ub > zero(ub))
     elseif isa(ub, AbstractVector)

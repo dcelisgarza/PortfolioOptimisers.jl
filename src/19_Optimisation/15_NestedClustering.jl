@@ -88,7 +88,7 @@ function NestedClustering(;
                                     <:AbstractVector{<:AbstractString},
                                     <:AbstractVector{Expr},
                                     <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                    #! Start: to delete          
+                                    #! Start: to delete
                                     <:WeightBoundsConstraint
                                     #! End: to delete
                                     } = nothing,

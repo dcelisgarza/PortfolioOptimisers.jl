@@ -64,6 +64,8 @@
         res_max = optimise!(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
         rk_min = expected_risk(r, res_min.w, pr)
         rk_max = expected_risk(r, res_max.w, pr)
+        rt_min = expected_return(ArithmeticReturn(), res_min.w, pr)
+        rt_max = expected_return(ArithmeticReturn(), res_max.w, pr)
         res1 = optimise!(NearOptimalCentering(;
                                               r = StandardDeviation(;
                                                                     settings = RiskMeasureSettings(;
@@ -84,15 +86,34 @@
             find_tol(Matrix(df), hcat(res1.w...))
         end
         @test success
+
+        df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier2.csv.gz"),
+                      DataFrame)
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
+        res3 = optimise!(NearOptimalCentering(; r = StandardDeviation(), opt = opt))
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            ret = ArithmeticReturn(;
+                                                   lb = range(; start = rt_min,
+                                                              stop = rt_max, length = 5)))
+        res4 = optimise!(NearOptimalCentering(; r = StandardDeviation(), opt = opt))
+        @test all(isapprox.(res3.w, res4.w))
+        success = isapprox(Matrix(df), hcat(res3.w...); rtol = 1e-4)
+        if !success
+            find_tol(Matrix(df), hcat(res3.w...))
+        end
+        @test success
     end
     @testset "Constrained Efficient Frontier" begin
-        df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier2.csv.gz"),
+        df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier3.csv.gz"),
                       DataFrame)
         r = factory(StandardDeviation(), pr)
         res_min = optimise!(MeanRisk(; r = r, opt = opt))
         res_max = optimise!(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
         rk_min = expected_risk(r, res_min.w, pr)
         rk_max = expected_risk(r, res_max.w, pr)
+        rt_min = expected_return(ArithmeticReturn(), res_min.w, pr)
+        rt_max = expected_return(ArithmeticReturn(), res_max.w, pr)
         res1 = optimise!(NearOptimalCentering(;
                                               r = StandardDeviation(;
                                                                     settings = RiskMeasureSettings(;
@@ -113,6 +134,25 @@
         success = isapprox(Matrix(df), hcat(res1.w...); rtol = 5e-5)
         if !success
             find_tol(Matrix(df), hcat(res1.w...))
+        end
+        @test success
+
+        df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier4.csv.gz"),
+                      DataFrame)
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
+        res3 = optimise!(NearOptimalCentering(; r = StandardDeviation(), opt = opt,
+                                              alg = ConstrainedNearOptimalCenteringAlgorithm()))
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            ret = ArithmeticReturn(;
+                                                   lb = range(; start = rt_min,
+                                                              stop = rt_max, length = 5)))
+        res4 = optimise!(NearOptimalCentering(; r = StandardDeviation(), opt = opt,
+                                              alg = ConstrainedNearOptimalCenteringAlgorithm()))
+        @test all(isapprox.(res3.w, res4.w))
+        success = isapprox(Matrix(df), hcat(res3.w...); rtol = 1e-4)
+        if !success
+            find_tol(Matrix(df), hcat(res3.w...))
         end
         @test success
     end

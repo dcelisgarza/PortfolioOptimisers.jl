@@ -59,7 +59,6 @@
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
                length = size(pr.X, 2))
     opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
-
     rs = [EqualRiskMeasure(), Variance(), StandardDeviation(), UncertaintySetVariance(),
           LowOrderMoment(), HighOrderMoment(), SquareRootKurtosis(), NegativeSkewness(),
           ValueatRisk(), ValueatRiskRange(), ConditionalValueatRisk(),
@@ -213,6 +212,14 @@
               0.06517803092186192, 0.01957181089902754]
         sets = AssetSets(; dict = Dict("nx" => rd.nx, "group1" => ["AAPL", "MSFT"]))
         eqn = ["JNJ==0.03", "group1 >= 0.02", "PEP <= 0.08"]
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn)
+        res = optimise!(HierarchicalEqualRiskContribution(; opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
+        @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
+                              for i in sets.dict["group1"]]] .- 0.02) .<= 1e-10)
+        @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
+
         opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
                                     cwf = JuMP_ClusteringWeightFiniliser(;
                                                                          alg = RelativeErrorClusteringWeightFiniliser(),
