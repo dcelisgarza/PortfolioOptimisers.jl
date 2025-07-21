@@ -119,7 +119,7 @@
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
         res = optimise!(HierarchicalEqualRiskContribution(; ri = Variance(),
-                                                          ro = Variance()opt = opt))
+                                                          ro = Variance(), opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
         res = optimise!(HierarchicalEqualRiskContribution(; ri = [Variance()], opt = opt))
@@ -143,7 +143,7 @@
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)
         res = optimise!(HierarchicalEqualRiskContribution(; ri = Variance(),
-                                                          ro = Variance()opt = opt,
+                                                          ro = Variance(), opt = opt,
                                                           threads = FLoops.SequentialEx()))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w, w1)

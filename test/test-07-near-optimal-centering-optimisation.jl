@@ -56,7 +56,7 @@
                                   "reduced_tol_infeas_rel" => 1e-4))]
     pr = prior(HighOrderPriorEstimator(), rd)
     opt = JuMPOptimiser(; pe = pr, slv = slv)
-    @testset "Efficient Frontier" begin
+    @testset "Unconstrained Efficient Frontier" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier1.csv.gz"),
                       DataFrame)
         r = factory(StandardDeviation(), pr)
@@ -78,6 +78,33 @@
                                                                                                               stop = rk_max,
                                                                                                               length = 5))),
                                               obj = MaximumReturn(), opt = opt))
+        @test all(isapprox.(res1.w, res2.w))
+        @test isapprox(Matrix(df), hcat(res1.w...))
+    end
+    @testset "Constrained Efficient Frontier" begin
+        df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier2.csv.gz"),
+                      DataFrame)
+        r = factory(StandardDeviation(), pr)
+        res_min = optimise!(MeanRisk(; r = r, opt = opt))
+        res_max = optimise!(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
+        rk_min = expected_risk(r, res_min.w, pr)
+        rk_max = expected_risk(r, res_max.w, pr)
+        res1 = optimise!(NearOptimalCentering(;
+                                              r = StandardDeviation(;
+                                                                    settings = RiskMeasureSettings(;
+                                                                                                   ub = Frontier(;
+                                                                                                                 N = 5))),
+                                              obj = MaximumReturn(), opt = opt,
+                                              alg = ConstrainedNearOptimalCenteringAlgorithm()))
+        res2 = optimise!(NearOptimalCentering(;
+                                              r = StandardDeviation(;
+                                                                    settings = RiskMeasureSettings(;
+                                                                                                   ub = range(;
+                                                                                                              start = rk_min,
+                                                                                                              stop = rk_max,
+                                                                                                              length = 5))),
+                                              obj = MaximumReturn(), opt = opt,
+                                              alg = ConstrainedNearOptimalCenteringAlgorithm()))
         @test all(isapprox.(res1.w, res2.w))
         @test isapprox(Matrix(df), hcat(res1.w...))
     end
