@@ -203,4 +203,58 @@
             @test success
         end
     end
+    @testset "Weight bounds" begin
+        w1 = [0.00908374873880388, 0.0030813159109630405, 0.010918199959460204,
+              0.005595309855503248, 0.022247736637590203, 0.009462220791969355,
+              0.01173118247048863, 0.15335141162301058, 0.012897796620250668,
+              0.1202420807244618, 0.06262619007540955, 0.11709370371475523,
+              0.009275523953337955, 0.12297190754199298, 0.06382989742924242,
+              0.09641530015038421, 0.006088453496011643, 0.0783381784854751,
+              0.06517803092186192, 0.01957181089902754]
+        sets = AssetSets(; dict = Dict("nx" => rd.nx, "group1" => ["AAPL", "MSFT"]))
+        eqn = ["JNJ==0.03", "group1 >= 0.02", "PEP <= 0.08"]
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+                                    cwf = JuMP_ClusteringWeightFiniliser(;
+                                                                         alg = RelativeErrorClusteringWeightFiniliser(),
+                                                                         slv = slv))
+        res = optimise!(HierarchicalEqualRiskContribution(; opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
+        @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
+                              for i in sets.dict["group1"]]] .- 0.02) .<= 1e-10)
+        @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
+
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+                                    cwf = JuMP_ClusteringWeightFiniliser(;
+                                                                         alg = SquareRelativeErrorClusteringWeightFiniliser(),
+                                                                         slv = slv))
+        res = optimise!(HierarchicalEqualRiskContribution(; opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
+        @test all(abs.(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
+                              for i in sets.dict["group1"]]] .- 0.02) .<= 1e-10)
+        @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
+
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+                                    cwf = JuMP_ClusteringWeightFiniliser(;
+                                                                         alg = AbsoluteErrorClusteringWeightFiniliser(),
+                                                                         slv = slv))
+        res = optimise!(HierarchicalEqualRiskContribution(; opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
+        @test all(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
+                         for i in sets.dict["group1"]]] .>= 0.02)
+        @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
+
+        opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
+                                    cwf = JuMP_ClusteringWeightFiniliser(;
+                                                                         alg = SquareAbsoluteErrorClusteringWeightFiniliser(),
+                                                                         slv = slv))
+        res = optimise!(HierarchicalEqualRiskContribution(; opt = opt))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
+        @test all(res.w[[findfirst(x -> x == i, sets.dict[sets.key])
+                         for i in sets.dict["group1"]]] .>= 0.02)
+        @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
+    end
 end

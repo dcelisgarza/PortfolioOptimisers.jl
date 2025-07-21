@@ -75,9 +75,16 @@ function WeightBoundsConstraint(; group, name,
                                                                                        lb,
                                                                                        ub)
 end
-function weight_bounds_view(wb::WeightBoundsConstraint{<:Any, <:Any,
-                                                       <:Union{Nothing, <:Real},
-                                                       <:Union{Nothing, <:Real}}, ::Any)
+function weight_bounds_view(wb::Union{<:AbstractString, Expr,
+                                      <:AbstractVector{<:AbstractString},
+                                      <:AbstractVector{Expr},
+                                      <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                      #! Start: to delete
+                                      <:WeightBoundsConstraint{<:Any, <:Any,
+                                                               <:Union{Nothing, <:Real},
+                                                               <:Union{Nothing, <:Real}}
+                                      #! End: to delete
+                                      }, ::Any)
     return wb
 end
 function weight_bounds_view(wb::WeightBoundsConstraint{<:AbstractVector, <:AbstractVector,

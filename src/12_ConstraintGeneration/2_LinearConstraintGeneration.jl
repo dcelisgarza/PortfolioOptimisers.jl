@@ -143,7 +143,7 @@ end
 Base.length(res::AbstractParsingResult) = 1
 Base.iterate(res::AbstractParsingResult, state = 1) = state > 1 ? nothing : (res, state + 1)
 Base.getindex(res::AbstractParsingResult, i) = i == 1 ? res : throw(BoundsError(res, i))
-struct AssetSets{T1 <: AbstractString, T2 <: AbstractDict}
+struct AssetSets{T1 <: AbstractString, T2 <: AbstractDict} <: AbstractEstimator
     key::T1
     dict::T2
 end
@@ -445,7 +445,7 @@ function weight_bounds_constraints(eqn::Union{<:AbstractString, Expr,
                                               <:AbstractVector{<:Union{<:AbstractString,
                                                                        Expr}}},
                                    sets::AssetSets; datatype::DataType = Float64,
-                                   strict::Bool = false)
+                                   strict::Bool = false, kwargs...)
     lcs = parse_equation(eqn; datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets)
     return get_weight_bounds_constraints(lcs, sets; datatype = datatype, strict = strict)

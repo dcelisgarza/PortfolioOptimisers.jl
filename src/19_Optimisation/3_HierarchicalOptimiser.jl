@@ -15,12 +15,18 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
                              T3 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                              T4 <: Union{Nothing, <:Fees},
                              T5 <:
-                             Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
-                             T6 <: Union{Nothing, <:AssetSets,
-                               #! Start: to delete
-                                         <:DataFrame
-                               #! End: to delete
-                               }, T7 <: ClusteringWeightFinaliser, T8 <: Bool} <:
+                             Union{Nothing, <:WeightBoundsResult, <:AbstractString, Expr,
+                                   <:AbstractVector{<:AbstractString},
+                                   <:AbstractVector{Expr},
+                                   <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                   #! Start: to delete
+                                   <:WeightBoundsConstraint
+                                   #! End: to delete
+                                   }, T6 <: Union{Nothing, <:AssetSets,
+                                        #! Start: to delete
+                                                  <:DataFrame
+                                        #! End: to delete
+                                        }, T7 <: ClusteringWeightFinaliser, T8 <: Bool} <:
        BaseClusteringOptimisationEstimator
     pe::T1
     cle::T2
@@ -37,14 +43,20 @@ function HierarchicalOptimiser(;
                                           <:AbstractClusteringResult} = ClusteringEstimator(),
                                slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
                                fees::Union{Nothing, <:Fees} = nothing,
-                               wb::Union{Nothing, <:WeightBoundsResult,
-                                         <:WeightBoundsConstraint} = WeightBoundsResult(),
+                               wb::Union{Nothing, <:WeightBoundsResult, <:AbstractString,
+                                         Expr, <:AbstractVector{<:AbstractString},
+                                         <:AbstractVector{Expr},
+                                         <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                         #! Start: to delete
+                                         <:WeightBoundsConstraint
+                                         #! End: to delete
+                                         } = WeightBoundsResult(),
                                sets::Union{Nothing, <:AssetSets,
                                            #! Start: to delete
                                            <:DataFrame
                                            #! End: to delete
                                            } = nothing,
-                               cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
+                               cwf::ClusteringWeightFinaliser = IterativeClusteringWeightFiniliser(),
                                strict::Bool = false)
     if isa(wb, WeightBoundsConstraint)
         @smart_assert(!isnothing(sets))

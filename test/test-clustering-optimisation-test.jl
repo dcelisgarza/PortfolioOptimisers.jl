@@ -299,7 +299,7 @@
         end
         @test all(w[.!idx] .<= ub[.!idx])
 
-        cwfs = [HeuristicClusteringWeightFiniliser(),
+        cwfs = [IterativeClusteringWeightFiniliser(),
                 JuMP_ClusteringWeightFiniliser(; slv = slv),
                 JuMP_ClusteringWeightFiniliser(;
                                                alg = SquareRelativeErrorClusteringWeightFiniliser(),

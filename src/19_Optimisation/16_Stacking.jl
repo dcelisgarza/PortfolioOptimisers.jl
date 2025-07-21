@@ -13,12 +13,17 @@ struct StackingResult{T1 <: Type, T2 <: AbstractPriorResult,
     w::T7
 end
 struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                T2 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
-                T3 <: Union{Nothing, <:AssetSets,
+                T2 <: Union{Nothing, <:WeightBoundsResult, <:AbstractString, Expr,
+                            <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                            <:AbstractVector{<:Union{<:AbstractString, Expr}},
                   #! Start: to delete
-                            <:DataFrame
+                            <:WeightBoundsConstraint
                   #! End: to delete
-                  },
+                  }, T3 <: Union{Nothing, <:AssetSets,
+                       #! Start: to delete
+                                 <:DataFrame
+                       #! End: to delete
+                       },
                 T4 <: Union{<:OptimisationResult, <:OptimisationEstimator,
                             <:AbstractVector{<:Union{<:OptimisationEstimator,
                                                      <:OptimisationResult}}},
@@ -46,7 +51,13 @@ function assert_internal_optimiser(opt::Stacking)
 end
 function Stacking(;
                   pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
-                  wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = nothing,
+                  wb::Union{Nothing, <:WeightBoundsResult, <:AbstractString, Expr,
+                            <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                            <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                            #! Start: to delete
+                            <:WeightBoundsConstraint
+                            #! End: to delete
+                            } = nothing,
                   sets::Union{Nothing, <:AssetSets,
                               #! Start: to delete
                               <:DataFrame
@@ -55,7 +66,7 @@ function Stacking(;
                   opti::AbstractVector{<:Union{<:OptimisationEstimator,
                                                <:OptimisationResult}} = [MeanRisk()],
                   opto::OptimisationEstimator = MeanRisk(),
-                  cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
+                  cwf::ClusteringWeightFinaliser = IterativeClusteringWeightFiniliser(),
                   strict::Bool = false, threads::FLoops.Transducers.Executor = ThreadedEx())
     assert_external_optimiser(opto)
     if isa(wb, WeightBoundsConstraint)

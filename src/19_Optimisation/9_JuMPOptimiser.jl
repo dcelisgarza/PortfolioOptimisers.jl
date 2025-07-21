@@ -87,8 +87,13 @@ function Base.getproperty(r::JuMPOptimisationFactorRiskContributionResult, sym::
 end
 struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                      T2 <: Union{<:Solver, <:AbstractVector{<:Solver}},
-                     T3 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
-                     T4 <: Union{Nothing, <:Real, <:BudgetRange, <:BudgetCosts},
+                     T3 <: Union{Nothing, <:WeightBoundsResult, <:AbstractString, Expr,
+                                 <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                 <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                       #! Start: to delete
+                                 <:WeightBoundsConstraint
+                       #! End: to delete
+                       }, T4 <: Union{Nothing, <:Real, <:BudgetRange, <:BudgetCosts},
                      T5 <: Union{Nothing, <:Real, <:BudgetRange},
                      T6 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                      T7 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
@@ -183,7 +188,13 @@ end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                        slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                       wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = WeightBoundsResult(),
+                       wb::Union{Nothing, <:WeightBoundsResult, <:AbstractString, Expr,
+                                 <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                 <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                 #! Start: to delete
+                                 <:WeightBoundsConstraint
+                                 #! End: to delete
+                                 } = WeightBoundsResult(),
                        bgt::Union{Nothing, <:Real, <:BudgetConstraintEstimator} = 1.0,
                        sbgt::Union{Nothing, <:Real, <:BudgetRange} = nothing,
                        lt::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,

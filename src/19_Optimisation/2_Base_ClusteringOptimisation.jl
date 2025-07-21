@@ -5,12 +5,12 @@ Base.length(::BaseOptimisationEstimator) = 1
 function Base.iterate(::BaseOptimisationEstimator, state = 1)
     return state > 1 ? nothing : (:BaseOptimisationEstimator, state + 1)
 end
-struct HeuristicClusteringWeightFiniliser{T1 <: Integer} <: ClusteringWeightFinaliser
+struct IterativeClusteringWeightFiniliser{T1 <: Integer} <: ClusteringWeightFinaliser
     iter::T1
 end
-function HeuristicClusteringWeightFiniliser(; iter::Integer = 100)
+function IterativeClusteringWeightFiniliser(; iter::Integer = 100)
     @smart_assert(iter > 0)
-    return HeuristicClusteringWeightFiniliser{typeof(iter)}(iter)
+    return IterativeClusteringWeightFiniliser{typeof(iter)}(iter)
 end
 abstract type JuMP_ClusteringWeightFiniliserFormulation <: AbstractAlgorithm end
 struct RelativeErrorClusteringWeightFiniliser <: JuMP_ClusteringWeightFiniliserFormulation end
@@ -112,10 +112,10 @@ function opt_weight_bounds(cwf::JuMP_ClusteringWeightFiniliser, wb::WeightBounds
         value.(model[:w])
     else
         @warn("Version: $(cwf.alg)\nReverting to Heuristic type.")
-        opt_weight_bounds(HeuristicClusteringWeightFiniliser(), wb, wi)
+        opt_weight_bounds(IterativeClusteringWeightFiniliser(), wb, wi)
     end
 end
-function opt_weight_bounds(cwf::HeuristicClusteringWeightFiniliser, wb::WeightBoundsResult,
+function opt_weight_bounds(cwf::IterativeClusteringWeightFiniliser, wb::WeightBoundsResult,
                            w::AbstractVector)
     lb = wb.lb
     ub = wb.ub
@@ -152,6 +152,6 @@ function clustering_optimisation_result(cwf::ClusteringWeightFinaliser,
     return retcode, w
 end
 
-export HeuristicClusteringWeightFiniliser, RelativeErrorClusteringWeightFiniliser,
+export IterativeClusteringWeightFiniliser, RelativeErrorClusteringWeightFiniliser,
        SquareRelativeErrorClusteringWeightFiniliser, AbsoluteErrorClusteringWeightFiniliser,
        SquareAbsoluteErrorClusteringWeightFiniliser, JuMP_ClusteringWeightFiniliser

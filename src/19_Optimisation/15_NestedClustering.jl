@@ -15,13 +15,17 @@ struct NestedClusteringResult{T1 <: Type, T2 <: AbstractPriorResult,
 end
 struct NestedClustering{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                         T2 <: Union{<:ClusteringEstimator, <:AbstractClusteringResult},
-                        T3 <:
-                        Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
-                        T4 <: Union{Nothing, <:AssetSets,
+                        T3 <: Union{Nothing, <:WeightBoundsResult, <:AbstractString, Expr,
+                                    <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                    <:AbstractVector{<:Union{<:AbstractString, Expr}},
                           #! Start: to delete
-                                    <:DataFrame
+                                    <:WeightBoundsConstraint
                           #! End: to delete
-                          }, T5 <: OptimisationEstimator, T6 <: OptimisationEstimator,
+                          }, T4 <: Union{Nothing, <:AssetSets,
+                               #! Start: to delete
+                                         <:DataFrame
+                               #! End: to delete
+                               }, T5 <: OptimisationEstimator, T6 <: OptimisationEstimator,
                         T7 <: ClusteringWeightFinaliser, T8 <: Bool,
                         T9 <: FLoops.Transducers.Executor} <:
        ClusteringOptimisationEstimator
@@ -80,15 +84,21 @@ end
 function NestedClustering(;
                           pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
                           cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult} = ClusteringEstimator(),
-                          wb::Union{Nothing, <:WeightBoundsResult,
-                                    <:WeightBoundsConstraint} = nothing,
+                          wb::Union{Nothing, <:WeightBoundsResult, <:AbstractString, Expr,
+                                    <:AbstractVector{<:AbstractString},
+                                    <:AbstractVector{Expr},
+                                    <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                    #! Start: to delete          
+                                    <:WeightBoundsConstraint
+                                    #! End: to delete
+                                    } = nothing,
                           sets::Union{Nothing, <:AssetSets,
                                       #! Start: to delete
                                       <:DataFrame
                                       #! End: to delete
                                       } = nothing, opti::OptimisationEstimator = MeanRisk(),
                           opto::OptimisationEstimator = opti,
-                          cwf::ClusteringWeightFinaliser = HeuristicClusteringWeightFiniliser(),
+                          cwf::ClusteringWeightFinaliser = IterativeClusteringWeightFiniliser(),
                           strict::Bool = false,
                           threads::FLoops.Transducers.Executor = ThreadedEx())
     assert_external_optimiser(opto)
@@ -121,7 +131,15 @@ function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
                             threads = nco.threads)
 end
 function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsResult,
-                                               <:WeightBoundsConstraint},
+                                               <:AbstractString, Expr,
+                                               <:AbstractVector{<:AbstractString},
+                                               <:AbstractVector{Expr},
+                                               <:AbstractVector{<:Union{<:AbstractString,
+                                                                        Expr}},
+                                               #! Start: to delete
+                                               <:WeightBoundsConstraint
+                                               #! End: to delete
+                                               },
                                      sets::Union{Nothing, <:AssetSets,
                                                  #! Start: to delete
                                                  <:DataFrame
