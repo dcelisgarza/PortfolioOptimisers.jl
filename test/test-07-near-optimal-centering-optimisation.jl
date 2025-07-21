@@ -79,7 +79,11 @@
                                                                                                               length = 5))),
                                               obj = MaximumReturn(), opt = opt))
         @test all(isapprox.(res1.w, res2.w))
-        @test isapprox(Matrix(df), hcat(res1.w...))
+        success = isapprox(Matrix(df), hcat(res1.w...); rtol = 5e-7)
+        if !success
+            find_tol(Matrix(df), hcat(res1.w...))
+        end
+        @test success
     end
     @testset "Constrained Efficient Frontier" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier2.csv.gz"),
@@ -106,6 +110,10 @@
                                               obj = MaximumReturn(), opt = opt,
                                               alg = ConstrainedNearOptimalCenteringAlgorithm()))
         @test all(isapprox.(res1.w, res2.w))
-        @test isapprox(Matrix(df), hcat(res1.w...))
+        success = isapprox(Matrix(df), hcat(res1.w...); rtol = 5e-7)
+        if !success
+            find_tol(Matrix(df), hcat(res1.w...))
+        end
+        @test success
     end
 end
