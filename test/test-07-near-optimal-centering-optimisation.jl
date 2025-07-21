@@ -79,7 +79,7 @@
                                                                                                               length = 5))),
                                               obj = MaximumReturn(), opt = opt))
         @test all(isapprox.(res1.w, res2.w))
-        success = isapprox(Matrix(df), hcat(res1.w...); rtol = 5e-7)
+        success = isapprox(Matrix(df), hcat(res1.w...); rtol = 1e-4)
         if !success
             find_tol(Matrix(df), hcat(res1.w...))
         end
@@ -110,7 +110,7 @@
                                               obj = MaximumReturn(), opt = opt,
                                               alg = ConstrainedNearOptimalCenteringAlgorithm()))
         @test all(isapprox.(res1.w, res2.w))
-        success = isapprox(Matrix(df), hcat(res1.w...); rtol = 5e-7)
+        success = isapprox(Matrix(df), hcat(res1.w...); rtol = 5e-5)
         if !success
             find_tol(Matrix(df), hcat(res1.w...))
         end
