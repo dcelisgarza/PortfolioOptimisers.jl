@@ -24,7 +24,8 @@
     @testset "OWA l-moments" begin
         slv = Solver(; solver = Clarabel.Optimizer,
                      settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
-        owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_l_moment_weights.csv"), DataFrame)
+        owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_l_moment_weights.csv.gz"),
+                         DataFrame)
         owas = [NormalisedConstantRelativeRiskAversion(; g = 0.75),
                 NormalisedConstantRelativeRiskAversion(),
                 NormalisedConstantRelativeRiskAversion(; g = 0.25),
@@ -63,7 +64,7 @@
         @test_throws AssertionError OWAJuMPEstimator(slv = Solver[])
     end
     @testset "OWA weight vectors" begin
-        owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_weights.csv"), DataFrame)
+        owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_weights.csv.gz"), DataFrame)
         @test isapprox(owa_gmd(100), owa_t[!, 1])
         @test isapprox(owa_cvar(100), owa_t[!, 2])
         @test isapprox(owa_tg(100), owa_t[!, 3])

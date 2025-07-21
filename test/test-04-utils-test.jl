@@ -27,7 +27,7 @@
         X2 = rd.X
         F2 = rd.F
 
-        df = CSV.read(joinpath(@__DIR__, "assets/prices_to_returns_X_F.csv"), DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "assets/prices_to_returns_X_F.csv.gz"), DataFrame)
         @test hcat(vcat(X1, X2), vcat(F1, F2)) == Matrix(df)
 
         rd = prices_to_returns(Px; missing_col_percent = 0.1, missing_row_percent = 0.5)
@@ -42,7 +42,7 @@
         F4 = rd.F
         @test isnothing(F4)
 
-        df = CSV.read(joinpath(@__DIR__, "assets/prices_to_returns_X.csv"), DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "assets/prices_to_returns_X.csv.gz"), DataFrame)
         @test vcat(X3, X4) == Matrix(df)
 
         @test dfy[2:end, :date] == ts1 == ts2 == ts3 == ts4
