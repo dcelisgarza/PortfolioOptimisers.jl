@@ -337,7 +337,7 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVariance,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; rd::ReturnsResult, kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
@@ -346,7 +346,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
     X = pr.X
     r_sigma = r.sigma
     sigma = pr.sigma
-    ucs_variance_risk, key = set_ucs_variance_risk!(model, i, sigma_ucs(ucs, X; kwargs...),
+    ucs_variance_risk, key = set_ucs_variance_risk!(model, i,
+                                                    sigma_ucs(ucs, rd.X, rd.F; kwargs...),
                                                     r_sigma, sigma)
     set_risk_bounds_and_expression!(model, opt, ucs_variance_risk, r.settings, key)
     return nothing

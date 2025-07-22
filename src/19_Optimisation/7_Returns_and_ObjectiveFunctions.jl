@@ -191,12 +191,12 @@ function set_return_constraints!(model::JuMP.Model,
                                  pret::ArithmeticReturn{<:Union{<:AbstractUncertaintySetResult,
                                                                 <:AbstractUncertaintySetEstimator},
                                                         <:Any}, obj::ObjectiveFunction,
-                                 pr::AbstractPriorResult; kwargs...)
+                                 pr::AbstractPriorResult; rd::ReturnsResult, kwargs...)
     lb = pret.lb
     ucs = pret.ucs
     X = pr.X
     mu = pr.mu
-    set_ucs_return_constraints!(model, mu_ucs(ucs, X; kwargs...), mu)
+    set_ucs_return_constraints!(model, mu_ucs(ucs, rd.X, rd.F; kwargs...), mu)
     set_max_ratio_return_constraints!(model, obj, mu)
     set_return_bounds!(model, lb)
     return nothing

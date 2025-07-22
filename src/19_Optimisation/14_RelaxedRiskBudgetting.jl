@@ -142,7 +142,7 @@ function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult
     set_l2_regularisation!(model, rrb.opt.l2)
     set_non_fixed_fees!(model, rrb.opt.fees)
     set_relaxed_risk_budgetting_constraints!(model, rrb, pr.sigma)
-    set_return_constraints!(model, ret, MinimumRisk(), pr; iv = rd.iv, ivpa = rd.ivpa)
+    set_return_constraints!(model, ret, MinimumRisk(), pr; rd = rd)
     set_sdp_philogeny_constraints!(model, nplg, :sdp_nplg)
     set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
     add_custom_constraint!(model, rrb.opt.ccnt, rrb, pr)

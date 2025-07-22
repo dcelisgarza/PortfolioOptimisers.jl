@@ -39,7 +39,9 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorit
     q = ue.q * 0.5
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
-    Random.seed!(ue.rng, ue.seed)
+    if !isnothing(ue.seed)
+        Random.seed!(ue.rng, ue.seed)
+    end
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     sigma_l = Matrix{eltype(sigma)}(undef, N, N)
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
@@ -77,7 +79,9 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any, <:BoxUncertaintySetA
     q = ue.q * 0.5
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
-    Random.seed!(ue.rng, ue.seed)
+    if !isnothing(ue.seed)
+        Random.seed!(ue.rng, ue.seed)
+    end
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     sigma_l = Matrix{eltype(sigma)}(undef, N, N)
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
@@ -102,7 +106,9 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
     T, N = size(X)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
-    Random.seed!(ue.rng, ue.seed)
+    if !isnothing(ue.seed)
+        Random.seed!(ue.rng, ue.seed)
+    end
     X_mu = transpose(rand(ue.rng, MvNormal(mu, sigma), ue.n_sim))
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
@@ -183,7 +189,9 @@ function mu_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     T = size(X, 1)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
-    Random.seed!(ue.rng, ue.seed)
+    if !isnothing(ue.seed)
+        Random.seed!(ue.rng, ue.seed)
+    end
     X_mu = transpose(rand(ue.rng, MvNormal(mu, sigma), ue.n_sim))
     if ue.alg.diagonal
         sigma_mu = Diagonal(sigma_mu)
@@ -236,7 +244,9 @@ function sigma_ucs(ue::NormalUncertaintySetEstimator{<:Any,
     T, N = size(X)
     sigma_mu = sigma / T
     posdef!(ue.pe.ce.mp.pdm, sigma_mu)
-    Random.seed!(ue.rng, ue.seed)
+    if !isnothing(ue.seed)
+        Random.seed!(ue.rng, ue.seed)
+    end
     sigmas = rand(ue.rng, Wishart(T, sigma_mu), ue.n_sim)
     X_sigma = Array{eltype(sigma)}(undef, N, N, ue.n_sim)
     for i in axes(sigmas, 1)
