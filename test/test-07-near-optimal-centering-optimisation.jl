@@ -55,10 +55,10 @@
                                   "reduced_tol_infeas_abs" => 1e-4,
                                   "reduced_tol_infeas_rel" => 1e-4))]
     pr = prior(HighOrderPriorEstimator(), rd)
-    opt = JuMPOptimiser(; pe = pr, slv = slv)
     @testset "Unconstrained Efficient Frontier" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier1.csv.gz"),
                       DataFrame)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
         r = factory(StandardDeviation(), pr)
         res_min = optimise!(MeanRisk(; r = r, opt = opt))
         res_max = optimise!(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
@@ -107,6 +107,7 @@
     @testset "Constrained Efficient Frontier" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier3.csv.gz"),
                       DataFrame)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
         r = factory(StandardDeviation(), pr)
         res_min = optimise!(MeanRisk(; r = r, opt = opt))
         res_max = optimise!(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
