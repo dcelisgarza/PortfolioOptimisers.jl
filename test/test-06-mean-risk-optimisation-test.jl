@@ -108,5 +108,6 @@
             find_tol(res.w, df[!, i])
         end
         @test success
+        i += 1
     end
 end
