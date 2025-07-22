@@ -51,8 +51,7 @@ Here we encounter another consequence of the design philosophy of `PortfolioOpti
 
 r = LowOrderMoment(;
                    alg = LowOrderDeviation(;
-                                           alg = SecondLowerMoment(;
-                                                                   formulation = SqrtRiskExpr())))
+                                           alg = SecondLowerMoment(; alg = SqrtRiskExpr())))
 
 #=
 Since we will perform various optimisations on the same data, there's no need to redo work. Lets precompute the prior statistics using the `EmpiricalPriorEstimator` to avoid recomputing them every time we call the optimisation.

@@ -69,7 +69,6 @@ All concrete types that implement variance estimation (e.g., sample variance, ro
   - [`AbstractCovarianceEstimator`](@ref)
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
-
 function Base.show(io::IO,
                    ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                               <:AbstractCovarianceEstimator})
@@ -115,6 +114,5 @@ function Base.show(io::IO,
             println(io, "| $(typeof(val)): ", repr(val))
         end
     end
-
     return nothing
 end

@@ -67,24 +67,24 @@
           LowOrderMoment(;
                          alg = LowOrderDeviation(;
                                                  alg = SecondLowerMoment(;
-                                                                         formulation = SqrtRiskExpr())),
+                                                                         alg = SqrtRiskExpr())),
                          mu = mu),
           LowOrderMoment(;
                          alg = LowOrderDeviation(;
                                                  alg = SecondLowerMoment(;
-                                                                         formulation = SqrtRiskExpr())),
+                                                                         alg = SqrtRiskExpr())),
                          mu = rf),
           LowOrderMoment(;
                          alg = LowOrderDeviation(;
                                                  ve = SimpleVariance(; corrected = false,
                                                                      w = ew),
                                                  alg = SecondLowerMoment(;
-                                                                         formulation = SqrtRiskExpr())),
+                                                                         alg = SqrtRiskExpr())),
                          w = ew),
           LowOrderMoment(;
                          alg = LowOrderDeviation(;
                                                  alg = SecondLowerMoment(;
-                                                                         formulation = SqrtRiskExpr()))),
+                                                                         alg = SqrtRiskExpr()))),
           LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()), mu = mu),
           LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()), mu = rf),
           LowOrderMoment(;
@@ -214,18 +214,18 @@
           EqualRiskMeasure(), TurnoverRiskMeasure(; w = w1),
           TrackingRiskMeasure(; tracking = WeightsTracking(; w = w1)),
           TrackingRiskMeasure(; tracking = ReturnsTracking(; w = pr.X * w1)),
-          TrackingRiskMeasure(; formulation = NOCTracking(),
+          TrackingRiskMeasure(; alg = NOCTracking(),
                               tracking = WeightsTracking(; w = w1)),
-          TrackingRiskMeasure(; formulation = NOCTracking(),
+          TrackingRiskMeasure(; alg = NOCTracking(),
                               tracking = ReturnsTracking(; w = pr.X * w1)),
           RiskTrackingRiskMeasure(; r = StandardDeviation(),
                                   tracking = WeightsTracking(; w = w1)),
           RiskTrackingRiskMeasure(; r = Variance(), tracking = WeightsTracking(; w = w1)),
           RiskTrackingRiskMeasure(; r = StandardDeviation(),
                                   tracking = WeightsTracking(; w = w1),
-                                  formulation = DependentVariableTracking()),
+                                  alg = DependentVariableTracking()),
           RiskTrackingRiskMeasure(; r = Variance(), tracking = WeightsTracking(; w = w1),
-                                  formulation = DependentVariableTracking())]
+                                  alg = DependentVariableTracking())]
     @testset "Hierarchical Risk Parity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HRP.csv"), DataFrame)
         i = 1

@@ -124,7 +124,7 @@ opt1 = NearOptimalCentering(; r = r1, obj = obj, opt = opt)
 opt2 = NearOptimalCentering(; r = r2, obj = obj, opt = opt)
 
 #=
-Note the number of options in the estimator. In particular the `alg` property. Which in this case means the `NearOptimalCentering` formulation will not have any external constraints applied to it.
+Note the number of options in the estimator. In particular the `alg` property. Which in this case means the `NearOptimalCentering` alg will not have any external constraints applied to it.
 
 Lets optimise the portfolios.
 =#

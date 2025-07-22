@@ -9,17 +9,17 @@ function factory(alg::AbstractMomentMeasureAlgorithm, args...; kwargs...)
 end
 struct FirstLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
 abstract type DeviationLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
-struct SecondLowerMoment{T1 <: SecondMomentFormulation} <: DeviationLowerMoment
-    formulation::T1
+struct SecondLowerMoment{T1 <: SecondMomentAlgorithm} <: DeviationLowerMoment
+    alg::T1
 end
-function SecondLowerMoment(; formulation::SecondMomentFormulation = SOCRiskExpr())
-    return SecondLowerMoment{typeof(formulation)}(formulation)
+function SecondLowerMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
+    return SecondLowerMoment{typeof(alg)}(alg)
 end
-struct SecondCentralMoment{T1 <: SecondMomentFormulation} <: DeviationLowerMoment
-    formulation::T1
+struct SecondCentralMoment{T1 <: SecondMomentAlgorithm} <: DeviationLowerMoment
+    alg::T1
 end
-function SecondCentralMoment(; formulation::SecondMomentFormulation = SOCRiskExpr())
-    return SecondCentralMoment{typeof(formulation)}(formulation)
+function SecondCentralMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
+    return SecondCentralMoment{typeof(alg)}(alg)
 end
 struct MeanAbsoluteDeviation <: DeviationLowerMoment end
 struct LowOrderDeviation{T1 <: AbstractVarianceEstimator, T2 <: DeviationLowerMoment} <:

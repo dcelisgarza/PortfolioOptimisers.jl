@@ -43,24 +43,22 @@ struct ValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
     settings::T1
     alpha::T2
     w::T3
-    formulation::T4
+    alg::T4
 end
 function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alpha::Real = 0.05, w::Union{Nothing, <:AbstractWeights} = nothing,
-                     formulation::ValueatRiskFormulation = MIPValueatRisk())
+                     alg::ValueatRiskFormulation = MIPValueatRisk())
     @smart_assert(zero(alpha) < alpha < one(alpha))
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return ValueatRisk{typeof(settings), typeof(alpha), typeof(w), typeof(formulation)}(settings,
-                                                                                        alpha,
-                                                                                        w,
-                                                                                        formulation)
+    return ValueatRisk{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings,
+                                                                                alpha, w,
+                                                                                alg)
 end
 function factory(r::ValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
-    return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w,
-                       formulation = r.formulation)
+    return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w, alg = r.alg)
 end
 function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::AbstractVector)
     return -partialsort!(x, ceil(Int, r.alpha * length(x)))
@@ -82,24 +80,24 @@ struct ValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
     alpha::T2
     beta::T3
     w::T4
-    formulation::T5
+    alg::T5
 end
 function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                           alpha::Real = 0.05, beta::Real = 0.05,
                           w::Union{Nothing, <:AbstractWeights} = nothing,
-                          formulation::ValueatRiskFormulation = MIPValueatRisk())
+                          alg::ValueatRiskFormulation = MIPValueatRisk())
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(beta) < beta < one(beta))
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
     return ValueatRiskRange{typeof(settings), typeof(alpha), typeof(beta), typeof(w),
-                            typeof(formulation)}(settings, alpha, beta, w, formulation)
+                            typeof(alg)}(settings, alpha, beta, w, alg)
 end
 function factory(r::ValueatRiskRange, prior::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w,
-                            formulation = r.formulation)
+                            alg = r.alg)
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::AbstractVector)
     loss = -partialsort!(x, ceil(Int, r.alpha * length(x)))

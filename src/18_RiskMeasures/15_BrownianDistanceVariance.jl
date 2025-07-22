@@ -5,15 +5,14 @@ struct BrownianDistanceVariance{T1 <: RiskMeasureSettings,
                                 T2 <: Union{<:RSOCRiskExpr, <:QuadRiskExpr},
                                 T3 <: BrownianDistanceVarianceFormulation} <: RiskMeasure
     settings::T1
-    formulation::T2
-    cformulation::T3
+    alg::T2
+    algc::T3
 end
 function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                  formulation::Union{<:RSOCRiskExpr, <:QuadRiskExpr} = RSOCRiskExpr(),
-                                  cformulation::BrownianDistanceVarianceFormulation = IneqBrownianDistanceVariance())
-    return BrownianDistanceVariance{typeof(settings), typeof(formulation),
-                                    typeof(cformulation)}(settings, formulation,
-                                                          cformulation)
+                                  alg::Union{<:RSOCRiskExpr, <:QuadRiskExpr} = RSOCRiskExpr(),
+                                  algc::BrownianDistanceVarianceFormulation = IneqBrownianDistanceVariance())
+    return BrownianDistanceVariance{typeof(settings), typeof(alg), typeof(algc)}(settings,
+                                                                                 alg, algc)
 end
 function (::BrownianDistanceVariance)(x::AbstractVector)
     T = length(x)

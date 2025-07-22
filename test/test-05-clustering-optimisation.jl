@@ -81,6 +81,7 @@
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i]; rtol = 5e-7)
             if !success
+                println("Counter: $i")
                 find_tol(res.w, df[!, i])
             end
             @test success
@@ -101,6 +102,7 @@
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i])
             if !success
+                println("Counter: $i")
                 find_tol(res.w, df[!, i])
             end
             @test success
@@ -184,6 +186,7 @@
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i])
             if !success
+                println("Counter parallel: $i")
                 find_tol(res.w, df[!, i])
             end
             @test success
@@ -197,6 +200,7 @@
             @test isa(res.retcode, OptimisationSuccess)
             success = isapprox(res.w, df[!, i])
             if !success
+                println("Counter serial: $i")
                 find_tol(res.w, df[!, i])
             end
             @test success

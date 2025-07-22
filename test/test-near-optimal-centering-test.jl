@@ -67,11 +67,11 @@
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = SqrtRiskExpr()))),
+                                                                                 alg = SqrtRiskExpr()))),
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = SqrtRiskExpr()))),
+                                                                                   alg = SqrtRiskExpr()))),
                   NegativeSkewness(; settings = RiskMeasureSettings(;)),
                   ConditionalValueatRisk(;)]
         risks2 = [StandardDeviation(;
@@ -80,11 +80,11 @@
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = SqrtRiskExpr()))),
+                                                                                 alg = SqrtRiskExpr()))),
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = SqrtRiskExpr()))),
+                                                                                   alg = SqrtRiskExpr()))),
                   NegativeSkewness(;
                                    settings = RiskMeasureSettings(; ub = Frontier(; N = 3))),
                   ConditionalValueatRisk(;
@@ -291,7 +291,7 @@
                                                                            length = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = SqrtRiskExpr()))),
+                                                                                 alg = SqrtRiskExpr()))),
                   LowOrderMoment(;
                                  settings = RiskMeasureSettings(;
                                                                 ub = range(;
@@ -300,7 +300,7 @@
                                                                            length = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = SqrtRiskExpr()))),
+                                                                                   alg = SqrtRiskExpr()))),
                   NegativeSkewness(;
                                    settings = RiskMeasureSettings(;
                                                                   ub = range(;

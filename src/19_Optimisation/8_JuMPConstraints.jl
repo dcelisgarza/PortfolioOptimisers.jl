@@ -758,7 +758,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
     net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(te.tracking, X)
     err = te.err
-    f = err * sqrt(size(X, 1) - te.formulation.ddof)
+    f = err * sqrt(size(X, 1) - te.alg.ddof)
     t_te = model[Symbol(:t_te_, i)] = @variable(model)
     te = model[Symbol(:te_, i)] = @expression(model, net_X - wb * k)
     model[Symbol(:cte_soc_, i)], model[Symbol(:cte_, i)] = @constraints(model,

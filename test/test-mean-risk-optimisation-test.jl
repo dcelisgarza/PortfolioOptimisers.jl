@@ -87,77 +87,77 @@
         rets1 = [ArithmeticReturn(), KellyReturn()]
         rets2 = [ArithmeticReturn(; lb = Frontier(; N = 3)),
                  KellyReturn(; lb = Frontier(; N = 3))]
-        risks1 = [Variance(; formulation = QuadRiskExpr()),
+        risks1 = [Variance(; alg = QuadRiskExpr()),
                   Variance(; settings = RiskMeasureSettings(;)),
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = SqrtRiskExpr()))),
+                                                                                 alg = SqrtRiskExpr()))),
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = QuadRiskExpr()))),
+                                                                                 alg = QuadRiskExpr()))),
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = RSOCRiskExpr()))),
+                                                                                 alg = RSOCRiskExpr()))),
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = SOCRiskExpr()))),
+                                                                                 alg = SOCRiskExpr()))),
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = SqrtRiskExpr()))),
+                                                                                   alg = SqrtRiskExpr()))),
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = QuadRiskExpr()))),
+                                                                                   alg = QuadRiskExpr()))),
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = RSOCRiskExpr()))),
+                                                                                   alg = RSOCRiskExpr()))),
                   LowOrderMoment(;
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = SOCRiskExpr()))),
+                                                                                   alg = SOCRiskExpr()))),
                   NegativeSkewness(; settings = RiskMeasureSettings(;)),
                   NegativeSkewness(; alg = QuadRiskExpr()), ConditionalValueatRisk(;)]
         risks2 = [Variance(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
-                           formulation = QuadRiskExpr()),
+                           alg = QuadRiskExpr()),
                   Variance(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3))),
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = SqrtRiskExpr()))),
+                                                                                 alg = SqrtRiskExpr()))),
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = QuadRiskExpr()))),
+                                                                                 alg = QuadRiskExpr()))),
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = RSOCRiskExpr()))),
+                                                                                 alg = RSOCRiskExpr()))),
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = SOCRiskExpr()))),
+                                                                                 alg = SOCRiskExpr()))),
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = SqrtRiskExpr()))),
+                                                                                   alg = SqrtRiskExpr()))),
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = QuadRiskExpr()))),
+                                                                                   alg = QuadRiskExpr()))),
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = RSOCRiskExpr()))),
+                                                                                   alg = RSOCRiskExpr()))),
                   LowOrderMoment(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = SOCRiskExpr()))),
+                                                                                   alg = SOCRiskExpr()))),
                   NegativeSkewness(;
                                    settings = RiskMeasureSettings(; ub = Frontier(; N = 3))),
                   NegativeSkewness(;
@@ -259,7 +259,7 @@
                                                                      start = 6.866856440213463e-5,
                                                                      stop = 0.0020770775356002027,
                                                                      length = 3)),
-                           formulation = QuadRiskExpr()),
+                           alg = QuadRiskExpr()),
                   Variance(;
                            settings = RiskMeasureSettings(;
                                                           ub = range(;
@@ -274,7 +274,7 @@
                                                                            length = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = SqrtRiskExpr()))),
+                                                                                 alg = SqrtRiskExpr()))),
                   LowOrderMoment(;
                                  settings = RiskMeasureSettings(;
                                                                 ub = range(;
@@ -283,7 +283,7 @@
                                                                            length = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = QuadRiskExpr()))),
+                                                                                 alg = QuadRiskExpr()))),
                   LowOrderMoment(;
                                  settings = RiskMeasureSettings(;
                                                                 ub = range(;
@@ -292,7 +292,7 @@
                                                                            length = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = RSOCRiskExpr()))),
+                                                                                 alg = RSOCRiskExpr()))),
                   LowOrderMoment(;
                                  settings = RiskMeasureSettings(;
                                                                 ub = range(;
@@ -301,7 +301,7 @@
                                                                            length = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondLowerMoment(;
-                                                                                 formulation = SOCRiskExpr()))),
+                                                                                 alg = SOCRiskExpr()))),
                   LowOrderMoment(;
                                  settings = RiskMeasureSettings(;
                                                                 ub = range(;
@@ -310,7 +310,7 @@
                                                                            length = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = SqrtRiskExpr()))),
+                                                                                   alg = SqrtRiskExpr()))),
                   LowOrderMoment(;
                                  settings = RiskMeasureSettings(;
                                                                 ub = range(;
@@ -319,7 +319,7 @@
                                                                            length = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = QuadRiskExpr()))),
+                                                                                   alg = QuadRiskExpr()))),
                   LowOrderMoment(;
                                  settings = RiskMeasureSettings(;
                                                                 ub = range(;
@@ -328,7 +328,7 @@
                                                                            length = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = RSOCRiskExpr()))),
+                                                                                   alg = RSOCRiskExpr()))),
                   LowOrderMoment(;
                                  settings = RiskMeasureSettings(;
                                                                 ub = range(;
@@ -337,7 +337,7 @@
                                                                            length = 3)),
                                  alg = LowOrderDeviation(;
                                                          alg = SecondCentralMoment(;
-                                                                                   formulation = SOCRiskExpr()))),
+                                                                                   alg = SOCRiskExpr()))),
                   NegativeSkewness(;
                                    settings = RiskMeasureSettings(;
                                                                   ub = range(;
@@ -414,7 +414,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv"), DataFrame)
         pw = pweights(collect(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
                                     length = size(pr.X, 1))))
-        rs = [Variance(; sigma = sigma, formulation = QuadRiskExpr()), Variance(),
+        rs = [Variance(; sigma = sigma, alg = QuadRiskExpr()), Variance(),
               UncertaintySetVariance(; sigma = sigma, ucs = ucs1),
               UncertaintySetVariance(; ucs = ucs2), StandardDeviation(; sigma = sigma),
               StandardDeviation(), LowOrderMoment(; mu = mu), LowOrderMoment(; mu = rf),
@@ -422,12 +422,12 @@
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr())),
+                                                                             alg = SqrtRiskExpr())),
                              mu = mu),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr())),
+                                                                             alg = SqrtRiskExpr())),
                              mu = rf),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
@@ -435,12 +435,12 @@
                                                                          corrected = false,
                                                                          w = pw),
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr())),
+                                                                             alg = SqrtRiskExpr())),
                              w = pw),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = SqrtRiskExpr()))),
+                                                                             alg = SqrtRiskExpr()))),
               LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
                              mu = mu),
               LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment()),
@@ -455,12 +455,12 @@
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = QuadRiskExpr())),
+                                                                             alg = QuadRiskExpr())),
                              mu = mu),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = QuadRiskExpr())),
+                                                                             alg = QuadRiskExpr())),
                              mu = rf),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
@@ -468,21 +468,21 @@
                                                                          corrected = false,
                                                                          w = pw),
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = QuadRiskExpr())),
+                                                                             alg = QuadRiskExpr())),
                              w = pw),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = QuadRiskExpr()))),
+                                                                             alg = QuadRiskExpr()))),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = RSOCRiskExpr())),
+                                                                             alg = RSOCRiskExpr())),
                              mu = mu),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = RSOCRiskExpr())),
+                                                                             alg = RSOCRiskExpr())),
                              mu = rf),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
@@ -490,12 +490,12 @@
                                                                          corrected = false,
                                                                          w = pw),
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = RSOCRiskExpr())),
+                                                                             alg = RSOCRiskExpr())),
                              w = pw),
               LowOrderMoment(;
                              alg = LowOrderDeviation(;
                                                      alg = SecondLowerMoment(;
-                                                                             formulation = RSOCRiskExpr()))),
+                                                                             alg = RSOCRiskExpr()))),
               LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu),
               LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = rf),
               LowOrderMoment(; alg = MeanAbsoluteDeviation(), w = ew),
@@ -504,14 +504,14 @@
               SquareRootKurtosis(; kt = kt, N = 2), NegativeSkewness(),
               NegativeSkewness(; alg = QuadRiskExpr()), NegativeSkewness(; sk = sk, V = V),
               NegativeSkewness(; alg = QuadRiskExpr(), sk = sk, V = V),
-              ValueatRisk(; formulation = DistributionValueatRisk()),
-              ValueatRisk(; formulation = DistributionValueatRisk(; dist = TDist(30))),
-              ValueatRisk(; formulation = DistributionValueatRisk(; dist = Laplace())),
-              ValueatRiskRange(; beta = 0.2, formulation = DistributionValueatRisk()),
+              ValueatRisk(; alg = DistributionValueatRisk()),
+              ValueatRisk(; alg = DistributionValueatRisk(; dist = TDist(30))),
+              ValueatRisk(; alg = DistributionValueatRisk(; dist = Laplace())),
+              ValueatRiskRange(; beta = 0.2, alg = DistributionValueatRisk()),
               ValueatRiskRange(; beta = 0.2,
-                               formulation = DistributionValueatRisk(; dist = TDist(30))),
+                               alg = DistributionValueatRisk(; dist = TDist(30))),
               ValueatRiskRange(; beta = 0.2,
-                               formulation = DistributionValueatRisk(; dist = Laplace())),
+                               alg = DistributionValueatRisk(; dist = Laplace())),
               ConditionalValueatRisk(;), ConditionalValueatRisk(; w = pw),
               DistributionallyRobustConditionalValueatRisk(; l = 1.7, r = 3e-4),
               DistributionallyRobustConditionalValueatRisk(; l = 1.7, r = 3e-4, w = pw),
@@ -1289,7 +1289,7 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
-                            te = TrackingError(; formulation = NOCTracking(), err = 0,
+                            te = TrackingError(; alg = NOCTracking(), err = 0,
                                                tracking = WeightsTracking(; w = eqw)))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w = optimise!(mre, rd).w
@@ -1297,7 +1297,7 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
-                            te = TrackingError(; formulation = NOCTracking(), err = 6e-3,
+                            te = TrackingError(; alg = NOCTracking(), err = 6e-3,
                                                tracking = WeightsTracking(; w = eqw)))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w = optimise!(mre, rd).w
@@ -1305,7 +1305,7 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
-                            te = TrackingError(; formulation = NOCTracking(), err = 6e-3,
+                            te = TrackingError(; alg = NOCTracking(), err = 6e-3,
                                                tracking = WeightsTracking(; w = eqw)))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w

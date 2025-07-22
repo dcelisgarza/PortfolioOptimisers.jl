@@ -3,17 +3,16 @@ struct RiskTrackingError{T1 <: WeightsTracking, T2 <: AbstractBaseRiskMeasure, T
     tracking::T1
     r::T2
     err::T3
-    formulation::T4
+    alg::T4
 end
 function RiskTrackingError(; tracking::WeightsTracking,
                            r::AbstractBaseRiskMeasure = Variance(), err::Real = 0.0,
-                           formulation::VariableTracking = IndependentVariableTracking())
+                           alg::VariableTracking = IndependentVariableTracking())
     @smart_assert(isfinite(err) && err >= zero(err))
     r = no_bounds_no_risk_expr_risk_measure(r)
-    return RiskTrackingError{typeof(tracking), typeof(r), typeof(err), typeof(formulation)}(tracking,
-                                                                                            r,
-                                                                                            err,
-                                                                                            formulation)
+    return RiskTrackingError{typeof(tracking), typeof(r), typeof(err), typeof(alg)}(tracking,
+                                                                                    r, err,
+                                                                                    alg)
 end
 function tracking_view(::Nothing, args...)
     return nothing
@@ -21,48 +20,46 @@ end
 function tracking_view(tracking::RiskTrackingError, i::AbstractVector, X::AbstractMatrix)
     return RiskTrackingError(; tracking = tracking_view(tracking.tracking, i),
                              r = risk_measure_view(tracking.r, i, X), err = tracking.err,
-                             formulation = tracking.formulation)
+                             alg = tracking.alg)
 end
 function factory(tracking::RiskTrackingError, prior::AbstractPriorResult, args...;
                  kwargs...)
     return RiskTrackingError(; tracking = tracking.tracking,
                              r = factory(tracking.r, prior, args...; kwargs...),
-                             err = tracking.err, formulation = tracking.formulation)
+                             err = tracking.err, alg = tracking.alg)
 end
 function factory(tracking::RiskTrackingError, w::AbstractVector)
     return RiskTrackingError(; tracking = factory(tracking.tracking, w), r = tracking.r,
-                             err = tracking.err, formulation = tracking.formulation)
+                             err = tracking.err, alg = tracking.alg)
 end
 struct TrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: AbstractTrackingAlgorithm,
                            T3 <: NormTracking} <: RiskMeasure
     settings::T1
     tracking::T2
-    formulation::T3
+    alg::T3
 end
 function TrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              tracking::AbstractTrackingAlgorithm,
-                             formulation::NormTracking = SOCTracking())
-    return TrackingRiskMeasure{typeof(settings), typeof(tracking), typeof(formulation)}(settings,
-                                                                                        tracking,
-                                                                                        formulation)
+                             alg::NormTracking = SOCTracking())
+    return TrackingRiskMeasure{typeof(settings), typeof(tracking), typeof(alg)}(settings,
+                                                                                tracking,
+                                                                                alg)
 end
 function (r::TrackingRiskMeasure)(w::AbstractVector, X::AbstractMatrix,
                                   fees::Union{Nothing, <:Fees} = nothing)
     benchmark = tracking_benchmark(r.tracking, X)
-    return norm_tracking(r.formulation, calc_net_returns(w, X, fees), benchmark, size(X, 1))
+    return norm_tracking(r.alg, calc_net_returns(w, X, fees), benchmark, size(X, 1))
 end
 function risk_measure_view(r::TrackingRiskMeasure, i::AbstractVector, args...)
     tracking = tracking_view(r.tracking, i)
-    return TrackingRiskMeasure(; settings = r.settings, tracking = tracking,
-                               formulation = r.formulation)
+    return TrackingRiskMeasure(; settings = r.settings, tracking = tracking, alg = r.alg)
 end
 function factory(r::TrackingRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
-    return TrackingRiskMeasure(; settings = r.settings, tracking = r.tracking,
-                               formulation = r.formulation)
+    return TrackingRiskMeasure(; settings = r.settings, tracking = r.tracking, alg = r.alg)
 end
 function factory(r::TrackingRiskMeasure, w::AbstractVector)
     return TrackingRiskMeasure(; settings = r.settings, tracking = factory(r.tracking, w),
-                               formulation = r.formulation)
+                               alg = r.alg)
 end
 struct RiskTrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: WeightsTracking,
                                T3 <: AbstractBaseRiskMeasure, T4 <: VariableTracking} <:
@@ -70,15 +67,15 @@ struct RiskTrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: WeightsTracking,
     settings::T1
     tracking::T2
     r::T3
-    formulation::T4
+    alg::T4
 end
 function RiskTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  tracking::WeightsTracking,
                                  r::AbstractBaseRiskMeasure = Variance(),
-                                 formulation::VariableTracking = IndependentVariableTracking())
+                                 alg::VariableTracking = IndependentVariableTracking())
     r = no_bounds_no_risk_expr_risk_measure(r)
     return RiskTrackingRiskMeasure{typeof(settings), typeof(tracking), typeof(r),
-                                   typeof(formulation)}(settings, tracking, r, formulation)
+                                   typeof(alg)}(settings, tracking, r, alg)
 end
 function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
                                      <:IndependentVariableTracking})(w::AbstractVector,
@@ -102,18 +99,15 @@ end
 function risk_measure_view(r::RiskTrackingRiskMeasure, i::AbstractVector, X::AbstractMatrix)
     tracking = tracking_view(r.tracking, i)
     return RiskTrackingRiskMeasure(; settings = r.settings, tracking = tracking,
-                                   r = risk_measure_view(r.r, i, X),
-                                   formulation = r.formulation)
+                                   r = risk_measure_view(r.r, i, X), alg = r.alg)
 end
 function factory(r::RiskTrackingRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
     return RiskTrackingRiskMeasure(; settings = r.settings, tracking = r.tracking,
-                                   r = factory(r.r, prior, args...; kwargs...),
-                                   formulation = r.formulation)
+                                   r = factory(r.r, prior, args...; kwargs...), alg = r.alg)
 end
 function factory(r::RiskTrackingRiskMeasure, w::AbstractVector)
     return RiskTrackingRiskMeasure(; settings = r.settings,
-                                   tracking = factory(r.tracking, w), r = r.r,
-                                   formulation = r.formulation)
+                                   tracking = factory(r.tracking, w), r = r.r, alg = r.alg)
 end
 
 export SOCTracking, NOCTracking, IndependentVariableTracking, DependentVariableTracking,

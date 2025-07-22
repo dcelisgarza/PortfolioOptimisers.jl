@@ -65,24 +65,23 @@ struct TrackingError{T1 <: AbstractTrackingAlgorithm, T2 <: Real, T3 <: NormTrac
        AbstractTracking
     tracking::T1
     err::T2
-    formulation::T3
+    alg::T3
 end
 function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
-                       formulation::NormTracking = SOCTracking())
+                       alg::NormTracking = SOCTracking())
     @smart_assert(isfinite(err) && err >= zero(err))
-    return TrackingError{typeof(tracking), typeof(err), typeof(formulation)}(tracking, err,
-                                                                             formulation)
+    return TrackingError{typeof(tracking), typeof(err), typeof(alg)}(tracking, err, alg)
 end
 function tracking_view(tracking::TrackingError, i::AbstractVector, args...)
     return TrackingError(; tracking = tracking_view(tracking.tracking, i),
-                         err = tracking.err, formulation = tracking.formulation)
+                         err = tracking.err, alg = tracking.alg)
 end
 function tracking_view(tracking::AbstractVector{<:AbstractTracking}, args...)
     return [tracking_view(t, args...) for t in tracking]
 end
 function factory(tracking::TrackingError, w::AbstractVector)
     return TrackingError(; tracking = factory(tracking.tracking, w), err = tracking.err,
-                         formulation = tracking.formulation)
+                         alg = tracking.alg)
 end
 
 export WeightsTracking, ReturnsTracking, TrackingError
