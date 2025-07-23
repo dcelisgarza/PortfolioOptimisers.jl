@@ -23,6 +23,8 @@
     end
     rng = StableRNG(123456789)
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end],
+                           TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
     ew = eweights(1:252, inv(252); scale = true)
     fw = fweights(rand(rng, 252))
@@ -54,7 +56,7 @@
             success = isapprox(vec(mu), df[!, i])
             if !success
                 println("Counter: $i")
-                find_tol(res.w, df[!, i])
+                find_tol(mu, df[!, i])
             end
             @test success
         end
@@ -141,5 +143,29 @@
             end
             @test success
         end
+    end
+    res = [StepwiseRegression(; alg = Forward()),
+           StepwiseRegression(; alg = Forward(), crit = AIC()),
+           StepwiseRegression(; alg = Forward(), crit = AICC()),
+           StepwiseRegression(; alg = Forward(), crit = BIC()),
+           StepwiseRegression(; alg = Forward(), crit = RSquared()),
+           StepwiseRegression(; alg = Forward(), crit = AdjustedRSquared()),
+           StepwiseRegression(; alg = Backward()),
+           StepwiseRegression(; alg = Backward(), crit = AIC()),
+           StepwiseRegression(; alg = Backward(), crit = AICC()),
+           StepwiseRegression(; alg = Backward(), crit = BIC()),
+           StepwiseRegression(; alg = Backward(), crit = RSquared()),
+           StepwiseRegression(; alg = Backward(), crit = AdjustedRSquared()),
+           DimensionReductionRegression(), DimensionReductionRegression(; drtgt = PPCA())]
+    df = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv.gz"), DataFrame)
+    for (i, re) in pairs(res)
+        loadings = regression(re, rd.X, rd.F)
+        lt = [loadings.b; vec(loadings.M)]
+        success = isapprox(lt, df[!, i])
+        if !success
+            println("Counter: $i")
+            find_tol(lt, df[!, i])
+        end
+        @test success
     end
 end
