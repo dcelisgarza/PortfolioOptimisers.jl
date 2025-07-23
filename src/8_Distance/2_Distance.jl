@@ -4,6 +4,7 @@ end
 function Distance(; alg::AbstractDistanceAlgorithm = SimpleDistance())
     return Distance{typeof(alg)}(alg)
 end
+#! Implement cor_and_dist
 function distance(::Distance{<:SimpleDistance}, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
