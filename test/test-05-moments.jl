@@ -168,4 +168,17 @@
         end
         @test success
     end
+    @testset "Coskewness" begin
+        skes = [Coskewness(; alg = Full()), Coskewness(; alg = Semi())]
+        df = CSV.read(joinpath(@__DIR__, "./assets/coskewness.csv.gz"), DataFrame)
+        for (i, ske) in pairs(skes)
+            sk, v = coskewness(ske, rd.X)
+            success = isapprox([vec(sk); vec(v)], df[!, i])
+            if !success
+                println("Counter: $i")
+                find_tol([vec(sk); vec(v)], df[!, i])
+            end
+            @test success
+        end
+    end
 end
