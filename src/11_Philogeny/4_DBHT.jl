@@ -1229,8 +1229,9 @@ end
 function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
                     X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
                     dims::Int = 1, kwargs...)
-    S = cor(cle.ce, X; dims = dims, kwargs...)
-    D = distance(cle.de, S, X; dims = dims, kwargs...)
+    # S = cor(cle.ce, X; dims = dims, kwargs...)
+    # D = distance(cle.de, S, X; dims = dims, kwargs...)
+    S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     S = dbht_similarity(cle.alg.sim; S = S, D = D)
     clustering = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
     k = optimal_number_clusters(cle.onc, clustering, D)

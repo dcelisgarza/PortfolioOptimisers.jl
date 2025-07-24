@@ -21,6 +21,12 @@ function distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator
                     kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
+function cor_and_dist(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator,
+                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+    rho, dist = cor_and_dist(GeneralDistance(; power = de.power, alg = de.alg), ce, X;
+                             dims = dims, kwargs...)
+    return rho, Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
+end
 function distance(de::GeneralDistanceDistance, rho::AbstractMatrix, args...; kwargs...)
     dist = distance(GeneralDistance(; power = de.power, alg = de.alg), rho, args...;
                     kwargs...)

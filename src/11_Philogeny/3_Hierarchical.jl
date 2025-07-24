@@ -75,8 +75,9 @@ end
 function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HierarchicalClustering, <:Any},
                     X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
                     dims::Int = 1, kwargs...)
-    S = cor(cle.ce, X; dims = dims, kwargs...)
-    D = distance(cle.de, S, X; dims = dims, kwargs...)
+    # S = cor(cle.ce, X; dims = dims, kwargs...)
+    # D = distance(cle.de, S, X; dims = dims, kwargs...)
+    S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     clustering = hclust(D; linkage = cle.alg.linkage, branchorder = branchorder)
     k = optimal_number_clusters(cle.onc, clustering, D)
     return HierarchicalClusteringResult(; clustering = clustering, S = S, D = D, k = k)
