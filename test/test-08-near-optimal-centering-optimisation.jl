@@ -157,4 +157,66 @@
         end
         @test success
     end
+    @testset "Pareto Surface" begin
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        df = CSV.read(joinpath(@__DIR__,
+                               "./assets/NearOptimalCenteringParetoSurface1.csv.gz"),
+                      DataFrame)
+        r1 = StandardDeviation(;
+                               settings = RiskMeasureSettings(; scale = 2e2,
+                                                              ub = Frontier(; N = 3)))
+        r2 = ConditionalValueatRisk(;
+                                    settings = RiskMeasureSettings(;
+                                                                   ub = Frontier(; N = 5)))
+        res1 = optimise!(NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(),
+                                              opt = opt))
+        success = isapprox(Matrix(df), hcat(res1.w...); rtol = 5e-5)
+        if !success
+            find_tol(Matrix(df), hcat(res1.w...))
+        end
+        @test success
+
+        r1 = factory(StandardDeviation(; settings = RiskMeasureSettings(; scale = 2e2,)),
+                     pr)
+        r2 = ConditionalValueatRisk(; settings = RiskMeasureSettings(;))
+        res_min = optimise!(MeanRisk(; r = [r1, r2], opt = opt))
+        res_max = optimise!(MeanRisk(; r = [r1, r2], obj = MaximumReturn(), opt = opt))
+        rk1_min = expected_risk(r1, res_min.w, pr)
+        rk1_max = expected_risk(r1, res_max.w, pr)
+        rk2_min = expected_risk(r2, res_min.w, pr)
+        rk2_max = expected_risk(r2, res_max.w, pr)
+        rt_min = expected_return(ArithmeticReturn(), res_min.w, pr)
+        rt_max = expected_return(ArithmeticReturn(), res_max.w, pr)
+
+        df = CSV.read(joinpath(@__DIR__,
+                               "./assets/NearOptimalCenteringParetoSurface2.csv.gz"),
+                      DataFrame)
+        opt = JuMPOptimiser(; pe = pr,
+                            ret = ArithmeticReturn(;
+                                                   lb = range(; start = rt_min,
+                                                              stop = rt_min +
+                                                                     0.0009316063452440891,
+                                                              length = 3)), slv = slv)
+        r1 = StandardDeviation(;
+                               settings = RiskMeasureSettings(; scale = 2e2,
+                                                              ub = range(;
+                                                                         start = rk1_max -
+                                                                                 0.006363402327019335,
+                                                                         stop = rk1_max,
+                                                                         length = 3)))
+        r2 = ConditionalValueatRisk(;
+                                    settings = RiskMeasureSettings(;
+                                                                   ub = range(;
+                                                                              start = rk2_max -
+                                                                                      0.014823231590460057,
+                                                                              stop = rk2_max,
+                                                                              length = 3)))
+        res2 = optimise!(NearOptimalCentering(; r = [r1, r2], obj = MaximumUtility(),
+                                              opt = opt))
+        success = isapprox(Matrix(df), hcat(res2.w...); rtol = 5e-5)
+        if !success
+            find_tol(Matrix(df), hcat(res2.w...))
+        end
+        @test success
+    end
 end

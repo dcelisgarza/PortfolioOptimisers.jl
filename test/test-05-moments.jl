@@ -239,8 +239,7 @@
             d2 = cor_and_dist(deg, cei, rd.X)[2]
             @test isapprox(d1, d2)
             @test isapprox(r1, cor(cei, rd.X))
-
-            d3 = distance(de, cei, transpose(rd.X); dims = 2)
+            d3 = distance(de, cei, rd.X)
             d4 = if isa(ce, MutualInfoCovariance)
                 distance(Distance(;
                                   alg = VariationInfoDistance(; bins = ce.bins,
@@ -253,7 +252,7 @@
             else
                 distance(de, cov(cei, rd.X), rd.X)
             end
-            d5 = distance(deg, ce, transpose(rd.X); dims = 2)
+            d5 = distance(deg, ce, rd.X)
             d6 = if isa(ce, MutualInfoCovariance)
                 distance(GeneralDistance(;
                                          alg = VariationInfoDistance(; bins = ce.bins,
@@ -291,7 +290,7 @@
             @test isapprox(d1, d2)
             @test isapprox(r1, cor(cei, rd.X))
 
-            d3 = distance(de, cei, transpose(rd.X); dims = 2)
+            d3 = distance(de, cei, rd.X)
             d4 = if isa(ce, MutualInfoCovariance)
                 distance(DistanceDistance(;
                                           alg = VariationInfoDistance(; bins = ce.bins,
@@ -305,7 +304,7 @@
             else
                 distance(de, cov(cei, rd.X), rd.X)
             end
-            d5 = distance(deg, ce, transpose(rd.X); dims = 2)
+            d5 = distance(deg, ce, rd.X)
             d6 = if isa(ce, MutualInfoCovariance)
                 distance(GeneralDistanceDistance(;
                                                  alg = VariationInfoDistance(;
