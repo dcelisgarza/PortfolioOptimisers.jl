@@ -121,15 +121,17 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05,
     k = ceil(Int, T * alpha)
     rho = Matrix{eltype(X)}(undef, N, N)
     if k > 0
-        @floop threads for j in axes(X, 2)
-            xj = view(X, :, j)
-            v = sort(xj)[k]
-            maskj = xj .<= v
-            for i in 1:j
-                xi = view(X, :, i)
-                u = sort(xi)[k]
-                ltd = sum(xi .<= u .&& maskj) / k
-                rho[j, i] = rho[i, j] = clamp(ltd, zero(eltype(X)), one(eltype(X)))
+        let mv = sqrt(eps(eltype(X)))
+            @floop threads for j in axes(X, 2)
+                xj = view(X, :, j)
+                v = sort(xj)[k]
+                maskj = xj .<= v
+                for i in 1:j
+                    xi = view(X, :, i)
+                    u = sort(xi)[k]
+                    ltd = sum(xi .<= u .&& maskj) / k
+                    rho[j, i] = rho[i, j] = clamp(ltd, mv, one(eltype(X)))
+                end
             end
         end
     end

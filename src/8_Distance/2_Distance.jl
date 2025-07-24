@@ -56,13 +56,17 @@ function cor_and_dist(::Distance{<:LogDistance}, ce::StatsBase.CovarianceEstimat
     rho = abs.(cor(ce, X; dims = dims, kwargs...))
     return rho, -log.(rho)
 end
-function distance(::Distance{<:LogDistance}, ce::LTDCovariance, X::AbstractMatrix;
-                  dims::Int = 1, kwargs...)
+function distance(::Distance{<:LogDistance},
+                  ce::Union{<:LTDCovariance,
+                            <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return -log.(rho)
 end
-function cor_and_dist(::Distance{<:LogDistance}, ce::LTDCovariance, X::AbstractMatrix;
-                      dims::Int = 1, kwargs...)
+function cor_and_dist(::Distance{<:LogDistance},
+                      ce::Union{<:LTDCovariance,
+                                <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
+                      X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho = cor(ce, X; dims = dims, kwargs...)
     return rho, -log.(rho)
 end
@@ -121,6 +125,14 @@ function distance(::Distance{<:CanonicalDistance}, ce::MutualInfoCovariance,
                                                          normalise = ce.normalise)), ce, X;
                     dims = dims, kwargs...)
 end
+function distance(::Distance{<:CanonicalDistance},
+                  ce::PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+    return distance(Distance(;
+                             alg = VariationInfoDistance(; bins = ce.ce.bins,
+                                                         normalise = ce.ce.normalise)), ce,
+                    X; dims = dims, kwargs...)
+end
 function cor_and_dist(::Distance{<:CanonicalDistance}, ce::MutualInfoCovariance,
                       X::AbstractMatrix; dims::Int = 1, kwargs...)
     return cor_and_dist(Distance(;
@@ -128,20 +140,37 @@ function cor_and_dist(::Distance{<:CanonicalDistance}, ce::MutualInfoCovariance,
                                                              normalise = ce.normalise)), ce,
                         X; dims = dims, kwargs...)
 end
-function distance(::Distance{<:CanonicalDistance}, ce::LTDCovariance, X::AbstractMatrix;
-                  dims::Int = 1, kwargs...)
+function cor_and_dist(::Distance{<:CanonicalDistance},
+                      ce::PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any},
+                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+    return cor_and_dist(Distance(;
+                                 alg = VariationInfoDistance(; bins = ce.ce.bins,
+                                                             normalise = ce.ce.normalise)),
+                        ce, X; dims = dims, kwargs...)
+end
+function distance(::Distance{<:CanonicalDistance},
+                  ce::Union{<:LTDCovariance,
+                            <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
     return distance(Distance(; alg = LogDistance()), ce, X; dims = dims, kwargs...)
 end
-function cor_and_dist(::Distance{<:CanonicalDistance}, ce::LTDCovariance, X::AbstractMatrix;
-                      dims::Int = 1, kwargs...)
+function cor_and_dist(::Distance{<:CanonicalDistance},
+                      ce::Union{<:LTDCovariance,
+                                <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
+                      X::AbstractMatrix; dims::Int = 1, kwargs...)
     return cor_and_dist(Distance(; alg = LogDistance()), ce, X; dims = dims, kwargs...)
 end
-function distance(::Distance{<:CanonicalDistance}, ce::DistanceCovariance,
+function distance(::Distance{<:CanonicalDistance},
+                  ce::Union{<:DistanceCovariance,
+                            <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}},
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
     return distance(Distance(; alg = CorrelationDistance()), ce, X; dims = dims, kwargs...)
 end
-function cor_and_dist(::Distance{<:CanonicalDistance}, ce::DistanceCovariance,
-                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+function cor_and_dist(::Distance{<:CanonicalDistance},
+                      ce::Union{<:DistanceCovariance,
+                                <:PortfolioOptimisersCovariance{<:DistanceCovariance,
+                                                                <:Any}}, X::AbstractMatrix;
+                      dims::Int = 1, kwargs...)
     return cor_and_dist(Distance(; alg = CorrelationDistance()), ce, X; dims = dims,
                         kwargs...)
 end
