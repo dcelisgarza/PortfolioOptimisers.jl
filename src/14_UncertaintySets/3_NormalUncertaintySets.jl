@@ -125,7 +125,6 @@ function ucs(ue::NormalUncertaintySetEstimator{<:Any,
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-
     return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu,
                                        class = MuEllipseUncertaintySetResult()),
            EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma,
