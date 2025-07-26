@@ -53,5 +53,6 @@ jobs:
           file: lcov.info
           token: ${{ secrets.codecov_token }}
       - uses: julia-actions/julia-uploadcoveralls@latest
+        if: ${{ inputs.run_codecov }}
         env:
           COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
