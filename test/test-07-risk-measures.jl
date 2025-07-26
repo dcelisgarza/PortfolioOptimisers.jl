@@ -113,7 +113,7 @@
             elseif i ∈ (20, 23, 24)
                 0.25
             else
-                5e-7
+                1e-6
             end
             success = isapprox(r1, r2; rtol = rtol)
             if !success

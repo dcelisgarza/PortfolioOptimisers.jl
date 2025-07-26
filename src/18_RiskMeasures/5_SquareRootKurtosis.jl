@@ -21,7 +21,7 @@ function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSetting
     kt_flag = isa(kt, AbstractMatrix)
     if mu_flag
         @smart_assert(!isempty(mu) && all(isfinite, mu))
-    else
+    elseif isa(mu, Real)
         @smart_assert(isfinite(mu))
     end
     if isa(w, AbstractWeights)
