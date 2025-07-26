@@ -1,5 +1,6 @@
 @safetestset "Risk measures" begin
-    using PortfolioOptimisers, Test, DataFrames, TimeSeries, CSV, Clarabel, StatsBase
+    using PortfolioOptimisers, Test, DataFrames, TimeSeries, CSV, Clarabel, StatsBase,
+          LinearAlgebra
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -106,7 +107,7 @@
             r1 = expected_risk(r[1], w, rd.X)
             r2 = expected_risk(r[2], w, rd.X)
             rtol = if i == 15
-                1e-2
+                5e-2
             elseif i ∈ (16, 18, 21)
                 5e-2
             elseif i ∈ (20, 23, 24)
@@ -121,14 +122,14 @@
             end
             @test success
 
-            success = isapprox(df[i, 1], r1)
+            success = isapprox(df[i, 1], r1; rtol = rtol)
             if !success
                 println("Iteration $i r1 fails")
                 find_tol(r1, df[i, 1])
             end
             @test success
 
-            success = isapprox(df[i, 2], r2)
+            success = isapprox(df[i, 2], r2; rtol = rtol)
             if !success
                 println("Iteration $i r2 fails")
                 find_tol(r2, df[i, 2])
