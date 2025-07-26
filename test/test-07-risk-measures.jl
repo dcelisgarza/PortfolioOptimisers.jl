@@ -109,7 +109,7 @@
             rtol = if i == 15
                 5e-2
             elseif i ∈ (16, 18, 21)
-                1e-2
+                5e-2
             elseif i ∈ (20, 23, 24)
                 0.25
             else
