@@ -56,17 +56,18 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
                              sum(z) - 1 == 0
                              sum(nu - tau) * invk2 - ln_k <= 0
                          end)
+            @expression(model, risk, -dot(z, x))
         else
             @constraints(model, begin
                              dot(w, z) - 1 == 0
                              dot(w, nu - tau) * invk2 - ln_k <= 0
                          end)
+            @expression(model, risk, -dot(z, w .* x))
         end
         @constraints(model, begin
                          [i = 1:T], [nu[i], 1, z[i]] in MOI.PowerCone(invopk)
                          [i = 1:T], [z[i], 1, tau[i]] in MOI.PowerCone(omk)
                      end)
-        @expression(model, risk, -dot(z, x))
         @objective(model, Max, risk)
         if optimise_JuMP_model!(model, slv).success
             objective_value(model)

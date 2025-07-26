@@ -73,7 +73,7 @@ function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, <:AbstractWeights},
     cum_w = cumsum(sorted_w)
     alpha = sw * r.alpha
     idx = searchsortedfirst(cum_w, alpha)
-    if idx == 1
+    return if idx == 1
         -sorted_x[1]
     else
         idx = ifelse(idx > length(x), idx - 1, idx)

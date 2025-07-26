@@ -36,8 +36,8 @@
         @test isapprox(res1, res3)
         @test isapprox(res1, res4)
         @test isapprox(res1, res5)
-        @test !isapprox(res1, res6)
-        @test !isapprox(res1, res7)
+        @test isapprox(res1, res6')
+        @test isapprox(res1, res7')
     end
     @testset "Non Positive Definite Matrices" begin
         rng = StableRNG(123456789)
