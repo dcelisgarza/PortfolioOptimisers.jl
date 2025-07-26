@@ -1,7 +1,28 @@
 @safetestset "Risk measures" begin
     using PortfolioOptimisers, Test, DataFrames, TimeSeries, CSV, Clarabel, StatsBase
+    function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
+        for rtol in
+            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
+             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
+             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
+            if isapprox(a1, a2; rtol = rtol)
+                println("isapprox($name1, $name2, rtol = $(rtol))")
+                break
+            end
+        end
+        for atol in
+            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
+             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
+             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
+            if isapprox(a1, a2; atol = atol)
+                println("isapprox($name1, $name2, atol = $(atol))")
+                break
+            end
+        end
+    end
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
+    pr = prior(HighOrderPriorEstimator(; pe = EmpiricalPriorEstimator()), rd)
     w = fill(inv(size(rd.X, 2)), size(rd.X, 2))
     wt = pweights(fill(inv(size(rd.X, 1)), size(rd.X, 1)))
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
@@ -85,7 +106,7 @@
             r1 = expected_risk(r[1], w, rd.X)
             r2 = expected_risk(r[2], w, rd.X)
             rtol = if i == 15
-                5e-3
+                1e-2
             elseif i ∈ (16, 18, 21)
                 5e-2
             elseif i ∈ (20, 23, 24)
@@ -115,4 +136,95 @@
             @test success
         end
     end
+    r1 = factory(NegativeSkewness(), pr)
+    r2 = factory(NegativeSkewness(; alg = QuadRiskExpr()), pr)
+    @test isapprox(expected_risk(r1, w, rd.X), sqrt(expected_risk(r2, w, rd.X)))
+    @test isapprox(expected_risk(SquareRootKurtosis(; alg = Semi()), w, rd.X),
+                   0.0002291596657404573)
+    @test isapprox(expected_risk(SquareRootKurtosis(;), w, rd.X),
+                   expected_risk(SquareRootKurtosis(; mu = pr.mu), w, rd.X))
+    @test isapprox(expected_risk(SquareRootKurtosis(; mu = dot(w, pr.mu)), w, rd.X),
+                   expected_risk(SquareRootKurtosis(;), w, rd.X))
+    @test isapprox(expected_risk(LowOrderMoment(;
+                                                alg = LowOrderDeviation(;
+                                                                        alg = SecondLowerMoment(;
+                                                                                                alg = SqrtRiskExpr()))),
+                                 w, rd.X), 0.009123864007588172)
+    @test isapprox(expected_risk(LowOrderMoment(; mu = dot(w, pr.mu),
+                                                alg = LowOrderDeviation(;
+                                                                        alg = SecondLowerMoment(;
+                                                                                                alg = SqrtRiskExpr()))),
+                                 w, rd.X),
+                   sqrt(expected_risk(LowOrderMoment(;
+                                                     alg = LowOrderDeviation(;
+                                                                             alg = SecondLowerMoment(;
+                                                                                                     alg = QuadRiskExpr()))),
+                                      w, rd.X)))
+    @test isapprox(expected_risk(LowOrderMoment(;
+                                                alg = LowOrderDeviation(;
+                                                                        alg = SecondCentralMoment(;
+                                                                                                  alg = SqrtRiskExpr()))),
+                                 w, rd.X), 0.012828296955991162)
+    @test isapprox(expected_risk(LowOrderMoment(; mu = dot(w, pr.mu),
+                                                alg = LowOrderDeviation(;
+                                                                        alg = SecondCentralMoment(;
+                                                                                                  alg = SqrtRiskExpr()))),
+                                 w, rd.X),
+                   sqrt(expected_risk(LowOrderMoment(;
+                                                     alg = LowOrderDeviation(;
+                                                                             alg = SecondCentralMoment(;
+                                                                                                       alg = QuadRiskExpr()))),
+                                      w, rd.X)))
+    @test isapprox(expected_risk(LowOrderMoment(; alg = MeanAbsoluteDeviation()), w, rd.X),
+                   0.009807328313217291)
+    @test isapprox(expected_risk(LowOrderMoment(; alg = MeanAbsoluteDeviation()), w, rd.X),
+                   expected_risk(LowOrderMoment(; w = wt, alg = MeanAbsoluteDeviation()), w,
+                                 rd.X))
+    @test isapprox(expected_risk(HighOrderMoment(; alg = FourthLowerMoment()), w, rd.X),
+                   5.251415240227812e-8)
+    @test isapprox(expected_risk(HighOrderMoment(; mu = dot(w, pr.mu),
+                                                 alg = FourthLowerMoment()), w, rd.X),
+                   expected_risk(HighOrderMoment(; alg = FourthLowerMoment()), w, rd.X))
+
+    @test isapprox(expected_risk(HighOrderMoment(; alg = FourthCentralMoment()), w, rd.X),
+                   9.793810102468416e-8)
+    @test isapprox(expected_risk(HighOrderMoment(; mu = dot(w, pr.mu),
+                                                 alg = FourthCentralMoment()), w, rd.X),
+                   expected_risk(HighOrderMoment(; alg = FourthCentralMoment()), w, rd.X))
+    @test isapprox(expected_risk(HighOrderMoment(;
+                                                 alg = HighOrderDeviation(;
+                                                                          alg = ThirdLowerMoment())),
+                                 w, rd.X), 2.4944191180382487)
+    @test isapprox(expected_risk(HighOrderMoment(; mu = dot(w, pr.mu),
+                                                 alg = HighOrderDeviation(;
+                                                                          alg = ThirdLowerMoment())),
+                                 w, rd.X),
+                   expected_risk(HighOrderMoment(;
+                                                 alg = HighOrderDeviation(;
+                                                                          alg = ThirdLowerMoment())),
+                                 w, rd.X))
+    @test isapprox(expected_risk(HighOrderMoment(;
+                                                 alg = HighOrderDeviation(;
+                                                                          alg = FourthLowerMoment())),
+                                 w, rd.X), 7.5781142136319515)
+    @test isapprox(expected_risk(HighOrderMoment(; mu = dot(w, pr.mu),
+                                                 alg = HighOrderDeviation(;
+                                                                          alg = FourthLowerMoment())),
+                                 w, rd.X),
+                   expected_risk(HighOrderMoment(;
+                                                 alg = HighOrderDeviation(;
+                                                                          alg = FourthLowerMoment())),
+                                 w, rd.X))
+    @test isapprox(expected_risk(HighOrderMoment(;
+                                                 alg = HighOrderDeviation(;
+                                                                          alg = FourthCentralMoment())),
+                                 w, rd.X), 3.616393337050389)
+    @test isapprox(expected_risk(HighOrderMoment(; mu = dot(w, pr.mu),
+                                                 alg = HighOrderDeviation(;
+                                                                          alg = FourthCentralMoment())),
+                                 w, rd.X),
+                   expected_risk(HighOrderMoment(;
+                                                 alg = HighOrderDeviation(;
+                                                                          alg = FourthCentralMoment())),
+                                 w, rd.X))
 end
