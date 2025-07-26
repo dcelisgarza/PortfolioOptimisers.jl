@@ -56,7 +56,7 @@ for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
                  return if isempty(pnames)
                      $(r)(lb)
                  else
-                     $(r)(getproperty.(r, pnames)..., lb)
+                     $(r)(getproperty.(Ref(r), pnames)..., lb)
                  end
              end
          end)
@@ -321,4 +321,4 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn
 end
 
 export ArithmeticReturn, KellyReturn, MinimumRisk, MaximumUtility, MaximumRatio,
-       MaximumReturn
+       MaximumReturn, bounds_returns_estimator

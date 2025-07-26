@@ -109,7 +109,7 @@
             rtol = if i == 15
                 5e-2
             elseif i ∈ (16, 18, 21)
-                5e-2
+                1e-2
             elseif i ∈ (20, 23, 24)
                 0.25
             else
@@ -145,6 +145,8 @@
     @test isapprox(expected_risk(SquareRootKurtosis(;), w, rd.X),
                    expected_risk(SquareRootKurtosis(; mu = pr.mu), w, rd.X))
     @test isapprox(expected_risk(SquareRootKurtosis(; mu = dot(w, pr.mu)), w, rd.X),
+                   expected_risk(SquareRootKurtosis(;), w, rd.X))
+    @test isapprox(expected_risk(SquareRootKurtosis(; w = wt), w, rd.X),
                    expected_risk(SquareRootKurtosis(;), w, rd.X))
     @test isapprox(expected_risk(LowOrderMoment(;
                                                 alg = LowOrderDeviation(;
