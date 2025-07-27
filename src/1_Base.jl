@@ -69,7 +69,7 @@ All concrete types that implement variance estimation (e.g., sample variance, ro
   - [`AbstractCovarianceEstimator`](@ref)
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
-function Base.show(io::IO,
+function Base.show(io::IO, ::MIME"text/plain",
                    ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                               <:AbstractCovarianceEstimator})
     name = string(typeof(ear))
