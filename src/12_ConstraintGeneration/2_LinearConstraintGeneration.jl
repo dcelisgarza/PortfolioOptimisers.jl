@@ -149,6 +149,51 @@ struct AssetSets{T1 <: AbstractString, T2 <: AbstractDict} <: AbstractEstimator
 end
 Base.length(res::AssetSets) = 1
 Base.iterate(res::AssetSets, state = 1) = state > 1 ? nothing : (res, state + 1)
+function asset_sets_dict_to_array!(arr::AbstractArray, dict::AbstractDict, sets::AssetSets;
+                                   strict::Bool = false)
+    nx = sets.dict[sets.key]
+    for (key, val) in dict
+        if key in nx
+            arr[nx[key]] .= val
+        else
+            assets = get(sets.dict, key, nothing)
+            if isnothing(assets)
+                if strict
+                    throw(ArgumentError("$(key) is not in $(keys(sets.dict)).\n$(dict)"))
+                else
+                    @warn("$(key) is not in $(keys(sets.dict)).\n$(dict)")
+                end
+            else
+                unique!(assets)
+                arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
+            end
+        end
+    end
+    return nothing
+end
+function asset_sets_dict_to_array(dict::AbstractDict, sets::AssetSets, val::Real = 0.0;
+                                  strict::Bool = false)
+    nx = sets.dict[sets.key]
+    arr = fill(val, length(nx))
+    for (key, val) in dict
+        if key in nx
+            arr[nx[key]] .= val
+        else
+            assets = get(sets.dict, key, nothing)
+            if isnothing(assets)
+                if strict
+                    throw(ArgumentError("$(key) is not in $(keys(sets.dict)).\n$(dict)"))
+                else
+                    @warn("$(key) is not in $(keys(sets.dict)).\n$(dict)")
+                end
+            else
+                unique!(assets)
+                arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
+            end
+        end
+    end
+    return arr
+end
 function AssetSets(; key::AbstractString = "nx", dict::AbstractDict)
     @smart_assert(!isempty(dict))
     @smart_assert(haskey(dict, key))

@@ -70,41 +70,23 @@ function weight_bounds_view(wb::Union{<:AbstractString, Expr,
                                       <:WeightBoundsConstraint}, ::Any)
     return wb
 end
-function get_weight_bounds(sets::AssetSets, ::Nothing, lb::Bool, args...; kwargs...)
+function get_weight_bounds(::Nothing, lb::Bool, sets::AssetSets, args...; kwargs...)
     nx = sets.dict[sets.key]
     val = lb ? 0.0 : 1.0
     return range(; start = val, stop = val, length = length(nx))
 end
-function get_weight_bounds(sets::AssetSets, bounds::AbstractDict, lb::Bool;
+function get_weight_bounds(bounds::AbstractDict, lb::Bool, sets::AssetSets;
                            strict::Bool = false, datatype::DataType = Float64)
-    nx = sets.dict[sets.key]
-    wb = fill(lb ? zero(datatype) : one(datatype), length(nx))
-    for (key, val) in bounds
-        if key in nx
-            wb[nx[key]] .= val
-        else
-            assets = get(sets.dict, key, nothing)
-            if isnothing(assets)
-                if strict
-                    throw(ArgumentError("$(key) is not in $(keys(sets.dict)).\n$(bounds)"))
-                else
-                    @warn("$(key) is not in $(keys(sets.dict)).\n$(bounds)")
-                end
-            else
-                unique!(assets)
-                wb[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
-            end
-        end
-    end
-    return wb
+    return asset_sets_dict_to_array(bounds, sets, ifelse(lb, zero(datatype), one(datatype));
+                                    strict = strict)
 end
 function weight_bounds_constraints(wb::WeightBoundsConstraint, sets::AssetSets;
                                    strict::Bool = false, datatype::DataType = Float64,
                                    kwargs...)
     return WeightBoundsResult(;
-                              lb = get_weight_bounds(sets, wb.lb, true; strict = strict,
+                              lb = get_weight_bounds(wb.lb, true, sets; strict = strict,
                                                      datatype = datatype),
-                              ub = get_weight_bounds(sets, wb.ub, false; strict = strict,
+                              ub = get_weight_bounds(wb.ub, false, sets; strict = strict,
                                                      datatype = datatype))
 end
 function weight_bounds_constraints(wb::WeightBoundsResult{<:Any, <:Any}, args...;
