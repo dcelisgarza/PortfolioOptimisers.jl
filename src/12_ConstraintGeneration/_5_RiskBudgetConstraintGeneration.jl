@@ -48,7 +48,7 @@ function set_risk_budget!(rb::AbstractVector,
 end
 function risk_budget_constraints(plcas::Union{<:LinearConstraintSide,
                                               <:AbstractVector{<:LinearConstraintSide}},
-                                 sets::DataFrame; datatype::Type = Float64,
+                                 sets::DataFrame; datatype::DataType = Float64,
                                  strict::Bool = false)
     if isa(plcas, AbstractVector)
         @smart_assert(!isempty(plcas))

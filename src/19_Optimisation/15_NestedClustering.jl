@@ -147,8 +147,10 @@ function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsResult,
                                                  }, cwf::ClusteringWeightFinaliser,
                                      strict::Bool,
                                      resi::AbstractVector{<:OptimisationResult},
-                                     res::OptimisationResult, w::AbstractVector)
-    wb = weight_bounds_constraints(wb, sets; N = length(w), strict = strict)
+                                     res::OptimisationResult, w::AbstractVector;
+                                     datatype::DataType = Float64)
+    wb = weight_bounds_constraints(wb, sets; N = length(w), strict = strict,
+                                   datatype = datatype)
     retcode, w = clustering_optimisation_result(cwf, wb, w)
     wb_flag = isa(retcode, OptimisationFailure)
     opto_flag = isa(res.retcode, OptimisationFailure)
@@ -198,7 +200,8 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
     reso = optimise!(nco.opto, rdo; dims = dims, branchorder = branchorder,
                      str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.cwf, nco.strict,
-                                                 resi, reso, wi * reso.w)
+                                                 resi, reso, wi * reso.w;
+                                                 datatype = eltype(pr.X))
     return NestedClusteringResult(typeof(nco), pr, wb, clr, resi, reso, retcode, w)
 end
 

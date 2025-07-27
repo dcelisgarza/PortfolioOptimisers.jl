@@ -138,7 +138,7 @@ function get_black_litterman_views_data(blve::LinearConstraintSide{<:Any, <:Any,
 end
 function black_litterman_views(blves::Union{<:BlackLittermanViewsEstimator,
                                             <:AbstractVector{<:BlackLittermanViewsEstimator}},
-                               sets::DataFrame; datatype::Type = Float64,
+                               sets::DataFrame; datatype::DataType = Float64,
                                strict::Bool = false)
     if isa(blves, AbstractVector)
         @smart_assert(!isempty(blves))

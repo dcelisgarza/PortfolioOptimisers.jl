@@ -421,7 +421,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                              dims::Int = 1)
     pr = prior(opt.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     datatype = eltype(pr.X)
-    wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(pr.X, 2), strict = opt.strict)
+    wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(pr.X, 2), strict = opt.strict,
+                                   datatype = datatype)
     lcs = linear_constraints(opt.lcs, opt.sets; datatype = datatype, strict = opt.strict)
     cent = centrality_constraints(opt.cent, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     gcard = linear_constraints(opt.gcard, opt.sets; datatype = Int, strict = opt.strict)

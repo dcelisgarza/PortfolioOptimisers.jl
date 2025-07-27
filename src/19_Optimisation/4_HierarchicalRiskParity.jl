@@ -46,7 +46,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
     rku = unitary_expected_risks(r, pr.X, hrp.opt.fees)
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(pr.X, 2),
-                                   strict = hrp.opt.strict)
+                                   strict = hrp.opt.strict, datatype = eltype(pr.X))
     w = ones(eltype(pr.X), size(pr.X, 2))
     items = [clr.clustering.order]
     @inbounds while length(items) > 0
@@ -147,7 +147,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any,
     wk = zeros(eltype(pr.X), size(pr.X, 2))
     rku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     wb = weight_bounds_constraints(hrp.opt.wb, hrp.opt.sets; N = size(pr.X, 2),
-                                   strict = hrp.opt.strict)
+                                   strict = hrp.opt.strict, datatype = eltype(pr.X))
     w = ones(eltype(pr.X), size(pr.X, 2))
     items = [clr.clustering.order]
     @inbounds while length(items) > 0

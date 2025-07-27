@@ -171,7 +171,7 @@ function process_model(model::JuMP.Model, ::JuMPOptimisationEstimator)
     return JuMPOptimisationSolution(; w = w)
 end
 function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
-                              datatype::Type = Float64)
+                              datatype::DataType = Float64)
     trials = Dict()
     success = false
     for solver in opt.opt.slv

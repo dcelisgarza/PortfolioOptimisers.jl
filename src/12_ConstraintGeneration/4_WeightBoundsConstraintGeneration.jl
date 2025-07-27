@@ -44,109 +44,68 @@ function validate_bounds(args...)
 end
 function WeightBoundsResult(; lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
                             ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
-    @smart_assert(isnothing(lb) ⊼ isnothing(ub))
+    # @smart_assert(isnothing(lb) ⊼ isnothing(ub))
     validate_bounds(lb, ub)
     return WeightBoundsResult{typeof(lb), typeof(ub)}(lb, ub)
 end
-struct WeightBoundsConstraint{T1, T2,
-                              T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                              T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
-       AbstractEstimator
-    group::T1
-    name::T2
-    lb::T3
-    ub::T4
+struct WeightBoundsConstraint{T1 <: Union{Nothing, <:AbstractDict},
+                              T2 <: Union{Nothing, <:AbstractDict}} <: AbstractEstimator
+    lb::T1
+    ub::T2
 end
-function WeightBoundsConstraint(; group, name,
-                                lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
-                                ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
-    group_flag = isa(group, AbstractVector)
-    name_flag = isa(name, AbstractVector)
-    lb_flag = isa(lb, AbstractVector)
-    ub_flag = isa(ub, AbstractVector)
-    if group_flag || name_flag || lb_flag || ub_flag
-        @smart_assert(group_flag && name_flag)
-        @smart_assert(!isempty(group) && !isempty(name) && !isempty(lb) && !isempty(ub))
-        @smart_assert(length(group) == length(name) == length(lb) == length(ub))
+function WeightBoundsConstraint(; lb::Union{Nothing, <:AbstractDict} = nothing,
+                                ub::Union{Nothing, <:AbstractDict} = nothing)
+    if isa(lb, AbstractDict)
+        @smart_assert(!isempty(lb))
     end
-    validate_bounds(lb, ub)
-    return WeightBoundsConstraint{typeof(group), typeof(name), typeof(lb), typeof(ub)}(group,
-                                                                                       name,
-                                                                                       lb,
-                                                                                       ub)
+    if isa(ub, AbstractDict)
+        @smart_assert(!isempty(ub))
+    end
+    return WeightBoundsConstraint{typeof(lb), typeof(ub)}(lb, ub)
 end
 function weight_bounds_view(wb::Union{<:AbstractString, Expr,
                                       <:AbstractVector{<:AbstractString},
                                       <:AbstractVector{Expr},
                                       <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                      #! Start: to delete
-                                      <:WeightBoundsConstraint{<:Any, <:Any,
-                                                               <:Union{Nothing, <:Real},
-                                                               <:Union{Nothing, <:Real}}
-                                      #! End: to delete
-                                      }, ::Any)
+                                      <:WeightBoundsConstraint}, ::Any)
     return wb
 end
-function weight_bounds_view(wb::WeightBoundsConstraint{<:AbstractVector, <:AbstractVector,
-                                                       <:AbstractVector, <:AbstractVector},
-                            i::AbstractVector)
-    group = nothing_scalar_array_view(wb.group, i)
-    name = nothing_scalar_array_view(wb.group, i)
-    lb = nothing_scalar_array_view(wb.lb, i)
-    ub = nothing_scalar_array_view(wb.ub, i)
-    return WeightBoundsConstraint(; group = group, name = name, lb = lb, ub = ub)
+function get_weight_bounds(sets::AssetSets, ::Nothing, lb::Bool, args...; kwargs...)
+    nx = sets.dict[sets.key]
+    val = lb ? 0.0 : 1.0
+    return range(; start = val, stop = val, length = length(nx))
 end
-function weight_bounds_constraints(hcc::WeightBoundsConstraint{<:Any, <:Any,
-                                                               <:Union{Nothing, <:Real},
-                                                               <:Union{Nothing, <:Real}},
-                                   sets::DataFrame; strict::Bool = false)
-    @smart_assert(!isempty(sets))
-    group_names = names(sets)
-    N = nrow(sets)
-    lbtype = !isnothing(hcc.lb) ? eltype(hcc.lb) : Float64
-    ubtype = !isnothing(hcc.ub) ? eltype(hcc.ub) : Float64
-    LB = zeros(promote_type(lbtype, ubtype), N)
-    UB = ones(promote_type(lbtype, ubtype), N)
-    (; group, name, lb, ub) = hcc
-    if isnothing(lb)
-        lb = -Inf
-    end
-    if isnothing(ub)
-        ub = Inf
-    end
-    if !(isnothing(group) || string(group) ∉ group_names)
-        idx = sets[!, group] .== name
-        LB[idx] .= lb
-        UB[idx] .= ub
-    elseif strict
-        throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(hcc)"))
-    else
-        @warn("$(string(group)) is not in $(group_names).\n$(hcc)")
-    end
-    return WeightBoundsResult(; lb = LB, ub = UB)
-end
-function weight_bounds_constraints(hcc::WeightBoundsConstraint{<:AbstractVector,
-                                                               <:AbstractVector,
-                                                               <:AbstractVector,
-                                                               <:AbstractVector},
-                                   sets::DataFrame; strict::Bool = false, kwargs...)
-    @smart_assert(!isempty(sets))
-    group_names = names(sets)
-    N = nrow(sets)
-    LB = zeros(promote_type(eltype(hcc.lb), eltype(hcc.ub)), N)
-    UB = ones(promote_type(eltype(hcc.lb), eltype(hcc.ub)), N)
-    for (group, name, lb, ub) in zip(hcc.group, hcc.name, hcc.lb, hcc.ub)
-        if !(isnothing(group) || string(group) ∉ group_names)
-            idx = sets[!, group] .== name
-            LB[idx] .= lb
-            UB[idx] .= ub
-        elseif strict
-            throw(ArgumentError("$(string(group)) is not in $(group_names).\n$(hcc)"))
+function get_weight_bounds(sets::AssetSets, bounds::AbstractDict, lb::Bool;
+                           strict::Bool = false, datatype::DataType = Float64)
+    nx = sets.dict[sets.key]
+    wb = fill(lb ? zero(datatype) : one(datatype), length(nx))
+    for (key, val) in bounds
+        if key in nx
+            wb[nx[key]] .= val
         else
-            @warn("$(string(group)) is not in $(group_names).\n$(hcc)")
+            assets = get(sets.dict, key, nothing)
+            if isnothing(assets)
+                if strict
+                    throw(ArgumentError("$(key) is not in $(keys(sets.dict)).\n$(bounds)"))
+                else
+                    @warn("$(key) is not in $(keys(sets.dict)).\n$(bounds)")
+                end
+            else
+                unique!(assets)
+                wb[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
+            end
         end
     end
-    return WeightBoundsResult(; lb = LB, ub = UB)
+    return wb
+end
+function weight_bounds_constraints(wb::WeightBoundsConstraint, sets::AssetSets;
+                                   strict::Bool = false, datatype::DataType = Float64,
+                                   kwargs...)
+    return WeightBoundsResult(;
+                              lb = get_weight_bounds(sets, wb.lb, true; strict = strict,
+                                                     datatype = datatype),
+                              ub = get_weight_bounds(sets, wb.ub, false; strict = strict,
+                                                     datatype = datatype))
 end
 function weight_bounds_constraints(wb::WeightBoundsResult{<:Any, <:Any}, args...;
                                    scalar::Bool = false, N::Integer = 0, kwargs...)

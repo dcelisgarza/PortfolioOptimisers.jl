@@ -221,7 +221,7 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
     clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.clustering.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
-                                   strict = sh.opt.strict)
+                                   strict = sh.opt.strict, datatype = eltype(pr.X))
     w, gamma = schur_weights(pr, items, wb, sh.params)
     retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w)
     return SchurHierarchicalOptimisationResult(typeof(sh), pr, wb, clr, gamma, retcode, w)
@@ -232,7 +232,7 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
     clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.clustering.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
-                                   strict = sh.opt.strict)
+                                   strict = sh.opt.strict, datatype = eltype(pr.X))
     params = sh.params
     gammas = Vector{eltype(pr.X)}(undef, length(params))
     w = zeros(eltype(pr.X), size(pr.X, 2))

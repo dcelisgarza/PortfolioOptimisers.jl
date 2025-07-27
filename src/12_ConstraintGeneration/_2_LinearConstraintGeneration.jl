@@ -107,7 +107,8 @@ function get_constraint_data(lc::LinearConstraintSide{<:AbstractVector, <:Abstra
 end
 function linear_constraints(lcs::Union{<:LinearConstraint,
                                        <:AbstractVector{<:LinearConstraint}},
-                            sets::DataFrame; datatype::Type = Float64, strict::Bool = false)
+                            sets::DataFrame; datatype::DataType = Float64,
+                            strict::Bool = false)
     if isa(lcs, AbstractVector)
         @smart_assert(!isempty(lcs))
     end

@@ -1,9 +1,20 @@
+#! Implement the estimator, use WeightBoundsConstraint and Turnover as a guide.
+struct FeesEstimator{T1 <: Union{Nothing, <:Turnover}, T2 <: AbstractDict,
+                     T3 <: AbstractDict, T4 <: AbstractDict, T5 <: AbstractDict,
+                     T6 <: NamedTuple} <: AbstractEstimator
+    tn::T1
+    l::T2
+    s::T3
+    fl::T4
+    fs::T5
+    kwargs::T6
+end
 struct Fees{T1 <: Union{Nothing, <:Turnover},
             T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
             T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
             T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
             T5 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}, T6 <: NamedTuple} <:
-       AbstractEstimator
+       AbstractResult
     tn::T1
     l::T2
     s::T3

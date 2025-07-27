@@ -106,7 +106,7 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     reso = optimise!(st.opto, rdo; dims = dims, branchorder = branchorder,
                      str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.cwf, st.strict, resi,
-                                                 reso, wi * reso.w)
+                                                 reso, wi * reso.w; datatype = eltype(pr.X))
     return StackingResult(typeof(st), pr, wb, resi, reso, retcode, w)
 end
 
