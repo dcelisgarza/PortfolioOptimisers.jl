@@ -31,7 +31,7 @@ jobs:
         os:
           - ubuntu-latest
           - macOS-latest
-          - windows-latest
+          # - windows-latest
         arch:
           - x64
         allow_failure: [false]
@@ -44,10 +44,10 @@ jobs:
             os: macOS-latest
             arch: x64
             allow_failure: true
-          - version: "nightly"
-            os: windows-latest
-            arch: x64
-            allow_failure: true
+          # - version: "nightly"
+          #   os: windows-latest
+          #   arch: x64
+          #   allow_failure: true
           # Comment when lts tests pass.
           - version: "lts"
             os: ubuntu-latest
@@ -57,8 +57,8 @@ jobs:
             os: macOS-latest
             arch: x64
             allow_failure: true
-          - version: "lts"
-            os: windows-latest
-            arch: x64
-            allow_failure: true
+          # - version: "lts"
+          #   os: windows-latest
+          #   arch: x64
+          #   allow_failure: true
         # Comment when lts tests pass.

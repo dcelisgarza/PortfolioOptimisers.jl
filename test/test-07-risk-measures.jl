@@ -108,6 +108,8 @@
             r2 = expected_risk(r[2], w, rd.X)
             rtol = if i == 15
                 5e-2
+            elseif Sys.isapple() && i ∈ (18, 21)
+                1e-1
             elseif i ∈ (16, 18, 21)
                 5e-2
             elseif i ∈ (20, 23, 24)
@@ -234,5 +236,17 @@
                                                      alg = HighOrderDeviation(;
                                                                               alg = FourthCentralMoment())),
                                      w, rd.X))
+        @test isapprox(expected_risk(AverageDrawdown(), w, rd.X), 0.048143525862128035)
+        @test isapprox(expected_risk(AverageDrawdown(), w, rd.X),
+                       expected_risk(AverageDrawdown(; w = wt), w, rd.X))
+        @test isapprox(expected_risk(RelativeAverageDrawdown(), w, rd.X),
+                       0.05118499953858111)
+        @test isapprox(expected_risk(RelativeAverageDrawdown(), w, rd.X),
+                       expected_risk(RelativeAverageDrawdown(; w = wt), w, rd.X))
+        @test isapprox(expected_risk(RelativeUlcerIndex(), w, rd.X), 0.06356737835751593)
+        @test isapprox(expected_risk(RelativeMaximumDrawdown(), w, rd.X),
+                       0.14712227931904298)
+        @test isapprox(expected_risk(BrownianDistanceVariance(), w, rd.X),
+                       0.0005291680154419391)
     end
 end

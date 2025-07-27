@@ -1,5 +1,6 @@
 @safetestset "Equation tests" begin
-    using PortfolioOptimisers, Test
+    using PortfolioOptimisers, Test, Logging
+    Logging.disable_logging(Logging.Warn)
     (; vars, coef, op, rhs, eqn) = parse_equation("2*sqrt(prior(a ,   1b1)) /2*  5 + cbrt(3)^3*f >= 5/5 + d-69/3*c")
     @test vars == ["d", "f", "c", "sqrt(prior(a, 1b1))"]
     @test coef == [-1.0, 3.0, 23.0, 5.0]

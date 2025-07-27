@@ -1,7 +1,5 @@
-#=
 @safetestset "Naive optimisation tests" begin
-    using PortfolioOptimisers, CSV, DataFrames, Test, StableRNGs, Random, TimeSeries,
-          LinearAlgebra
+    using PortfolioOptimisers, CSV, Test, TimeSeries, LinearAlgebra
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -22,11 +20,8 @@
             end
         end
     end
-    X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/asset_prices.csv"));
-                  timestamp = :timestamp)
-    F = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/factor_prices.csv"));
-                  timestamp = :timestamp)
-    rd = prices_to_returns(X[(end - 252):end], F[(end - 252):end])
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
     pr = prior(EmpiricalPriorEstimator(), rd)
     N = size(pr.X, 2)
 
@@ -44,4 +39,3 @@
     res = optimise!(RandomWeights(;), rd)
     @test isapprox(sum(res.w), 1)
 end
-=#
