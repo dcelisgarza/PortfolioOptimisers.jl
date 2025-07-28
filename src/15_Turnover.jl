@@ -5,7 +5,6 @@ struct TurnoverEstimator{T1 <: AbstractVector{<:Real}, T2 <: AbstractDict} <:
 end
 function TurnoverEstimator(; w::AbstractVector{<:Real}, val::AbstractDict)
     @smart_assert(!isempty(w))
-    @smart_assert(all(isfinite, w) && all(x -> x >= zero(x), w))
     @smart_assert(!isempty(val))
     return TurnoverEstimator{typeof(w), typeof(val)}(w, val)
 end
@@ -14,7 +13,9 @@ function turnover_constraints(::Nothing, args...; kwargs...)
 end
 function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false,
                               datatype::DataType = Float64)
-    return asset_sets_dict_to_array(tn.val, sets, zero(datatype); strict = strict)
+    return Turnover(; w = tn.w,
+                    val = asset_sets_dict_to_array(tn.val, sets, zero(datatype);
+                                                   strict = strict))
 end
 struct Turnover{T1 <: AbstractVector{<:Real},
                 T2 <: Union{<:Real, <:AbstractVector{<:Real}}} <: AbstractResult
@@ -23,6 +24,7 @@ struct Turnover{T1 <: AbstractVector{<:Real},
 end
 function Turnover(; w::AbstractVector{<:Real},
                   val::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
+    @smart_assert(!isempty(w))
     if isa(val, AbstractVector)
         @smart_assert(!isempty(val))
         @smart_assert(length(val) == length(w))
@@ -30,7 +32,6 @@ function Turnover(; w::AbstractVector{<:Real},
     else
         @smart_assert(isfinite(val) && val >= zero(eltype(val)))
     end
-    @smart_assert(!isempty(w))
     return Turnover{typeof(w), typeof(val)}(w, val)
 end
 function turnover_constraints(tn::Turnover, args...; kwargs...)
@@ -49,7 +50,7 @@ function turnover_view(::Nothing, ::Any)
 end
 function turnover_view(tn::TurnoverEstimator, i::AbstractVector)
     w = view(tn.w, i)
-    return Turnover(; w = w, val = tn.val)
+    return TurnoverEstimator(; w = w, val = tn.val)
 end
 function turnover_view(tn::Turnover, i::AbstractVector)
     w = view(tn.w, i)
@@ -63,4 +64,4 @@ function factory(tn::Turnover, w::AbstractVector)
     return Turnover(; w = w, val = tn.val)
 end
 
-export Turnover
+export TurnoverEstimator, Turnover, turnover_constraints

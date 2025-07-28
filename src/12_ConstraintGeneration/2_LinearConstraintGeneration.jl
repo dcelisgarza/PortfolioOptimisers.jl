@@ -177,7 +177,7 @@ function asset_sets_dict_to_array(dict::AbstractDict, sets::AssetSets, val::Real
     arr = fill(val, length(nx))
     for (key, val) in dict
         if key in nx
-            arr[nx[key]] .= val
+            arr[findfirst(x -> x == key, nx)] = val
         else
             assets = get(sets.dict, key, nothing)
             if isnothing(assets)

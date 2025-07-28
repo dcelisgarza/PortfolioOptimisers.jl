@@ -1,4 +1,4 @@
-struct FeesEstimator{T1 <: Union{Nothing, <:TurnoverEstimator},
+struct FeesEstimator{T1 <: Union{Nothing, <:TurnoverEstimator, <:Turnover},
                      T2 <: Union{Nothing, <:AbstractDict},
                      T3 <: Union{Nothing, <:AbstractDict},
                      T4 <: Union{Nothing, <:AbstractDict},
@@ -11,7 +11,7 @@ struct FeesEstimator{T1 <: Union{Nothing, <:TurnoverEstimator},
     fs::T5
     kwargs::T6
 end
-function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator} = nothing,
+function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
                        l::Union{Nothing, <:AbstractDict} = nothing,
                        s::Union{Nothing, <:AbstractDict} = nothing,
                        fl::Union{Nothing, <:AbstractDict} = nothing,
@@ -32,8 +32,10 @@ function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator} = nothing,
     return FeesEstimator{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
                          typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
 end
-function fees_view(fees::FeesEstimator, args...)
-    return fees
+function fees_view(fees::FeesEstimator, i::AbstractVector)
+    tn = turnover_view(fees.tn, i)
+    return FeesEstimator(; tn = tn, l = fees.l, s = fees.s, fl = fees.fl, fs = fees.fs,
+                         kwargs = fees.kwargs)
 end
 function fees_constraints(fees::FeesEstimator, sets::AssetSets; strict::Bool = false,
                           datatype::DataType = Float64)
@@ -79,16 +81,16 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
         @smart_assert(!isempty(fs))
     end
     if !isnothing(l)
-        @smart_assert(all(x -> x > zero(x), l))
+        @smart_assert(any(x -> x > zero(x), l))
     end
     if !isnothing(s)
-        @smart_assert(all(x -> x > zero(x), s))
+        @smart_assert(any(x -> x > zero(x), s))
     end
     if !isnothing(fl)
-        @smart_assert(all(x -> x > zero(x), fl))
+        @smart_assert(any(x -> x > zero(x), fl))
     end
     if !isnothing(fs)
-        @smart_assert(all(x -> x > zero(x), fs))
+        @smart_assert(any(x -> x > zero(x), fs))
     end
     return Fees{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(kwargs)}(tn,
                                                                                           l,
@@ -307,5 +309,5 @@ function drawdowns(X::AbstractArray; cX::Bool = false, compound::Bool = false,
     return nothing
 end
 
-export Fees, calc_fees, calc_asset_fees, calc_net_returns, calc_net_asset_returns,
-       cumulative_returns, drawdowns
+export FeesEstimator, Fees, fees_constraints, calc_fees, calc_asset_fees, calc_net_returns,
+       calc_net_asset_returns, cumulative_returns, drawdowns
