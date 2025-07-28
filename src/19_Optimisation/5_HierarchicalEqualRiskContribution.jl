@@ -251,7 +251,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
             rkbo[cl] .= zero(eltype(pr.X))
         end
     end
-    return w, rkcl
+    return w, rkcl, fees
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:OptimisationRiskMeasure, <:Any,
@@ -283,7 +283,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
             rkcl[i] = expected_risk(ro_i, view(rkbo, :, i), pr.X, fees)
         end
     end
-    return w, rkcl
+    return w, rkcl, fees
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
@@ -313,7 +313,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
             rkbo[cl] .= zero(eltype(pr.X))
         end
     end
-    return w, rkcl
+    return w, rkcl, fees
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
@@ -344,7 +344,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                               view(rkbo, :, i), cl, ro_i, pr.X, fees)
         end
     end
-    return w, rkcl
+    return w, rkcl, fees
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
@@ -366,7 +366,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
         rkcl[i] = herc_scalarised_risk_o!(hec.sceo, wk, roku, rkbo, cl, ro, pr.X, fees)
         rkbo[cl] .= zero(eltype(pr.X))
     end
-    return w, rkcl
+    return w, rkcl, fees
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
@@ -390,7 +390,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
         rkcl[i] = herc_scalarised_risk_o!(hec.sceo, view(wk, :, i), view(roku, :, i),
                                           view(rkbo, :, i), cl, ro, pr.X, fees)
     end
-    return w, rkcl
+    return w, rkcl, fees
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
@@ -414,7 +414,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
         rkcl[i] = expected_risk(ro, rkbo, pr.X, fees)
         rkbo[cl] .= zero(eltype(pr.X))
     end
-    return w, rkcl
+    return w, rkcl, fees
 end
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                                                           <:AbstractVector{<:OptimisationRiskMeasure},
@@ -440,7 +440,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
         rkbo[cl, i] ./= sum(view(rkbo, cl, i))
         rkcl[i] = expected_risk(ro, view(rkbo, :, i), pr.X, fees)
     end
-    return w, rkcl
+    return w, rkcl, fees
 end
 function optimise!(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
@@ -450,7 +450,7 @@ function optimise!(hec::HierarchicalEqualRiskContribution,
                      branchorder = branchorder)
     idx = cutree(clr.clustering; k = clr.k)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
-    w, rkcl = herc_risk(hec, pr, cls)
+    w, rkcl, fees = herc_risk(hec, pr, cls)
     nd = to_tree(clr.clustering)[2]
     hs = [i.height for i in nd]
     nd = nd[sortperm(hs; rev = true)]
@@ -486,7 +486,7 @@ function optimise!(hec::HierarchicalEqualRiskContribution,
     wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; N = length(w),
                                    strict = hec.opt.strict, datatype = eltype(pr.X))
     retcode, w = clustering_optimisation_result(hec.opt.cwf, wb, w / sum(w))
-    return HierarchicalOptimisationResult(typeof(hec), pr, wb, clr, retcode, w)
+    return HierarchicalOptimisationResult(typeof(hec), pr, fees, wb, clr, retcode, w)
 end
 
 export HierarchicalEqualRiskContribution
