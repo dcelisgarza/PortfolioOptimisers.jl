@@ -140,4 +140,92 @@
         end
         i += 1
     end
+    @testset "Scalarisers" begin
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+        mr = MeanRisk(; r = r, opt = opt)
+        w1 = optimise!(mr, rd).w
+        @test isapprox(w1,
+                       [1.7074698994991376e-10, 8.433104973224101e-11,
+                        1.9860067068611146e-9, 3.1027970850564853e-10, 0.09898828657505643,
+                        0.0038933979989648256, 6.636136386259997e-10, 0.35967323582529487,
+                        0.012150886312492075, 0.10067191014130493, 2.964806359249512e-10,
+                        0.14595634518390374, 3.891455764455336e-10, 0.14289553677354302,
+                        5.362751594199594e-10, 0.03009102863550913, 1.1386315235757199e-10,
+                        1.1094461786914318e-9, 0.07216633866035838, 0.033513028233384],
+                       rtol = 1e-6)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sce = MaxScalariser())
+        r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+        mr = MeanRisk(; r = r, opt = opt)
+        w2 = optimise!(mr, rd).w
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser(; gamma = 1e-3))
+        r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+        mr = MeanRisk(; r = r, opt = opt)
+        w3 = optimise!(mr, rd).w
+        @test isapprox(w3, w1, rtol = 2e-2)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser(; gamma = 1e5))
+        r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
+        mr = MeanRisk(; r = r, opt = opt)
+        w4 = optimise!(mr, rd).w
+        @test isapprox(w4, w2, rtol = 1e-4)
+    end
+    #=
+    # @testset "Arithmetic return uncertainty set" begin
+    rng = StableRNG(123456789)
+    ucs1 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
+                                                alg = BoxUncertaintySetAlgorithm()), pr.X)
+    ucs2 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
+                                                alg = EllipseUncertaintySetAlgorithm(;
+                                                                                     method = GeneralKUncertaintyAlgorithm())),
+                  pr.X)
+
+    ucss = [ucs1, ucs2]
+    objs = [MinimumRisk(), MaximumRatio(; rf = rf), MaximumReturn()]
+    df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk-UncertaintyReturns.csv"), DataFrame)
+    df = DataFrame()
+    i = 1
+    for ucs in ucss
+        for obj in objs
+            ret = ArithmeticReturn(; ucs = ucs)
+            opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
+            mre = MeanRisk(; obj = obj, opt = opt)
+            res = optimise!(mre)
+            @test isa(res.retcode, OptimisationSuccess)
+            df[!, "$i"] = res.w
+            # rtol = 1e-6
+            # success = isapprox(res.w, df[!, i]; rtol = rtol)
+            # if !success
+            #     println("Counter: $i")
+            #     find_tol(res.w, df[!, i])
+            # end
+            # @test success
+            i += 1
+        end
+    end
+
+    ret = ArithmeticReturn(; ucs = ucs2)
+    opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
+    mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf), opt = opt)
+    res = optimise!(mre)
+
+    using PortfolioOptimiser
+    portfolio = Portfolio(; prices = X,
+                          solvers = PortOptSolver(; name = :Clarabel,
+                                                  solver = Clarabel.Optimizer,
+                                                  check_sol = (; allow_local = true,
+                                                               allow_almost = true),
+                                                  params = Dict("verbose" => false)))
+    asset_statistics!(portfolio)
+    wc_statistics!(portfolio;
+                   wc_type = WCType(; diagonal = true, k_mu = KGeneralWC(),
+                                    box = NormalWC(; rng = rng, seed = 123456789),
+                                    ellipse = NormalWC(; rng = rng, seed = 123456789)))
+    w = PortfolioOptimiser.optimise!(portfolio,
+                                     Trad(; rm = CVaR(), kelly = NoKelly(; wc_set = Ellipse()),
+                                          obj = Sharpe(; ohf = 0, rf = rf)))
+    # end
+    =#
 end
