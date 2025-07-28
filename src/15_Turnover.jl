@@ -1,6 +1,23 @@
-#! Implement the Turnover estimator, use WeightBoundsConstraint as a guide.
+struct TurnoverEstimator{T1 <: AbstractVector{<:Real}, T2 <: AbstractDict} <:
+       AbstractEstimator
+    w::T1
+    val::T2
+end
+function TurnoverEstimator(; w::AbstractVector{<:Real}, val::AbstractDict)
+    @smart_assert(!isempty(w))
+    @smart_assert(all(isfinite, w) && all(x -> x >= zero(x), w))
+    @smart_assert(!isempty(val))
+    return TurnoverEstimator{typeof(w), typeof(val)}(w, val)
+end
+function turnover_constraints(::Nothing, args...; kwargs...)
+    return nothing
+end
+function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false,
+                              datatype::DataType = Float64)
+    return asset_sets_dict_to_array(tn.val, sets, zero(datatype); strict = strict)
+end
 struct Turnover{T1 <: AbstractVector{<:Real},
-                T2 <: Union{<:Real, <:AbstractVector{<:Real}}} <: AbstractEstimator
+                T2 <: Union{<:Real, <:AbstractVector{<:Real}}} <: AbstractResult
     w::T1
     val::T2
 end
@@ -16,8 +33,15 @@ function Turnover(; w::AbstractVector{<:Real},
     @smart_assert(!isempty(w))
     return Turnover{typeof(w), typeof(val)}(w, val)
 end
+function turnover_constraints(tn::Turnover, args...; kwargs...)
+    return tn
+end
 function turnover_view(::Nothing, ::Any)
     return nothing
+end
+function turnover_view(tn::TurnoverEstimator, i::AbstractVector)
+    w = view(tn.w, i)
+    return Turnover(; w = w, val = tn.val)
 end
 function turnover_view(tn::Turnover, i::AbstractVector)
     w = view(tn.w, i)

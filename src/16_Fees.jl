@@ -1,13 +1,51 @@
-#! Implement the estimator, use WeightBoundsConstraint and Turnover as a guide.
-struct FeesEstimator{T1 <: Union{Nothing, <:Turnover}, T2 <: AbstractDict,
-                     T3 <: AbstractDict, T4 <: AbstractDict, T5 <: AbstractDict,
-                     T6 <: NamedTuple} <: AbstractEstimator
+struct FeesEstimator{T1 <: Union{Nothing, <:TurnoverEstimator},
+                     T2 <: Union{Nothing, <:AbstractDict},
+                     T3 <: Union{Nothing, <:AbstractDict},
+                     T4 <: Union{Nothing, <:AbstractDict},
+                     T5 <: Union{Nothing, <:AbstractDict}, T6 <: NamedTuple} <:
+       AbstractEstimator
     tn::T1
     l::T2
     s::T3
     fl::T4
     fs::T5
     kwargs::T6
+end
+function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator} = nothing,
+                       l::Union{Nothing, <:AbstractDict} = nothing,
+                       s::Union{Nothing, <:AbstractDict} = nothing,
+                       fl::Union{Nothing, <:AbstractDict} = nothing,
+                       fs::Union{Nothing, <:AbstractDict} = nothing,
+                       kwargs::NamedTuple = (; atol = 1e-8))
+    if isa(l, AbstractDict)
+        @smart_assert(!isempty(l))
+    end
+    if isa(s, AbstractDict)
+        @smart_assert(!isempty(s))
+    end
+    if isa(fl, AbstractDict)
+        @smart_assert(!isempty(fl))
+    end
+    if isa(fs, AbstractDict)
+        @smart_assert(!isempty(fs))
+    end
+    return FeesEstimator{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
+                         typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
+end
+function fees_view(fees::FeesEstimator, args...)
+    return fees
+end
+function fees_constraints(fees::FeesEstimator, sets::AssetSets; strict::Bool = false,
+                          datatype::DataType = Float64)
+    return Fees(;
+                tn = turnover_constraints(fees.tn, sets; strict = strict,
+                                          datatype = datatype),
+                l = asset_sets_dict_to_array(fees.l, sets, zero(datatype); strict = strict),
+                s = asset_sets_dict_to_array(fees.s, sets, zero(datatype); strict = strict),
+                fl = asset_sets_dict_to_array(fees.fl, sets, zero(datatype);
+                                              strict = strict),
+                fs = asset_sets_dict_to_array(fees.fs, sets, zero(datatype);
+                                              strict = strict))
 end
 struct Fees{T1 <: Union{Nothing, <:Turnover},
             T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
@@ -61,6 +99,12 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
 end
 Base.length(::Fees) = 1
 Base.iterate(::Fees, i = 1) = i <= 1 ? (i, nothing) : nothing
+function fees_constraints(::Nothing, args...; kwargs...)
+    return nothing
+end
+function fees_constraints(fees::Fees, args...; kwargs...)
+    return fees
+end
 function fees_view(::Nothing, ::Any)
     return nothing
 end

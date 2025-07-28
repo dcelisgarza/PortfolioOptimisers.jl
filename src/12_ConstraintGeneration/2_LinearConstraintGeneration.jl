@@ -194,6 +194,9 @@ function asset_sets_dict_to_array(dict::AbstractDict, sets::AssetSets, val::Real
     end
     return arr
 end
+function asset_sets_dict_to_array(::Nothing, args...; kwargs...)
+    return nothing
+end
 function AssetSets(; key::AbstractString = "nx", dict::AbstractDict)
     @smart_assert(!isempty(dict))
     @smart_assert(haskey(dict, key))
