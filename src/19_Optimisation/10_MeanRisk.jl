@@ -203,9 +203,9 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
 end
 function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret) = processed_jump_optimiser_attributes(mr.opt,
-                                                                                                      rd;
-                                                                                                      dims = dims)
+    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
+                                                                                                                rd;
+                                                                                                                dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
@@ -216,14 +216,14 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, mr.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, mr.opt.card, gcard, nplg, cplg, mr.opt.lt, mr.opt.st,
-                         mr.opt.fees, mr.opt.ss)
+                         fees, mr.opt.ss)
     set_smip_constraints!(model, wb, mr.opt.scard, sgcard, smtx, mr.opt.ss)
-    set_turnover_constraints!(model, mr.opt.tn)
+    set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, mr.opt.te, mr, nplg, cplg)
     set_number_effective_assets!(model, mr.opt.nea)
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)
-    set_non_fixed_fees!(model, mr.opt.fees)
+    set_non_fixed_fees!(model, fees)
     set_risk_constraints!(model, mr.r, mr, pr, nplg, cplg; rd = rd)
     scalarise_risk_expression!(model, mr.opt.sce)
     set_return_constraints!(model, ret, mr.obj, pr; rd = rd)

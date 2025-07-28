@@ -36,6 +36,14 @@ end
 function turnover_constraints(tn::Turnover, args...; kwargs...)
     return tn
 end
+function turnover_constraints(tn::Union{<:AbstractVector{<:TurnoverEstimator},
+                                        <:AbstractVector{<:Turnover},
+                                        <:AbstractVector{<:Union{<:TurnoverEstimator,
+                                                                 <:Turnover}}},
+                              sets::AssetSets; strict::Bool = false,
+                              datatype::DataType = Float64)
+    return turnover_constraints.(tn, Ref(sets); strict = strict, datatype = datatype)
+end
 function turnover_view(::Nothing, ::Any)
     return nothing
 end

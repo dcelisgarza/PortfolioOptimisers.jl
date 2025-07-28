@@ -96,9 +96,9 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
 end
 function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret) = processed_jump_optimiser_attributes(frc.opt,
-                                                                                                      rd;
-                                                                                                      dims = dims)
+    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
+                                                                                                                rd;
+                                                                                                                dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
@@ -109,14 +109,14 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, frc.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, frc.opt.card, gcard, nplg, cplg, frc.opt.lt, frc.opt.st,
-                         frc.opt.fees, frc.opt.ss)
+                         fees, frc.opt.ss)
     set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, frc.opt.ss)
-    set_turnover_constraints!(model, frc.opt.tn)
+    set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, frc.opt.te, frc, nplg, cplg)
     set_number_effective_assets!(model, frc.opt.nea)
     set_l1_regularisation!(model, frc.opt.l1)
     set_l2_regularisation!(model, frc.opt.l2)
-    set_non_fixed_fees!(model, frc.opt.fees)
+    set_non_fixed_fees!(model, fees)
     set_risk_constraints!(model, frc.r, frc, pr, nplg, cplg, b1, frc.sets; rd = rd)
     scalarise_risk_expression!(model, frc.opt.sce)
     set_return_constraints!(model, ret, frc.obj, pr; rd = rd)

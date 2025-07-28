@@ -132,11 +132,15 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                                   <:PhilogenyConstraintResult},
                      T16 <: Union{Nothing, <:PhilogenyConstraintEstimator,
                                   <:PhilogenyConstraintResult},
-                     T17 <: Union{Nothing, <:Turnover},
+                     T17 <: Union{Nothing, <:TurnoverEstimator,
+                                  <:AbstractVector{<:TurnoverEstimator}, <:Turnover,
+                                  <:AbstractVector{<:Turnover},
+                                  <:AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}}},
                      T18 <:
                      Union{Nothing, <:AbstractTracking, <:AbstractVector{AbstractTracking}},
-                     T21 <: Union{Nothing, <:Fees}, T22 <: JuMPReturnsEstimator,
-                     T23 <: Scalariser, T24 <: Union{Nothing, <:CustomConstraint},
+                     T21 <: Union{Nothing, <:FeesEstimator, <:Fees},
+                     T22 <: JuMPReturnsEstimator, T23 <: Scalariser,
+                     T24 <: Union{Nothing, <:CustomConstraint},
                      T25 <: Union{Nothing, <:CustomObjective}, T26 <: Real, T27 <: Real,
                      T28 <: Union{Nothing, <:Integer}, T29 <: Union{Nothing, <:Integer},
                      T30 <: Union{Nothing, <:Real}, T31 <: Union{Nothing, <:Real},
@@ -239,10 +243,13 @@ function JuMPOptimiser(;
                                    <:PhilogenyConstraintResult} = nothing,
                        cplg::Union{Nothing, <:PhilogenyConstraintEstimator,
                                    <:PhilogenyConstraintResult} = nothing,
-                       tn::Union{Nothing, <:Turnover, <:AbstractVector{<:Turnover}} = nothing,
+                       tn::Union{Nothing, <:TurnoverEstimator,
+                                 <:AbstractVector{<:TurnoverEstimator}, <:Turnover,
+                                 <:AbstractVector{<:Turnover},
+                                 <:AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}}} = nothing,
                        te::Union{Nothing, <:AbstractTracking,
                                  <:AbstractVector{<:AbstractTracking}} = nothing,
-                       fees::Union{Nothing, <:Fees} = nothing,
+                       fees::Union{Nothing, <:FeesEstimator, <:Fees} = nothing,
                        ret::JuMPReturnsEstimator = ArithmeticReturn(),
                        sce::Scalariser = SumScalariser(),
                        ccnt::Union{Nothing, <:CustomConstraint} = nothing,
@@ -405,7 +412,10 @@ struct ProcessedJuMPOptimiserAttributes{T1 <: AbstractPriorResult,
                                                     <:AbstractMatrix},
                                         T8 <: Union{Nothing, <:PhilogenyConstraintResult},
                                         T9 <: Union{Nothing, <:PhilogenyConstraintResult},
-                                        T10 <: JuMPReturnsEstimator} <: AbstractResult
+                                        T10 <: Union{Nothing, <:Turnover,
+                                                     <:AbstractVector{<:Turnover}},
+                                        T11 <: Union{Nothing, <:Fees},
+                                        T12 <: JuMPReturnsEstimator} <: AbstractResult
     pr::T1
     wb::T2
     lcs::T3
@@ -415,7 +425,9 @@ struct ProcessedJuMPOptimiserAttributes{T1 <: AbstractPriorResult,
     smtx::T7
     nplg::T8
     cplg::T9
-    ret::T10
+    tn::T10
+    fees::T11
+    ret::T12
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
@@ -431,9 +443,11 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     smtx = asset_sets_matrix(opt.smtx, opt.sets)
     nplg = philogeny_constraints(opt.nplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     cplg = philogeny_constraints(opt.cplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
+    tn = turnover_constraints(opt.tn, opt.sets; strict = opt.strict, datatype = datatype)
+    fees = fees_constraints(opt.fees, opt.sets; strict = opt.strict, datatype = datatype)
     ret = jump_returns_factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
-                                            cplg, ret)
+                                            cplg, tn, fees, ret)
 end
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = propertynames(opt)
@@ -443,17 +457,16 @@ function no_bounds_optimiser(opt::JuMPOptimiser, args...)
                          (getproperty(opt, pnames[i]) for i in (idx + 1):length(pnames))...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
-    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, ret) = processed_jump_optimiser_attributes(opt,
-                                                                                                      rd;
-                                                                                                      dims = dims)
+    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(opt,
+                                                                                                                rd;
+                                                                                                                dims = dims)
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = opt.lt, st = opt.st, lcs = lcs, lcm = opt.lcm, cent = cent,
                          gcard = gcard, sgcard = sgcard, smtx = smtx, sets = opt.sets,
-                         nplg = nplg, cplg = cplg, tn = opt.tn, te = opt.te,
-                         fees = opt.fees, ret = ret, sce = opt.sce, ccnt = opt.ccnt,
-                         cobj = opt.cobj, sc = opt.sc, so = opt.so, card = opt.card,
-                         nea = opt.nea, l1 = opt.l1, l2 = opt.l2, ss = opt.ss,
-                         strict = opt.strict)
+                         nplg = nplg, cplg = cplg, tn = tn, te = opt.te, fees = fees,
+                         ret = ret, sce = opt.sce, ccnt = opt.ccnt, cobj = opt.cobj,
+                         sc = opt.sc, so = opt.so, card = opt.card, nea = opt.nea,
+                         l1 = opt.l1, l2 = opt.l2, ss = opt.ss, strict = opt.strict)
 end
 
 export JuMPOptimisationResult, JuMPOptimiser
