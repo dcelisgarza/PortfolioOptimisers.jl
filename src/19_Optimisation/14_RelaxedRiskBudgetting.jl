@@ -136,7 +136,7 @@ function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult
                          fees, rrb.opt.ss)
     set_smip_constraints!(model, wb, rrb.opt.scard, sgcard, smtx, rrb.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, rrb.opt.te)
+    set_tracking_error_constraints!(model, pr, rrb.opt.te, nothing, nothing, nothing, fees)
     set_number_effective_assets!(model, rrb.opt.nea)
     set_l1_regularisation!(model, rrb.opt.l1)
     set_l2_regularisation!(model, rrb.opt.l2)
@@ -148,8 +148,11 @@ function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult
     add_custom_constraint!(model, rrb.opt.ccnt, rrb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rrb.opt.cobj, rrb, pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(pr.X))
-    return JuMPOptimisationResult(typeof(rrb), pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
-                                  cplg, ret, retcode, sol, ifelse(save, model, nothing))
+    return JuMPOptimisationResult(typeof(rrb),
+                                  ProcessedJuMPOptimiserAttributes(pr, wb, lcs, cent, gcard,
+                                                                   sgcard, smtx, nplg, cplg,
+                                                                   tn, fees, ret), retcode,
+                                  sol, ifelse(save, model, nothing))
 end
 
 export BasicRelaxedRiskBudgettingAlgorithm, RegularisationRelaxedRiskBudgettingAlgorithm,

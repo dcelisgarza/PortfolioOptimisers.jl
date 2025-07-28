@@ -112,7 +112,7 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                          fees, frc.opt.ss)
     set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, frc.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, frc.opt.te, frc, nplg, cplg)
+    set_tracking_error_constraints!(model, pr, frc.opt.te, frc, nplg, cplg, fees)
     set_number_effective_assets!(model, frc.opt.nea)
     set_l1_regularisation!(model, frc.opt.l1)
     set_l2_regularisation!(model, frc.opt.l2)
@@ -127,8 +127,19 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     add_custom_constraint!(model, frc.opt.ccnt, frc, pr)
     set_portfolio_objective_function!(model, frc.obj, ret, frc.opt.cobj, frc, pr)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(pr.X))
-    return JuMPOptimisationFactorRiskContributionResult(typeof(frc), pr, wb, lcs, cent,
-                                                        gcard, sgcard, smtx, nplg, cplg,
+    return JuMPOptimisationFactorRiskContributionResult(typeof(frc),
+                                                        ProcessedJuMPOptimiserAttributes(pr,
+                                                                                         wb,
+                                                                                         lcs,
+                                                                                         cent,
+                                                                                         gcard,
+                                                                                         sgcard,
+                                                                                         smtx,
+                                                                                         nplg,
+                                                                                         cplg,
+                                                                                         tn,
+                                                                                         fees,
+                                                                                         ret),
                                                         frc_nplg, frc_cplg, retcode, sol,
                                                         ifelse(save, model, nothing))
 end

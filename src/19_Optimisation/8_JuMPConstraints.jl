@@ -799,11 +799,12 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
                                          cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
                                                      <:IntegerPhilogenyResult},
                                          nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                                     <:IntegerPhilogenyResult}, args...)
+                                                     <:IntegerPhilogenyResult},
+                                         fees::Union{Nothing, <:Fees}, args...)
     r = te.r
     wb = te.tracking.w
     err = te.err
-    rb = expected_risk(r, wb, pr.X, opt.opt.fees)
+    rb = expected_risk(r, wb, pr.X, fees)
     k = model[:k]
     sc = model[:sc]
     te_dw = Symbol(:te_w_, i)

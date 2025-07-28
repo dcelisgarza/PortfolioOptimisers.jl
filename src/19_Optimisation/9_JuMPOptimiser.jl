@@ -1,33 +1,41 @@
-struct JuMPOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
-                              T3 <: Union{Nothing, <:WeightBoundsResult},
-                              T4 <: Union{Nothing, <:LinearConstraintResult},
-                              T5 <: Union{Nothing, <:LinearConstraintResult},
-                              T6 <: Union{Nothing, <:LinearConstraintResult},
-                              T7 <: Union{Nothing, <:LinearConstraintResult},
-                              T8 <:
-                              Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix},
-                              T9 <: Union{Nothing, <:PhilogenyConstraintResult},
-                              T10 <: Union{Nothing, <:PhilogenyConstraintResult},
-                              T11 <: JuMPReturnsEstimator,
-                              T12 <: Union{<:OptimisationReturnCode,
-                                           <:AbstractVector{<:OptimisationReturnCode}},
-                              T13 <: Union{<:JuMPOptimisationSolution,
-                                           <:AbstractVector{<:JuMPOptimisationSolution}},
-                              T14 <: Union{Nothing, JuMP.Model}} <: OptimisationResult
+struct ProcessedJuMPOptimiserAttributes{T1 <: AbstractPriorResult,
+                                        T2 <: Union{Nothing, <:WeightBoundsResult},
+                                        T3 <: Union{Nothing, <:LinearConstraintResult},
+                                        T4 <: Union{Nothing, <:LinearConstraintResult},
+                                        T5 <: Union{Nothing, <:LinearConstraintResult},
+                                        T6 <: Union{Nothing, <:LinearConstraintResult},
+                                        T7 <: Union{Nothing, Symbol, <:AbstractString,
+                                                    <:AbstractMatrix},
+                                        T8 <: Union{Nothing, <:PhilogenyConstraintResult},
+                                        T9 <: Union{Nothing, <:PhilogenyConstraintResult},
+                                        T10 <: Union{Nothing, <:Turnover,
+                                                     <:AbstractVector{<:Turnover}},
+                                        T11 <: Union{Nothing, <:Fees},
+                                        T12 <: JuMPReturnsEstimator} <: AbstractResult
+    pr::T1
+    wb::T2
+    lcs::T3
+    cent::T4
+    gcard::T5
+    sgcard::T6
+    smtx::T7
+    nplg::T8
+    cplg::T9
+    tn::T10
+    fees::T11
+    ret::T12
+end
+struct JuMPOptimisationResult{T1 <: Type, T2 <: ProcessedJuMPOptimiserAttributes,
+                              T3 <: Union{<:OptimisationReturnCode,
+                                          <:AbstractVector{<:OptimisationReturnCode}},
+                              T4 <: Union{<:JuMPOptimisationSolution,
+                                          <:AbstractVector{<:JuMPOptimisationSolution}},
+                              T5 <: Union{Nothing, JuMP.Model}} <: OptimisationResult
     oe::T1
-    pr::T2
-    wb::T3
-    lcs::T4
-    cent::T5
-    gcard::T6
-    sgcard::T7
-    smtx::T8
-    nplg::T9
-    cplg::T10
-    ret::T11
-    retcode::T12
-    sol::T13
-    model::T14
+    pa::T2
+    retcode::T3
+    sol::T4
+    model::T5
 end
 function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
     return if sym == :w
@@ -36,24 +44,8 @@ function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
         getfield(r, sym)
     end
 end
-struct JuMPOptimisationFactorRiskContributionResult{T1 <: Type, T2 <: AbstractPriorResult,
-                                                    T3 <:
-                                                    Union{Nothing, <:WeightBoundsResult},
-                                                    T4 <: Union{Nothing,
-                                                                <:LinearConstraintResult},
-                                                    T5 <: Union{Nothing,
-                                                                <:LinearConstraintResult},
-                                                    T6 <: Union{Nothing,
-                                                                <:LinearConstraintResult},
-                                                    T7 <: Union{Nothing,
-                                                                <:LinearConstraintResult},
-                                                    T8 <:
-                                                    Union{Nothing, Symbol, <:AbstractString,
-                                                          <:AbstractMatrix},
-                                                    T9 <: Union{Nothing,
-                                                                <:IntegerPhilogenyResult},
-                                                    T10 <: Union{Nothing,
-                                                                 <:IntegerPhilogenyResult},
+struct JuMPOptimisationFactorRiskContributionResult{T1 <: Type,
+                                                    T2 <: ProcessedJuMPOptimiserAttributes,
                                                     T11 <: Union{Nothing,
                                                                  <:SemiDefinitePhilogenyResult},
                                                     T12 <: Union{Nothing,
@@ -63,15 +55,7 @@ struct JuMPOptimisationFactorRiskContributionResult{T1 <: Type, T2 <: AbstractPr
                                                     T15 <: Union{Nothing, JuMP.Model}} <:
        OptimisationResult
     oe::T1
-    pr::T2
-    wb::T3
-    lcs::T4
-    cent::T5
-    gcard::T6
-    sgcard::T7
-    smtx::T8
-    nplg::T9
-    cplg::T10
+    pa::T2
     frc_nplg::T11
     frc_cplg::T12
     retcode::T13
@@ -401,33 +385,6 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
                          ret = ret, sce = opt.sce, ccnt = ccnt, cobj = cobj, sc = opt.sc,
                          so = opt.so, card = opt.card, scard = opt.scard, nea = opt.nea,
                          l1 = opt.l1, l2 = opt.l2, ss = opt.ss, strict = opt.strict)
-end
-struct ProcessedJuMPOptimiserAttributes{T1 <: AbstractPriorResult,
-                                        T2 <: Union{Nothing, <:WeightBoundsResult},
-                                        T3 <: Union{Nothing, <:LinearConstraintResult},
-                                        T4 <: Union{Nothing, <:LinearConstraintResult},
-                                        T5 <: Union{Nothing, <:LinearConstraintResult},
-                                        T6 <: Union{Nothing, <:LinearConstraintResult},
-                                        T7 <: Union{Nothing, Symbol, <:AbstractString,
-                                                    <:AbstractMatrix},
-                                        T8 <: Union{Nothing, <:PhilogenyConstraintResult},
-                                        T9 <: Union{Nothing, <:PhilogenyConstraintResult},
-                                        T10 <: Union{Nothing, <:Turnover,
-                                                     <:AbstractVector{<:Turnover}},
-                                        T11 <: Union{Nothing, <:Fees},
-                                        T12 <: JuMPReturnsEstimator} <: AbstractResult
-    pr::T1
-    wb::T2
-    lcs::T3
-    cent::T4
-    gcard::T5
-    sgcard::T6
-    smtx::T7
-    nplg::T8
-    cplg::T9
-    tn::T10
-    fees::T11
-    ret::T12
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)

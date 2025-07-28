@@ -227,13 +227,15 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
                                                           <:Any, <:SequentialEx},
                    pr::AbstractPriorResult, cls::AbstractVector)
     ri = factory(hec.ri, pr, hec.opt.slv)
-    riku = unitary_expected_risks(ri, pr.X, hec.opt.fees)
+    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
+                            datatype = eltype(pr.X))
+    riku = unitary_expected_risks(ri, pr.X, fees)
     if hec.ri === hec.ro
         ro = ri
         roku = riku
     else
         ro = factory(hec.ro, pr, hec.opt.slv)
-        roku = unitary_expected_risks(ro, pr.X, hec.opt.fees)
+        roku = unitary_expected_risks(ro, pr.X, fees)
     end
     rkbo = zeros(eltype(pr.X), size(pr.X, 2))
     rkcl = Vector{eltype(pr.X)}(undef, length(cls))
@@ -245,7 +247,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
             w[cl] ./= sum(view(w, cl))
             rkbo[cl] .= inv.(view(roku_i, cl))
             rkbo[cl] ./= sum(view(rkbo, cl))
-            rkcl[i] = expected_risk(ro_i, rkbo, pr.X, hec.opt.fees)
+            rkcl[i] = expected_risk(ro_i, rkbo, pr.X, fees)
             rkbo[cl] .= zero(eltype(pr.X))
         end
     end
@@ -257,13 +259,15 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
                                                           <:FLoops.Transducers.Executor},
                    pr::AbstractPriorResult, cls::AbstractVector)
     ri = factory(hec.ri, pr, hec.opt.slv)
-    riku = unitary_expected_risks(ri, pr.X, hec.opt.fees)
+    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
+                            datatype = eltype(pr.X))
+    riku = unitary_expected_risks(ri, pr.X, fees)
     if hec.ri === hec.ro
         ro = ri
         roku = riku
     else
         ro = factory(hec.ro, pr, hec.opt.slv)
-        roku = unitary_expected_risks(ro, pr.X, hec.opt.fees)
+        roku = unitary_expected_risks(ro, pr.X, fees)
     end
     Nc = length(cls)
     rkbo = zeros(eltype(pr.X), size(pr.X, 2), Nc)
@@ -276,7 +280,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
             w[cl] ./= sum(view(w, cl))
             rkbo[cl, i] .= inv.(view(roku_i, cl))
             rkbo[cl, i] ./= sum(view(rkbo, cl, i))
-            rkcl[i] = expected_risk(ro_i, view(rkbo, :, i), pr.X, hec.opt.fees)
+            rkcl[i] = expected_risk(ro_i, view(rkbo, :, i), pr.X, fees)
         end
     end
     return w, rkcl
@@ -298,13 +302,14 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     wk = zeros(eltype(pr.X), size(pr.X, 2))
     rkbo = zeros(eltype(pr.X), size(pr.X, 2))
+    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
+                            datatype = eltype(pr.X))
     let
         rku_i, ro_i = rku, ro
         @floop hec.threads for (i, cl) in pairs(cls)
-            w[cl] .= herc_scalarised_risk_i!(hec.scei, wk, rku_i, cl, ri, pr.X,
-                                             hec.opt.fees)
+            w[cl] .= herc_scalarised_risk_i!(hec.scei, wk, rku_i, cl, ri, pr.X, fees)
             rkcl[i] = herc_scalarised_risk_o!(hec.sceo, wk, rku_i, rkbo, cl, ro_i, pr.X,
-                                              hec.opt.fees)
+                                              fees)
             rkbo[cl] .= zero(eltype(pr.X))
         end
     end
@@ -328,14 +333,15 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
     rku = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), Nc)
     wk = zeros(eltype(pr.X), size(pr.X, 2), Nc)
     rkbo = zeros(eltype(pr.X), size(pr.X, 2), Nc)
+    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
+                            datatype = eltype(pr.X))
     let
         ro_i = ro
         @floop hec.threads for (i, cl) in pairs(cls)
             w[cl] .= herc_scalarised_risk_i!(hec.scei, view(wk, :, i), view(rku, :, i), cl,
-                                             ri, pr.X, hec.opt.fees)
+                                             ri, pr.X, fees)
             rkcl[i] = herc_scalarised_risk_o!(hec.sceo, view(wk, :, i), view(rku, :, i),
-                                              view(rkbo, :, i), cl, ro_i, pr.X,
-                                              hec.opt.fees)
+                                              view(rkbo, :, i), cl, ro_i, pr.X, fees)
         end
     end
     return w, rkcl
@@ -345,7 +351,9 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
                                                           <:Any, <:Any, <:SequentialEx},
                    pr::AbstractPriorResult, cls::AbstractVector)
     ri = factory(hec.ri, pr, hec.opt.slv)
-    riku = unitary_expected_risks(ri, pr.X, hec.opt.fees)
+    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
+                            datatype = eltype(pr.X))
+    riku = unitary_expected_risks(ri, pr.X, fees)
     ro = factory(hec.ro, pr, hec.opt.slv)
     rkcl = Vector{eltype(pr.X)}(undef, length(cls))
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
@@ -355,8 +363,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
     @floop hec.threads for (i, cl) in pairs(cls)
         w[cl] .= inv.(view(riku, cl))
         w[cl] ./= sum(view(w, cl))
-        rkcl[i] = herc_scalarised_risk_o!(hec.sceo, wk, roku, rkbo, cl, ro, pr.X,
-                                          hec.opt.fees)
+        rkcl[i] = herc_scalarised_risk_o!(hec.sceo, wk, roku, rkbo, cl, ro, pr.X, fees)
         rkbo[cl] .= zero(eltype(pr.X))
     end
     return w, rkcl
@@ -367,7 +374,9 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
                                                           <:FLoops.Transducers.Executor},
                    pr::AbstractPriorResult, cls::AbstractVector)
     ri = factory(hec.ri, pr, hec.opt.slv)
-    riku = unitary_expected_risks(ri, pr.X, hec.opt.fees)
+    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
+                            datatype = eltype(pr.X))
+    riku = unitary_expected_risks(ri, pr.X, fees)
     ro = factory(hec.ro, pr, hec.opt.slv)
     Nc = length(cls)
     rkcl = Vector{eltype(pr.X)}(undef, Nc)
@@ -379,7 +388,7 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationR
         w[cl] .= inv.(view(riku, cl))
         w[cl] ./= sum(view(w, cl))
         rkcl[i] = herc_scalarised_risk_o!(hec.sceo, view(wk, :, i), view(roku, :, i),
-                                          view(rkbo, :, i), cl, ro, pr.X, hec.opt.fees)
+                                          view(rkbo, :, i), cl, ro, pr.X, fees)
     end
     return w, rkcl
 end
@@ -390,17 +399,19 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                    pr::AbstractPriorResult, cls::AbstractVector)
     ri = factory(hec.ri, pr, hec.opt.slv)
     ro = factory(hec.ro, pr, hec.opt.slv)
-    roku = unitary_expected_risks(ro, pr.X, hec.opt.fees)
+    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
+                            datatype = eltype(pr.X))
+    roku = unitary_expected_risks(ro, pr.X, fees)
     rkcl = Vector{eltype(pr.X)}(undef, length(cls))
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     wk = zeros(eltype(pr.X), size(pr.X, 2))
     riku = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
     rkbo = zeros(eltype(pr.X), size(pr.X, 2))
     @floop hec.threads for (i, cl) in pairs(cls)
-        w[cl] .= herc_scalarised_risk_i!(hec.scei, wk, riku, cl, ri, pr.X, hec.opt.fees)
+        w[cl] .= herc_scalarised_risk_i!(hec.scei, wk, riku, cl, ri, pr.X, fees)
         rkbo[cl] .= inv.(view(roku, cl))
         rkbo[cl] ./= sum(view(rkbo, cl))
-        rkcl[i] = expected_risk(ro, rkbo, pr.X, hec.opt.fees)
+        rkcl[i] = expected_risk(ro, rkbo, pr.X, fees)
         rkbo[cl] .= zero(eltype(pr.X))
     end
     return w, rkcl
@@ -413,7 +424,9 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
                    pr::AbstractPriorResult, cls::AbstractVector)
     ri = factory(hec.ri, pr, hec.opt.slv)
     ro = factory(hec.ro, pr, hec.opt.slv)
-    roku = unitary_expected_risks(ro, pr.X, hec.opt.fees)
+    fees = fees_constraints(hec.opt.fees, hec.opt.sets; strict = hec.opt.strict,
+                            datatype = eltype(pr.X))
+    roku = unitary_expected_risks(ro, pr.X, fees)
     Nc = length(cls)
     rkcl = Vector{eltype(pr.X)}(undef, Nc)
     w = Vector{eltype(pr.X)}(undef, size(pr.X, 2))
@@ -422,10 +435,10 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
     rkbo = zeros(eltype(pr.X), size(pr.X, 2), Nc)
     @floop hec.threads for (i, cl) in pairs(cls)
         w[cl] .= herc_scalarised_risk_i!(hec.scei, view(wk, :, i), view(riku, :, i), cl, ri,
-                                         pr.X, hec.opt.fees)
+                                         pr.X, fees)
         rkbo[cl, i] .= inv.(view(roku, cl))
         rkbo[cl, i] ./= sum(view(rkbo, cl, i))
-        rkcl[i] = expected_risk(ro, view(rkbo, :, i), pr.X, hec.opt.fees)
+        rkcl[i] = expected_risk(ro, view(rkbo, :, i), pr.X, fees)
     end
     return w, rkcl
 end

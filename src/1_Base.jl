@@ -69,7 +69,7 @@ All concrete types that implement variance estimation (e.g., sample variance, ro
   - [`AbstractCovarianceEstimator`](@ref)
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
-function Base.show(io::IO, ::MIME"text/plain",
+function Base.show(io::IO, arg::MIME"text/plain",
                    ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                               <:AbstractCovarianceEstimator})
     name = string(typeof(ear))
@@ -93,7 +93,7 @@ function Base.show(io::IO, ::MIME"text/plain",
                    Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
                          <:AbstractCovarianceEstimator, <:JuMP.Model})
             ioalg = IOBuffer()
-            show(ioalg, val)
+            show(ioalg, arg, val)
             algstr = String(take!(ioalg))
             alglines = split(algstr, '\n')
             println(io, "| ", alglines[1])

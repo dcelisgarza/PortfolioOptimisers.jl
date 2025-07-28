@@ -125,7 +125,7 @@ function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims
                          fees, rb.opt.ss)
     set_smip_constraints!(model, wb, rb.opt.scard, sgcard, smtx, rb.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, rb.opt.te, rb, nplg, cplg)
+    set_tracking_error_constraints!(model, pr, rb.opt.te, rb, nplg, cplg, fees)
     set_number_effective_assets!(model, rb.opt.nea)
     set_l1_regularisation!(model, rb.opt.l1)
     set_l2_regularisation!(model, rb.opt.l2)
@@ -138,8 +138,11 @@ function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims
     add_custom_constraint!(model, rb.opt.ccnt, rb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
-    return JuMPOptimisationResult(typeof(rb), pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
-                                  cplg, ret, retcode, sol, ifelse(save, model, nothing))
+    return JuMPOptimisationResult(typeof(rb),
+                                  ProcessedJuMPOptimiserAttributes(pr, wb, lcs, cent, gcard,
+                                                                   sgcard, smtx, nplg, cplg,
+                                                                   tn, fees, ret), retcode,
+                                  sol, ifelse(save, model, nothing))
 end
 
 export AssetRiskBudgettingAlgorithm, FactorRiskBudgettingAlgorithm, RiskBudgetting

@@ -1,19 +1,21 @@
 struct HierarchicalOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
-                                      T3 <: Union{Nothing, <:WeightBoundsResult},
-                                      T4 <: AbstractClusteringResult,
-                                      T5 <: OptimisationReturnCode, T6 <: AbstractVector} <:
+                                      T3 <: Union{Nothing, <:Fees},
+                                      T4 <: Union{Nothing, <:WeightBoundsResult},
+                                      T5 <: AbstractClusteringResult,
+                                      T6 <: OptimisationReturnCode, T7 <: AbstractVector} <:
        OptimisationResult
     oe::T1
     pr::T2
-    wb::T3
-    clr::T4
-    retcode::T5
-    w::T6
+    fees::T3
+    wb::T4
+    clr::T5
+    retcode::T6
+    w::T7
 end
 struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                              T2 <: Union{<:ClusteringEstimator, <:AbstractClusteringResult},
                              T3 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                             T4 <: Union{Nothing, <:Fees},
+                             T4 <: Union{Nothing, <:FeesEstimator, <:Fees},
                              T5 <:
                              Union{Nothing, <:WeightBoundsResult, <:AbstractString, Expr,
                                    <:AbstractVector{<:AbstractString},
