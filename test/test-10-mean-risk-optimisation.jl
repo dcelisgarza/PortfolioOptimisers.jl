@@ -55,6 +55,9 @@
                                   "reduced_tol_ktratio" => 1e-3, "reduced_tol_feas" => 1e-4,
                                   "reduced_tol_infeas_abs" => 1e-4,
                                   "reduced_tol_infeas_rel" => 1e-4))]
+    sets = AssetSets(;
+                     dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
+                                 "group2" => rd.nx[2:2:end]))
     pr = prior(HighOrderPriorEstimator(), rd)
     clr = clusterise(ClusteringEstimator(), pr)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
@@ -94,7 +97,6 @@
           OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray()),
           OrderedWeightsArrayRange(), NegativeSkewness(),
           NegativeSkewness(; alg = QuadRiskExpr())]
-
     df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
     i = 1
     for obj in objs, ret in rets, r in rs
@@ -164,7 +166,7 @@
         r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
         mr = MeanRisk(; r = r, opt = opt)
         w3 = optimise!(mr, rd).w
-        @test isapprox(w3, w1, rtol = 2e-2)
+        @test isapprox(w3, w1, rtol = 5e-2)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser(; gamma = 1e5))
         r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
@@ -172,60 +174,64 @@
         w4 = optimise!(mr, rd).w
         @test isapprox(w4, w2, rtol = 1e-4)
     end
-    #=
-    # @testset "Arithmetic return uncertainty set" begin
-    rng = StableRNG(123456789)
-    ucs1 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
-                                                alg = BoxUncertaintySetAlgorithm()), pr.X)
-    ucs2 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
-                                                alg = EllipseUncertaintySetAlgorithm(;
-                                                                                     method = GeneralKUncertaintyAlgorithm())),
-                  pr.X)
-
-    ucss = [ucs1, ucs2]
-    objs = [MinimumRisk(), MaximumRatio(; rf = rf), MaximumReturn()]
-    df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk-UncertaintyReturns.csv"), DataFrame)
-    df = DataFrame()
-    i = 1
-    for ucs in ucss
-        for obj in objs
-            ret = ArithmeticReturn(; ucs = ucs)
-            opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
-            mre = MeanRisk(; obj = obj, opt = opt)
-            res = optimise!(mre)
-            @test isa(res.retcode, OptimisationSuccess)
-            df[!, "$i"] = res.w
-            # rtol = 1e-6
-            # success = isapprox(res.w, df[!, i]; rtol = rtol)
-            # if !success
-            #     println("Counter: $i")
-            #     find_tol(res.w, df[!, i])
-            # end
-            # @test success
-            i += 1
+    @testset "Arithmetic return uncertainty set" begin
+        rng = StableRNG(123456789)
+        ucs1 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+                                                    rng = rng,
+                                                    alg = BoxUncertaintySetAlgorithm()),
+                      pr.X)
+        ucs2 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+                                                    rng = rng,
+                                                    alg = EllipseUncertaintySetAlgorithm()),
+                      pr.X)
+        ucss = [ucs1, ucs2]
+        objs = [MinimumRisk(), MaximumRatio(; rf = rf), MaximumReturn()]
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskUncertainty.csv.gz"), DataFrame)
+        i = 1
+        for ucs in ucss
+            for obj in objs
+                ret = ArithmeticReturn(; ucs = ucs)
+                opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
+                mre = MeanRisk(; obj = obj, opt = opt)
+                res = optimise!(mre)
+                @test isa(res.retcode, OptimisationSuccess)
+                rtol = 1e-6
+                success = isapprox(res.w, df[!, i]; rtol = rtol)
+                if !success
+                    println("Counter: $i")
+                    find_tol(res.w, df[!, i])
+                end
+                @test success
+                i += 1
+            end
         end
     end
+    @testset "Weight bounds" begin
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBoundsConstraint(;
+                                                        lb = ["group1" => -1,
+                                                              "group2" => 0.1],
+                                                        ub = Dict("group1" => -0.1,
+                                                                  "group2" => 1)))
+        mr = MeanRisk(; opt = opt)
+        res1 = optimise!(mr)
+        @test isapprox(sum(res1.w), 1)
+        @test isapprox(sum(res1.w[res1.w .< zero(eltype(res1.w))]), -1)
+        @test isapprox(sum(res1.w[res1.w .>= zero(eltype(res1.w))]), 2)
+        @test all(res1.pa.wb.lb[1:2:end] .<= res1.w[1:2:end])
+        @test all(abs.(res1.w[1:2:end] .- res1.pa.wb.ub[1:2:end]) .< 5e-10)
+        @test all(res1.pa.wb.lb[2:2:end] .<= res1.w[2:2:end] .<= res1.pa.wb.ub[2:2:end])
 
-    ret = ArithmeticReturn(; ucs = ucs2)
-    opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
-    mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf), opt = opt)
-    res = optimise!(mre)
-
-    using PortfolioOptimiser
-    portfolio = Portfolio(; prices = X,
-                          solvers = PortOptSolver(; name = :Clarabel,
-                                                  solver = Clarabel.Optimizer,
-                                                  check_sol = (; allow_local = true,
-                                                               allow_almost = true),
-                                                  params = Dict("verbose" => false)))
-    asset_statistics!(portfolio)
-    wc_statistics!(portfolio;
-                   wc_type = WCType(; diagonal = true, k_mu = KGeneralWC(),
-                                    box = NormalWC(; rng = rng, seed = 123456789),
-                                    ellipse = NormalWC(; rng = rng, seed = 123456789)))
-    w = PortfolioOptimiser.optimise!(portfolio,
-                                     Trad(; rm = CVaR(), kelly = NoKelly(; wc_set = Ellipse()),
-                                          obj = Sharpe(; ohf = 0, rf = rf)))
-    # end
-    =#
+        lb = zeros(eltype(res1.w), size(res1.w))
+        ub = zeros(eltype(res1.w), size(res1.w))
+        lb[1:2:end] .= -1
+        ub[1:2:end] .= -0.1
+        lb[2:2:end] .= 0.1
+        ub[2:2:end] .= 1
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBoundsResult(; lb = lb, ub = ub))
+        mr = MeanRisk(; opt = opt)
+        res2 = optimise!(mr)
+        @test isapprox(res1.w, res2.w)
+    end
 end

@@ -48,17 +48,23 @@ function WeightBoundsResult(; lb::Union{Nothing, <:Real, <:AbstractVector{<:Real
     validate_bounds(lb, ub)
     return WeightBoundsResult{typeof(lb), typeof(ub)}(lb, ub)
 end
-struct WeightBoundsConstraint{T1 <: Union{Nothing, <:AbstractDict},
-                              T2 <: Union{Nothing, <:AbstractDict}} <: AbstractEstimator
+struct WeightBoundsConstraint{T1 <: Union{Nothing, <:AbstractDict,
+                                          <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                              T2 <: Union{Nothing, <:AbstractDict,
+                                          <:AbstractVector{<:Pair{<:Any, <:Real}}}} <:
+       AbstractEstimator
     lb::T1
     ub::T2
 end
-function WeightBoundsConstraint(; lb::Union{Nothing, <:AbstractDict} = nothing,
-                                ub::Union{Nothing, <:AbstractDict} = nothing)
-    if isa(lb, AbstractDict)
+function WeightBoundsConstraint(;
+                                lb::Union{Nothing, <:AbstractDict,
+                                          <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
+                                ub::Union{Nothing, <:AbstractDict,
+                                          <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing)
+    if !isnothing(lb)
         @smart_assert(!isempty(lb))
     end
-    if isa(ub, AbstractDict)
+    if !isnothing(ub)
         @smart_assert(!isempty(ub))
     end
     return WeightBoundsConstraint{typeof(lb), typeof(ub)}(lb, ub)
@@ -75,10 +81,12 @@ function get_weight_bounds(::Nothing, lb::Bool, sets::AssetSets, args...; kwargs
     val = lb ? 0.0 : 1.0
     return range(; start = val, stop = val, length = length(nx))
 end
-function get_weight_bounds(bounds::AbstractDict, lb::Bool, sets::AssetSets;
-                           strict::Bool = false, datatype::DataType = Float64)
-    return asset_sets_dict_to_array(bounds, sets, ifelse(lb, zero(datatype), one(datatype));
-                                    strict = strict)
+function get_weight_bounds(bounds::Union{<:AbstractDict,
+                                         <:AbstractVector{<:Pair{<:Any, <:Real}}}, lb::Bool,
+                           sets::AssetSets; strict::Bool = false,
+                           datatype::DataType = Float64)
+    return asset_sets_to_array(bounds, sets, ifelse(lb, zero(datatype), one(datatype));
+                               strict = strict)
 end
 function weight_bounds_constraints(wb::WeightBoundsConstraint, sets::AssetSets;
                                    strict::Bool = false, datatype::DataType = Float64,

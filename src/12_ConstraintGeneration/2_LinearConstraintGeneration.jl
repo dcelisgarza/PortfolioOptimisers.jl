@@ -149,8 +149,10 @@ struct AssetSets{T1 <: AbstractString, T2 <: AbstractDict} <: AbstractEstimator
 end
 Base.length(res::AssetSets) = 1
 Base.iterate(res::AssetSets, state = 1) = state > 1 ? nothing : (res, state + 1)
-function asset_sets_dict_to_array!(arr::AbstractArray, dict::AbstractDict, sets::AssetSets;
-                                   strict::Bool = false)
+function asset_sets_to_array!(arr::AbstractArray,
+                              dict::Union{<:AbstractDict,
+                                          <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                              sets::AssetSets; strict::Bool = false)
     nx = sets.dict[sets.key]
     for (key, val) in dict
         if key in nx
@@ -171,8 +173,9 @@ function asset_sets_dict_to_array!(arr::AbstractArray, dict::AbstractDict, sets:
     end
     return nothing
 end
-function asset_sets_dict_to_array(dict::AbstractDict, sets::AssetSets, val::Real = 0.0;
-                                  strict::Bool = false)
+function asset_sets_to_array(dict::Union{<:AbstractDict,
+                                         <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                             sets::AssetSets, val::Real = 0.0; strict::Bool = false)
     nx = sets.dict[sets.key]
     arr = fill(val, length(nx))
     for (key, val) in dict
@@ -194,7 +197,7 @@ function asset_sets_dict_to_array(dict::AbstractDict, sets::AssetSets, val::Real
     end
     return arr
 end
-function asset_sets_dict_to_array(::Nothing, args...; kwargs...)
+function asset_sets_to_array(::Nothing, args...; kwargs...)
     return nothing
 end
 function AssetSets(; key::AbstractString = "nx", dict::AbstractDict)

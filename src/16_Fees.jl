@@ -1,9 +1,13 @@
 struct FeesEstimator{T1 <: Union{Nothing, <:TurnoverEstimator, <:Turnover},
-                     T2 <: Union{Nothing, <:AbstractDict},
-                     T3 <: Union{Nothing, <:AbstractDict},
-                     T4 <: Union{Nothing, <:AbstractDict},
-                     T5 <: Union{Nothing, <:AbstractDict}, T6 <: NamedTuple} <:
-       AbstractEstimator
+                     T2 <: Union{Nothing, <:AbstractDict,
+                                 <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                     T3 <: Union{Nothing, <:AbstractDict,
+                                 <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                     T4 <: Union{Nothing, <:AbstractDict,
+                                 <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                     T5 <: Union{Nothing, <:AbstractDict,
+                                 <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                     T6 <: NamedTuple} <: AbstractEstimator
     tn::T1
     l::T2
     s::T3
@@ -12,21 +16,25 @@ struct FeesEstimator{T1 <: Union{Nothing, <:TurnoverEstimator, <:Turnover},
     kwargs::T6
 end
 function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
-                       l::Union{Nothing, <:AbstractDict} = nothing,
-                       s::Union{Nothing, <:AbstractDict} = nothing,
-                       fl::Union{Nothing, <:AbstractDict} = nothing,
-                       fs::Union{Nothing, <:AbstractDict} = nothing,
+                       l::Union{Nothing, <:AbstractDict,
+                                <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
+                       s::Union{Nothing, <:AbstractDict,
+                                <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
+                       fl::Union{Nothing, <:AbstractDict,
+                                 <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
+                       fs::Union{Nothing, <:AbstractDict,
+                                 <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))
-    if isa(l, AbstractDict)
+    if !isnothing(l)
         @smart_assert(!isempty(l))
     end
-    if isa(s, AbstractDict)
+    if !isnothing(s)
         @smart_assert(!isempty(s))
     end
-    if isa(fl, AbstractDict)
+    if !isnothing(fl)
         @smart_assert(!isempty(fl))
     end
-    if isa(fs, AbstractDict)
+    if !isnothing(fs)
         @smart_assert(!isempty(fs))
     end
     return FeesEstimator{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
@@ -42,12 +50,10 @@ function fees_constraints(fees::FeesEstimator, sets::AssetSets; strict::Bool = f
     return Fees(;
                 tn = turnover_constraints(fees.tn, sets; strict = strict,
                                           datatype = datatype),
-                l = asset_sets_dict_to_array(fees.l, sets, zero(datatype); strict = strict),
-                s = asset_sets_dict_to_array(fees.s, sets, zero(datatype); strict = strict),
-                fl = asset_sets_dict_to_array(fees.fl, sets, zero(datatype);
-                                              strict = strict),
-                fs = asset_sets_dict_to_array(fees.fs, sets, zero(datatype);
-                                              strict = strict))
+                l = asset_sets_to_array(fees.l, sets, zero(datatype); strict = strict),
+                s = asset_sets_to_array(fees.s, sets, zero(datatype); strict = strict),
+                fl = asset_sets_to_array(fees.fl, sets, zero(datatype); strict = strict),
+                fs = asset_sets_to_array(fees.fs, sets, zero(datatype); strict = strict))
 end
 struct Fees{T1 <: Union{Nothing, <:Turnover},
             T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},

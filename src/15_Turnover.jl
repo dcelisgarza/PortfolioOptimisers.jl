@@ -1,9 +1,13 @@
-struct TurnoverEstimator{T1 <: AbstractVector{<:Real}, T2 <: AbstractDict} <:
+struct TurnoverEstimator{T1 <: AbstractVector{<:Real},
+                         T2 <:
+                         Union{<:AbstractDict, <:AbstractVector{<:Pair{<:Any, <:Real}}}} <:
        AbstractEstimator
     w::T1
     val::T2
 end
-function TurnoverEstimator(; w::AbstractVector{<:Real}, val::AbstractDict)
+function TurnoverEstimator(; w::AbstractVector{<:Real},
+                           val::Union{<:AbstractDict,
+                                      <:AbstractVector{<:Pair{<:Any, <:Real}}})
     @smart_assert(!isempty(w))
     @smart_assert(!isempty(val))
     return TurnoverEstimator{typeof(w), typeof(val)}(w, val)
@@ -14,8 +18,8 @@ end
 function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false,
                               datatype::DataType = Float64)
     return Turnover(; w = tn.w,
-                    val = asset_sets_dict_to_array(tn.val, sets, zero(datatype);
-                                                   strict = strict))
+                    val = asset_sets_to_array(tn.val, sets, zero(datatype);
+                                              strict = strict))
 end
 struct Turnover{T1 <: AbstractVector{<:Real},
                 T2 <: Union{<:Real, <:AbstractVector{<:Real}}} <: AbstractResult
