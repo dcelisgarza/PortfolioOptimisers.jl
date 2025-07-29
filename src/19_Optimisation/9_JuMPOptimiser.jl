@@ -1,29 +1,33 @@
 struct ProcessedJuMPOptimiserAttributes{T1 <: AbstractPriorResult,
                                         T2 <: Union{Nothing, <:WeightBoundsResult},
-                                        T3 <: Union{Nothing, <:LinearConstraintResult},
-                                        T4 <: Union{Nothing, <:LinearConstraintResult},
+                                        T3 <: Union{Nothing, <:Real, <:AbstractVector},
+                                        T4 <: Union{Nothing, <:Real, <:AbstractVector},
                                         T5 <: Union{Nothing, <:LinearConstraintResult},
                                         T6 <: Union{Nothing, <:LinearConstraintResult},
-                                        T7 <: Union{Nothing, Symbol, <:AbstractString,
+                                        T7 <: Union{Nothing, <:LinearConstraintResult},
+                                        T8 <: Union{Nothing, <:LinearConstraintResult},
+                                        T9 <: Union{Nothing, Symbol, <:AbstractString,
                                                     <:AbstractMatrix},
-                                        T8 <: Union{Nothing, <:PhilogenyConstraintResult},
-                                        T9 <: Union{Nothing, <:PhilogenyConstraintResult},
-                                        T10 <: Union{Nothing, <:Turnover,
+                                        T10 <: Union{Nothing, <:PhilogenyConstraintResult},
+                                        T11 <: Union{Nothing, <:PhilogenyConstraintResult},
+                                        T12 <: Union{Nothing, <:Turnover,
                                                      <:AbstractVector{<:Turnover}},
-                                        T11 <: Union{Nothing, <:Fees},
-                                        T12 <: JuMPReturnsEstimator} <: AbstractResult
+                                        T13 <: Union{Nothing, <:Fees},
+                                        T14 <: JuMPReturnsEstimator} <: AbstractResult
     pr::T1
     wb::T2
-    lcs::T3
-    cent::T4
-    gcard::T5
-    sgcard::T6
-    smtx::T7
-    nplg::T8
-    cplg::T9
-    tn::T10
-    fees::T11
-    ret::T12
+    lt::T3
+    st::T4
+    lcs::T5
+    cent::T6
+    gcard::T7
+    sgcard::T8
+    smtx::T9
+    nplg::T10
+    cplg::T11
+    tn::T12
+    fees::T13
+    ret::T14
 end
 struct JuMPOptimisationResult{T1 <: Type, T2 <: ProcessedJuMPOptimiserAttributes,
                               T3 <: Union{<:OptimisationReturnCode,
@@ -62,6 +66,10 @@ function Base.getproperty(r::Union{<:JuMPOptimisationResult,
         r.pa.pr
     elseif sym == :wb
         r.pa.wb
+    elseif sym == :lt
+        r.pa.lt
+    elseif sym == :st
+        r.pa.st
     elseif sym == :lcs
         r.pa.lcs
     elseif sym == :cent
@@ -93,8 +101,10 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T3 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
                      T4 <: Union{Nothing, <:Real, <:BudgetRange, <:BudgetCosts},
                      T5 <: Union{Nothing, <:Real, <:BudgetRange},
-                     T6 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                     T7 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                     T6 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:AbstractDict,
+                                 <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                     T7 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:AbstractDict,
+                                 <:AbstractVector{<:Pair{<:Any, <:Real}}},
                      T8 <: Union{Nothing, <:AbstractString, Expr,
                                  <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
                                  <:AbstractVector{<:Union{<:AbstractString, Expr}},
@@ -193,8 +203,10 @@ function JuMPOptimiser(;
                        wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = WeightBoundsResult(),
                        bgt::Union{Nothing, <:Real, <:BudgetConstraintEstimator} = 1.0,
                        sbgt::Union{Nothing, <:Real, <:BudgetRange} = nothing,
-                       lt::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                       st::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                       lt::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:AbstractDict,
+                                 <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
+                       st::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:AbstractDict,
+                                 <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
                        lcs::Union{Nothing, <:AbstractString, Expr,
                                   <:AbstractVector{<:AbstractString},
                                   <:AbstractVector{Expr},
@@ -304,6 +316,8 @@ function JuMPOptimiser(;
                  <:LinearConstraint, <:AbstractVector{<:LinearConstraint}
                  #! End: to delete
                  }) ||
+       isa(lt, Union{<:AbstractDict, <:AbstractVector{<:Pair{<:Any, <:Real}}}) ||
+       isa(st, Union{<:AbstractDict, <:AbstractVector{<:Pair{<:Any, <:Real}}}) ||
        isa(cent,
            Union{<:AbstractString, Expr, <:AbstractVector{<:AbstractString},
                  <:AbstractVector{Expr}, <:AbstractVector{<:Union{<:AbstractString, Expr}},
@@ -336,10 +350,10 @@ function JuMPOptimiser(;
         N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
         @smart_assert(N == N_ineq + N_eq)
     end
-    if !isnothing(lt)
+    if isa(lt, Real) || isa(lt, AbstractVector{<:Real})
         assert_finite_nonnegative_real_or_vec(lt)
     end
-    if !isnothing(st)
+    if isa(st, Real) || isa(st, AbstractVector{<:Real})
         assert_finite_nonnegative_real_or_vec(st)
     end
     if isa(tn, AbstractVector)
@@ -368,13 +382,20 @@ function JuMPOptimiser(;
                                                                  card, scard, nea, l1, l2,
                                                                  ss, strict)
 end
+function threshold_view(t::Union{<:AbstractDict, <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                        ::Any)
+    return t
+end
+function threshold_view(t::Union{Nothing, <:Real, <:AbstractVector}, i::AbstractVector)
+    return nothing_scalar_array_view(t, i)
+end
 function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
     bgt = budget_view(opt.bgt, i)
-    lt = nothing_scalar_array_view(opt.lt, i)
-    st = nothing_scalar_array_view(opt.lt, i)
+    lt = threshold_view(opt.lt, i)
+    st = threshold_view(opt.st, i)
     # lcs = linear_constraint_view(opt.lcs, i)
     # gcard = linear_constraint_view(opt.gcard, i)
     # sgcard = linear_constraint_view(opt.sgcard, i)
@@ -400,6 +421,14 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     datatype = eltype(pr.X)
     wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(pr.X, 2), strict = opt.strict,
                                    datatype = datatype)
+    lt = asset_sets_to_array(opt.lt, opt.sets, zero(datatype); strict = opt.strict)
+    if isa(lt, Real) || isa(lt, AbstractVector{<:Real})
+        assert_finite_nonnegative_real_or_vec(lt)
+    end
+    st = asset_sets_to_array(opt.st, opt.sets, zero(datatype); strict = opt.strict)
+    if isa(st, Real) || isa(st, AbstractVector{<:Real})
+        assert_finite_nonnegative_real_or_vec(st)
+    end
     lcs = linear_constraints(opt.lcs, opt.sets; datatype = datatype, strict = opt.strict)
     cent = centrality_constraints(opt.cent, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     gcard = linear_constraints(opt.gcard, opt.sets; datatype = Int, strict = opt.strict)
@@ -410,8 +439,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     tn = turnover_constraints(opt.tn, opt.sets; strict = opt.strict, datatype = datatype)
     fees = fees_constraints(opt.fees, opt.sets; strict = opt.strict, datatype = datatype)
     ret = jump_returns_factory(opt.ret, pr)
-    return ProcessedJuMPOptimiserAttributes(pr, wb, lcs, cent, gcard, sgcard, smtx, nplg,
-                                            cplg, tn, fees, ret)
+    return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx,
+                                            nplg, cplg, tn, fees, ret)
 end
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = propertynames(opt)
@@ -421,11 +450,11 @@ function no_bounds_optimiser(opt::JuMPOptimiser, args...)
                          (getproperty(opt, pnames[i]) for i in (idx + 1):length(pnames))...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
-    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(opt,
-                                                                                                                rd;
-                                                                                                                dims = dims)
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(opt,
+                                                                                                                        rd;
+                                                                                                                        dims = dims)
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
-                         lt = opt.lt, st = opt.st, lcs = lcs, lcm = opt.lcm, cent = cent,
+                         lt = lt, st = st, lcs = lcs, lcm = opt.lcm, cent = cent,
                          gcard = gcard, sgcard = sgcard, smtx = smtx, sets = opt.sets,
                          nplg = nplg, cplg = cplg, tn = tn, te = opt.te, fees = fees,
                          ret = ret, sce = opt.sce, ccnt = opt.ccnt, cobj = opt.cobj,

@@ -76,10 +76,8 @@ function weight_bounds_view(wb::Union{<:AbstractString, Expr,
                                       <:WeightBoundsConstraint}, ::Any)
     return wb
 end
-function get_weight_bounds(::Nothing, lb::Bool, sets::AssetSets, args...; kwargs...)
-    nx = sets.dict[sets.key]
-    val = lb ? 0.0 : 1.0
-    return range(; start = val, stop = val, length = length(nx))
+function get_weight_bounds(wb::Union{Nothing, <:Real, <:AbstractVector}, args...; kwargs...)
+    return wb
 end
 function get_weight_bounds(bounds::Union{<:AbstractDict,
                                          <:AbstractVector{<:Pair{<:Any, <:Real}}}, lb::Bool,

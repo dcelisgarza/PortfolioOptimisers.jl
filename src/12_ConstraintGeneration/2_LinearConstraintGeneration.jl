@@ -197,8 +197,9 @@ function asset_sets_to_array(dict::Union{<:AbstractDict,
     end
     return arr
 end
-function asset_sets_to_array(::Nothing, args...; kwargs...)
-    return nothing
+function asset_sets_to_array(val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...;
+                             kwargs...)
+    return val
 end
 function AssetSets(; key::AbstractString = "nx", dict::AbstractDict)
     @smart_assert(!isempty(dict))

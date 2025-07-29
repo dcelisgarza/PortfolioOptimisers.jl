@@ -111,9 +111,9 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
 end
 function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lcs, cent, gcard, sgcard, smtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
-                                                                                                                rd;
-                                                                                                                dims = dims)
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
+                                                                                                                        rd;
+                                                                                                                        dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
@@ -121,8 +121,7 @@ function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, rb.opt.lcm, :lcm_ineq, :lcm_eq)
-    set_mip_constraints!(model, wb, rb.opt.card, gcard, nplg, cplg, rb.opt.lt, rb.opt.st,
-                         fees, rb.opt.ss)
+    set_mip_constraints!(model, wb, rb.opt.card, gcard, nplg, cplg, lt, st, fees, rb.opt.ss)
     set_smip_constraints!(model, wb, rb.opt.scard, sgcard, smtx, rb.opt.ss)
     set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, rb.opt.te, rb, nplg, cplg, fees)
@@ -139,10 +138,11 @@ function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
     return JuMPOptimisationResult(typeof(rb),
-                                  ProcessedJuMPOptimiserAttributes(pr, wb, lcs, cent, gcard,
-                                                                   sgcard, smtx, nplg, cplg,
-                                                                   tn, fees, ret), retcode,
-                                  sol, ifelse(save, model, nothing))
+                                  ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs,
+                                                                   cent, gcard, sgcard,
+                                                                   smtx, nplg, cplg, tn,
+                                                                   fees, ret), retcode, sol,
+                                  ifelse(save, model, nothing))
 end
 
 export AssetRiskBudgettingAlgorithm, FactorRiskBudgettingAlgorithm, RiskBudgetting

@@ -381,4 +381,18 @@
         @test count(w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 2
         @test count(w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 3
     end
+    # @testset "Buy-in threshold" begin
+    # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = ["WMT" => 0.25, "group2" => 0.5],
+    #                     sets = sets)
+    # mre = MeanRisk(; opt = opt)
+    # res = optimise!(mre, rd)
+
+    # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = 0.15, sets = sets)
+    # mre = MeanRisk(; opt = opt)
+    # res = optimise!(mre, rd)
+
+    # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = fill(0.15, size(pr.X, 2)), sets = sets)
+    # mre = MeanRisk(; opt = opt)
+    # res = optimise!(mre, rd)
+    # end
 end
