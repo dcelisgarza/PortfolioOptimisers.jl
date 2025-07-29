@@ -305,18 +305,6 @@
         @test all(res1.pa.wb.lb[1:2:end] .<= res1.w[1:2:end])
         @test all(abs.(res1.w[1:2:end] .- res1.pa.wb.ub[1:2:end]) .< 5e-10)
         @test all(res1.pa.wb.lb[2:2:end] .<= res1.w[2:2:end] .<= res1.pa.wb.ub[2:2:end])
-
-        lb = zeros(eltype(res1.w), size(res1.w))
-        ub = zeros(eltype(res1.w), size(res1.w))
-        lb[1:2:end] .= -1
-        ub[1:2:end] .= -0.1
-        lb[2:2:end] .= 0.1
-        ub[2:2:end] .= 1
-        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                            wb = WeightBoundsResult(; lb = lb, ub = ub))
-        mr = MeanRisk(; opt = opt)
-        res2 = optimise!(mr)
-        @test isapprox(res1.w, res2.w)
     end
     @testset "Budget" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
@@ -348,7 +336,7 @@
     @testset "Cardinality" begin
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, card = 3)
         mre = MeanRisk(; opt = opt)
-        res = optimise!(mre, rd)
+        res = optimise!(mre)
         w = res.w
         @test count(w .> 1e-10) <= 3
 
@@ -356,14 +344,14 @@
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             card = 7)
         mre = MeanRisk(; opt = opt)
-        res = optimise!(mre, rd)
+        res = optimise!(mre)
         w = res.w
         @test count(abs.(w) .> 1e-10) <= 7
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                             gcard = [:(XOM + MRK + WMT <= 2), :(group2 == 5)], sets = sets)
         mre = MeanRisk(; opt = opt)
-        res = optimise!(mre, rd)
+        res = optimise!(mre)
         w = res.w
         @test rd.nx[.!iszero.(vec(res.gcard.A_ineq[1, :]))] == ["MRK", "WMT", "XOM"]
         @test rd.nx[.!iszero.(vec(res.gcard.A_eq[1, :]))] == rd.nx[2:2:end]
@@ -374,25 +362,37 @@
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             gcard = [:(XOM + MRK + WMT <= 2), :(group2 == 3)], sets = sets)
         mre = MeanRisk(; opt = opt)
-        res = optimise!(mre, rd)
+        res = optimise!(mre)
         w = res.w
         @test rd.nx[.!iszero.(vec(res.gcard.A_ineq[1, :]))] == ["MRK", "WMT", "XOM"]
         @test rd.nx[.!iszero.(vec(res.gcard.A_eq[1, :]))] == rd.nx[2:2:end]
         @test count(w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 2
         @test count(w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 3
     end
-    # @testset "Buy-in threshold" begin
-    # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = ["WMT" => 0.25, "group2" => 0.5],
-    #                     sets = sets)
-    # mre = MeanRisk(; opt = opt)
-    # res = optimise!(mre, rd)
+    @testset "Buy-in threshold" begin
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                            lt = ["WMT" => 0.23, "group2" => 0.48], sets = sets)
+        mre = MeanRisk(; opt = opt)
+        res = optimise!(mre)
+        @test res.w[findfirst(x -> x == "WMT", rd.nx)] >= 0.23
+        @test res.w[2:2:end][res.w[2:2:end] .> 1e-9][1] >= 0.48
 
-    # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = 0.15, sets = sets)
-    # mre = MeanRisk(; opt = opt)
-    # res = optimise!(mre, rd)
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = 0.15, sets = sets)
+        mre = MeanRisk(; opt = opt)
+        res = optimise!(mre)
+        res.w[res.w .>= 1e-10] .>= 0.15
 
-    # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = fill(0.15, size(pr.X, 2)), sets = sets)
-    # mre = MeanRisk(; opt = opt)
-    # res = optimise!(mre, rd)
-    # end
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = fill(0.15, size(pr.X, 2)),
+                            sets = sets)
+        mre = MeanRisk(; opt = opt)
+        @test isapprox(res.w, optimise!(mre).w)
+
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            st = 0.25, lt = 0.4, sets = sets)
+        mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mre)
+        @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)
+        @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<= -0.25)
+    end
 end

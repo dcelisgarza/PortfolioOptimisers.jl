@@ -83,8 +83,8 @@ function get_weight_bounds(bounds::Union{<:AbstractDict,
                                          <:AbstractVector{<:Pair{<:Any, <:Real}}}, lb::Bool,
                            sets::AssetSets; strict::Bool = false,
                            datatype::DataType = Float64)
-    return asset_sets_to_array(bounds, sets, ifelse(lb, zero(datatype), one(datatype));
-                               strict = strict)
+    return estimator_to_val(bounds, sets, ifelse(lb, zero(datatype), one(datatype));
+                            strict = strict)
 end
 function weight_bounds_constraints(wb::WeightBoundsConstraint, sets::AssetSets;
                                    strict::Bool = false, datatype::DataType = Float64,

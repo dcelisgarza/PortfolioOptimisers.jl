@@ -18,8 +18,7 @@ end
 function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false,
                               datatype::DataType = Float64)
     return Turnover(; w = tn.w,
-                    val = asset_sets_to_array(tn.val, sets, zero(datatype);
-                                              strict = strict))
+                    val = estimator_to_val(tn.val, sets, zero(datatype); strict = strict))
 end
 struct Turnover{T1 <: AbstractVector{<:Real},
                 T2 <: Union{<:Real, <:AbstractVector{<:Real}}} <: AbstractResult

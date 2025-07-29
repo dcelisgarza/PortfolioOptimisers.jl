@@ -50,10 +50,10 @@ function fees_constraints(fees::FeesEstimator, sets::AssetSets; strict::Bool = f
     return Fees(;
                 tn = turnover_constraints(fees.tn, sets; strict = strict,
                                           datatype = datatype),
-                l = asset_sets_to_array(fees.l, sets, zero(datatype); strict = strict),
-                s = asset_sets_to_array(fees.s, sets, zero(datatype); strict = strict),
-                fl = asset_sets_to_array(fees.fl, sets, zero(datatype); strict = strict),
-                fs = asset_sets_to_array(fees.fs, sets, zero(datatype); strict = strict))
+                l = estimator_to_val(fees.l, sets, zero(datatype); strict = strict),
+                s = estimator_to_val(fees.s, sets, zero(datatype); strict = strict),
+                fl = estimator_to_val(fees.fl, sets, zero(datatype); strict = strict),
+                fs = estimator_to_val(fees.fs, sets, zero(datatype); strict = strict))
 end
 struct Fees{T1 <: Union{Nothing, <:Turnover},
             T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},

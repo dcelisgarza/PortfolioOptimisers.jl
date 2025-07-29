@@ -386,7 +386,8 @@ function threshold_view(t::Union{<:AbstractDict, <:AbstractVector{<:Pair{<:Any, 
                         ::Any)
     return t
 end
-function threshold_view(t::Union{Nothing, <:Real, <:AbstractVector}, i::AbstractVector)
+function threshold_view(t::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                        i::AbstractVector)
     return nothing_scalar_array_view(t, i)
 end
 function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
@@ -415,20 +416,25 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
                          so = opt.so, card = opt.card, scard = opt.scard, nea = opt.nea,
                          l1 = opt.l1, l2 = opt.l2, ss = opt.ss, strict = opt.strict)
 end
+function threshold_to_array(t::Union{Nothing, <:Real, <:AbstractVector{<:Real},
+                                     <:AbstractDict,
+                                     <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                            sets::AssetSets; datatype::DataType = Float64,
+                            strict::Bool = false)
+    t = estimator_to_val(t, sets, zero(datatype); strict = strict)
+    if isa(t, Real) || isa(t, AbstractVector{<:Real})
+        assert_finite_nonnegative_real_or_vec(t)
+    end
+    return t
+end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
     pr = prior(opt.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     datatype = eltype(pr.X)
     wb = weight_bounds_constraints(opt.wb, opt.sets; N = size(pr.X, 2), strict = opt.strict,
                                    datatype = datatype)
-    lt = asset_sets_to_array(opt.lt, opt.sets, zero(datatype); strict = opt.strict)
-    if isa(lt, Real) || isa(lt, AbstractVector{<:Real})
-        assert_finite_nonnegative_real_or_vec(lt)
-    end
-    st = asset_sets_to_array(opt.st, opt.sets, zero(datatype); strict = opt.strict)
-    if isa(st, Real) || isa(st, AbstractVector{<:Real})
-        assert_finite_nonnegative_real_or_vec(st)
-    end
+    lt = threshold_to_array(opt.lt, opt.sets; datatype = datatype, strict = opt.strict)
+    st = threshold_to_array(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
     lcs = linear_constraints(opt.lcs, opt.sets; datatype = datatype, strict = opt.strict)
     cent = centrality_constraints(opt.cent, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     gcard = linear_constraints(opt.gcard, opt.sets; datatype = Int, strict = opt.strict)
