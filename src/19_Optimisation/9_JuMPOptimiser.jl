@@ -37,13 +37,6 @@ struct JuMPOptimisationResult{T1 <: Type, T2 <: ProcessedJuMPOptimiserAttributes
     sol::T4
     model::T5
 end
-function Base.getproperty(r::JuMPOptimisationResult, sym::Symbol)
-    return if sym == :w
-        !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, :w)
-    else
-        getfield(r, sym)
-    end
-end
 struct JuMPOptimisationFactorRiskContributionResult{T1 <: Type,
                                                     T2 <: ProcessedJuMPOptimiserAttributes,
                                                     T11 <: Union{Nothing,
@@ -62,9 +55,35 @@ struct JuMPOptimisationFactorRiskContributionResult{T1 <: Type,
     sol::T14
     model::T15
 end
-function Base.getproperty(r::JuMPOptimisationFactorRiskContributionResult, sym::Symbol)
-    return if sym == :w
-        r.sol.w
+function Base.getproperty(r::Union{<:JuMPOptimisationResult,
+                                   <:JuMPOptimisationFactorRiskContributionResult},
+                          sym::Symbol)
+    return if sym == :pr
+        r.pa.pr
+    elseif sym == :wb
+        r.pa.wb
+    elseif sym == :lcs
+        r.pa.lcs
+    elseif sym == :cent
+        r.pa.cent
+    elseif sym == :gcard
+        r.pa.gcard
+    elseif sym == :sgcard
+        r.pa.sgcard
+    elseif sym == :smtx
+        r.pa.smtx
+    elseif sym == :nplg
+        r.pa.nplg
+    elseif sym == :cplg
+        r.pa.cplg
+    elseif sym == :tn
+        r.pa.tn
+    elseif sym == :fees
+        r.pa.fees
+    elseif sym == :ret
+        r.pa.ret
+    elseif sym == :w
+        !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, :w)
     else
         getfield(r, sym)
     end
@@ -115,8 +134,8 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                                   <:AbstractVector{<:TurnoverEstimator}, <:Turnover,
                                   <:AbstractVector{<:Turnover},
                                   <:AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}}},
-                     T18 <:
-                     Union{Nothing, <:AbstractTracking, <:AbstractVector{AbstractTracking}},
+                     T18 <: Union{Nothing, <:AbstractTracking,
+                                  <:AbstractVector{<:AbstractTracking}},
                      T21 <: Union{Nothing, <:FeesEstimator, <:Fees},
                      T22 <: JuMPReturnsEstimator, T23 <: Scalariser,
                      T24 <: Union{Nothing, <:CustomConstraint},

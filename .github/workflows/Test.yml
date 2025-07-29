@@ -57,8 +57,8 @@ jobs:
             os: macOS-latest
             arch: x64
             allow_failure: true
-          # - version: "lts"
-          #   os: windows-latest
-          #   arch: x64
-          #   allow_failure: true
+            # - version: "lts"
+            #   os: windows-latest
+            #   arch: x64
+            #   allow_failure: true
         # Comment when lts tests pass.

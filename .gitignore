@@ -16,3 +16,4 @@ bestietemplate/*
 /docs/.CondaPkg/*
 /test/.CondaPkg/*
 *NOTRACK*
+/zed-julia/*
