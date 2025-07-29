@@ -1,6 +1,6 @@
 @safetestset "Mean Risk Optimisation" begin
-    using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, StatsBase,
-          StableRNGs
+    using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, HiGHS, Pajarito,
+          JuMP, StatsBase, StableRNGs, LinearAlgebra
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -55,6 +55,90 @@
                                   "reduced_tol_ktratio" => 1e-3, "reduced_tol_feas" => 1e-4,
                                   "reduced_tol_infeas_abs" => 1e-4,
                                   "reduced_tol_infeas_rel" => 1e-4))]
+    mip_slv = [Solver(; name = :mip1,
+                      solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                         "verbose" => false,
+                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                  MOI.Silent() => true),
+                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                     "verbose" => false)),
+                      check_sol = (; allow_local = true, allow_almost = true)),
+               Solver(; name = :mip2,
+                      solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                         "verbose" => false,
+                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                  MOI.Silent() => true),
+                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                     "verbose" => false,
+                                                                                                     "max_step_fraction" => 0.95)),
+                      check_sol = (; allow_local = true, allow_almost = true)),
+               Solver(; name = :mip3,
+                      solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                         "verbose" => false,
+                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                  MOI.Silent() => true),
+                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                     "verbose" => false,
+                                                                                                     "max_step_fraction" => 0.90)),
+                      check_sol = (; allow_local = true, allow_almost = true)),
+               Solver(; name = :mip4,
+                      solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                         "verbose" => false,
+                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                  MOI.Silent() => true),
+                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                     "verbose" => false,
+                                                                                                     "max_step_fraction" => 0.85)),
+                      check_sol = (; allow_local = true, allow_almost = true)),
+               Solver(; name = :mip5,
+                      solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                         "verbose" => false,
+                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                  MOI.Silent() => true),
+                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                     "verbose" => false,
+                                                                                                     "max_step_fraction" => 0.80)),
+                      check_sol = (; allow_local = true, allow_almost = true)),
+               Solver(; name = :mip6,
+                      solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                         "verbose" => false,
+                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                  MOI.Silent() => true),
+                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                     "verbose" => false,
+                                                                                                     "max_step_fraction" => 0.75)),
+                      check_sol = (; allow_local = true, allow_almost = true)),
+               Solver(; name = :mip7,
+                      solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                         "verbose" => false,
+                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                  MOI.Silent() => true),
+                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                     "verbose" => false,
+                                                                                                     "max_step_fraction" => 0.7)),
+                      check_sol = (; allow_local = true, allow_almost = true)),
+               Solver(; name = :mip8,
+                      solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                         "verbose" => false,
+                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                  MOI.Silent() => true),
+                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                     "verbose" => false,
+                                                                                                     "max_step_fraction" => 0.6,
+                                                                                                     "max_iter" => 1500,
+                                                                                                     "tol_gap_abs" => 1e-4,
+                                                                                                     "tol_gap_rel" => 1e-4,
+                                                                                                     "tol_ktratio" => 1e-3,
+                                                                                                     "tol_feas" => 1e-4,
+                                                                                                     "tol_infeas_abs" => 1e-4,
+                                                                                                     "tol_infeas_rel" => 1e-4,
+                                                                                                     "reduced_tol_gap_abs" => 1e-4,
+                                                                                                     "reduced_tol_gap_rel" => 1e-4,
+                                                                                                     "reduced_tol_ktratio" => 1e-3,
+                                                                                                     "reduced_tol_feas" => 1e-4,
+                                                                                                     "reduced_tol_infeas_abs" => 1e-4,
+                                                                                                     "reduced_tol_infeas_rel" => 1e-4)),
+                      check_sol = (; allow_local = true, allow_almost = true))]
     sets = AssetSets(;
                      dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
                                  "group2" => rd.nx[2:2:end]))
@@ -260,5 +344,41 @@
         @test 0.1 <= sum(res.w) <= 0.45
         @test isapprox(sum(res.w[res.w .< zero(eltype(res.w))]), -0.15, rtol = 5e-5)
         @test 0.45 <= sum(res.w[res.w .> zero(eltype(res.w))]) <= 0.60
+    end
+    @testset "Cardinality" begin
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, card = 3)
+        mre = MeanRisk(; opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test count(w .> 1e-10) <= 3
+
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            card = 7)
+        mre = MeanRisk(; opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test count(abs.(w) .> 1e-10) <= 7
+
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                            gcard = [:(XOM + MRK + WMT <= 2), :(group2 == 5)], sets = sets)
+        mre = MeanRisk(; opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test rd.nx[.!iszero.(vec(res.gcard.A_ineq[1, :]))] == ["MRK", "WMT", "XOM"]
+        @test rd.nx[.!iszero.(vec(res.gcard.A_eq[1, :]))] == rd.nx[2:2:end]
+        @test count(w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 2
+        @test count(w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 5
+
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            gcard = [:(XOM + MRK + WMT <= 2), :(group2 == 3)], sets = sets)
+        mre = MeanRisk(; opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test rd.nx[.!iszero.(vec(res.gcard.A_ineq[1, :]))] == ["MRK", "WMT", "XOM"]
+        @test rd.nx[.!iszero.(vec(res.gcard.A_eq[1, :]))] == rd.nx[2:2:end]
+        @test count(w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 2
+        @test count(w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 3
     end
 end

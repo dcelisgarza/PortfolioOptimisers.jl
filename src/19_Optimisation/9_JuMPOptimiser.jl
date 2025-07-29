@@ -403,8 +403,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     lcs = linear_constraints(opt.lcs, opt.sets; datatype = datatype, strict = opt.strict)
     cent = centrality_constraints(opt.cent, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     gcard = linear_constraints(opt.gcard, opt.sets; datatype = Int, strict = opt.strict)
-    sgcard = linear_constraints(opt.sgcard, opt.sets; datatype = datatype,
-                                strict = opt.strict)
+    sgcard = linear_constraints(opt.sgcard, opt.sets; datatype = Int, strict = opt.strict)
     smtx = asset_sets_matrix(opt.smtx, opt.sets)
     nplg = philogeny_constraints(opt.nplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     cplg = philogeny_constraints(opt.cplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
