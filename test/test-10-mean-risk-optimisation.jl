@@ -234,4 +234,31 @@
         res2 = optimise!(mr)
         @test isapprox(res1.w, res2.w)
     end
+    @testset "Budget" begin
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MaximumReturn(), opt = opt)
+        res = optimise!(mr)
+        @test isapprox(sum(res.w), 1)
+        @test isapprox(sum(res.w[res.w .< zero(eltype(res.w))]), -1, rtol = 1e-6)
+        @test isapprox(sum(res.w[res.w .>= zero(eltype(res.w))]), 2, rtol = 1e-6)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 0.15, bgt = 0.5,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mr)
+        @test isapprox(sum(res.w), 0.5)
+        @test isapprox(sum(res.w[res.w .< zero(eltype(res.w))]), -0.15, rtol = 1e-4)
+        @test isapprox(sum(res.w[res.w .>= zero(eltype(res.w))]), 0.65, rtol = 5e-5)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
+                            sbgt = BudgetRange(; lb = 0.15, ub = 0.15),
+                            bgt = BudgetRange(; lb = 0.3, ub = 0.45),
+                            wb = WeightBoundsResult(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mr)
+        @test 0.1 <= sum(res.w) <= 0.45
+        @test isapprox(sum(res.w[res.w .< zero(eltype(res.w))]), -0.15, rtol = 5e-5)
+        @test 0.45 <= sum(res.w[res.w .> zero(eltype(res.w))]) <= 0.60
+    end
 end
