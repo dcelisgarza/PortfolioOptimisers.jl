@@ -54,9 +54,9 @@ for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
              function bounds_returns_estimator(r::$(r), lb::Real)
                  pnames = setdiff(propertynames(r), (:lb,))
                  return if isempty(pnames)
-                     $(r)(lb)
+                     $(r)(; lb = lb)
                  else
-                     $(r)(getproperty.(Ref(r), pnames)..., lb)
+                     $(r)(; lb = lb, NamedTuple{pnames}(getproperty.(Ref(r), pnames))...)
                  end
              end
          end)

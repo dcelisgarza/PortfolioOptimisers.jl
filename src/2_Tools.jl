@@ -324,12 +324,9 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
         X = collapse(X, collapse_args...)
     end
     X = DataFrame(X)
-    f(x) =
-        if isa(x, Number) && isnan(x)
-            missing
-        else
-            x
-        end
+
+    f(x) = isa(x, Number) && isnan(x) ? missing : x
+
     DataFrames.transform!(X, 2:ncol(X) .=> ByRow((x) -> f(x)); renamecols = false)
     if !isnothing(impute_method)
         X = Impute.impute(X, impute_method)
