@@ -1,7 +1,7 @@
 for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVariance,))
     eval(quote
              function no_bounds_risk_measure(r::$(r), args...)
-                 pnames = setdiff(propertynames(r), (:settings,))
+                 pnames = Tuple(setdiff(propertynames(r), (:settings,)))
                  settings = r.settings
                  settings = RiskMeasureSettings(; rke = settings.rke,
                                                 scale = settings.scale)
@@ -20,7 +20,7 @@ end
 for r in traverse_concrete_subtypes(RiskMeasure)
     eval(quote
              function no_bounds_no_risk_expr_risk_measure(r::$(r))
-                 pnames = setdiff(propertynames(r), (:settings,))
+                 pnames = Tuple(setdiff(propertynames(r), (:settings,)))
                  settings = r.settings
                  settings = RiskMeasureSettings(; rke = settings.rke,
                                                 scale = settings.scale)
@@ -32,7 +32,7 @@ for r in traverse_concrete_subtypes(RiskMeasure)
                  end
              end
              function bounds_risk_measure(r::$(r), ub::Real)
-                 pnames = setdiff(propertynames(r), (:settings,))
+                 pnames = Tuple(setdiff(propertynames(r), (:settings,)))
                  settings = r.settings
                  settings = RiskMeasureSettings(; ub = ub, rke = settings.rke,
                                                 scale = settings.scale)
