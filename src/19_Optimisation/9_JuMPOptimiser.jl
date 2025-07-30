@@ -416,8 +416,11 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
                          so = opt.so, card = opt.card, scard = opt.scard, nea = opt.nea,
                          l1 = opt.l1, l2 = opt.l2, ss = opt.ss, strict = opt.strict)
 end
-function threshold_to_array(t::Union{Nothing, <:Real, <:AbstractVector{<:Real},
-                                     <:AbstractDict,
+function threshold_to_array(t::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                            args...; kwargs...)
+    return t
+end
+function threshold_to_array(t::Union{<:AbstractDict,
                                      <:AbstractVector{<:Pair{<:Any, <:Real}}},
                             sets::AssetSets; datatype::DataType = Float64,
                             strict::Bool = false)
