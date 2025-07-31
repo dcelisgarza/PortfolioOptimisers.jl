@@ -96,9 +96,9 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
 end
 function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
-                                                                                                                                         rd;
-                                                                                                                                         dims = dims)
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
+                                                                                                                                                     rd;
+                                                                                                                                                     dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
@@ -110,8 +110,8 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_linear_weight_constraints!(model, frc.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, frc.opt.card, gcard, nplg, cplg, lt, st, fees,
                          frc.opt.ss)
-    set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, sgmtx, nothing, nothing,
-                          nothing, nothing, frc.opt.ss)
+    set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
+                          sgst, frc.opt.ss)
     set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, frc.opt.te, frc, nplg, cplg, fees)
     set_number_effective_assets!(model, frc.opt.nea)
@@ -141,6 +141,8 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                                                                          slt,
                                                                                          sst,
                                                                                          sgmtx,
+                                                                                         sglt,
+                                                                                         sgst,
                                                                                          nplg,
                                                                                          cplg,
                                                                                          tn,

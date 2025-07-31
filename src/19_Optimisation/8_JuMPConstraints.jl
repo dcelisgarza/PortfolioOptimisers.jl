@@ -722,11 +722,19 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
                                    card::AbstractVector{<:Integer},
                                    gcard::AbstractVector{<:LinearConstraintResult},
                                    smtx::AbstractVector{<:AbstractMatrix},
-                                   lt::Union{Nothing, <:BuyInThresholdResult},
-                                   st::Union{Nothing, <:BuyInThresholdResult},
+                                   lt::Union{Nothing, <:BuyInThresholdResult,
+                                             <:AbstractVector{<:BuyInThresholdResult},
+                                             <:AbstractVector{<:Union{Nothing,
+                                                                      <:BuyInThresholdResult}}},
+                                   st::Union{Nothing, <:BuyInThresholdResult,
+                                             <:AbstractVector{<:BuyInThresholdResult},
+                                             <:AbstractVector{<:Union{Nothing,
+                                                                      <:BuyInThresholdResult}}},
                                    ss::Union{Nothing, <:Real})
     for (i, (c, g, s)) in enumerate(zip(card, gcard, smtx))
-        set_all_smip_constraints!(model, wb, c, g, s, lt, st, ss, i)
+        lti = isa(lt, Union{Nothing, <:BuyInThresholdResult}) ? lt : lt[i]
+        sti = isa(st, Union{Nothing, <:BuyInThresholdResult}) ? st : st[i]
+        set_all_smip_constraints!(model, wb, c, g, s, lti, sti, ss, i)
     end
     return nothing
 end
@@ -755,11 +763,19 @@ end
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
                                    card::AbstractVector{<:Integer},
                                    smtx::AbstractVector{<:AbstractMatrix},
-                                   lt::Union{Nothing, <:BuyInThresholdResult},
-                                   st::Union{Nothing, <:BuyInThresholdResult},
+                                   lt::Union{Nothing, <:BuyInThresholdResult,
+                                             <:AbstractVector{<:BuyInThresholdResult},
+                                             <:AbstractVector{<:Union{Nothing,
+                                                                      <:BuyInThresholdResult}}},
+                                   st::Union{Nothing, <:BuyInThresholdResult,
+                                             <:AbstractVector{<:BuyInThresholdResult},
+                                             <:AbstractVector{<:Union{Nothing,
+                                                                      <:BuyInThresholdResult}}},
                                    ss::Union{Nothing, <:Real})
     for (i, (c, s)) in enumerate(zip(card, smtx))
-        set_scardmip_constraints!(model, wb, c, s, lt, st, ss, i)
+        lti = isa(lt, Union{Nothing, <:BuyInThresholdResult}) ? lt : lt[i]
+        sti = isa(st, Union{Nothing, <:BuyInThresholdResult}) ? st : st[i]
+        set_scardmip_constraints!(model, wb, c, s, lti, sti, ss, i)
     end
     return nothing
 end
@@ -801,11 +817,19 @@ end
 function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
                                     gcard::AbstractVector{<:LinearConstraintResult},
                                     smtx::AbstractVector{<:AbstractMatrix},
-                                    lt::Union{Nothing, <:BuyInThresholdResult},
-                                    st::Union{Nothing, <:BuyInThresholdResult},
+                                    lt::Union{Nothing, <:BuyInThresholdResult,
+                                              <:AbstractVector{<:BuyInThresholdResult},
+                                              <:AbstractVector{<:Union{Nothing,
+                                                                       <:BuyInThresholdResult}}},
+                                    st::Union{Nothing, <:BuyInThresholdResult,
+                                              <:AbstractVector{<:BuyInThresholdResult},
+                                              <:AbstractVector{<:Union{Nothing,
+                                                                       <:BuyInThresholdResult}}},
                                     ss::Union{Nothing, <:Real})
     for (i, (gc, s)) in enumerate(zip(gcard, smtx))
-        set_sgcardmip_constraints!(model, wb, gc, s, lt, st, ss, i)
+        lti = isa(lt, Union{Nothing, <:BuyInThresholdResult}) ? lt : lt[i]
+        sti = isa(st, Union{Nothing, <:BuyInThresholdResult}) ? st : st[i]
+        set_sgcardmip_constraints!(model, wb, gc, s, lti, sti, ss, i)
     end
     return nothing
 end
