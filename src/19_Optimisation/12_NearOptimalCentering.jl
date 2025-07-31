@@ -571,7 +571,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.nplg, opt.cplg, opt.lt,
                          opt.st, opt.fees, opt.ss)
     set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx, opt.sgmtx,
-                          nothing, nothing, opt.ss)
+                          nothing, nothing, nothing, nothing, opt.ss)
     set_turnover_constraints!(model, opt.tn)
     set_tracking_error_constraints!(model, opt.pe, opt.te, noc, opt.nplg, opt.cplg,
                                     opt.fees)

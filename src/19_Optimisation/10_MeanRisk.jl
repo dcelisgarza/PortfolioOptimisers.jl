@@ -223,7 +223,7 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_linear_weight_constraints!(model, mr.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, mr.opt.card, gcard, nplg, cplg, lt, st, fees, mr.opt.ss)
     set_smip_constraints!(model, wb, mr.opt.scard, sgcard, smtx, sgmtx, nothing, nothing,
-                          mr.opt.ss)
+                          nothing, nothing, mr.opt.ss)
     set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, mr.opt.te, mr, nplg, cplg, fees)
     set_number_effective_assets!(model, mr.opt.nea)

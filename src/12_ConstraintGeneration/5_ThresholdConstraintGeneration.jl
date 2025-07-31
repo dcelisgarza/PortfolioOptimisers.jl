@@ -38,8 +38,7 @@ function threshold_constraints(t::Union{<:AbstractDict,
                                 val = estimator_to_val(t, sets, zero(datatype);
                                                        strict = strict))
 end
-function threshold_constraints(t::Union{<:AbstractVector{Nothing},
-                                        <:AbstractVector{<:AbstractDict},
+function threshold_constraints(t::Union{<:AbstractVector{<:AbstractDict},
                                         <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
                                                                                  <:Real}}},
                                         <:AbstractVector{<:Union{Nothing, <:AbstractDict,

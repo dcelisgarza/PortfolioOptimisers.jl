@@ -615,62 +615,6 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     return nothing
 end
-function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
-                                   card::Union{Nothing, <:Integer},
-                                   gcard::Union{Nothing, <:LinearConstraintResult},
-                                   smtx::Union{Nothing, <:AbstractMatrix},
-                                   lt::Union{Nothing, <:BuyInThresholdResult},
-                                   st::Union{Nothing, <:BuyInThresholdResult},
-                                   ss::Union{Nothing, <:Real}, i::Integer = 1)
-    card_flag = !isnothing(card)
-    gcard_flag = !isnothing(gcard)
-    lt_flag = !isnothing(lt)
-    st_flag = !isnothing(st)
-    if !(card_flag || gcard_flag || lt_flag || st_flag)
-        return nothing
-    end
-    sc = model[:sc]
-    sib = if st_flag && haskey(model, :sw)
-        #! Short smip threshold constraints
-    else
-        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sib_, :i_smip_, :isbf_,
-                         :w_smip_lt_, i)
-    end
-    if card_flag
-        model[Symbol(:scard_, i)] = @constraint(model, sc * (sum(sib) - card) <= 0)
-    end
-    if gcard_flag
-        if !isnothing(gcard.ineq)
-            A = gcard.ineq.A
-            B = gcard.ineq.B
-            model[Symbol(:gscard_ineq_, i)] = @constraint(model,
-                                                          sc *
-                                                          (A * transpose(smtx) * sib ⊖ B) <=
-                                                          0)
-        end
-        if !isnothing(gcard.eq)
-            A = gcard.eq.A
-            B = gcard.eq.B
-            model[Symbol(:gscard_eq_, i)] = @constraint(model,
-                                                        sc *
-                                                        (A * transpose(smtx) * sib ⊖ B) ==
-                                                        0)
-        end
-    end
-    return nothing
-end
-function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
-                                   card::AbstractVector{<:Integer},
-                                   gcard::AbstractVector{<:LinearConstraintResult},
-                                   smtx::AbstractVector{<:AbstractMatrix},
-                                   lt::Union{Nothing, <:BuyInThresholdResult},
-                                   st::Union{Nothing, <:BuyInThresholdResult},
-                                   ss::Union{Nothing, <:Real})
-    for (i, (c, g, s)) in enumerate(zip(card, gcard, smtx))
-        set_all_smip_constraints!(model, wb, c, g, s, lt, st, ss, i)
-    end
-    return nothing
-end
 function smip_wb(model::JuMP.Model, wb::WeightBoundsResult, smtx::AbstractMatrix,
                  il::AbstractVector, is::AbstractVector, key1::Symbol = :smtx_expr_,
                  key2::Symbol = :set_w_mip_, i::Integer = 1)
@@ -730,6 +674,62 @@ function smip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
     end
     return sib
 end
+function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+                                   card::Union{Nothing, <:Integer},
+                                   gcard::Union{Nothing, <:LinearConstraintResult},
+                                   smtx::Union{Nothing, <:AbstractMatrix},
+                                   lt::Union{Nothing, <:BuyInThresholdResult},
+                                   st::Union{Nothing, <:BuyInThresholdResult},
+                                   ss::Union{Nothing, <:Real}, i::Integer = 1)
+    card_flag = !isnothing(card)
+    gcard_flag = !isnothing(gcard)
+    lt_flag = !isnothing(lt)
+    st_flag = !isnothing(st)
+    if !(card_flag || gcard_flag || lt_flag || st_flag)
+        return nothing
+    end
+    sc = model[:sc]
+    sib = if st_flag && haskey(model, :sw)
+        #! Short smip threshold constraints
+    else
+        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sib_, :i_smip_, :isbf_,
+                         :w_smip_lt_, i)
+    end
+    if card_flag
+        model[Symbol(:scard_, i)] = @constraint(model, sc * (sum(sib) - card) <= 0)
+    end
+    if gcard_flag
+        if !isnothing(gcard.ineq)
+            A = gcard.ineq.A
+            B = gcard.ineq.B
+            model[Symbol(:gscard_ineq_, i)] = @constraint(model,
+                                                          sc *
+                                                          (A * transpose(smtx) * sib ⊖ B) <=
+                                                          0)
+        end
+        if !isnothing(gcard.eq)
+            A = gcard.eq.A
+            B = gcard.eq.B
+            model[Symbol(:gscard_eq_, i)] = @constraint(model,
+                                                        sc *
+                                                        (A * transpose(smtx) * sib ⊖ B) ==
+                                                        0)
+        end
+    end
+    return nothing
+end
+function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+                                   card::AbstractVector{<:Integer},
+                                   gcard::AbstractVector{<:LinearConstraintResult},
+                                   smtx::AbstractVector{<:AbstractMatrix},
+                                   lt::Union{Nothing, <:BuyInThresholdResult},
+                                   st::Union{Nothing, <:BuyInThresholdResult},
+                                   ss::Union{Nothing, <:Real})
+    for (i, (c, g, s)) in enumerate(zip(card, gcard, smtx))
+        set_all_smip_constraints!(model, wb, c, g, s, lt, st, ss, i)
+    end
+    return nothing
+end
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
                                    card::Union{Nothing, <:Integer},
                                    smtx::Union{Nothing, <:AbstractMatrix},
@@ -779,8 +779,8 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     sib = if st_flag && haskey(model, :sw)
         #! Short smip threshold constraints
     else
-        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sib_, :i_smip_, :isbf_,
-                         :w_smip_lt_, i)
+        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :gsib_, :i_gsmip_, :igsbf_,
+                         :w_gsmip_lt_, i)
     end
     if !isnothing(gcard.ineq)
         A = gcard.ineq.A
@@ -819,12 +819,14 @@ function set_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
                                             <:AbstractVector{<:AbstractMatrix}},
                                lt::Union{Nothing, <:BuyInThresholdResult},
                                st::Union{Nothing, <:BuyInThresholdResult},
+                               glt::Union{Nothing, <:BuyInThresholdResult},
+                               gst::Union{Nothing, <:BuyInThresholdResult},
                                ss::Union{Nothing, <:Real})
     if smtx === sgmtx
         set_all_smip_constraints!(model, wb, card, gcard, smtx, lt, st, ss)
     else
         set_scardmip_constraints!(model, wb, card, smtx, lt, st, ss)
-        set_sgcardmip_constraints!(model, wb, gcard, sgmtx, lt, st, ss)
+        set_sgcardmip_constraints!(model, wb, gcard, sgmtx, glt, gst, ss)
     end
     return nothing
 end
