@@ -702,7 +702,7 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
         if !isnothing(gcard.ineq)
             A = gcard.ineq.A
             B = gcard.ineq.B
-            model[Symbol(:gscard_ineq_, i)] = @constraint(model,
+            model[Symbol(:sgcard_ineq_, i)] = @constraint(model,
                                                           sc *
                                                           (A * transpose(smtx) * sib ⊖ B) <=
                                                           0)
@@ -710,7 +710,7 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
         if !isnothing(gcard.eq)
             A = gcard.eq.A
             B = gcard.eq.B
-            model[Symbol(:gscard_eq_, i)] = @constraint(model,
+            model[Symbol(:sgcard_eq_, i)] = @constraint(model,
                                                         sc *
                                                         (A * transpose(smtx) * sib ⊖ B) ==
                                                         0)
@@ -779,22 +779,22 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     sib = if st_flag && haskey(model, :sw)
         #! Short smip threshold constraints
     else
-        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :gsib_, :i_gsmip_, :igsbf_,
-                         :w_gsmip_lt_, i)
+        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sgib_, :i_sgmip_, :isgbf_,
+                         :w_sgmip_lt_, i)
     end
     if !isnothing(gcard.ineq)
         A = gcard.ineq.A
         B = gcard.ineq.B
-        model[Symbol(:gsgcard_ineq_, i)] = @constraint(model,
-                                                       sc *
-                                                       (A * transpose(smtx) * sib ⊖ B) <= 0)
+        model[Symbol(:sgcard_ineq_, i)] = @constraint(model,
+                                                      sc *
+                                                      (A * transpose(smtx) * sib ⊖ B) <= 0)
     end
     if !isnothing(gcard.eq)
         A = gcard.eq.A
         B = gcard.eq.B
-        model[Symbol(:gsgcard_eq_, i)] = @constraint(model,
-                                                     sc * (A * transpose(smtx) * sib ⊖ B) ==
-                                                     0)
+        model[Symbol(:sgcard_eq_, i)] = @constraint(model,
+                                                    sc * (A * transpose(smtx) * sib ⊖ B) ==
+                                                    0)
     end
     return nothing
 end
