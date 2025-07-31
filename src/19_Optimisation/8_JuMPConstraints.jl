@@ -615,11 +615,11 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     return nothing
 end
-function set_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
-                               card::Union{Nothing, <:Integer},
-                               gcard::Union{Nothing, <:LinearConstraintResult},
-                               smtx::Union{Nothing, Symbol, <:AbstractString,
-                                           <:AbstractMatrix}, ss::Union{Nothing, <:Real})
+function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+                                   card::Union{Nothing, <:Integer},
+                                   gcard::Union{Nothing, <:LinearConstraintResult},
+                                   smtx::Union{Nothing, <:AbstractMatrix},
+                                   ss::Union{Nothing, <:Real}, i::Integer = 1)
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     if !(card_flag || gcard_flag)
@@ -629,46 +629,231 @@ function set_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     k = model[:k]
     sc = model[:sc]
     N = size(smtx, 1)
-    @variable(model, sib[1:N], binary = true)
+    sib = model[Symbol(:sib_, i)] = @variable(model, [1:N], binary = true)
     if isa(k, Real)
-        @expression(model, i_smip, sib)
+        i_smip = model[Symbol(:i_smip_, i)] = @expression(model, sib)
     else
         if isnothing(ss)
             ss = 100_000.0
         end
-        @variable(model, isbf[1:N] >= 0)
-        @constraints(model, begin
-                         isbf_ub, isbf .- k <= 0
-                         isbfd_ub, isbf - ss * sib <= 0
-                         isbfd_lb, (isbf + ss * (1 .- sib)) .- k >= 0
-                     end)
-        @expression(model, i_smip, isbf)
+        isbf = model[Symbol(:isbf_, i)] = @variable(model, [1:N], lower_bound = 0)
+        model[Symbol(:isbf_ub_, i)], model[Symbol(:isbfd_ub_, i)], model[Symbol(:isbfd_lb_, i)] = @constraints(model,
+                                                                                                               begin
+                                                                                                                   isbf .-
+                                                                                                                   k <=
+                                                                                                                   0
+                                                                                                                   isbf -
+                                                                                                                   ss *
+                                                                                                                   sib <=
+                                                                                                                   0
+                                                                                                                   (isbf +
+                                                                                                                    ss *
+                                                                                                                    (1 .-
+                                                                                                                     sib)) .-
+                                                                                                                   k >=
+                                                                                                                   0
+                                                                                                               end)
+        i_smip = model[Symbol(:i_smip_, i)] = @expression(model, isbf)
     end
-    @expression(model, smtx_expr, smtx * w)
+    smtx_expr = model[Symbol(:smtx_expr_, i)] = @expression(model, smtx * w)
     lb = wb.lb
     ub = wb.ub
     if !isnothing(lb) && w_finite_flag(lb)
-        lb = [sum(lb[view(smtx, i, :)]) for i in axes(smtx, 1)]
-        @constraint(model, set_w_mip_lb, sc * (smtx_expr - lb .* i_smip) >= 0)
+        lb = [sum(lb[view(smtx, j, :)]) for j in axes(smtx, 1)]
+        model[Symbol(:set_w_mip_lb_, i)] = @constraint(model,
+                                                       sc * (smtx_expr - lb .* i_smip) >= 0)
     end
     if !isnothing(ub) && w_finite_flag(ub)
-        ub = [sum(ub[view(smtx, i, :)]) for i in axes(smtx, 1)]
-        @constraint(model, set_w_mip_ub, sc * (smtx_expr - ub .* i_smip) <= 0)
+        ub = [sum(ub[view(smtx, j, :)]) for j in axes(smtx, 1)]
+        model[Symbol(:set_w_mip_ub_, i)] = @constraint(model,
+                                                       sc * (smtx_expr - ub .* i_smip) <= 0)
     end
     if card_flag
-        @constraint(model, scard, sc * (sum(sib) - card) <= 0)
+        model[Symbol(:scard_, i)] = @constraint(model, sc * (sum(sib) - card) <= 0)
     end
     if gcard_flag
         if !isnothing(gcard.ineq)
             A = gcard.ineq.A
             B = gcard.ineq.B
-            @constraint(model, gscard_ineq, sc * (A * transpose(smtx) * sib ⊖ B) <= 0)
+            model[Symbol(:gscard_ineq_, i)] = @constraint(model,
+                                                          sc *
+                                                          (A * transpose(smtx) * sib ⊖ B) <=
+                                                          0)
         end
         if !isnothing(gcard.eq)
             A = gcard.eq.A
             B = gcard.eq.B
-            @constraint(model, gscard_eq, sc * (A * transpose(smtx) * sib ⊖ B) == 0)
+            model[Symbol(:gscard_eq_, i)] = @constraint(model,
+                                                        sc *
+                                                        (A * transpose(smtx) * sib ⊖ B) ==
+                                                        0)
         end
+    end
+    return nothing
+end
+function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+                                   card::AbstractVector{<:Integer},
+                                   gcard::AbstractVector{<:LinearConstraintResult},
+                                   smtx::AbstractVector{<:AbstractMatrix},
+                                   ss::Union{Nothing, <:Real})
+    for (i, (c, g, s)) in enumerate(zip(card, gcard, smtx))
+        set_all_smip_constraints!(model, wb, c, g, s, ss, i)
+    end
+    return nothing
+end
+function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+                                   card::Union{Nothing, <:Integer},
+                                   smtx::Union{Nothing, <:AbstractMatrix},
+                                   ss::Union{Nothing, <:Real}, i::Integer = 1)
+    if isnothing(card)
+        return nothing
+    end
+    w = model[:w]
+    k = model[:k]
+    sc = model[:sc]
+    N = size(smtx, 1)
+    sib = model[Symbol(:sib_, i)] = @variable(model, [1:N], binary = true)
+    if isa(k, Real)
+        i_smip = model[Symbol(:i_smip_, i)] = @expression(model, sib)
+    else
+        if isnothing(ss)
+            ss = 100_000.0
+        end
+        isbf = model[Symbol(:isbf_, i)] = @variable(model, [1:N], lower_bound = 0)
+        model[Symbol(:isbf_ub_, i)], model[Symbol(:isbfd_ub_, i)], model[Symbol(:isbfd_lb_, i)] = @constraints(model,
+                                                                                                               begin
+                                                                                                                   isbf .-
+                                                                                                                   k <=
+                                                                                                                   0
+                                                                                                                   isbf -
+                                                                                                                   ss *
+                                                                                                                   sib <=
+                                                                                                                   0
+                                                                                                                   (isbf +
+                                                                                                                    ss *
+                                                                                                                    (1 .-
+                                                                                                                     sib)) .-
+                                                                                                                   k >=
+                                                                                                                   0
+                                                                                                               end)
+        i_smip = model[Symbol(:i_smip_, i)] = @expression(model, isbf)
+    end
+    smtx_expr = model[Symbol(:smtx_expr_, i)] = @expression(model, smtx * w)
+    lb = wb.lb
+    ub = wb.ub
+    if !isnothing(lb) && w_finite_flag(lb)
+        lb = [sum(lb[view(smtx, j, :)]) for j in axes(smtx, 1)]
+        model[Symbol(:set_w_mip_lb_, i)] = @constraint(model,
+                                                       sc * (smtx_expr - lb .* i_smip) >= 0)
+    end
+    if !isnothing(ub) && w_finite_flag(ub)
+        ub = [sum(ub[view(smtx, j, :)]) for j in axes(smtx, 1)]
+        model[Symbol(:set_w_mip_ub_, i)] = @constraint(model,
+                                                       sc * (smtx_expr - ub .* i_smip) <= 0)
+    end
+    model[Symbol(:scard_, i)] = @constraint(model, sc * (sum(sib) - card) <= 0)
+    return nothing
+end
+function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+                                   card::AbstractVector{<:Integer},
+                                   smtx::AbstractVector{<:AbstractMatrix},
+                                   ss::Union{Nothing, <:Real})
+    for (i, (c, s)) in enumerate(zip(card, smtx))
+        set_scardmip_constraints!(model, wb, c, s, ss, i)
+    end
+    return nothing
+end
+function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+                                    gcard::Union{Nothing, <:LinearConstraintResult},
+                                    smtx::Union{Nothing, <:AbstractMatrix},
+                                    ss::Union{Nothing, <:Real}, i::Integer = 1)
+    if isnothing(gcard)
+        return nothing
+    end
+    w = model[:w]
+    k = model[:k]
+    sc = model[:sc]
+    N = size(smtx, 1)
+    sib = model[Symbol(:sgib_, i)] = @variable(model, [1:N], binary = true)
+    if isa(k, Real)
+        i_smip = model[Symbol(:i_sgmip_, i)] = @expression(model, sib)
+    else
+        if isnothing(ss)
+            ss = 100_000.0
+        end
+        isbf = model[Symbol(:isgbf_, i)] = @variable(model, [1:N], lower_bound = 0)
+        model[Symbol(:isgbf_ub_, i)], model[Symbol(:isgbfd_ub_, i)], model[Symbol(:isgbfd_lb_, i)] = @constraints(model,
+                                                                                                                  begin
+                                                                                                                      isbf .-
+                                                                                                                      k <=
+                                                                                                                      0
+                                                                                                                      isbf -
+                                                                                                                      ss *
+                                                                                                                      sib <=
+                                                                                                                      0
+                                                                                                                      (isbf +
+                                                                                                                       ss *
+                                                                                                                       (1 .-
+                                                                                                                        sib)) .-
+                                                                                                                      k >=
+                                                                                                                      0
+                                                                                                                  end)
+        i_smip = model[Symbol(:i_sgmip_, i)] = @expression(model, isbf)
+    end
+    smtx_expr = model[Symbol(:sgmtx_expr_, i)] = @expression(model, smtx * w)
+    lb = wb.lb
+    ub = wb.ub
+    if !isnothing(lb) && w_finite_flag(lb)
+        lb = [sum(lb[view(smtx, j, :)]) for j in axes(smtx, 1)]
+        model[Symbol(:setg_w_mip_lb_, i)] = @constraint(model,
+                                                        sc * (smtx_expr - lb .* i_smip) >=
+                                                        0)
+    end
+    if !isnothing(ub) && w_finite_flag(ub)
+        ub = [sum(ub[view(smtx, j, :)]) for j in axes(smtx, 1)]
+        model[Symbol(:setg_w_mip_ub_, i)] = @constraint(model,
+                                                        sc * (smtx_expr - ub .* i_smip) <=
+                                                        0)
+    end
+    if !isnothing(gcard.ineq)
+        A = gcard.ineq.A
+        B = gcard.ineq.B
+        model[Symbol(:gsgcard_ineq_, i)] = @constraint(model,
+                                                       sc *
+                                                       (A * transpose(smtx) * sib ⊖ B) <= 0)
+    end
+    if !isnothing(gcard.eq)
+        A = gcard.eq.A
+        B = gcard.eq.B
+        model[Symbol(:gsgcard_eq_, i)] = @constraint(model,
+                                                     sc * (A * transpose(smtx) * sib ⊖ B) ==
+                                                     0)
+    end
+    return nothing
+end
+function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+                                    gcard::AbstractVector{<:LinearConstraintResult},
+                                    smtx::AbstractVector{<:AbstractMatrix},
+                                    ss::Union{Nothing, <:Real})
+    for (i, (gc, s)) in enumerate(zip(gcard, smtx))
+        set_sgcardmip_constraints!(model, wb, gc, s, ss, i)
+    end
+    return nothing
+end
+function set_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+                               card::Union{Nothing, <:Integer, <:AbstractVector{<:Integer}},
+                               gcard::Union{Nothing, <:LinearConstraintResult,
+                                            <:AbstractVector{<:LinearConstraintResult}},
+                               smtx::Union{Nothing, <:AbstractMatrix,
+                                           <:AbstractVector{<:AbstractMatrix}},
+                               sgmtx::Union{Nothing, <:AbstractMatrix,
+                                            <:AbstractVector{<:AbstractMatrix}},
+                               ss::Union{Nothing, <:Real})
+    if smtx === sgmtx
+        set_all_smip_constraints!(model, wb, card, gcard, smtx, ss)
+    else
+        set_scardmip_constraints!(model, wb, card, smtx, ss)
+        set_sgcardmip_constraints!(model, wb, gcard, sgmtx, ss)
     end
     return nothing
 end

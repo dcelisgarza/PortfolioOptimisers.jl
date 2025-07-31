@@ -541,6 +541,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                                    opt.gcard,
                                                                                    opt.sgcard,
                                                                                    opt.smtx,
+                                                                                   opt.sgmtx,
                                                                                    opt.nplg,
                                                                                    opt.cplg,
                                                                                    opt.tn,
@@ -569,7 +570,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_linear_weight_constraints!(model, opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.nplg, opt.cplg, opt.lt,
                          opt.st, opt.fees, opt.ss)
-    set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx, opt.ss)
+    set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx, opt.sgmtx, opt.ss)
     set_turnover_constraints!(model, opt.tn)
     set_tracking_error_constraints!(model, opt.pe, opt.te, noc, opt.nplg, opt.cplg,
                                     opt.fees)
@@ -599,6 +600,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                                    opt.gcard,
                                                                                    opt.sgcard,
                                                                                    opt.smtx,
+                                                                                   opt.sgmtx,
                                                                                    opt.nplg,
                                                                                    opt.cplg,
                                                                                    opt.tn,

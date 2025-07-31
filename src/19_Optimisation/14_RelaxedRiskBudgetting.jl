@@ -120,9 +120,9 @@ function set_relaxed_risk_budgetting_constraints!(model::JuMP.Model,
 end
 function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(rrb.opt,
-                                                                                                                        rd;
-                                                                                                                        dims = dims)
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(rrb.opt,
+                                                                                                                               rd;
+                                                                                                                               dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)
@@ -134,7 +134,7 @@ function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult
     set_linear_weight_constraints!(model, rrb.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, rrb.opt.card, gcard, nplg, cplg, lt, st, fees,
                          rrb.opt.ss)
-    set_smip_constraints!(model, wb, rrb.opt.scard, sgcard, smtx, rrb.opt.ss)
+    set_smip_constraints!(model, wb, rrb.opt.scard, sgcard, smtx, sgmtx, rrb.opt.ss)
     set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, rrb.opt.te, nothing, nothing, nothing, fees)
     set_number_effective_assets!(model, rrb.opt.nea)
@@ -151,9 +151,9 @@ function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult
     return JuMPOptimisationResult(typeof(rrb),
                                   ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs,
                                                                    cent, gcard, sgcard,
-                                                                   smtx, nplg, cplg, tn,
-                                                                   fees, ret), retcode, sol,
-                                  ifelse(save, model, nothing))
+                                                                   smtx, sgmtx, nplg, cplg,
+                                                                   tn, fees, ret), retcode,
+                                  sol, ifelse(save, model, nothing))
 end
 
 export BasicRelaxedRiskBudgettingAlgorithm, RegularisationRelaxedRiskBudgettingAlgorithm,

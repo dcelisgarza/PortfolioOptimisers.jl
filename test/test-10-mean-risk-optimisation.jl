@@ -141,7 +141,12 @@
                       check_sol = (; allow_local = true, allow_almost = true))]
     sets = AssetSets(;
                      dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
-                                 "group2" => rd.nx[2:2:end]))
+                                 "group2" => rd.nx[2:2:end],
+                                 "clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
+                                                 3, 3, 3, 3, 3, 3],
+                                 "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
+                                                 3, 1, 2, 3, 1, 2]))
+
     pr = prior(HighOrderPriorEstimator(), rd)
     clr = clusterise(ClusteringEstimator(), pr)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
@@ -157,74 +162,78 @@
                                                    alg = EllipseUncertaintySetAlgorithm()),
                      rd.X)
     rf = 4.2 / 100 / 252
-    objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf)]
-    rets = [ArithmeticReturn(), KellyReturn()]
-    rs = [StandardDeviation(), Variance(), UncertaintySetVariance(; ucs = ucs1),
-          UncertaintySetVariance(; ucs = ucs2), LowOrderMoment(),
-          LowOrderMoment(;
-                         alg = LowOrderDeviation(;
-                                                 alg = SecondLowerMoment(;
-                                                                         alg = SqrtRiskExpr()))),
-          LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
-          LowOrderMoment(;
-                         alg = LowOrderDeviation(;
-                                                 alg = SecondCentralMoment(;
-                                                                           alg = SqrtRiskExpr()))),
-          LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondCentralMoment())),
-          LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
-          ConditionalValueatRisk(), ConditionalValueatRiskRange(), EntropicValueatRisk(),
-          EntropicValueatRiskRange(), RelativisticValueatRisk(),
-          RelativisticValueatRiskRange(), MaximumDrawdown(), AverageDrawdown(),
-          UlcerIndex(), ConditionalDrawdownatRisk(), EntropicDrawdownatRisk(),
-          RelativisticDrawdownatRisk(), SquareRootKurtosis(; N = 2), SquareRootKurtosis(),
-          OrderedWeightsArray(; alg = ExactOrderedWeightsArray()), OrderedWeightsArray(),
-          OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray()),
-          OrderedWeightsArrayRange(), NegativeSkewness(),
-          NegativeSkewness(; alg = QuadRiskExpr())]
-    df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
-    i = 1
-    for obj in objs, ret in rets, r in rs
-        opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
-        mr = MeanRisk(; r = r, obj = obj, opt = opt)
-        res = optimise!(mr, rd)
-        @test isa(res.retcode, OptimisationSuccess)
-        rtol = if i ∈ (27, 59, 163, 189)
-            5e-4
-        elseif i ∈ (123, 187, 190) || Sys.isapple() && i == 60
-            5e-3
-        elseif i == 126
-            1e-3
-        else
-            1e-4
-        end
-        success = isapprox(res.w, df[!, i]; rtol = rtol)
-        if !success
-            println("Counter: $i")
-            find_tol(res.w, df[!, i])
-        end
-        @test success
-        if isa(obj, MaximumRatio)
-            rk = expected_risk(factory(r, pr, slv), res.w, rd.X)
-            rt = expected_return(ret, res.w, pr)
-
-            opt1 = JuMPOptimiser(; pe = pr, slv = slv,
-                                 ret = bounds_returns_estimator(ret, rt))
-            mr = MeanRisk(; r = r, opt = opt1)
+    @testset "Mean Risk" begin
+        objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf)]
+        rets = [ArithmeticReturn(), KellyReturn()]
+        rs = [StandardDeviation(), Variance(), UncertaintySetVariance(; ucs = ucs1),
+              UncertaintySetVariance(; ucs = ucs2), LowOrderMoment(),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             alg = SqrtRiskExpr()))),
+              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondCentralMoment(;
+                                                                               alg = SqrtRiskExpr()))),
+              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondCentralMoment())),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
+              ConditionalValueatRisk(), ConditionalValueatRiskRange(),
+              EntropicValueatRisk(), EntropicValueatRiskRange(), RelativisticValueatRisk(),
+              RelativisticValueatRiskRange(), MaximumDrawdown(), AverageDrawdown(),
+              UlcerIndex(), ConditionalDrawdownatRisk(), EntropicDrawdownatRisk(),
+              RelativisticDrawdownatRisk(), SquareRootKurtosis(; N = 2),
+              SquareRootKurtosis(), OrderedWeightsArray(; alg = ExactOrderedWeightsArray()),
+              OrderedWeightsArray(),
+              OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray()),
+              OrderedWeightsArrayRange(), NegativeSkewness(),
+              NegativeSkewness(; alg = QuadRiskExpr())]
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
+        i = 1
+        for obj in objs, ret in rets, r in rs
+            opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
+            mr = MeanRisk(; r = r, obj = obj, opt = opt)
             res = optimise!(mr, rd)
-            rt1 = expected_return(ret, res.w, pr)
-            @test rt1 >= rt || abs(rt1 - rt) < 1e-10
-
-            mr = MeanRisk(; r = bounds_risk_measure(r, rk), obj = MaximumReturn(),
-                          opt = opt)
-            res = optimise!(mr, rd)
-            rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
-            if !isa(r, SquareRootKurtosis) || isa(r, SquareRootKurtosis) && isnothing(r.N)
-                @test rk1 <= rk || abs(rk1 - rk) < 1e-9
+            @test isa(res.retcode, OptimisationSuccess)
+            rtol = if i ∈ (27, 59, 163, 189)
+                5e-4
+            elseif i ∈ (123, 187, 190) || Sys.isapple() && i == 60
+                5e-3
+            elseif i == 126
+                1e-3
             else
-                @test rk1 / rk < 1.07
+                1e-4
             end
+            success = isapprox(res.w, df[!, i]; rtol = rtol)
+            if !success
+                println("Counter: $i")
+                find_tol(res.w, df[!, i])
+            end
+            @test success
+            if isa(obj, MaximumRatio)
+                rk = expected_risk(factory(r, pr, slv), res.w, rd.X)
+                rt = expected_return(ret, res.w, pr)
+
+                opt1 = JuMPOptimiser(; pe = pr, slv = slv,
+                                     ret = bounds_returns_estimator(ret, rt))
+                mr = MeanRisk(; r = r, opt = opt1)
+                res = optimise!(mr, rd)
+                rt1 = expected_return(ret, res.w, pr)
+                @test rt1 >= rt || abs(rt1 - rt) < 1e-10
+
+                mr = MeanRisk(; r = bounds_risk_measure(r, rk), obj = MaximumReturn(),
+                              opt = opt)
+                res = optimise!(mr, rd)
+                rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
+                if !isa(r, SquareRootKurtosis) ||
+                   isa(r, SquareRootKurtosis) && isnothing(r.N)
+                    @test rk1 <= rk || abs(rk1 - rk) < 1e-9
+                else
+                    @test rk1 / rk < 1.07
+                end
+            end
+            i += 1
         end
-        i += 1
     end
     @testset "Scalarisers" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv)
@@ -340,6 +349,12 @@
         w = res.w
         @test count(w .> 1e-10) <= 3
 
+        opt = JuMPOptimiser(; l2 = 0.1, pe = pr, slv = mip_slv, card = 3)
+        mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mre)
+        w = res.w
+        @test count(w .> 1e-10) <= 3
+
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             card = 7)
@@ -368,6 +383,47 @@
         @test rd.nx[.!iszero.(vec(res.gcard.A_eq[1, :]))] == rd.nx[2:2:end]
         @test count(w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 2
         @test count(w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 3
+
+        # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1,
+        #                     smtx = "clusters1", sets = sets)
+        # mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
+        # res = optimise!(mre, rd)
+        # w = res.w
+
+        # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1, smtx = "clusters2", sets = sets)
+        # mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
+        # res = optimise!(mre, rd)
+        # w = res.w
+
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = [1, 1],
+                            smtx = ["clusters1", "clusters2"], sets = sets)
+        mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+
+        i = 1
+        dict = Dict{Tuple{Int, Int}, Int}()
+        clusters3 = Int[]
+        for cs in zip(sets.dict["clusters1"], sets.dict["clusters2"])
+            if !haskey(dict, cs)
+                dict[cs] = i
+                i += 1
+            end
+            push!(clusters3, dict[cs])
+        end
+        sets.dict["clusters3"] = clusters3
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1, smtx = "clusters3",
+                            sets = sets)
+        mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
+        @test isapprox(res.w, optimise!(mre, rd).w)
+
+        # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1,
+        #                     smtx = "clusters1", sets = sets)
+        # mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
+        # res = optimise!(mre, rd)
+        # w = res.w
+        # [sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)]
+
     end
     @testset "Buy-in threshold" begin
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
@@ -386,6 +442,14 @@
                             sets = sets)
         mre = MeanRisk(; opt = opt)
         @test isapprox(res.w, optimise!(mre).w)
+
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            st = 0.25, lt = 0.4, sets = sets)
+        mre = MeanRisk(; opt = opt)
+        res = optimise!(mre)
+        @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)
+        @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<= -0.25)
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,

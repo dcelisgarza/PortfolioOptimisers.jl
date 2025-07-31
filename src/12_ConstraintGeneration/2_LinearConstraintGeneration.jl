@@ -143,12 +143,25 @@ end
 Base.length(res::AbstractParsingResult) = 1
 Base.iterate(res::AbstractParsingResult, state = 1) = state > 1 ? nothing : (res, state + 1)
 Base.getindex(res::AbstractParsingResult, i) = i == 1 ? res : throw(BoundsError(res, i))
-struct AssetSets{T1 <: AbstractString, T2 <: AbstractDict} <: AbstractEstimator
+struct AssetSets{T1 <: AbstractString,
+                 T2 <: AbstractDict{<:Union{Symbol, <:AbstractString}, <:Any}} <:
+       AbstractEstimator
     key::T1
     dict::T2
 end
 Base.length(res::AssetSets) = 1
 Base.iterate(res::AssetSets, state = 1) = state > 1 ? nothing : (res, state + 1)
+function AssetSets(; key::AbstractString = "nx",
+                   dict::AbstractDict{<:Union{Symbol, <:AbstractString}})
+    @smart_assert(!isempty(dict))
+    @smart_assert(haskey(dict, key))
+    return AssetSets(key, dict)
+end
+function asset_sets_view(sets::AssetSets, i::AbstractVector)
+    dict = Dict(k => v for (k, v) in sets.dict if k != sets.key)
+    dict[sets.key] = view(sets.dict[sets.key], i)
+    return AssetSets(; key = sets.key, dict = dict)
+end
 function estimator_to_val!(arr::AbstractArray,
                            dict::Union{<:AbstractDict,
                                        <:AbstractVector{<:Pair{<:Any, <:Real}}},
@@ -200,16 +213,6 @@ end
 function estimator_to_val(val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...;
                           kwargs...)
     return val
-end
-function AssetSets(; key::AbstractString = "nx", dict::AbstractDict)
-    @smart_assert(!isempty(dict))
-    @smart_assert(haskey(dict, key))
-    return AssetSets(key, dict)
-end
-function asset_sets_view(sets::AssetSets, i::AbstractVector)
-    dict = Dict(k => v for (k, v) in sets.dict if k != sets.key)
-    dict[sets.key] = view(sets.dict[sets.key], i)
-    return AssetSets(; key = sets.key, dict = dict)
 end
 function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = Float64)
     # 3. Evaluate numeric functions on both sides
@@ -461,6 +464,15 @@ function linear_constraints(eqn::Union{<:AbstractString, Expr,
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
+function linear_constraints(eqn::Union{<:AbstractVector{<:AbstractVector{<:AbstractString}},
+                                       <:AbstractVector{<:AbstractVector{Expr}},
+                                       <:AbstractVector{<:AbstractVector{<:Union{<:AbstractString,
+                                                                                 Expr}}}},
+                            sets::AssetSets; datatype::DataType = Float64,
+                            strict::Bool = false, bl_flag::Bool = false)
+    return linear_constraints.(eqn, Ref(sets); datatype = datatype, strict = strict,
+                               bl_flag = bl_flag)
+end
 function get_weight_bounds_constraints(lcs::Union{<:ParsingResult,
                                                   <:AbstractVector{<:ParsingResult}},
                                        sets::AssetSets; datatype::DataType = Float64,
@@ -541,35 +553,39 @@ function risk_budget_constraints(eqn::Union{<:AbstractString, Expr,
     lcs = replace_group_by_assets(lcs, sets)
     return get_risk_budget_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
-function asset_sets_matrix(smtx::Union{Nothing, Symbol, <:AbstractString}, args...;
-                           kwargs...)
+function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
+    @smart_assert(haskey(sets.dict, smtx))
+    all_sets = sets.dict[smtx]
+    @smart_assert(length(sets.dict[sets.key]) == length(all_sets))
+    unique_sets = unique(all_sets)
+    A = BitMatrix(undef, length(all_sets), length(unique_sets))
+    for (i, val) in pairs(unique_sets)
+        A[:, i] = all_sets .== val
+    end
+    return transpose(A)
+end
+function asset_sets_matrix(smtx::Union{<:AbstractVector{Symbol},
+                                       <:AbstractVector{<:AbstractString},
+                                       <:AbstractVector{<:Union{Symbol, <:AbstractString}}},
+                           sets::AssetSets)
+    return asset_sets_matrix.(smtx, Ref(sets))
+end
+function asset_sets_matrix(smtx::Union{Nothing, <:AbstractMatrix,
+                                       <:AbstractVector{<:AbstractMatrix}}, args...)
     return smtx
 end
-function asset_sets_matrix(smtx::AbstractString, sets::AssetSets; strict::Bool = false)
-    @smart_assert(haskey(sets.dict, smtx))
-    nx = sets.dict[sets.key]
-    set_keys = unique!(sets.dict[smtx])
-    A = BitMatrix(undef, length(set_keys), length(nx))
-    for (i, key) in pairs(set_keys)
-        group = sets.dict[key]
-        for a in group
-            idx = findfirst(x -> x == a, nx)
-            if isnothing(idx)
-                msg = "$a is not found in $nx.\nIt belongs to $key, $group.\nWhich is referenced by $smtx, $set_keys."
-                strict ? throw(ArgumentError(msg)) : @warn(msg)
-                continue
-            end
-            A[i, idx] = true
-        end
-    end
-    return A
-end
-function asset_sets_matrix_view(smtx::Union{Nothing, Symbol, <:AbstractString}, ::Any;
+function asset_sets_matrix_view(smtx::Union{Nothing, Symbol, <:AbstractString,
+                                            <:AbstractVector{Symbol},
+                                            <:AbstractVector{<:AbstractString}}, ::Any;
                                 kwargs...)
     return smtx
 end
 function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector; kwargs...)
     return view(smtx, :, i)
+end
+function asset_sets_matrix_view(smtx::AbstractVector{<:AbstractMatrix}, i::AbstractVector;
+                                kwargs...)
+    return asset_sets_matrix_view.(smtx, Ref(i); kwargs...)
 end
 
 export AssetSets, PartialLinearConstraintResult, LinearConstraintResult, parse_equation,
