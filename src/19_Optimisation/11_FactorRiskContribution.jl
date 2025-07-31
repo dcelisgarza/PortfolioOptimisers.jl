@@ -110,7 +110,8 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_linear_weight_constraints!(model, frc.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, frc.opt.card, gcard, nplg, cplg, lt, st, fees,
                          frc.opt.ss)
-    set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, sgmtx, frc.opt.ss)
+    set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, sgmtx, nothing, nothing,
+                          frc.opt.ss)
     set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, frc.opt.te, frc, nplg, cplg, fees)
     set_number_effective_assets!(model, frc.opt.nea)

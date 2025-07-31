@@ -1,7 +1,7 @@
 struct ProcessedJuMPOptimiserAttributes{T1 <: AbstractPriorResult,
                                         T2 <: Union{Nothing, <:WeightBoundsResult},
-                                        T3 <: Union{Nothing, <:Real, <:AbstractVector},
-                                        T4 <: Union{Nothing, <:Real, <:AbstractVector},
+                                        T3 <: Union{Nothing, <:BuyInThresholdResult},
+                                        T4 <: Union{Nothing, <:BuyInThresholdResult},
                                         T5 <: Union{Nothing, <:LinearConstraintResult},
                                         T6 <: Union{Nothing, <:LinearConstraintResult},
                                         T7 <: Union{Nothing, <:LinearConstraintResult},
@@ -107,9 +107,9 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T3 <: Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint},
                      T4 <: Union{Nothing, <:Real, <:BudgetRange, <:BudgetCosts},
                      T5 <: Union{Nothing, <:Real, <:BudgetRange},
-                     T6 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:AbstractDict,
+                     T6 <: Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
                                  <:AbstractVector{<:Pair{<:Any, <:Real}}},
-                     T7 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:AbstractDict,
+                     T7 <: Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
                                  <:AbstractVector{<:Pair{<:Any, <:Real}}},
                      T8 <: Union{Nothing, <:AbstractString, Expr,
                                  <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
@@ -221,9 +221,9 @@ function JuMPOptimiser(;
                        wb::Union{Nothing, <:WeightBoundsResult, <:WeightBoundsConstraint} = WeightBoundsResult(),
                        bgt::Union{Nothing, <:Real, <:BudgetConstraintEstimator} = 1.0,
                        sbgt::Union{Nothing, <:Real, <:BudgetRange} = nothing,
-                       lt::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:AbstractDict,
+                       lt::Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
                                  <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
-                       st::Union{Nothing, <:Real, <:AbstractVector{<:Real}, <:AbstractDict,
+                       st::Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
                                  <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
                        lcs::Union{Nothing, <:AbstractString, Expr,
                                   <:AbstractVector{<:AbstractString},
@@ -359,8 +359,8 @@ function JuMPOptimiser(;
         @smart_assert(length(scard) == length(sgmtx))
     end
     if isa(wb, WeightBoundsConstraint) ||
-       !isa(lt, Union{Nothing, <:Real, <:AbstractVector{<:Real}}) ||
-       !isa(st, Union{Nothing, <:Real, <:AbstractVector{<:Real}}) ||
+       !isa(lt, Union{Nothing, <:BuyInThresholdResult}) ||
+       !isa(st, Union{Nothing, <:BuyInThresholdResult}) ||
        !isa(lcs, Union{Nothing, <:LinearConstraintResult}) ||
        !isa(cent, Union{Nothing, <:LinearConstraintResult}) ||
        !isa(gcard, Union{Nothing, <:LinearConstraintResult}) ||
@@ -375,12 +375,6 @@ function JuMPOptimiser(;
         N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
         N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
         @smart_assert(N == N_ineq + N_eq)
-    end
-    if isa(lt, Real) || isa(lt, AbstractVector{<:Real})
-        assert_finite_nonnegative_real_or_vec(lt)
-    end
-    if isa(st, Real) || isa(st, AbstractVector{<:Real})
-        assert_finite_nonnegative_real_or_vec(st)
     end
     if isa(tn, AbstractVector)
         @smart_assert(!isempty(tn))

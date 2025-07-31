@@ -146,7 +146,6 @@
                                                  3, 3, 3, 3, 3, 3],
                                  "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
                                                  3, 1, 2, 3, 1, 2]))
-
     pr = prior(HighOrderPriorEstimator(), rd)
     clr = clusterise(ClusteringEstimator(), pr)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
@@ -384,16 +383,20 @@
         @test count(w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 2
         @test count(w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 3
 
-        # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1,
-        #                     smtx = "clusters1", sets = sets)
-        # mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
-        # res = optimise!(mre, rd)
-        # w = res.w
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1, smtx = "clusters1",
+                            sets = sets)
+        mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test sum(.!iszero.([sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)])) == 1
 
-        # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1, smtx = "clusters2", sets = sets)
-        # mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
-        # res = optimise!(mre, rd)
-        # w = res.w
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 2, smtx = "clusters2",
+                            sets = sets)
+        mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
+                       opt = opt)
+        res = optimise!(mre, rd)
+        w = res.w
+        @test sum(.!iszero.([sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)])) == 2
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = [1, 1],
                             smtx = ["clusters1", "clusters2"], sets = sets)
@@ -433,19 +436,22 @@
         @test res.w[findfirst(x -> x == "WMT", rd.nx)] >= 0.23
         @test res.w[2:2:end][res.w[2:2:end] .> 1e-9][1] >= 0.48
 
-        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = 0.15, sets = sets)
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                            lt = BuyInThresholdResult(; val = 0.15), sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise!(mre)
         res.w[res.w .>= 1e-10] .>= 0.15
 
-        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = fill(0.15, size(pr.X, 2)),
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                            lt = BuyInThresholdResult(; val = fill(0.15, size(pr.X, 2))),
                             sets = sets)
         mre = MeanRisk(; opt = opt)
         @test isapprox(res.w, optimise!(mre).w)
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
-                            st = 0.25, lt = 0.4, sets = sets)
+                            st = BuyInThresholdResult(; val = 0.25),
+                            lt = BuyInThresholdResult(; val = 0.4), sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise!(mre)
         @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)
@@ -453,7 +459,8 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
-                            st = 0.25, lt = 0.4, sets = sets)
+                            st = BuyInThresholdResult(; val = 0.25),
+                            lt = BuyInThresholdResult(; val = 0.4), sets = sets)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre)
         @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)
