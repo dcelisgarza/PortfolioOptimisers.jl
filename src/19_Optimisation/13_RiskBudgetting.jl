@@ -111,9 +111,9 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
 end
 function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
-                                                                                                                               rd;
-                                                                                                                               dims = dims)
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
+                                                                                                                                         rd;
+                                                                                                                                         dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
@@ -141,9 +141,10 @@ function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims
     return JuMPOptimisationResult(typeof(rb),
                                   ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs,
                                                                    cent, gcard, sgcard,
-                                                                   smtx, sgmtx, nplg, cplg,
-                                                                   tn, fees, ret), retcode,
-                                  sol, ifelse(save, model, nothing))
+                                                                   smtx, slt, sst, sgmtx,
+                                                                   nplg, cplg, tn, fees,
+                                                                   ret), retcode, sol,
+                                  ifelse(save, model, nothing))
 end
 
 export AssetRiskBudgettingAlgorithm, FactorRiskBudgettingAlgorithm, RiskBudgetting

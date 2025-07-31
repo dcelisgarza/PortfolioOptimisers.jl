@@ -455,7 +455,10 @@
         mre = MeanRisk(; opt = opt)
         res = optimise!(mre)
         @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)
-        @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-9] .<= -0.25)
+        @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<= -0.25)
+        if Sys.isapple()
+            println(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10])
+        end
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                             wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,

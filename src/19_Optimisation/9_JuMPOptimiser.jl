@@ -9,14 +9,22 @@ struct ProcessedJuMPOptimiserAttributes{T1 <: AbstractPriorResult,
                                                     <:AbstractVector{<:LinearConstraintResult}},
                                         T9 <: Union{Nothing, <:AbstractMatrix,
                                                     <:AbstractVector{<:AbstractMatrix}},
-                                        T10 <: Union{Nothing, <:AbstractMatrix,
+                                        T10 <: Union{Nothing, <:BuyInThresholdResult,
+                                                     <:AbstractVector{<:BuyInThresholdResult},
+                                                     <:AbstractVector{<:Union{Nothing,
+                                                                              <:BuyInThresholdResult}}},
+                                        T11 <: Union{Nothing, <:BuyInThresholdResult,
+                                                     <:AbstractVector{<:BuyInThresholdResult},
+                                                     <:AbstractVector{<:Union{Nothing,
+                                                                              <:BuyInThresholdResult}}},
+                                        T12 <: Union{Nothing, <:AbstractMatrix,
                                                      <:AbstractVector{<:AbstractMatrix}},
-                                        T11 <: Union{Nothing, <:PhilogenyConstraintResult},
-                                        T12 <: Union{Nothing, <:PhilogenyConstraintResult},
-                                        T13 <: Union{Nothing, <:Turnover,
+                                        T13 <: Union{Nothing, <:PhilogenyConstraintResult},
+                                        T14 <: Union{Nothing, <:PhilogenyConstraintResult},
+                                        T15 <: Union{Nothing, <:Turnover,
                                                      <:AbstractVector{<:Turnover}},
-                                        T14 <: Union{Nothing, <:Fees},
-                                        T15 <: JuMPReturnsEstimator} <: AbstractResult
+                                        T16 <: Union{Nothing, <:Fees},
+                                        T17 <: JuMPReturnsEstimator} <: AbstractResult
     pr::T1
     wb::T2
     lt::T3
@@ -26,12 +34,14 @@ struct ProcessedJuMPOptimiserAttributes{T1 <: AbstractPriorResult,
     gcard::T7
     sgcard::T8
     smtx::T9
-    sgmtx::T10
-    nplg::T11
-    cplg::T12
-    tn::T13
-    fees::T14
-    ret::T15
+    slt::T10
+    sst::T11
+    sgmtx::T12
+    nplg::T13
+    cplg::T14
+    tn::T15
+    fees::T16
+    ret::T17
 end
 struct JuMPOptimisationResult{T1 <: Type, T2 <: ProcessedJuMPOptimiserAttributes,
                               T3 <: Union{<:OptimisationReturnCode,
@@ -84,6 +94,10 @@ function Base.getproperty(r::Union{<:JuMPOptimisationResult,
         r.pa.sgcard
     elseif sym == :smtx
         r.pa.smtx
+    elseif sym == :slt
+        r.pa.slt
+    elseif sym == :sst
+        r.pa.sst
     elseif sym == :sgmtx
         r.pa.sgmtx
     elseif sym == :nplg
@@ -144,33 +158,45 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T13 <: Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix,
                                   <:AbstractVector{Symbol}, <:AbstractVector{<:AbstractString},
                                   <:AbstractVector{<:AbstractMatrix}},
-                     T14 <: Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix,
+                     T14 <: Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
+                                  <:AbstractVector{<:Pair{<:Any, <:Real}},
+                                  <:AbstractVector{<:AbstractDict},
+                                  <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                                  <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                                           <:AbstractVector{<:Pair{<:Any, <:Real}}}}},
+                     T15 <: Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
+                                  <:AbstractVector{<:Pair{<:Any, <:Real}},
+                                  <:AbstractVector{<:AbstractDict},
+                                  <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                                  <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                                           <:AbstractVector{<:Pair{<:Any, <:Real}}}}},
+                     T16 <: Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix,
                                   <:AbstractVector{Symbol}, <:AbstractVector{<:AbstractString},
                                   <:AbstractVector{<:AbstractMatrix}},
-                     T15 <: Union{Nothing, <:AssetSets,
+                     T17 <: Union{Nothing, <:AssetSets,
                        #! Start: to delete
                                   <:DataFrame
                        #! End: to delete
                        },
-                     T16 <: Union{Nothing, <:PhilogenyConstraintEstimator,
+                     T18 <: Union{Nothing, <:PhilogenyConstraintEstimator,
                                   <:PhilogenyConstraintResult},
-                     T17 <: Union{Nothing, <:PhilogenyConstraintEstimator,
+                     T19 <: Union{Nothing, <:PhilogenyConstraintEstimator,
                                   <:PhilogenyConstraintResult},
-                     T18 <: Union{Nothing, <:TurnoverEstimator,
+                     T20 <: Union{Nothing, <:TurnoverEstimator,
                                   <:AbstractVector{<:TurnoverEstimator}, <:Turnover,
                                   <:AbstractVector{<:Turnover},
                                   <:AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}}},
-                     T19 <: Union{Nothing, <:AbstractTracking,
+                     T21 <: Union{Nothing, <:AbstractTracking,
                                   <:AbstractVector{<:AbstractTracking}},
-                     T20 <: Union{Nothing, <:FeesEstimator, <:Fees},
-                     T21 <: JuMPReturnsEstimator, T22 <: Scalariser,
-                     T23 <: Union{Nothing, <:CustomConstraint},
-                     T24 <: Union{Nothing, <:CustomObjective}, T25 <: Real, T26 <: Real,
-                     T27 <: Union{Nothing, <:Integer},
-                     T28 <: Union{Nothing, <:Integer, <:AbstractVector{<:Integer}},
-                     T29 <: Union{Nothing, <:Real}, T30 <: Union{Nothing, <:Real},
+                     T22 <: Union{Nothing, <:FeesEstimator, <:Fees},
+                     T23 <: JuMPReturnsEstimator, T24 <: Scalariser,
+                     T25 <: Union{Nothing, <:CustomConstraint},
+                     T26 <: Union{Nothing, <:CustomObjective}, T27 <: Real, T28 <: Real,
+                     T29 <: Union{Nothing, <:Integer},
+                     T30 <: Union{Nothing, <:Integer, <:AbstractVector{<:Integer}},
                      T31 <: Union{Nothing, <:Real}, T32 <: Union{Nothing, <:Real},
-                     T33 <: Bool} <: BaseJuMPOptimisationEstimator
+                     T33 <: Union{Nothing, <:Real}, T34 <: Union{Nothing, <:Real},
+                     T35 <: Bool} <: BaseJuMPOptimisationEstimator
     pe::T1 # PriorEstimator
     slv::T2
     wb::T3 # WeightBoundsResult
@@ -184,26 +210,28 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
     gcard::T11
     sgcard::T12
     smtx::T13
-    sgmtx::T14
-    sets::T15
-    nplg::T16
-    cplg::T17
-    tn::T18 # Turnover
-    te::T19 # TrackingError
-    fees::T20
-    ret::T21
-    sce::T22
-    ccnt::T23
-    cobj::T24
-    sc::T25
-    so::T26
-    card::T27
-    scard::T28
-    nea::T29
-    l1::T30
-    l2::T31
-    ss::T32
-    strict::T33
+    slt::T14
+    sst::T15
+    sgmtx::T16
+    sets::T17
+    nplg::T18
+    cplg::T19
+    tn::T20 # Turnover
+    te::T21 # TrackingError
+    fees::T22
+    ret::T23
+    sce::T24
+    ccnt::T25
+    cobj::T26
+    sc::T27
+    so::T28
+    card::T29
+    scard::T30
+    nea::T31
+    l1::T32
+    l2::T33
+    ss::T34
+    strict::T35
 end
 function assert_finite_nonnegative_real_or_vec(val::Real)
     @smart_assert(isfinite(val) && val > zero(val))
@@ -264,6 +292,20 @@ function JuMPOptimiser(;
                                    <:AbstractVector{Symbol},
                                    <:AbstractVector{<:AbstractString},
                                    <:AbstractVector{<:AbstractMatrix}} = nothing,
+                       slt::Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
+                                  <:AbstractVector{<:Pair{<:Any, <:Real}},
+                                  <:AbstractVector{<:AbstractDict},
+                                  <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                                  <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                                           <:AbstractVector{<:Pair{<:Any,
+                                                                                   <:Real}}}}} = nothing,
+                       sst::Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
+                                  <:AbstractVector{<:Pair{<:Any, <:Real}},
+                                  <:AbstractVector{<:AbstractDict},
+                                  <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                                  <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                                           <:AbstractVector{<:Pair{<:Any,
+                                                                                   <:Real}}}}} = nothing,
                        sgmtx::Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix,
                                     <:AbstractVector{Symbol},
                                     <:AbstractVector{<:AbstractString},
@@ -330,6 +372,12 @@ function JuMPOptimiser(;
         if isa(scard, Integer)
             @smart_assert(isfinite(scard) && scard > 0)
             @smart_assert(isa(smtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
+            @smart_assert(isa(slt,
+                              Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
+                                    <:AbstractVector{<:Pair{<:Any, <:Real}}}))
+            @smart_assert(isa(sst,
+                              Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
+                                    <:AbstractVector{<:Pair{<:Any, <:Real}}}))
         elseif isa(scard, AbstractVector)
             @smart_assert(!isempty(scard))
             @smart_assert(all(isfinite, scard) && all(x -> x > 0, scard))
@@ -338,6 +386,20 @@ function JuMPOptimiser(;
                                     <:AbstractVector{<:AbstractString},
                                     <:AbstractVector{<:AbstractMatrix}}))
             @smart_assert(length(scard) == length(smtx))
+            if isa(slt,
+                   Union{<:AbstractVector{<:AbstractDict},
+                         <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                         <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                                  <:AbstractVector{<:Pair{<:Any, <:Real}}}}})
+                @smart_assert(length(scard) == length(slt))
+            end
+            if isa(sst,
+                   Union{<:AbstractVector{<:AbstractDict},
+                         <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                         <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                                  <:AbstractVector{<:Pair{<:Any, <:Real}}}}})
+                @smart_assert(length(scard) == length(sst))
+            end
         end
     end
     if isa(gcard, AbstractVector)
@@ -390,23 +452,16 @@ function JuMPOptimiser(;
     end
     return JuMPOptimiser{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                          typeof(lt), typeof(st), typeof(lcs), typeof(lcm), typeof(cent),
-                         typeof(gcard), typeof(sgcard), typeof(smtx), typeof(sgmtx),
-                         typeof(sets), typeof(nplg), typeof(cplg), typeof(tn), typeof(te),
-                         typeof(fees), typeof(ret), typeof(sce), typeof(ccnt), typeof(cobj),
-                         typeof(sc), typeof(so), typeof(card), typeof(scard), typeof(nea),
-                         typeof(l1), typeof(l2), typeof(ss), typeof(strict)}(pe, slv, wb,
-                                                                             bgt, sbgt, lt,
-                                                                             st, lcs, lcm,
-                                                                             cent, gcard,
-                                                                             sgcard, smtx,
-                                                                             sgmtx, sets,
-                                                                             nplg, cplg, tn,
-                                                                             te, fees, ret,
-                                                                             sce, ccnt,
-                                                                             cobj, sc, so,
-                                                                             card, scard,
-                                                                             nea, l1, l2,
-                                                                             ss, strict)
+                         typeof(gcard), typeof(sgcard), typeof(smtx), typeof(slt),
+                         typeof(sst), typeof(sgmtx), typeof(sets), typeof(nplg),
+                         typeof(cplg), typeof(tn), typeof(te), typeof(fees), typeof(ret),
+                         typeof(sce), typeof(ccnt), typeof(cobj), typeof(sc), typeof(so),
+                         typeof(card), typeof(scard), typeof(nea), typeof(l1), typeof(l2),
+                         typeof(ss), typeof(strict)}(pe, slv, wb, bgt, sbgt, lt, st, lcs,
+                                                     lcm, cent, gcard, sgcard, smtx, slt,
+                                                     sst, sgmtx, sets, nplg, cplg, tn, te,
+                                                     fees, ret, sce, ccnt, cobj, sc, so,
+                                                     card, scard, nea, l1, l2, ss, strict)
 end
 function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
@@ -419,6 +474,8 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     # gcard = linear_constraint_view(opt.gcard, i)
     # sgcard = linear_constraint_view(opt.sgcard, i)
     smtx = asset_sets_matrix_view(opt.smtx, i)
+    slt = threshold_view(opt.slt, i)
+    sst = threshold_view(opt.sst, i)
     sgmtx = if opt.smtx === opt.sgmtx
         smtx
     else
@@ -433,12 +490,12 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     cobj = custom_objective_view(opt.cobj, i)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = opt.lcs, lcm = opt.lcm, cent = opt.cent,
-                         gcard = opt.gcard, sgcard = opt.sgcard, smtx = smtx, sgmtx = sgmtx,
-                         sets = sets, nplg = opt.nplg, cplg = opt.cplg, tn = tn, te = te,
-                         fees = fees, ret = ret, sce = opt.sce, ccnt = ccnt, cobj = cobj,
-                         sc = opt.sc, so = opt.so, card = opt.card, scard = opt.scard,
-                         nea = opt.nea, l1 = opt.l1, l2 = opt.l2, ss = opt.ss,
-                         strict = opt.strict)
+                         gcard = opt.gcard, sgcard = opt.sgcard, smtx = smtx, slt = slt,
+                         sst = sst, sgmtx = sgmtx, sets = sets, nplg = opt.nplg,
+                         cplg = opt.cplg, tn = tn, te = te, fees = fees, ret = ret,
+                         sce = opt.sce, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
+                         card = opt.card, scard = opt.scard, nea = opt.nea, l1 = opt.l1,
+                         l2 = opt.l2, ss = opt.ss, strict = opt.strict)
 end
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
@@ -453,6 +510,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     gcard = linear_constraints(opt.gcard, opt.sets; datatype = Int, strict = opt.strict)
     sgcard = linear_constraints(opt.sgcard, opt.sets; datatype = Int, strict = opt.strict)
     smtx = asset_sets_matrix(opt.smtx, opt.sets)
+    slt = threshold_constraints(opt.slt, opt.sets; datatype = datatype, strict = opt.strict)
+    sst = threshold_constraints(opt.sst, opt.sets; datatype = datatype, strict = opt.strict)
     sgmtx = if opt.smtx === opt.sgmtx
         smtx
     else
@@ -464,7 +523,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     fees = fees_constraints(opt.fees, opt.sets; strict = opt.strict, datatype = datatype)
     ret = jump_returns_factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx,
-                                            sgmtx, nplg, cplg, tn, fees, ret)
+                                            slt, sst, sgmtx, nplg, cplg, tn, fees, ret)
 end
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = Tuple(setdiff(propertynames(opt), (:ret,)))
@@ -472,17 +531,17 @@ function no_bounds_optimiser(opt::JuMPOptimiser, args...)
                          NamedTuple{pnames}(getproperty.(Ref(opt), pnames))...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(opt,
-                                                                                                                               rd;
-                                                                                                                               dims = dims)
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(opt,
+                                                                                                                                         rd;
+                                                                                                                                         dims = dims)
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = lcs, lcm = opt.lcm, cent = cent,
-                         gcard = gcard, sgcard = sgcard, smtx = smtx, sgmtx = sgmtx,
-                         sets = opt.sets, nplg = nplg, cplg = cplg, tn = tn, te = opt.te,
-                         fees = fees, ret = ret, sce = opt.sce, ccnt = opt.ccnt,
-                         cobj = opt.cobj, sc = opt.sc, so = opt.so, card = opt.card,
-                         nea = opt.nea, l1 = opt.l1, l2 = opt.l2, ss = opt.ss,
-                         strict = opt.strict)
+                         gcard = gcard, sgcard = sgcard, smtx = smtx, slt = slt, sst = sst,
+                         sgmtx = sgmtx, sets = opt.sets, nplg = nplg, cplg = cplg, tn = tn,
+                         te = opt.te, fees = fees, ret = ret, sce = opt.sce,
+                         ccnt = opt.ccnt, cobj = opt.cobj, sc = opt.sc, so = opt.so,
+                         card = opt.card, nea = opt.nea, l1 = opt.l1, l2 = opt.l2,
+                         ss = opt.ss, strict = opt.strict)
 end
 
 export JuMPOptimisationResult, JuMPOptimiser

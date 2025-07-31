@@ -96,9 +96,9 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
 end
 function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
-                                                                                                                               rd;
-                                                                                                                               dims = dims)
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
+                                                                                                                                         rd;
+                                                                                                                                         dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
@@ -138,6 +138,8 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                                                                          gcard,
                                                                                          sgcard,
                                                                                          smtx,
+                                                                                         slt,
+                                                                                         sst,
                                                                                          sgmtx,
                                                                                          nplg,
                                                                                          cplg,
