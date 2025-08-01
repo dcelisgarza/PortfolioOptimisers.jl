@@ -410,39 +410,58 @@ function JuMPOptimiser(;
     if !isnothing(card)
         @smart_assert(isfinite(card) && card > 0)
     end
-    if !isnothing(scard)
-        if isa(scard, Integer)
-            @smart_assert(isfinite(scard) && scard > 0)
-            @smart_assert(isa(smtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
-            @smart_assert(isa(slt,
-                              Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
-                                    <:AbstractVector{<:Pair{<:Any, <:Real}}}))
-            @smart_assert(isa(sst,
-                              Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
-                                    <:AbstractVector{<:Pair{<:Any, <:Real}}}))
-        elseif isa(scard, AbstractVector)
-            @smart_assert(!isempty(scard))
-            @smart_assert(all(isfinite, scard) && all(x -> x > 0, scard))
-            @smart_assert(isa(smtx,
-                              Union{<:AbstractVector{Symbol},
-                                    <:AbstractVector{<:AbstractString},
-                                    <:AbstractVector{<:AbstractMatrix}}))
-            @smart_assert(length(scard) == length(smtx))
-            if isa(slt,
-                   Union{<:AbstractVector{<:AbstractDict},
-                         <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                         <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                                  <:AbstractVector{<:Pair{<:Any, <:Real}}}}})
-                @smart_assert(length(scard) == length(slt))
-            end
-            if isa(sst,
-                   Union{<:AbstractVector{<:AbstractDict},
-                         <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                         <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                                  <:AbstractVector{<:Pair{<:Any, <:Real}}}}})
-                @smart_assert(length(scard) == length(sst))
-            end
+    if isa(scard, Integer)
+        @smart_assert(isfinite(scard) && scard > 0)
+        @smart_assert(isa(smtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
+        @smart_assert(isa(slt,
+                          Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
+                                <:AbstractVector{<:Pair{<:Any, <:Real}}}))
+        @smart_assert(isa(sst,
+                          Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
+                                <:AbstractVector{<:Pair{<:Any, <:Real}}}))
+    elseif isa(scard, AbstractVector)
+        @smart_assert(!isempty(scard))
+        @smart_assert(all(isfinite, scard) && all(x -> x > 0, scard))
+        @smart_assert(isa(smtx,
+                          Union{<:AbstractVector{Symbol},
+                                <:AbstractVector{<:AbstractString},
+                                <:AbstractVector{<:AbstractMatrix}}))
+        @smart_assert(length(scard) == length(smtx))
+        if isa(slt,
+               Union{<:AbstractVector{<:AbstractDict},
+                     <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                     <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                              <:AbstractVector{<:Pair{<:Any, <:Real}}}}})
+            @smart_assert(length(scard) == length(slt))
         end
+        if isa(sst,
+               Union{<:AbstractVector{<:AbstractDict},
+                     <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                     <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                              <:AbstractVector{<:Pair{<:Any, <:Real}}}}})
+            @smart_assert(length(scard) == length(sst))
+        end
+    elseif isnothing(scard) && (isa(slt,
+                                    Union{<:BuyInThresholdResult, <:AbstractDict,
+                                          <:AbstractVector{<:Pair{<:Any, <:Real}}}) || isa(sst,
+                                                                                           Union{<:BuyInThresholdResult, <:AbstractDict,
+                                                                                                 <:AbstractVector{<:Pair{<:Any, <:Real}}}))
+        @smart_assert(isa(smtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
+    elseif isnothing(scard) && (isa(slt,
+                                    Union{<:AbstractVector{<:AbstractDict},
+                                          <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                                          <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                                                   <:AbstractVector{<:Pair{<:Any, <:Real}}}}}) ||
+                                isa(sst,
+                                    Union{<:AbstractVector{<:AbstractDict},
+                                          <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                                          <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                                                   <:AbstractVector{<:Pair{<:Any, <:Real}}}}}))
+        @smart_assert(isa(smtx,
+                          Union{<:AbstractVector{Symbol},
+                                <:AbstractVector{<:AbstractString},
+                                <:AbstractVector{<:AbstractMatrix}}))
+        @smart_assert(length(slt) == length(sst) == length(smtx))
     end
     if isa(gcard, AbstractVector)
         @smart_assert(!isempty(gcard))
@@ -461,7 +480,15 @@ function JuMPOptimiser(;
         @smart_assert(isa(sgst,
                           Union{Nothing, <:BuyInThresholdResult, <:AbstractDict,
                                 <:AbstractVector{<:Pair{<:Any, <:Real}}}))
-    elseif isa(sgcard, AbstractVector{<:AbstractVector})
+        if isa(sgcard, LinearConstraintResult) && isa(smtx, AbstractMatrix)
+            N = size(smtx, 1)
+            N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
+            N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
+            @smart_assert(N == N_ineq + N_eq)
+        end
+    elseif isa(sgcard,
+               Union{<:AbstractVector{<:AbstractVector},
+                     <:AbstractVector{<:LinearConstraintResult}})
         @smart_assert(isa(sgmtx,
                           Union{<:AbstractVector{Symbol},
                                 <:AbstractVector{<:AbstractString},
@@ -481,6 +508,35 @@ function JuMPOptimiser(;
                                               <:AbstractVector{<:Pair{<:Any, <:Real}}}}})
             @smart_assert(length(sgcard) == length(sgst))
         end
+        for (sgc, smt) in zip(sgcard, smtx)
+            if isa(sgc, LinearConstraintResult) && isa(smt, AbstractMatrix)
+                N = size(smt, 1)
+                N_ineq = !isnothing(sgc.ineq) ? length(sgc.B_ineq) : 0
+                N_eq = !isnothing(sgc.eq) ? length(sgc.B_eq) : 0
+                @smart_assert(N == N_ineq + N_eq)
+            end
+        end
+    elseif isnothing(sgcard) && (isa(sglt,
+                                     Union{<:BuyInThresholdResult, <:AbstractDict,
+                                           <:AbstractVector{<:Pair{<:Any, <:Real}}}) || isa(sgst,
+                                                                                            Union{<:BuyInThresholdResult, <:AbstractDict,
+                                                                                                  <:AbstractVector{<:Pair{<:Any, <:Real}}}))
+        @smart_assert(isa(sgmtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
+    elseif isnothing(sgcard) && (isa(sglt,
+                                     Union{<:AbstractVector{<:AbstractDict},
+                                           <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                                           <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                                                    <:AbstractVector{<:Pair{<:Any, <:Real}}}}}) ||
+                                 isa(sgst,
+                                     Union{<:AbstractVector{<:AbstractDict},
+                                           <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+                                           <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+                                                                    <:AbstractVector{<:Pair{<:Any, <:Real}}}}}))
+        @smart_assert(isa(sgmtx,
+                          Union{<:AbstractVector{Symbol},
+                                <:AbstractVector{<:AbstractString},
+                                <:AbstractVector{<:AbstractMatrix}}))
+        @smart_assert(length(sglt) == length(sgst) == length(sgmtx))
     end
     if isa(wb, WeightBoundsConstraint) ||
        !isa(lt, Union{Nothing, <:BuyInThresholdResult}) ||
@@ -493,12 +549,6 @@ function JuMPOptimiser(;
                   <:AbstractVector{<:LinearConstraintResult}}) ||
        !isnothing(scard)
         @smart_assert(!isnothing(sets))
-    end
-    if isa(sgcard, LinearConstraintResult) && isa(smtx, AbstractMatrix)
-        N = size(smtx, 1)
-        N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
-        N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
-        @smart_assert(N == N_ineq + N_eq)
     end
     if isa(tn, AbstractVector)
         @smart_assert(!isempty(tn))

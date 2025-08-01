@@ -431,7 +431,7 @@ function set_linear_weight_constraints!(model::JuMP.Model, lcm::LinearConstraint
     end
     return nothing
 end
-function mip_wb(args...)
+function mip_wb(::Any, ::Nothing, args...)
     return nothing
 end
 function add_to_fees!(model::JuMP.Model, expr::AbstractJuMPScalar)
@@ -615,32 +615,127 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     return nothing
 end
+function smip_wb(::Any, ::Nothing, args...)
+    return nothing
+end
 function smip_wb(model::JuMP.Model, wb::WeightBoundsResult, smtx::AbstractMatrix,
-                 il::AbstractVector, is::AbstractVector, key1::Symbol = :smtx_expr_,
-                 key2::Symbol = :set_w_mip_, i::Integer = 1)
+                 smtx_expr::AbstractVector{<:AbstractJuMPScalar}, il::AbstractVector,
+                 is::AbstractVector, key::Symbol = :set_w_mip_, i::Integer = 1)
     sc = model[:sc]
-    w = model[:w]
-    smtx_expr = model[Symbol(key1, i)] = @expression(model, smtx * w)
     lb = wb.lb
     if !isnothing(lb) && w_finite_flag(lb)
         lb = [sum(lb[view(smtx, j, :)]) for j in axes(smtx, 1)]
-        model[Symbol(key2, :lb_, i)] = @constraint(model, sc * (smtx_expr - lb ⊙ is) >= 0)
+        model[Symbol(key, :lb_, i)] = @constraint(model, sc * (smtx_expr - lb ⊙ is) >= 0)
     end
     ub = wb.ub
     if !isnothing(ub) && w_finite_flag(ub)
         ub = [sum(ub[view(smtx, j, :)]) for j in axes(smtx, 1)]
-        model[Symbol(key2, :ub_, i)] = @constraint(model, sc * (smtx_expr - ub ⊙ il) <= 0)
+        model[Symbol(key, :ub_, i)] = @constraint(model, sc * (smtx_expr - ub ⊙ il) <= 0)
     end
-    return smtx_expr
+    return nothing
+end
+function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResult,
+                                         smtx::Union{Nothing, <:AbstractMatrix},
+                                         lt::Union{Nothing, <:BuyInThresholdResult},
+                                         st::Union{Nothing, <:BuyInThresholdResult},
+                                         ss::Union{Nothing, <:Real}, lt_flag::Bool,
+                                         st_flag::Bool, key1::Symbol = :si,
+                                         key7::Symbol = :smtx_expr_,
+                                         key8::Symbol = :set_w_mip_, i::Integer = 1)
+    w = model[:w]
+    k = model[:k]
+    sc = model[:sc]
+    if isnothing(ss)
+        ss = 1_000
+    end
+    N = size(smtx, 1)
+    ilb, isb = model[Symbol(key1, :lb_, i)], model[Symbol(key1, :ub_, i)] = @variables(model,
+                                                                                       begin
+                                                                                           [1:N],
+                                                                                           (binary = true)
+                                                                                           [1:N],
+                                                                                           (binary = true)
+                                                                                       end)
+    key2 = Symbol(key1, :_mip_)
+    i_mip = model[Symbol(key2, i)] = @expression(model, ilb + isb)
+    il, is = if isa(k, Real)
+        model[Symbol(key1, :l_, i)], model[Symbol(key1, :s_, i)] = @expressions(model,
+                                                                                begin
+                                                                                    ilb
+                                                                                    isb
+                                                                                end)
+    else
+        key3 = Symbol(key1, :lf_)
+        key4 = Symbol(key1, :sf_)
+        ilf, isf = model[Symbol(key3, i)], model[Symbol(key4, i)] = @variables(model,
+                                                                               begin
+                                                                                   [1:N],
+                                                                                   (lower_bound = 0)
+                                                                                   [1:N],
+                                                                                   (lower_bound = 0)
+                                                                               end)
+        key5 = Symbol(key1, :lfd_)
+        key6 = Symbol(key1, :sfd_)
+        model[Symbol(key3, :ub_, i)], model[Symbol(key4, :ub_, i)], model[Symbol(key5, :ub_, i)], model[Symbol(key6, :ub_, i)], model[Symbol(key5, :lb_, i)], model[Symbol(key6, :lb_, i)] = @constraints(model,
+                                                                                                                                                                                                          begin
+                                                                                                                                                                                                              ilf .-
+                                                                                                                                                                                                              k <=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              isf .-
+                                                                                                                                                                                                              k <=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              ilf -
+                                                                                                                                                                                                              ss *
+                                                                                                                                                                                                              ilb <=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              isf -
+                                                                                                                                                                                                              ss *
+                                                                                                                                                                                                              isb <=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              (ilf +
+                                                                                                                                                                                                               ss *
+                                                                                                                                                                                                               (1 .-
+                                                                                                                                                                                                                ilb)) .-
+                                                                                                                                                                                                              k >=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              (isf +
+                                                                                                                                                                                                               ss *
+                                                                                                                                                                                                               (1 .-
+                                                                                                                                                                                                                isb)) .-
+                                                                                                                                                                                                              k >=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                          end)
+        model[Symbol(key1, :l_, i)], model[Symbol(key1, :s_, i)] = @expressions(model,
+                                                                                begin
+                                                                                    ilf
+                                                                                    isf
+                                                                                end)
+    end
+    model[Symbol(key2, :ub, i)] = @constraint(model, i_mip .- 1 <= 0)
+    smtx_expr = model[Symbol(key7, i)] = @expression(model, smtx * w)
+    smip_wb(model, wb, smtx, smtx_expr, il, is, key8, i)
+    if lt_flag
+        model[Symbol(key8, :lt, i)] = @constraint(model,
+                                                  sc * (smtx_expr - il ⊙ lt.val +
+                                                        ss * (1 .- ilb)) >= 0)
+    end
+    if st_flag
+        model[Symbol(key8, :st, i)] = @constraint(model,
+                                                  sc * (smtx_expr + is ⊙ st.val -
+                                                        ss * (1 .- isb)) <= 0)
+    end
+    return i_mip
 end
 function smip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
                           smtx::Union{Nothing, <:AbstractMatrix},
                           lt::Union{Nothing, <:BuyInThresholdResult},
                           ss::Union{Nothing, <:Real}, lt_flag::Bool, key1::Symbol = :sib_,
                           key2::Symbol = :i_smip_, key3::Symbol = :isbf_,
-                          key4::Symbol = :w_smip_lt_, i::Integer = 1)
-    sc = model[:sc]
+                          key4::Symbol = :smtx_expr_, key5::Symbol = :set_w_mip_,
+                          key6::Symbol = :w_smip_lt_, i::Integer = 1)
+    w = model[:w]
     k = model[:k]
+    sc = model[:sc]
     N = size(smtx, 1)
     sib = model[Symbol(key1, i)] = @variable(model, [1:N], binary = true)
     i_smip = if isa(k, Real)
@@ -668,9 +763,10 @@ function smip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
                                                                                                                      end)
         model[Symbol(key2, i)] = @expression(model, isbf)
     end
-    smtx_expr = smip_wb(model, wb, smtx, i_smip, i_smip, :smtx_expr_, :set_w_mip_, i)
+    smtx_expr = model[Symbol(key4, i)] = @expression(model, smtx * w)
+    smip_wb(model, wb, smtx, smtx_expr, i_smip, i_smip, key5, i)
     if lt_flag
-        model[Symbol(key4, i)] = @constraint(model, sc * (smtx_expr - i_smip ⊙ lt.val) >= 0)
+        model[Symbol(key6, i)] = @constraint(model, sc * (smtx_expr - i_smip ⊙ lt.val) >= 0)
     end
     return sib
 end
@@ -690,10 +786,11 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     sc = model[:sc]
     sib = if st_flag && haskey(model, :sw)
-        #! Short smip threshold constraints
+        short_mip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
+                                        :smtx_expr_, :set_w_mip_, i)
     else
         smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sib_, :i_smip_, :isbf_,
-                         :w_smip_lt_, i)
+                         :smtx_expr_, :set_w_mip_, :w_smip_lt_, i)
     end
     if card_flag
         model[Symbol(:scard_, i)] = @constraint(model, sc * (sum(sib) - card) <= 0)
@@ -752,10 +849,11 @@ function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     sc = model[:sc]
     sib = if st_flag && haskey(model, :sw)
-        #! Short smip threshold constraints
+        short_mip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
+                                        :smtx_expr_, :set_w_mip_, i)
     else
         smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sib_, :i_smip_, :isbf_,
-                         :w_smip_lt_, i)
+                         :smtx_expr_, :set_w_mip_, :w_smip_lt_, i)
     end
     model[Symbol(:scard_, i)] = @constraint(model, sc * (sum(sib) - card) <= 0)
     return nothing
@@ -793,10 +891,11 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     sc = model[:sc]
     sib = if st_flag && haskey(model, :sw)
-        #! Short smip threshold constraints
+        short_mip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :sgi,
+                                        :sgmtx_expr_, :setg_w_mip_, i)
     else
         smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sgib_, :i_sgmip_, :isgbf_,
-                         :w_sgmip_lt_, i)
+                         :sgmtx_expr_, :setg_w_mip_, :w_sgmip_lt_, i)
     end
     if !isnothing(gcard.ineq)
         A = gcard.ineq.A
