@@ -557,15 +557,14 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     # lcs = linear_constraint_view(opt.lcs, i)
     # gcard = linear_constraint_view(opt.gcard, i)
     # sgcard = linear_constraint_view(opt.sgcard, i)
-    smtx = asset_sets_matrix_view(opt.smtx, i)
+    if opt.smtx === opt.sgmtx
+        smtx = sgmtx = asset_sets_matrix_view(opt.smtx, i)
+    else
+        smtx  = asset_sets_matrix_view(opt.smtx, i)
+        sgmtx = asset_sets_matrix_view(opt.sgmtx, i)
+    end
     slt = threshold_view(opt.slt, i)
     sst = threshold_view(opt.sst, i)
-    sgmtx = if opt.smtx === opt.sgmtx
-        smtx
-    else
-        asset_sets_matrix_view(opt.sgmtx, i)
-        # threshold_view(opt.sgst, i)
-    end
     # sglt = if opt.slt === opt.sglt
     #     slt
     # else
@@ -600,20 +599,14 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     cent = centrality_constraints(opt.cent, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     gcard = linear_constraints(opt.gcard, opt.sets; datatype = Int, strict = opt.strict)
     sgcard = linear_constraints(opt.sgcard, opt.sets; datatype = Int, strict = opt.strict)
-    smtx = asset_sets_matrix(opt.smtx, opt.sets)
+    if opt.smtx === opt.sgmtx
+        smtx = sgmtx = asset_sets_matrix(opt.smtx, opt.sets)
+    else
+        smtx = asset_sets_matrix(opt.smtx, opt.sets)
+        sgmtx = asset_sets_matrix(opt.sgmtx, opt.sets)
+    end
     slt = threshold_constraints(opt.slt, opt.sets; datatype = datatype, strict = opt.strict)
     sst = threshold_constraints(opt.sst, opt.sets; datatype = datatype, strict = opt.strict)
-    sgmtx = if opt.smtx === opt.sgmtx
-        smtx
-    else
-        asset_sets_matrix(opt.sgmtx, opt.sets)
-    end
-    # sglt = if opt.slt === opt.sglt
-    #     slt#, sst
-    # else
-    #     threshold_constraints(opt.sglt, opt.sets; datatype = datatype, strict = opt.strict)
-    #     # threshold_constraints(opt.sgst, opt.sets; datatype = datatype, strict = opt.strict)
-    # end
     nplg = philogeny_constraints(opt.nplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     cplg = philogeny_constraints(opt.cplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     tn = turnover_constraints(opt.tn, opt.sets; strict = opt.strict, datatype = datatype)

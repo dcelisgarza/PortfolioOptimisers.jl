@@ -239,4 +239,4 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
     return valid_k_clusters(clustering, W_list)
 end
 
-export HClustAlgorithm, ClusterNode
+export ClusterNode
