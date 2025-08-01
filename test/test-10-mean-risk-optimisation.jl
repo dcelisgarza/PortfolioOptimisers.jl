@@ -333,7 +333,56 @@
         res = optimise!(mr)
         @test 0.1 <= sum(res.w) <= 0.45
         @test isapprox(sum(res.w[res.w .< zero(eltype(res.w))]), -0.15, rtol = 5e-5)
-        @test 0.45 <= sum(res.w[res.w .> zero(eltype(res.w))]) <= 0.60
+        @test 0.45 <= sum(res.w[res.w .>= zero(eltype(res.w))]) <= 0.60
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = nothing, bgt = 1.7,
+                            wb = WeightBounds(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MinimumRisk(), opt = opt)
+        res = optimise!(mr)
+        @test isapprox(sum(res.w), 1.7)
+        @test all(res.w .>= 0)
+        @test !haskey(res.model, :sbgt)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1.4, bgt = nothing,
+                            wb = WeightBounds(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mr)
+        @test isapprox(sum(res.w[res.w .< 0]), -1.4, rtol = 1e-3)
+        @test !haskey(res.model, :bgt)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
+                            sbgt = BudgetRange(; lb = 0.41, ub = 0.63), bgt = 0.87,
+                            wb = WeightBounds(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mr)
+        @test isapprox(sum(res.w), 0.87)
+        @test -0.63 <= sum(res.w[res.w .< zero(eltype(res.w))]) <= -0.41
+        @test 0.87 + 0.41 <= sum(res.w[res.w .>= zero(eltype(res.w))]) <= 0.87 + 0.63
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 0.61,
+                            bgt = BudgetRange(; lb = 0.4, ub = 0.79),
+                            wb = WeightBounds(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MaximumUtility(), opt = opt)
+        res = optimise!(mr)
+        @test 0.4 <= sum(res.w) <= 0.79
+        @test isapprox(sum(res.w[res.w .< zero(eltype(res.w))]), -0.61, rtol = 5e-5)
+        @test 0.61 + 0.4 <= sum(res.w[res.w .> zero(eltype(res.w))]) <= 0.61 + 0.79
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
+                            sbgt = BudgetRange(; lb = 0.41, ub = 0.63), bgt = nothing,
+                            wb = WeightBounds(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mr)
+        @test -0.63 <= sum(res.w[res.w .< zero(eltype(res.w))]) <= -0.41
+        @test !haskey(res.model, :bgt)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = nothing,
+                            bgt = BudgetRange(; lb = 0.4, ub = 0.79),
+                            wb = WeightBounds(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MaximumUtility(), opt = opt)
+        res = optimise!(mr)
+        @test 0.4 <= sum(res.w) <= 0.79
+        @test !haskey(res.model, :sbgt)
     end
     @testset "Cardinality" begin
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, card = 3)
