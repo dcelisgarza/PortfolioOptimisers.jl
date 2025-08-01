@@ -48,33 +48,4 @@ function threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresho
     return threshold_constraints.(t, Ref(sets); kwargs...)
 end
 
-#! Start: delete
-function threshold_constraints(t::Union{<:AbstractDict,
-                                        <:AbstractVector{<:Pair{<:Any, <:Real}}},
-                               sets::AssetSets; datatype::DataType = Float64,
-                               strict::Bool = false)
-    return BuyInThreshold(;
-                          val = estimator_to_val(t, sets, zero(datatype); strict = strict))
-end
-function threshold_constraints(t::Union{<:AbstractVector{<:AbstractDict},
-                                        <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
-                                                                                 <:Real}}},
-                                        <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                                                 <:AbstractVector{<:Pair{<:Any,
-                                                                                         <:Real}}}}},
-                               sets::AssetSets; kwargs...)
-    return threshold_constraints.(t, Ref(sets); kwargs...)
-end
-function threshold_view(t::Union{<:AbstractDict, <:AbstractVector{<:Pair{<:Any, <:Real}},
-                                 <:AbstractVector{Nothing},
-                                 <:AbstractVector{<:AbstractDict},
-                                 <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                                 <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                                          <:AbstractVector{<:Pair{<:Any,
-                                                                                  <:Real}}}}},
-                        ::Any)
-    return t
-end
-#! Stop: delete
-
-export BuyInThreshold
+export BuyInThreshold, BuyInThresholdEstimator
