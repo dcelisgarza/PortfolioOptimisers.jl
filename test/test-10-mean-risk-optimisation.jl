@@ -383,6 +383,26 @@
         res = optimise!(mr)
         @test 0.4 <= sum(res.w) <= 0.79
         @test !haskey(res.model, :sbgt)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
+                            sbgt = BudgetRange(; lb = nothing, ub = 0.23),
+                            bgt = BudgetRange(; lb = 0.41, ub = nothing),
+                            wb = WeightBounds(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mr)
+        @test sum(res.w) >= 0.41
+        @test sum(res.w[res.w .< 0]) >= -0.23
+        @test sum(res.w[res.w .>= 0]) >= 0.64
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
+                            sbgt = BudgetRange(; lb = 0.35, ub = nothing),
+                            bgt = BudgetRange(; lb = nothing, ub = 0.65),
+                            wb = WeightBounds(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mr)
+        @test sum(res.w) <= 0.41
+        @test sum(res.w[res.w .< 0]) <= -0.35
+        @test sum(res.w[res.w .>= 0]) <= 0.76
     end
     @testset "Cardinality" begin
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, card = 3)
