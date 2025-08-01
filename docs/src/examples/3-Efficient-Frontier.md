@@ -1,5 +1,4 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../examples/3-Efficient-Frontier.jl"
 ```
@@ -28,7 +27,7 @@ end;
 nothing #hide
 ````
 
-## 1. Returns data
+## 1. ReturnsResult data
 
 We will use the same data as the previous example.
 
@@ -62,7 +61,7 @@ This time we will use the `ConditionalValueatRisk` measure and we will once agai
 
 ````@example 3-Efficient-Frontier
 r = ConditionalValueatRisk()
-pr = prior(EmpiricalPriorEstimator(), rd)
+pr = prior(EmpiricalPrior(), rd)
 ````
 
 Lets create the efficient frontier by setting returns lower bounds and minimising the risk. We will compute a 30-point frontier.
@@ -120,6 +119,7 @@ plot_measures(res1.w, res1.pr; x = r, y = ConditionalDrawdownatRisk(),
               colorbar_title = "\nCDaR/CVaR Ratio", right_margin = 6Plots.mm)
 ````
 
-* * *
+---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

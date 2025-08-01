@@ -1,9 +1,10 @@
-struct SchurHierarchicalOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
-                                           T3 <: Union{Nothing, <:WeightBoundsResult},
-                                           T4 <: AbstractClusteringResult,
-                                           T5 <: Union{<:Real, <:AbstractVector{<:Real}},
-                                           T6 <: OptimisationReturnCode,
-                                           T7 <: AbstractVector} <: OptimisationResult
+struct SchurHierarchicalRiskParityOptimisation{T1 <: Type, T2 <: AbstractPriorResult,
+                                               T3 <: Union{Nothing, <:WeightBounds},
+                                               T4 <: AbstractClusteringResult,
+                                               T5 <:
+                                               Union{<:Real, <:AbstractVector{<:Real}},
+                                               T6 <: OptimisationReturnCode,
+                                               T7 <: AbstractVector} <: OptimisationResult
     oe::T1
     pr::T2
     wb::T3
@@ -106,8 +107,7 @@ function naive_portfolio_risk(::StandardDeviation, sigma::AbstractMatrix)
     w ./= sum(w)
     return sqrt(dot(w, sigma, w))
 end
-function schur_weights(pr::AbstractPriorResult, items::AbstractVector,
-                       wb::WeightBoundsResult,
+function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::WeightBounds,
                        params::SchurParams{<:Any, <:Any, <:NonMonotonicSchur, <:Any},
                        gamma::Union{Nothing, <:Real} = nothing)
     r = factory(params.r, pr)
@@ -177,8 +177,7 @@ function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lr
     end
     throw(ArgumentError("Binary search did not converge within the specified tolerance."))
 end
-function schur_weights(pr::AbstractPriorResult, items::AbstractVector,
-                       wb::WeightBoundsResult,
+function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::WeightBounds,
                        params::SchurParams{<:Any, <:Any, <:MonotonicSchur, <:Any})
     max_gamma = params.gamma
     r = factory(params.r, pr)
@@ -224,7 +223,8 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
                                    strict = sh.opt.strict, datatype = eltype(pr.X))
     w, gamma = schur_weights(pr, items, wb, sh.params)
     retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w)
-    return SchurHierarchicalOptimisationResult(typeof(sh), pr, wb, clr, gamma, retcode, w)
+    return SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gamma, retcode,
+                                                   w)
 end
 function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
@@ -242,8 +242,9 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
         gammas[i] = gamma
     end
     retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w / sum(w))
-    return SchurHierarchicalOptimisationResult(typeof(sh), pr, wb, clr, gammas, retcode, w)
+    return SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gammas, retcode,
+                                                   w)
 end
 
-export SchurHierarchicalOptimisationResult, SchurParams, SchurHierarchicalRiskParity,
+export SchurHierarchicalRiskParityOptimisation, SchurParams, SchurHierarchicalRiskParity,
        NonMonotonicSchur, MonotonicSchur

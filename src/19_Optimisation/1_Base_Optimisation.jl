@@ -16,7 +16,7 @@ end
 function OptimisationFailure(; res = nothing)
     return OptimisationFailure{typeof(res)}(res)
 end
-struct SingletonOptimisationResult{T1 <: OptimisationReturnCode} <: OptimisationResult
+struct SingletonOptimisation{T1 <: OptimisationReturnCode} <: OptimisationResult
     retcode::T1
 end
 abstract type OptimisationModelResult <: AbstractResult end

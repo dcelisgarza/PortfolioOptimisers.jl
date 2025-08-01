@@ -43,7 +43,7 @@ Construct a [`Detone`](@ref) estimator for removing the top `n` principal compon
 
   - `n::Integer`: Number of leading principal components to remove. Must satisfy `n ≥ 0`.
 
-# Returns
+# ReturnsResult
 
   - `Detone`: A detoning estimator.
 
@@ -66,21 +66,21 @@ function Detone(; n::Integer = 1)
 end
 
 """
-    detone!(dt::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
+    detone!(dt::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
     detone!(::Nothing, args...)
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
 
   - If `dt` is `nothing`, this is a no-op and returns `nothing`.
-  - If `dt` is a [`Detone`](@ref) object, the top `n` principal components are removed from `X` in-place. Optionally, a [`PosdefEstimator`](@ref) can be provided to ensure the output is positive definite.
+  - If `dt` is a [`Detone`](@ref) object, the top `n` principal components are removed from `X` in-place. Optionally, a [`Posdef`](@ref) can be provided to ensure the output is positive definite.
 
 # Arguments
 
   - `dt::Detone`: The detoning estimator specifying the number of components to remove.
   - `X::AbstractMatrix`: The covariance or correlation matrix to be detoned (modified in-place).
-  - `pdm::Union{Nothing, <:PosdefEstimator}`: Optional positive definite matrix estimator.
+  - `pdm::Union{Nothing, <:Posdef}`: Optional positive definite matrix estimator.
 
-# Returns
+# ReturnsResult
 
   - `nothing`. The input matrix `X` is modified in-place.
 
@@ -126,8 +126,7 @@ julia> X
 function detone!(::Nothing, args...)
     return nothing
 end
-function detone!(ce::Detone, X::AbstractMatrix,
-                 pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
+function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
     n = ce.n
     @smart_assert(one(size(X, 1)) <= n <= size(X, 1))
     n -= 1
@@ -150,7 +149,7 @@ function detone!(ce::Detone, X::AbstractMatrix,
 end
 
 """
-    detone(dt::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
+    detone(dt::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
     detone(::Nothing, args...)
 
 Same as [`detone!`](@ref), but returns a new matrix instead of modifying `X` in-place.
@@ -191,8 +190,7 @@ julia> Xd = detone(Detone(), X)
 function detone(::Nothing, args...)
     return nothing
 end
-function detone(ce::Detone, X::AbstractMatrix,
-                pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
+function detone(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
     X = copy(X)
     detone!(ce, X, pdm)
     return X

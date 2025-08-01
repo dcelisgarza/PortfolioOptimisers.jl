@@ -50,7 +50,7 @@
                                                                                                     "max_step_fraction" => 0.75)),
                      check_sol = (; allow_local = true, allow_almost = true))
     pr = prior(HighOrderPriorEstimator(;
-                                       pe = FactorPriorEstimator(;
+                                       pe = FactorPrior(;
                                                                  re = DimensionReductionRegression())),
                rd)
     rf = 4.34 / 100 / 252
@@ -133,12 +133,12 @@
                                                               obj = MaximumReturn(),
                                                               opt = opt1)).w)
                 sol_fnt3 = optimise!(NearOptimalCentering(;
-                                                          alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                                          alg = ConstrainedNearOptimalCentering(),
                                                           r = r1, obj = MinimumRisk(),
                                                           opt = opt2))
                 w_fnt3 = sol_fnt3.w
                 sol_fnt4 = optimise!(NearOptimalCentering(;
-                                                          alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                                          alg = ConstrainedNearOptimalCentering(),
                                                           r = r2, obj = MaximumReturn(),
                                                           opt = opt1))
                 w_fnt4 = sol_fnt4.w
@@ -324,13 +324,13 @@
                            optimise!(NearOptimalCentering(; r = [r1], obj = MaximumReturn(),
                                                           opt = opt1)).w)
             sol_fnt_2 = optimise!(NearOptimalCentering(;
-                                                       alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                                       alg = ConstrainedNearOptimalCentering(),
                                                        r = r1, obj = MaximumReturn(),
                                                        opt = opt1))
             w_fnt_2 = sol_fnt_2.w
             @test isapprox(w_fnt_2,
                            optimise!(NearOptimalCentering(;
-                                                          alg = ConstrainedNearOptimalCenteringAlgorithm(),
+                                                          alg = ConstrainedNearOptimalCentering(),
                                                           r = [r1], obj = MaximumReturn(),
                                                           opt = opt1)).w)
             r1 = PortfolioOptimisers.factory(r1, pr, slv)

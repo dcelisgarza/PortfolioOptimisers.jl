@@ -33,16 +33,16 @@
         rng = StableRNG(123456789)
         rd = prices_to_returns(Xp[(end - 252):end])
         X = rd.X
-        ues = [DeltaUncertaintySetEstimator(;),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
+        ues = [DeltaUncertaintySet(;),
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
                                              alg = BoxUncertaintySetAlgorithm(),
                                              seed = 987654321),
-               ARCHUncertaintySetEstimator(; alg = BoxUncertaintySetAlgorithm(),
+               ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(),
                                            bootstrap = StationaryBootstrap(),
                                            seed = 987654321),
-               ARCHUncertaintySetEstimator(; alg = BoxUncertaintySetAlgorithm(),
+               ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(),
                                            bootstrap = MovingBootstrap(), seed = 987654321),
-               ARCHUncertaintySetEstimator(; alg = BoxUncertaintySetAlgorithm(),
+               ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(),
                                            bootstrap = CircularBootstrap(),
                                            seed = 987654321)]
         ues_t = CSV.read(joinpath(@__DIR__, "assets/Box-Uncertainty-Sets.csv"), DataFrame)
@@ -137,87 +137,87 @@
         rng = StableRNG(123456789)
         rd = prices_to_returns(Xp[(end - 252):end][:A, :GOOG, :AMZN, :T])
         X = rd.X
-        ues = [NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
+        ues = [NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
                                              alg = EllipseUncertaintySetAlgorithm(;
                                                                                   diagonal = true,
                                                                                   method = NormalKUncertaintyAlgorithm()),
                                              seed = 987654321),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
                                              alg = EllipseUncertaintySetAlgorithm(;
                                                                                   diagonal = true,
                                                                                   method = GeneralKUncertaintyAlgorithm()),
                                              seed = 987654321),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
                                              alg = EllipseUncertaintySetAlgorithm(;
                                                                                   diagonal = true,
                                                                                   method = ChiSqKUncertaintyAlgorithm()),
                                              seed = 987654321),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
                                              alg = EllipseUncertaintySetAlgorithm(;
                                                                                   diagonal = true,
                                                                                   method = 10),
                                              seed = 987654321),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
                                              alg = EllipseUncertaintySetAlgorithm(;
                                                                                   diagonal = false,
                                                                                   method = NormalKUncertaintyAlgorithm()),
                                              seed = 987654321),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
                                              alg = EllipseUncertaintySetAlgorithm(;
                                                                                   diagonal = false,
                                                                                   method = GeneralKUncertaintyAlgorithm()),
                                              seed = 987654321),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
                                              alg = EllipseUncertaintySetAlgorithm(;
                                                                                   diagonal = false,
                                                                                   method = ChiSqKUncertaintyAlgorithm()),
                                              seed = 987654321),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
                                              alg = EllipseUncertaintySetAlgorithm(;
                                                                                   diagonal = false,
                                                                                   method = 10),
                                              seed = 987654321),
-               ARCHUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+               ARCHUncertaintySet(; pe = EmpiricalPrior(),
                                            alg = EllipseUncertaintySetAlgorithm(;
                                                                                 diagonal = true,
                                                                                 method = NormalKUncertaintyAlgorithm()),
                                            seed = 987654321,
                                            bootstrap = StationaryBootstrap()),
-               ARCHUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+               ARCHUncertaintySet(; pe = EmpiricalPrior(),
                                            alg = EllipseUncertaintySetAlgorithm(;
                                                                                 diagonal = true,
                                                                                 method = GeneralKUncertaintyAlgorithm()),
                                            seed = 987654321, bootstrap = MovingBootstrap()),
-               ARCHUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+               ARCHUncertaintySet(; pe = EmpiricalPrior(),
                                            alg = EllipseUncertaintySetAlgorithm(;
                                                                                 diagonal = true,
                                                                                 method = ChiSqKUncertaintyAlgorithm()),
                                            seed = 987654321,
                                            bootstrap = CircularBootstrap()),
-               ARCHUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+               ARCHUncertaintySet(; pe = EmpiricalPrior(),
                                            alg = EllipseUncertaintySetAlgorithm(;
                                                                                 diagonal = true,
                                                                                 method = 10),
                                            seed = 987654321,
                                            bootstrap = StationaryBootstrap()),
-               ARCHUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+               ARCHUncertaintySet(; pe = EmpiricalPrior(),
                                            alg = EllipseUncertaintySetAlgorithm(;
                                                                                 diagonal = false,
                                                                                 method = NormalKUncertaintyAlgorithm()),
                                            seed = 987654321, bootstrap = MovingBootstrap()),
-               ARCHUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+               ARCHUncertaintySet(; pe = EmpiricalPrior(),
                                            alg = EllipseUncertaintySetAlgorithm(;
                                                                                 diagonal = false,
                                                                                 method = GeneralKUncertaintyAlgorithm()),
                                            seed = 987654321,
                                            bootstrap = CircularBootstrap()),
-               ARCHUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+               ARCHUncertaintySet(; pe = EmpiricalPrior(),
                                            alg = EllipseUncertaintySetAlgorithm(;
                                                                                 diagonal = false,
                                                                                 method = ChiSqKUncertaintyAlgorithm()),
                                            seed = 987654321,
                                            bootstrap = StationaryBootstrap()),
-               ARCHUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+               ARCHUncertaintySet(; pe = EmpiricalPrior(),
                                            alg = EllipseUncertaintySetAlgorithm(;
                                                                                 diagonal = false,
                                                                                 method = 10),

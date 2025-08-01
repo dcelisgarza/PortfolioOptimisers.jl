@@ -1183,23 +1183,21 @@ function entropy_pooling_views(pr::AbstractPriorResult,
     return if !ineq_flag && !eq_flag
         nothing
     else
-        return LinearConstraintResult(;
-                                      ineq = if ineq_flag
-                                          PartialLinearConstraintResult(; A = A_ineq,
-                                                                        B = B_ineq)
-                                      else
-                                          nothing
-                                      end,
-                                      eq = if eq_flag
-                                          PartialLinearConstraintResult(; A = A_eq,
-                                                                        B = B_eq)
-                                      else
-                                          nothing
-                                      end)
+        return LinearConstraint(;
+                                ineq = if ineq_flag
+                                    PartialLinearConstraint(; A = A_ineq, B = B_ineq)
+                                else
+                                    nothing
+                                end,
+                                eq = if eq_flag
+                                    PartialLinearConstraint(; A = A_eq, B = B_eq)
+                                else
+                                    nothing
+                                end)
     end
 end
-function entropy_pooling_views(pr::AbstractPriorResult, epvs::LinearConstraintResult,
-                               args...; kwargs...)
+function entropy_pooling_views(pr::AbstractPriorResult, epvs::LinearConstraint, args...;
+                               kwargs...)
     return lcm
 end
 function entropy_pooling_views(pr::AbstractPriorResult, ::Nothing, args...; kwargs...)

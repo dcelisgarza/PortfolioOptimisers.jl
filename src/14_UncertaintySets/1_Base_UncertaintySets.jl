@@ -31,15 +31,15 @@ function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwarg
     return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
-struct BoxUncertaintySetResult{T1 <: AbstractArray, T2 <: AbstractArray} <:
+struct BoxUncertaintySet{T1 <: AbstractArray, T2 <: AbstractArray} <:
        AbstractUncertaintySetResult
     lb::T1
     ub::T2
 end
-function BoxUncertaintySetResult(; lb::AbstractArray, ub::AbstractArray)
+function BoxUncertaintySet(; lb::AbstractArray, ub::AbstractArray)
     @smart_assert(!isempty(lb) && !isempty(ub))
     @smart_assert(size(lb) == size(ub))
-    return BoxUncertaintySetResult{typeof(lb), typeof(ub)}(lb, ub)
+    return BoxUncertaintySet{typeof(lb), typeof(ub)}(lb, ub)
 end
 struct NormalKUncertaintyAlgorithm{T1 <: NamedTuple} <: AbstractUncertaintyKAlgorithm
     kwargs::T1
@@ -76,25 +76,23 @@ function EllipseUncertaintySetAlgorithm(;
                                                                             diagonal)
 end
 abstract type AbstractEllipseUncertaintySetResultClass <: AbstractUncertaintySetResult end
-struct MuEllipseUncertaintySetResult <: AbstractEllipseUncertaintySetResultClass end
-struct SigmaEllipseUncertaintySetResult <: AbstractEllipseUncertaintySetResultClass end
-struct EllipseUncertaintySetResult{T1 <: AbstractMatrix, T2 <: Real,
-                                   T3 <: AbstractEllipseUncertaintySetResultClass} <:
+struct MuEllipseUncertaintySet <: AbstractEllipseUncertaintySetResultClass end
+struct SigmaEllipseUncertaintySet <: AbstractEllipseUncertaintySetResultClass end
+struct EllipseUncertaintySet{T1 <: AbstractMatrix, T2 <: Real,
+                             T3 <: AbstractEllipseUncertaintySetResultClass} <:
        AbstractUncertaintySetResult
     sigma::T1
     k::T2
     class::T3
 end
-function EllipseUncertaintySetResult(; sigma::AbstractMatrix, k::Real,
-                                     class::AbstractEllipseUncertaintySetResultClass)
+function EllipseUncertaintySet(; sigma::AbstractMatrix, k::Real,
+                               class::AbstractEllipseUncertaintySetResultClass)
     @smart_assert(!isempty(sigma))
     assert_matrix_issquare(sigma)
     @smart_assert(zero(k) < k)
-    return EllipseUncertaintySetResult{typeof(sigma), typeof(k), typeof(class)}(sigma, k,
-                                                                                class)
+    return EllipseUncertaintySet{typeof(sigma), typeof(k), typeof(class)}(sigma, k, class)
 end
 
-export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySetResult,
+export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        NormalKUncertaintyAlgorithm, GeneralKUncertaintyAlgorithm,
-       ChiSqKUncertaintyAlgorithm, EllipseUncertaintySetAlgorithm,
-       EllipseUncertaintySetResult
+       ChiSqKUncertaintyAlgorithm, EllipseUncertaintySetAlgorithm, EllipseUncertaintySet

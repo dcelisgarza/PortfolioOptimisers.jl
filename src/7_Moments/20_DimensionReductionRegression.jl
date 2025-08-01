@@ -67,7 +67,7 @@ function regression(re::DimensionReductionRegression, X::AbstractMatrix, F::Abst
     b = view(loadings, :, 1)
     M = view(loadings, :, 2:cols)
     L = transpose(pinv(Vp) * transpose(M .* transpose(sigma)))
-    return RegressionResult(; b = b, M = M, L = L)
+    return Regression(; b = b, M = M, L = L)
 end
 
 export PCA, PPCA, DimensionReductionRegression

@@ -66,7 +66,7 @@ Construct a [`Cokurtosis`](@ref) estimator for cokurtosis computation.
   - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator.
   - `alg::AbstractMomentAlgorithm`: Moment algorithm.
 
-# Returns
+# ReturnsResult
 
   - `Cokurtosis`: Configured cokurtosis estimator.
 
@@ -78,7 +78,7 @@ Cokurtosis
    me | SimpleExpectedReturns
       |   w | nothing
    mp | DefaultMatrixProcessing
-      |       pdm | PosdefEstimator
+      |       pdm | Posdef
       |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
       |   denoise | nothing
       |    detone | nothing
@@ -113,7 +113,7 @@ Internal helper for cokurtosis computation.
   - `X::AbstractMatrix`: Data matrix (observations × assets).
   - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator.
 
-# Returns
+# ReturnsResult
 
   - `ckurt::Matrix`: Cokurtosis tensor after matrix processing.
 
@@ -151,7 +151,7 @@ This method computes the cokurtosis tensor using the estimator's mean and matrix
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
-# Returns
+# ReturnsResult
 
   - `ckurt::Matrix`: Cokurtosis tensor (assets^2 × assets^2).
 

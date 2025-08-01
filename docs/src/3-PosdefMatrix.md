@@ -1,8 +1,8 @@
 # PosdefMatrix
 
 ```@docs
-PosdefEstimator
-PosdefEstimator()
+Posdef
+Posdef()
 posdef!
 posdef
 PortfolioOptimisers.AbstractPosdefEstimator

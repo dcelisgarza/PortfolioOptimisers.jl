@@ -1,36 +1,32 @@
-abstract type PhilogenyConstraintEstimator <: AbstractEstimator end
-abstract type PhilogenyConstraintResult <: AbstractResult end
-struct SemiDefinitePhilogenyConstraintEstimator{T1 <: AbstractPhilogenyEstimator,
-                                                T2 <: Real} <: PhilogenyConstraintEstimator
+abstract type PhilogenyEstimator <: AbstractEstimator end
+abstract type PhilogenyResult <: AbstractResult end
+struct SemiDefinitePhilogenyEstimator{T1 <: AbstractPhilogenyEstimator, T2 <: Real} <:
+       PhilogenyEstimator
     pe::T1
     p::T2
 end
-function SemiDefinitePhilogenyConstraintEstimator(;
-                                                  pe::AbstractPhilogenyEstimator = NetworkEstimator(),
-                                                  p::Real = 0.05)
+function SemiDefinitePhilogenyEstimator(; pe::AbstractPhilogenyEstimator = Network(),
+                                        p::Real = 0.05)
     @smart_assert(p >= zero(p))
-    return SemiDefinitePhilogenyConstraintEstimator{typeof(pe), typeof(p)}(pe, p)
+    return SemiDefinitePhilogenyEstimator{typeof(pe), typeof(p)}(pe, p)
 end
-struct SemiDefinitePhilogenyResult{T1 <: AbstractMatrix{<:Real}, T2 <: Real} <:
-       PhilogenyConstraintResult
+struct SemiDefinitePhilogeny{T1 <: AbstractMatrix{<:Real}, T2 <: Real} <: PhilogenyResult
     A::T1
     p::T2
 end
-function SemiDefinitePhilogenyResult(; A::AbstractMatrix{<:Real}, p::Real = 0.05)
+function SemiDefinitePhilogeny(; A::AbstractMatrix{<:Real}, p::Real = 0.05)
     @smart_assert(!isempty(A))
     @smart_assert(p >= zero(p))
-    return SemiDefinitePhilogenyResult{typeof(A), typeof(p)}(A, p)
+    return SemiDefinitePhilogeny{typeof(A), typeof(p)}(A, p)
 end
-function philogeny_constraints(plc::SemiDefinitePhilogenyConstraintEstimator,
-                               X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return SemiDefinitePhilogenyResult(;
-                                       A = philogeny_matrix(plc.pe, X; dims = dims,
-                                                            kwargs...), p = plc.p)
+function philogeny_constraints(plc::SemiDefinitePhilogenyEstimator, X::AbstractMatrix;
+                               dims::Int = 1, kwargs...)
+    return SemiDefinitePhilogeny(; A = philogeny_matrix(plc.pe, X; dims = dims, kwargs...),
+                                 p = plc.p)
 end
-struct IntegerPhilogenyConstraintEstimator{T1 <: AbstractPhilogenyEstimator,
-                                           T2 <:
-                                           Union{<:Integer, <:AbstractVector{<:Integer}},
-                                           T3 <: Real} <: PhilogenyConstraintEstimator
+struct IntegerPhilogenyEstimator{T1 <: AbstractPhilogenyEstimator,
+                                 T2 <: Union{<:Integer, <:AbstractVector{<:Integer}},
+                                 T3 <: Real} <: PhilogenyEstimator
     pe::T1
     B::T2
     scale::T3
@@ -54,11 +50,9 @@ end
 function validate_length_integer_philogeny_constraint_B(args...)
     return nothing
 end
-function IntegerPhilogenyConstraintEstimator(;
-                                             pe::AbstractPhilogenyEstimator = NetworkEstimator(),
-                                             B::Union{<:Integer,
-                                                      <:AbstractVector{<:Integer}} = 1,
-                                             scale::Real = 100_000.0)
+function IntegerPhilogenyEstimator(; pe::AbstractPhilogenyEstimator = Network(),
+                                   B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
+                                   scale::Real = 100_000.0)
     if isa(B, AbstractVector)
         @smart_assert(!isempty(B))
         @smart_assert(all(x -> x >= zero(x), B))
@@ -66,19 +60,18 @@ function IntegerPhilogenyConstraintEstimator(;
     else
         @smart_assert(B >= zero(B))
     end
-    return IntegerPhilogenyConstraintEstimator{typeof(pe), typeof(B), typeof(scale)}(pe, B,
-                                                                                     scale)
+    return IntegerPhilogenyEstimator{typeof(pe), typeof(B), typeof(scale)}(pe, B, scale)
 end
-struct IntegerPhilogenyResult{T1 <: AbstractMatrix{<:Real},
-                              T2 <: Union{<:Integer, <:AbstractVector{<:Integer}},
-                              T3 <: Real} <: PhilogenyConstraintResult
+struct IntegerPhilogeny{T1 <: AbstractMatrix{<:Real},
+                        T2 <: Union{<:Integer, <:AbstractVector{<:Integer}}, T3 <: Real} <:
+       PhilogenyResult
     A::T1
     B::T2
     scale::T3
 end
-function IntegerPhilogenyResult(; A::AbstractMatrix{<:Real},
-                                B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
-                                scale::Real = 100_000.0)
+function IntegerPhilogeny(; A::AbstractMatrix{<:Real},
+                          B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
+                          scale::Real = 100_000.0)
     @smart_assert(!isempty(A))
     A = unique(A + I; dims = 1)
     if isa(B, AbstractVector)
@@ -88,15 +81,15 @@ function IntegerPhilogenyResult(; A::AbstractMatrix{<:Real},
     else
         @smart_assert(B >= zero(B))
     end
-    return IntegerPhilogenyResult{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
+    return IntegerPhilogeny{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
 end
-function philogeny_constraints(plc::IntegerPhilogenyConstraintEstimator, X::AbstractMatrix;
+function philogeny_constraints(plc::IntegerPhilogenyEstimator, X::AbstractMatrix;
                                dims::Int = 1, kwargs...)
-    return IntegerPhilogenyResult(; A = philogeny_matrix(plc.pe, X; dims = dims, kwargs...),
-                                  B = plc.B, scale = plc.scale)
+    return IntegerPhilogeny(; A = philogeny_matrix(plc.pe, X; dims = dims, kwargs...),
+                            B = plc.B, scale = plc.scale)
 end
-function philogeny_constraints(plc::Union{<:SemiDefinitePhilogenyResult,
-                                          <:IntegerPhilogenyResult}, args...; kwargs...)
+function philogeny_constraints(plc::Union{<:SemiDefinitePhilogeny, <:IntegerPhilogeny},
+                               args...; kwargs...)
     return plc
 end
 function philogeny_constraints(::Nothing, args...; kwargs...)
@@ -122,24 +115,22 @@ end
 function vec_to_real_measure(val::Real, ::AbstractVector)
     return val
 end
-struct CentralityConstraintEstimator{T1 <: CentralityEstimator,
-                                     T2 <: Union{<:Real, <:VectorToRealMeasure},
-                                     T3 <: ComparisonOperators} <:
-       PhilogenyConstraintEstimator
+struct CentralityEstimator{T1 <: Centrality, T2 <: Union{<:Real, <:VectorToRealMeasure},
+                           T3 <: ComparisonOperators} <: PhilogenyEstimator
     A::T1
     B::T2
     comp::T3
 end
-function CentralityConstraintEstimator(; A::CentralityEstimator = CentralityEstimator(),
-                                       B::Union{<:Real, <:VectorToRealMeasure} = MinValue(),
-                                       comp::ComparisonOperators = LEQ())
-    return CentralityConstraintEstimator{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
+function CentralityEstimator(; A::Centrality = Centrality(),
+                             B::Union{<:Real, <:VectorToRealMeasure} = MinValue(),
+                             comp::ComparisonOperators = LEQ())
+    return CentralityEstimator{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
-function Base.iterate(S::CentralityConstraintEstimator, state = 1)
+function Base.iterate(S::CentralityEstimator, state = 1)
     return state > 1 ? nothing : (S, state + 1)
 end
-function centrality_constraints(ccs::Union{<:CentralityConstraintEstimator,
-                                           <:AbstractVector{<:CentralityConstraintEstimator}},
+function centrality_constraints(ccs::Union{<:CentralityEstimator,
+                                           <:AbstractVector{<:CentralityEstimator}},
                                 X::AbstractMatrix; dims::Int = 1, kwargs...)
     if isa(ccs, AbstractVector)
         @smart_assert(!isempty(ccs))
@@ -176,27 +167,24 @@ function centrality_constraints(ccs::Union{<:CentralityConstraintEstimator,
     return if !ineq_flag && !eq_flag
         nothing
     else
-        LinearConstraintResult(;
-                               ineq = if ineq_flag
-                                   PartialLinearConstraintResult(; A = A_ineq, B = B_ineq)
-                               else
-                                   nothing
-                               end,
-                               eq = if eq_flag
-                                   PartialLinearConstraintResult(; A = A_eq, B = B_eq)
-                               else
-                                   nothing
-                               end)
+        LinearConstraint(; ineq = if ineq_flag
+                             PartialLinearConstraint(; A = A_ineq, B = B_ineq)
+                         else
+                             nothing
+                         end, eq = if eq_flag
+                             PartialLinearConstraint(; A = A_eq, B = B_eq)
+                         else
+                             nothing
+                         end)
     end
 end
-function centrality_constraints(ccs::LinearConstraintResult, args...; kwargs...)
+function centrality_constraints(ccs::LinearConstraint, args...; kwargs...)
     return ccs
 end
 function centrality_constraints(::Nothing, args...; kwargs...)
     return nothing
 end
 
-export SemiDefinitePhilogenyConstraintEstimator, SemiDefinitePhilogenyResult,
-       IntegerPhilogenyConstraintEstimator, IntegerPhilogenyResult, MinValue, MeanValue,
-       MedianValue, MaxValue, CentralityConstraintEstimator, philogeny_constraints,
-       centrality_constraints
+export SemiDefinitePhilogenyEstimator, SemiDefinitePhilogeny, IntegerPhilogenyEstimator,
+       IntegerPhilogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityEstimator,
+       philogeny_constraints, centrality_constraints

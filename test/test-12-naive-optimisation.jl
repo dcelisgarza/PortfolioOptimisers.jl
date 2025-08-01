@@ -22,7 +22,7 @@
     end
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
-    pr = prior(EmpiricalPriorEstimator(), rd)
+    pr = prior(EmpiricalPrior(), rd)
     N = size(pr.X, 2)
 
     res = optimise!(InverseVolatility(; pe = pr), rd)

@@ -3,21 +3,22 @@ abstract type AbstractClusteringAlgorithm <: AbstractPhilogenyAlgorithm end
 abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
 abstract type AbstractClusteringResult <: AbstractPhilogenyResult end
-struct HierarchicalClusteringResult{T1 <: Clustering.Hclust, T2 <: AbstractMatrix,
-                                    T3 <: AbstractMatrix, T4 <: Integer} <:
+struct HierarchicalClustering{T1 <: Clustering.Hclust, T2 <: AbstractMatrix,
+                              T3 <: AbstractMatrix, T4 <: Integer} <:
        AbstractClusteringResult
     clustering::T1
     S::T2
     D::T3
     k::T4
 end
-function HierarchicalClusteringResult(; clustering::Clustering.Hclust, S::AbstractMatrix,
-                                      D::AbstractMatrix, k::Integer)
+function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
+                                D::AbstractMatrix, k::Integer)
     @smart_assert(!isempty(S) && !isempty(D))
     @smart_assert(size(S) == size(D))
     @smart_assert(k >= one(k))
-    return HierarchicalClusteringResult{typeof(clustering), typeof(S), typeof(D),
-                                        typeof(k)}(clustering, S, D, k)
+    return HierarchicalClustering{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering,
+                                                                                       S, D,
+                                                                                       k)
 end
 function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
     return cle
@@ -51,11 +52,11 @@ function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
     end
     return OptimalNumberClusters{typeof(max_k), typeof(alg)}(max_k, alg)
 end
-struct HierarchicalClustering{T1 <: Symbol} <: AbstractClusteringAlgorithm
+struct HClustAlgorithm{T1 <: Symbol} <: AbstractClusteringAlgorithm
     linkage::T1
 end
-function HierarchicalClustering(; linkage::Symbol = :ward)
-    return HierarchicalClustering{typeof(linkage)}(linkage)
+function HClustAlgorithm(; linkage::Symbol = :ward)
+    return HClustAlgorithm{typeof(linkage)}(linkage)
 end
 struct ClusteringEstimator{T1 <: StatsBase.CovarianceEstimator,
                            T2 <: AbstractDistanceEstimator,
@@ -71,7 +72,7 @@ function ClusteringEstimator(;
                              ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                              de::AbstractDistanceEstimator = Distance(;
                                                                       alg = CanonicalDistance()),
-                             alg::AbstractClusteringAlgorithm = HierarchicalClustering(),
+                             alg::AbstractClusteringAlgorithm = HClustAlgorithm(),
                              onc::Union{<:Integer,
                                         <:AbstractOptimalNumberClustersEstimator} = OptimalNumberClusters())
     return ClusteringEstimator{typeof(ce), typeof(de), typeof(alg), typeof(onc)}(ce, de,
@@ -79,5 +80,5 @@ function ClusteringEstimator(;
 end
 
 export clusterise, SecondOrderDifference, PredefinedNumberClusters,
-       StandardisedSilhouetteScore, OptimalNumberClusters, HierarchicalClustering,
+       StandardisedSilhouetteScore, OptimalNumberClusters, HClustAlgorithm,
        ClusteringEstimator

@@ -45,7 +45,7 @@
         sigma1 = cov(X)
         sigma2 = copy(sigma1)
         sigma3 = copy(sigma1)
-        posdef!(PosdefEstimator(), sigma1)
+        posdef!(Posdef(), sigma1)
         @test isposdef(sigma1)
 
         posdef!(nothing, sigma2)
@@ -54,7 +54,7 @@
     end
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
-    pr = prior(EmpiricalPriorEstimator(), rd)
+    pr = prior(EmpiricalPrior(), rd)
     T, N = size(rd.X)
     q = T / N
     @testset "Denoise algorithms" begin
@@ -63,7 +63,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/Denoise.csv.gz"), DataFrame)
         for (i, de) in pairs(des)
             sigma1 = copy(pr.sigma)
-            denoise!(de, sigma1, q, PosdefEstimator())
+            denoise!(de, sigma1, q, Posdef())
             success = isapprox(vec(sigma1), df[!, i])
             if !success
                 println("Counter: $i")
@@ -77,7 +77,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/Detone.csv.gz"), DataFrame)
         for (i, de) in pairs(des)
             sigma1 = copy(pr.sigma)
-            detone!(des[i], sigma1, PosdefEstimator())
+            detone!(des[i], sigma1, Posdef())
             success = isapprox(vec(sigma1), df[!, i])
             if !success
                 println("Counter: $i")

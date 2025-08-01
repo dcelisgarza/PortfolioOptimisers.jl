@@ -181,13 +181,12 @@ function dup_elim_sum_matrices(n::Int)
 
     return d, l, s
 end
-struct HighOrderPriorResult{T1 <: AbstractPriorResult,
-                            T2 <: Union{Nothing, <:AbstractMatrix},
-                            T3 <: Union{Nothing, <:AbstractMatrix},
-                            T4 <: Union{Nothing, <:AbstractMatrix},
-                            T5 <: Union{Nothing, <:AbstractMatrix},
-                            T6 <: Union{Nothing, <:AbstractMatrix},
-                            T7 <: Union{Nothing, <:AbstractMatrixProcessingEstimator}} <:
+struct HighOrderPrior{T1 <: AbstractPriorResult, T2 <: Union{Nothing, <:AbstractMatrix},
+                      T3 <: Union{Nothing, <:AbstractMatrix},
+                      T4 <: Union{Nothing, <:AbstractMatrix},
+                      T5 <: Union{Nothing, <:AbstractMatrix},
+                      T6 <: Union{Nothing, <:AbstractMatrix},
+                      T7 <: Union{Nothing, <:AbstractMatrixProcessingEstimator}} <:
        AbstractPriorResult
     pr::T1
     kt::T2
@@ -197,13 +196,12 @@ struct HighOrderPriorResult{T1 <: AbstractPriorResult,
     V::T6
     skmp::T7
 end
-function HighOrderPriorResult(; pr::AbstractPriorResult,
-                              kt::Union{Nothing, <:AbstractMatrix},
-                              L2::Union{Nothing, <:AbstractMatrix},
-                              S2::Union{Nothing, <:AbstractMatrix},
-                              sk::Union{Nothing, <:AbstractMatrix},
-                              V::Union{Nothing, <:AbstractMatrix},
-                              skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
+function HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix},
+                        L2::Union{Nothing, <:AbstractMatrix},
+                        S2::Union{Nothing, <:AbstractMatrix},
+                        sk::Union{Nothing, <:AbstractMatrix},
+                        V::Union{Nothing, <:AbstractMatrix},
+                        skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
     kt_flag = isa(kt, AbstractMatrix)
     L2_flag = isa(L2, AbstractMatrix)
     S2_flag = isa(S2, AbstractMatrix)
@@ -229,8 +227,8 @@ function HighOrderPriorResult(; pr::AbstractPriorResult,
         @smart_assert(sk_flag && V_flag,
                       "If either sk or V, is nothing, both must be nothing.")
     end
-    return HighOrderPriorResult{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk),
-                                typeof(V), typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
+    return HighOrderPrior{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk),
+                          typeof(V), typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
 end
 function dup_elim_sum_view(args...)
     return nothing, nothing, nothing
@@ -238,7 +236,7 @@ end
 function dup_elim_sum_view(::AbstractMatrix, N)
     return dup_elim_sum_matrices(N)
 end
-function prior_view(pr::HighOrderPriorResult, i::AbstractVector)
+function prior_view(pr::HighOrderPrior, i::AbstractVector)
     idx = fourth_moment_index_factory(length(pr.mu), i)
     kt = pr.kt
     L2, S2 = dup_elim_sum_view(kt, length(i))[2:3]
@@ -246,11 +244,11 @@ function prior_view(pr::HighOrderPriorResult, i::AbstractVector)
     skmp = pr.skmp
     sk = nothing_scalar_array_view_odd_order(sk, i, idx)
     V = __coskewness(sk, view(pr.X, :, i), skmp)
-    return HighOrderPriorResult(; pr = prior_view(pr.pr, i),
-                                kt = nothing_scalar_array_view(kt, idx), L2 = L2, S2 = S2,
-                                sk = sk, V = V, skmp = skmp)
+    return HighOrderPrior(; pr = prior_view(pr.pr, i),
+                          kt = nothing_scalar_array_view(kt, idx), L2 = L2, S2 = S2,
+                          sk = sk, V = V, skmp = skmp)
 end
-function Base.getproperty(obj::HighOrderPriorResult, sym::Symbol)
+function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
     return if sym == :X
         obj.pr.X
     elseif sym == :mu
@@ -287,7 +285,7 @@ function factory(pe::HighOrderPriorEstimator,
                                    ske = factory(pe.ske, w))
 end
 function HighOrderPriorEstimator(;
-                                 pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
+                                 pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
                                  kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
                                                                                          alg = Full()),
                                  ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
@@ -317,8 +315,8 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
     kt = cokurtosis(pe.kte, X; mean = transpose(mu), kwargs...)
     L2, S2 = !isnothing(kt) ? dup_elim_sum_matrices(length(mu))[2:3] : (nothing, nothing)
     sk, V = coskewness(pe.ske, X; mean = transpose(mu), kwargs...)
-    return HighOrderPriorResult(; pr = pr, kt = kt, L2 = L2, S2 = S2, sk = sk, V = V,
-                                skmp = isnothing(sk) ? nothing : pe.ske.mp)
+    return HighOrderPrior(; pr = pr, kt = kt, L2 = L2, S2 = S2, sk = sk, V = V,
+                          skmp = isnothing(sk) ? nothing : pe.ske.mp)
 end
 
-export HighOrderPriorResult, HighOrderPriorEstimator
+export HighOrderPrior, HighOrderPriorEstimator

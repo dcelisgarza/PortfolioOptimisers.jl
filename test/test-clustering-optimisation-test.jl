@@ -45,7 +45,7 @@
                                   "reduced_tol_infeas_abs" => 1e-4,
                                   "reduced_tol_infeas_rel" => 1e-4))]
     pr = prior(HighOrderPriorEstimator(;
-                                       pe = FactorPriorEstimator(;
+                                       pe = FactorPrior(;
                                                                  re = DimensionReductionRegression())),
                rd)
     clr = clusterise(ClusteringEstimator(), rd.X)
@@ -284,7 +284,7 @@
         ub = [0.2, 1, 1, 1, 1, 1, 1, 1, 0.05, 0, 0.2, 1, 1, 1, 1, 1, 1, 1, 0.05, 0, 0.2, 1,
               1, 1, 1, 1, 0.03, 1, 0.05, 0]
         opt = HierarchicalOptimiser(; pe = pr, cle = clr,
-                                    wb = WeightBoundsResult(; lb = lb, ub = ub), slv = slv)
+                                    wb = WeightBounds(; lb = lb, ub = ub), slv = slv)
         r = [Variance(), ConditionalValueatRisk()]
         w = optimise!(HierarchicalRiskParity(; r = r, opt = opt)).w
         idx = (w - lb) .< 0
@@ -299,20 +299,20 @@
         end
         @test all(w[.!idx] .<= ub[.!idx])
 
-        cwfs = [IterativeClusteringWeightFiniliser(),
-                JuMP_ClusteringWeightFiniliser(; slv = slv),
-                JuMP_ClusteringWeightFiniliser(;
-                                               alg = SquareRelativeErrorClusteringWeightFiniliser(),
+        cwfs = [IterativeWeightFiniliser(),
+                JuMPWeightFiniliser(; slv = slv),
+                JuMPWeightFiniliser(;
+                                               alg = SquareRelativeErrorWeightFiniliser(),
                                                slv = slv),
-                JuMP_ClusteringWeightFiniliser(;
-                                               alg = AbsoluteErrorClusteringWeightFiniliser(),
+                JuMPWeightFiniliser(;
+                                               alg = AbsoluteErrorWeightFiniliser(),
                                                slv = slv),
-                JuMP_ClusteringWeightFiniliser(;
-                                               alg = SquareAbsoluteErrorClusteringWeightFiniliser(),
+                JuMPWeightFiniliser(;
+                                               alg = SquareAbsoluteErrorWeightFiniliser(),
                                                slv = slv)]
         for cwf in cwfs
             opt = HierarchicalOptimiser(; pe = pr, cle = clr, cwf = cwf,
-                                        wb = WeightBoundsResult(; lb = lb, ub = ub),
+                                        wb = WeightBounds(; lb = lb, ub = ub),
                                         slv = slv)
             w = optimise!(HierarchicalEqualRiskContribution(; ri = r, opt = opt)).w
             idx = (w - lb) .< 0
@@ -329,7 +329,7 @@
         end
     end
     @testset "Schur HRP" begin
-        pr = prior(EmpiricalPriorEstimator(;
+        pr = prior(EmpiricalPrior(;
                                            ce = PortfolioOptimisersCovariance(;
                                                                               ce = Covariance(;
                                                                                               alg = Full(),
@@ -364,7 +364,7 @@
                                                                        opt = opt))
     end
     @testset "Nested Clustering" begin
-        pr = prior(EmpiricalPriorEstimator(), rd)
+        pr = prior(EmpiricalPrior(), rd)
         clr = clusterise(ClusteringEstimator(), pr.X)
         jopt = JuMPOptimiser(; pe = pr, slv = slv)
         hopt = HierarchicalOptimiser(; slv = slv)

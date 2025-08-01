@@ -1,17 +1,16 @@
-struct BlackLittermanViewsResult{T1 <: AbstractMatrix, T2 <: AbstractVector} <:
-       AbstractResult
+struct BlackLittermanViews{T1 <: AbstractMatrix, T2 <: AbstractVector} <: AbstractResult
     P::T1
     Q::T2
 end
-function BlackLittermanViewsResult(; P::AbstractMatrix, Q::AbstractVector)
+function BlackLittermanViews(; P::AbstractMatrix, Q::AbstractVector)
     @smart_assert(!isempty(P) && !isempty(Q))
     @smart_assert(size(P, 1) == length(Q))
-    return BlackLittermanViewsResult{typeof(P), typeof(Q)}(P, Q)
+    return BlackLittermanViews{typeof(P), typeof(Q)}(P, Q)
 end
 function black_litterman_views(::Nothing, args...; kwargs...)
     return nothing
 end
-function black_litterman_views(blves::BlackLittermanViewsResult, args...; kwargs...)
+function black_litterman_views(blves::BlackLittermanViews, args...; kwargs...)
     return blves
 end
 function get_black_litterman_views(lcs::Union{<:ParsingResult,
@@ -41,7 +40,7 @@ function get_black_litterman_views(lcs::Union{<:ParsingResult,
     end
     return if !isempty(P)
         P = transpose(reshape(P, length(nx), :))
-        BlackLittermanViewsResult(; P = P, Q = Q)
+        BlackLittermanViews(; P = P, Q = Q)
     else
         nothing
     end
@@ -156,10 +155,10 @@ function black_litterman_views(blves::Union{<:BlackLittermanViewsEstimator,
     end
     return if !isempty(P)
         P = transpose(reshape(P, nrow(sets), :))
-        BlackLittermanViewsResult(; P = P, Q = Q)
+        BlackLittermanViews(; P = P, Q = Q)
     else
         nothing
     end
 end
 #! End: to delete
-export black_litterman_views, BlackLittermanViewsEstimator, BlackLittermanViewsResult
+export black_litterman_views, BlackLittermanViewsEstimator, BlackLittermanViews

@@ -103,34 +103,29 @@ function calc_mst(cent::PrimTree, g::AbstractGraph)
     return Graphs.prim_mst(g, cent.args...; cent.kwargs...)
 end
 abstract type AbstractNetworkEstimator <: AbstractPhilogenyEstimator end
-struct NetworkEstimator{T1 <: StatsBase.CovarianceEstimator,
-                        T2 <: AbstractDistanceEstimator,
-                        T3 <:
-                        Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType},
-                        T4 <: Integer} <: AbstractNetworkEstimator
+struct Network{T1 <: StatsBase.CovarianceEstimator, T2 <: AbstractDistanceEstimator,
+               T3 <: Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType},
+               T4 <: Integer} <: AbstractNetworkEstimator
     ce::T1
     de::T2
     alg::T3
     n::T4
 end
-function NetworkEstimator(;
-                          ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                          de::AbstractDistanceEstimator = Distance(;
-                                                                   alg = CanonicalDistance()),
-                          alg::Union{<:AbstractSimilarityMatrixAlgorithm,
-                                     <:AbstractTreeType} = KruskalTree(), n::Integer = 1)
-    return NetworkEstimator{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
+function Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                 de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+                 alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
+                 n::Integer = 1)
+    return Network{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
 end
-struct CentralityEstimator{T1 <: AbstractNetworkEstimator,
-                           T2 <: AbstractCentralityAlgorithm}
+struct Centrality{T1 <: AbstractNetworkEstimator, T2 <: AbstractCentralityAlgorithm}
     ne::T1
     cent::T2
 end
-function CentralityEstimator(; ne::AbstractNetworkEstimator = NetworkEstimator(),
-                             cent::AbstractCentralityAlgorithm = DegreeCentrality())
-    return CentralityEstimator{typeof(ne), typeof(cent)}(ne, cent)
+function Centrality(; ne::AbstractNetworkEstimator = Network(),
+                    cent::AbstractCentralityAlgorithm = DegreeCentrality())
+    return Centrality{typeof(ne), typeof(cent)}(ne, cent)
 end
-function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
+function calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractTreeType, <:Any},
                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     # S = cor(ne.ce, X; dims = dims, kwargs...)
     # D = distance(ne.de, S, X; dims = dims, kwargs...)
@@ -139,9 +134,8 @@ function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <
     tree = calc_mst(ne.alg, G)
     return adjacency_matrix(SimpleGraph(G[tree]))
 end
-function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any,
-                                             <:AbstractSimilarityMatrixAlgorithm, <:Any},
-                        X::AbstractMatrix; dims::Int = 1, kwargs...)
+function calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm,
+                                    <:Any}, X::AbstractMatrix; dims::Int = 1, kwargs...)
     # S = cor(ne.ce, X; dims = dims, kwargs...)
     # D = distance(ne.de, S, X; dims = dims, kwargs...)
     S, D = cor_and_dist(ne.de, ne.ce, X; dims = dims, kwargs...)
@@ -149,7 +143,7 @@ function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any,
     Rpm = PMFG_T2s(S)[1]
     return adjacency_matrix(SimpleGraph(Rpm))
 end
-function philogeny_matrix(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function philogeny_matrix(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs...)
     A = calc_adjacency(ne, X; dims = dims, kwargs...)
     P = zeros(Int, size(Matrix(A)))
     for i in 0:(ne.n)
@@ -169,21 +163,20 @@ function philogeny_matrix(cle::ClusteringEstimator, X::AbstractMatrix;
     end
     return P * transpose(P) - I
 end
-function centrality_vector(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
+function centrality_vector(ne::Network, cent::AbstractCentralityAlgorithm,
                            X::AbstractMatrix; dims::Int = 1, kwargs...)
     P = philogeny_matrix(ne, X; dims = dims, kwargs...)
     G = SimpleGraph(P)
     return calc_centrality(cent, G)
 end
-function centrality_vector(cte::CentralityEstimator, X::AbstractMatrix; dims::Int = 1,
-                           kwargs...)
+function centrality_vector(cte::Centrality, X::AbstractMatrix; dims::Int = 1, kwargs...)
     return centrality_vector(cte.ne, cte.cent, X; dims = dims, kwargs...)
 end
-function average_centrality(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
+function average_centrality(ne::Network, cent::AbstractCentralityAlgorithm,
                             w::AbstractVector, X::AbstractMatrix; dims::Int = 1, kwargs...)
     return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...), w)
 end
-function average_centrality(cte::CentralityEstimator, w::AbstractVector, X::AbstractMatrix;
+function average_centrality(cte::Centrality, w::AbstractVector, X::AbstractMatrix;
                             dims::Int = 1, kwargs...)
     return average_centrality(cte.ne, cte.cent, w, X; dims = dims, kwargs...)
 end
@@ -193,12 +186,12 @@ function asset_philogeny(w::AbstractVector, X::AbstractMatrix)
     c /= sum(aw)
     return c
 end
-function asset_philogeny(cle::Union{<:NetworkEstimator, <:ClusteringEstimator},
-                         w::AbstractVector, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function asset_philogeny(cle::Union{<:Network, <:ClusteringEstimator}, w::AbstractVector,
+                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     return asset_philogeny(w, philogeny_matrix(cle, X; dims = dims, kwargs...))
 end
 
 export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
        KatzCentrality, Pagerank, RadialityCentrality, StressCentrality, KruskalTree,
-       BoruvkaTree, PrimTree, NetworkEstimator, philogeny_matrix, average_centrality,
-       asset_philogeny, AbstractCentralityAlgorithm, CentralityEstimator, centrality_vector
+       BoruvkaTree, PrimTree, Network, philogeny_matrix, average_centrality,
+       asset_philogeny, AbstractCentralityAlgorithm, Centrality, centrality_vector

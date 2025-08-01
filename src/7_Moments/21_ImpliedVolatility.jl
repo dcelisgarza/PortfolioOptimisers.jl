@@ -102,7 +102,7 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::AbstractMat
         rv_p[i] = exp(rv_pi)
         # push!(fr, fri)
     end
-    #, RegressionResult(; b = view(reg, :, 1), M = view(reg, :, 2:3)), r2s, fr
+    #, Regression(; b = view(reg, :, 1), M = view(reg, :, 2:3)), r2s, fr
     return rv_p
 end
 function Statistics.cov(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,

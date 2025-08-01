@@ -23,7 +23,7 @@ All concrete types representing the output of regression-based moment estimation
 # Related
 
   - [`AbstractResult`](@ref)
-  - [`RegressionResult`](@ref)
+  - [`Regression`](@ref)
   - [`AbstractRegressionEstimator`](@ref)
 """
 abstract type AbstractRegressionResult <: AbstractResult end
@@ -140,15 +140,14 @@ end
 
 """
 """
-struct RegressionResult{T1 <: AbstractMatrix, T2 <: Union{Nothing, <:AbstractMatrix},
-                        T3 <: Union{Nothing, <:AbstractVector}} <: AbstractRegressionResult
+struct Regression{T1 <: AbstractMatrix, T2 <: Union{Nothing, <:AbstractMatrix},
+                  T3 <: Union{Nothing, <:AbstractVector}} <: AbstractRegressionResult
     M::T1
     L::T2
     b::T3
 end
-function RegressionResult(; M::AbstractMatrix,
-                          L::Union{Nothing, <:AbstractMatrix} = nothing,
-                          b::Union{Nothing, <:AbstractVector})
+function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
+                    b::Union{Nothing, <:AbstractVector})
     @smart_assert(!isempty(M))
     if isa(b, AbstractVector)
         @smart_assert(!isempty(b))
@@ -157,26 +156,25 @@ function RegressionResult(; M::AbstractMatrix,
     if !isnothing(L)
         @smart_assert(size(M, 1) == size(L, 1))
     end
-    return RegressionResult{typeof(M), typeof(L), typeof(b)}(M, L, b)
+    return Regression{typeof(M), typeof(L), typeof(b)}(M, L, b)
 end
-function Base.getproperty(r::RegressionResult{<:Any, Nothing, <:Any}, sym::Symbol)
+function Base.getproperty(r::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
     return if sym == :L
         getfield(r, :M)
     else
         getfield(r, sym)
     end
 end
-function Base.getproperty(r::RegressionResult{<:Any, <:AbstractMatrix, <:Any}, sym::Symbol)
+function Base.getproperty(r::Regression{<:Any, <:AbstractMatrix, <:Any}, sym::Symbol)
     return if sym == :L
         getfield(r, :L)
     else
         getfield(r, sym)
     end
 end
-function regression_view(r::RegressionResult, i::AbstractVector)
-    return RegressionResult(; M = view(r.M, i, :),
-                            L = isnothing(r.L) ? nothing : view(r.L, i, :),
-                            b = view(r.b, i))
+function regression_view(r::Regression, i::AbstractVector)
+    return Regression(; M = view(r.M, i, :), L = isnothing(r.L) ? nothing : view(r.L, i, :),
+                      b = view(r.b, i))
 end
 function regression_view(::Nothing, args...)
     return nothing
@@ -184,8 +182,8 @@ end
 function regression_view(r::AbstractRegressionEstimator, args...)
     return r
 end
-function regression(re::RegressionResult, args...)
+function regression(re::Regression, args...)
     return re
 end
 
-export regression, RegressionResult
+export regression, Regression

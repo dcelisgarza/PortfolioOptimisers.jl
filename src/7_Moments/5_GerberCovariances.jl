@@ -143,7 +143,7 @@ Creates a [`NormalisedGerber0`](@ref) object using the specified expected return
 
   - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator used for mean-centering before normalisation.
 
-# Returns
+# ReturnsResult
 
   - `NormalisedGerber0`: An instance of the original normalised Gerber covariance algorithm.
 
@@ -204,7 +204,7 @@ Creates a [`NormalisedGerber1`](@ref) object using the specified expected return
 
   - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator used for mean-centering before normalisation.
 
-# Returns
+# ReturnsResult
 
   - `NormalisedGerber1`: An instance of the original normalised Gerber covariance algorithm.
 
@@ -267,7 +267,7 @@ Creates a [`NormalisedGerber2`](@ref) object using the specified expected return
 
   - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator used for mean-centering before normalisation.
 
-# Returns
+# ReturnsResult
 
   - `NormalisedGerber2`: An instance of the original normalised Gerber covariance algorithm.
 
@@ -307,7 +307,7 @@ end
 
 """
     struct GerberCovariance{T1 <: StatsBase.CovarianceEstimator,
-                            T2 <: PosdefEstimator,
+                            T2 <: Posdef,
                             T3 <: Real,
                             T4 <: GerberCovarianceAlgorithm} <: BaseGerberCovariance
         ve::T1
@@ -323,7 +323,7 @@ A flexible container type for configuring and applying Gerber covariance estimat
 # Fields
 
   - `ve::StatsBase.CovarianceEstimator`: Variance estimator.
-  - `pdm::PosdefEstimator`: Positive definite matrix estimator (see [`PosdefEstimator`](@ref)).
+  - `pdm::Posdef`: Positive definite matrix estimator (see [`Posdef`](@ref)).
   - `threshold::Real`: Threshold parameter for Gerber covariance computation (typically in (0, 1)).
   - `alg::GerberCovarianceAlgorithm`: Gerber covariance algorithm variant.
 
@@ -331,7 +331,7 @@ A flexible container type for configuring and applying Gerber covariance estimat
 
     GerberCovariance(; alg::GerberCovarianceAlgorithm = Gerber1(),
                       ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                      pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator(),
+                      pdm::Union{Nothing, <:Posdef} = Posdef(),
                       threshold::Real = 0.5)
 
 Construct a `GerberCovariance` estimator with the specified algorithm, variance estimator, positive definite estimator, and threshold.
@@ -342,7 +342,7 @@ Construct a `GerberCovariance` estimator with the specified algorithm, variance 
   - [`GerberCovarianceAlgorithm`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`SimpleVariance`](@ref)
-  - [`PosdefEstimator`](@ref)
+  - [`Posdef`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber1`](@ref)
   - [`Gerber2`](@ref)
@@ -350,8 +350,8 @@ Construct a `GerberCovariance` estimator with the specified algorithm, variance 
   - [`NormalisedGerber1`](@ref)
   - [`NormalisedGerber2`](@ref)
 """
-struct GerberCovariance{T1 <: StatsBase.CovarianceEstimator, T2 <: PosdefEstimator,
-                        T3 <: Real, T4 <: GerberCovarianceAlgorithm} <: BaseGerberCovariance
+struct GerberCovariance{T1 <: StatsBase.CovarianceEstimator, T2 <: Posdef, T3 <: Real,
+                        T4 <: GerberCovarianceAlgorithm} <: BaseGerberCovariance
     ve::T1
     pdm::T2
     threshold::T3
@@ -359,7 +359,7 @@ struct GerberCovariance{T1 <: StatsBase.CovarianceEstimator, T2 <: PosdefEstimat
 end
 """
     GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                     pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator(),
+                     pdm::Union{Nothing, <:Posdef} = Posdef(),
                      threshold::Real = 0.5,
                      alg::GerberCovarianceAlgorithm = Gerber1())
 
@@ -370,11 +370,11 @@ This constructor creates a `GerberCovariance` object using the specified Gerber 
 # Arguments
 
   - `ve::StatsBase.CovarianceEstimator`: Variance estimator.
-  - `pdm::Union{Nothing, <:PosdefEstimator}`: Positive definite matrix estimator.
+  - `pdm::Union{Nothing, <:Posdef}`: Positive definite matrix estimator.
   - `threshold::Real`: Threshold parameter for Gerber covariance computation.
   - `alg::GerberCovarianceAlgorithm`: Gerber covariance algorithm variant.
 
-# Returns
+# ReturnsResult
 
   - `GerberCovariance`: A configured Gerber covariance estimator.
 
@@ -392,7 +392,7 @@ GerberCovariance
             |             |   w | nothing
             |           w | nothing
             |   corrected | Bool: true
-        pdm | PosdefEstimator
+        pdm | Posdef
             |   alg | UnionAll: NearestCorrelationMatrix.Newton
   threshold | Float64: 0.5
         alg | Gerber1()
@@ -404,7 +404,7 @@ GerberCovariance
   - [`GerberCovarianceAlgorithm`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`SimpleVariance`](@ref)
-  - [`PosdefEstimator`](@ref)
+  - [`Posdef`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber1`](@ref)
   - [`Gerber2`](@ref)
@@ -413,8 +413,8 @@ GerberCovariance
   - [`NormalisedGerber2`](@ref)
 """
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                          pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator(),
-                          threshold::Real = 0.5, alg::GerberCovarianceAlgorithm = Gerber1())
+                          pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
+                          alg::GerberCovarianceAlgorithm = Gerber1())
     @smart_assert(zero(threshold) < threshold < one(threshold))
     return GerberCovariance{typeof(ve), typeof(pdm), typeof(threshold), typeof(alg)}(ve,
                                                                                      pdm,
@@ -435,7 +435,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
   - `X::AbstractMatrix`: Data matrix (observations × assets).
   - `std_vec::AbstractArray`: Vector of standard deviations for each asset, used to scale the threshold.
 
-# Returns
+# ReturnsResult
 
   - `rho::Matrix{Float64}`: The Gerber correlation, projected to be positive definite using the estimator's `pdm` field.
 
@@ -487,7 +487,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
   - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0}`: Gerber correlation estimator configured with the `NormalisedGerber0` algorithm.
   - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
 
-# Returns
+# ReturnsResult
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -539,7 +539,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
   - `X::AbstractMatrix`: Data matrix (observations × assets).
   - `std_vec::AbstractArray`: Vector of standard deviations for each asset, used to scale the threshold.
 
-# Returns
+# ReturnsResult
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -587,7 +587,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
   - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1}`: Gerber correlation estimator configured with the `NormalisedGerber1` algorithm.
   - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
 
-# Returns
+# ReturnsResult
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -641,7 +641,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
   - `X::AbstractMatrix`: Data matrix (observations × assets).
   - `std_vec::AbstractArray`: Vector of standard deviations for each asset, used to scale the threshold.
 
-# Returns
+# ReturnsResult
 
   - `rho::Matrix{Float64}`: The Gerber correlation or correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -695,7 +695,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
   - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}`: Gerber correlation estimator configured with the `NormalisedGerber2` algorithm.
   - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
 
-# Returns
+# ReturnsResult
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -752,7 +752,7 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
   - `dims::Int`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# Returns
+# ReturnsResult
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix.
 
@@ -794,7 +794,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
   - `dims::Int`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# Returns
+# ReturnsResult
 
   - `sigma::Matrix{Float64}`: The Gerber covariance matrix.
 
@@ -836,7 +836,7 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
   - `dims::Int`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# Returns
+# ReturnsResult
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix.
 
@@ -882,7 +882,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
   - `dims::Int`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# Returns
+# ReturnsResult
 
   - `sigma::Matrix{Float64}`: The Gerber covariance matrix.
 

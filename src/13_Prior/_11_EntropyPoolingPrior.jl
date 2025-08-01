@@ -1,5 +1,5 @@
-function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
-                         optim::OptimEntropyPoolingEstimator)
+function entropy_pooling(w::AbstractVector, epcs::LinearConstraint,
+                         optim::OptimEntropyPooling)
     T = length(w)
     factor = inv(sqrt(T))
     A_sum = fill(factor, 1, T)
@@ -52,8 +52,8 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
     end
     return pweights(exp.(log_p - (one(eltype(log_p)) .+ transpose(lhs) * x)))
 end
-function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
-                         optim::JuMPEntropyPoolingEstimator)
+function entropy_pooling(w::AbstractVector, epcs::LinearConstraint,
+                         optim::JuMPEntropyPooling)
     model = Model()
     S = length(w)
     log_p = log.(w)
@@ -86,27 +86,25 @@ function entropy_pooling(w::AbstractVector, epcs::LinearConstraintResult,
         pweights(fill(NaN, length(q)))
     end
 end
-function entropy_pooling(w::AbstractVector, epcs::Union{Nothing, <:LinearConstraintResult},
-                         optim::Union{<:OptimEntropyPoolingEstimator,
-                                      <:JuMPEntropyPoolingEstimator}, ::Nothing, ::Nothing,
-                         ::Any, ::Any)
+function entropy_pooling(w::AbstractVector, epcs::Union{Nothing, <:LinearConstraint},
+                         optim::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling},
+                         ::Nothing, ::Nothing, ::Any, ::Any)
     return entropy_pooling(w, epcs, optim)
 end
-function entropy_pooling(w::AbstractVector, epcs::Union{Nothing, <:LinearConstraintResult},
-                         optim::Union{<:OptimEntropyPoolingEstimator,
-                                      <:JuMPEntropyPoolingEstimator},
-                         d_epcs::Union{Nothing, <:LinearConstraintResult},
+function entropy_pooling(w::AbstractVector, epcs::Union{Nothing, <:LinearConstraint},
+                         optim::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling},
+                         d_epcs::Union{Nothing, <:LinearConstraint},
                          d_views::Union{<:DiscontinuousEntropyPoolingViewEstimator,
                                         <:AbstractVector{<:DiscontinuousEntropyPoolingViewEstimator}},
-                         ds_opt::Union{Nothing, <:OptimEntropyPoolingEstimator},
-                         dm_opt::Union{Nothing, <:OptimEntropyPoolingEstimator})
+                         ds_opt::Union{Nothing, <:OptimEntropyPooling},
+                         dm_opt::Union{Nothing, <:OptimEntropyPooling})
     N = length(d_views)
     VN = Val(N)
     alpha, d_opt = if N == 1
-        d_views.A.alpha, !isnothing(ds_opt) ? ds_opt : OptimEntropyPoolingEstimator()
+        d_views.A.alpha, !isnothing(ds_opt) ? ds_opt : OptimEntropyPooling()
     else
         getproperty.(getproperty.(d_views, :A), :alpha),
-        !isnothing(dm_opt) ? dm_opt : OptimEntropyPoolingEstimator()
+        !isnothing(dm_opt) ? dm_opt : OptimEntropyPooling()
     end
     A = d_epcs.A_eq
     B = d_epcs.B_eq
@@ -118,9 +116,8 @@ function entropy_pooling(w::AbstractVector, epcs::Union{Nothing, <:LinearConstra
         pos_part = max.(-A .- x, zero(eltype(x)))
         A_eq = vcat(epcs.A_eq, pos_part * ialpha)
         B_eq = vcat(epcs.B_eq, B .- x)
-        epcs2 = LinearConstraintResult(; ineq = epcs.ineq,
-                                       eq = PartialLinearConstraintResult(; A = A_eq,
-                                                                          B = B_eq))
+        epcs2 = LinearConstraint(; ineq = epcs.ineq,
+                                 eq = PartialLinearConstraint(; A = A_eq, B = B_eq))
         return pos_part, entropy_pooling(w, epcs2, optim)
     end
     function h(::Val{1}, _A, _B, _w, _pos_part)
@@ -153,8 +150,8 @@ struct EntropyPoolingPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_
                                                 <:DiscontinuousEntropyPoolingViewEstimator,
                                                 <:AbstractVector{<:DiscontinuousEntropyPoolingViewEstimator}},
                                     T4 <: DataFrame, T5 <: AbstractEntropyPoolingOptimiser,
-                                    T6 <: Union{Nothing, <:OptimEntropyPoolingEstimator},
-                                    T7 <: Union{Nothing, <:OptimEntropyPoolingEstimator},
+                                    T6 <: Union{Nothing, <:OptimEntropyPooling},
+                                    T7 <: Union{Nothing, <:OptimEntropyPooling},
                                     T8 <: Union{Nothing, <:AbstractVector},
                                     T9 <: AbstractEntropyPoolingAlgorithm} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
@@ -169,7 +166,7 @@ struct EntropyPoolingPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_
     alg::T9
 end
 function EntropyPoolingPriorEstimator(;
-                                      pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
+                                      pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
                                       views::Union{<:ContinuousEntropyPoolingViewEstimator,
                                                    <:AbstractVector{<:ContinuousEntropyPoolingViewEstimator}},
                                       d_views::Union{Nothing,
@@ -180,11 +177,9 @@ function EntropyPoolingPriorEstimator(;
                                                   <:DataFrame
                                                   #! End: to delete
                                                   } = DataFrame(),
-                                      opt::AbstractEntropyPoolingOptimiser = OptimEntropyPoolingEstimator(),
-                                      d_opt1::Union{Nothing,
-                                                    <:OptimEntropyPoolingEstimator} = nothing,
-                                      d_opt2::Union{Nothing,
-                                                    <:OptimEntropyPoolingEstimator} = nothing,
+                                      opt::AbstractEntropyPoolingOptimiser = OptimEntropyPooling(),
+                                      d_opt1::Union{Nothing, <:OptimEntropyPooling} = nothing,
+                                      d_opt2::Union{Nothing, <:OptimEntropyPooling} = nothing,
                                       w::Union{Nothing, <:AbstractWeights} = nothing,
                                       alg::AbstractEntropyPoolingAlgorithm = H0_EntropyPooling())
     if isa(views, AbstractVector)
@@ -251,9 +246,9 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
     pe = factory(pe, w)
     (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = prior(pe.pe, X, F; strict = strict,
                                                             kwargs...)
-    return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma, chol = chol, w = w,
-                               loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
-                               f_w = !isnothing(loadings) ? w : nothing)
+    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w,
+                         loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
+                         f_w = !isnothing(loadings) ? w : nothing)
 end
 function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                 <:Any, <:Any,
@@ -313,11 +308,10 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
     (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = pr
-    return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma, chol = chol, w = wi,
-                               loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
-                               f_w = wi)
+    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = wi,
+                         loadings = loadings, f_mu = f_mu, f_sigma = f_sigma, f_w = wi)
 end
 
-export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling,
-       OptimEntropyPoolingEstimator, JuMPEntropyPoolingEstimator, entropy_pooling,
-       EntropyPoolingPriorEstimator, effective_number_scenarios
+export H0_EntropyPooling, H1_EntropyPooling, H2_EntropyPooling, OptimEntropyPooling,
+       JuMPEntropyPooling, entropy_pooling, EntropyPoolingPriorEstimator,
+       effective_number_scenarios

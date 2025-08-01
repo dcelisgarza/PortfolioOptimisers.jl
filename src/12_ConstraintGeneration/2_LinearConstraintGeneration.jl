@@ -1,25 +1,24 @@
-struct PartialLinearConstraintResult{T1 <: AbstractMatrix, T2 <: AbstractVector} <:
+struct PartialLinearConstraint{T1 <: AbstractMatrix, T2 <: AbstractVector} <:
        AbstractConstraintResult
     A::T1
     B::T2
 end
-function PartialLinearConstraintResult(; A::AbstractMatrix, B::AbstractVector)
+function PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
     @smart_assert(!isempty(A) && !isempty(B))
-    return PartialLinearConstraintResult{typeof(A), typeof(B)}(A, B)
+    return PartialLinearConstraint{typeof(A), typeof(B)}(A, B)
 end
-struct LinearConstraintResult{T1 <: Union{Nothing, <:PartialLinearConstraintResult},
-                              T2 <: Union{Nothing, <:PartialLinearConstraintResult}} <:
+struct LinearConstraint{T1 <: Union{Nothing, <:PartialLinearConstraint},
+                        T2 <: Union{Nothing, <:PartialLinearConstraint}} <:
        AbstractConstraintResult
     ineq::T1
     eq::T2
 end
-function LinearConstraintResult(;
-                                ineq::Union{Nothing, <:PartialLinearConstraintResult} = nothing,
-                                eq::Union{Nothing, <:PartialLinearConstraintResult} = nothing)
+function LinearConstraint(; ineq::Union{Nothing, <:PartialLinearConstraint} = nothing,
+                          eq::Union{Nothing, <:PartialLinearConstraint} = nothing)
     @smart_assert(isnothing(ineq) ⊼ isnothing(eq))
-    return LinearConstraintResult{typeof(ineq), typeof(eq)}(ineq, eq)
+    return LinearConstraint{typeof(ineq), typeof(eq)}(ineq, eq)
 end
-function Base.getproperty(obj::LinearConstraintResult, sym::Symbol)
+function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     return if sym == :A_ineq
         isnothing(obj.ineq) ? nothing : obj.ineq.A
     elseif sym == :B_ineq
@@ -436,19 +435,19 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
     eq = nothing
     if ineq_flag
         A_ineq = transpose(reshape(A_ineq, length(nx), :))
-        ineq = PartialLinearConstraintResult(; A = A_ineq, B = B_ineq)
+        ineq = PartialLinearConstraint(; A = A_ineq, B = B_ineq)
     end
     if eq_flag
         A_eq = transpose(reshape(A_eq, length(nx), :))
-        eq = PartialLinearConstraintResult(; A = A_eq, B = B_eq)
+        eq = PartialLinearConstraint(; A = A_eq, B = B_eq)
     end
     return if !ineq_flag && !eq_flag
         nothing
     else
-        LinearConstraintResult(; ineq = ineq, eq = eq)
+        LinearConstraint(; ineq = ineq, eq = eq)
     end
 end
-function linear_constraints(lcs::LinearConstraintResult, args...; kwargs...)
+function linear_constraints(lcs::LinearConstraint, args...; kwargs...)
     return lcs
 end
 function linear_constraints(::Nothing, args...; kwargs...)
@@ -501,7 +500,7 @@ function get_weight_bounds_constraints(lcs::Union{<:ParsingResult,
             lb[At] .= lc.rhs
         end
     end
-    return WeightBoundsResult(; lb = lb, ub = ub)
+    return WeightBounds(; lb = lb, ub = ub)
 end
 function weight_bounds_constraints(eqn::Union{<:AbstractString, Expr,
                                               <:AbstractVector{<:AbstractString},
@@ -588,5 +587,5 @@ function asset_sets_matrix_view(smtx::AbstractVector{<:AbstractMatrix}, i::Abstr
     return asset_sets_matrix_view.(smtx, Ref(i); kwargs...)
 end
 
-export AssetSets, PartialLinearConstraintResult, LinearConstraintResult, parse_equation,
+export AssetSets, PartialLinearConstraint, LinearConstraint, parse_equation,
        replace_group_by_assets, linear_constraints, asset_sets_matrix

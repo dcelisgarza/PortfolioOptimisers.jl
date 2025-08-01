@@ -22,7 +22,7 @@
     end
     X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
     rd = prices_to_returns(X)
-    pr = prior(EmpiricalPriorEstimator(), rd)
+    pr = prior(EmpiricalPrior(), rd)
     w = fill(inv(size(pr.X, 2)), size(pr.X, 2))
     slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
@@ -38,8 +38,7 @@
            Fees(; tn = Turnover(; val = 0.001, w = w), l = 0.002, s = 0.003, fl = 0.005,
                 fs = 0.007)]
     res = optimise!(MeanRisk(;
-                             opt = JuMPOptimiser(;
-                                                 wb = WeightBoundsResult(; lb = -1, ub = 1),
+                             opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),
                                                  sbgt = 1, bgt = 1, pe = pr, slv = slv)))
     df = CSV.read(joinpath(@__DIR__, "./assets/Fees.csv.gz"), DataFrame)
     f1s = [0.02002313426946848, 0.12149580659357644]

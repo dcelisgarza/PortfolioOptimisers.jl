@@ -152,15 +152,14 @@
                length = size(pr.X, 2))
     wp = pweights(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
                         length = size(pr.X, 1)))
-    ucs1 = sigma_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
-                                                   rng = StableRNG(987654321),
-                                                   alg = BoxUncertaintySetAlgorithm()),
-                     rd.X)
-    ucs2 = sigma_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
-                                                   rng = StableRNG(987654321),
-                                                   alg = EllipseUncertaintySetAlgorithm()),
-                     rd.X)
+    ucs1 = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(),
+                                          rng = StableRNG(987654321),
+                                          alg = BoxUncertaintySetAlgorithm()), rd.X)
+    ucs2 = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(),
+                                          rng = StableRNG(987654321),
+                                          alg = EllipseUncertaintySetAlgorithm()), rd.X)
     rf = 4.2 / 100 / 252
+
     @testset "Mean Risk" begin
         objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf)]
         rets = [ArithmeticReturn(), KellyReturn()]
@@ -268,14 +267,10 @@
     end
     @testset "Arithmetic return uncertainty set" begin
         rng = StableRNG(123456789)
-        ucs1 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
-                                                    rng = rng,
-                                                    alg = BoxUncertaintySetAlgorithm()),
-                      pr.X)
-        ucs2 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
-                                                    rng = rng,
-                                                    alg = EllipseUncertaintySetAlgorithm()),
-                      pr.X)
+        ucs1 = mu_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
+                                           alg = BoxUncertaintySetAlgorithm()), pr.X)
+        ucs2 = mu_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
+                                           alg = EllipseUncertaintySetAlgorithm()), pr.X)
         ucss = [ucs1, ucs2]
         objs = [MinimumRisk(), MaximumRatio(; rf = rf), MaximumReturn()]
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskUncertainty.csv.gz"), DataFrame)
@@ -316,7 +311,7 @@
     end
     @testset "Budget" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1))
+                            wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumReturn(), opt = opt)
         res = optimise!(mr)
         @test isapprox(sum(res.w), 1)
@@ -324,7 +319,7 @@
         @test isapprox(sum(res.w[res.w .>= zero(eltype(res.w))]), 2, rtol = 1e-6)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 0.15, bgt = 0.5,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1))
+                            wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mr)
         @test isapprox(sum(res.w), 0.5)
@@ -334,7 +329,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                             sbgt = BudgetRange(; lb = 0.15, ub = 0.15),
                             bgt = BudgetRange(; lb = 0.3, ub = 0.45),
-                            wb = WeightBoundsResult(; lb = -1, ub = 1))
+                            wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mr)
         @test 0.1 <= sum(res.w) <= 0.45
@@ -354,9 +349,8 @@
         w = res.w
         @test count(w .> 1e-10) <= 3
 
-        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
-                            card = 7)
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, wb = WeightBounds(; lb = -1, ub = 1),
+                            sbgt = 1, bgt = 1, card = 7)
         mre = MeanRisk(; opt = opt)
         res = optimise!(mre)
         w = res.w
@@ -372,8 +366,8 @@
         @test count(w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 2
         @test count(w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 5
 
-        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, wb = WeightBounds(; lb = -1, ub = 1),
+                            sbgt = 1, bgt = 1,
                             gcard = [:(XOM + MRK + WMT <= 2), :(group2 == 3)], sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise!(mre)
@@ -436,36 +430,32 @@
         @test res.w[findfirst(x -> x == "WMT", rd.nx)] >= 0.23
         @test res.w[2:2:end][res.w[2:2:end] .> 1e-9][1] >= 0.48
 
-        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            lt = BuyInThresholdResult(; val = 0.15), sets = sets)
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = BuyInThreshold(; val = 0.15),
+                            sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise!(mre)
         res.w[res.w .>= 1e-10] .>= 0.15
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            lt = BuyInThresholdResult(; val = fill(0.15, size(pr.X, 2))),
+                            lt = BuyInThreshold(; val = fill(0.15, size(pr.X, 2))),
                             sets = sets)
         mre = MeanRisk(; opt = opt)
         @test isapprox(res.w, optimise!(mre).w)
 
-        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
-                            st = BuyInThresholdResult(; val = 0.25),
-                            lt = BuyInThresholdResult(; val = 0.4), sets = sets)
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, wb = WeightBounds(; lb = -1, ub = 1),
+                            sbgt = 1, bgt = 1, st = BuyInThreshold(; val = 0.25),
+                            lt = BuyInThreshold(; val = 0.4), sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise!(mre)
         @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)
+        @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<= -0.25)
         if Sys.isapple()
-            @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<=
-                      -0.25 + sqrt(eps()))
-        else
-            @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<= -0.25)
+            println(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10])
         end
 
-        opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
-                            st = BuyInThresholdResult(; val = 0.25),
-                            lt = BuyInThresholdResult(; val = 0.4), sets = sets)
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, wb = WeightBounds(; lb = -1, ub = 1),
+                            sbgt = 1, bgt = 1, st = BuyInThreshold(; val = 0.25),
+                            lt = BuyInThreshold(; val = 0.4), sets = sets)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre)
         @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)

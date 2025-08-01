@@ -22,7 +22,7 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. Returns data
+## 1. ReturnsResult data
 
 We will use the same data as the previous example.
 =#
@@ -54,10 +54,10 @@ r = LowOrderMoment(;
                                            alg = SecondLowerMoment(; alg = SqrtRiskExpr())))
 
 #=
-Since we will perform various optimisations on the same data, there's no need to redo work. Lets precompute the prior statistics using the `EmpiricalPriorEstimator` to avoid recomputing them every time we call the optimisation.
+Since we will perform various optimisations on the same data, there's no need to redo work. Lets precompute the prior statistics using the `EmpiricalPrior` to avoid recomputing them every time we call the optimisation.
 =#
 
-pr = prior(EmpiricalPriorEstimator(), rd)
+pr = prior(EmpiricalPrior(), rd)
 
 #=
 We can provide the prior result to `JuMPOptimiser`.

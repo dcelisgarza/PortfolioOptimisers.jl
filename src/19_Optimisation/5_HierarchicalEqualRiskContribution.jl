@@ -486,7 +486,7 @@ function optimise!(hec::HierarchicalEqualRiskContribution,
     wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; N = length(w),
                                    strict = hec.opt.strict, datatype = eltype(pr.X))
     retcode, w = clustering_optimisation_result(hec.opt.cwf, wb, w / sum(w))
-    return HierarchicalOptimisationResult(typeof(hec), pr, fees, wb, clr, retcode, w)
+    return HierarchicalOptimisation(typeof(hec), pr, fees, wb, clr, retcode, w)
 end
 
 export HierarchicalEqualRiskContribution

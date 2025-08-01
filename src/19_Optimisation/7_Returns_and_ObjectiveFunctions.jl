@@ -9,10 +9,9 @@ function ArithmeticReturn(;
                           ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                      <:AbstractUncertaintySetEstimator} = nothing,
                           lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing)
-    if isa(ucs, EllipseUncertaintySetResult)
+    if isa(ucs, EllipseUncertaintySet)
         @smart_assert(isa(ucs,
-                          EllipseUncertaintySetResult{<:Any, <:Any,
-                                                      <:MuEllipseUncertaintySetResult}))
+                          EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
     end
     if isa(lb, Real)
         @smart_assert(isfinite(lb))
@@ -160,7 +159,7 @@ function set_return_constraints!(model::JuMP.Model, pret::ArithmeticReturn{Nothi
     set_return_bounds!(model, lb)
     return nothing
 end
-function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySetResult,
+function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
                                      mu::AbstractVector)
     sc = model[:sc]
     w = model[:w]
@@ -173,7 +172,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySetRe
     add_market_impact_cost!(model, ret)
     return nothing
 end
-function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySetResult,
+function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipseUncertaintySet,
                                      mu::AbstractVector)
     sc = model[:sc]
     w = model[:w]

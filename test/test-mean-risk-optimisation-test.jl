@@ -74,7 +74,7 @@
                                                                                                     "max_step_fraction" => 0.75)),
                      check_sol = (; allow_local = true, allow_almost = true))
     pr = prior(HighOrderPriorEstimator(;
-                                       pe = FactorPriorEstimator(;
+                                       pe = FactorPrior(;
                                                                  re = DimensionReductionRegression())),
                rd)
     rf = 4.34 / 100 / 252
@@ -403,11 +403,11 @@
         sk, V = coskewness(Coskewness(; alg = Semi()), rd.X)
         kt = cokurtosis(Cokurtosis(; alg = Semi()), rd.X)
         rng = StableRNG(987456321)
-        ucs1 = sigma_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+        ucs1 = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(),
                                                        rng = rng,
                                                        alg = BoxUncertaintySetAlgorithm(),
                                                        seed = 987654321), pr.X)
-        ucs2 = sigma_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+        ucs2 = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(),
                                                        rng = rng,
                                                        alg = EllipseUncertaintySetAlgorithm(),
                                                        seed = 987654321), pr.X)
@@ -627,13 +627,13 @@
         w4 = optimise!(mr, rd).w
         @test isapprox(w4, w2, rtol = 5e-5)
     end
-    @testset "Returns lower bounds and uncertainty sets" begin
+    @testset "ReturnsResult lower bounds and uncertainty sets" begin
         rng = StableRNG(123456789)
-        ucs1 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+        ucs1 = mu_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(),
                                                     rng = rng,
                                                     alg = BoxUncertaintySetAlgorithm(),
                                                     seed = 987654321), pr.X)
-        ucs2 = mu_ucs(NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
+        ucs2 = mu_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(),
                                                     rng = rng,
                                                     alg = EllipseUncertaintySetAlgorithm(),
                                                     seed = 987654321), pr.X)
@@ -728,7 +728,7 @@
         @test 0.8 <= sum(w) <= 1.5
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15), bgt = 1.3,
+                            wb = WeightBounds(; lb = -0.1, ub = 0.15), bgt = 1.3,
                             sbgt = nothing)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
@@ -737,7 +737,7 @@
         @test isapprox(sum(w[w .< 0]), 0)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15), bgt = nothing,
+                            wb = WeightBounds(; lb = -0.1, ub = 0.15), bgt = nothing,
                             sbgt = 0.4)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
@@ -745,7 +745,7 @@
         @test isapprox(sum(w[w .< 0]), -0.4, rtol = 5e-5)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15), bgt = 1.3,
+                            wb = WeightBounds(; lb = -0.1, ub = 0.15), bgt = 1.3,
                             sbgt = 0.3)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
@@ -754,7 +754,7 @@
         @test isapprox(sum(w[w .< 0]), -0.3, rtol = 5e-5)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15),
+                            wb = WeightBounds(; lb = -0.1, ub = 0.15),
                             bgt = BudgetRange(; lb = 0.6, ub = 0.8), sbgt = 0.25)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
@@ -763,7 +763,7 @@
         @test 0.6 + 0.25 - sqrt(eps()) <= sum(w[w .> 0]) <= 0.8 + 0.25 + sqrt(eps())
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15),
+                            wb = WeightBounds(; lb = -0.1, ub = 0.15),
                             sbgt = BudgetRange(; lb = 0.2, ub = 0.6), bgt = 0.9)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
@@ -772,7 +772,7 @@
         @test -0.6 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.2 + sqrt(eps())
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15),
+                            wb = WeightBounds(; lb = -0.1, ub = 0.15),
                             bgt = BudgetRange(; lb = 0.6, ub = 0.8), sbgt = nothing)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
@@ -780,7 +780,7 @@
         @test 0.6 - sqrt(eps()) < sum(w) < 0.8 + sqrt(eps())
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.1, ub = 0.15),
+                            wb = WeightBounds(; lb = -0.1, ub = 0.15),
                             sbgt = BudgetRange(; lb = 0.2, ub = 0.6), bgt = nothing)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
@@ -788,7 +788,7 @@
         @test -0.6 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.2 + sqrt(eps())
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.13, ub = 0.25),
+                            wb = WeightBounds(; lb = -0.13, ub = 0.25),
                             bgt = BudgetRange(; lb = 0.6, ub = 0.8),
                             sbgt = BudgetRange(; lb = 0.2, ub = 0.5))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
@@ -799,7 +799,7 @@
         @test -0.5 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.2 + sqrt(eps())
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.13, ub = 0.25),
+                            wb = WeightBounds(; lb = -0.13, ub = 0.25),
                             bgt = BudgetRange(; lb = 0.6, ub = 0.8),
                             sbgt = BudgetRange(; lb = 0.2, ub = nothing))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
@@ -810,7 +810,7 @@
         @test isapprox(sum(w[w .< 0]), -0.2, rtol = 5e-5)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.13, ub = 0.25),
+                            wb = WeightBounds(; lb = -0.13, ub = 0.25),
                             bgt = BudgetRange(; lb = 0.6, ub = 0.8),
                             sbgt = BudgetRange(; lb = nothing, ub = 0.5))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
@@ -821,7 +821,7 @@
         @test -0.5 - sqrt(eps()) <= sum(w[w .< 0])
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.13, ub = 0.25),
+                            wb = WeightBounds(; lb = -0.13, ub = 0.25),
                             bgt = BudgetRange(; lb = nothing, ub = 0.8),
                             sbgt = BudgetRange(; lb = 0.2, ub = 0.5))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
@@ -832,7 +832,7 @@
         @test -0.5 - sqrt(eps()) <= sum(w[w .< 0]) <= -0.2 + sqrt(eps())
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.13, ub = 0.25),
+                            wb = WeightBounds(; lb = -0.13, ub = 0.25),
                             bgt = BudgetRange(; lb = 0.6, ub = nothing),
                             sbgt = BudgetRange(; lb = 0.2, ub = 0.5))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
@@ -850,7 +850,7 @@
         @test round(inv(dot(w, w))) <= 5
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), bgt = 1,
                             sbgt = 0.3, card = 7)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
@@ -864,7 +864,7 @@
                                                                     name = 1), B = 5,
                                       comp = LEQ())
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), bgt = 1,
                             sbgt = 0.2, gcard = gcard, sets = sets)
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
@@ -874,7 +874,7 @@
 
         gcard = linear_constraints(gcard, sets)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), bgt = 1,
                             sbgt = 0.2, gcard = gcard)
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         @test isapprox(w, optimise!(mre, rd).w)
@@ -888,7 +888,7 @@
                                                                     coef = [1, 1, 1]),
                                       B = 2, comp = LEQ())
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), bgt = 1,
                             sbgt = 0.2, gcard = gcard, sets = sets)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
@@ -943,7 +943,7 @@
         w = res.w
         @test isapprox([sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)], [0, 0, 1])
 
-        sgcard = LinearConstraint(;
+        sgcard = LinearConstraintEstimator(;
                                   A = LinearConstraintSide(; group = [:Clusters, :Clusters],
                                                            name = [1, 3],
                                                            coef = [inv(6), inv(11)]), B = 1,
@@ -956,20 +956,20 @@
         w = res.w
         @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i in [1, 3]]) <= 1
 
-        sgcard = LinearConstraint(;
+        sgcard = LinearConstraintEstimator(;
                                   A = LinearConstraintSide(; group = [:Clusters, :Clusters],
                                                            name = [1, 2],
                                                            coef = [inv(6), inv(13)]), B = 1,
                                   comp = LEQ())
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sgcard = sgcard, smtx = :Clusters,
-                            sets = sets, wb = WeightBoundsResult(; lb = -0.2, ub = 1),
+                            sets = sets, wb = WeightBounds(; lb = -0.2, ub = 1),
                             bgt = 1, sbgt = 0.2)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
         @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i in [1, 2]]) <= 1
 
-        sgcard = LinearConstraint(;
+        sgcard = LinearConstraintEstimator(;
                                   A = LinearConstraintSide(; group = [:Clusters, :Clusters],
                                                            name = [1, 3],
                                                            coef = [inv(6), inv(11)]), B = 1,
@@ -982,13 +982,13 @@
         w = res.w
         @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i in [1, 3]]) <= 1
 
-        sgcard = LinearConstraint(;
+        sgcard = LinearConstraintEstimator(;
                                   A = LinearConstraintSide(; group = [:Clusters, :Clusters],
                                                            name = [2, 3],
                                                            coef = [inv(11), inv(13)]),
                                   B = 1, comp = LEQ())
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sgcard = sgcard, smtx = :Clusters,
-                            sets = sets, wb = WeightBoundsResult(; lb = -0.2, ub = 1),
+                            sets = sets, wb = WeightBounds(; lb = -0.2, ub = 1),
                             bgt = 1, sbgt = 0.2)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
@@ -996,9 +996,9 @@
         w = res.w
         @test sum([sum(w[res.smtx[i, :]]) >= sqrt(eps()) for i in [2, 3]]) <= 1
 
-        plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = 1)
+        plc = IntegerPhilogenyEstimator(; pe = Network(), B = 1)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, bgt = 1, cplg = plc,
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), sbgt = 0.2)
+                            wb = WeightBounds(; lb = -0.2, ub = 1), sbgt = 0.2)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
         res = optimise!(mre, rd)
@@ -1007,9 +1007,9 @@
         res.cplg.A
         @test all(res.cplg.A * value.(res.model[:ib]) .<= 1)
 
-        plc = IntegerPhilogenyConstraintEstimator(; pe = ClusteringEstimator(), B = 2)
+        plc = IntegerPhilogenyEstimator(; pe = ClusteringEstimator(), B = 2)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, bgt = 1, nplg = plc,
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), sbgt = 0.2)
+                            wb = WeightBounds(; lb = -0.2, ub = 1), sbgt = 0.2)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
         res = optimise!(mre, rd)
@@ -1029,7 +1029,7 @@
         @test all(w[w .>= sqrt(eps())] .>= 0.5 - sqrt(eps()))
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = 0.2, st = 0.2, sbgt = 1, bgt = 1,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1))
+                            wb = WeightBounds(; lb = -1, ub = 1))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
@@ -1037,7 +1037,7 @@
         @test all(w[w .<= -sqrt(eps())] .<= -0.2 + sqrt(eps()))
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = 0.5, st = 0.5, sbgt = 1, bgt = 1,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1))
+                            wb = WeightBounds(; lb = -1, ub = 1))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
@@ -1046,33 +1046,33 @@
     end
     @testset "L1 and L2 penalties" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w0 = optimise!(mre, rd).w
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, l1 = 5e-6,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w1 = optimise!(mre, rd).w
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, l1 = 1e-4,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1)
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w2 = optimise!(mre, rd).w
         @test sum(w0[w0 .< 0]) <= sum(w1[w1 .< 0]) <= sum(w2[w2 .< 0])
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w3 = optimise!(mre, rd).w
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, l1 = 1e-4,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w4 = optimise!(mre, rd).w
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, l1 = 1e-3,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w5 = optimise!(mre, rd).w
         @test sum(w3[w3 .< 0]) <= sum(w4[w4 .< 0]) <= sum(w5[w5 .< 0])
@@ -1080,37 +1080,37 @@
         N = size(pr.X, 2)
         wt = eqw
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, l2 = 1e-4,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1)
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w6 = optimise!(mre, rd).w
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, l2 = 1e-3,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1)
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w7 = optimise!(mre, rd).w
         @test rmsd(w0, wt) >= rmsd(w6, wt) >= rmsd(w7, wt)
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, l2 = 1e-2,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w8 = optimise!(mre, rd).w
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, l2 = 1e-2,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w9 = optimise!(mre, rd).w
         @test rmsd(w3, wt) >= rmsd(w8, wt) >= rmsd(w9, wt)
     end
     @testset "Fees" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; l = 10),
-                            wb = WeightBoundsResult(; lb = 0, ub = 1), sbgt = 0, bgt = 1)
+                            wb = WeightBounds(; lb = 0, ub = 1), sbgt = 0, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         @test count(res.w .>= 5e-5) == 1
         @test isapprox(sum(res.w[res.w .>= 5e-5]), 1, rtol = 5.0e-5)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; s = 10),
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), sbgt = 0.6,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), sbgt = 0.6,
                             bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
@@ -1118,7 +1118,7 @@
         @test isapprox(sum(res.w[res.w .<= -5e-5]), -0.6, rtol = 5e-4)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; l = 0.0034375),
-                            wb = WeightBoundsResult(; lb = 0, ub = 1), sbgt = 0, bgt = 1)
+                            wb = WeightBounds(; lb = 0, ub = 1), sbgt = 0, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
         res = optimise!(mre, rd)
@@ -1126,7 +1126,7 @@
         @test isapprox(sum(res.w[res.w .>= sqrt(eps())]), 1)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; s = 0.008056640625),
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
         res = optimise!(mre, rd)
@@ -1134,21 +1134,21 @@
         @test isapprox(sum(res.w[res.w .<= -sqrt(eps())]), -1)
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, fees = Fees(; fl = 10),
-                            wb = WeightBoundsResult(; lb = 0, ub = 1), sbgt = 0, bgt = 1)
+                            wb = WeightBounds(; lb = 0, ub = 1), sbgt = 0, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         @test count(res.w .>= sqrt(eps())) == 1
         @test isapprox(sum(res.w[res.w .>= sqrt(eps())]), 1)
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, fees = Fees(; fs = 10),
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         @test count(res.w .<= -sqrt(eps())) == 0
         @test isapprox(sum(res.w[res.w .<= -sqrt(eps())]), 0)
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, fees = Fees(; fl = 10),
-                            wb = WeightBoundsResult(; lb = 0, ub = 1), sbgt = 0, bgt = 1)
+                            wb = WeightBounds(; lb = 0, ub = 1), sbgt = 0, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
         res = optimise!(mre, rd)
@@ -1156,7 +1156,7 @@
         @test isapprox(sum(res.w[res.w .>= sqrt(eps())]), 1)
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, fees = Fees(; fs = 10),
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
         res = optimise!(mre, rd)
@@ -1164,7 +1164,7 @@
         @test isapprox(sum(res.w[res.w .<= -sqrt(eps())]), 0)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; l = 10),
-                            ret = KellyReturn(), wb = WeightBoundsResult(; lb = 0, ub = 1),
+                            ret = KellyReturn(), wb = WeightBounds(; lb = 0, ub = 1),
                             sbgt = 0, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
@@ -1173,7 +1173,7 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; s = 10),
                             ret = KellyReturn(),
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), sbgt = 0.6,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), sbgt = 0.6,
                             bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
@@ -1181,7 +1181,7 @@
         @test isapprox(sum(res.w[res.w .<= -5e-5]), -0.6, rtol = 5e-4)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; l = 10),
-                            ret = KellyReturn(), wb = WeightBoundsResult(; lb = 0, ub = 1),
+                            ret = KellyReturn(), wb = WeightBounds(; lb = 0, ub = 1),
                             sbgt = 0, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
@@ -1189,7 +1189,7 @@
         @test rmsd(res.w, eqw) <= 0.015
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; s = 10),
-                            ret = KellyReturn(), wb = WeightBoundsResult(; lb = -1, ub = 1),
+                            ret = KellyReturn(), wb = WeightBounds(; lb = -1, ub = 1),
                             sbgt = 1, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
@@ -1197,7 +1197,7 @@
         @test rmsd(res.w, eqw) <= 0.017
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, fees = Fees(; fl = 10),
-                            ret = KellyReturn(), wb = WeightBoundsResult(; lb = 0, ub = 1),
+                            ret = KellyReturn(), wb = WeightBounds(; lb = 0, ub = 1),
                             sbgt = 0, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
@@ -1206,7 +1206,7 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, fees = Fees(; fs = 10),
                             ret = KellyReturn(),
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), sbgt = 0.6,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), sbgt = 0.6,
                             bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
@@ -1214,7 +1214,7 @@
         @test isapprox(sum(res.w[res.w .<= -5e-5]), 0, rtol = 5e-4)
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, fees = Fees(; fl = 10),
-                            ret = KellyReturn(), wb = WeightBoundsResult(; lb = 0, ub = 1),
+                            ret = KellyReturn(), wb = WeightBounds(; lb = 0, ub = 1),
                             sbgt = 0, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
@@ -1222,7 +1222,7 @@
         @test rmsd(res.w, eqw) <= 0.46
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, fees = Fees(; fs = 10),
-                            ret = KellyReturn(), wb = WeightBoundsResult(; lb = -1, ub = 1),
+                            ret = KellyReturn(), wb = WeightBounds(; lb = -1, ub = 1),
                             sbgt = 1, bgt = 1)
         mre = MeanRisk(; r = ConditionalDrawdownatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
@@ -1232,7 +1232,7 @@
     end
     @testset "Cone constraints" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 7.5,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
         mre = MeanRisk(; obj = MaximumReturn(), opt = opt)
         w = optimise!(mre, rd).w
         @test isapprox(number_effective_assets(w), opt.nea, rtol = 1e-7)
@@ -1242,7 +1242,7 @@
         @test isapprox(number_effective_assets(w), opt.nea, rtol = 5e-6)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             tn = Turnover(; w = eqw, val = 0))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w = optimise!(mre, rd).w
@@ -1250,21 +1250,21 @@
         @test all(abs.(w - eqw) .<= sqrt(eps()))
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             tn = Turnover(; w = eqw, val = 3e-2))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w = optimise!(mre, rd).w
         @test all(abs.(w - eqw) .- 3e-2 .<= sqrt(eps()))
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             tn = Turnover(; w = eqw, val = 1e-1))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
         @test all(abs.(w - eqw) .- 1e-1 .<= sqrt(eps()))
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             te = TrackingError(; err = 0,
                                                tracking = WeightsTracking(; w = eqw)))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
@@ -1272,7 +1272,7 @@
         @test isapprox(norm(pr.X * (eqw - w), 2) / sqrt(T), 0, atol = 1e-10)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             te = TrackingError(; err = 6e-3,
                                                tracking = WeightsTracking(; w = eqw)))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
@@ -1280,7 +1280,7 @@
         @test norm(pr.X * (w - eqw), 2) / sqrt(T) <= 6e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             te = TrackingError(; err = 6e-3,
                                                tracking = WeightsTracking(; w = eqw)))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
@@ -1288,7 +1288,7 @@
         @test norm(pr.X * (w - eqw), 2) / sqrt(T) <= 6e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             te = TrackingError(; alg = NOCTracking(), err = 0,
                                                tracking = WeightsTracking(; w = eqw)))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
@@ -1296,7 +1296,7 @@
         @test isapprox(norm(pr.X * (eqw - w), 1) / T, 0, atol = 1e-10)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             te = TrackingError(; alg = NOCTracking(), err = 6e-3,
                                                tracking = WeightsTracking(; w = eqw)))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
@@ -1304,7 +1304,7 @@
         @test norm(pr.X * (w - eqw), 1) / T <= 6e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             te = TrackingError(; alg = NOCTracking(), err = 6e-3,
                                                tracking = WeightsTracking(; w = eqw)))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
@@ -1313,19 +1313,19 @@
     end
     @testset "Linear constraints" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1)
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w0 = optimise!(mre, rd).w
 
-        lcs = [LinearConstraint(;
+        lcs = [LinearConstraintEstimator(;
                                 A = LinearConstraintSide(; group = :Assets, name = :ADI,
                                                          coef = 1), B = -0.05, comp = EQ()),
-               LinearConstraint(;
+               LinearConstraintEstimator(;
                                 A = LinearConstraintSide(; group = [:Assets, :Assets],
                                                          name = [:ADI, :TXN],
                                                          coef = [0.5, -1]), B = 0,
                                 comp = LEQ()),
-               LinearConstraint(;
+               LinearConstraintEstimator(;
                                 A = LinearConstraintSide(;
                                                          group = [:Assets, :Assets,
                                                                   :Assets],
@@ -1333,7 +1333,7 @@
                                                          coef = [1, 1, -1]), comp = GEQ(),
                                 B = 0)]
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             lcs = lcs, sets = sets)
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         w = optimise!(mre, rd).w
@@ -1342,7 +1342,7 @@
         @test w[rd.nx .== "ADP"][1] + w[rd.nx .== "AMGN"][1] >= w[rd.nx .== "MSFT"][1]
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1, bgt = 1,
                             lcs = linear_constraints(lcs, sets))
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         w = optimise!(mre, rd).w
@@ -1351,9 +1351,9 @@
         @test w[rd.nx .== "ADP"][1] + w[rd.nx .== "AMGN"][1] >= w[rd.nx .== "MSFT"][1]
     end
     @testset "Philogeny constraints" begin
-        plc = SemiDefinitePhilogenyConstraintEstimator(; pe = NetworkEstimator())
+        plc = SemiDefinitePhilogenyEstimator(; pe = Network())
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), bgt = 1,
                             sbgt = 0.2, cplg = plc)
         mre = MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; rf = rf), opt = opt)
         sol = optimise!(mre, rd)
@@ -1371,9 +1371,9 @@
                         0.06296984961556344, -6.294376604762954e-9, 0.023281394884115205],
                        rtol = 1e-6)
 
-        plc = SemiDefinitePhilogenyConstraintEstimator(; pe = NetworkEstimator(), p = 0.5)
+        plc = SemiDefinitePhilogenyEstimator(; pe = Network(), p = 0.5)
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), bgt = 1,
                             sbgt = 0.2, cplg = plc)
         mre = MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; rf = rf), opt = opt)
         sol = optimise!(mre, rd)
@@ -1391,9 +1391,9 @@
                         0.11506907666793889, 8.333511385906014e-9, 7.804864100089278e-8],
                        rtol = 1e-6)
 
-        plc = SemiDefinitePhilogenyConstraintEstimator(; pe = NetworkEstimator())
+        plc = SemiDefinitePhilogenyEstimator(; pe = Network())
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), bgt = 1,
                             sbgt = 0.2, cplg = plc)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         sol = optimise!(mre, rd)
@@ -1411,17 +1411,17 @@
                         6.112285629755843e-7, -4.497173200495211e-6, 4.7360186859669635e-6],
                        rtol = 1e-6)
 
-        plc = SemiDefinitePhilogenyConstraintEstimator(; pe = NetworkEstimator(), p = 0.5)
+        plc = SemiDefinitePhilogenyEstimator(; pe = Network(), p = 0.5)
         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), bgt = 1,
                             sbgt = 0.2, cplg = plc)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         sol = optimise!(mre, rd)
         @test isequal(w, sol.w)
 
-        plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator())
+        plc = IntegerPhilogenyEstimator(; pe = Network())
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            wb = WeightBoundsResult(; lb = -0.5, ub = 1), bgt = 1,
+                            wb = WeightBounds(; lb = -0.5, ub = 1), bgt = 1,
                             sbgt = 0.5, cplg = plc)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
@@ -1434,9 +1434,9 @@
                         -0.4884395046878225, -0.0, 0.058937966135803016, -0.0, -0.0, -0.0,
                         -0.0], rtol = 1e-6)
 
-        plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator())
+        plc = IntegerPhilogenyEstimator(; pe = Network())
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            wb = WeightBoundsResult(; lb = -0.2, ub = 1), bgt = 1,
+                            wb = WeightBounds(; lb = -0.2, ub = 1), bgt = 1,
                             sbgt = 0.5, nplg = plc)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
@@ -1448,9 +1448,9 @@
                         0.6763228055813865, -0.0, -0.0, -0.0, -0.2, -0.0,
                         0.29444127658361774, -0.0, -0.0, -0.0, -0.0], rtol = 1e-6)
 
-        plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator())
+        plc = IntegerPhilogenyEstimator(; pe = Network())
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            wb = WeightBoundsResult(; lb = 0, ub = 1), bgt = 1, sbgt = 0.5,
+                            wb = WeightBounds(; lb = 0, ub = 1), bgt = 1, sbgt = 0.5,
                             nplg = plc)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
@@ -1462,7 +1462,7 @@
                         0.0, 0.0, 0.0, 0.0, 0.4381447521586327, 0.0, 0.0, 0.0, 0.0],
                        rtol = 1e-6)
 
-        ce = CentralityConstraintEstimator(; A = CentralityEstimator(), B = MinValue(),
+        ce = CentralityEstimator(; A = Centrality(), B = MinValue(),
                                            comp = LEQ())
         opt = JuMPOptimiser(; pe = pr, slv = slv, cent = ce, sets = sets)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
@@ -1483,7 +1483,7 @@
                         -3.1024091744633977e-10, -3.2453162827112235e-10], rtol = 1e-6)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, cent = ce, sets = sets,
-                            wb = WeightBoundsResult(; lb = -0.2), sbgt = 0.2)
+                            wb = WeightBounds(; lb = -0.2), sbgt = 0.2)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
         res = optimise!(mre, rd)
         w = res.w

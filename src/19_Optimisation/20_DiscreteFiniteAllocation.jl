@@ -1,9 +1,9 @@
-struct DiscreteAllocationResult{T1, T2 <: AbstractVector, T3 <: AbstractVector,
-                                T4 <: AbstractVector, T5 <: OptimisationReturnCode,
-                                T6 <: Union{Nothing, <:OptimisationReturnCode},
-                                T7 <: Union{Nothing, <:OptimisationReturnCode},
-                                T8 <: Union{Nothing, <:JuMP.Model},
-                                T9 <: Union{Nothing, <:JuMP.Model}, T10 <: Real} <:
+struct DiscreteAllocationOptimisation{T1, T2 <: AbstractVector, T3 <: AbstractVector,
+                                      T4 <: AbstractVector, T5 <: OptimisationReturnCode,
+                                      T6 <: Union{Nothing, <:OptimisationReturnCode},
+                                      T7 <: Union{Nothing, <:OptimisationReturnCode},
+                                      T8 <: Union{Nothing, <:JuMP.Model},
+                                      T9 <: Union{Nothing, <:JuMP.Model}, T10 <: Real} <:
        OptimisationResult
     oe::T1
     shares::T2
@@ -111,10 +111,10 @@ function optimise!(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
     else
         OptimisationFailure(nothing)
     end
-    return DiscreteAllocationResult(typeof(da), view(res, :, 1), view(res, :, 2),
-                                    view(res, :, 3), retcode, sretcode, lretcode,
-                                    ifelse(save, smodel, nothing),
-                                    ifelse(save, lmodel, nothing), lcash)
+    return DiscreteAllocationOptimisation(typeof(da), view(res, :, 1), view(res, :, 2),
+                                          view(res, :, 3), retcode, sretcode, lretcode,
+                                          ifelse(save, smodel, nothing),
+                                          ifelse(save, lmodel, nothing), lcash)
 end
 
-export DiscreteAllocationResult, DiscreteAllocation
+export DiscreteAllocationOptimisation, DiscreteAllocation

@@ -41,7 +41,7 @@ These methods are called internally when no matrix processing algorithm is speci
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
-# Returns
+# ReturnsResult
 
   - `nothing`.
 
@@ -83,14 +83,14 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Fields
 
-  - `pdm::Union{Nothing, <:PosdefEstimator}`: Positive definite matrix estimator (see [`PosdefEstimator`](@ref)), or `nothing` to skip.
+  - `pdm::Union{Nothing, <:Posdef}`: Positive definite matrix estimator (see [`Posdef`](@ref)), or `nothing` to skip.
   - `denoise::Union{Nothing, <:Denoise}`: Denoising estimator (see [`Denoise`](@ref)), or `nothing` to skip.
   - `detone::Union{Nothing, <:Detone}`: Detoning estimator (see [`Detone`](@ref)), or `nothing` to skip.
   - `alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm}`: Optional custom matrix processing algorithm, or `nothing` to skip.
 
 # Constructor
 
-    DefaultMatrixProcessing(; pdm = PosdefEstimator(), denoise = nothing, detone = nothing, alg = nothing)
+    DefaultMatrixProcessing(; pdm = Posdef(), denoise = nothing, detone = nothing, alg = nothing)
 
 Keyword arguments correspond to the fields above. The constructor infers types and sets defaults for robust matrix processing.
 
@@ -101,7 +101,7 @@ Keyword arguments correspond to the fields above. The constructor infers types a
   - [`matrix_processing`](@ref)
   - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
-struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:PosdefEstimator},
+struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:Posdef},
                                T2 <: Union{Nothing, <:Denoise},
                                T3 <: Union{Nothing, <:Detone},
                                T4 <: Union{Nothing, <:AbstractMatrixProcessingAlgorithm}} <:
@@ -112,18 +112,18 @@ struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:PosdefEstimator},
     alg::T4
 end
 """
-    DefaultMatrixProcessing(; pdm = PosdefEstimator(), denoise = nothing, detone = nothing, alg = nothing)
+    DefaultMatrixProcessing(; pdm = Posdef(), denoise = nothing, detone = nothing, alg = nothing)
 
 Construct a [`DefaultMatrixProcessing`](@ref) object, configuring all steps for matrix processing in PortfolioOptimisers.jl.
 
 # Arguments
 
-  - `pdm::Union{Nothing, <:PosdefEstimator}`: Positive definite matrix estimator.
+  - `pdm::Union{Nothing, <:Posdef}`: Positive definite matrix estimator.
   - `denoise::Union{Nothing, <:Denoise}`: Denoising estimator.
   - `detone::Union{Nothing, <:Detone}`: Detoning estimator.
   - `alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm}`: Optional custom matrix processing algorithm.
 
-# Returns
+# ReturnsResult
 
   - `DefaultMatrixProcessing`: A configured matrix processing estimator.
 
@@ -132,7 +132,7 @@ Construct a [`DefaultMatrixProcessing`](@ref) object, configuring all steps for 
 ```jldoctest
 julia> mp = DefaultMatrixProcessing()
 DefaultMatrixProcessing
-      pdm | PosdefEstimator
+      pdm | Posdef
           |   alg | UnionAll: NearestCorrelationMatrix.Newton
   denoise | nothing
    detone | nothing
@@ -140,7 +140,7 @@ DefaultMatrixProcessing
 
 julia> mp = DefaultMatrixProcessing(; denoise = Denoise(), detone = Detone(; n = 2))
 DefaultMatrixProcessing
-      pdm | PosdefEstimator
+      pdm | Posdef
           |   alg | UnionAll: NearestCorrelationMatrix.Newton
   denoise | Denoise
           |      alg | ShrunkDenoise
@@ -161,8 +161,7 @@ DefaultMatrixProcessing
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
 """
-function DefaultMatrixProcessing(;
-                                 pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator(),
+function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
                                  denoise::Union{Nothing, <:Denoise} = nothing,
                                  detone::Union{Nothing, <:Detone} = nothing,
                                  alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
@@ -220,7 +219,7 @@ Construct a [`NonPositiveDefiniteMatrixProcessing`](@ref) object, configuring ma
   - `detone::Union{Nothing, <:Detone} = nothing`: Detoning estimator.
   - `alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing`: Optional custom matrix processing algorithm.
 
-# Returns
+# ReturnsResult
 
   - `NonPositiveDefiniteMatrixProcessing`: A configured matrix processing estimator.
 
@@ -288,7 +287,7 @@ The processing pipeline consists of:
   - `args...`: Additional positional arguments passed to custom algorithms.
   - `kwargs...`: Additional keyword arguments passed to custom algorithms.
 
-# Returns
+# ReturnsResult
 
   - `nothing`. The input matrix `sigma` is modified in-place.
 

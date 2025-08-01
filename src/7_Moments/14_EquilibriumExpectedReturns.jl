@@ -51,7 +51,7 @@ Construct an [`EquilibriumExpectedReturns`](@ref) estimator for equilibrium-base
   - `w::Union{Nothing, <:AbstractWeights}`: Equilibrium portfolio weights. If `nothing`, uses equal weights.
   - `l::Real`: Risk aversion parameter.
 
-# Returns
+# ReturnsResult
 
   - `EquilibriumExpectedReturns`: Configured equilibrium expected returns estimator.
 
@@ -69,7 +69,7 @@ EquilibriumExpectedReturns
      |      |       |    w | nothing
      |      |   alg | Full()
      |   mp | DefaultMatrixProcessing
-     |      |       pdm | PosdefEstimator
+     |      |       pdm | Posdef
      |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
      |      |   denoise | nothing
      |      |    detone | nothing
@@ -108,7 +108,7 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
   - `dims::Int`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
 
-# Returns
+# ReturnsResult
 
   - `mu::AbstractArray`: Equilibrium expected returns vector.
 

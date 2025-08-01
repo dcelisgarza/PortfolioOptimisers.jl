@@ -29,12 +29,12 @@
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
-    pr = prior(FactorPriorEstimator(; re = DimensionReductionRegression()), rd)
+    pr = prior(FactorPrior(; re = DimensionReductionRegression()), rd)
     opt = JuMPOptimiser(; pe = pr, slv = slv)
-    algs = (BasicRelaxedRiskBudgettingAlgorithm(),
-            RegularisationRelaxedRiskBudgettingAlgorithm(),
-            RegularisationPenaltyRelaxedRiskBudgettingAlgorithm(),
-            RegularisationPenaltyRelaxedRiskBudgettingAlgorithm(; p = 50))
+    algs = (BasicRelaxedRiskBudgetting(),
+            RegularisedRelaxedRiskBudgetting(),
+            RegularisedPenalisedRelaxedRiskBudgetting(),
+            RegularisedPenalisedRelaxedRiskBudgetting(; p = 50))
     rkbs = (nothing, 1:30)
     df = CSV.read(joinpath(@__DIR__, "./assets/Relaxed-Risk-Budgetting.csv"), DataFrame)
     i = 1

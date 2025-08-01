@@ -368,7 +368,7 @@ end
 function set_weight_constraints!(args...)
     return nothing
 end
-function set_weight_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
                                  bgt::Union{Nothing, <:Real, <:BudgetRange},
                                  sbgt::Union{Nothing, <:Real, <:BudgetRange},
                                  long::Bool = false)
@@ -414,7 +414,7 @@ end
 function set_linear_weight_constraints!(::JuMP.Model, ::Nothing, ::Symbol, ::Symbol)
     return nothing
 end
-function set_linear_weight_constraints!(model::JuMP.Model, lcm::LinearConstraintResult,
+function set_linear_weight_constraints!(model::JuMP.Model, lcm::LinearConstraint,
                                         key_ineq::Symbol, key_eq::Symbol)
     w = model[:w]
     k = model[:k]
@@ -443,8 +443,7 @@ function add_to_fees!(model::JuMP.Model, expr::AbstractJuMPScalar)
     end
     return nothing
 end
-function mip_wb(model::JuMP.Model, wb::WeightBoundsResult, il::AbstractVector,
-                is::AbstractVector)
+function mip_wb(model::JuMP.Model, wb::WeightBounds, il::AbstractVector, is::AbstractVector)
     sc = model[:sc]
     w = model[:w]
     lb = wb.lb
@@ -457,9 +456,9 @@ function mip_wb(model::JuMP.Model, wb::WeightBoundsResult, il::AbstractVector,
     end
     return nothing
 end
-function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResult,
-                                         lt::Union{Nothing, <:BuyInThresholdResult},
-                                         st::Union{Nothing, <:BuyInThresholdResult},
+function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
+                                         lt::Union{Nothing, <:BuyInThreshold},
+                                         st::Union{Nothing, <:BuyInThreshold},
                                          ffl::Union{Nothing, <:Real, <:AbstractVector},
                                          ffs::Union{Nothing, <:Real, <:AbstractVector},
                                          ss::Union{Nothing, <:Real}, lt_flag::Bool,
@@ -519,10 +518,10 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
     end
     return i_mip
 end
-function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
+function mip_constraints(model::JuMP.Model, wb::WeightBounds,
                          ffl::Union{Nothing, <:Real, <:AbstractVector},
-                         lt::Union{Nothing, <:BuyInThresholdResult},
-                         ss::Union{Nothing, <:Real}, lt_flag::Bool, ffl_flag::Bool)
+                         lt::Union{Nothing, <:BuyInThreshold}, ss::Union{Nothing, <:Real},
+                         lt_flag::Bool, ffl_flag::Bool)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -552,18 +551,18 @@ function mip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
     end
     return ib
 end
-function set_mip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds,
                               card::Union{Nothing, <:Integer},
-                              gcard::Union{Nothing, <:LinearConstraintResult},
-                              nplg::Union{Nothing, <:PhilogenyConstraintResult},
-                              cplg::Union{Nothing, <:PhilogenyConstraintResult},
-                              lt::Union{Nothing, <:BuyInThresholdResult},
-                              st::Union{Nothing, <:BuyInThresholdResult},
+                              gcard::Union{Nothing, <:LinearConstraint},
+                              nplg::Union{Nothing, <:PhilogenyResult},
+                              cplg::Union{Nothing, <:PhilogenyResult},
+                              lt::Union{Nothing, <:BuyInThreshold},
+                              st::Union{Nothing, <:BuyInThreshold},
                               fees::Union{Nothing, <:Fees}, ss::Union{Nothing, <:Real})
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
-    n_flag = isa(nplg, IntegerPhilogenyResult)
-    c_flag = isa(cplg, IntegerPhilogenyResult)
+    n_flag = isa(nplg, IntegerPhilogeny)
+    c_flag = isa(cplg, IntegerPhilogeny)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
     ffl_flag, ffs_flag, ffl, ffs = if !isnothing(fees)
@@ -618,7 +617,7 @@ end
 function smip_wb(::Any, ::Nothing, args...)
     return nothing
 end
-function smip_wb(model::JuMP.Model, wb::WeightBoundsResult, smtx::AbstractMatrix,
+function smip_wb(model::JuMP.Model, wb::WeightBounds, smtx::AbstractMatrix,
                  smtx_expr::AbstractVector{<:AbstractJuMPScalar}, il::AbstractVector,
                  is::AbstractVector, key::Symbol = :set_w_mip_, i::Integer = 1)
     sc = model[:sc]
@@ -634,10 +633,10 @@ function smip_wb(model::JuMP.Model, wb::WeightBoundsResult, smtx::AbstractMatrix
     end
     return nothing
 end
-function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResult,
+function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                          smtx::Union{Nothing, <:AbstractMatrix},
-                                         lt::Union{Nothing, <:BuyInThresholdResult},
-                                         st::Union{Nothing, <:BuyInThresholdResult},
+                                         lt::Union{Nothing, <:BuyInThreshold},
+                                         st::Union{Nothing, <:BuyInThreshold},
                                          ss::Union{Nothing, <:Real}, lt_flag::Bool,
                                          st_flag::Bool, key1::Symbol = :si,
                                          key7::Symbol = :smtx_expr_,
@@ -726,13 +725,13 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBoundsResu
     end
     return i_mip
 end
-function smip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
+function smip_constraints(model::JuMP.Model, wb::WeightBounds,
                           smtx::Union{Nothing, <:AbstractMatrix},
-                          lt::Union{Nothing, <:BuyInThresholdResult},
-                          ss::Union{Nothing, <:Real}, lt_flag::Bool, key1::Symbol = :sib_,
-                          key2::Symbol = :i_smip_, key3::Symbol = :isbf_,
-                          key4::Symbol = :smtx_expr_, key5::Symbol = :set_w_mip_,
-                          key6::Symbol = :w_smip_lt_, i::Integer = 1)
+                          lt::Union{Nothing, <:BuyInThreshold}, ss::Union{Nothing, <:Real},
+                          lt_flag::Bool, key1::Symbol = :sib_, key2::Symbol = :i_smip_,
+                          key3::Symbol = :isbf_, key4::Symbol = :smtx_expr_,
+                          key5::Symbol = :set_w_mip_, key6::Symbol = :w_smip_lt_,
+                          i::Integer = 1)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -770,12 +769,12 @@ function smip_constraints(model::JuMP.Model, wb::WeightBoundsResult,
     end
     return sib
 end
-function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::Union{Nothing, <:Integer},
-                                   gcard::Union{Nothing, <:LinearConstraintResult},
+                                   gcard::Union{Nothing, <:LinearConstraint},
                                    smtx::Union{Nothing, <:AbstractMatrix},
-                                   lt::Union{Nothing, <:BuyInThresholdResult},
-                                   st::Union{Nothing, <:BuyInThresholdResult},
+                                   lt::Union{Nothing, <:BuyInThreshold},
+                                   st::Union{Nothing, <:BuyInThreshold},
                                    ss::Union{Nothing, <:Real}, i::Integer = 1)
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
@@ -815,31 +814,31 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     return nothing
 end
-function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::AbstractVector{<:Integer},
-                                   gcard::AbstractVector{<:LinearConstraintResult},
+                                   gcard::AbstractVector{<:LinearConstraint},
                                    smtx::AbstractVector{<:AbstractMatrix},
-                                   lt::Union{Nothing, <:BuyInThresholdResult,
-                                             <:AbstractVector{<:BuyInThresholdResult},
+                                   lt::Union{Nothing, <:BuyInThreshold,
+                                             <:AbstractVector{<:BuyInThreshold},
                                              <:AbstractVector{<:Union{Nothing,
-                                                                      <:BuyInThresholdResult}}},
-                                   st::Union{Nothing, <:BuyInThresholdResult,
-                                             <:AbstractVector{<:BuyInThresholdResult},
+                                                                      <:BuyInThreshold}}},
+                                   st::Union{Nothing, <:BuyInThreshold,
+                                             <:AbstractVector{<:BuyInThreshold},
                                              <:AbstractVector{<:Union{Nothing,
-                                                                      <:BuyInThresholdResult}}},
+                                                                      <:BuyInThreshold}}},
                                    ss::Union{Nothing, <:Real})
     for (i, (c, g, s)) in enumerate(zip(card, gcard, smtx))
-        lti = isa(lt, Union{Nothing, <:BuyInThresholdResult}) ? lt : lt[i]
-        sti = isa(st, Union{Nothing, <:BuyInThresholdResult}) ? st : st[i]
+        lti = isa(lt, Union{Nothing, <:BuyInThreshold}) ? lt : lt[i]
+        sti = isa(st, Union{Nothing, <:BuyInThreshold}) ? st : st[i]
         set_all_smip_constraints!(model, wb, c, g, s, lti, sti, ss, i)
     end
     return nothing
 end
-function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::Union{Nothing, <:Integer},
                                    smtx::Union{Nothing, <:AbstractMatrix},
-                                   lt::Union{Nothing, <:BuyInThresholdResult},
-                                   st::Union{Nothing, <:BuyInThresholdResult},
+                                   lt::Union{Nothing, <:BuyInThreshold},
+                                   st::Union{Nothing, <:BuyInThreshold},
                                    ss::Union{Nothing, <:Real}, i::Integer = 1)
     card_flag = !isnothing(card)
     lt_flag = !isnothing(lt)
@@ -858,30 +857,30 @@ function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     model[Symbol(:scard_, i)] = @constraint(model, sc * (sum(sib) - card) <= 0)
     return nothing
 end
-function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::AbstractVector{<:Integer},
                                    smtx::AbstractVector{<:AbstractMatrix},
-                                   lt::Union{Nothing, <:BuyInThresholdResult,
-                                             <:AbstractVector{<:BuyInThresholdResult},
+                                   lt::Union{Nothing, <:BuyInThreshold,
+                                             <:AbstractVector{<:BuyInThreshold},
                                              <:AbstractVector{<:Union{Nothing,
-                                                                      <:BuyInThresholdResult}}},
-                                   st::Union{Nothing, <:BuyInThresholdResult,
-                                             <:AbstractVector{<:BuyInThresholdResult},
+                                                                      <:BuyInThreshold}}},
+                                   st::Union{Nothing, <:BuyInThreshold,
+                                             <:AbstractVector{<:BuyInThreshold},
                                              <:AbstractVector{<:Union{Nothing,
-                                                                      <:BuyInThresholdResult}}},
+                                                                      <:BuyInThreshold}}},
                                    ss::Union{Nothing, <:Real})
     for (i, (c, s)) in enumerate(zip(card, smtx))
-        lti = isa(lt, Union{Nothing, <:BuyInThresholdResult}) ? lt : lt[i]
-        sti = isa(st, Union{Nothing, <:BuyInThresholdResult}) ? st : st[i]
+        lti = isa(lt, Union{Nothing, <:BuyInThreshold}) ? lt : lt[i]
+        sti = isa(st, Union{Nothing, <:BuyInThreshold}) ? st : st[i]
         set_scardmip_constraints!(model, wb, c, s, lti, sti, ss, i)
     end
     return nothing
 end
-function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
-                                    gcard::Union{Nothing, <:LinearConstraintResult},
+function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                                    gcard::Union{Nothing, <:LinearConstraint},
                                     smtx::Union{Nothing, <:AbstractMatrix},
-                                    lt::Union{Nothing, <:BuyInThresholdResult},
-                                    st::Union{Nothing, <:BuyInThresholdResult},
+                                    lt::Union{Nothing, <:BuyInThreshold},
+                                    st::Union{Nothing, <:BuyInThreshold},
                                     ss::Union{Nothing, <:Real}, i::Integer = 1)
     gcard_flag = !isnothing(gcard)
     lt_flag = !isnothing(lt)
@@ -913,37 +912,37 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
     end
     return nothing
 end
-function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
-                                    gcard::AbstractVector{<:LinearConstraintResult},
+function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                                    gcard::AbstractVector{<:LinearConstraint},
                                     smtx::AbstractVector{<:AbstractMatrix},
-                                    lt::Union{Nothing, <:BuyInThresholdResult,
-                                              <:AbstractVector{<:BuyInThresholdResult},
+                                    lt::Union{Nothing, <:BuyInThreshold,
+                                              <:AbstractVector{<:BuyInThreshold},
                                               <:AbstractVector{<:Union{Nothing,
-                                                                       <:BuyInThresholdResult}}},
-                                    st::Union{Nothing, <:BuyInThresholdResult,
-                                              <:AbstractVector{<:BuyInThresholdResult},
+                                                                       <:BuyInThreshold}}},
+                                    st::Union{Nothing, <:BuyInThreshold,
+                                              <:AbstractVector{<:BuyInThreshold},
                                               <:AbstractVector{<:Union{Nothing,
-                                                                       <:BuyInThresholdResult}}},
+                                                                       <:BuyInThreshold}}},
                                     ss::Union{Nothing, <:Real})
     for (i, (gc, s)) in enumerate(zip(gcard, smtx))
-        lti = isa(lt, Union{Nothing, <:BuyInThresholdResult}) ? lt : lt[i]
-        sti = isa(st, Union{Nothing, <:BuyInThresholdResult}) ? st : st[i]
+        lti = isa(lt, Union{Nothing, <:BuyInThreshold}) ? lt : lt[i]
+        sti = isa(st, Union{Nothing, <:BuyInThreshold}) ? st : st[i]
         set_sgcardmip_constraints!(model, wb, gc, s, lti, sti, ss, i)
     end
     return nothing
 end
-function set_smip_constraints!(model::JuMP.Model, wb::WeightBoundsResult,
+function set_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                card::Union{Nothing, <:Integer, <:AbstractVector{<:Integer}},
-                               gcard::Union{Nothing, <:LinearConstraintResult,
-                                            <:AbstractVector{<:LinearConstraintResult}},
+                               gcard::Union{Nothing, <:LinearConstraint,
+                                            <:AbstractVector{<:LinearConstraint}},
                                smtx::Union{Nothing, <:AbstractMatrix,
                                            <:AbstractVector{<:AbstractMatrix}},
                                sgmtx::Union{Nothing, <:AbstractMatrix,
                                             <:AbstractVector{<:AbstractMatrix}},
-                               lt::Union{Nothing, <:BuyInThresholdResult},
-                               st::Union{Nothing, <:BuyInThresholdResult},
-                               glt::Union{Nothing, <:BuyInThresholdResult},
-                               gst::Union{Nothing, <:BuyInThresholdResult},
+                               lt::Union{Nothing, <:BuyInThreshold},
+                               st::Union{Nothing, <:BuyInThreshold},
+                               glt::Union{Nothing, <:BuyInThreshold},
+                               gst::Union{Nothing, <:BuyInThreshold},
                                ss::Union{Nothing, <:Real})
     if smtx === sgmtx
         set_all_smip_constraints!(model, wb, card, gcard, smtx, lt, st, ss)
@@ -1057,10 +1056,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                                     <:IntegerPhilogenyResult},
-                                         nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                                     <:IntegerPhilogenyResult}, args...)
+                                         cplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                                     <:IntegerPhilogeny},
+                                         nplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                                     <:IntegerPhilogeny}, args...)
     r = te.r
     wb = te.tracking.w
     err = te.err
@@ -1077,10 +1076,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:DependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                                     <:IntegerPhilogenyResult},
-                                         nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                                     <:IntegerPhilogenyResult},
+                                         cplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                                     <:IntegerPhilogeny},
+                                         nplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                                     <:IntegerPhilogeny},
                                          fees::Union{Nothing, <:Fees}, args...)
     r = te.r
     wb = te.tracking.w
@@ -1216,7 +1215,7 @@ end
 function set_sdp_philogeny_constraints!(args...)
     return nothing
 end
-function set_sdp_philogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhilogenyResult,
+function set_sdp_philogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhilogeny,
                                         key::Symbol)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
@@ -1233,8 +1232,8 @@ end
 function set_sdp_frc_philogeny_constraints!(args...)
     return nothing
 end
-function set_sdp_frc_philogeny_constraints!(model::JuMP.Model,
-                                            adj::SemiDefinitePhilogenyResult, key::Symbol)
+function set_sdp_frc_philogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhilogeny,
+                                            key::Symbol)
     sc = model[:sc]
     set_sdp_frc_constraints!(model)
     W = model[:W]

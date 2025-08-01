@@ -255,7 +255,7 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
   - `vecs::AbstractMatrix`: Corresponding eigenvectors of `X`.
   - `num_factors::Integer`: Number of eigenvalues to treat as noise.
 
-# Returns
+# ReturnsResult
 
   - `nothing`. The input matrix `X` is modified in-place.
 
@@ -319,7 +319,7 @@ This function is used internally to fit the MP distribution to the observed spec
   - `n::Integer`: Number of points in the range of eigenvalues for density estimation.
   - `q::Real`: Effective sample ratio (e.g., `n_obs / n_assets`).
 
-# Returns
+# ReturnsResult
 
   - `sse::Real`: The sum of squared errors between the empirical and theoretical densities.
 
@@ -364,7 +364,7 @@ This function fits the MP distribution to the observed spectrum by minimizing th
   - `args`: Additional positional arguments for [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
   - `kwargs`: Additional keyword arguments for [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
 
-# Returns
+# ReturnsResult
 
   - `(e_max, x)`: Tuple containing the estimated upper edge of the noise eigenvalue spectrum (`e_max`) and the fitted scale parameter (`x`).
 
@@ -388,22 +388,22 @@ function find_max_eval(vals, q; kernel = AverageShiftedHistograms.Kernels.gaussi
 end
 
 """
-    denoise!(de::Denoise, X::AbstractMatrix, q::Real, pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
+    denoise!(de::Denoise, X::AbstractMatrix, q::Real, pdm::Union{Nothing, <:Posdef} = Posdef())
     denoise!(::Nothing, args...)
 
 In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
 
   - If `de` is `nothing`, this is a no-op and returns `nothing`.
-  - If `de` is a [`Denoise`](@ref) object, the specified denoising algorithm is applied to `X` in-place. Optionally, a [`PosdefEstimator`](@ref) can be provided to ensure the output is positive definite.
+  - If `de` is a [`Denoise`](@ref) object, the specified denoising algorithm is applied to `X` in-place. Optionally, a [`Posdef`](@ref) can be provided to ensure the output is positive definite.
 
 # Arguments
 
   - `de::Denoise`: The denoising estimator specifying the algorithm and kernel parameters.
-  - `pdm::Union{Nothing, <:PosdefEstimator}`: Optional positive definite matrix estimator. If provided, ensures the output is positive definite.
+  - `pdm::Union{Nothing, <:Posdef}`: Optional positive definite matrix estimator. If provided, ensures the output is positive definite.
   - `X::AbstractMatrix`: The covariance or correlation matrix to be denoised (modified in-place).
   - `q::Real`: The effective sample ratio (e.g., `n_obs / n_assets`), used for spectral thresholding.
 
-# Returns
+# ReturnsResult
 
   - `nothing`. The input matrix `X` is modified in-place.
 
@@ -454,7 +454,7 @@ function denoise!(::Nothing, args...)
     return nothing
 end
 function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
-                  pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
+                  pdm::Union{Nothing, <:Posdef} = Posdef())
     assert_matrix_issquare(X)
     s = diag(X)
     iscov = any(!isone, s)
@@ -475,7 +475,7 @@ function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
 end
 
 """
-    denoise(de::Denoise, X::AbstractMatrix, q::Real, pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
+    denoise(de::Denoise, X::AbstractMatrix, q::Real, pdm::Union{Nothing, <:Posdef} = Posdef())
     denoise(::Nothing, args...)
 
 Same as [`denoise!`](@ref), but returns a new matrix instead of modifying `X` in-place.
@@ -521,7 +521,7 @@ function denoise(::Nothing, args...)
     return nothing
 end
 function denoise(de::Denoise, X::AbstractMatrix, q::Real,
-                 pdm::Union{Nothing, <:PosdefEstimator} = PosdefEstimator())
+                 pdm::Union{Nothing, <:Posdef} = Posdef())
     X = copy(X)
     denoise!(de, X, q, pdm)
     return X

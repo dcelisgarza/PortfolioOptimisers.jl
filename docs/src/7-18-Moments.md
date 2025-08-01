@@ -7,5 +7,5 @@ PortfolioOptimisers.AbstractRegressionAlgorithm
 PortfolioOptimisers.AbstractStepwiseRegressionAlgorithm
 PortfolioOptimisers.AbstractStepwiseRegressionCriterion
 PortfolioOptimisers.AbstractRegressionTarget
-RegressionResult
+Regression
 ```

@@ -1,28 +1,26 @@
-struct FactorPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_2_1,
-                            T2 <: AbstractMatrixProcessingEstimator,
-                            T3 <: AbstractRegressionEstimator,
-                            T4 <: AbstractVarianceEstimator, T5 <: Bool} <:
-       AbstractLowOrderPriorEstimator_2_1
+struct FactorPrior{T1 <: AbstractLowOrderPriorEstimatorMap_2_1,
+                   T2 <: AbstractMatrixProcessingEstimator,
+                   T3 <: AbstractRegressionEstimator, T4 <: AbstractVarianceEstimator,
+                   T5 <: Bool} <: AbstractLowOrderPriorEstimator_2_1
     pe::T1
     mp::T2
     re::T3
     ve::T4
     rsd::T5
 end
-function FactorPriorEstimator(;
-                              pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPriorEstimator(),
-                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                              re::AbstractRegressionEstimator = StepwiseRegression(),
-                              ve::AbstractVarianceEstimator = SimpleVariance(),
-                              rsd::Bool = true)
-    return FactorPriorEstimator{typeof(pe), typeof(mp), typeof(re), typeof(ve),
-                                typeof(rsd)}(pe, mp, re, ve, rsd)
+function FactorPrior(; pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPrior(),
+                     mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                     re::AbstractRegressionEstimator = StepwiseRegression(),
+                     ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
+    return FactorPrior{typeof(pe), typeof(mp), typeof(re), typeof(ve), typeof(rsd)}(pe, mp,
+                                                                                    re, ve,
+                                                                                    rsd)
 end
-function factory(pe::FactorPriorEstimator, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return FactorPriorEstimator(; pe = factory(pe.pe, w), mp = pe.mp, re = pe.re,
-                                ve = factory(pe.ve, w), rsd = pe.rsd)
+function factory(pe::FactorPrior, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = pe.re,
+                       ve = factory(pe.ve, w), rsd = pe.rsd)
 end
-function Base.getproperty(obj::FactorPriorEstimator, sym::Symbol)
+function Base.getproperty(obj::FactorPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me
     elseif sym == :ce
@@ -31,8 +29,8 @@ function Base.getproperty(obj::FactorPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
-               dims::Int = 1, kwargs...)
+function prior(pe::FactorPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
+               kwargs...)
     @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -53,12 +51,10 @@ function prior(pe::FactorPriorEstimator, X::AbstractMatrix, F::AbstractMatrix;
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    return LowOrderPriorResult(; X = posterior_X, mu = posterior_mu,
-                               sigma = posterior_sigma,
-                               chol = transpose(reshape(posterior_csigma,
-                                                        length(posterior_mu), :)),
-                               w = f_prior.w, loadings = loadings, f_mu = f_mu,
-                               f_sigma = f_sigma, f_w = f_prior.w)
+    return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
+                         chol = transpose(reshape(posterior_csigma, length(posterior_mu),
+                                                  :)), w = f_prior.w, loadings = loadings,
+                         f_mu = f_mu, f_sigma = f_sigma, f_w = f_prior.w)
 end
 
-export FactorPriorEstimator
+export FactorPrior

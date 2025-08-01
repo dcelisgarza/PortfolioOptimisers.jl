@@ -1210,21 +1210,20 @@ function J_LoGo(sigma, separators, cliques)
     jlogo!(jlogo, sigma, separators, -1)
     return jlogo
 end
-struct DBHTClusteringResult{T1 <: Clustering.Hclust, T2 <: AbstractMatrix,
-                            T3 <: AbstractMatrix, T4 <: Integer} <: AbstractClusteringResult
+struct DBHTClustering{T1 <: Clustering.Hclust, T2 <: AbstractMatrix, T3 <: AbstractMatrix,
+                      T4 <: Integer} <: AbstractClusteringResult
     clustering::T1
     S::T2
     D::T3
     k::T4
 end
-function DBHTClusteringResult(; clustering::Clustering.Hclust, S::AbstractMatrix,
-                              D::AbstractMatrix, k::Integer)
+function DBHTClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
+                        D::AbstractMatrix, k::Integer)
     @smart_assert(!isempty(S) && !isempty(D))
     @smart_assert(size(S) == size(D))
     @smart_assert(k >= one(k))
-    return DBHTClusteringResult{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering,
-                                                                                     S, D,
-                                                                                     k)
+    return DBHTClustering{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering,
+                                                                               S, D, k)
 end
 function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
                     X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
@@ -1235,7 +1234,7 @@ function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
     S = dbht_similarity(cle.alg.sim; S = S, D = D)
     clustering = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
     k = optimal_number_clusters(cle.onc, clustering, D)
-    return DBHTClusteringResult(; clustering = clustering, S = S, D = D, k = k)
+    return DBHTClustering(; clustering = clustering, S = S, D = D, k = k)
 end
 function logo!(::Nothing, args...; kwargs...)
     return nothing
@@ -1263,7 +1262,7 @@ end
 function LoGo_dist_assert(args...)
     return nothing
 end
-function logo!(je::LoGo, pdm::Union{Nothing, <:PosdefEstimator}, sigma::AbstractMatrix,
+function logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix,
                X::AbstractMatrix; dims::Int = 1, kwargs...)
     assert_matrix_issquare(sigma)
     LoGo_dist_assert(je.dist, sigma, X)
@@ -1282,7 +1281,7 @@ function logo!(je::LoGo, pdm::Union{Nothing, <:PosdefEstimator}, sigma::Abstract
     posdef!(pdm, sigma)
     return nothing
 end
-function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:PosdefEstimator},
+function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef},
                                       sigma::AbstractMatrix, X::AbstractMatrix;
                                       dims::Int = 1, kwargs...)
     return logo!(je, pdm, sigma, X; dims = dims, kwargs...)

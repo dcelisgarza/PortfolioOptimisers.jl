@@ -22,7 +22,7 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. Returns data
+## 1. ReturnsResult data
 
 We will use the same data as the previous example.
 =#
@@ -56,7 +56,7 @@ This time we will use the `ConditionalValueatRisk` measure and we will once agai
 =#
 
 r = ConditionalValueatRisk()
-pr = prior(EmpiricalPriorEstimator(), rd)
+pr = prior(EmpiricalPrior(), rd)
 
 #=
 Lets create the efficient frontier by setting returns lower bounds and minimising the risk. We will compute a 30-point frontier.

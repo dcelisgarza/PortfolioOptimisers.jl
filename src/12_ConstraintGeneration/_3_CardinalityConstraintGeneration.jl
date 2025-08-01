@@ -13,7 +13,7 @@ function CardinalityConstraintSide(; group, name,
 end
 function CardinalityConstraint(; A::LinearConstraintSide, B::Integer = 1,
                                comp::ComparisonOperators = LEQ())
-    return LinearConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
+    return LinearConstraintEstimator{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
 function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFrame;
                            kwargs...)

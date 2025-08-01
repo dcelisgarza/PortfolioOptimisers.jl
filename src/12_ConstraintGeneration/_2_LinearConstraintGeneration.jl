@@ -29,29 +29,28 @@ end
 #     coef = nothing_scalar_array_view(lc.coef, i)
 #     return LinearConstraintSide(; group = group, name = name, coef = coef)
 # end
-struct LinearConstraint{T1 <: LinearConstraintSide, T2 <: Real,
-                        T3 <: ComparisonOperators} <: AbstractConstraint
+struct LinearConstraintEstimator{T1 <: LinearConstraintSide, T2 <: Real,
+                                 T3 <: ComparisonOperators} <: AbstractConstraint
     A::T1
     B::T2
     comp::T3
 end
-function LinearConstraint(; A::LinearConstraintSide, B::Real = 0.0,
-                          comp::ComparisonOperators = LEQ())
-    return LinearConstraint{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
+function LinearConstraintEstimator(; A::LinearConstraintSide, B::Real = 0.0,
+                                   comp::ComparisonOperators = LEQ())
+    return LinearConstraintEstimator{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
 end
-function Base.iterate(S::Union{<:LinearConstraintSide, <:LinearConstraint,
-                               <:PartialLinearConstraintResult, <:LinearConstraintResult},
-                      state = 1)
+function Base.iterate(S::Union{<:LinearConstraintSide, <:LinearConstraintEstimator,
+                               <:PartialLinearConstraint, <:LinearConstraint}, state = 1)
     return state > 1 ? nothing : (S, state + 1)
 end
 # function linear_constraint_view(::Nothing, ::Any)
 #     return nothing
 # end
-# function linear_constraint_view(lc::LinearConstraint, i::AbstractVector)
+# function linear_constraint_view(lc::LinearConstraintEstimator, i::AbstractVector)
 #     A = linear_constraint_side_view(lc.A, i)
-#     return LinearConstraint(; A = A, B = lc.B, comp = lc.comp)
+#     return LinearConstraintEstimator(; A = A, B = lc.B, comp = lc.comp)
 # end
-# function linear_constraint_view(lc::AbstractVector{<:LinearConstraint}, i::AbstractVector)
+# function linear_constraint_view(lc::AbstractVector{<:LinearConstraintEstimator}, i::AbstractVector)
 #     return linear_constraint_view.(lc, Ref(i))
 # end
 function get_constraint_data(lc::LinearConstraintSide{<:Any, <:Any, <:Any}, sets::DataFrame,
@@ -105,8 +104,8 @@ function get_constraint_data(lc::LinearConstraintSide{<:AbstractVector, <:Abstra
     end
     return A
 end
-function linear_constraints(lcs::Union{<:LinearConstraint,
-                                       <:AbstractVector{<:LinearConstraint}},
+function linear_constraints(lcs::Union{<:LinearConstraintEstimator,
+                                       <:AbstractVector{<:LinearConstraintEstimator}},
                             sets::DataFrame; datatype::DataType = Float64,
                             strict::Bool = false)
     if isa(lcs, AbstractVector)
@@ -145,18 +144,16 @@ function linear_constraints(lcs::Union{<:LinearConstraint,
     return if !ineq_flag && !eq_flag
         nothing
     else
-        LinearConstraintResult(;
-                               ineq = if ineq_flag
-                                   PartialLinearConstraintResult(; A = A_ineq, B = B_ineq)
-                               else
-                                   nothing
-                               end,
-                               eq = if eq_flag
-                                   PartialLinearConstraintResult(; A = A_eq, B = B_eq)
-                               else
-                                   nothing
-                               end)
+        LinearConstraint(; ineq = if ineq_flag
+                             PartialLinearConstraint(; A = A_ineq, B = B_ineq)
+                         else
+                             nothing
+                         end, eq = if eq_flag
+                             PartialLinearConstraint(; A = A_eq, B = B_eq)
+                         else
+                             nothing
+                         end)
     end
 end
 
-export LinearConstraintSide, LinearConstraint
+export LinearConstraintSide, LinearConstraintEstimator

@@ -1,4 +1,4 @@
-abstract type AbstractTracking <: AbstractEstimator end
+abstract type AbstractTracking <: AbstractResult end
 abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
 abstract type TrackingFormulation <: AbstractAlgorithm end
 abstract type NormTracking <: TrackingFormulation end

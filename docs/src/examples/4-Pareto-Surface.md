@@ -1,5 +1,4 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../examples/4-Pareto-Surface.jl"
 ```
@@ -28,7 +27,7 @@ end;
 nothing #hide
 ````
 
-## 1. Returns data
+## 1. ReturnsResult data
 
 We will use the same data as the previous example.
 
@@ -87,9 +86,9 @@ de = Denoise(; alg = SpectralDenoise(;))
 mp = DefaultMatrixProcessing(; denoise = de)
 pe = HighOrderPriorEstimator(;
                              # Prior estimator for low order moments
-                             pe = EmpiricalPriorEstimator(;
-                                                          ce = PortfolioOptimisersCovariance(;
-                                                                                             mp = mp)),
+                             pe = EmpiricalPrior(;
+                                                 ce = PortfolioOptimisersCovariance(;
+                                                                                    mp = mp)),
                              # Estimator for cokurtosis
                              kte = Cokurtosis(; mp = mp),
                              # Estimator for coskewness
@@ -184,7 +183,7 @@ nothing #hide
 
 Now we only need to maximise the return given both risk measures. Internally, the optimisation will generate the mesh as a product of the ranges in the order in which the risk measures were provided. This also works with the `MeanRisk` estimatro, in fact, `NearOptimalCentering` uses it internally.
 
-Since we are using an unconstrained `NearOptimalCentering`, the risk bound constraints will not be satisfied by the solution. If we wish to satisfy them, we can provide `alg = ConstrainedNearOptimalCenteringAlgorithm()`, but would also make the optimisations harder, which may cause them to fail.
+Since we are using an unconstrained `NearOptimalCentering`, the risk bound constraints will not be satisfied by the solution. If we wish to satisfy them, we can provide `alg = ConstrainedNearOptimalCentering()`, but would also make the optimisations harder, which may cause them to fail.
 
 ````@example 4-Pareto-Surface
 opt3 = NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(), opt = opt)
@@ -236,6 +235,7 @@ plot_measures(res3.w, pr; x = r1, y = r2,
               colorbar_title = "\n\nCDaR/Return", right_margin = 8Plots.mm)
 ````
 
-* * *
+---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

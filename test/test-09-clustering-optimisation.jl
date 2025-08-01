@@ -225,9 +225,9 @@
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
         opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
-                                    cwf = JuMP_ClusteringWeightFiniliser(;
-                                                                         alg = RelativeErrorClusteringWeightFiniliser(),
-                                                                         slv = slv))
+                                    cwf = JuMPWeightFiniliser(;
+                                                              alg = RelativeErrorWeightFiniliser(),
+                                                              slv = slv))
         res = optimise!(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
@@ -236,9 +236,9 @@
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
         opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
-                                    cwf = JuMP_ClusteringWeightFiniliser(;
-                                                                         alg = SquareRelativeErrorClusteringWeightFiniliser(),
-                                                                         slv = slv))
+                                    cwf = JuMPWeightFiniliser(;
+                                                              alg = SquareRelativeErrorWeightFiniliser(),
+                                                              slv = slv))
         res = optimise!(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
@@ -247,9 +247,9 @@
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
         opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
-                                    cwf = JuMP_ClusteringWeightFiniliser(;
-                                                                         alg = AbsoluteErrorClusteringWeightFiniliser(),
-                                                                         slv = slv))
+                                    cwf = JuMPWeightFiniliser(;
+                                                              alg = AbsoluteErrorWeightFiniliser(),
+                                                              slv = slv))
         res = optimise!(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)
@@ -258,9 +258,9 @@
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
 
         opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn,
-                                    cwf = JuMP_ClusteringWeightFiniliser(;
-                                                                         alg = SquareAbsoluteErrorClusteringWeightFiniliser(),
-                                                                         slv = slv))
+                                    cwf = JuMPWeightFiniliser(;
+                                                              alg = SquareAbsoluteErrorWeightFiniliser(),
+                                                              slv = slv))
         res = optimise!(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)
         @test isapprox(res.w[findfirst(x -> x == "JNJ", sets.dict[sets.key])], 0.03)

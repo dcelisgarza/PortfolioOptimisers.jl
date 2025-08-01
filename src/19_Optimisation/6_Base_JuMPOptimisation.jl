@@ -12,20 +12,16 @@ function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     return model[:G]
 end
 function get_chol_or_sigma_pm(model::JuMP.Model,
-                              pr::Union{<:LowOrderPriorResult{<:Any, <:Any, <:Any,
-                                                              <:AbstractMatrix, <:Any,
-                                                              <:Any, <:Any, <:Any, <:Any},
-                                        <:HighOrderPriorResult{<:LowOrderPriorResult{<:Any,
-                                                                                     <:Any,
-                                                                                     <:Any,
-                                                                                     <:AbstractMatrix,
-                                                                                     <:Any,
-                                                                                     <:Any,
-                                                                                     <:Any,
-                                                                                     <:Any,
-                                                                                     <:Any},
-                                                               <:Any, <:Any, <:Any, <:Any,
-                                                               <:Any, <:Any}})
+                              pr::Union{<:LowOrderPrior{<:Any, <:Any, <:Any,
+                                                        <:AbstractMatrix, <:Any, <:Any,
+                                                        <:Any, <:Any, <:Any},
+                                        <:HighOrderPrior{<:LowOrderPrior{<:Any, <:Any,
+                                                                         <:Any,
+                                                                         <:AbstractMatrix,
+                                                                         <:Any, <:Any,
+                                                                         <:Any, <:Any,
+                                                                         <:Any}, <:Any,
+                                                         <:Any, <:Any, <:Any, <:Any, <:Any}})
     if !haskey(model, :G)
         G = pr.chol
         @expression(model, G, G)
@@ -144,19 +140,19 @@ function set_risk_constraints!(args...; kwargs...)
 end
 function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult},
-                               nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult}, args...; kwargs...)
+                               cplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                           <:IntegerPhilogeny},
+                               nplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                           <:IntegerPhilogeny}, args...; kwargs...)
     set_risk_constraints!(model, 1, r, opt, pr, cplg, nplg, args...; kwargs...)
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasure},
                                opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult},
-                               nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult}, args...; kwargs...)
+                               cplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                           <:IntegerPhilogeny},
+                               nplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                           <:IntegerPhilogeny}, args...; kwargs...)
     for (i, r) in enumerate(rs)
         set_risk_constraints!(model, i, r, opt, pr, cplg, nplg, args...; kwargs...)
     end

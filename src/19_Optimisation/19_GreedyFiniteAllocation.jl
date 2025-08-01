@@ -1,6 +1,6 @@
-struct GreedyAllocationResult{T1, T2 <: AbstractVector, T3 <: AbstractVector,
-                              T4 <: AbstractVector, T5 <: OptimisationReturnCode,
-                              T6 <: Real} <: OptimisationResult
+struct GreedyAllocationOptimisation{T1, T2 <: AbstractVector, T3 <: AbstractVector,
+                                    T4 <: AbstractVector, T5 <: OptimisationReturnCode,
+                                    T6 <: Real} <: OptimisationResult
     oe::T1
     shares::T2
     cost::T3
@@ -118,8 +118,9 @@ function optimise!(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
     res[sidx, 2] = -scost
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
-    return GreedyAllocationResult(typeof(ga), view(res, :, 1), view(res, :, 2),
-                                  view(res, :, 3), OptimisationSuccess(nothing), lcash)
+    return GreedyAllocationOptimisation(typeof(ga), view(res, :, 1), view(res, :, 2),
+                                        view(res, :, 3), OptimisationSuccess(nothing),
+                                        lcash)
 end
 
-export GreedyAllocationResult, GreedyAllocation
+export GreedyAllocationOptimisation, GreedyAllocation

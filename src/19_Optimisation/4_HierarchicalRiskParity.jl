@@ -21,9 +21,8 @@ function opt_view(hrp::HierarchicalRiskParity, i::AbstractVector, X::AbstractMat
     opt = opt_view(hrp.opt, i)
     return HierarchicalRiskParity(; r = r, opt = opt, sce = hrp.sce)
 end
-function split_factor_weight_constraints(alpha::Real, wb::WeightBoundsResult,
-                                         w::AbstractVector, lc::AbstractVector,
-                                         rc::AbstractVector)
+function split_factor_weight_constraints(alpha::Real, wb::WeightBounds, w::AbstractVector,
+                                         lc::AbstractVector, rc::AbstractVector)
     lb = wb.lb
     ub = wb.ub
     wlc = w[lc[1]]
@@ -74,7 +73,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
         end
     end
     retcode, w = clustering_optimisation_result(hrp.opt.cwf, wb, w / sum(w))
-    return HierarchicalOptimisationResult(typeof(hrp), pr, fees, wb, clr, retcode, w)
+    return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
 end
 function hrp_scalarised_risk(::SumScalariser, wu::AbstractMatrix, wk::AbstractVector,
                              rku::AbstractVector, lc::AbstractVector, rc::AbstractVector,
@@ -171,7 +170,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any,
         end
     end
     retcode, w = clustering_optimisation_result(hrp.opt.cwf, wb, w / sum(w))
-    return HierarchicalOptimisationResult(typeof(hrp), pr, fees, wb, clr, retcode, w)
+    return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
 end
 
 export HierarchicalRiskParity

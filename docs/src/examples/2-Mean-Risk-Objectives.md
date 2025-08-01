@@ -1,5 +1,4 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../examples/2-Mean-Risk-Objectives.jl"
 ```
@@ -28,7 +27,7 @@ end;
 nothing #hide
 ````
 
-## 1. Returns data
+## 1. ReturnsResult data
 
 We will use the same data as the previous example.
 
@@ -61,10 +60,10 @@ r = LowOrderMoment(;
                                            alg = SecondLowerMoment(; alg = SqrtRiskExpr())))
 ````
 
-Since we will perform various optimisations on the same data, there's no need to redo work. Lets precompute the prior statistics using the `EmpiricalPriorEstimator` to avoid recomputing them every time we call the optimisation.
+Since we will perform various optimisations on the same data, there's no need to redo work. Lets precompute the prior statistics using the `EmpiricalPrior` to avoid recomputing them every time we call the optimisation.
 
 ````@example 2-Mean-Risk-Objectives
-pr = prior(EmpiricalPriorEstimator(), rd)
+pr = prior(EmpiricalPrior(), rd)
 ````
 
 We can provide the prior result to `JuMPOptimiser`.
@@ -130,6 +129,7 @@ pretty_table(DataFrame(;
 
 We can seee that indeed, the minimum risk produces the portfolio with minimum risk, the maximum ratio produces the portfolio with the maximum risk-return ratio, and the maximum return portfolio produces the portfolio with the maximum return.
 
-* * *
+---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

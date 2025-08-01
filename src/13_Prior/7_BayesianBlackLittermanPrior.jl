@@ -1,17 +1,16 @@
-struct BayesianBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_2_2,
-                                            T2 <: AbstractMatrixProcessingEstimator,
-                                            T3 <: Union{<:AbstractString, Expr,
-                                                        <:AbstractVector{<:AbstractString},
-                                                        <:AbstractVector{Expr},
-                                                        <:AbstractVector{<:Union{<:AbstractString,
-                                                                                 Expr}},
-                                              #! Start: to delete
-                                                        <:BlackLittermanViewsEstimator,
-                                                        <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                              #! End: to delete
-                                              }, T4 <: DataFrame,
-                                            T5 <: Union{Nothing, <:AbstractVector},
-                                            T6 <: Real, T7 <: Union{Nothing, <:Real}} <:
+struct BayesianBlackLittermanPrior{T1 <: AbstractLowOrderPriorEstimatorMap_2_2,
+                                   T2 <: AbstractMatrixProcessingEstimator,
+                                   T3 <: Union{<:AbstractString, Expr,
+                                               <:AbstractVector{<:AbstractString},
+                                               <:AbstractVector{Expr},
+                                               <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                     #! Start: to delete
+                                               <:BlackLittermanViewsEstimator,
+                                               <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                     #! End: to delete
+                                     }, T4 <: DataFrame,
+                                   T5 <: Union{Nothing, <:AbstractVector}, T6 <: Real,
+                                   T7 <: Union{Nothing, <:Real}} <:
        AbstractLowOrderPriorEstimator_2_2
     pe::T1
     mp::T2
@@ -21,29 +20,28 @@ struct BayesianBlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimator
     rf::T6
     tau::T7
 end
-function BayesianBlackLittermanPriorEstimator(;
-                                              pe::AbstractLowOrderPriorEstimatorMap_2_2 = FactorPriorEstimator(;
-                                                                                                               pe = EmpiricalPriorEstimator(;
-                                                                                                                                            me = EquilibriumExpectedReturns())),
-                                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                              views::Union{<:AbstractString, Expr,
-                                                           <:AbstractVector{<:AbstractString},
-                                                           <:AbstractVector{Expr},
-                                                           <:AbstractVector{<:Union{<:AbstractString,
-                                                                                    Expr}},
-                                                           #! Start: to delete
-                                                           <:BlackLittermanViewsEstimator,
-                                                           <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                                           #! End: to delete
-                                                           },
-                                              sets::Union{<:AssetSets,
-                                                          #! Start: to delete
-                                                          <:DataFrame
-                                                          #! End: to delete
-                                                          } = DataFrame(),
-                                              views_conf::Union{Nothing, <:AbstractVector} = nothing,
-                                              rf::Real = 0.0,
-                                              tau::Union{Nothing, <:Real} = nothing)
+function BayesianBlackLittermanPrior(;
+                                     pe::AbstractLowOrderPriorEstimatorMap_2_2 = FactorPrior(;
+                                                                                             pe = EmpiricalPrior(;
+                                                                                                                 me = EquilibriumExpectedReturns())),
+                                     mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                                     views::Union{<:AbstractString, Expr,
+                                                  <:AbstractVector{<:AbstractString},
+                                                  <:AbstractVector{Expr},
+                                                  <:AbstractVector{<:Union{<:AbstractString,
+                                                                           Expr}},
+                                                  #! Start: to delete
+                                                  <:BlackLittermanViewsEstimator,
+                                                  <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                                  #! End: to delete
+                                                  },
+                                     sets::Union{<:AssetSets,
+                                                 #! Start: to delete
+                                                 <:DataFrame
+                                                 #! End: to delete
+                                                 } = DataFrame(),
+                                     views_conf::Union{Nothing, <:AbstractVector} = nothing,
+                                     rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
     if isa(views_conf, AbstractVector)
         @smart_assert(isa(views, AbstractVector))
         @smart_assert(!isempty(views))
@@ -58,20 +56,20 @@ function BayesianBlackLittermanPriorEstimator(;
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))
     end
-    return BayesianBlackLittermanPriorEstimator{typeof(pe), typeof(mp), typeof(views),
-                                                typeof(sets), typeof(views_conf),
-                                                typeof(rf), typeof(tau)}(pe, mp, views,
-                                                                         sets, views_conf,
-                                                                         rf, tau)
+    return BayesianBlackLittermanPrior{typeof(pe), typeof(mp), typeof(views), typeof(sets),
+                                       typeof(views_conf), typeof(rf), typeof(tau)}(pe, mp,
+                                                                                    views,
+                                                                                    sets,
+                                                                                    views_conf,
+                                                                                    rf, tau)
 end
-function factory(pe::BayesianBlackLittermanPriorEstimator,
+function factory(pe::BayesianBlackLittermanPrior,
                  w::Union{Nothing, <:AbstractWeights} = nothing)
-    return BayesianBlackLittermanPriorEstimator(; pe = factory(pe.pe, w), mp = pe.mp,
-                                                views = pe.views, sets = pe.sets,
-                                                views_conf = pe.views_conf, rf = pe.rf,
-                                                tau = pe.tau)
+    return BayesianBlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp,
+                                       views = pe.views, sets = pe.sets,
+                                       views_conf = pe.views_conf, rf = pe.rf, tau = pe.tau)
 end
-function Base.getproperty(obj::BayesianBlackLittermanPriorEstimator, sym::Symbol)
+function Base.getproperty(obj::BayesianBlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me
     elseif sym == :ce
@@ -80,8 +78,8 @@ function Base.getproperty(obj::BayesianBlackLittermanPriorEstimator, sym::Symbol
         getfield(obj, sym)
     end
 end
-function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
-               F::AbstractMatrix; dims::Int = 1, strict::Bool = false, kwargs...)
+function prior(pe::BayesianBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix;
+               dims::Int = 1, strict::Bool = false, kwargs...)
     @smart_assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -115,9 +113,8 @@ function prior(pe::BayesianBlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_sigma = inv(v3 - v1 * (v2 \ transpose(M)) * v3)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b) .+ pe.rf
-    return LowOrderPriorResult(; X = posterior_X, mu = posterior_mu,
-                               sigma = posterior_sigma, loadings = loadings, f_mu = f_mu,
-                               f_sigma = f_sigma)
+    return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
+                         loadings = loadings, f_mu = f_mu, f_sigma = f_sigma)
 end
 
-export BayesianBlackLittermanPriorEstimator
+export BayesianBlackLittermanPrior

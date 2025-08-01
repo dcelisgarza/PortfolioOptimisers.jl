@@ -1,16 +1,15 @@
-struct BlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
-                                    T2 <: AbstractMatrixProcessingEstimator,
-                                    T3 <: Union{<:AbstractString, Expr,
-                                                <:AbstractVector{<:AbstractString},
-                                                <:AbstractVector{Expr},
-                                                <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                      #! Start: to delete
-                                                <:BlackLittermanViewsEstimator,
-                                                <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                      #! End: to delete
-                                      }, T4 <: DataFrame,
-                                    T5 <: Union{Nothing, <:AbstractVector}, T6 <: Real,
-                                    T7 <: Union{Nothing, <:Real}} <:
+struct BlackLittermanPrior{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
+                           T2 <: AbstractMatrixProcessingEstimator,
+                           T3 <:
+                           Union{<:AbstractString, Expr, <:AbstractVector{<:AbstractString},
+                                 <:AbstractVector{Expr},
+                                 <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                 #! Start: to delete
+                                 <:BlackLittermanViewsEstimator,
+                                 <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                 #! End: to delete
+                                 }, T4 <: DataFrame, T5 <: Union{Nothing, <:AbstractVector},
+                           T6 <: Real, T7 <: Union{Nothing, <:Real}} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
     pe::T1
     mp::T2
@@ -20,7 +19,7 @@ struct BlackLittermanPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_
     rf::T6
     tau::T7
 end
-function Base.getproperty(obj::BlackLittermanPriorEstimator, sym::Symbol)
+function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me
     elseif sym == :ce
@@ -29,27 +28,26 @@ function Base.getproperty(obj::BlackLittermanPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function BlackLittermanPriorEstimator(;
-                                      pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(;
-                                                                                                              me = EquilibriumExpectedReturns()),
-                                      mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                      views::Union{<:AbstractString, Expr,
-                                                   <:AbstractVector{<:AbstractString},
-                                                   <:AbstractVector{Expr},
-                                                   <:AbstractVector{<:Union{<:AbstractString,
-                                                                            Expr}},
-                                                   #! Start: to delete
-                                                   <:BlackLittermanViewsEstimator,
-                                                   <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                                   #! End: to delete
-                                                   },
-                                      sets::Union{<:AssetSets,
-                                                  #! Start: to delete
-                                                  <:DataFrame
-                                                  #! End: to delete
-                                                  } = DataFrame(),
-                                      views_conf::Union{Nothing, <:AbstractVector} = nothing,
-                                      rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
+function BlackLittermanPrior(;
+                             pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(;
+                                                                                            me = EquilibriumExpectedReturns()),
+                             mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                             views::Union{<:AbstractString, Expr,
+                                          <:AbstractVector{<:AbstractString},
+                                          <:AbstractVector{Expr},
+                                          <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                          #! Start: to delete
+                                          <:BlackLittermanViewsEstimator,
+                                          <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                          #! End: to delete
+                                          },
+                             sets::Union{<:AssetSets,
+                                         #! Start: to delete
+                                         <:DataFrame
+                                         #! End: to delete
+                                         } = DataFrame(),
+                             views_conf::Union{Nothing, <:AbstractVector} = nothing,
+                             rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
     if isa(views_conf, AbstractVector)
         @smart_assert(isa(views, AbstractVector))
         @smart_assert(!isempty(views))
@@ -64,22 +62,18 @@ function BlackLittermanPriorEstimator(;
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))
     end
-    return BlackLittermanPriorEstimator{typeof(pe), typeof(mp), typeof(views), typeof(sets),
-                                        typeof(views_conf), typeof(rf), typeof(tau)}(pe, mp,
-                                                                                     views,
-                                                                                     sets,
-                                                                                     views_conf,
-                                                                                     rf,
-                                                                                     tau)
+    return BlackLittermanPrior{typeof(pe), typeof(mp), typeof(views), typeof(sets),
+                               typeof(views_conf), typeof(rf), typeof(tau)}(pe, mp, views,
+                                                                            sets,
+                                                                            views_conf, rf,
+                                                                            tau)
 end
-function factory(pe::BlackLittermanPriorEstimator,
-                 w::Union{Nothing, <:AbstractWeights} = nothing)
-    return BlackLittermanPriorEstimator(; pe = factory(pe.pe, w), mp = pe.mp,
-                                        views = pe.views, sets = pe.sets,
-                                        views_conf = pe.views_conf, rf = pe.rf,
-                                        tau = pe.tau)
+function factory(pe::BlackLittermanPrior, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,
+                               sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
+                               tau = pe.tau)
 end
-function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
+function prior(pe::BlackLittermanPrior, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
     @smart_assert(dims in (1, 2))
@@ -110,8 +104,7 @@ function prior(pe::BlackLittermanPriorEstimator, X::AbstractMatrix,
     posterior_mu = (prior_mu + v1 * (v2 \ v3)) .+ pe.rf
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
-    return LowOrderPriorResult(; X = posterior_X, mu = posterior_mu,
-                               sigma = posterior_sigma)
+    return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma)
 end
 
-export BlackLittermanPriorEstimator
+export BlackLittermanPrior

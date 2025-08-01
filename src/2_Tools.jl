@@ -233,7 +233,7 @@ end
 
 Convert price data (and optionally factor data) in `TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
 
-Returns a [`ReturnsResult`](@ref) containing asset and factor returns, time series, and optional implied volatility data, suitable for downstream portfolio optimization.
+ReturnsResult a [`ReturnsResult`](@ref) containing asset and factor returns, time series, and optional implied volatility data, suitable for downstream portfolio optimization.
 
 # Arguments
 
@@ -250,7 +250,7 @@ Returns a [`ReturnsResult`](@ref) containing asset and factor returns, time seri
   - `join_method::Symbol`: How to join asset and factor data (`:outer`, `:inner`, etc.).
   - `impute_method::Union{Nothing, Impute.Imputor}`: Optional imputation method for missing data.
 
-# Returns
+# ReturnsResult
 
   - [`ReturnsResult`](@ref): Struct containing asset/factor returns, names, time series, and optional implied volatility data.
 
@@ -427,7 +427,7 @@ end
 """
     ⊗(A::AbstractArray, B::AbstractArray)
 
-Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
+Tensor product of two arrays. ReturnsResult a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
 
 # Examples
 
@@ -584,7 +584,7 @@ Efficient scalar and vector dot product utility.
   - `a::AbstractVector`, `b::Real`: Multiplies the sum of `a` by `b`.
   - `a::AbstractVector`, `b::AbstractVector`: Computes the dot product of `a` and `b`.
 
-# Returns
+# ReturnsResult
 
   - `Real`: The resulting scalar.
 
@@ -627,7 +627,7 @@ Utility for safely viewing or indexing into possibly `nothing`, scalar, or array
   - `x`: Input value, which may be `nothing`, a scalar, vector, or array.
   - `i`: Index or indices to view.
 
-# Returns
+# ReturnsResult
 
   - The corresponding view or value, or `nothing` if `x` is `nothing`.
 
@@ -679,7 +679,7 @@ Utility for safely viewing or indexing into possibly `nothing` or array values w
   - `x`: Input value, which may be `nothing` or an array.
   - `i`, `j`: Indices to view.
 
-# Returns
+# ReturnsResult
 
   - The corresponding view or `nothing`.
 
@@ -716,7 +716,7 @@ Utility for safely indexing into possibly `nothing`, scalar, vector, or array va
   - `x`: Input value, which may be `nothing`, a scalar, vector, or matrix.
   - `i`, `j`: Indices.
 
-# Returns
+# ReturnsResult
 
   - The corresponding value or `nothing`.
 
@@ -770,7 +770,7 @@ Utility for safely viewing or indexing into possibly `nothing` or DataFrame valu
   - `x`: Input value, which may be `nothing` or a DataFrame.
   - `i`: Indices.
 
-# Returns
+# ReturnsResult
 
   - The corresponding view or `nothing`.
 
@@ -816,7 +816,7 @@ Constructs an index vector for extracting the fourth moment submatrix correspond
   - `N::Integer`: Size of the full covariance matrix.
   - `i::AbstractVector`: Indices of the variables of interest.
 
-# Returns
+# ReturnsResult
 
   - `Vector{Int}`: Indices for extracting the fourth moment submatrix.
 
@@ -849,7 +849,7 @@ Recursively traverse all subtypes of the given abstract type `t` and collect all
   - `t`: An abstract type whose subtypes will be traversed.
   - `ctarr::Union{Nothing, <:AbstractVector}`: (Optional) An array to collect the concrete types. If not provided, a new empty array is created.
 
-# Returns
+# ReturnsResult
 
 An array containing all concrete struct types that are subtypes (direct or indirect) of `types`.
 
@@ -894,7 +894,7 @@ This is useful for converting arrays with abstract element types to arrays with 
 
   - `A::AbstractArray`: The input array.
 
-# Returns
+# ReturnsResult
 
 A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
 

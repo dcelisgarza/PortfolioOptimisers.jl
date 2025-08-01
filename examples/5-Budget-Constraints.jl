@@ -31,7 +31,7 @@ mipresfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. Returns data
+## 1. ReturnsResult data
 
 We will use the same data as the previous example.
 =#
@@ -74,7 +74,7 @@ This time we will use the `EntropicValueatRisk` measure and we will once again p
 =#
 
 r = EntropicValueatRisk()
-pr = prior(EmpiricalPriorEstimator(), rd)
+pr = prior(EmpiricalPrior(), rd)
 
 #=
 ## 3. Exact budget constraints
@@ -94,7 +94,7 @@ opt1 = JuMPOptimiser(; pe = pr, slv = slv)
 mr1 = MeanRisk(; r = r, opt = opt1)
 
 #=
-You can see that `wb` is of type `WeightBoundsResult`, `lb = 0.0` (asset weights lower bound), and `ub = 1.0` (asset weights upper bound), and `bgt = 1.0` (budget).
+You can see that `wb` is of type `WeightBounds`, `lb = 0.0` (asset weights lower bound), and `ub = 1.0` (asset weights upper bound), and `bgt = 1.0` (budget).
 
 We can check that the constraints were satisfied.
 =#
@@ -135,7 +135,7 @@ opt2 = JuMPOptimiser(; pe = pr, slv = slv,
                      ## Budget and short budget absolute values.
                      bgt = 0, sbgt = 1,
                      ## Weight bounds.
-                     wb = WeightBoundsResult(; lb = -1.0, ub = 1.0))
+                     wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr2 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt2)
 res2 = optimise!(mr2)
 println("budget: $(sum(res2.w))")
@@ -169,7 +169,7 @@ opt3 = JuMPOptimiser(; pe = pr, slv = slv,
                      ## Budget and short budget absolute values.
                      bgt = -1, sbgt = 1,
                      ## Weight bounds.
-                     wb = WeightBoundsResult(; lb = -1.0, ub = 0.0))
+                     wb = WeightBounds(; lb = -1.0, ub = 0.0))
 mr3 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt3)
 res3 = optimise!(mr3)
 println("budget: $(sum(res3.w))")
@@ -231,7 +231,7 @@ opt5 = JuMPOptimiser(; pe = pr, slv = slv,
                      ## Budget and short budget absolute values.
                      bgt = 0.5, sbgt = 1,
                      ## Weight bounds.
-                     wb = WeightBoundsResult(; lb = -1.0, ub = 1.0))
+                     wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr5 = MeanRisk(; r = r, opt = opt5)
 res5 = optimise!(mr5)
 println("budget: $(sum(res5.w))")
@@ -267,7 +267,7 @@ opt6 = JuMPOptimiser(; pe = pr, slv = slv,
                      ## Exact short budget
                      sbgt = 0.5,
                      ## Weight bounds.
-                     wb = WeightBoundsResult(; lb = -1.0, ub = 1.0))
+                     wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr6 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt6)
 res6 = optimise!(mr6)
 println("budget: $(sum(res6.w))")
@@ -287,7 +287,7 @@ opt7 = JuMPOptimiser(; pe = pr, slv = slv,
                      ## Remove the slack from the short budget.
                      sbgt = BudgetRange(; lb = 0.5, ub = 0.5),
                      ## Weight bounds.
-                     wb = WeightBoundsResult(; lb = -1.0, ub = 1.0))
+                     wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr7 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt7)
 res7 = optimise!(mr7)
 println("budget: $(sum(res7.w))")

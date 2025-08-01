@@ -40,7 +40,7 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator for computing expected ret
 
   - `w::Union{Nothing, <:AbstractWeights}`: Optional observation weights. If `nothing`, the unweighted mean is computed.
 
-# Returns
+# ReturnsResult
 
   - `SimpleExpectedReturns`: A simple expected returns estimator configured with optional weights.
 
@@ -48,7 +48,7 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator for computing expected ret
 
   - If `w` is provided, it must not be empty.
 
-# Returns
+# ReturnsResult
 
   - `SimpleExpectedReturns`: A simple expected returns estimator.
 
@@ -96,7 +96,7 @@ This method computes the expected returns as the sample mean of the input data `
   - `dims`: Dimension along which to compute the mean.
   - `kwargs...`: Additional keyword arguments passed to [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean).
 
-# Returns
+# ReturnsResult
 
   - The mean of `X` along the specified dimension using the [`SimpleExpectedReturns`](@ref) estimator.
 

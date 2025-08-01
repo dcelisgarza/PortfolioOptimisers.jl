@@ -90,12 +90,12 @@ function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
     pe2 = if !isnothing(pe.pe2)
         factory(pe.pe2, w)
     else
-        factory(EmpiricalPriorEstimator(), w)
+        factory(EmpiricalPrior(), w)
     end
     (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = prior(pe2, X, F; strict = strict,
                                                             kwargs...)
-    return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma, chol = chol, w = w,
-                               loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
-                               f_w = !isnothing(loadings) ? w : nothing)
+    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w,
+                         loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
+                         f_w = !isnothing(loadings) ? w : nothing)
     return nothing
 end

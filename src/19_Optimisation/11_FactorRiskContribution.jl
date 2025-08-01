@@ -1,14 +1,11 @@
 struct FactorRiskContribution{T1 <: JuMPOptimiser,
-                              T2 <:
-                              Union{<:RegressionResult, <:AbstractRegressionEstimator},
+                              T2 <: Union{<:Regression, <:AbstractRegressionEstimator},
                               T3 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
                               T4 <: ObjectiveFunction,
-                              T5 <:
-                              Union{Nothing, <:SemiDefinitePhilogenyConstraintEstimator,
-                                    <:SemiDefinitePhilogenyResult},
-                              T6 <:
-                              Union{Nothing, <:SemiDefinitePhilogenyConstraintEstimator,
-                                    <:SemiDefinitePhilogenyResult},
+                              T5 <: Union{Nothing, <:SemiDefinitePhilogenyEstimator,
+                                          <:SemiDefinitePhilogeny},
+                              T6 <: Union{Nothing, <:SemiDefinitePhilogenyEstimator,
+                                          <:SemiDefinitePhilogeny},
                               T7 <: Union{Nothing, <:AssetSets,
                                 #! Start: to delete
                                           <:DataFrame
@@ -26,16 +23,13 @@ struct FactorRiskContribution{T1 <: JuMPOptimiser,
     flag::T9
 end
 function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
-                                re::Union{<:RegressionResult,
-                                          <:AbstractRegressionEstimator} = StepwiseRegression(),
+                                re::Union{<:Regression, <:AbstractRegressionEstimator} = StepwiseRegression(),
                                 r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                                 obj::ObjectiveFunction = MinimumRisk(),
-                                nplg::Union{Nothing,
-                                            <:SemiDefinitePhilogenyConstraintEstimator,
-                                            <:SemiDefinitePhilogenyResult} = nothing,
-                                cplg::Union{Nothing,
-                                            <:SemiDefinitePhilogenyConstraintEstimator,
-                                            <:SemiDefinitePhilogenyResult} = nothing,
+                                nplg::Union{Nothing, <:SemiDefinitePhilogenyEstimator,
+                                            <:SemiDefinitePhilogeny} = nothing,
+                                cplg::Union{Nothing, <:SemiDefinitePhilogenyEstimator,
+                                            <:SemiDefinitePhilogeny} = nothing,
                                 sets::Union{Nothing, <:AssetSets,
                                             #! Start: to delete
                                             <:DataFrame
@@ -50,11 +44,9 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
         @smart_assert(!isempty(wi))
     end
     @smart_assert(!isa(opt.nplg,
-                       Union{<:SemiDefinitePhilogenyConstraintEstimator,
-                             <:SemiDefinitePhilogenyResult}))
+                       Union{<:SemiDefinitePhilogenyEstimator, <:SemiDefinitePhilogeny}))
     @smart_assert(!isa(opt.cplg,
-                       Union{<:SemiDefinitePhilogenyConstraintEstimator,
-                             <:SemiDefinitePhilogenyResult}))
+                       Union{<:SemiDefinitePhilogenyEstimator, <:SemiDefinitePhilogeny}))
     return FactorRiskContribution{typeof(opt), typeof(re), typeof(r), typeof(obj),
                                   typeof(nplg), typeof(cplg), typeof(sets), typeof(wi),
                                   typeof(flag)}(opt, re, r, obj, nplg, cplg, sets, wi, flag)
@@ -71,7 +63,7 @@ function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMat
                                   flag = frc.flag)
 end
 function set_factor_risk_contribution_constraints!(model::JuMP.Model,
-                                                   re::Union{<:RegressionResult,
+                                                   re::Union{<:Regression,
                                                              <:AbstractRegressionEstimator},
                                                    rd::ReturnsResult, flag::Bool,
                                                    wi::Union{Nothing, AbstractVector})
@@ -96,9 +88,9 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
 end
 function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
-                                                                                                                                                     rd;
-                                                                                                                                                     dims = dims)
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
+                                                                                                                                         rd;
+                                                                                                                                         dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
@@ -110,8 +102,8 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_linear_weight_constraints!(model, frc.opt.lcm, :lcm_ineq, :lcm_eq)
     set_mip_constraints!(model, wb, frc.opt.card, gcard, nplg, cplg, lt, st, fees,
                          frc.opt.ss)
-    set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
-                          sgst, frc.opt.ss)
+    set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, sgmtx, slt, sst, nothing,
+                          nothing, frc.opt.ss)
     set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, frc.opt.te, frc, nplg, cplg, fees)
     set_number_effective_assets!(model, frc.opt.nea)
@@ -128,28 +120,24 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     add_custom_constraint!(model, frc.opt.ccnt, frc, pr)
     set_portfolio_objective_function!(model, frc.obj, ret, frc.opt.cobj, frc, pr)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(pr.X))
-    return JuMPOptimisationFactorRiskContributionResult(typeof(frc),
-                                                        ProcessedJuMPOptimiserAttributes(pr,
-                                                                                         wb,
-                                                                                         lt,
-                                                                                         st,
-                                                                                         lcs,
-                                                                                         cent,
-                                                                                         gcard,
-                                                                                         sgcard,
-                                                                                         smtx,
-                                                                                         slt,
-                                                                                         sst,
-                                                                                         sgmtx,
-                                                                                         sglt,
-                                                                                         sgst,
-                                                                                         nplg,
-                                                                                         cplg,
-                                                                                         tn,
-                                                                                         fees,
-                                                                                         ret),
-                                                        frc_nplg, frc_cplg, retcode, sol,
-                                                        ifelse(save, model, nothing))
+    return JuMPOptimisationFactorRiskContribution(typeof(frc),
+                                                  ProcessedJuMPOptimiserAttributes(pr, wb,
+                                                                                   lt, st,
+                                                                                   lcs,
+                                                                                   cent,
+                                                                                   gcard,
+                                                                                   sgcard,
+                                                                                   smtx,
+                                                                                   slt, sst,
+                                                                                   sgmtx,
+                                                                                   #    sglt,
+                                                                                   #    sgst,
+                                                                                   nplg,
+                                                                                   cplg, tn,
+                                                                                   fees,
+                                                                                   ret),
+                                                  frc_nplg, frc_cplg, retcode, sol,
+                                                  ifelse(save, model, nothing))
 end
 
 export FactorRiskContribution

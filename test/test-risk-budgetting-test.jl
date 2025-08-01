@@ -31,7 +31,7 @@
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
     @testset "Asset Risk Budgetting" begin
-        pr = prior(FactorPriorEstimator(; re = DimensionReductionRegression()), rd)
+        pr = prior(FactorPrior(; re = DimensionReductionRegression()), rd)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         r = PortfolioOptimisers.factory(StandardDeviation(), pr)
 
@@ -53,7 +53,7 @@
         lo, hi = extrema(rkc)
         @test isapprox(hi / lo, 1, rtol = 5e-4)
 
-        rbe = RiskBudgetting(; alg = AssetRiskBudgettingAlgorithm(; rkb = 1:30), r = r,
+        rbe = RiskBudgetting(; alg = AssetRiskBudgetting(; rkb = 1:30), r = r,
                              opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
@@ -74,7 +74,7 @@
         @test argmin(rkc) == 1
         @test argmax(rkc) == 30
 
-        rbe = RiskBudgetting(; alg = AssetRiskBudgettingAlgorithm(; rkb = 60:-2:2), r = r,
+        rbe = RiskBudgetting(; alg = AssetRiskBudgetting(; rkb = 60:-2:2), r = r,
                              opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
@@ -96,12 +96,12 @@
         @test argmax(rkc) == 1
     end
     @testset "Factor Risk Budgetting" begin
-        pr = prior(EmpiricalPriorEstimator(), rd)
-        pr1 = prior(FactorPriorEstimator(), rd)
-        opt = JuMPOptimiser(; bgt = 1, sbgt = 1, wb = WeightBoundsResult(; lb = -1, ub = 1),
+        pr = prior(EmpiricalPrior(), rd)
+        pr1 = prior(FactorPrior(), rd)
+        opt = JuMPOptimiser(; bgt = 1, sbgt = 1, wb = WeightBounds(; lb = -1, ub = 1),
                             pe = pr, slv = slv)
         r = PortfolioOptimisers.factory(StandardDeviation(), pr)
-        rbe = RiskBudgetting(; alg = FactorRiskBudgettingAlgorithm(;), r = r, opt = opt)
+        rbe = RiskBudgetting(; alg = FactorRiskBudgetting(;), r = r, opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
                        [0.1605458602901386, 0.03779155180677548, -0.038618775320146445,
@@ -120,7 +120,7 @@
         lo, hi = extrema(rkc[1:10])
         @test isapprox(hi / lo, 1, rtol = 5e-4)
 
-        rbe = RiskBudgetting(; alg = FactorRiskBudgettingAlgorithm(; rkb = 1:10), r = r,
+        rbe = RiskBudgetting(; alg = FactorRiskBudgetting(; rkb = 1:10), r = r,
                              opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
@@ -141,7 +141,7 @@
         @test argmin(rkc[1:10]) == 1
         @test argmax(rkc[1:10]) == 10
 
-        rbe = RiskBudgetting(; alg = FactorRiskBudgettingAlgorithm(; rkb = 10:-1:1), r = r,
+        rbe = RiskBudgetting(; alg = FactorRiskBudgetting(; rkb = 10:-1:1), r = r,
                              opt = opt)
         w = optimise!(rbe, rd).w
         @test isapprox(w,
@@ -163,7 +163,7 @@
         @test argmax(rkc[1:10]) == 1
 
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.loadings,
                                                                  flag = false), r = r,
                              opt = opt)
         w = optimise!(rbe, rd).w
@@ -184,7 +184,7 @@
         @test isapprox(hi / lo, 1, rtol = 5e-4)
 
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.loadings,
                                                                  flag = false, rkb = 1:10),
                              r = r, opt = opt)
         w = optimise!(rbe, rd).w
@@ -207,7 +207,7 @@
         @test argmax(rkc[1:10]) == 10
 
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.loadings,
                                                                  flag = false,
                                                                  rkb = 10:-1:1), r = r,
                              opt = opt)
@@ -231,13 +231,13 @@
         @test argmax(rkc[1:10]) == 1
 
         rd1 = prices_to_returns(X, F)
-        pr = prior(EmpiricalPriorEstimator(), rd1)
-        pr1 = prior(FactorPriorEstimator(; re = DimensionReductionRegression()), rd1)
-        opt = JuMPOptimiser(; bgt = 1, sbgt = 1, wb = WeightBoundsResult(; lb = -1, ub = 1),
+        pr = prior(EmpiricalPrior(), rd1)
+        pr1 = prior(FactorPrior(; re = DimensionReductionRegression()), rd1)
+        opt = JuMPOptimiser(; bgt = 1, sbgt = 1, wb = WeightBounds(; lb = -1, ub = 1),
                             pe = pr, slv = slv)
         r = PortfolioOptimisers.factory(StandardDeviation(), pr)
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.loadings,
                                                                  flag = true), r = r,
                              opt = opt)
         w = optimise!(rbe, rd1).w
@@ -258,7 +258,7 @@
         @test isapprox(hi / lo, 6, rtol = 5e-3)
 
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.loadings,
                                                                  flag = true, rkb = 1:2:14),
                              r = r, opt = opt)
         w = optimise!(rbe, rd1).w
@@ -281,7 +281,7 @@
         @test argmax(rkc[1:7]) == 7
 
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgettingAlgorithm(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.loadings,
                                                                  rkb = [1, 2, 3, 10, 4, 5,
                                                                         6], flag = true),
                              r = r, opt = opt)

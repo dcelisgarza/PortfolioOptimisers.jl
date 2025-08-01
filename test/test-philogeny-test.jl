@@ -26,12 +26,12 @@
     F = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/factor_prices.csv"));
                   timestamp = :timestamp)
     rd = prices_to_returns(X[(end - 252):end], F[(end - 252):end])
-    pr = prior(FactorPriorEstimator(; re = DimensionReductionRegression()), rd)
+    pr = prior(FactorPrior(; re = DimensionReductionRegression()), rd)
     @testset "Clustering tests" begin
         X = pr.X
         clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
                                              de = Distance(; alg = CanonicalDistance()),
-                                             alg = HierarchicalClustering(),
+                                             alg = HClustAlgorithm(),
                                              onc = OptimalNumberClusters(;
                                                                          alg = SecondOrderDifference())),
                          X)
@@ -151,7 +151,7 @@
         clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
                                              de = DistanceDistance(;
                                                                    alg = CanonicalDistance()),
-                                             alg = HierarchicalClustering(),
+                                             alg = HClustAlgorithm(),
                                              onc = OptimalNumberClusters(;
                                                                          alg = StandardisedSilhouetteScore())),
                          X)
@@ -177,7 +177,7 @@
         df2 = CSV.read(joinpath(@__DIR__, "./assets/Average_Centrality.csv"), DataFrame)
         w = fill(inv(30), 30)
         for (i, ce) in enumerate(ces)
-            v1 = centrality_vector(CentralityEstimator(; cent = ce), X)
+            v1 = centrality_vector(Centrality(; cent = ce), X)
             res = isapprox(v1, df1[!, i])
             if !res
                 println("Iteration $i failed on default centrality algorithm.")
@@ -185,7 +185,7 @@
             end
             @test res
 
-            c = average_centrality(CentralityEstimator(; cent = ce), w, X)
+            c = average_centrality(Centrality(; cent = ce), w, X)
             res = isapprox(c, df2[i, 1])
             if !res
                 println("Iteration $i failed on default average centrality algorithm.")
@@ -198,7 +198,7 @@
         X = pr.X
         df = CSV.read(joinpath(@__DIR__, "./assets/Philogeny_Matrix_1.csv"), DataFrame)
         for i in 1:10
-            A = philogeny_matrix(NetworkEstimator(; n = i), X)
+            A = philogeny_matrix(Network(; n = i), X)
             res = isapprox(vec(A), df[!, i])
             if !res
                 println("Iteration $i failed on detault network estimator.")
@@ -209,7 +209,7 @@
 
         df = CSV.read(joinpath(@__DIR__, "./assets/Philogeny_Matrix_2.csv"), DataFrame)
         for i in 1:3
-            A = philogeny_matrix(NetworkEstimator(; n = i,
+            A = philogeny_matrix(Network(; n = i,
                                                   alg = MaximumDistanceSimilarity()), X)
             res = isapprox(vec(A), df[!, i])
             if !res
@@ -224,12 +224,12 @@
         @test isapprox(vec(A), df[!, 1])
 
         w = fill(inv(30), 30)
-        @test isapprox(asset_philogeny(NetworkEstimator(), w, X), 0.06444444444444444)
+        @test isapprox(asset_philogeny(Network(), w, X), 0.06444444444444444)
         @test isapprox(asset_philogeny(ClusteringEstimator(), w, X), 0.32888888888888984)
 
-        A1 = PortfolioOptimisers.calc_adjacency(NetworkEstimator(; alg = KruskalTree()), X)
-        A2 = PortfolioOptimisers.calc_adjacency(NetworkEstimator(; alg = BoruvkaTree()), X)
-        A3 = PortfolioOptimisers.calc_adjacency(NetworkEstimator(; alg = PrimTree()), X)
+        A1 = PortfolioOptimisers.calc_adjacency(Network(; alg = KruskalTree()), X)
+        A2 = PortfolioOptimisers.calc_adjacency(Network(; alg = BoruvkaTree()), X)
+        A3 = PortfolioOptimisers.calc_adjacency(Network(; alg = PrimTree()), X)
 
         @test A1 == A2
         @test A1 == A3

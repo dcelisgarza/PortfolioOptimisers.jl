@@ -8,14 +8,14 @@ All concrete types that implement positive definite matrix projection or estimat
 # Related
 
   - [`AbstractEstimator`](@ref)
-  - [`PosdefEstimator`](@ref)
+  - [`Posdef`](@ref)
   - [`posdef!`](@ref)
   - [`posdef`](@ref)
 """
 abstract type AbstractPosdefEstimator <: AbstractEstimator end
 
 """
-    struct PosdefEstimator{T1} <: AbstractPosdefEstimator
+    struct Posdef{T1} <: AbstractPosdefEstimator
         alg::T1
     end
 
@@ -27,9 +27,9 @@ A concrete estimator type for projecting a matrix to the nearest positive defini
 
 # Constructor
 
-    PosdefEstimator(; alg = NearestCorrelationMatrix.Newton)
+    Posdef(; alg = NearestCorrelationMatrix.Newton)
 
-Creates a new `PosdefEstimator` with the specified algorithm.
+Creates a new `Posdef` with the specified algorithm.
 
 # Related
 
@@ -37,13 +37,13 @@ Creates a new `PosdefEstimator` with the specified algorithm.
   - [`posdef!`](@ref)
   - [`posdef`](@ref)
 """
-struct PosdefEstimator{T1} <: AbstractPosdefEstimator
+struct Posdef{T1} <: AbstractPosdefEstimator
     alg::T1
 end
 """
-    PosdefEstimator(; alg = NearestCorrelationMatrix.Newton)
+    Posdef(; alg = NearestCorrelationMatrix.Newton)
 
-Constructor for [`PosdefEstimator`](@ref). Defaults to the [`NearestCorrelationMatrix.Newton`](https://github.com/adknudson/NearestCorrelationMatrix.jl) algorithm.
+Constructor for [`Posdef`](@ref). Defaults to the [`NearestCorrelationMatrix.Newton`](https://github.com/adknudson/NearestCorrelationMatrix.jl) algorithm.
 
 # Arguments
 
@@ -54,8 +54,8 @@ Constructor for [`PosdefEstimator`](@ref). Defaults to the [`NearestCorrelationM
 ```jldoctest
 julia> using LinearAlgebra
 
-julia> est = PosdefEstimator()
-PosdefEstimator
+julia> est = Posdef()
+Posdef
   alg | UnionAll: NearestCorrelationMatrix.Newton
 ```
 
@@ -65,27 +65,27 @@ PosdefEstimator
   - [`posdef!`](@ref)
   - [`posdef`](@ref)
 """
-function PosdefEstimator(; alg = NearestCorrelationMatrix.Newton)
-    return PosdefEstimator{typeof(alg)}(alg)
+function Posdef(; alg = NearestCorrelationMatrix.Newton)
+    return Posdef{typeof(alg)}(alg)
 end
 
 """
-    posdef!(method::PosdefEstimator, X::AbstractMatrix)
+    posdef!(method::Posdef, X::AbstractMatrix)
     posdef!(::Nothing, args...)
 
 In-place projection of a matrix to the nearest positive definite (PD) matrix using the specified estimator.
 
   - If `method` is `nothing`, this is a no-op and returns `nothing`.
-  - If `method` is a [`PosdefEstimator`](@ref), the algorithm specified in `method.alg` is used to project `X` to the nearest PD matrix. If `X` is already positive definite, it is left unchanged.
+  - If `method` is a [`Posdef`](@ref), the algorithm specified in `method.alg` is used to project `X` to the nearest PD matrix. If `X` is already positive definite, it is left unchanged.
 
 For covariance matrices, the function internally converts to a correlation matrix, applies the projection, and then rescales back to covariance.
 
 # Arguments
 
-  - `method::PosdefEstimator`: The estimator specifying the projection algorithm.
+  - `method::Posdef`: The estimator specifying the projection algorithm.
   - `X::AbstractMatrix`: The matrix to be projected in-place.
 
-# Returns
+# ReturnsResult
 
   - `nothing`. The input matrix `X` is modified in-place.
 
@@ -98,8 +98,8 @@ For covariance matrices, the function internally converts to a correlation matri
 ```jldoctest
 julia> using LinearAlgebra
 
-julia> est = PosdefEstimator()
-PosdefEstimator
+julia> est = Posdef()
+Posdef
   alg | UnionAll: NearestCorrelationMatrix.Newton
 
 julia> X = [1.0 0.9; 0.9 1.0];
@@ -120,12 +120,12 @@ true
 # Related
 
   - [`posdef`](@ref)
-  - [`PosdefEstimator`](@ref)
+  - [`Posdef`](@ref)
 """
 function posdef!(::Nothing, args...)
     return nothing
 end
-function posdef!(method::PosdefEstimator, X::AbstractMatrix)
+function posdef!(method::Posdef, X::AbstractMatrix)
     if isposdef(X)
         return nothing
     end
@@ -147,7 +147,7 @@ function posdef!(method::PosdefEstimator, X::AbstractMatrix)
 end
 
 """
-    posdef(method::PosdefEstimator, X::AbstractMatrix)
+    posdef(method::Posdef, X::AbstractMatrix)
     posdef(::Nothing, args...)
 
 Same as [`posdef!`](@ref), but returns a new matrix instead of modifying `X` in-place.
@@ -159,7 +159,7 @@ Same as [`posdef!`](@ref), but returns a new matrix instead of modifying `X` in-
 ```jldoctest
 julia> using LinearAlgebra
 
-julia> est = PosdefEstimator();
+julia> est = Posdef();
 
 julia> X = [1.0 2.0; 0.9 1.0];  # Not PD
 
@@ -177,15 +177,15 @@ julia> X_pd
 # Related
 
   - [`posdef!`](@ref)
-  - [`PosdefEstimator`](@ref)
+  - [`Posdef`](@ref)
 """
 function posdef(::Nothing, args...)
     return nothing
 end
-function posdef(method::PosdefEstimator, X::AbstractMatrix)
+function posdef(method::Posdef, X::AbstractMatrix)
     X = copy(X)
     posdef!(method, X)
     return X
 end
 
-export PosdefEstimator, posdef, posdef!
+export Posdef, posdef, posdef!

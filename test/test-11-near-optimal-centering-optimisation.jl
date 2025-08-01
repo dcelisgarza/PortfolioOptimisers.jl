@@ -121,7 +121,7 @@
                                                                                                    ub = Frontier(;
                                                                                                                  N = 5))),
                                               obj = MaximumReturn(), opt = opt,
-                                              alg = ConstrainedNearOptimalCenteringAlgorithm()))
+                                              alg = ConstrainedNearOptimalCentering()))
         res2 = optimise!(NearOptimalCentering(;
                                               r = StandardDeviation(;
                                                                     settings = RiskMeasureSettings(;
@@ -130,7 +130,7 @@
                                                                                                               stop = rk_max,
                                                                                                               length = 5))),
                                               obj = MaximumReturn(), opt = opt,
-                                              alg = ConstrainedNearOptimalCenteringAlgorithm()))
+                                              alg = ConstrainedNearOptimalCentering()))
         @test all(isapprox.(res1.w, res2.w))
         success = isapprox(Matrix(df), hcat(res1.w...); rtol = 5e-5)
         if !success
@@ -143,13 +143,13 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
         res3 = optimise!(NearOptimalCentering(; r = StandardDeviation(), opt = opt,
-                                              alg = ConstrainedNearOptimalCenteringAlgorithm()))
+                                              alg = ConstrainedNearOptimalCentering()))
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             ret = ArithmeticReturn(;
                                                    lb = range(; start = rt_min,
                                                               stop = rt_max, length = 5)))
         res4 = optimise!(NearOptimalCentering(; r = StandardDeviation(), opt = opt,
-                                              alg = ConstrainedNearOptimalCenteringAlgorithm()))
+                                              alg = ConstrainedNearOptimalCentering()))
         @test all(isapprox.(res3.w, res4.w))
         success = isapprox(Matrix(df), hcat(res3.w...); rtol = 1e-4)
         if !success

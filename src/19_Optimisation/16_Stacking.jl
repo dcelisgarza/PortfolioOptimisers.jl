@@ -1,9 +1,9 @@
 abstract type BaseStackingOptimisationEstimator <: OptimisationEstimator end
-struct StackingResult{T1 <: Type, T2 <: AbstractPriorResult,
-                      T3 <: Union{Nothing, <:WeightBoundsResult},
-                      T4 <: AbstractVector{<:OptimisationResult}, T5 <: OptimisationResult,
-                      T6 <: OptimisationReturnCode, T7 <: AbstractVector} <:
-       OptimisationResult
+struct StackingOptimisation{T1 <: Type, T2 <: AbstractPriorResult,
+                            T3 <: Union{Nothing, <:WeightBounds},
+                            T4 <: AbstractVector{<:OptimisationResult},
+                            T5 <: OptimisationResult, T6 <: OptimisationReturnCode,
+                            T7 <: AbstractVector} <: OptimisationResult
     oe::T1
     pr::T2
     wb::T3
@@ -13,11 +13,11 @@ struct StackingResult{T1 <: Type, T2 <: AbstractPriorResult,
     w::T7
 end
 struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                T2 <: Union{Nothing, <:WeightBoundsResult, <:AbstractString, Expr,
+                T2 <: Union{Nothing, <:WeightBounds, <:AbstractString, Expr,
                             <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
                             <:AbstractVector{<:Union{<:AbstractString, Expr}},
                   #! Start: to delete
-                            <:WeightBoundsConstraint
+                            <:WeightBoundsEstimator
                   #! End: to delete
                   }, T3 <: Union{Nothing, <:AssetSets,
                        #! Start: to delete
@@ -27,7 +27,7 @@ struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
                 T4 <: Union{<:OptimisationResult, <:OptimisationEstimator,
                             <:AbstractVector{<:Union{<:OptimisationEstimator,
                                                      <:OptimisationResult}}},
-                T5 <: OptimisationEstimator, T6 <: ClusteringWeightFinaliser, T7 <: Bool,
+                T5 <: OptimisationEstimator, T6 <: WeightFinaliser, T7 <: Bool,
                 T8 <: FLoops.Transducers.Executor} <: BaseStackingOptimisationEstimator
     pe::T1
     wb::T2
@@ -50,12 +50,12 @@ function assert_internal_optimiser(opt::Stacking)
     return nothing
 end
 function Stacking(;
-                  pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
-                  wb::Union{Nothing, <:WeightBoundsResult, <:AbstractString, Expr,
+                  pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
+                  wb::Union{Nothing, <:WeightBounds, <:AbstractString, Expr,
                             <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
                             <:AbstractVector{<:Union{<:AbstractString, Expr}},
                             #! Start: to delete
-                            <:WeightBoundsConstraint
+                            <:WeightBoundsEstimator
                             #! End: to delete
                             } = nothing,
                   sets::Union{Nothing, <:AssetSets,
@@ -66,10 +66,10 @@ function Stacking(;
                   opti::AbstractVector{<:Union{<:OptimisationEstimator,
                                                <:OptimisationResult}} = [MeanRisk()],
                   opto::OptimisationEstimator = MeanRisk(),
-                  cwf::ClusteringWeightFinaliser = IterativeClusteringWeightFiniliser(),
-                  strict::Bool = false, threads::FLoops.Transducers.Executor = ThreadedEx())
+                  cwf::WeightFinaliser = IterativeWeightFiniliser(), strict::Bool = false,
+                  threads::FLoops.Transducers.Executor = ThreadedEx())
     assert_external_optimiser(opto)
-    if isa(wb, WeightBoundsConstraint)
+    if isa(wb, WeightBoundsEstimator)
         @smart_assert(!isnothing(sets))
     end
     return Stacking{typeof(pe), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
@@ -107,7 +107,7 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
                      str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.cwf, st.strict, resi,
                                                  reso, wi * reso.w; datatype = eltype(pr.X))
-    return StackingResult(typeof(st), pr, wb, resi, reso, retcode, w)
+    return StackingOptimisation(typeof(st), pr, wb, resi, reso, retcode, w)
 end
 
-export StackingResult, Stacking
+export StackingOptimisation, Stacking

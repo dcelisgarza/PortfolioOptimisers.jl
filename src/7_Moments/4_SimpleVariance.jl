@@ -53,7 +53,7 @@ This constructor creates a `SimpleVariance` object using the specified expected 
   - `w::Union{Nothing, <:AbstractWeights}`: Optional observation weights. If `nothing`, the estimator is unweighted.
   - `corrected::Bool`: Whether to apply Bessel's correction.
 
-# Returns
+# ReturnsResult
 
   - `SimpleVariance`: A variance estimator configured with the specified mean estimator, weights, and bias correction flag.
 
@@ -120,7 +120,7 @@ This method computes the standard deviation of the input array `X` using the con
   - `mean`: Optional mean value or vector for centering. If not provided, estimated using `ve.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
-# Returns
+# ReturnsResult
 
   - Standard deviation of `X`, computed according to the estimator configuration.
 
@@ -173,7 +173,7 @@ This method computes the standard deviation of the input vector `X` using the co
   - `X::AbstractVector`: Data vector for which to compute the standard deviation.
   - `mean`: Optional mean value for centering. If not provided, the default mean is used.
 
-# Returns
+# ReturnsResult
 
   - Standard deviation of `X`, computed according to the estimator configuration.
 
@@ -238,7 +238,7 @@ This method computes the variance of the input array `X` using the configuration
   - `mean`: Optional mean value or vector for centering. If not provided, estimated using `ve.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
-# Returns
+# ReturnsResult
 
   - Variance of `X`, computed according to the estimator configuration.
 
@@ -289,7 +289,7 @@ This method computes the variance of the input vector `X` using the configuratio
   - `X::AbstractVector`: Data vector for which to compute the variance.
   - `mean`: Optional mean value for centering. If not provided, the default mean is used.
 
-# Returns
+# ReturnsResult
 
   - Variance of `X`, computed according to the estimator configuration.
 

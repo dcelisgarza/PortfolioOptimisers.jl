@@ -12,12 +12,10 @@ end
 function bootstrap_func(::MovingBootstrap, block_size, X, seed)
     return pyimport("arch.bootstrap").MovingBlockBootstrap(block_size, X; seed = seed)
 end
-struct ARCHUncertaintySetEstimator{T1 <: AbstractPriorEstimator,
-                                   T2 <: AbstractUncertaintySetAlgorithm, T3 <: Integer,
-                                   T4 <: Integer, T5 <: Real,
-                                   T6 <: Union{Nothing, <:Integer},
-                                   T7 <: ARCHBootstrapSet} <:
-       BootsrapUncertaintySetEstimator
+struct ARCHUncertaintySet{T1 <: AbstractPriorEstimator,
+                          T2 <: AbstractUncertaintySetAlgorithm, T3 <: Integer,
+                          T4 <: Integer, T5 <: Real, T6 <: Union{Nothing, <:Integer},
+                          T7 <: ARCHBootstrapSet} <: BootsrapUncertaintySetEstimator
     pe::T1
     alg::T2
     n_sim::T3
@@ -26,22 +24,20 @@ struct ARCHUncertaintySetEstimator{T1 <: AbstractPriorEstimator,
     seed::T6
     bootstrap::T7
 end
-function ARCHUncertaintySetEstimator(;
-                                     pe::AbstractPriorEstimator = EmpiricalPriorEstimator(),
-                                     alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
-                                     n_sim::Integer = 3_000, block_size::Integer = 3,
-                                     q::Real = 0.05,
-                                     seed::Union{Nothing, <:Integer} = nothing,
-                                     bootstrap::ARCHBootstrapSet = StationaryBootstrap())
+function ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
+                            alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
+                            n_sim::Integer = 3_000, block_size::Integer = 3, q::Real = 0.05,
+                            seed::Union{Nothing, <:Integer} = nothing,
+                            bootstrap::ARCHBootstrapSet = StationaryBootstrap())
     @smart_assert(n_sim > zero(n_sim))
     @smart_assert(block_size > zero(block_size))
     @smart_assert(zero(q) < q < one(q))
-    return ARCHUncertaintySetEstimator{typeof(pe), typeof(alg), typeof(n_sim),
-                                       typeof(block_size), typeof(q), typeof(seed),
-                                       typeof(bootstrap)}(pe, alg, n_sim, block_size, q,
-                                                          seed, bootstrap)
+    return ARCHUncertaintySet{typeof(pe), typeof(alg), typeof(n_sim), typeof(block_size),
+                              typeof(q), typeof(seed), typeof(bootstrap)}(pe, alg, n_sim,
+                                                                          block_size, q,
+                                                                          seed, bootstrap)
 end
-function bootstrap_generator(ue::ARCHUncertaintySetEstimator, X::AbstractMatrix; kwargs...)
+function bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
@@ -53,8 +49,7 @@ function bootstrap_generator(ue::ARCHUncertaintySetEstimator, X::AbstractMatrix;
     end
     return mus, sigmas
 end
-function mu_bootstrap_generator(ue::ARCHUncertaintySetEstimator, X::AbstractMatrix;
-                                kwargs...)
+function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
@@ -64,8 +59,7 @@ function mu_bootstrap_generator(ue::ARCHUncertaintySetEstimator, X::AbstractMatr
     end
     return mus
 end
-function sigma_bootstrap_generator(ue::ARCHUncertaintySetEstimator, X::AbstractMatrix;
-                                   kwargs...)
+function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
     gen = bootstrap_func(ue.bootstrap, ue.block_size, Py(X).to_numpy(), ue.seed)
     for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
@@ -75,9 +69,9 @@ function sigma_bootstrap_generator(ue::ARCHUncertaintySetEstimator, X::AbstractM
     end
     return sigmas
 end
-function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm, <:Any,
-                                             <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
-             args...; dims::Int = 1, kwargs...)
+function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+                                    <:Any, <:Any, <:Any}, X::AbstractMatrix, args...;
+             dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus, sigmas = bootstrap_generator(ue, pr.X; kwargs...)
@@ -96,12 +90,12 @@ function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm
             sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
         end
     end
-    return BoxUncertaintySetResult(; lb = mu_l, ub = mu_u),
-           BoxUncertaintySetResult(; lb = sigma_l, ub = sigma_u)
+    return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
+           BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
-function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm, <:Any,
-                                                <:Any, <:Any, <:Any, <:Any},
-                X::AbstractMatrix, args...; dims::Int = 1, kwargs...)
+function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any}, X::AbstractMatrix, args...;
+                dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus = mu_bootstrap_generator(ue, pr.X; kwargs...)
@@ -113,11 +107,11 @@ function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgori
         mu_l[j] = quantile(mu_j, q)
         mu_u[j] = quantile(mu_j, one(q) - q)
     end
-    return BoxUncertaintySetResult(; lb = mu_l, ub = mu_u)
+    return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
-function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlgorithm,
-                                                   <:Any, <:Any, <:Any, <:Any, <:Any},
-                   X::AbstractMatrix, args...; dims::Int = 1, kwargs...)
+function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+                                          <:Any, <:Any, <:Any}, X::AbstractMatrix, args...;
+                   dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
     N = size(pr.X, 2)
     sigmas = sigma_bootstrap_generator(ue, pr.X; kwargs...)
@@ -131,11 +125,11 @@ function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:BoxUncertaintySetAlg
             sigma_u[j, i] = sigma_u[i, j] = quantile(sigma_ij, one(q) - q)
         end
     end
-    return BoxUncertaintySetResult(; lb = sigma_l, ub = sigma_u)
+    return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
-function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
-                                             <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
-             args...; dims::Int = 1, kwargs...)
+function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any, <:Any,
+                                    <:Any, <:Any, <:Any}, X::AbstractMatrix, args...;
+             dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus, sigmas = bootstrap_generator(ue, pr.X; kwargs...)
@@ -154,14 +148,14 @@ function ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgor
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu,
-                                       class = MuEllipseUncertaintySetResult()),
-           EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma,
-                                       class = SigmaEllipseUncertaintySetResult())
+    return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
+                                 class = MuEllipseUncertaintySet()),
+           EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
+                                 class = SigmaEllipseUncertaintySet())
 end
-function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgorithm,
-                                                <:Any, <:Any, <:Any, <:Any, <:Any},
-                X::AbstractMatrix, args...; dims::Int = 1, kwargs...)
+function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
+                                       <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
+                args...; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus = mu_bootstrap_generator(ue, pr.X; kwargs...)
@@ -176,12 +170,12 @@ function mu_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAl
         cov(ue.pe.ce, X_mu)
     end
     k_mu = k_ucs(ue.alg.method, ue.q, X_mu, sigma_mu)
-    return EllipseUncertaintySetResult(; sigma = sigma_mu, k = k_mu,
-                                       class = MuEllipseUncertaintySetResult())
+    return EllipseUncertaintySet(; sigma = sigma_mu, k = k_mu,
+                                 class = MuEllipseUncertaintySet())
 end
-function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySetAlgorithm,
-                                                   <:Any, <:Any, <:Any, <:Any, <:Any},
-                   X::AbstractMatrix, args...; dims::Int = 1, kwargs...)
+function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
+                                          <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
+                   args...; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
     N = size(pr.X, 2)
     sigmas = sigma_bootstrap_generator(ue, pr.X; kwargs...)
@@ -196,8 +190,8 @@ function sigma_ucs(ue::ARCHUncertaintySetEstimator{<:Any, <:EllipseUncertaintySe
         cov(ue.pe.ce, X_sigma)
     end
     k_sigma = k_ucs(ue.alg.method, ue.q, X_sigma, sigma_sigma)
-    return EllipseUncertaintySetResult(; sigma = sigma_sigma, k = k_sigma,
-                                       class = SigmaEllipseUncertaintySetResult())
+    return EllipseUncertaintySet(; sigma = sigma_sigma, k = k_sigma,
+                                 class = SigmaEllipseUncertaintySet())
 end
 
-export StationaryBootstrap, CircularBootstrap, MovingBootstrap, ARCHUncertaintySetEstimator
+export StationaryBootstrap, CircularBootstrap, MovingBootstrap, ARCHUncertaintySet

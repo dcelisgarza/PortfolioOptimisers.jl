@@ -171,9 +171,9 @@
         @test ub == fill(Inf, 5)
 
         wb = weight_bounds_constraints(nothing)
-        @test WeightBoundsResult(-Inf, Inf) == wb
+        @test WeightBounds(-Inf, Inf) == wb
 
-        wb = WeightBoundsResult(; lb = 0.5, ub = 0.7)
+        wb = WeightBounds(; lb = 0.5, ub = 0.7)
         (; lb, ub) = wb
         @test lb == 0.5
         @test ub == 0.7
@@ -185,39 +185,39 @@
         @test lb == range(; start = 0.5, stop = 0.5, length = 5)
         @test ub == range(; start = 0.7, stop = 0.7, length = 5)
 
-        wb = WeightBoundsResult(; lb = 0.5, ub = [0.7])
+        wb = WeightBounds(; lb = 0.5, ub = [0.7])
         @test wb.lb == 0.5
         @test wb.ub == [0.7]
 
-        wb = WeightBoundsResult(; lb = [0.5], ub = 0.7)
+        wb = WeightBounds(; lb = [0.5], ub = 0.7)
         @test wb.lb == [0.5]
         @test wb.ub == 0.7
 
-        wb = WeightBoundsResult(; lb = nothing, ub = [0.7])
+        wb = WeightBounds(; lb = nothing, ub = [0.7])
         @test isnothing(wb.lb)
         @test wb.ub == [0.7]
         wb = weight_bounds_constraints(wb; N = 1)
         @test all(wb.lb .== -Inf)
 
-        wb = WeightBoundsResult(; lb = [0.5], ub = nothing)
+        wb = WeightBounds(; lb = [0.5], ub = nothing)
         @test wb.lb == [0.5]
         @test isnothing(wb.ub)
         wb = weight_bounds_constraints(wb; N = 1)
         @test all(wb.ub .== Inf)
 
-        wb = WeightBoundsResult(; lb = nothing, ub = [0.7])
+        wb = WeightBounds(; lb = nothing, ub = [0.7])
         @test isnothing(wb.lb)
         @test wb.ub == [0.7]
 
-        wb = WeightBoundsResult(; lb = nothing, ub = 0.7)
+        wb = WeightBounds(; lb = nothing, ub = 0.7)
         @test isnothing(wb.lb)
         @test wb.ub == 0.7
 
-        wb = WeightBoundsResult(; lb = [0.5], ub = nothing)
+        wb = WeightBounds(; lb = [0.5], ub = nothing)
         @test wb.lb == [0.5]
         @test isnothing(wb.ub)
 
-        wb = WeightBoundsResult(; lb = 0.5, ub = nothing)
+        wb = WeightBounds(; lb = 0.5, ub = nothing)
         @test wb.lb == 0.5
         @test isnothing(wb.ub)
     end
@@ -272,34 +272,34 @@
         rng = StableRNG(123456789)
         X = randn(rng, 100, 20)
 
-        plc = SemiDefinitePhilogenyConstraintEstimator(; pe = NetworkEstimator(), p = 0.1)
+        plc = SemiDefinitePhilogenyEstimator(; pe = Network(), p = 0.1)
         res = philogeny_constraints(plc, X)
         @test res === philogeny_constraints(res)
-        @test isapprox(res.A, philogeny_matrix(NetworkEstimator(), X))
+        @test isapprox(res.A, philogeny_matrix(Network(), X))
         @test res.p == 0.1
 
-        plc = SemiDefinitePhilogenyConstraintEstimator(; pe = ClusteringEstimator(),
+        plc = SemiDefinitePhilogenyEstimator(; pe = ClusteringEstimator(),
                                                        p = 0.15)
         res = philogeny_constraints(plc, X)
         @test res === philogeny_constraints(res)
         @test isapprox(res.A, philogeny_matrix(ClusteringEstimator(), X))
         @test res.p == 0.15
 
-        plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = 2)
+        plc = IntegerPhilogenyEstimator(; pe = Network(), B = 2)
         res = philogeny_constraints(plc, X)
         @test res === philogeny_constraints(res)
-        @test isapprox(res.A, philogeny_matrix(NetworkEstimator(), X) + I)
+        @test isapprox(res.A, philogeny_matrix(Network(), X) + I)
         @test res.B == 2
         @test isapprox(res.scale, 1e5)
 
         B = fill(1, 20)
-        plc = IntegerPhilogenyConstraintEstimator(; pe = NetworkEstimator(), B = B)
+        plc = IntegerPhilogenyEstimator(; pe = Network(), B = B)
         res = philogeny_constraints(plc, X)
         @test res === philogeny_constraints(res)
-        @test isapprox(res.A, philogeny_matrix(NetworkEstimator(), X) + I)
+        @test isapprox(res.A, philogeny_matrix(Network(), X) + I)
         @test res.B === B
 
-        plc = IntegerPhilogenyConstraintEstimator(; pe = ClusteringEstimator(), scale = 1e3)
+        plc = IntegerPhilogenyEstimator(; pe = ClusteringEstimator(), scale = 1e3)
         res = philogeny_constraints(plc, X)
         @test res === philogeny_constraints(res)
         @test isapprox(res.A,
@@ -307,7 +307,7 @@
         @test res.B == 1
         @test res.scale == 1e3
 
-        plc = IntegerPhilogenyConstraintEstimator(;
+        plc = IntegerPhilogenyEstimator(;
                                                   pe = ClusteringEstimator(;
                                                                            onc = OptimalNumberClusters(;
                                                                                                        max_k = 2)),
@@ -323,7 +323,7 @@
                                                              alg = PredefinedNumberClusters(;
                                                                                             k = 3),
                                                              max_k = 4))
-        plc = IntegerPhilogenyConstraintEstimator(; pe = pe, B = [3, 5, 4])
+        plc = IntegerPhilogenyEstimator(; pe = pe, B = [3, 5, 4])
         res = philogeny_constraints(plc, X)
         @test res === philogeny_constraints(res)
         @test isapprox(res.A, unique(philogeny_matrix(pe, X) + I; dims = 1))
@@ -334,16 +334,16 @@
     @testset "Centrality constraints" begin
         rng = StableRNG(123456789)
         X = randn(rng, 100, 20)
-        ces = [CentralityEstimator(), CentralityEstimator(; cent = EigenvectorCentrality()),
-               CentralityEstimator(; cent = ClosenessCentrality()),
-               CentralityEstimator(; cent = StressCentrality()),
-               CentralityEstimator(; cent = RadialityCentrality())]
+        ces = [Centrality(), Centrality(; cent = EigenvectorCentrality()),
+               Centrality(; cent = ClosenessCentrality()),
+               Centrality(; cent = StressCentrality()),
+               Centrality(; cent = RadialityCentrality())]
 
-        ce1 = CentralityConstraintEstimator(; A = ces[1], B = MinValue(), comp = GEQ())
-        ce2 = CentralityConstraintEstimator(; A = ces[2], B = MeanValue(), comp = LEQ())
-        ce3 = CentralityConstraintEstimator(; A = ces[3], B = MedianValue(), comp = EQ())
-        ce4 = CentralityConstraintEstimator(; A = ces[4], B = 50, comp = EQ())
-        ce5 = CentralityConstraintEstimator(; A = ces[5], B = MaxValue(), comp = LEQ())
+        ce1 = CentralityEstimator(; A = ces[1], B = MinValue(), comp = GEQ())
+        ce2 = CentralityEstimator(; A = ces[2], B = MeanValue(), comp = LEQ())
+        ce3 = CentralityEstimator(; A = ces[3], B = MedianValue(), comp = EQ())
+        ce4 = CentralityEstimator(; A = ces[4], B = 50, comp = EQ())
+        ce5 = CentralityEstimator(; A = ces[5], B = MaxValue(), comp = LEQ())
         ccs = [ce1, ce2, ce3, ce4, ce5]
         lcs = centrality_constraints(ccs, X)
         lcs2 = centrality_constraints(lcs, X)
@@ -393,54 +393,54 @@ end
 #=
    assets = 1:10
    sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
-   constr = [LinearConstraint(; A = LinearConstraintSide(; group = :Assets, name = 1),
+   constr = [LinearConstraintEstimator(; A = LinearConstraintSide(; group = :Assets, name = 1),
                               B = 0.35, comp = EQ()),
-             LinearConstraint(;
+             LinearConstraintEstimator(;
                               A = LinearConstraintSide(; group = [:Assets, :Assets, :Assets],
                                                        name = [1, 1, 3], coef = [1, -0, -0.3]),
                               B = 0.25, comp = LEQ()),
-             LinearConstraint(; A = LinearConstraintSide(; group = :Assets, name = 5), B = 0.5,
+             LinearConstraintEstimator(; A = LinearConstraintSide(; group = :Assets, name = 5), B = 0.5,
                               comp = EQ()),
-             LinearConstraint(;
+             LinearConstraintEstimator(;
                               A = LinearConstraintSide(; group = [:Clusters, :Clusters],
                                                        name = [3, 2], coef = [2, -3]),
                               comp = GEQ()),
-             LinearConstraint(;
+             LinearConstraintEstimator(;
                               A = LinearConstraintSide(;
                                                        group = [:Clusters, :Clusters,
                                                                 :Clusters], name = [1, 3, 2],
                                                        coef = [-1, 2, -3]), B = -0.1,
                               comp = LEQ()),
-             LinearConstraint(;
+             LinearConstraintEstimator(;
                               A = LinearConstraintSide(; group = fill(:Assets, 20),
                                                        name = [assets; assets],
                                                        coef = [-loadings.MTUM;
                                                                loadings.QUAL]), B = 0.9,
                               comp = GEQ()),
-             LinearConstraint(;
+             LinearConstraintEstimator(;
                               A = LinearConstraintSide(; group = [:Clusters, :Assets],
                                                        name = [2, 7], coef = -[1, 1]), B = 0.7,
                               comp = EQ()),
-             LinearConstraint(;
+             LinearConstraintEstimator(;
                               A = LinearConstraintSide(; group = :Assets, name = 1, coef = 1),
                               B = 4, comp = EQ()),
-             LinearConstraint(;
+             LinearConstraintEstimator(;
                               A = LinearConstraintSide(; group = [:Assets, :Assets, :Assets],
                                                        name = [1, 1, 3], coef = [1, -1, 1]),
                               B = 5, comp = LEQ()),
-             LinearConstraint(; A = LinearConstraintSide(; group = :Assets, name = 5), B = 7,
+             LinearConstraintEstimator(; A = LinearConstraintSide(; group = :Assets, name = 5), B = 7,
                               comp = EQ()),
-             LinearConstraint(;
+             LinearConstraintEstimator(;
                               A = LinearConstraintSide(; group = [:Clusters, :Clusters],
                                                        name = [3, 2], coef = [1, -1]), B = 3,
                               comp = GEQ()),
-             LinearConstraint(;
+             LinearConstraintEstimator(;
                               A = LinearConstraintSide(;
                                                        group = [:Clusters, :Clusters,
                                                                 :Clusters], name = [1, 3, 2],
                                                        coef = -[1, 1, -1]), B = 7,
                               comp = LEQ()),
-             LinearConstraint(;
+             LinearConstraintEstimator(;
                               A = LinearConstraintSide(; group = [:Clusters, :Assets],
                                                        name = [2, 7], coef = [-1, -1]), B = 8,
                               comp = EQ())]
@@ -455,13 +455,13 @@ end
    @test A_eq === constr_result.A_eq
    @test B_eq === constr_result.B_eq
 
-   @test isnothing(linear_constraints(LinearConstraint(;
+   @test isnothing(linear_constraints(LinearConstraintEstimator(;
                                                        A = LinearConstraintSide(;
                                                                                 group = nothing,
                                                                                 name = nothing)),
                                       sets))
 
-   @test isnothing(linear_constraints(LinearConstraint(;
+   @test isnothing(linear_constraints(LinearConstraintEstimator(;
                                                        A = LinearConstraintSide(;
                                                                                 group = [:Foo],
                                                                                 name = [20],
@@ -474,11 +474,11 @@ end
    @test isnothing(lcs.name[1])
 
    lhs_1 = LinearConstraintSide(; group = :Asset, name = 1)
-   constr = LinearConstraint(; A = lhs_1, B = 0.35, comp = EQ())
+   constr = LinearConstraintEstimator(; A = lhs_1, B = 0.35, comp = EQ())
    @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
 
    lhs_1 = LinearConstraintSide(; group = [:Asset, :Foo], name = [1, :Bar], coef = [1, -1])
-   constr = LinearConstraint(; A = lhs_1, B = 0.35, comp = EQ())
+   constr = LinearConstraintEstimator(; A = lhs_1, B = 0.35, comp = EQ())
    @test_throws ArgumentError linear_constraints(constr, sets, strict = true)
    @test isnothing(linear_constraints(nothing))
 
@@ -581,7 +581,7 @@ constr = CardinalityConstraint(; A = lhs_1, B = 9, comp = EQ())
 assets = 1:10
 sets = DataFrame(; Assets = assets, Clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
 
-hcc_1 = WeightBoundsConstraint(; group = :Assets, name = 1, lb = 0.7, ub = 0.8)
+hcc_1 = WeightBoundsEstimator(; group = :Assets, name = 1, lb = 0.7, ub = 0.8)
 wb_result = weight_bounds_constraints(hcc_1, sets)
 wb_result2 = weight_bounds_constraints(wb_result, sets)
 @test wb_result === wb_result2
@@ -589,44 +589,44 @@ wb_result2 = weight_bounds_constraints(wb_result, sets)
 @test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 @test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
-hcc_2 = WeightBoundsConstraint(; group = [:Assets, :Assets], name = [1, 5], lb = [0.7, 0.3],
+hcc_2 = WeightBoundsEstimator(; group = [:Assets, :Assets], name = [1, 5], lb = [0.7, 0.3],
                                ub = [0.8, 0.6])
 (; lb, ub) = weight_bounds_constraints(hcc_2, sets)
 @test isapprox(lb, [0.7, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0])
 @test isapprox(ub, [0.8, 1.0, 1.0, 1.0, 0.6, 1.0, 1.0, 1.0, 1.0, 1.0])
 
-hcc_3 = WeightBoundsConstraint(; group = :Clusters, name = 3, lb = 0.2, ub = 0.5)
+hcc_3 = WeightBoundsEstimator(; group = :Clusters, name = 3, lb = 0.2, ub = 0.5)
 (; lb, ub) = weight_bounds_constraints(hcc_3, sets)
 @test isapprox(lb, [0.0, 0.0, 0.2, 0.0, 0.2, 0.0, 0.0, 0.0, 0.2, 0.2])
 @test isapprox(ub, [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 1.0, 0.5, 0.5])
 
-hcc_4 = WeightBoundsConstraint(; group = :Assets, name = 1, lb = nothing, ub = nothing)
+hcc_4 = WeightBoundsEstimator(; group = :Assets, name = 1, lb = nothing, ub = nothing)
 (; lb, ub) = weight_bounds_constraints(hcc_4, sets; strict = true)
 @test isapprox(lb, [-Inf, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 @test isapprox(ub, [Inf, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
-@test_throws UndefKeywordError WeightBoundsConstraint(group = :Asset)
-hcc = WeightBoundsConstraint(; group = nothing, name = nothing)
+@test_throws UndefKeywordError WeightBoundsEstimator(group = :Asset)
+hcc = WeightBoundsEstimator(; group = nothing, name = nothing)
 @test isnothing(hcc.group)
 @test isnothing(hcc.name)
 
-@test_throws UndefKeywordError WeightBoundsConstraint(; group = [nothing], ub = [2],
+@test_throws UndefKeywordError WeightBoundsEstimator(; group = [nothing], ub = [2],
                                                       lb = [1])
-lcs = WeightBoundsConstraint(; group = [nothing], name = [nothing], ub = [5], lb = [3])
+lcs = WeightBoundsEstimator(; group = [nothing], name = [nothing], ub = [5], lb = [3])
 @test isnothing(lcs.group[1])
 @test isnothing(lcs.name[1])
 
-hcc_1 = WeightBoundsConstraint(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
+hcc_1 = WeightBoundsEstimator(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
 @test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
 
-hcc_1 = WeightBoundsConstraint(; group = [:Foo], name = [:Bar], lb = [0.7], ub = [0.8])
+hcc_1 = WeightBoundsEstimator(; group = [:Foo], name = [:Bar], lb = [0.7], ub = [0.8])
 @test_throws ArgumentError weight_bounds_constraints(hcc_1, sets; strict = true)
 
 (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
 @test all(iszero, lb)
 @test all(isone, ub)
 
-hcc_1 = WeightBoundsConstraint(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
+hcc_1 = WeightBoundsEstimator(; group = :Foo, name = :Bar, lb = 0.7, ub = 0.8)
 (; lb, ub) = weight_bounds_constraints(hcc_1, sets)
 @test all(iszero, lb)
 @test all(isone, ub)

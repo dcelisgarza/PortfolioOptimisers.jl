@@ -80,7 +80,7 @@ This function attempts to compute the weighted covariance matrix using the provi
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cov`.
 
-# Returns
+# ReturnsResult
 
   - Covariance matrix as computed by the estimator and optional weights.
 
@@ -122,7 +122,7 @@ This function attempts to compute the weighted correlation matrix using the prov
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cor`.
 
-# Returns
+# ReturnsResult
 
   - Correlation matrix as computed by the estimator and optional weights.
 

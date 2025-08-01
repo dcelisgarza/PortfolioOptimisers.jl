@@ -98,18 +98,18 @@ function sdp_rc_variance_flag!(::JuMP.Model,
 end
 function sdp_rc_variance_flag!(::JuMP.Model,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
-                                       <:RiskBudgetting}, ::LinearConstraintResult)
+                                       <:RiskBudgetting}, ::LinearConstraint)
     return true
 end
 function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
-                            cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                        <:IntegerPhilogenyResult},
-                            nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                        <:IntegerPhilogenyResult})
+                            cplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                        <:IntegerPhilogeny},
+                            nplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                        <:IntegerPhilogeny})
     return if rc_flag ||
               haskey(model, :rc_variance) ||
-              isa(cplg, SemiDefinitePhilogenyResult) ||
-              isa(nplg, SemiDefinitePhilogenyResult)
+              isa(cplg, SemiDefinitePhilogeny) ||
+              isa(nplg, SemiDefinitePhilogeny)
         true
     else
         false
@@ -185,7 +185,7 @@ end
 function rc_variance_constraints!(args...)
     return nothing
 end
-function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstraintResult,
+function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstraint,
                                   variance_risk::AbstractJuMPScalar)
     sigma_W = model[Symbol(:sigma_W_, i)]
     sc = model[:sc]
@@ -210,10 +210,9 @@ end
 function set_risk!(model::JuMP.Model, i::Any, r::Variance,
                    opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgetting},
                    pr::AbstractPriorResult,
-                   cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                               <:IntegerPhilogenyResult},
-                   nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                               <:IntegerPhilogenyResult}, args...; w_key::Symbol = :w,
+                   cplg::Union{Nothing, <:SemiDefinitePhilogeny, <:IntegerPhilogeny},
+                   nplg::Union{Nothing, <:SemiDefinitePhilogeny, <:IntegerPhilogeny},
+                   args...; w_key::Symbol = :w,
                    W_key::Symbol = isa(i, Integer) ? :W : Symbol(:W_, i), kwargs...)
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
@@ -227,10 +226,10 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgetting}, pr::AbstractPriorResult,
-                               cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult},
-                               nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                                           <:IntegerPhilogenyResult}, args...; kwargs...)
+                               cplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                           <:IntegerPhilogeny},
+                               nplg::Union{Nothing, <:SemiDefinitePhilogeny,
+                                           <:IntegerPhilogeny}, args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
@@ -244,21 +243,17 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::FactorRiskContribution,
-                               pr::Union{<:LowOrderPriorResult{<:Any, <:Any, <:Any, <:Any,
-                                                               <:Any, <:RegressionResult,
-                                                               <:Any, <:Any, <:Any},
-                                         <:HighOrderPriorResult{<:LowOrderPriorResult{<:Any,
-                                                                                      <:Any,
-                                                                                      <:Any,
-                                                                                      <:Any,
-                                                                                      <:Any,
-                                                                                      <:RegressionResult,
-                                                                                      <:Any,
-                                                                                      <:Any,
-                                                                                      <:Any},
-                                                                <:Any, <:Any, <:Any, <:Any,
-                                                                <:Any, <:Any}}, ::Any,
-                               ::Any, b1::AbstractMatrix,
+                               pr::Union{<:LowOrderPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                         <:Regression, <:Any, <:Any, <:Any},
+                                         <:HighOrderPrior{<:LowOrderPrior{<:Any, <:Any,
+                                                                          <:Any, <:Any,
+                                                                          <:Any,
+                                                                          <:Regression,
+                                                                          <:Any, <:Any,
+                                                                          <:Any}, <:Any,
+                                                          <:Any, <:Any, <:Any, <:Any,
+                                                          <:Any}}, ::Any, ::Any,
+                               b1::AbstractMatrix,
                                sets::Union{Nothing, <:AssetSets,
                                            #! Start: to delete
                                            <:DataFrame
@@ -282,8 +277,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                              variance_risk, r.settings)
     return nothing
 end
-function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySetResult,
-                                args...)
+function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySet, args...)
     if !haskey(model, :Au)
         sc = model[:sc]
         W = model[:W]
@@ -302,7 +296,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
     ucs_variance_risk = model[key] = @expression(model, tr(Au * ub) - tr(Al * lb))
     return ucs_variance_risk, key
 end
-function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertaintySetResult,
+function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertaintySet,
                                 r_sigma::Union{Nothing, <:AbstractMatrix},
                                 sigma::AbstractMatrix)
     sc = model[:sc]
@@ -1639,8 +1633,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer,
                                                      <:Any},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgetting}, pr::HighOrderPriorResult,
-                               args...; kwargs...)
+                                          <:RiskBudgetting}, pr::HighOrderPrior, args...;
+                               kwargs...)
     key = Symbol(:sqrt_kurtosis_risk_, i)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
@@ -1684,8 +1678,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, Nothing,
                                                      <:Any},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgetting}, pr::HighOrderPriorResult,
-                               args...; kwargs...)
+                                          <:RiskBudgetting}, pr::HighOrderPrior, args...;
+                               kwargs...)
     key = Symbol(:sqrt_kurtosis_risk_, i)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
@@ -1704,9 +1698,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_risk_constraints!(::JuMP.Model, ::Any, ::SquareRootKurtosis,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
-                                       <:RiskBudgetting}, pr::LowOrderPriorResult, args...;
+                                       <:RiskBudgetting}, pr::LowOrderPrior, args...;
                                kwargs...)
-    throw(ArgumentError("SquareRootKurtosis requires a HighOrderPriorResult, not a $(typeof(pr))."))
+    throw(ArgumentError("SquareRootKurtosis requires a HighOrderPrior, not a $(typeof(pr))."))
 end
 function set_owa_constraints!(model::JuMP.Model, X::AbstractMatrix)
     if haskey(model, :owa)
@@ -2043,8 +2037,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                    <:SqrtRiskExpr},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgetting}, pr::HighOrderPriorResult,
-                               args...; kwargs...)
+                                          <:RiskBudgetting}, pr::HighOrderPrior, args...;
+                               kwargs...)
     key = Symbol(:nskew_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -2061,8 +2055,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                    <:QuadRiskExpr},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                          <:RiskBudgetting}, pr::HighOrderPriorResult,
-                               args...; kwargs...)
+                                          <:RiskBudgetting}, pr::HighOrderPrior, args...;
+                               kwargs...)
     key = Symbol(:qnskew_risk_, i)
     sc = model[:sc]
     w = model[:w]
@@ -2080,9 +2074,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_risk_constraints!(::JuMP.Model, ::Any, ::NegativeSkewness,
                                ::Union{<:MeanRisk, <:NearOptimalCentering,
-                                       <:RiskBudgetting}, pr::LowOrderPriorResult, args...;
+                                       <:RiskBudgetting}, pr::LowOrderPrior, args...;
                                kwargs...)
-    throw(ArgumentError("NegativeSkewness requires a HighOrderPriorResult, not a $(typeof(pr))."))
+    throw(ArgumentError("NegativeSkewness requires a HighOrderPrior, not a $(typeof(pr))."))
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:NOCTracking},
@@ -2133,10 +2127,9 @@ function set_risk!(model::JuMP.Model, i::Any,
                                               <:IndependentVariableTracking},
                    opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgetting},
                    pr::AbstractPriorResult,
-                   cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                               <:IntegerPhilogenyResult},
-                   nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                               <:IntegerPhilogenyResult}, args...; kwargs...)
+                   cplg::Union{Nothing, <:SemiDefinitePhilogeny, <:IntegerPhilogeny},
+                   nplg::Union{Nothing, <:SemiDefinitePhilogeny, <:IntegerPhilogeny},
+                   args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tracking.w
@@ -2153,10 +2146,9 @@ function set_risk!(model::JuMP.Model, i::Any,
                                               <:DependentVariableTracking},
                    opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgetting},
                    pr::AbstractPriorResult,
-                   cplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                               <:IntegerPhilogenyResult},
-                   nplg::Union{Nothing, <:SemiDefinitePhilogenyResult,
-                               <:IntegerPhilogenyResult}, args...; kwargs...)
+                   cplg::Union{Nothing, <:SemiDefinitePhilogeny, <:IntegerPhilogeny},
+                   nplg::Union{Nothing, <:SemiDefinitePhilogeny, <:IntegerPhilogeny},
+                   args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tracking.w

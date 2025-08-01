@@ -47,7 +47,7 @@ This constructor creates a `LTDCovariance` object using the specified variance e
   - `alpha::Real`: Quantile level for the lower tail.
   - `threads::FLoops.Transducers.Executor`: Parallel execution strategy.
 
-# Returns
+# ReturnsResult
 
   - `LTDCovariance`: A configured lower tail dependence covariance estimator.
 
@@ -100,7 +100,7 @@ The lower tail dependence (LTD) between two assets quantifies the probability th
   - `alpha::Real`: Quantile level for the lower tail.
   - `threads::FLoops.Transducers.Executor`: Parallel execution strategy.
 
-# Returns
+# ReturnsResult
 
   - `rho::Matrix{Float64}`: Symmetric matrix of lower tail dependence coefficients, where `rho[i, j]` is the estimated LTD between assets `i` and `j`.
 
@@ -152,7 +152,7 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
   - `dims::Int`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments.
 
-# Returns
+# ReturnsResult
 
   - `rho::Matrix{Float64}`: Symmetric matrix of lower tail dependence correlation coefficients.
 
@@ -186,7 +186,7 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
   - `dims::Int`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
-# Returns
+# ReturnsResult
 
   - `sigma::Matrix{Float64}`: Symmetric matrix of lower tail dependence covariances.
 

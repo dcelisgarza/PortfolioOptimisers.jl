@@ -24,18 +24,15 @@
                                      timestamp = :Date)[(end - 252):end])
     @testset "Box Uncertainty sets" begin
         rng = StableRNG(123456789)
-        ues = [DeltaUncertaintySetEstimator(;),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
-                                             alg = BoxUncertaintySetAlgorithm(),
-                                             seed = 987654321),
-               ARCHUncertaintySetEstimator(; alg = BoxUncertaintySetAlgorithm(),
-                                           bootstrap = StationaryBootstrap(),
-                                           seed = 987654321),
-               ARCHUncertaintySetEstimator(; alg = BoxUncertaintySetAlgorithm(),
-                                           bootstrap = MovingBootstrap(), seed = 987654321),
-               ARCHUncertaintySetEstimator(; alg = BoxUncertaintySetAlgorithm(),
-                                           bootstrap = CircularBootstrap(),
-                                           seed = 987654321)]
+        ues = [DeltaUncertaintySet(;),
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng,
+                                    alg = BoxUncertaintySetAlgorithm(), seed = 987654321),
+               ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(),
+                                  bootstrap = StationaryBootstrap(), seed = 987654321),
+               ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(),
+                                  bootstrap = MovingBootstrap(), seed = 987654321),
+               ARCHUncertaintySet(; alg = BoxUncertaintySetAlgorithm(),
+                                  bootstrap = CircularBootstrap(), seed = 987654321)]
         df = CSV.read(joinpath(@__DIR__, "assets/BoxUncertaintySet.csv.gz"), DataFrame)
         for (i, ue) in pairs(ues)
             mu_set1, sigma_set1 = ucs(ue, rd.X)
@@ -73,43 +70,30 @@
 
     @testset "Ellipse Uncertainty sets" begin
         rng = StableRNG(123456789)
-        ues = [NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
-                                             seed = 987654321,
-                                             alg = EllipseUncertaintySetAlgorithm(;
-                                                                                  diagonal = true,
-                                                                                  method = NormalKUncertaintyAlgorithm())),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
-                                             seed = 987654321,
-                                             alg = EllipseUncertaintySetAlgorithm(;
-                                                                                  diagonal = false,
-                                                                                  method = GeneralKUncertaintyAlgorithm())),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
-                                             seed = 987654321,
-                                             alg = EllipseUncertaintySetAlgorithm(;
-                                                                                  diagonal = true,
-                                                                                  method = ChiSqKUncertaintyAlgorithm())),
-               NormalUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(), rng = rng,
-                                             seed = 987654321,
-                                             alg = EllipseUncertaintySetAlgorithm(;
-                                                                                  diagonal = true,
-                                                                                  method = 10)),
-               ARCHUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
-                                           alg = EllipseUncertaintySetAlgorithm(;
-                                                                                diagonal = true,
-                                                                                method = NormalKUncertaintyAlgorithm()),
-                                           seed = 987654321,
-                                           bootstrap = StationaryBootstrap()),
-               ARCHUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
-                                           alg = EllipseUncertaintySetAlgorithm(;
-                                                                                diagonal = false,
-                                                                                method = GeneralKUncertaintyAlgorithm()),
-                                           seed = 987654321, bootstrap = MovingBootstrap()),
-               ARCHUncertaintySetEstimator(; pe = EmpiricalPriorEstimator(),
-                                           alg = EllipseUncertaintySetAlgorithm(;
-                                                                                diagonal = true,
-                                                                                method = ChiSqKUncertaintyAlgorithm()),
-                                           seed = 987654321,
-                                           bootstrap = CircularBootstrap())]
+        ues = [NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng, seed = 987654321,
+                                    alg = EllipseUncertaintySetAlgorithm(; diagonal = true,
+                                                                         method = NormalKUncertaintyAlgorithm())),
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng, seed = 987654321,
+                                    alg = EllipseUncertaintySetAlgorithm(; diagonal = false,
+                                                                         method = GeneralKUncertaintyAlgorithm())),
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng, seed = 987654321,
+                                    alg = EllipseUncertaintySetAlgorithm(; diagonal = true,
+                                                                         method = ChiSqKUncertaintyAlgorithm())),
+               NormalUncertaintySet(; pe = EmpiricalPrior(), rng = rng, seed = 987654321,
+                                    alg = EllipseUncertaintySetAlgorithm(; diagonal = true,
+                                                                         method = 10)),
+               ARCHUncertaintySet(; pe = EmpiricalPrior(),
+                                  alg = EllipseUncertaintySetAlgorithm(; diagonal = true,
+                                                                       method = NormalKUncertaintyAlgorithm()),
+                                  seed = 987654321, bootstrap = StationaryBootstrap()),
+               ARCHUncertaintySet(; pe = EmpiricalPrior(),
+                                  alg = EllipseUncertaintySetAlgorithm(; diagonal = false,
+                                                                       method = GeneralKUncertaintyAlgorithm()),
+                                  seed = 987654321, bootstrap = MovingBootstrap()),
+               ARCHUncertaintySet(; pe = EmpiricalPrior(),
+                                  alg = EllipseUncertaintySetAlgorithm(; diagonal = true,
+                                                                       method = ChiSqKUncertaintyAlgorithm()),
+                                  seed = 987654321, bootstrap = CircularBootstrap())]
         df = CSV.read(joinpath(@__DIR__, "assets/EllipseUncertaintySet.csv.gz"), DataFrame)
         for (i, ue) in pairs(ues)
             mu_set1, sigma_set1 = ucs(ue, rd.X)

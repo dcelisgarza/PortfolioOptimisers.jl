@@ -45,7 +45,7 @@ This constructor creates a `GeneralWeightedCovariance` object using the specifie
   - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use.
   - `w::Union{Nothing, <:AbstractWeights}`: Optional observation weights. If `nothing`, the estimator is unweighted. If provided, must be non-empty.
 
-# Returns
+# ReturnsResult
 
   - `GeneralWeightedCovariance`: A covariance estimator configured with the specified method and optional weights.
 
@@ -104,7 +104,7 @@ This method dispatches to [`robust_cov`](@ref), using the specified covariance e
   - `mean`: Optional mean vector to use for centering.
   - `kwargs...`: Additional keyword arguments passed to [`robust_cov`](@ref).
 
-# Returns
+# ReturnsResult
 
   - Covariance matrix as computed by the estimator and optional weights.
 
@@ -137,7 +137,7 @@ This method dispatches to [`robust_cor`](@ref), using the specified covariance e
   - `mean`: Optional mean vector to use for centering.
   - `kwargs...`: Additional keyword arguments passed to [`robust_cor`](@ref).
 
-# Returns
+# ReturnsResult
 
   - Correlation matrix as computed by the estimator and optional weights.
 
@@ -216,7 +216,7 @@ This constructor creates a `Covariance` object using the specified expected retu
   - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
   - `alg::AbstractMomentAlgorithm`: Moment algorithm.
 
-# Returns
+# ReturnsResult
 
   - `Covariance`: A configured joint mean and covariance estimator.
 
@@ -264,7 +264,7 @@ Compute the full covariance matrix using a [`Covariance`](@ref) estimator.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
 
-# Returns
+# ReturnsResult
 
   - Covariance matrix as computed by the estimator and moment algorithm.
 
@@ -297,7 +297,7 @@ Compute the semi covariance matrix using a [`Covariance`](@ref) estimator.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
 
-# Returns
+# ReturnsResult
 
   - Covariance matrix as computed by the estimator and moment algorithm.
 
@@ -332,7 +332,7 @@ Compute the full correlation matrix using a [`Covariance`](@ref) estimator.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
 
-# Returns
+# ReturnsResult
 
   - Correlation matrix as computed by the estimator and moment algorithm.
 
@@ -365,7 +365,7 @@ Compute the semi correlation matrix using a [`Covariance`](@ref) estimator.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
 
-# Returns
+# ReturnsResult
 
   - Correlation matrix as computed by the estimator and moment algorithm.
 

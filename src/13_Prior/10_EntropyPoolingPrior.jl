@@ -12,17 +12,15 @@ end
 function get_epw(::H2_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return wi
 end
-struct CVaREntropyPoolingEstimator{T1 <: Tuple, T2 <: NamedTuple} <:
-       AbstractEntropyPoolingOptimiser
+struct CVaREntropyPooling{T1 <: Tuple, T2 <: NamedTuple} <: AbstractEntropyPoolingOptimiser
     args::T1
     kwargs::T2
 end
-function CVaREntropyPoolingEstimator(; args::Tuple = (Roots.Brent(),),
-                                     kwargs::NamedTuple = (;))
-    return CVaREntropyPoolingEstimator{typeof(args), typeof(kwargs)}(args, kwargs)
+function CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple = (;))
+    return CVaREntropyPooling{typeof(args), typeof(kwargs)}(args, kwargs)
 end
-struct OptimEntropyPoolingEstimator{T1 <: Tuple, T2 <: NamedTuple, T3 <: Real, T4 <: Real,
-                                    T5 <: AbstractEntropyPoolingOptAlgorithm} <:
+struct OptimEntropyPooling{T1 <: Tuple, T2 <: NamedTuple, T3 <: Real, T4 <: Real,
+                           T5 <: AbstractEntropyPoolingOptAlgorithm} <:
        AbstractEntropyPoolingOptimiser
     args::T1
     kwargs::T2
@@ -30,17 +28,16 @@ struct OptimEntropyPoolingEstimator{T1 <: Tuple, T2 <: NamedTuple, T3 <: Real, T
     sc2::T4
     alg::T5
 end
-function OptimEntropyPoolingEstimator(; args::Tuple = (), kwargs::NamedTuple = (;),
-                                      sc1::Real = 1, sc2::Real = 1e3,
-                                      alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Real = 1,
+                             sc2::Real = 1e3,
+                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     @smart_assert(sc1 >= zero(sc1))
-    return OptimEntropyPoolingEstimator{typeof(args), typeof(kwargs), typeof(sc1),
-                                        typeof(sc2), typeof(alg)}(args, kwargs, sc1, sc2,
-                                                                  alg)
+    return OptimEntropyPooling{typeof(args), typeof(kwargs), typeof(sc1), typeof(sc2),
+                               typeof(alg)}(args, kwargs, sc1, sc2, alg)
 end
-struct JuMPEntropyPoolingEstimator{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}},
-                                   T2 <: Real, T3 <: Real, T4 <: Real,
-                                   T5 <: AbstractEntropyPoolingOptAlgorithm} <:
+struct JuMPEntropyPooling{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T2 <: Real,
+                          T3 <: Real, T4 <: Real,
+                          T5 <: AbstractEntropyPoolingOptAlgorithm} <:
        AbstractEntropyPoolingOptimiser
     slv::T1
     sc1::T2
@@ -48,50 +45,49 @@ struct JuMPEntropyPoolingEstimator{T1 <: Union{<:Solver, <:AbstractVector{<:Solv
     so::T4
     alg::T5
 end
-function JuMPEntropyPoolingEstimator(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                                     sc1::Real = 1, sc2::Real = 1e5, so::Real = 1,
-                                     alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+function JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
+                            sc1::Real = 1, sc2::Real = 1e5, so::Real = 1,
+                            alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
     @smart_assert(sc1 >= zero(sc1))
     @smart_assert(sc2 >= zero(sc2))
     @smart_assert(so >= zero(so))
-    return JuMPEntropyPoolingEstimator{typeof(slv), typeof(sc1), typeof(sc2), typeof(so),
-                                       typeof(alg)}(slv, sc1, sc2, so, alg)
+    return JuMPEntropyPooling{typeof(slv), typeof(sc1), typeof(sc2), typeof(so),
+                              typeof(alg)}(slv, sc1, sc2, so, alg)
 end
 function effective_number_scenarios(x::AbstractVector, y::AbstractVector)
     return exp(-kldivergence(x, y))
 end
-struct EPPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
-                        T2 <: Union{Nothing, <:AbstractString, Expr,
-                                    <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                    <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                        T3 <: Union{Nothing, <:AbstractString, Expr,
-                                    <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                    <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                        T4 <: Union{Nothing, <:AbstractString, Expr,
-                                    <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                    <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                        T5 <: Union{Nothing, <:AbstractString, Expr,
-                                    <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                    <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                        T6 <: Union{Nothing, <:AbstractString, Expr,
-                                    <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                    <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                        T7 <: Union{Nothing, <:AbstractString, Expr,
-                                    <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                    <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                        T8 <: Union{Nothing, <:AbstractString, Expr,
-                                    <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                    <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                        T9 <: Real, T10 <: Real, T11 <: Union{Nothing, <:AssetSets},
-                        T12 <: Union{Nothing, <:CVaREntropyPoolingEstimator},
-                        T13 <: Union{Nothing, <:OptimEntropyPoolingEstimator},
-                        T14 <: Union{<:OptimEntropyPoolingEstimator,
-                                     <:JuMPEntropyPoolingEstimator},
-                        T15 <: Union{Nothing, <:AbstractVector},
-                        T16 <: AbstractEntropyPoolingAlgorithm} <:
+struct EntropyPoolingPrior{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
+                           T2 <: Union{Nothing, <:AbstractString, Expr,
+                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                           T3 <: Union{Nothing, <:AbstractString, Expr,
+                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                           T4 <: Union{Nothing, <:AbstractString, Expr,
+                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                           T5 <: Union{Nothing, <:AbstractString, Expr,
+                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                           T6 <: Union{Nothing, <:AbstractString, Expr,
+                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                           T7 <: Union{Nothing, <:AbstractString, Expr,
+                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                           T8 <: Union{Nothing, <:AbstractString, Expr,
+                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
+                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                           T9 <: Real, T10 <: Real, T11 <: Union{Nothing, <:AssetSets},
+                           T12 <: Union{Nothing, <:CVaREntropyPooling},
+                           T13 <: Union{Nothing, <:OptimEntropyPooling},
+                           T14 <: Union{<:OptimEntropyPooling, <:JuMPEntropyPooling},
+                           T15 <: Union{Nothing, <:AbstractVector},
+                           T16 <: AbstractEntropyPoolingAlgorithm} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
     pe::T1
     mu_views::T2
@@ -110,46 +106,50 @@ struct EPPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
     w::T15
     alg::T16
 end
-function EPPriorEstimator(;
-                          pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPriorEstimator(),
-                          mu_views::Union{Nothing, <:AbstractString, Expr,
-                                          <:AbstractVector{<:AbstractString},
-                                          <:AbstractVector{Expr},
-                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}} = nothing,
-                          var_views::Union{Nothing, <:AbstractString, Expr,
-                                           <:AbstractVector{<:AbstractString},
-                                           <:AbstractVector{Expr},
-                                           <:AbstractVector{<:Union{<:AbstractString, Expr}}} = nothing,
-                          cvar_views::Union{Nothing, <:AbstractString, Expr,
-                                            <:AbstractVector{<:AbstractString},
-                                            <:AbstractVector{Expr},
-                                            <:AbstractVector{<:Union{<:AbstractString,
-                                                                     Expr}}} = nothing,
-                          sigma_views::Union{Nothing, <:AbstractString, Expr,
+function EntropyPoolingPrior(;
+                             pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
+                             mu_views::Union{Nothing, <:AbstractString, Expr,
                                              <:AbstractVector{<:AbstractString},
                                              <:AbstractVector{Expr},
                                              <:AbstractVector{<:Union{<:AbstractString,
                                                                       Expr}}} = nothing,
-                          sk_views::Union{Nothing, <:AbstractString, Expr,
-                                          <:AbstractVector{<:AbstractString},
-                                          <:AbstractVector{Expr},
-                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}} = nothing,
-                          kt_views::Union{Nothing, <:AbstractString, Expr,
-                                          <:AbstractVector{<:AbstractString},
-                                          <:AbstractVector{Expr},
-                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}} = nothing,
-                          rho_views::Union{Nothing, <:AbstractString, Expr,
-                                           <:AbstractVector{<:AbstractString},
-                                           <:AbstractVector{Expr},
-                                           <:AbstractVector{<:Union{<:AbstractString, Expr}}} = nothing,
-                          var_alpha::Real = 0.05, cvar_alpha::Real = 0.05,
-                          sets::Union{Nothing, <:AssetSets} = nothing,
-                          ds_opt::Union{Nothing, <:CVaREntropyPoolingEstimator} = nothing,
-                          dm_opt::Union{Nothing, <:OptimEntropyPoolingEstimator} = nothing,
-                          opt::Union{<:OptimEntropyPoolingEstimator,
-                                     <:JuMPEntropyPoolingEstimator} = OptimEntropyPoolingEstimator(),
-                          w::Union{Nothing, AbstractVector} = nothing,
-                          alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
+                             var_views::Union{Nothing, <:AbstractString, Expr,
+                                              <:AbstractVector{<:AbstractString},
+                                              <:AbstractVector{Expr},
+                                              <:AbstractVector{<:Union{<:AbstractString,
+                                                                       Expr}}} = nothing,
+                             cvar_views::Union{Nothing, <:AbstractString, Expr,
+                                               <:AbstractVector{<:AbstractString},
+                                               <:AbstractVector{Expr},
+                                               <:AbstractVector{<:Union{<:AbstractString,
+                                                                        Expr}}} = nothing,
+                             sigma_views::Union{Nothing, <:AbstractString, Expr,
+                                                <:AbstractVector{<:AbstractString},
+                                                <:AbstractVector{Expr},
+                                                <:AbstractVector{<:Union{<:AbstractString,
+                                                                         Expr}}} = nothing,
+                             sk_views::Union{Nothing, <:AbstractString, Expr,
+                                             <:AbstractVector{<:AbstractString},
+                                             <:AbstractVector{Expr},
+                                             <:AbstractVector{<:Union{<:AbstractString,
+                                                                      Expr}}} = nothing,
+                             kt_views::Union{Nothing, <:AbstractString, Expr,
+                                             <:AbstractVector{<:AbstractString},
+                                             <:AbstractVector{Expr},
+                                             <:AbstractVector{<:Union{<:AbstractString,
+                                                                      Expr}}} = nothing,
+                             rho_views::Union{Nothing, <:AbstractString, Expr,
+                                              <:AbstractVector{<:AbstractString},
+                                              <:AbstractVector{Expr},
+                                              <:AbstractVector{<:Union{<:AbstractString,
+                                                                       Expr}}} = nothing,
+                             var_alpha::Real = 0.05, cvar_alpha::Real = 0.05,
+                             sets::Union{Nothing, <:AssetSets} = nothing,
+                             ds_opt::Union{Nothing, <:CVaREntropyPooling} = nothing,
+                             dm_opt::Union{Nothing, <:OptimEntropyPooling} = nothing,
+                             opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
+                             w::Union{Nothing, AbstractVector} = nothing,
+                             alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
     if isa(mu_views, AbstractVector)
         @smart_assert(!isempty(mu_views))
     end
@@ -185,27 +185,27 @@ function EPPriorEstimator(;
     end
     @smart_assert(zero(var_alpha) < var_alpha < one(var_alpha))
     @smart_assert(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha))
-    return EPPriorEstimator{typeof(pe), typeof(mu_views), typeof(var_views),
-                            typeof(cvar_views), typeof(sigma_views), typeof(sk_views),
-                            typeof(kt_views), typeof(rho_views), typeof(var_alpha),
-                            typeof(cvar_alpha), typeof(sets), typeof(ds_opt),
-                            typeof(dm_opt), typeof(opt), typeof(w), typeof(alg)}(pe,
-                                                                                 mu_views,
-                                                                                 var_views,
-                                                                                 cvar_views,
-                                                                                 sigma_views,
-                                                                                 sk_views,
-                                                                                 kt_views,
-                                                                                 rho_views,
-                                                                                 var_alpha,
-                                                                                 cvar_alpha,
-                                                                                 sets,
-                                                                                 ds_opt,
-                                                                                 dm_opt,
-                                                                                 opt, w,
-                                                                                 alg)
+    return EntropyPoolingPrior{typeof(pe), typeof(mu_views), typeof(var_views),
+                               typeof(cvar_views), typeof(sigma_views), typeof(sk_views),
+                               typeof(kt_views), typeof(rho_views), typeof(var_alpha),
+                               typeof(cvar_alpha), typeof(sets), typeof(ds_opt),
+                               typeof(dm_opt), typeof(opt), typeof(w), typeof(alg)}(pe,
+                                                                                    mu_views,
+                                                                                    var_views,
+                                                                                    cvar_views,
+                                                                                    sigma_views,
+                                                                                    sk_views,
+                                                                                    kt_views,
+                                                                                    rho_views,
+                                                                                    var_alpha,
+                                                                                    cvar_alpha,
+                                                                                    sets,
+                                                                                    ds_opt,
+                                                                                    dm_opt,
+                                                                                    opt, w,
+                                                                                    alg)
 end
-function Base.getproperty(obj::EPPriorEstimator, sym::Symbol)
+function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me
     elseif sym == :ce
@@ -214,15 +214,15 @@ function Base.getproperty(obj::EPPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function factory(pe::EPPriorEstimator, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return EPPriorEstimator(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
-                            var_views = pe.var_views, cvar_views = pe.cvar_views,
-                            sigma_views = pe.sigma_views, sk_views = pe.sk_views,
-                            kt_views = pe.kt_views, rho_views = pe.rho_views,
-                            var_alpha = pe.var_alpha, cvar_alpha = pe.cvar_alpha,
-                            sets = pe.sets, ds_opt = pe.ds_opt, dm_opt = pe.dm_opt,
-                            opt = pe.opt, w = nothing_scalar_array_factory(pe.w, w),
-                            alg = pe.alg)
+function factory(pe::EntropyPoolingPrior, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
+                               var_views = pe.var_views, cvar_views = pe.cvar_views,
+                               sigma_views = pe.sigma_views, sk_views = pe.sk_views,
+                               kt_views = pe.kt_views, rho_views = pe.rho_views,
+                               var_alpha = pe.var_alpha, cvar_alpha = pe.cvar_alpha,
+                               sets = pe.sets, ds_opt = pe.ds_opt, dm_opt = pe.dm_opt,
+                               opt = pe.opt, w = nothing_scalar_array_factory(pe.w, w),
+                               alg = pe.alg)
 end
 function get_pr_value end
 function add_ep_constraint!(epc::AbstractDict, lhs::AbstractMatrix, rhs::AbstractVector,
@@ -364,8 +364,8 @@ function ep_var_views!(var_views::Union{<:AbstractString, Expr,
     return nothing
 end
 function entropy_pooling(w::AbstractVector, epc::AbstractDict,
-                         opt::OptimEntropyPoolingEstimator{<:Any, <:Any, <:Any, <:Any,
-                                                           <:ExpEntropyPooling})
+                         opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
+                                                  <:ExpEntropyPooling})
     T = length(w)
     factor = inv(sqrt(T))
     A = fill(factor, 1, T)
@@ -417,8 +417,8 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     return pweights(w .* exp.(-transpose(A) * x .- one(eltype(w))))
 end
 function entropy_pooling(w::AbstractVector, epc::AbstractDict,
-                         opt::OptimEntropyPoolingEstimator{<:Any, <:Any, <:Any, <:Any,
-                                                           <:LogEntropyPooling})
+                         opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
+                                                  <:LogEntropyPooling})
     T = length(w)
     factor = inv(sqrt(T))
     A = fill(factor, 1, T)
@@ -473,8 +473,8 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     return pweights(exp.(log_p - (one(eltype(log_p)) .+ transpose(A) * x)))
 end
 function entropy_pooling(w::AbstractVector, epc::AbstractDict,
-                         opt::JuMPEntropyPoolingEstimator{<:Any, <:Any, <:Any, <:Any,
-                                                          <:ExpEntropyPooling})
+                         opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
+                                                 <:ExpEntropyPooling})
     (; sc1, sc2, so, slv) = opt
     T = length(w)
     model = Model()
@@ -520,8 +520,8 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     end
 end
 function entropy_pooling(w::AbstractVector, epc::AbstractDict,
-                         opt::JuMPEntropyPoolingEstimator{<:Any, <:Any, <:Any, <:Any,
-                                                          <:LogEntropyPooling})
+                         opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
+                                                 <:LogEntropyPooling})
     (; sc1, sc2, so, slv) = opt
     model = Model()
     T = length(w)
@@ -587,8 +587,8 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
                               epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets,
                               alpha::Real, w::AbstractWeights,
                               opt::AbstractEntropyPoolingOptimiser,
-                              ds_opt::Union{Nothing, <:CVaREntropyPoolingEstimator},
-                              dm_opt::Union{Nothing, <:OptimEntropyPoolingEstimator};
+                              ds_opt::Union{Nothing, <:CVaREntropyPooling},
+                              dm_opt::Union{Nothing, <:OptimEntropyPooling};
                               strict::Bool = false)
     cvar_views = parse_equation(cvar_views)
     cvar_views = replace_group_by_assets(cvar_views, sets, false, true, false)
@@ -621,13 +621,13 @@ function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
     end
     N = length(B)
     d_opt = if N == 1
-        ifelse(!isnothing(ds_opt), ds_opt, CVaREntropyPoolingEstimator())
+        ifelse(!isnothing(ds_opt), ds_opt, CVaREntropyPooling())
     else
         ifelse(!isnothing(dm_opt), dm_opt,
-               OptimEntropyPoolingEstimator(;
-                                            args = (Optim.Fminbox(),
-                                                    Optim.Options(; outer_x_abstol = 1e-4,
-                                                                  x_abstol = 1e-4))))
+               OptimEntropyPooling(;
+                                   args = (Optim.Fminbox(),
+                                           Optim.Options(; outer_x_abstol = 1e-4,
+                                                         x_abstol = 1e-4))))
     end
     function func(etas)
         delete!(epc, :cvar_eq)
@@ -893,9 +893,10 @@ function ep_kt_views!(kurtosis_views::Union{<:AbstractString, Expr,
     end
     return to_fix
 end
-function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                    <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
+function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                       <:Any,
+                                       <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
                X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
     @smart_assert(dims in (1, 2))
@@ -962,13 +963,13 @@ function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
     (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = pr
-    return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1,
-                               loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
-                               f_w = !isnothing(loadings) ? w1 : nothing)
+    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1,
+                         loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
+                         f_w = !isnothing(loadings) ? w1 : nothing)
 end
-function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                    <:H0_EntropyPooling}, X::AbstractMatrix,
+function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                       <:Any, <:H0_EntropyPooling}, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
     @smart_assert(dims in (1, 2))
@@ -1014,9 +1015,9 @@ function prior(pe::EPPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:
     pe = factory(pe, w1)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = pr
-    return LowOrderPriorResult(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1,
-                               loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
-                               f_w = !isnothing(loadings) ? w1 : nothing)
+    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1,
+                         loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
+                         f_w = !isnothing(loadings) ? w1 : nothing)
 end
 
-export LogEntropyPooling, ExpEntropyPooling, EPPriorEstimator
+export LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior

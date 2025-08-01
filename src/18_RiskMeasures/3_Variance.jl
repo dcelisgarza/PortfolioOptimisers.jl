@@ -11,9 +11,10 @@ struct Variance{T1 <: RiskMeasureSettings, T2 <: Union{Nothing, <:AbstractMatrix
                       <:AbstractVector{Expr},
                       <:AbstractVector{<:Union{<:AbstractString, Expr}},
                       #! Start: to delete
-                      <:LinearConstraint, <:AbstractVector{<:LinearConstraint},
+                      <:LinearConstraintEstimator,
+                      <:AbstractVector{<:LinearConstraintEstimator},
                       #! End: to delete
-                      <:LinearConstraintResult}, T4 <: VarianceAlgorithm} <:
+                      <:LinearConstraint}, T4 <: VarianceAlgorithm} <:
        JuMPRiskContributionSigmaRiskMeasure
     settings::T1
     sigma::T2
@@ -26,9 +27,10 @@ function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                             <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
                             <:AbstractVector{<:Union{<:AbstractString, Expr}},
                             #! Start: to delete
-                            <:LinearConstraint, <:AbstractVector{<:LinearConstraint},
+                            <:LinearConstraintEstimator,
+                            <:AbstractVector{<:LinearConstraintEstimator},
                             #! End: to delete
-                            <:LinearConstraintResult} = nothing,
+                            <:LinearConstraint} = nothing,
                   alg::VarianceAlgorithm = SOCRiskExpr())
     if isa(sigma, AbstractMatrix)
         @smart_assert(!isempty(sigma))
@@ -47,8 +49,8 @@ function factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
 end
 function risk_measure_view(r::Variance, i::AbstractVector, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
-    @smart_assert(!isa(r.rc, LinearConstraintResult),
-                  "`rc` cannot be a `LinearConstraintResult` because there is no way to only consider items from a specific cluster.")
+    @smart_assert(!isa(r.rc, LinearConstraint),
+                  "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific cluster.")
     # rc = linear_constraint_view(r.rc, i)
     return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
 end
@@ -87,7 +89,7 @@ struct UncertaintySetVariance{T1 <: RiskMeasureSettings,
 end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                           <:AbstractUncertaintySetEstimator} = NormalUncertaintySetEstimator(;),
+                                           <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(;),
                                 sigma::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing)
     if isa(sigma, AbstractMatrix)
         @smart_assert(!isempty(sigma))

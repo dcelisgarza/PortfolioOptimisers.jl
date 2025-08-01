@@ -31,7 +31,7 @@
                   timestamp = :timestamp)
     @testset "Empirical Prior" begin
         rd = prices_to_returns(X[(end - 252):end], F[(end - 252):end])
-        pes = [EmpiricalPriorEstimator(), EmpiricalPriorEstimator(; horizon = 252)]
+        pes = [EmpiricalPrior(), EmpiricalPrior(; horizon = 252)]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Empirical-Prior.csv"), DataFrame)
         for (i, pe) in enumerate(pes)
             pr = prior(pe, transpose(rd.X); dims = 2)
@@ -51,8 +51,8 @@
             @test res2
             @test pr === prior(pr)
         end
-        pr1 = prior(EmpiricalPriorEstimator(), rd)
-        pr2 = prior(EmpiricalPriorEstimator(), rd.X)
+        pr1 = prior(EmpiricalPrior(), rd)
+        pr2 = prior(EmpiricalPrior(), rd.X)
         @test pr1.X == pr2.X
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
@@ -67,7 +67,7 @@
         rd = prices_to_returns(X[(end - 100):end][:AAPL, :BKNG, :COST, :GOOG, :MRK, :NFLX,
                                                   :SBUX, :TSLA, :TXN, :VRTX],
                                F[(end - 100):end][:GLOF, :QUAL])
-        pr1 = prior(FactorPriorEstimator(; rsd = false), transpose(rd.X), transpose(rd.F);
+        pr1 = prior(FactorPrior(; rsd = false), transpose(rd.X), transpose(rd.F);
                     dims = 2)
         pm1_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-No-Residuals.csv"),
                          DataFrame)
@@ -81,7 +81,7 @@
         @test isapprox(pr1.chol, chol_t)
         @test pr1 === prior(pr1)
 
-        pr2 = prior(FactorPriorEstimator(; rsd = true), transpose(rd.X), transpose(rd.F);
+        pr2 = prior(FactorPrior(; rsd = true), transpose(rd.X), transpose(rd.F);
                     dims = 2)
         pm2_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-Residuals.csv"),
                          DataFrame)
@@ -94,8 +94,8 @@
         @test isapprox(pr2.sigma, sigma_t)
         @test isapprox(pr2.chol, chol_t)
 
-        pr1 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())), rd)
-        pr2 = prior(FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward())),
+        pr1 = prior(FactorPrior(; re = StepwiseRegression(; alg = Backward())), rd)
+        pr2 = prior(FactorPrior(; re = StepwiseRegression(; alg = Backward())),
                     rd.X, rd.F)
         @test pr1.X == pr2.X
         @test pr1.mu == pr2.mu
@@ -106,7 +106,7 @@
         @test pr1.loadings.b == pr2.loadings.b
         @test pr1.loadings.M == pr2.loadings.M
 
-        pe1 = FactorPriorEstimator(; rsd = false)
+        pe1 = FactorPrior(; rsd = false)
         ew = eweights(1:10, 0.3)
         pe2 = PortfolioOptimisers.factory(pe1, ew)
         @test pe2.pe.ce.ce.ce.w == ew
@@ -217,7 +217,7 @@
                                                   :SBUX, :TSLA, :TXN, :VRTX],
                                F[(end - 100):end][:GLOF, :QUAL])
 
-        pe1 = FactorPriorEstimator(; re = DimensionReductionRegression(;), rsd = true)
+        pe1 = FactorPrior(; re = DimensionReductionRegression(;), rsd = true)
         pr1 = prior(pe1, transpose(rd.X), transpose(rd.F); dims = 2)
 
         pe2 = HighOrderPriorEstimator(; pe = pe1)
@@ -275,13 +275,13 @@
         @test_throws ArgumentError black_litterman_views("foo==0.2", sets, strict = true)
     end
     @testset "Black Litteman type tests" begin
-        pe1 = BayesianBlackLittermanPriorEstimator(; tau = 1,
+        pe1 = BayesianBlackLittermanPrior(; tau = 1,
                                                    views = BlackLittermanViewsEstimator(;
                                                                                         A = LinearConstraintSide(;
                                                                                                                  name = nothing,
                                                                                                                  group = nothing)),
-                                                   pe = FactorPriorEstimator(;
-                                                                             pe = EmpiricalPriorEstimator(;
+                                                   pe = FactorPrior(;
+                                                                             pe = EmpiricalPrior(;
                                                                                                           me = ShrunkExpectedReturns(;
                                                                                                                                      alg = JamesStein()),
                                                                                                           ce = PortfolioOptimisersCovariance(;
@@ -290,17 +290,17 @@
         @test pe1.tau == 1
         @test isa(pe1.me, ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein{<:GrandMean}})
         @test isa(pe1.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0})
-        pe2 = BayesianBlackLittermanPriorEstimator(;
+        pe2 = BayesianBlackLittermanPrior(;
                                                    views = BlackLittermanViewsEstimator(;
                                                                                         A = LinearConstraintSide(;
                                                                                                                  name = nothing,
                                                                                                                  group = nothing)),
-                                                   pe = FactorBlackLittermanPriorEstimator(;
+                                                   pe = FactorBlackLittermanPrior(;
                                                                                            views = BlackLittermanViewsEstimator(;
                                                                                                                                 A = LinearConstraintSide(;
                                                                                                                                                          name = nothing,
                                                                                                                                                          group = nothing)),
-                                                                                           pe = EmpiricalPriorEstimator(;
+                                                                                           pe = EmpiricalPrior(;
                                                                                                                         me = ShrunkExpectedReturns(;
                                                                                                                                                    alg = BodnarOkhrinParolya()),
                                                                                                                         ce = PortfolioOptimisersCovariance(;
@@ -309,12 +309,12 @@
         @test isa(pe2.me,
                   ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya{<:GrandMean}})
         @test isa(pe2.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2})
-        pe3 = BayesianBlackLittermanPriorEstimator(;
+        pe3 = BayesianBlackLittermanPrior(;
                                                    views = BlackLittermanViewsEstimator(;
                                                                                         A = LinearConstraintSide(;
                                                                                                                  name = nothing,
                                                                                                                  group = nothing)),
-                                                   pe = AugmentedBlackLittermanPriorEstimator(;
+                                                   pe = AugmentedBlackLittermanPrior(;
                                                                                               a_views = BlackLittermanViewsEstimator(;
                                                                                                                                      A = LinearConstraintSide(;
                                                                                                                                                               name = nothing,
@@ -323,24 +323,24 @@
                                                                                                                                      A = LinearConstraintSide(;
                                                                                                                                                               name = nothing,
                                                                                                                                                               group = nothing)),
-                                                                                              a_pe = EmpiricalPriorEstimator(;
+                                                                                              a_pe = EmpiricalPrior(;
                                                                                                                              me = ExcessExpectedReturns(),
                                                                                                                              ce = PortfolioOptimisersCovariance(;
                                                                                                                                                                 ce = GerberCovariance(;
                                                                                                                                                                                       alg = Gerber1())))))
         @test isa(pe3.me, ExcessExpectedReturns{<:SimpleExpectedReturns{Nothing}, <:Any})
         @test isa(pe3.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1})
-        pe4 = BayesianBlackLittermanPriorEstimator(;
+        pe4 = BayesianBlackLittermanPrior(;
                                                    views = BlackLittermanViewsEstimator(;
                                                                                         A = LinearConstraintSide(;
                                                                                                                  name = nothing,
                                                                                                                  group = nothing)),
-                                                   pe = BlackLittermanPriorEstimator(;
+                                                   pe = BlackLittermanPrior(;
                                                                                      views = BlackLittermanViewsEstimator(;
                                                                                                                           A = LinearConstraintSide(;
                                                                                                                                                    name = nothing,
                                                                                                                                                    group = nothing)),
-                                                                                     pe = EmpiricalPriorEstimator(;
+                                                                                     pe = EmpiricalPrior(;
                                                                                                                   me = EquilibriumExpectedReturns(),
                                                                                                                   ce = PortfolioOptimisersCovariance(;
                                                                                                                                                      ce = SmythBrobyCovariance(;
@@ -349,24 +349,24 @@
         @test isa(pe4.ce.ce,
                   SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:SmythBroby0})
-        pe5 = BayesianBlackLittermanPriorEstimator(;
+        pe5 = BayesianBlackLittermanPrior(;
                                                    views = BlackLittermanViewsEstimator(;
                                                                                         A = LinearConstraintSide(;
                                                                                                                  name = nothing,
                                                                                                                  group = nothing)),
-                                                   pe = BayesianBlackLittermanPriorEstimator(;
+                                                   pe = BayesianBlackLittermanPrior(;
                                                                                              views = BlackLittermanViewsEstimator(;
                                                                                                                                   A = LinearConstraintSide(;
                                                                                                                                                            name = nothing,
                                                                                                                                                            group = nothing))))
         @test isa(pe5.me, EquilibriumExpectedReturns)
         @test isa(pe5.ce.ce, Covariance{<:Any, <:Any, <:Full})
-        pe6 = BlackLittermanPriorEstimator(;
+        pe6 = BlackLittermanPrior(;
                                            views = BlackLittermanViewsEstimator(;
                                                                                 A = LinearConstraintSide(;
                                                                                                          name = nothing,
                                                                                                          group = nothing)),
-                                           pe = EmpiricalPriorEstimator(;
+                                           pe = EmpiricalPrior(;
                                                                         me = ShrunkExpectedReturns(;
                                                                                                    alg = BayesStein()),
                                                                         ce = PortfolioOptimisersCovariance(;
@@ -376,13 +376,13 @@
         @test isa(pe6.ce.ce,
                   SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:NormalisedSmythBroby0})
-        pe7 = BlackLittermanPriorEstimator(; tau = 0.5,
+        pe7 = BlackLittermanPrior(; tau = 0.5,
                                            views = BlackLittermanViewsEstimator(;
                                                                                 A = LinearConstraintSide(;
                                                                                                          name = nothing,
                                                                                                          group = nothing)),
-                                           pe = FactorPriorEstimator(;
-                                                                     pe = EmpiricalPriorEstimator(;
+                                           pe = FactorPrior(;
+                                                                     pe = EmpiricalPrior(;
                                                                                                   me = ShrunkExpectedReturns(;
                                                                                                                              alg = JamesStein()),
                                                                                                   ce = PortfolioOptimisersCovariance(;
@@ -391,17 +391,17 @@
         @test pe7.tau == 0.5
         @test isa(pe7.me, ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein{<:GrandMean}})
         @test isa(pe7.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0})
-        pe8 = BlackLittermanPriorEstimator(;
+        pe8 = BlackLittermanPrior(;
                                            views = BlackLittermanViewsEstimator(;
                                                                                 A = LinearConstraintSide(;
                                                                                                          name = nothing,
                                                                                                          group = nothing)),
-                                           pe = FactorBlackLittermanPriorEstimator(;
+                                           pe = FactorBlackLittermanPrior(;
                                                                                    views = BlackLittermanViewsEstimator(;
                                                                                                                         A = LinearConstraintSide(;
                                                                                                                                                  name = nothing,
                                                                                                                                                  group = nothing)),
-                                                                                   pe = EmpiricalPriorEstimator(;
+                                                                                   pe = EmpiricalPrior(;
                                                                                                                 me = ShrunkExpectedReturns(;
                                                                                                                                            alg = BodnarOkhrinParolya()),
                                                                                                                 ce = PortfolioOptimisersCovariance(;
@@ -410,12 +410,12 @@
         @test isa(pe8.me,
                   ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya{<:GrandMean}})
         @test isa(pe8.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2})
-        pe9 = BlackLittermanPriorEstimator(;
+        pe9 = BlackLittermanPrior(;
                                            views = BlackLittermanViewsEstimator(;
                                                                                 A = LinearConstraintSide(;
                                                                                                          name = nothing,
                                                                                                          group = nothing)),
-                                           pe = AugmentedBlackLittermanPriorEstimator(;
+                                           pe = AugmentedBlackLittermanPrior(;
                                                                                       a_views = BlackLittermanViewsEstimator(;
                                                                                                                              A = LinearConstraintSide(;
                                                                                                                                                       name = nothing,
@@ -424,27 +424,27 @@
                                                                                                                              A = LinearConstraintSide(;
                                                                                                                                                       name = nothing,
                                                                                                                                                       group = nothing)),
-                                                                                      a_pe = EmpiricalPriorEstimator(;
+                                                                                      a_pe = EmpiricalPrior(;
                                                                                                                      me = ExcessExpectedReturns(),
                                                                                                                      ce = PortfolioOptimisersCovariance(;
                                                                                                                                                         ce = GerberCovariance(;
                                                                                                                                                                               alg = NormalisedGerber1())))))
         @test isa(pe9.me, ExcessExpectedReturns)
         @test isa(pe9.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1})
-        pe10 = BlackLittermanPriorEstimator(;
+        pe10 = BlackLittermanPrior(;
                                             views = BlackLittermanViewsEstimator(;
                                                                                  A = LinearConstraintSide(;
                                                                                                           name = nothing,
                                                                                                           group = nothing)),
-                                            pe = BlackLittermanPriorEstimator(;
+                                            pe = BlackLittermanPrior(;
                                                                               views = BlackLittermanViewsEstimator(;
                                                                                                                    A = LinearConstraintSide(;
                                                                                                                                             name = nothing,
                                                                                                                                             group = nothing))))
         @test isa(pe10.me, EquilibriumExpectedReturns)
         @test isa(pe5.ce.ce, Covariance{<:Any, <:Any, <:Full})
-        pe11 = FactorPriorEstimator(;
-                                    pe = EmpiricalPriorEstimator(;
+        pe11 = FactorPrior(;
+                                    pe = EmpiricalPrior(;
                                                                  me = ShrunkExpectedReturns(;
                                                                                             alg = BayesStein()),
                                                                  ce = PortfolioOptimisersCovariance(;
@@ -454,13 +454,13 @@
         @test isa(pe11.ce.ce,
                   SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:NormalisedSmythBroby0})
-        pe12 = FactorPriorEstimator(;
-                                    pe = BlackLittermanPriorEstimator(;
+        pe12 = FactorPrior(;
+                                    pe = BlackLittermanPrior(;
                                                                       views = BlackLittermanViewsEstimator(;
                                                                                                            A = LinearConstraintSide(;
                                                                                                                                     name = nothing,
                                                                                                                                     group = nothing)),
-                                                                      pe = EmpiricalPriorEstimator(;
+                                                                      pe = EmpiricalPrior(;
                                                                                                    me = ShrunkExpectedReturns(;
                                                                                                                               alg = JamesStein()),
                                                                                                    ce = PortfolioOptimisersCovariance(;
@@ -468,12 +468,12 @@
                                                                                                                                                             alg = NormalisedGerber2())))))
         @test isa(pe12.me, ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein{<:GrandMean}})
         @test isa(pe12.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2})
-        pe13 = FactorBlackLittermanPriorEstimator(; tau = 0.3,
+        pe13 = FactorBlackLittermanPrior(; tau = 0.3,
                                                   views = BlackLittermanViewsEstimator(;
                                                                                        A = LinearConstraintSide(;
                                                                                                                 name = nothing,
                                                                                                                 group = nothing)),
-                                                  pe = EmpiricalPriorEstimator(;
+                                                  pe = EmpiricalPrior(;
                                                                                me = ShrunkExpectedReturns(;
                                                                                                           alg = BayesStein()),
                                                                                ce = PortfolioOptimisersCovariance(;
@@ -484,17 +484,17 @@
         @test isa(pe13.ce.ce,
                   SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:NormalisedSmythBroby0})
-        pe14 = FactorBlackLittermanPriorEstimator(;
+        pe14 = FactorBlackLittermanPrior(;
                                                   views = BlackLittermanViewsEstimator(;
                                                                                        A = LinearConstraintSide(;
                                                                                                                 name = nothing,
                                                                                                                 group = nothing)),
-                                                  pe = BlackLittermanPriorEstimator(;
+                                                  pe = BlackLittermanPrior(;
                                                                                     views = BlackLittermanViewsEstimator(;
                                                                                                                          A = LinearConstraintSide(;
                                                                                                                                                   name = nothing,
                                                                                                                                                   group = nothing)),
-                                                                                    pe = EmpiricalPriorEstimator(;
+                                                                                    pe = EmpiricalPrior(;
                                                                                                                  me = ShrunkExpectedReturns(;
                                                                                                                                             alg = JamesStein()),
                                                                                                                  ce = PortfolioOptimisersCovariance(;
@@ -502,7 +502,7 @@
                                                                                                                                                                           alg = NormalisedGerber2())))))
         @test isa(pe14.me, ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein{<:GrandMean}})
         @test isa(pe14.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2})
-        pe15 = AugmentedBlackLittermanPriorEstimator(; tau = 0.2,
+        pe15 = AugmentedBlackLittermanPrior(; tau = 0.2,
                                                      a_views = BlackLittermanViewsEstimator(;
                                                                                             A = LinearConstraintSide(;
                                                                                                                      name = nothing,
@@ -511,7 +511,7 @@
                                                                                             A = LinearConstraintSide(;
                                                                                                                      name = nothing,
                                                                                                                      group = nothing)),
-                                                     a_pe = EmpiricalPriorEstimator(;
+                                                     a_pe = EmpiricalPrior(;
                                                                                     me = ShrunkExpectedReturns(;
                                                                                                                alg = BayesStein()),
                                                                                     ce = PortfolioOptimisersCovariance(;
@@ -524,7 +524,7 @@
                                        <:Any, <:NormalisedSmythBroby0})
         @test isa(pe15.f_me, SimpleExpectedReturns)
         @test isa(pe15.f_ce, PortfolioOptimisersCovariance)
-        pe16 = AugmentedBlackLittermanPriorEstimator(;
+        pe16 = AugmentedBlackLittermanPrior(;
                                                      a_views = BlackLittermanViewsEstimator(;
                                                                                             A = LinearConstraintSide(;
                                                                                                                      name = nothing,
@@ -533,12 +533,12 @@
                                                                                             A = LinearConstraintSide(;
                                                                                                                      name = nothing,
                                                                                                                      group = nothing)),
-                                                     a_pe = BlackLittermanPriorEstimator(;
+                                                     a_pe = BlackLittermanPrior(;
                                                                                          views = BlackLittermanViewsEstimator(;
                                                                                                                               A = LinearConstraintSide(;
                                                                                                                                                        name = nothing,
                                                                                                                                                        group = nothing)),
-                                                                                         pe = EmpiricalPriorEstimator(;
+                                                                                         pe = EmpiricalPrior(;
                                                                                                                       me = ShrunkExpectedReturns(;
                                                                                                                                                  alg = JamesStein()),
                                                                                                                       ce = PortfolioOptimisersCovariance(;
@@ -584,20 +584,20 @@
                                                                      name = 2, coef = 1.0),
                                             B = 0.001)
         views = [vc_1, vc_2, vc_3, vc_4, vc_5]
-        pes = [BlackLittermanPriorEstimator(; views = views, sets = sets),
-               BlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.0001),
-               BlackLittermanPriorEstimator(;
-                                            pe = EmpiricalPriorEstimator(;
+        pes = [BlackLittermanPrior(; views = views, sets = sets),
+               BlackLittermanPrior(; views = views, sets = sets, rf = 0.0001),
+               BlackLittermanPrior(;
+                                            pe = EmpiricalPrior(;
                                                                          me = ExcessExpectedReturns()),
                                             views = views, sets = sets),
-               BlackLittermanPriorEstimator(;
-                                            pe = EmpiricalPriorEstimator(;
+               BlackLittermanPrior(;
+                                            pe = EmpiricalPrior(;
                                                                          me = ExcessExpectedReturns(;
                                                                                                     rf = 0.0001)),
                                             views = views, sets = sets, rf = 0.0001),
-               BlackLittermanPriorEstimator(; views = views, sets = sets,
+               BlackLittermanPrior(; views = views, sets = sets,
                                             views_conf = fill(eps(), length(views))),
-               BlackLittermanPriorEstimator(; views = views, sets = sets,
+               BlackLittermanPrior(; views = views, sets = sets,
                                             views_conf = fill(1.0 - eps(), length(views)))]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Black-Litterman-Prior.csv"), DataFrame)
         for i in eachindex(pes)
@@ -699,11 +699,11 @@
                                                                      name = 2, coef = 1.0),
                                             B = 0.001)
         views = [vc_1, vc_2, vc_3, vc_4, vc_5]
-        pe1 = FactorPriorEstimator(; re = StepwiseRegression(; alg = Backward()),
+        pe1 = FactorPrior(; re = StepwiseRegression(; alg = Backward()),
                                    rsd = true)
         pr1 = prior(pe1, transpose(X), transpose(F); dims = 2)
 
-        pe2 = BlackLittermanPriorEstimator(; pe = pe1, views = views, sets = sets)
+        pe2 = BlackLittermanPrior(; pe = pe1, views = views, sets = sets)
         pr2 = prior(pe2, transpose(X), transpose(F); dims = 2)
         df = CSV.read(joinpath(@__DIR__, "./assets/Black-Litterman-Factor-Prior.csv"),
                       DataFrame)
@@ -736,24 +736,24 @@
                                                                      coef = [1, -1.0]),
                                             B = 0.002)
         views = [vc_1, vc_2, vc_3]
-        pes = [BayesianBlackLittermanPriorEstimator(;
-                                                    pe = FactorPriorEstimator(;
-                                                                              pe = EmpiricalPriorEstimator(;
+        pes = [BayesianBlackLittermanPrior(;
+                                                    pe = FactorPrior(;
+                                                                              pe = EmpiricalPrior(;
                                                                                                            me = ExcessExpectedReturns(;
                                                                                                                                       rf = 0.001))),
                                                     mp = DefaultMatrixProcessing(),
                                                     views = views, sets = sets, rf = 0.001),
-               BayesianBlackLittermanPriorEstimator(;
-                                                    pe = FactorPriorEstimator(;
-                                                                              pe = EmpiricalPriorEstimator(;
+               BayesianBlackLittermanPrior(;
+                                                    pe = FactorPrior(;
+                                                                              pe = EmpiricalPrior(;
                                                                                                            me = ExcessExpectedReturns(;
                                                                                                                                       rf = 0.001))),
                                                     mp = DefaultMatrixProcessing(),
                                                     views = views, sets = sets, rf = 0.001,
                                                     views_conf = fill(eps(), length(views))),
-               BayesianBlackLittermanPriorEstimator(;
-                                                    pe = FactorPriorEstimator(;
-                                                                              pe = EmpiricalPriorEstimator(;
+               BayesianBlackLittermanPrior(;
+                                                    pe = FactorPrior(;
+                                                                              pe = EmpiricalPrior(;
                                                                                                            me = ExcessExpectedReturns(;
                                                                                                                                       rf = 0.001))),
                                                     mp = DefaultMatrixProcessing(),
@@ -845,39 +845,39 @@
         views = [vc_1, vc_2, vc_3]
         sets = DataFrame(:Factor => [1, 2, 3, 4])
 
-        pes = [FactorBlackLittermanPriorEstimator(; views = views, sets = sets,
+        pes = [FactorBlackLittermanPrior(; views = views, sets = sets,
                                                   rsd = false),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   rsd = false),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, rsd = false),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   rsd = false),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = false,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rsd = false,
                                                   views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   rsd = false,
                                                   views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, rsd = false,
                                                   views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   rsd = false,
                                                   views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = false,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rsd = false,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   rsd = false,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, rsd = false,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   rsd = false,
                                                   views_conf = fill(1 - sqrt(eps()),
@@ -945,37 +945,37 @@
         @test pr1.loadings.b == pr2.loadings.b
         @test pr1.loadings.M == pr2.loadings.M
 
-        pes = [FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = true),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+        pes = [FactorBlackLittermanPrior(; views = views, sets = sets, rsd = true),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   rsd = true),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, rsd = true),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10),
                                                   rsd = true),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = true,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rsd = true,
                                                   views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   rsd = true,
                                                   views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, rsd = true,
                                                   views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10), rsd = true,
                                                   views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rsd = true,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views))),
-               FactorBlackLittermanPriorEstimator(; views = views, sets = sets, rf = 0.001,
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
                                                   l = 1, w = (1:10) / sum(1:10), rsd = true,
                                                   views_conf = fill(1 - sqrt(eps()),
                                                                     length(views)))]
@@ -1075,39 +1075,39 @@
                                                                      coef = [1, -1.0]),
                                             B = 0.002)
         f_views = [vc_1, vc_2, vc_3]
-        pes = [AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+        pes = [AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets),
-               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+               AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets,
                                                      rf = 0.001),
-               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+               AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets,
                                                      rf = 0.001, l = 1),
-               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+               AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets,
                                                      rf = 0.001, l = 1,
                                                      w = (1:10) / sum(1:10)),
-               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+               AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets,
                                                      a_views_conf = fill(eps(),
                                                                          length(a_views)),
                                                      f_views_conf = fill(eps(),
                                                                          length(f_views))),
-               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+               AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets,
                                                      rf = 0.001,
                                                      a_views_conf = fill(eps(),
                                                                          length(a_views)),
                                                      f_views_conf = fill(eps(),
                                                                          length(f_views))),
-               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+               AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets,
                                                      rf = 0.001, l = 1,
                                                      a_views_conf = fill(eps(),
                                                                          length(a_views)),
                                                      f_views_conf = fill(eps(),
                                                                          length(f_views))),
-               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+               AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets,
                                                      rf = 0.001, l = 1,
                                                      w = (1:10) / sum(1:10),
@@ -1115,27 +1115,27 @@
                                                                          length(a_views)),
                                                      f_views_conf = fill(eps(),
                                                                          length(f_views))),
-               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+               AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets,
                                                      a_views_conf = fill(1 - sqrt(eps()),
                                                                          length(a_views)),
                                                      f_views_conf = fill(1 - sqrt(eps()),
                                                                          length(f_views))),
-               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+               AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets,
                                                      rf = 0.001,
                                                      a_views_conf = fill(1 - sqrt(eps()),
                                                                          length(a_views)),
                                                      f_views_conf = fill(1 - sqrt(eps()),
                                                                          length(f_views))),
-               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+               AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets,
                                                      rf = 0.001, l = 1,
                                                      a_views_conf = fill(1 - sqrt(eps()),
                                                                          length(a_views)),
                                                      f_views_conf = fill(1 - sqrt(eps()),
                                                                          length(f_views))),
-               AugmentedBlackLittermanPriorEstimator(; a_views = a_views, a_sets = a_sets,
+               AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
                                                      f_views = f_views, f_sets = f_sets,
                                                      rf = 0.001, l = 1,
                                                      w = (1:10) / sum(1:10),
@@ -1287,19 +1287,19 @@
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H2_EntropyPooling()),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
-                                            opt = JuMPEntropyPoolingEstimator(;
+                                            opt = JuMPEntropyPooling(;
                                                                               slv = Solver(;
                                                                                            solver = Clarabel.Optimizer,
                                                                                            settings = Dict("verbose" => false)))),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H1_EntropyPooling(),
-                                            opt = JuMPEntropyPoolingEstimator(;
+                                            opt = JuMPEntropyPooling(;
                                                                               slv = Solver(;
                                                                                            solver = Clarabel.Optimizer,
                                                                                            settings = Dict("verbose" => false)))),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H2_EntropyPooling(),
-                                            opt = JuMPEntropyPoolingEstimator(;
+                                            opt = JuMPEntropyPooling(;
                                                                               slv = Solver(;
                                                                                            solver = Clarabel.Optimizer,
                                                                                            settings = Dict("verbose" => false))))]
@@ -1622,7 +1622,7 @@
         @test sort(c) == c
         @test sort!(c) == c
 
-        @test_throws AssertionError JuMPEntropyPoolingEstimator(; slv = Solver[])
+        @test_throws AssertionError JuMPEntropyPooling(; slv = Solver[])
         pe = EntropyPoolingPriorEstimator(;
                                           views = ContinuousEntropyPoolingViewEstimator(;
                                                                                         A = C1_LinearEntropyPoolingConstraintEstimator(;
@@ -1654,11 +1654,11 @@
                                                                                                       name2 = 3,
                                                                                                       coef = 0.217),
                                                        comp = LEQ())]
-        pes = [EntropyPoolingPriorEstimator(; pe = FactorPriorEstimator(;), views = views,
+        pes = [EntropyPoolingPriorEstimator(; pe = FactorPrior(;), views = views,
                                             sets = sets),
-               EntropyPoolingPriorEstimator(; pe = FactorPriorEstimator(;), views = views,
+               EntropyPoolingPriorEstimator(; pe = FactorPrior(;), views = views,
                                             sets = sets, alg = H1_EntropyPooling()),
-               EntropyPoolingPriorEstimator(; pe = FactorPriorEstimator(;), views = views,
+               EntropyPoolingPriorEstimator(; pe = FactorPrior(;), views = views,
                                             sets = sets, alg = H2_EntropyPooling())]
 
         ress = (1.0759615986400306e-15, 1.0759615986400306e-15, 1.0759615986400306e-15)

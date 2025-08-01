@@ -79,15 +79,15 @@ function (r::SquareRootKurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Semi})(w::A
     return sqrt(isnothing(r.w) ? mean(val) : mean(val, r.w))
 end
 function factory(r::SquareRootKurtosis,
-                 pr::HighOrderPriorResult{<:LowOrderPriorResult, <:Any, <:Any, <:Any,
-                                          <:Any}, args...; kwargs...)
+                 pr::HighOrderPrior{<:LowOrderPrior, <:Any, <:Any, <:Any, <:Any}, args...;
+                 kwargs...)
     w = nothing_scalar_array_factory(r.w, pr.w)
     mu = nothing_scalar_array_factory(r.mu, pr.mu)
     kt = nothing_scalar_array_factory(r.kt, pr.kt)
     return SquareRootKurtosis(; settings = r.settings, alg = r.alg, w = w, mu = mu, kt = kt,
                               N = r.N)
 end
-function factory(r::SquareRootKurtosis, pr::LowOrderPriorResult, args...; kwargs...)
+function factory(r::SquareRootKurtosis, pr::LowOrderPrior, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, pr.w)
     mu = nothing_scalar_array_factory(r.mu, pr.mu)
     kt = nothing_scalar_array_factory(r.kt, nothing)

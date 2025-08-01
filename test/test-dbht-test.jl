@@ -395,10 +395,10 @@
             sigma2 = copy(sigma)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i]),
-                                                             PosdefEstimator(), sigma1, X)
+                                                             Posdef(), sigma1, X)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = desg[i]),
-                                                             PosdefEstimator(), sigma2, X)
+                                                             Posdef(), sigma2, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1
@@ -447,11 +447,11 @@
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = des[i],
                                                                                       sim = ExponentialSimilarity()),
-                                                             PosdefEstimator(), sigma1, X)
+                                                             Posdef(), sigma1, X)
             PortfolioOptimisers.matrix_processing_algorithm!(PortfolioOptimisers.LoGo(;
                                                                                       dist = desg[i],
                                                                                       sim = ExponentialSimilarity()),
-                                                             PosdefEstimator(), sigma2, X)
+                                                             Posdef(), sigma2, X)
             MN = size(sigma1)
             res1 = isapprox(sigma1, reshape(logo_t[!, i], MN))
             if !res1

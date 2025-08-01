@@ -11,9 +11,8 @@ function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
     @smart_assert(zero(g) < g < one(g))
     return NormalisedConstantRelativeRiskAversion{typeof(g)}(g)
 end
-struct OWAJuMPEstimator{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T2 <: Real,
-                        T3 <: Real, T4 <: Real,
-                        T5 <: AbstractOrderedWeightsArrayAlgorithm} <:
+struct OWAJuMP{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T2 <: Real, T3 <: Real,
+               T4 <: Real, T5 <: AbstractOrderedWeightsArrayAlgorithm} <:
        AbstractOrderedWeightsArrayEstimator
     slv::T1
     max_phi::T2
@@ -21,17 +20,20 @@ struct OWAJuMPEstimator{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T2 <:
     so::T4
     alg::T5
 end
-function OWAJuMPEstimator(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
-                          max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
-                          alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
+                 max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
+                 alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
     if isa(slv, AbstractVector)
         @smart_assert(!isempty(slv))
     end
     @smart_assert(zero(max_phi) < max_phi < one(max_phi))
     @smart_assert(sc > zero(sc))
     @smart_assert(so > zero(so))
-    return OWAJuMPEstimator{typeof(slv), typeof(max_phi), typeof(sc), typeof(so),
-                            typeof(alg)}(slv, max_phi, sc, so, alg)
+    return OWAJuMP{typeof(slv), typeof(max_phi), typeof(sc), typeof(so), typeof(alg)}(slv,
+                                                                                      max_phi,
+                                                                                      sc,
+                                                                                      so,
+                                                                                      alg)
 end
 function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real)
     N = size(weights, 2)
@@ -55,7 +57,7 @@ function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion,
                           weights::AbstractMatrix{<:Real})
     return ncrra_weights(weights, method.g)
 end
-function owa_model_setup(method::OWAJuMPEstimator, weights::AbstractMatrix{<:Real})
+function owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
     T, N = size(weights)
     model = JuMP.Model()
     max_phi = method.max_phi
@@ -74,8 +76,7 @@ function owa_model_setup(method::OWAJuMPEstimator, weights::AbstractMatrix{<:Rea
                  end)
     return model
 end
-function owa_model_solve(model::JuMP.Model, method::OWAJuMPEstimator,
-                         weights::AbstractMatrix)
+function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMatrix)
     slv = method.slv
     return if optimise_JuMP_model!(model, slv).success
         phi = model[:phi]
@@ -87,8 +88,7 @@ function owa_model_solve(model::JuMP.Model, method::OWAJuMPEstimator,
         w = ncrra_weights(weights, 0.5)
     end
 end
-function owa_l_moment_crm(method::OWAJuMPEstimator{<:Any, <:Any, <:Any, <:Any,
-                                                   <:MaximumEntropy},
+function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy},
                           weights::AbstractMatrix{<:Real})
     T = size(weights, 1)
     sc = method.sc
@@ -108,8 +108,8 @@ function owa_l_moment_crm(method::OWAJuMPEstimator{<:Any, <:Any, <:Any, <:Any,
     @objective(model, Max, -so * t)
     return owa_model_solve(model, method, weights)
 end
-function owa_l_moment_crm(method::OWAJuMPEstimator{<:Any, <:Any, <:Any, <:Any,
-                                                   <:MinimumSquareDistance},
+function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
+                                          <:MinimumSquareDistance},
                           weights::AbstractMatrix{<:Real})
     sc = method.sc
     so = method.so
@@ -121,8 +121,7 @@ function owa_l_moment_crm(method::OWAJuMPEstimator{<:Any, <:Any, <:Any, <:Any,
     @objective(model, Min, so * t)
     return owa_model_solve(model, method, weights)
 end
-function owa_l_moment_crm(method::OWAJuMPEstimator{<:Any, <:Any, <:Any, <:Any,
-                                                   <:MinimumSumSquares},
+function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumSumSquares},
                           weights::AbstractMatrix{<:Real})
     sc = method.sc
     so = method.so
@@ -228,6 +227,6 @@ function owa_l_moment_crm(T::Integer; k::Integer = 2,
 end
 
 export MaximumEntropy, MinimumSquareDistance, MinimumSumSquares,
-       NormalisedConstantRelativeRiskAversion, OWAJuMPEstimator, owa_gmd, owa_cvar,
-       owa_wcvar, owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_wcvarrg, owa_tgrg, owa_l_moment,
+       NormalisedConstantRelativeRiskAversion, OWAJuMP, owa_gmd, owa_cvar, owa_wcvar,
+       owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_wcvarrg, owa_tgrg, owa_l_moment,
        owa_l_moment_crm

@@ -1,8 +1,8 @@
-struct HierarchicalOptimisationResult{T1 <: Type, T2 <: AbstractPriorResult,
-                                      T3 <: Union{Nothing, <:Fees},
-                                      T4 <: Union{Nothing, <:WeightBoundsResult},
-                                      T5 <: AbstractClusteringResult,
-                                      T6 <: OptimisationReturnCode, T7 <: AbstractVector} <:
+struct HierarchicalOptimisation{T1 <: Type, T2 <: AbstractPriorResult,
+                                T3 <: Union{Nothing, <:Fees},
+                                T4 <: Union{Nothing, <:WeightBounds},
+                                T5 <: AbstractClusteringResult,
+                                T6 <: OptimisationReturnCode, T7 <: AbstractVector} <:
        OptimisationResult
     oe::T1
     pr::T2
@@ -16,19 +16,18 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
                              T2 <: Union{<:ClusteringEstimator, <:AbstractClusteringResult},
                              T3 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
                              T4 <: Union{Nothing, <:FeesEstimator, <:Fees},
-                             T5 <:
-                             Union{Nothing, <:WeightBoundsResult, <:AbstractString, Expr,
-                                   <:AbstractVector{<:AbstractString},
-                                   <:AbstractVector{Expr},
-                                   <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                   #! Start: to delete
-                                   <:WeightBoundsConstraint
-                                   #! End: to delete
-                                   }, T6 <: Union{Nothing, <:AssetSets,
-                                        #! Start: to delete
-                                                  <:DataFrame
-                                        #! End: to delete
-                                        }, T7 <: ClusteringWeightFinaliser, T8 <: Bool} <:
+                             T5 <: Union{Nothing, <:WeightBounds, <:AbstractString, Expr,
+                                         <:AbstractVector{<:AbstractString},
+                                         <:AbstractVector{Expr},
+                                         <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                               #! Start: to delete
+                                         <:WeightBoundsEstimator
+                               #! End: to delete
+                               }, T6 <: Union{Nothing, <:AssetSets,
+                                    #! Start: to delete
+                                              <:DataFrame
+                                    #! End: to delete
+                                    }, T7 <: WeightFinaliser, T8 <: Bool} <:
        BaseClusteringOptimisationEstimator
     pe::T1
     cle::T2
@@ -40,27 +39,27 @@ struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPri
     strict::T8
 end
 function HierarchicalOptimiser(;
-                               pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPriorEstimator(),
+                               pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
                                cle::Union{<:ClusteringEstimator,
                                           <:AbstractClusteringResult} = ClusteringEstimator(),
                                slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
                                fees::Union{Nothing, <:Fees} = nothing,
-                               wb::Union{Nothing, <:WeightBoundsResult, <:AbstractString,
-                                         Expr, <:AbstractVector{<:AbstractString},
+                               wb::Union{Nothing, <:WeightBounds, <:AbstractString, Expr,
+                                         <:AbstractVector{<:AbstractString},
                                          <:AbstractVector{Expr},
                                          <:AbstractVector{<:Union{<:AbstractString, Expr}},
                                          #! Start: to delete
-                                         <:WeightBoundsConstraint
+                                         <:WeightBoundsEstimator
                                          #! End: to delete
-                                         } = WeightBoundsResult(),
+                                         } = WeightBounds(),
                                sets::Union{Nothing, <:AssetSets,
                                            #! Start: to delete
                                            <:DataFrame
                                            #! End: to delete
                                            } = nothing,
-                               cwf::ClusteringWeightFinaliser = IterativeClusteringWeightFiniliser(),
+                               cwf::WeightFinaliser = IterativeWeightFiniliser(),
                                strict::Bool = false)
-    if isa(wb, WeightBoundsConstraint)
+    if isa(wb, WeightBoundsEstimator)
         @smart_assert(!isnothing(sets))
     end
     return HierarchicalOptimiser{typeof(pe), typeof(cle), typeof(slv), typeof(fees),
@@ -104,4 +103,4 @@ function unitary_expected_risks!(wk::AbstractVector, rk::AbstractVector,
     return nothing
 end
 
-export HierarchicalOptimisationResult, HierarchicalOptimiser
+export HierarchicalOptimisation, HierarchicalOptimiser

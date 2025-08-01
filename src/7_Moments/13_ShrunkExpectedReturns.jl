@@ -124,7 +124,7 @@ Construct a [`JamesStein`](@ref) shrinkage algorithm for expected returns estima
 
   - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target.
 
-# Returns
+# ReturnsResult
 
   - `JamesStein`: Configured James-Stein shrinkage algorithm.
 
@@ -186,7 +186,7 @@ Construct a [`BayesStein`](@ref) shrinkage algorithm for expected returns estima
 
   - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target.
 
-# Returns
+# ReturnsResult
 
   - `BayesStein`: Configured Bayes-Stein shrinkage algorithm.
 
@@ -248,7 +248,7 @@ Construct a [`BodnarOkhrinParolya`](@ref) shrinkage algorithm for expected retur
 
   - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target.
 
-# Returns
+# ReturnsResult
 
   - `BodnarOkhrinParolya`: Configured Bodnar-Okhrin-Parolya shrinkage algorithm.
 
@@ -326,7 +326,7 @@ Construct a [`ShrunkExpectedReturns`](@ref) estimator for shrinkage-based expect
   - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
   - `alg::AbstractShrunkExpectedReturnsAlgorithm`: Shrinkage algorithm.
 
-# Returns
+# ReturnsResult
 
   - `ShrunkExpectedReturns`: Configured shrinkage-based expected returns estimator.
 
@@ -346,7 +346,7 @@ ShrunkExpectedReturns
       |      |       |    w | nothing
       |      |   alg | Full()
       |   mp | DefaultMatrixProcessing
-      |      |       pdm | PosdefEstimator
+      |      |       pdm | Posdef
       |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
       |      |   denoise | nothing
       |      |    detone | nothing
@@ -380,22 +380,22 @@ Compute the shrinkage target vector for expected returns estimation.
 
 # Arguments
 
-  - `target::GrandMean`: Returns a vector filled with the mean of `mu`.
-  - `target::VolatilityWeighted`: Returns a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
-  - `target::MeanSquareError`: Returns a vector filled with the trace of `sigma` divided by `T`.
+  - `target::GrandMean`: ReturnsResult a vector filled with the mean of `mu`.
+  - `target::VolatilityWeighted`: ReturnsResult a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
+  - `target::MeanSquareError`: ReturnsResult a vector filled with the trace of `sigma` divided by `T`.
   - `mu::AbstractArray`: Vector of expected returns.
   - `sigma::AbstractMatrix`: Covariance matrix of asset returns.
   - `kwargs...`: Additional keyword arguments, such as `T` (number of observations) or `isigma` (inverse covariance matrix).
 
-# Returns
+# ReturnsResult
 
   - `b::AbstractArray`: Target vector for shrinkage estimation.
 
 # Methods
 
-  - `target_mean(::GrandMean, mu, sigma; kwargs...)`: Returns a vector filled with the grand mean of `mu`.
-  - `target_mean(::VolatilityWeighted, mu, sigma; isigma = nothing, kwargs...)`: Returns a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
-  - `target_mean(::MeanSquareError, mu, sigma; T, kwargs...)`: Returns a vector filled with the trace of `sigma` divided by `T`.
+  - `target_mean(::GrandMean, mu, sigma; kwargs...)`: ReturnsResult a vector filled with the grand mean of `mu`.
+  - `target_mean(::VolatilityWeighted, mu, sigma; isigma = nothing, kwargs...)`: ReturnsResult a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
+  - `target_mean(::MeanSquareError, mu, sigma; T, kwargs...)`: ReturnsResult a vector filled with the trace of `sigma` divided by `T`.
 
 # Related
 
@@ -440,7 +440,7 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
   - `dims::Int`: Dimension along which to compute the mean.
   - `kwargs...`: Additional keyword arguments passed to the mean and covariance estimators.
 
-# Returns
+# ReturnsResult
 
   - `mu::AbstractArray`: Shrunk expected returns vector.
 
@@ -454,7 +454,7 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
       + `JamesStein`: the centered mean and eigenvalues of the covariance matrix.
       + `BayesStein`: a Bayesian formula involving the centered mean and inverse covariance.
       + `BodnarOkhrinParolya`: a Bayesian formula involving the target mean, mean and inverse covariance.
-  - Returns the shrunk mean vector.
+  - ReturnsResult the shrunk mean vector.
 
 # Related
 

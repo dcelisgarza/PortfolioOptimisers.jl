@@ -45,7 +45,7 @@
                                   "reduced_tol_infeas_abs" => 1e-4,
                                   "reduced_tol_infeas_rel" => 1e-4))]
     pr = prior(HighOrderPriorEstimator(;
-                                       pe = FactorPriorEstimator(;
+                                       pe = FactorPrior(;
                                                                  re = DimensionReductionRegression())),
                rd)
     rf = 4.34 / 100 / 252

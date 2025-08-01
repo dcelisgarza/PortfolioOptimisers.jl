@@ -72,7 +72,7 @@ function to_tree(a::Hclust)
     end
     return nd, d
 end
-function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HierarchicalClustering, <:Any},
+function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
                     X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
                     dims::Int = 1, kwargs...)
     # S = cor(cle.ce, X; dims = dims, kwargs...)
@@ -80,7 +80,7 @@ function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HierarchicalCluster
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     clustering = hclust(D; linkage = cle.alg.linkage, branchorder = branchorder)
     k = optimal_number_clusters(cle.onc, clustering, D)
-    return HierarchicalClusteringResult(; clustering = clustering, S = S, D = D, k = k)
+    return HierarchicalClustering(; clustering = clustering, S = S, D = D, k = k)
 end
 function validate_k_value(clustering::Hclust, nodes::AbstractVector, k::Integer)
     idx = cutree(clustering; k = k)
@@ -239,4 +239,4 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
     return valid_k_clusters(clustering, W_list)
 end
 
-export HierarchicalClustering, ClusterNode
+export HClustAlgorithm, ClusterNode

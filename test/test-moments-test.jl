@@ -30,7 +30,7 @@
     ew = eweights(1:252, inv(252); scale = true)
     fw = fweights(rand(rng, 252))
     rf = 4.34 / 100 / 252
-    @testset "Expected Returns" begin
+    @testset "Expected ReturnsResult" begin
         mes = [SimpleExpectedReturns(), SimpleExpectedReturns(; w = ew),
                ShrunkExpectedReturns(; alg = JamesStein()),
                ShrunkExpectedReturns(; alg = JamesStein(; target = VolatilityWeighted())),
@@ -69,7 +69,7 @@
                                      me = SimpleExpectedReturns(; w = ew)),
                EquilibriumExpectedReturns(), EquilibriumExpectedReturns(; l = 2),
                ExcessExpectedReturns(), ExcessExpectedReturns(; rf = rf)]
-        ert = CSV.read(joinpath(@__DIR__, "./assets/Expected-Returns.csv"), DataFrame)
+        ert = CSV.read(joinpath(@__DIR__, "./assets/Expected-ReturnsResult.csv"), DataFrame)
         for i in eachindex(mes)
             er = mean(mes[i], X)
             res = isapprox(er, reshape(ert[!, i], size(er)))
