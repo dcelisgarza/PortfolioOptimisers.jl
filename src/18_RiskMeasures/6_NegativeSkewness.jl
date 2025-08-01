@@ -1,7 +1,4 @@
-struct NegativeSkewness{T1 <: RiskMeasureSettings, T2 <: AbstractMatrixProcessingEstimator,
-                        T3 <: Union{Nothing, <:AbstractMatrix},
-                        T4 <: Union{Nothing, <:AbstractMatrix}, T5 <: QuadSqrtRiskExpr} <:
-       AbstractNegativeSkewRiskMeasure
+struct NegativeSkewness{T1, T2, T3, T4, T5} <: AbstractNegativeSkewRiskMeasure
     settings::T1
     mp::T2
     sk::T3
@@ -24,8 +21,7 @@ function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(
         @smart_assert(size(sk, 1)^2 == size(sk, 2))
         assert_matrix_issquare(V)
     end
-    return NegativeSkewness{typeof(settings), typeof(mp), typeof(sk), typeof(V),
-                            typeof(alg)}(settings, mp, sk, V, alg)
+    return NegativeSkewness(settings, mp, sk, V, alg)
 end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SqrtRiskExpr})(w::AbstractVector)
     return sqrt(dot(w, r.V, w))

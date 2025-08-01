@@ -5,17 +5,7 @@ struct SOCRiskExpr <: VarianceAlgorithm end
 struct RSOCRiskExpr <: SecondMomentAlgorithm end
 struct SqrtRiskExpr <: SecondMomentAlgorithm end
 const QuadSqrtRiskExpr = Union{<:SqrtRiskExpr, <:QuadRiskExpr}
-struct Variance{T1 <: RiskMeasureSettings, T2 <: Union{Nothing, <:AbstractMatrix},
-                T3 <:
-                Union{Nothing, <:AbstractString, Expr, <:AbstractVector{<:AbstractString},
-                      <:AbstractVector{Expr},
-                      <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                      #! Start: to delete
-                      <:LinearConstraintEstimator,
-                      <:AbstractVector{<:LinearConstraintEstimator},
-                      #! End: to delete
-                      <:LinearConstraint}, T4 <: VarianceAlgorithm} <:
-       JuMPRiskContributionSigmaRiskMeasure
+struct Variance{T1, T2, T3, T4} <: JuMPRiskContributionSigmaRiskMeasure
     settings::T1
     sigma::T2
     rc::T3
@@ -36,9 +26,7 @@ function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
         @smart_assert(!isempty(sigma))
         assert_matrix_issquare(sigma)
     end
-    return Variance{typeof(settings), typeof(sigma), typeof(rc), typeof(alg)}(settings,
-                                                                              sigma, rc,
-                                                                              alg)
+    return Variance(settings, sigma, rc, alg)
 end
 function (r::Variance)(w::AbstractVector)
     return dot(w, r.sigma, w)
@@ -54,8 +42,7 @@ function risk_measure_view(r::Variance, i::AbstractVector, args...)
     # rc = linear_constraint_view(r.rc, i)
     return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
 end
-struct StandardDeviation{T1 <: RiskMeasureSettings,
-                         T2 <: Union{Nothing, <:AbstractMatrix}} <: SigmaRiskMeasure
+struct StandardDeviation{T1, T2} <: SigmaRiskMeasure
     settings::T1
     sigma::T2
 end
@@ -65,7 +52,7 @@ function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings
         @smart_assert(!isempty(sigma))
         assert_matrix_issquare(sigma)
     end
-    return StandardDeviation{typeof(settings), typeof(sigma)}(settings, sigma)
+    return StandardDeviation(settings, sigma)
 end
 function (r::StandardDeviation)(w::AbstractVector)
     return sqrt(dot(w, r.sigma, w))
@@ -78,11 +65,7 @@ function risk_measure_view(r::StandardDeviation, i::AbstractVector, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     return StandardDeviation(; settings = r.settings, sigma = sigma)
 end
-struct UncertaintySetVariance{T1 <: RiskMeasureSettings,
-                              T2 <: Union{Nothing, <:AbstractUncertaintySetResult,
-                                          <:AbstractUncertaintySetEstimator},
-                              T3 <: Union{Nothing, <:AbstractMatrix{<:Real}}} <:
-       SigmaRiskMeasure
+struct UncertaintySetVariance{T1, T2, T3} <: SigmaRiskMeasure
     settings::T1
     ucs::T2
     sigma::T3
@@ -94,17 +77,17 @@ function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSet
     if isa(sigma, AbstractMatrix)
         @smart_assert(!isempty(sigma))
     end
-    return UncertaintySetVariance{typeof(settings), typeof(ucs), typeof(sigma)}(settings,
-                                                                                ucs, sigma)
+    return UncertaintySetVariance(settings, ucs, sigma)
 end
 function (r::UncertaintySetVariance)(w::AbstractVector)
     return dot(w, r.sigma, w)
 end
 function no_bounds_risk_measure(r::UncertaintySetVariance, flag::Bool = true)
     return if flag
-        UncertaintySetVariance(RiskMeasureSettings(; rke = r.settings.rke,
-                                                   scale = r.settings.scale), r.ucs,
-                               r.sigma)
+        UncertaintySetVariance(;
+                               settings = RiskMeasureSettings(; rke = r.settings.rke,
+                                                              scale = r.settings.scale),
+                               r.ucs, sigma = r.sigma)
     else
         Variance(;
                  settings = RiskMeasureSettings(; rke = r.settings.rke,

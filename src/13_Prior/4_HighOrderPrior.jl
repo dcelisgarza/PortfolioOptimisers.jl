@@ -181,13 +181,7 @@ function dup_elim_sum_matrices(n::Int)
 
     return d, l, s
 end
-struct HighOrderPrior{T1 <: AbstractPriorResult, T2 <: Union{Nothing, <:AbstractMatrix},
-                      T3 <: Union{Nothing, <:AbstractMatrix},
-                      T4 <: Union{Nothing, <:AbstractMatrix},
-                      T5 <: Union{Nothing, <:AbstractMatrix},
-                      T6 <: Union{Nothing, <:AbstractMatrix},
-                      T7 <: Union{Nothing, <:AbstractMatrixProcessingEstimator}} <:
-       AbstractPriorResult
+struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
     pr::T1
     kt::T2
     L2::T3
@@ -227,8 +221,7 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:Abstract
         @smart_assert(sk_flag && V_flag,
                       "If either sk or V, is nothing, both must be nothing.")
     end
-    return HighOrderPrior{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk),
-                          typeof(V), typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
+    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
 end
 function dup_elim_sum_view(args...)
     return nothing, nothing, nothing
@@ -271,10 +264,7 @@ function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
-struct HighOrderPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
-                               T2 <: Union{Nothing, <:CokurtosisEstimator},
-                               T3 <: Union{Nothing, <:CoskewnessEstimator}} <:
-       AbstractHighOrderPriorEstimator
+struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
     pe::T1
     kte::T2
     ske::T3
@@ -290,7 +280,7 @@ function HighOrderPriorEstimator(;
                                                                                          alg = Full()),
                                  ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
                                                                                          alg = Full()))
-    return HighOrderPriorEstimator{typeof(pe), typeof(kte), typeof(ske)}(pe, kte, ske)
+    return HighOrderPriorEstimator(pe, kte, ske)
 end
 function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
     return if sym == :me

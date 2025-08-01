@@ -10,27 +10,24 @@ abstract type LinearEntropyPoolingConstraintEstimator <:
 abstract type BilinearEntropyPoolingConstraintEstimator <:
               AbstractNonConstantEntropyPoolingConstraintEstimator end
 abstract type AbstractEntropyPoolingConstraintAlgorithm <: AbstractAlgorithm end
-struct ConstantEntropyPoolingConstraintEstimator{T1 <: Real} <:
+struct ConstantEntropyPoolingConstraintEstimator{T1} <:
        AbstractConstantEntropyPoolingConstraintEstimator
     coef::T1
 end
 function ConstantEntropyPoolingConstraintEstimator(; coef::Real = 0.0)
-    return ConstantEntropyPoolingConstraintEstimator{typeof(coef)}(coef)
+    return ConstantEntropyPoolingConstraintEstimator(coef)
 end
 abstract type AbstractDiscontinuousEntropyPoolingConstraintEstimator <:
               EntropyPoolingConstraintEstimator end
 abstract type C0_EntropyPoolingAlgorithm <: AbstractEntropyPoolingConstraintAlgorithm end
 struct MeanEntropyPoolingViewAlgorithm <: C0_EntropyPoolingAlgorithm end
-struct ValueatRiskEntropyPoolingAlgorithm{T1 <: Real} <: C0_EntropyPoolingAlgorithm
+struct ValueatRiskEntropyPoolingAlgorithm{T1} <: C0_EntropyPoolingAlgorithm
     alpha::T1
 end
 function ValueatRiskEntropyPoolingAlgorithm(; alpha::Real = 0.05)
-    return ValueatRiskEntropyPoolingAlgorithm{typeof(alpha)}(alpha)
+    return ValueatRiskEntropyPoolingAlgorithm(alpha)
 end
-struct C0_LinearEntropyPoolingConstraintEstimator{T1, T2,
-                                                  T3 <:
-                                                  Union{<:Real, <:AbstractVector{<:Real}},
-                                                  T4 <: C0_EntropyPoolingAlgorithm} <:
+struct C0_LinearEntropyPoolingConstraintEstimator{T1, T2, T3, T4} <:
        LinearEntropyPoolingConstraintEstimator
     group::T1
     name::T2
@@ -49,16 +46,9 @@ function C0_LinearEntropyPoolingConstraintEstimator(; group, name,
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
     end
-    return C0_LinearEntropyPoolingConstraintEstimator{typeof(group), typeof(name),
-                                                      typeof(coef), typeof(kind)}(group,
-                                                                                  name,
-                                                                                  coef,
-                                                                                  kind)
+    return C0_LinearEntropyPoolingConstraintEstimator(group, name, coef, kind)
 end
-struct C1_LinearEntropyPoolingConstraintEstimator{T1, T2,
-                                                  T3 <:
-                                                  Union{<:Real, <:AbstractVector{<:Real}},
-                                                  T4 <: Real} <:
+struct C1_LinearEntropyPoolingConstraintEstimator{T1, T2, T3, T4} <:
        LinearEntropyPoolingConstraintEstimator
     group::T1
     name::T2
@@ -77,19 +67,12 @@ function C1_LinearEntropyPoolingConstraintEstimator(; group, name,
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
     end
-    return C1_LinearEntropyPoolingConstraintEstimator{typeof(group), typeof(name),
-                                                      typeof(coef), typeof(exponent)}(group,
-                                                                                      name,
-                                                                                      coef,
-                                                                                      exponent)
+    return C1_LinearEntropyPoolingConstraintEstimator(group, name, coef, exponent)
 end
 abstract type C2_EntropyPoolingAlgorithm <: AbstractEntropyPoolingConstraintAlgorithm end
 struct SkewnessEntropyPoolingViewAlgorithm <: C2_EntropyPoolingAlgorithm end
 struct KurtosisEntropyPoolingAlgorithm <: C2_EntropyPoolingAlgorithm end
-struct C2_LinearEntropyPoolingConstraintEstimator{T1, T2,
-                                                  T3 <:
-                                                  Union{<:Real, <:AbstractVector{<:Real}},
-                                                  T4 <: C2_EntropyPoolingAlgorithm} <:
+struct C2_LinearEntropyPoolingConstraintEstimator{T1, T2, T3, T4} <:
        LinearEntropyPoolingConstraintEstimator
     group::T1
     name::T2
@@ -108,15 +91,9 @@ function C2_LinearEntropyPoolingConstraintEstimator(; group, name,
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
     end
-    return C2_LinearEntropyPoolingConstraintEstimator{typeof(group), typeof(name),
-                                                      typeof(coef), typeof(kind)}(group,
-                                                                                  name,
-                                                                                  coef,
-                                                                                  kind)
+    return C2_LinearEntropyPoolingConstraintEstimator(group, name, coef, kind)
 end
-struct C4_LinearEntropyPoolingConstraintEstimator{T1, T2, T3, T4,
-                                                  T5 <:
-                                                  Union{<:Real, <:AbstractVector{<:Real}}} <:
+struct C4_LinearEntropyPoolingConstraintEstimator{T1, T2, T3, T4, T5} <:
        BilinearEntropyPoolingConstraintEstimator
     group1::T1
     group2::T2
@@ -145,17 +122,9 @@ function C4_LinearEntropyPoolingConstraintEstimator(; group1, name1, group2, nam
                       length(group2) ==
                       length(name2))
     end
-    return C4_LinearEntropyPoolingConstraintEstimator{typeof(group1), typeof(group2),
-                                                      typeof(name1), typeof(name2),
-                                                      typeof(coef)}(group1, group2, name1,
-                                                                    name2, coef)
+    return C4_LinearEntropyPoolingConstraintEstimator(group1, group2, name1, name2, coef)
 end
-struct ContinuousEntropyPoolingViewEstimator{T1 <:
-                                             AbstractNonConstantEntropyPoolingConstraintEstimator,
-                                             T2 <:
-                                             Union{<:ContinuousEntropyPoolingConstraintEstimator,
-                                                   <:AbstractVector{<:ContinuousEntropyPoolingConstraintEstimator}},
-                                             T3 <: ComparisonOperators}
+struct ContinuousEntropyPoolingViewEstimator{T1, T2, T3}
     A::T1
     B::T2
     comp::T3
@@ -165,8 +134,7 @@ function ContinuousEntropyPoolingViewEstimator(;
                                                B::Union{<:ContinuousEntropyPoolingConstraintEstimator,
                                                         <:AbstractVector{<:ContinuousEntropyPoolingConstraintEstimator}},
                                                comp::ComparisonOperators = LEQ())
-    return ContinuousEntropyPoolingViewEstimator{typeof(A), typeof(B), typeof(comp)}(A, B,
-                                                                                     comp)
+    return ContinuousEntropyPoolingViewEstimator(A, B, comp)
 end
 function Base.setindex!(obj::ContinuousEntropyPoolingViewEstimator, args...)
     return obj
@@ -501,10 +469,7 @@ function get_B_entropy_pooling_view_data(::AbstractPriorResult,
     return epv.coef
 end
 #########
-struct ConditionalValueatRiskPoolingConstraintEstimator{T1, T2,
-                                                        T3 <: Union{<:Real,
-                                                                    <:AbstractVector{<:Real}},
-                                                        T4 <: Real} <:
+struct ConditionalValueatRiskPoolingConstraintEstimator{T1, T2, T3, T4} <:
        AbstractDiscontinuousEntropyPoolingConstraintEstimator
     group::T1
     name::T2
@@ -523,20 +488,9 @@ function ConditionalValueatRiskPoolingConstraintEstimator(; group, name,
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
     end
-    return ConditionalValueatRiskPoolingConstraintEstimator{typeof(group), typeof(name),
-                                                            typeof(coef), typeof(alpha)}(group,
-                                                                                         name,
-                                                                                         coef,
-                                                                                         alpha)
+    return ConditionalValueatRiskPoolingConstraintEstimator(group, name, coef, alpha)
 end
-struct DiscontinuousEntropyPoolingViewEstimator{T1 <:
-                                                AbstractDiscontinuousEntropyPoolingConstraintEstimator,
-                                                T2 <:
-                                                Union{<:AbstractDiscontinuousEntropyPoolingConstraintEstimator,
-                                                      <:ConstantEntropyPoolingConstraintEstimator,
-                                                      <:AbstractVector{<:AbstractDiscontinuousEntropyPoolingConstraintEstimator},
-                                                      <:AbstractVector{<:ConstantEntropyPoolingConstraintEstimator}},
-                                                T3 <: ComparisonOperators}
+struct DiscontinuousEntropyPoolingViewEstimator{T1, T2, T3}
     A::T1
     B::T2
     comp::T3
@@ -554,7 +508,7 @@ function DiscontinuousEntropyPoolingViewEstimator(;
     else
         @smart_assert(A.alpha == B.alpha)
     end
-    return DiscontinuousEntropyPoolingViewEstimator{typeof(A), typeof(B), EQ}(A, B, EQ())
+    return DiscontinuousEntropyPoolingViewEstimator(A, B, EQ())
 end
 function Base.length(::Union{<:ContinuousEntropyPoolingViewEstimator,
                              <:DiscontinuousEntropyPoolingViewEstimator})
@@ -1188,8 +1142,7 @@ function entropy_pooling_views(pr::AbstractPriorResult,
                                     PartialLinearConstraint(; A = A_ineq, B = B_ineq)
                                 else
                                     nothing
-                                end,
-                                eq = if eq_flag
+                                end, eq = if eq_flag
                                     PartialLinearConstraint(; A = A_eq, B = B_eq)
                                 else
                                     nothing

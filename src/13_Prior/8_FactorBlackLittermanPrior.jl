@@ -1,21 +1,4 @@
-struct FactorBlackLittermanPrior{T1 <: AbstractLowOrderPriorEstimatorMap_2_1,
-                                 T2 <: AbstractMatrixProcessingEstimator,
-                                 T3 <: AbstractMatrixProcessingEstimator,
-                                 T4 <: AbstractRegressionEstimator,
-                                 T5 <: AbstractVarianceEstimator,
-                                 T6 <: Union{<:AbstractString, Expr,
-                                             <:AbstractVector{<:AbstractString},
-                                             <:AbstractVector{Expr},
-                                             <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                   #! Start: to delete
-                                             <:BlackLittermanViewsEstimator,
-                                             <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                   #! End: to delete
-                                   }, T7 <: DataFrame,
-                                 T8 <: Union{Nothing, <:AbstractVector},
-                                 T9 <: Union{Nothing, <:AbstractVector}, T10 <: Real,
-                                 T11 <: Union{Nothing, <:Real},
-                                 T12 <: Union{Nothing, <:Real}, T13 <: Bool} <:
+struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
        AbstractLowOrderPriorEstimator_2_1
     pe::T1
     f_mp::T2
@@ -70,12 +53,8 @@ function FactorBlackLittermanPrior(;
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))
     end
-    return FactorBlackLittermanPrior{typeof(pe), typeof(f_mp), typeof(mp), typeof(re),
-                                     typeof(ve), typeof(views), typeof(sets),
-                                     typeof(views_conf), typeof(w), typeof(rf), typeof(l),
-                                     typeof(tau), typeof(rsd)}(pe, f_mp, mp, re, ve, views,
-                                                               sets, views_conf, w, rf, l,
-                                                               tau, rsd)
+    return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
+                                     l, tau, rsd)
 end
 function factory(pe::FactorBlackLittermanPrior,
                  w::Union{Nothing, <:AbstractWeights} = nothing)

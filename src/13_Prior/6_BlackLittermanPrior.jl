@@ -1,15 +1,4 @@
-struct BlackLittermanPrior{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
-                           T2 <: AbstractMatrixProcessingEstimator,
-                           T3 <:
-                           Union{<:AbstractString, Expr, <:AbstractVector{<:AbstractString},
-                                 <:AbstractVector{Expr},
-                                 <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                 #! Start: to delete
-                                 <:BlackLittermanViewsEstimator,
-                                 <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                 #! End: to delete
-                                 }, T4 <: DataFrame, T5 <: Union{Nothing, <:AbstractVector},
-                           T6 <: Real, T7 <: Union{Nothing, <:Real}} <:
+struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
     pe::T1
     mp::T2
@@ -62,11 +51,7 @@ function BlackLittermanPrior(;
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))
     end
-    return BlackLittermanPrior{typeof(pe), typeof(mp), typeof(views), typeof(sets),
-                               typeof(views_conf), typeof(rf), typeof(tau)}(pe, mp, views,
-                                                                            sets,
-                                                                            views_conf, rf,
-                                                                            tau)
+    return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
 function factory(pe::BlackLittermanPrior, w::Union{Nothing, <:AbstractWeights} = nothing)
     return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,

@@ -1,9 +1,5 @@
 abstract type BaseStackingOptimisationEstimator <: OptimisationEstimator end
-struct StackingOptimisation{T1 <: Type, T2 <: AbstractPriorResult,
-                            T3 <: Union{Nothing, <:WeightBounds},
-                            T4 <: AbstractVector{<:OptimisationResult},
-                            T5 <: OptimisationResult, T6 <: OptimisationReturnCode,
-                            T7 <: AbstractVector} <: OptimisationResult
+struct StackingOptimisation{T1, T2, T3, T4, T5, T6, T7} <: OptimisationResult
     oe::T1
     pr::T2
     wb::T3
@@ -12,23 +8,7 @@ struct StackingOptimisation{T1 <: Type, T2 <: AbstractPriorResult,
     retcode::T6
     w::T7
 end
-struct Stacking{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                T2 <: Union{Nothing, <:WeightBounds, <:AbstractString, Expr,
-                            <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                            <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                  #! Start: to delete
-                            <:WeightBoundsEstimator
-                  #! End: to delete
-                  }, T3 <: Union{Nothing, <:AssetSets,
-                       #! Start: to delete
-                                 <:DataFrame
-                       #! End: to delete
-                       },
-                T4 <: Union{<:OptimisationResult, <:OptimisationEstimator,
-                            <:AbstractVector{<:Union{<:OptimisationEstimator,
-                                                     <:OptimisationResult}}},
-                T5 <: OptimisationEstimator, T6 <: WeightFinaliser, T7 <: Bool,
-                T8 <: FLoops.Transducers.Executor} <: BaseStackingOptimisationEstimator
+struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8} <: BaseStackingOptimisationEstimator
     pe::T1
     wb::T2
     sets::T3
@@ -72,9 +52,7 @@ function Stacking(;
     if isa(wb, WeightBoundsEstimator)
         @smart_assert(!isnothing(sets))
     end
-    return Stacking{typeof(pe), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
-                    typeof(cwf), typeof(strict), typeof(threads)}(pe, wb, sets, opti, opto,
-                                                                  cwf, strict, threads)
+    return Stacking(pe, wb, sets, opti, opto, cwf, strict, threads)
 end
 function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X

@@ -44,11 +44,11 @@ function expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEsti
     rk, rt, sr = expected_risk_ret_ratio(r, ret, w, pr; fees = fees, rf = rf, kwargs...)
     return rk, rt, sr - N / (T * sr)
 end
-struct ReturnRiskMeasure{T1 <: JuMPReturnsEstimator} <: NoOptimisationRiskMeasure
+struct ReturnRiskMeasure{T1} <: NoOptimisationRiskMeasure
     rt::T1
 end
 function ReturnRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn())
-    return ReturnRiskMeasure{typeof(rt)}(rt)
+    return ReturnRiskMeasure(rt)
 end
 function factory(r::ReturnRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
     rt = jump_returns_factory(r.rt, prior, args...; kwargs...)
@@ -62,15 +62,14 @@ function expected_risk(r::ReturnRiskMeasure, w::AbstractVector{<:Real},
                        kwargs...)
     return expected_return(r.rt, w, pr, fees)
 end
-struct RatioRiskMeasure{T1 <: JuMPReturnsEstimator, T2 <: AbstractBaseRiskMeasure,
-                        T3 <: Real} <: NoOptimisationRiskMeasure
+struct RatioRiskMeasure{T1, T2, T3} <: NoOptimisationRiskMeasure
     rt::T1
     rk::T2
     rf::T3
 end
 function RatioRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
                           rk::AbstractBaseRiskMeasure = Variance(), rf::Real = 0.0)
-    return RatioRiskMeasure{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
+    return RatioRiskMeasure(rt, rk, rf)
 end
 function factory(r::RatioRiskMeasure, prior::AbstractPriorResult, args...; kwargs...)
     rt = jump_returns_factory(r.rt, prior, args...; kwargs...)

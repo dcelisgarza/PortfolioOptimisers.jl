@@ -1,11 +1,10 @@
-struct RiskRatioRiskMeasure{T1 <: AbstractBaseRiskMeasure, T2 <: AbstractBaseRiskMeasure} <:
-       HierarchicalRiskMeasure
+struct RiskRatioRiskMeasure{T1, T2} <: HierarchicalRiskMeasure
     r1::T1
     r2::T2
 end
 function RiskRatioRiskMeasure(; r1::AbstractBaseRiskMeasure = Variance(),
                               r2::AbstractBaseRiskMeasure = ConditionalValueatRisk())
-    return RiskRatioRiskMeasure{typeof(r1), typeof(r2)}(r1, r2)
+    return RiskRatioRiskMeasure(r1, r2)
 end
 function factory(r::RiskRatioRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
     r1 = factory(r.r1, pr, args...; kwargs...)

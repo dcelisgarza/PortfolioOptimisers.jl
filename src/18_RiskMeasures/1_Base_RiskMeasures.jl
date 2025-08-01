@@ -22,7 +22,7 @@ abstract type AbstractMomentHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure
 abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
 Base.length(::AbstractBaseRiskMeasure) = 1
 Base.iterate(rs::AbstractBaseRiskMeasure, state = 1) = state > 1 ? nothing : (rs, state + 1)
-struct Frontier{T1 <: Integer, T2 <: Real, T3 <: Bool} <: AbstractAlgorithm
+struct Frontier{T1, T2, T3} <: AbstractAlgorithm
     N::T1
     factor::T2
     flag::T3
@@ -31,16 +31,14 @@ function Frontier(; N::Integer = 20)
     @smart_assert(N > zero(N))
     factor = 1
     flag = true
-    return Frontier{typeof(N), typeof(factor), typeof(flag)}(N, 1, true)
+    return Frontier(N, 1, true)
 end
 function _Frontier(; N::Integer = 20, factor::Real, flag::Bool)
     @smart_assert(N > zero(N))
     @smart_assert(isfinite(factor) && factor > zero(factor))
-    return Frontier{typeof(N), typeof(factor), typeof(flag)}(N, factor, flag)
+    return Frontier(N, factor, flag)
 end
-struct RiskMeasureSettings{T1 <: Real,
-                           T2 <: Union{Nothing, <:Real, <:AbstractVector, <:Frontier},
-                           T3 <: Bool} <: AbstractRiskMeasureSettings
+struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
     scale::T1
     ub::T2
     rke::T3
@@ -54,13 +52,13 @@ function RiskMeasureSettings(; scale::Real = 1.0,
         @smart_assert(!isempty(ub) && all(isfinite, ub) && all(x -> x > zero(x), ub))
     end
     @smart_assert(isfinite(scale))
-    return RiskMeasureSettings{typeof(scale), typeof(ub), typeof(rke)}(scale, ub, rke)
+    return RiskMeasureSettings(scale, ub, rke)
 end
-struct HierarchicalRiskMeasureSettings{T1 <: Real} <: AbstractRiskMeasureSettings
+struct HierarchicalRiskMeasureSettings{T1} <: AbstractRiskMeasureSettings
     scale::T1
 end
 function HierarchicalRiskMeasureSettings(; scale::Real = 1.0)
-    return HierarchicalRiskMeasureSettings{typeof(scale)}(scale)
+    return HierarchicalRiskMeasureSettings(scale)
 end
 const MuRiskMeasures = Union{MuRiskMeasure, MuHierarchicalRiskMeasure,
                              MuNoOptimisationRiskMeasure, SquareRootKurtosisRiskMeasure}
@@ -85,12 +83,12 @@ end
 abstract type Scalariser end
 struct SumScalariser <: Scalariser end
 struct MaxScalariser <: Scalariser end
-struct LogSumExpScalariser{T1 <: Real} <: Scalariser
+struct LogSumExpScalariser{T1} <: Scalariser
     gamma::T1
 end
 function LogSumExpScalariser(; gamma::Real = 1.0)
     @smart_assert(gamma > zero(gamma))
-    return LogSumExpScalariser{typeof(gamma)}(gamma)
+    return LogSumExpScalariser(gamma)
 end
 function expected_risk end
 function no_bounds_risk_measure end

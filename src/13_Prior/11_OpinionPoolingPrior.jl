@@ -1,16 +1,7 @@
 abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
 struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
 struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
-struct OpinionPoolingPrior{T1 <:
-                           AbstractVector{<:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
-                           T2 <:
-                           Union{Nothing, <:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
-                           T3 <:
-                           Union{Nothing, <:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
-                           T4 <: Union{Nothing, <:Real},
-                           T5 <: Union{Nothing, <:AbstractVector},
-                           T6 <: OpinionPoolingAlgorithm,
-                           T7 <: FLoops.Transducers.Executor} <:
+struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
     pes::T1
     pe1::T2
@@ -36,9 +27,7 @@ function OpinionPoolingPrior(;
         @smart_assert(!isempty(w) && length(w) == length(pes))
         @smart_assert(sum(w) <= one(eltype(w)))
     end
-    return OpinionPoolingPrior{typeof(pes), typeof(pe1), typeof(pe2), typeof(p), typeof(w),
-                               typeof(alg), typeof(threads)}(pes, pe1, pe2, p, w, alg,
-                                                             threads)
+    return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)
 end
 function robust_probabilities(::AbstractMatrix, ow::AbstractVector, ::Nothing)
     return ow

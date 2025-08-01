@@ -66,7 +66,7 @@ Posdef
   - [`posdef`](@ref)
 """
 function Posdef(; alg = NearestCorrelationMatrix.Newton)
-    return Posdef{typeof(alg)}(alg)
+    return Posdef(alg)
 end
 
 """

@@ -1,5 +1,4 @@
-struct LinearConstraintSide{T1, T2, T3 <: Union{<:Real, <:AbstractVector{<:Real}}} <:
-       AbstractConstraintSide
+struct LinearConstraintSide{T1, T2, T3} <: AbstractConstraintSide
     group::T1
     name::T2
     coef::T3
@@ -14,8 +13,7 @@ function LinearConstraintSide(; group, name,
         @smart_assert(!isempty(group) && !isempty(name) && !isempty(coef))
         @smart_assert(length(group) == length(name) == length(coef))
     end
-    return LinearConstraintSide{typeof(group), typeof(name), typeof(coef)}(group, name,
-                                                                           coef)
+    return LinearConstraintSide(group, name, coef)
 end
 # function linear_constraint_side_view(lc::LinearConstraintSide{<:Any, <:Any, <:Any}, ::Any)
 #     return lc
@@ -29,15 +27,14 @@ end
 #     coef = nothing_scalar_array_view(lc.coef, i)
 #     return LinearConstraintSide(; group = group, name = name, coef = coef)
 # end
-struct LinearConstraintEstimator{T1 <: LinearConstraintSide, T2 <: Real,
-                                 T3 <: ComparisonOperators} <: AbstractConstraint
+struct LinearConstraintEstimator{T1, T2, T3} <: AbstractConstraint
     A::T1
     B::T2
     comp::T3
 end
 function LinearConstraintEstimator(; A::LinearConstraintSide, B::Real = 0.0,
                                    comp::ComparisonOperators = LEQ())
-    return LinearConstraintEstimator{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
+    return LinearConstraintEstimator(A, B, comp)
 end
 function Base.iterate(S::Union{<:LinearConstraintSide, <:LinearConstraintEstimator,
                                <:PartialLinearConstraint, <:LinearConstraint}, state = 1)

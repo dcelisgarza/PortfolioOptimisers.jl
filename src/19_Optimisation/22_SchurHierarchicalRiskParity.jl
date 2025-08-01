@@ -1,10 +1,5 @@
-struct SchurHierarchicalRiskParityOptimisation{T1 <: Type, T2 <: AbstractPriorResult,
-                                               T3 <: Union{Nothing, <:WeightBounds},
-                                               T4 <: AbstractClusteringResult,
-                                               T5 <:
-                                               Union{<:Real, <:AbstractVector{<:Real}},
-                                               T6 <: OptimisationReturnCode,
-                                               T7 <: AbstractVector} <: OptimisationResult
+struct SchurHierarchicalRiskParityOptimisation{T1, T2, T3, T4, T5, T6, T7} <:
+       OptimisationResult
     oe::T1
     pr::T2
     wb::T3
@@ -15,17 +10,16 @@ struct SchurHierarchicalRiskParityOptimisation{T1 <: Type, T2 <: AbstractPriorRe
 end
 abstract type SchurAlgorithm <: AbstractAlgorithm end
 struct NonMonotonicSchur <: SchurAlgorithm end
-struct MonotonicSchur{T1 <: Integer, T2 <: Real} <: SchurAlgorithm
+struct MonotonicSchur{T1, T2} <: SchurAlgorithm
     N::T1
     tol::T2
 end
 function MonotonicSchur(; N::Integer = 10, tol::Real = 1e-4)
     @smart_assert(N > 0)
     @smart_assert(tol > 0)
-    return MonotonicSchur{typeof(N), typeof(tol)}(N, tol)
+    return MonotonicSchur(N, tol)
 end
-struct SchurParams{T1 <: Union{<:StandardDeviation, <:Variance}, T2 <: Real,
-                   T3 <: SchurAlgorithm, T4 <: Bool} <: AbstractAlgorithm
+struct SchurParams{T1, T2, T3, T4} <: AbstractAlgorithm
     r::T1
     gamma::T2
     alg::T3
@@ -35,17 +29,13 @@ function SchurParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
                      gamma::Real = 0.5, alg::SchurAlgorithm = MonotonicSchur(),
                      flag::Bool = true)
     @smart_assert(one(gamma) >= gamma >= zero(gamma))
-    return SchurParams{typeof(r), typeof(gamma), typeof(alg), typeof(flag)}(r, gamma, alg,
-                                                                            flag)
+    return SchurParams(r, gamma, alg, flag)
 end
 function schur_params_view(sp::SchurParams, i::AbstractVector, X::AbstractMatrix)
     r = risk_measure_view(sp.r, i, X)
     return SchurParams(; r = r, gamma = sp.gamma, alg = sp.alg, flag = sp.flag)
 end
-struct SchurHierarchicalRiskParity{T1 <: HierarchicalOptimiser,
-                                   T2 <:
-                                   Union{<:SchurParams, <:AbstractVector{<:SchurParams}}} <:
-       ClusteringOptimisationEstimator
+struct SchurHierarchicalRiskParity{T1, T2} <: ClusteringOptimisationEstimator
     opt::T1
     params::T2
 end
@@ -55,7 +45,7 @@ function SchurHierarchicalRiskParity(; opt::HierarchicalOptimiser = Hierarchical
     if isa(params, AbstractVector)
         @smart_assert(!isempty(params))
     end
-    return SchurHierarchicalRiskParity{typeof(opt), typeof(params)}(opt, params)
+    return SchurHierarchicalRiskParity(opt, params)
 end
 function opt_view(sh::SchurHierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X

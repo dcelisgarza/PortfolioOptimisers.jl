@@ -88,21 +88,21 @@ All concrete types representing regression targets (such as linear or generalise
   - [`AbstractRegressionAlgorithm`](@ref)
 """
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
-struct LinearModel{T1 <: NamedTuple} <: AbstractRegressionTarget
+struct LinearModel{T1} <: AbstractRegressionTarget
     kwargs::T1
 end
 function LinearModel(; kwargs::NamedTuple = (;))
-    return LinearModel{typeof(kwargs)}(kwargs)
+    return LinearModel(kwargs)
 end
 function GLM.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
     return GLM.fit(GLM.LinearModel, X, y; target.kwargs...)
 end
-struct GeneralisedLinearModel{T1 <: Tuple, T2 <: NamedTuple} <: AbstractRegressionTarget
+struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
     args::T1
     kwargs::T2
 end
 function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
-    return GeneralisedLinearModel{typeof(args), typeof(kwargs)}(args, kwargs)
+    return GeneralisedLinearModel(args, kwargs)
 end
 function GLM.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
     return GLM.fit(GLM.GeneralizedLinearModel, X, y, target.args...; target.kwargs...)
@@ -140,8 +140,7 @@ end
 
 """
 """
-struct Regression{T1 <: AbstractMatrix, T2 <: Union{Nothing, <:AbstractMatrix},
-                  T3 <: Union{Nothing, <:AbstractVector}} <: AbstractRegressionResult
+struct Regression{T1, T2, T3} <: AbstractRegressionResult
     M::T1
     L::T2
     b::T3
@@ -156,7 +155,7 @@ function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = n
     if !isnothing(L)
         @smart_assert(size(M, 1) == size(L, 1))
     end
-    return Regression{typeof(M), typeof(L), typeof(b)}(M, L, b)
+    return Regression(M, L, b)
 end
 function Base.getproperty(r::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
     return if sym == :L

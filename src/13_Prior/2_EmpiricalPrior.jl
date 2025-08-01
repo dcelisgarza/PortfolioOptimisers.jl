@@ -1,10 +1,4 @@
-struct LowOrderPrior{T1 <: AbstractMatrix, T2 <: AbstractVector, T3 <: AbstractMatrix,
-                     T4 <: Union{Nothing, <:AbstractMatrix},
-                     T5 <: Union{Nothing, <:AbstractVector},
-                     T6 <: Union{Nothing, <:Regression},
-                     T7 <: Union{Nothing, <:AbstractVector},
-                     T8 <: Union{Nothing, <:AbstractMatrix},
-                     T9 <: Union{Nothing, <:AbstractVector}} <: AbstractPriorResult
+struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractPriorResult
     X::T1
     mu::T2
     sigma::T3
@@ -47,16 +41,7 @@ function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractM
             @smart_assert(length(f_w) == size(X, 1))
         end
     end
-    return LowOrderPrior{typeof(X), typeof(mu), typeof(sigma), typeof(chol), typeof(w),
-                         typeof(loadings), typeof(f_mu), typeof(f_sigma), typeof(f_w)}(X,
-                                                                                       mu,
-                                                                                       sigma,
-                                                                                       chol,
-                                                                                       w,
-                                                                                       loadings,
-                                                                                       f_mu,
-                                                                                       f_sigma,
-                                                                                       f_w)
+    return LowOrderPrior(X, mu, sigma, chol, w, loadings, f_mu, f_sigma, f_w)
 end
 function prior_view(pr::LowOrderPrior, i::AbstractVector)
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
@@ -65,9 +50,7 @@ function prior_view(pr::LowOrderPrior, i::AbstractVector)
                          loadings = regression_view(pr.loadings, i), f_mu = pr.f_mu,
                          f_sigma = pr.f_sigma, f_w = pr.f_w)
 end
-struct EmpiricalPrior{T1 <: StatsBase.CovarianceEstimator,
-                      T2 <: AbstractExpectedReturnsEstimator,
-                      T3 <: Union{Nothing, <:Real}} <: AbstractLowOrderPriorEstimator_1_0
+struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_1_0
     ce::T1
     me::T2
     horizon::T3
@@ -76,7 +59,7 @@ function EmpiricalPrior(;
                         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                         horizon::Union{Nothing, <:Real} = nothing)
-    return EmpiricalPrior{typeof(ce), typeof(me), typeof(horizon)}(ce, me, horizon)
+    return EmpiricalPrior(ce, me, horizon)
 end
 function factory(pe::EmpiricalPrior, w::Union{Nothing, <:AbstractWeights} = nothing)
     return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),

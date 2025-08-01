@@ -76,10 +76,7 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
         end
     end
 end
-struct RelativisticValueatRisk{T1 <: RiskMeasureSettings,
-                               T2 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                               T3 <: Real, T4 <: Real,
-                               T5 <: Union{Nothing, <:AbstractWeights}} <: SolverRiskMeasure
+struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: SolverRiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -98,8 +95,7 @@ function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSe
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return RelativisticValueatRisk{typeof(settings), typeof(slv), typeof(alpha),
-                                   typeof(kappa), typeof(w)}(settings, slv, alpha, kappa, w)
+    return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
 function factory(r::RelativisticValueatRisk, prior::AbstractPriorResult,
                  slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}}, args...;
@@ -112,12 +108,7 @@ end
 function (r::RelativisticValueatRisk)(x::AbstractVector)
     return RRM(x, r.slv, r.alpha, r.kappa, r.w)
 end
-struct RelativisticValueatRiskRange{T1 <: RiskMeasureSettings,
-                                    T2 <:
-                                    Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                                    T3 <: Real, T4 <: Real, T5 <: Real, T6 <: Real,
-                                    T7 <: Union{Nothing, <:AbstractWeights}} <:
-       SolverRiskMeasure
+struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: SolverRiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -143,10 +134,7 @@ function RelativisticValueatRiskRange(;
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return RelativisticValueatRiskRange{typeof(settings), typeof(slv), typeof(alpha),
-                                        typeof(kappa_a), typeof(beta), typeof(kappa_b),
-                                        typeof(w)}(settings, slv, alpha, kappa_a, beta,
-                                                   kappa_b, w)
+    return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
 function (r::RelativisticValueatRiskRange)(x::AbstractVector)
     return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)
@@ -159,10 +147,7 @@ function factory(r::RelativisticValueatRiskRange, prior::AbstractPriorResult,
                                         kappa_a = r.kappa_a, beta = r.beta,
                                         kappa_b = r.kappa_b, slv = slv)
 end
-struct RelativisticDrawdownatRisk{T1 <: RiskMeasureSettings,
-                                  T2 <:
-                                  Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                                  T3 <: Real, T4 <: Real} <: SolverRiskMeasure
+struct RelativisticDrawdownatRisk{T1, T2, T3, T4} <: SolverRiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -177,8 +162,7 @@ function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(),
     end
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(kappa) < kappa < one(kappa))
-    return RelativisticDrawdownatRisk{typeof(settings), typeof(slv), typeof(alpha),
-                                      typeof(kappa)}(settings, slv, alpha, kappa)
+    return RelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
 function (r::RelativisticDrawdownatRisk)(x::AbstractVector)
     pushfirst!(x, 1)
@@ -195,11 +179,7 @@ function (r::RelativisticDrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     return RRM(dd, r.slv, r.alpha, r.kappa)
 end
-struct RelativeRelativisticDrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings,
-                                          T2 <: Union{Nothing, <:Solver,
-                                                      <:AbstractVector{<:Solver}},
-                                          T3 <: Real, T4 <: Real} <:
-       SolverHierarchicalRiskMeasure
+struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4} <: SolverHierarchicalRiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -215,8 +195,7 @@ function RelativeRelativisticDrawdownatRisk(;
     end
     @smart_assert(zero(alpha) < alpha < one(alpha))
     @smart_assert(zero(kappa) < kappa < one(kappa))
-    return RelativeRelativisticDrawdownatRisk{typeof(settings), typeof(slv), typeof(alpha),
-                                              typeof(kappa)}(settings, slv, alpha, kappa)
+    return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
 function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)
     x .= pushfirst!(x, 0) .+ one(eltype(x))

@@ -1,5 +1,5 @@
 """
-    struct ExcessExpectedReturns{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real} <: AbstractShrunkExpectedReturnsEstimator
+    struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
         me::T1
         rf::T2
     end
@@ -25,8 +25,7 @@ Construct an `ExcessExpectedReturns` estimator with the specified mean estimator
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
-struct ExcessExpectedReturns{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real} <:
-       AbstractShrunkExpectedReturnsEstimator
+struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
     me::T1
     rf::T2
 end
@@ -63,7 +62,7 @@ ExcessExpectedReturns
 function ExcessExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                rf::Real = 0.0)
-    return ExcessExpectedReturns{typeof(me), typeof(rf)}(me, rf)
+    return ExcessExpectedReturns(me, rf)
 end
 
 """

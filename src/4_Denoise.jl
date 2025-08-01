@@ -71,7 +71,7 @@ FixedDenoise()
 struct FixedDenoise <: AbstractDenoiseAlgorithm end
 
 """
-    struct ShrunkDenoise{T1 <: Real} <: AbstractDenoiseAlgorithm
+    struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
         alpha::T1
     end
 
@@ -89,7 +89,7 @@ Creates a new `ShrunkDenoise` with the specified shrinkage parameter `alpha`.
   - [`denoise!`](@ref)
   - [`Denoise`](@ref)
 """
-struct ShrunkDenoise{T1 <: Real} <: AbstractDenoiseAlgorithm
+struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
     alpha::T1
 end
 """
@@ -115,12 +115,11 @@ ShrunkDenoise
 """
 function ShrunkDenoise(; alpha::Real = 0.0)
     @smart_assert(zero(alpha) <= alpha <= one(alpha))
-    return ShrunkDenoise{typeof(alpha)}(alpha)
+    return ShrunkDenoise(alpha)
 end
 
 """
-    struct Denoise{T1 <: AbstractDenoiseAlgorithm, T2 <: Tuple, T3 <: NamedTuple, T4,
-                   T5 <: Integer, T6 <: Integer} <: AbstractDenoiseEstimator
+    struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
         alg::T1
         args::T2
         kwargs::T3
@@ -162,8 +161,7 @@ Keyword arguments correspond to the fields above. The constructor infers types a
   - [`denoise!`](@ref)
   - [`denoise`](@ref)
 """
-struct Denoise{T1 <: AbstractDenoiseAlgorithm, T2 <: Tuple, T3 <: NamedTuple, T4,
-               T5 <: Integer, T6 <: Integer} <: AbstractDenoiseEstimator
+struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
     alg::T1
     args::T2
     kwargs::T3
@@ -232,8 +230,7 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
                  kwargs::NamedTuple = (;),
                  kernel = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
                  n::Integer = 1000)
-    return Denoise{typeof(alg), typeof(args), typeof(kwargs), typeof(kernel), typeof(m),
-                   typeof(n)}(alg, args, kwargs, kernel, m, n)
+    return Denoise(alg, args, kwargs, kernel, m, n)
 end
 
 """

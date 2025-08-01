@@ -1,15 +1,13 @@
-struct PValue{T1 <: Real} <: AbstractStepwiseRegressionCriterion
+struct PValue{T1} <: AbstractStepwiseRegressionCriterion
     threshold::T1
 end
 function PValue(; threshold::Real = 0.05)
     @smart_assert(zero(threshold) < threshold < one(threshold))
-    return PValue{typeof(threshold)}(threshold)
+    return PValue(threshold)
 end
 struct Forward <: AbstractStepwiseRegressionAlgorithm end
 struct Backward <: AbstractStepwiseRegressionAlgorithm end
-struct StepwiseRegression{T1 <: AbstractStepwiseRegressionCriterion,
-                          T2 <: AbstractStepwiseRegressionAlgorithm,
-                          T3 <: AbstractRegressionTarget} <: AbstractRegressionEstimator
+struct StepwiseRegression{T1, T2, T3} <: AbstractRegressionEstimator
     crit::T1
     alg::T2
     target::T3
@@ -17,7 +15,7 @@ end
 function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = Forward(),
                             target::AbstractRegressionTarget = LinearModel())
-    return StepwiseRegression{typeof(crit), typeof(alg), typeof(target)}(crit, alg, target)
+    return StepwiseRegression(crit, alg, target)
 end
 function add_best_asset_after_failure_pval!(target::AbstractRegressionTarget,
                                             included::AbstractVector, F::AbstractMatrix,

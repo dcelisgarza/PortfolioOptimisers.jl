@@ -1,8 +1,8 @@
-struct Distance{T1 <: AbstractDistanceAlgorithm} <: AbstractDistanceEstimator
+struct Distance{T1} <: AbstractDistanceEstimator
     alg::T1
 end
 function Distance(; alg::AbstractDistanceAlgorithm = SimpleDistance())
-    return Distance{typeof(alg)}(alg)
+    return Distance(alg)
 end
 function distance(::Distance{<:SimpleDistance}, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)

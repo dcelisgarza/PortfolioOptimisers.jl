@@ -8,12 +8,11 @@ function CardinalityConstraintSide(; group, name,
         @smart_assert(!isempty(group) && !isempty(name))
         @smart_assert(length(group) == length(name) == length(coef))
     end
-    return LinearConstraintSide{typeof(group), typeof(name), typeof(coef)}(group, name,
-                                                                           coef)
+    return LinearConstraintSide(group, name, coef)
 end
 function CardinalityConstraint(; A::LinearConstraintSide, B::Integer = 1,
                                comp::ComparisonOperators = LEQ())
-    return LinearConstraintEstimator{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
+    return LinearConstraintEstimator(A, B, comp)
 end
 function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFrame;
                            kwargs...)

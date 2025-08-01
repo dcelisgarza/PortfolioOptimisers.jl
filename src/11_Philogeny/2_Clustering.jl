@@ -3,9 +3,7 @@ abstract type AbstractClusteringAlgorithm <: AbstractPhilogenyAlgorithm end
 abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
 abstract type AbstractClusteringResult <: AbstractPhilogenyResult end
-struct HierarchicalClustering{T1 <: Clustering.Hclust, T2 <: AbstractMatrix,
-                              T3 <: AbstractMatrix, T4 <: Integer} <:
-       AbstractClusteringResult
+struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     clustering::T1
     S::T2
     D::T3
@@ -16,32 +14,27 @@ function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatr
     @smart_assert(!isempty(S) && !isempty(D))
     @smart_assert(size(S) == size(D))
     @smart_assert(k >= one(k))
-    return HierarchicalClustering{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering,
-                                                                                       S, D,
-                                                                                       k)
+    return HierarchicalClustering(clustering, S, D, k)
 end
 function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
     return cle
 end
 struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
-struct PredefinedNumberClusters{T1 <: Integer} <: AbstractOptimalNumberClustersAlgorithm
+struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm
     k::T1
 end
 function PredefinedNumberClusters(; k::Integer = 1)
     @smart_assert(k >= one(k))
-    return PredefinedNumberClusters{typeof(k)}(k)
+    return PredefinedNumberClusters(k)
 end
-struct StandardisedSilhouetteScore{T1 <: Union{Nothing, <:Distances.SemiMetric}} <:
-       AbstractOptimalNumberClustersAlgorithm
+struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
     metric::T1
 end
 function StandardisedSilhouetteScore(;
                                      metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
-    return StandardisedSilhouetteScore{typeof(metric)}(metric)
+    return StandardisedSilhouetteScore(metric)
 end
-struct OptimalNumberClusters{T1 <: Union{Nothing, <:Integer},
-                             T2 <: AbstractOptimalNumberClustersAlgorithm} <:
-       AbstractOptimalNumberClustersEstimator
+struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
     max_k::T1
     alg::T2
 end
@@ -50,19 +43,15 @@ function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
     if !isnothing(max_k)
         @smart_assert(max_k >= one(max_k))
     end
-    return OptimalNumberClusters{typeof(max_k), typeof(alg)}(max_k, alg)
+    return OptimalNumberClusters(max_k, alg)
 end
-struct HClustAlgorithm{T1 <: Symbol} <: AbstractClusteringAlgorithm
+struct HClustAlgorithm{T1} <: AbstractClusteringAlgorithm
     linkage::T1
 end
 function HClustAlgorithm(; linkage::Symbol = :ward)
-    return HClustAlgorithm{typeof(linkage)}(linkage)
+    return HClustAlgorithm(linkage)
 end
-struct ClusteringEstimator{T1 <: StatsBase.CovarianceEstimator,
-                           T2 <: AbstractDistanceEstimator,
-                           T3 <: AbstractClusteringAlgorithm,
-                           T4 <: Union{<:Integer, <:AbstractOptimalNumberClustersEstimator}} <:
-       AbstractClusteringEstimator
+struct ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator
     ce::T1
     de::T2
     alg::T3
@@ -75,8 +64,7 @@ function ClusteringEstimator(;
                              alg::AbstractClusteringAlgorithm = HClustAlgorithm(),
                              onc::Union{<:Integer,
                                         <:AbstractOptimalNumberClustersEstimator} = OptimalNumberClusters())
-    return ClusteringEstimator{typeof(ce), typeof(de), typeof(alg), typeof(onc)}(ce, de,
-                                                                                 alg, onc)
+    return ClusteringEstimator(ce, de, alg, onc)
 end
 
 export clusterise, SecondOrderDifference, PredefinedNumberClusters,

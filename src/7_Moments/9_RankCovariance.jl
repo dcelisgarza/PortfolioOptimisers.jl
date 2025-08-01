@@ -14,7 +14,7 @@ All concrete types implementing rank-based covariance estimation algorithms (suc
 abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
 
 """
-    struct KendallCovariance{T1 <: AbstractVarianceEstimator} <: RankCovarianceEstimator
+    struct KendallCovariance{T1} <: RankCovarianceEstimator
 
 Robust covariance estimator based on Kendall's tau rank correlation.
 
@@ -37,7 +37,7 @@ Construct a `KendallCovariance` object with the specified variance estimator.
   - [`AbstractVarianceEstimator`](@ref)
   - [`SimpleVariance`](@ref)
 """
-struct KendallCovariance{T1 <: AbstractVarianceEstimator} <: RankCovarianceEstimator
+struct KendallCovariance{T1} <: RankCovarianceEstimator
     ve::T1
 end
 """
@@ -75,7 +75,7 @@ KendallCovariance
   - [`SimpleVariance`](@ref)
 """
 function KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
-    return KendallCovariance{typeof(ve)}(ve)
+    return KendallCovariance(ve)
 end
 
 """
@@ -153,7 +153,7 @@ function factory(ce::KendallCovariance, w::Union{Nothing, <:AbstractWeights} = n
 end
 
 """
-    struct SpearmanCovariance{T1 <: AbstractVarianceEstimator} <: RankCovarianceEstimator
+    struct SpearmanCovariance{T1} <: RankCovarianceEstimator
 
 Robust covariance estimator based on Spearman's rho rank correlation.
 
@@ -176,7 +176,7 @@ Construct a `SpearmanCovariance` object with the specified variance estimator.
   - [`AbstractVarianceEstimator`](@ref)
   - [`SimpleVariance`](@ref)
 """
-struct SpearmanCovariance{T1 <: AbstractVarianceEstimator} <: RankCovarianceEstimator
+struct SpearmanCovariance{T1} <: RankCovarianceEstimator
     ve::T1
 end
 """
@@ -213,7 +213,7 @@ SpearmanCovariance
   - [`SimpleVariance`](@ref)
 """
 function SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
-    return SpearmanCovariance{typeof(ve)}(ve)
+    return SpearmanCovariance(ve)
 end
 
 """

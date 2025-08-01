@@ -12,10 +12,7 @@ end
 function bootstrap_func(::MovingBootstrap, block_size, X, seed)
     return pyimport("arch.bootstrap").MovingBlockBootstrap(block_size, X; seed = seed)
 end
-struct ARCHUncertaintySet{T1 <: AbstractPriorEstimator,
-                          T2 <: AbstractUncertaintySetAlgorithm, T3 <: Integer,
-                          T4 <: Integer, T5 <: Real, T6 <: Union{Nothing, <:Integer},
-                          T7 <: ARCHBootstrapSet} <: BootsrapUncertaintySetEstimator
+struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootsrapUncertaintySetEstimator
     pe::T1
     alg::T2
     n_sim::T3
@@ -32,10 +29,7 @@ function ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
     @smart_assert(n_sim > zero(n_sim))
     @smart_assert(block_size > zero(block_size))
     @smart_assert(zero(q) < q < one(q))
-    return ARCHUncertaintySet{typeof(pe), typeof(alg), typeof(n_sim), typeof(block_size),
-                              typeof(q), typeof(seed), typeof(bootstrap)}(pe, alg, n_sim,
-                                                                          block_size, q,
-                                                                          seed, bootstrap)
+    return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, seed, bootstrap)
 end
 function bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)

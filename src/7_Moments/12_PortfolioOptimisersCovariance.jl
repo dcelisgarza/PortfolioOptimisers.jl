@@ -1,6 +1,8 @@
 """
-    struct PortfolioOptimisersCovariance{T1 <: AbstractCovarianceEstimator,
-                                         T2 <: AbstractMatrixProcessingEstimator} <: AbstractCovarianceEstimator
+    struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
+        ce::T1
+        mp::T2
+    end
 
 Composite covariance estimator with post-processing.
 
@@ -23,9 +25,7 @@ Creates a `PortfolioOptimisersCovariance` object with the specified covariance e
   - [`AbstractCovarianceEstimator`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
 """
-struct PortfolioOptimisersCovariance{T1 <: AbstractCovarianceEstimator,
-                                     T2 <: AbstractMatrixProcessingEstimator} <:
-       AbstractCovarianceEstimator
+struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
     ce::T1
     mp::T2
 end
@@ -76,7 +76,7 @@ PortfolioOptimisersCovariance
 """
 function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
                                        mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
-    return PortfolioOptimisersCovariance{typeof(ce), typeof(mp)}(ce, mp)
+    return PortfolioOptimisersCovariance(ce, mp)
 end
 function factory(ce::PortfolioOptimisersCovariance,
                  w::Union{Nothing, <:AbstractWeights} = nothing)

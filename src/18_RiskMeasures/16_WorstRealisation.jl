@@ -1,8 +1,8 @@
-struct WorstRealisation{T1 <: RiskMeasureSettings} <: RiskMeasure
+struct WorstRealisation{T1} <: RiskMeasure
     settings::T1
 end
 function WorstRealisation(; settings::RiskMeasureSettings = RiskMeasureSettings())
-    return WorstRealisation{typeof(settings)}(settings)
+    return WorstRealisation(settings)
 end
 function (::WorstRealisation)(x::AbstractVector)
     return -minimum(x)

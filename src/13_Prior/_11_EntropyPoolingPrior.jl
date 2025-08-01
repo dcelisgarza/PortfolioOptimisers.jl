@@ -143,17 +143,7 @@ function entropy_pooling(w::AbstractVector, epcs::Union{Nothing, <:LinearConstra
     end
     return g(x)
 end
-struct EntropyPoolingPriorEstimator{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
-                                    T2 <: Union{<:ContinuousEntropyPoolingViewEstimator,
-                                                <:AbstractVector{<:ContinuousEntropyPoolingViewEstimator}},
-                                    T3 <: Union{Nothing,
-                                                <:DiscontinuousEntropyPoolingViewEstimator,
-                                                <:AbstractVector{<:DiscontinuousEntropyPoolingViewEstimator}},
-                                    T4 <: DataFrame, T5 <: AbstractEntropyPoolingOptimiser,
-                                    T6 <: Union{Nothing, <:OptimEntropyPooling},
-                                    T7 <: Union{Nothing, <:OptimEntropyPooling},
-                                    T8 <: Union{Nothing, <:AbstractVector},
-                                    T9 <: AbstractEntropyPoolingAlgorithm} <:
+struct EntropyPoolingPriorEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
        AbstractLowOrderPriorEstimator_1o2_1o2
     pe::T1
     views::T2
@@ -195,14 +185,8 @@ function EntropyPoolingPriorEstimator(;
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return EntropyPoolingPriorEstimator{typeof(pe), typeof(views), typeof(d_views),
-                                        typeof(sets), typeof(opt), typeof(d_opt1),
-                                        typeof(d_opt2), typeof(w), typeof(alg)}(pe, views,
-                                                                                d_views,
-                                                                                sets, opt,
-                                                                                d_opt1,
-                                                                                d_opt2, w,
-                                                                                alg)
+    return EntropyPoolingPriorEstimator(pe, views, d_views, sets, opt, d_opt1, d_opt2, w,
+                                        alg)
 end
 function Base.getproperty(obj::EntropyPoolingPriorEstimator, sym::Symbol)
     return if sym == :me

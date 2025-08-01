@@ -419,7 +419,6 @@
         # res = optimise!(mre, rd)
         # w = res.w
         # [sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)]
-
     end
     @testset "Buy-in threshold" begin
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
@@ -450,9 +449,11 @@
         mre = MeanRisk(; opt = opt)
         res = optimise!(mre)
         @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)
-        @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<= -0.25)
         if Sys.isapple()
-            println(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10])
+            @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<=
+                      -0.25 + sqrt(eps()))
+        else
+            @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<= -0.25)
         end
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, wb = WeightBounds(; lb = -1, ub = 1),

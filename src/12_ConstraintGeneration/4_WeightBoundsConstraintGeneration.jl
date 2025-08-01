@@ -1,17 +1,3 @@
-struct WeightBounds{T1 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                    T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
-       AbstractResult
-    lb::T1
-    ub::T2
-end
-function weight_bounds_view(::Nothing, ::Any)
-    return nothing
-end
-function weight_bounds_view(wb::WeightBounds, i::AbstractVector)
-    lb = nothing_scalar_array_view(wb.lb, i)
-    ub = nothing_scalar_array_view(wb.ub, i)
-    return WeightBounds(; lb = lb, ub = ub)
-end
 function validate_bounds(lb::Real, ub::Real)
     @smart_assert(lb <= ub)
     return nothing
@@ -42,17 +28,24 @@ end
 function validate_bounds(args...)
     return nothing
 end
+function weight_bounds_view(::Nothing, ::Any)
+    return nothing
+end
+struct WeightBounds{T1, T2} <: AbstractResult
+    lb::T1
+    ub::T2
+end
 function WeightBounds(; lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
                       ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
-    # @smart_assert(isnothing(lb) ⊼ isnothing(ub))
     validate_bounds(lb, ub)
-    return WeightBounds{typeof(lb), typeof(ub)}(lb, ub)
+    return WeightBounds(lb, ub)
 end
-struct WeightBoundsEstimator{T1 <: Union{Nothing, <:AbstractDict,
-                                         <:AbstractVector{<:Pair{<:Any, <:Real}}},
-                             T2 <: Union{Nothing, <:AbstractDict,
-                                         <:AbstractVector{<:Pair{<:Any, <:Real}}}} <:
-       AbstractEstimator
+function weight_bounds_view(wb::WeightBounds, i::AbstractVector)
+    lb = nothing_scalar_array_view(wb.lb, i)
+    ub = nothing_scalar_array_view(wb.ub, i)
+    return WeightBounds(; lb = lb, ub = ub)
+end
+struct WeightBoundsEstimator{T1, T2} <: AbstractEstimator
     lb::T1
     ub::T2
 end
@@ -67,7 +60,7 @@ function WeightBoundsEstimator(;
     if !isnothing(ub)
         @smart_assert(!isempty(ub))
     end
-    return WeightBoundsEstimator{typeof(lb), typeof(ub)}(lb, ub)
+    return WeightBoundsEstimator(lb, ub)
 end
 function weight_bounds_view(wb::Union{<:AbstractString, Expr,
                                       <:AbstractVector{<:AbstractString},

@@ -1,5 +1,4 @@
-struct RiskTrackingError{T1 <: WeightsTracking, T2 <: AbstractBaseRiskMeasure, T3 <: Real,
-                         T4 <: VariableTracking} <: AbstractTracking
+struct RiskTrackingError{T1, T2, T3, T4} <: AbstractTracking
     tracking::T1
     r::T2
     err::T3
@@ -10,9 +9,7 @@ function RiskTrackingError(; tracking::WeightsTracking,
                            alg::VariableTracking = IndependentVariableTracking())
     @smart_assert(isfinite(err) && err >= zero(err))
     r = no_bounds_no_risk_expr_risk_measure(r)
-    return RiskTrackingError{typeof(tracking), typeof(r), typeof(err), typeof(alg)}(tracking,
-                                                                                    r, err,
-                                                                                    alg)
+    return RiskTrackingError(tracking, r, err, alg)
 end
 function tracking_view(::Nothing, args...)
     return nothing
@@ -32,8 +29,7 @@ function factory(tracking::RiskTrackingError, w::AbstractVector)
     return RiskTrackingError(; tracking = factory(tracking.tracking, w), r = tracking.r,
                              err = tracking.err, alg = tracking.alg)
 end
-struct TrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: AbstractTrackingAlgorithm,
-                           T3 <: NormTracking} <: RiskMeasure
+struct TrackingRiskMeasure{T1, T2, T3} <: RiskMeasure
     settings::T1
     tracking::T2
     alg::T3
@@ -41,9 +37,7 @@ end
 function TrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              tracking::AbstractTrackingAlgorithm,
                              alg::NormTracking = SOCTracking())
-    return TrackingRiskMeasure{typeof(settings), typeof(tracking), typeof(alg)}(settings,
-                                                                                tracking,
-                                                                                alg)
+    return TrackingRiskMeasure(settings, tracking, alg)
 end
 function (r::TrackingRiskMeasure)(w::AbstractVector, X::AbstractMatrix,
                                   fees::Union{Nothing, <:Fees} = nothing)
@@ -61,9 +55,7 @@ function factory(r::TrackingRiskMeasure, w::AbstractVector)
     return TrackingRiskMeasure(; settings = r.settings, tracking = factory(r.tracking, w),
                                alg = r.alg)
 end
-struct RiskTrackingRiskMeasure{T1 <: RiskMeasureSettings, T2 <: WeightsTracking,
-                               T3 <: AbstractBaseRiskMeasure, T4 <: VariableTracking} <:
-       RiskMeasure
+struct RiskTrackingRiskMeasure{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     tracking::T2
     r::T3
@@ -74,8 +66,7 @@ function RiskTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSe
                                  r::AbstractBaseRiskMeasure = Variance(),
                                  alg::VariableTracking = IndependentVariableTracking())
     r = no_bounds_no_risk_expr_risk_measure(r)
-    return RiskTrackingRiskMeasure{typeof(settings), typeof(tracking), typeof(r),
-                                   typeof(alg)}(settings, tracking, r, alg)
+    return RiskTrackingRiskMeasure(settings, tracking, r, alg)
 end
 function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
                                      <:IndependentVariableTracking})(w::AbstractVector,

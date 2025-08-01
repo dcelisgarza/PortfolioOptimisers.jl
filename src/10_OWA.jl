@@ -3,17 +3,14 @@ abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
 struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
 struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
 struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
-struct NormalisedConstantRelativeRiskAversion{T1 <: Real} <:
-       AbstractOrderedWeightsArrayEstimator
+struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
     g::T1
 end
 function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
     @smart_assert(zero(g) < g < one(g))
-    return NormalisedConstantRelativeRiskAversion{typeof(g)}(g)
+    return NormalisedConstantRelativeRiskAversion(g)
 end
-struct OWAJuMP{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T2 <: Real, T3 <: Real,
-               T4 <: Real, T5 <: AbstractOrderedWeightsArrayAlgorithm} <:
-       AbstractOrderedWeightsArrayEstimator
+struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
     slv::T1
     max_phi::T2
     sc::T3
@@ -29,11 +26,7 @@ function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
     @smart_assert(zero(max_phi) < max_phi < one(max_phi))
     @smart_assert(sc > zero(sc))
     @smart_assert(so > zero(so))
-    return OWAJuMP{typeof(slv), typeof(max_phi), typeof(sc), typeof(so), typeof(alg)}(slv,
-                                                                                      max_phi,
-                                                                                      sc,
-                                                                                      so,
-                                                                                      alg)
+    return OWAJuMP(slv, max_phi, sc, so, alg)
 end
 function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real)
     N = size(weights, 2)

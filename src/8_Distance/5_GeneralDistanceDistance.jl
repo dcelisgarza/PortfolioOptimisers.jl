@@ -1,6 +1,4 @@
-struct GeneralDistanceDistance{T1 <: Distances.Metric, T2 <: Tuple, T3 <: NamedTuple,
-                               T4 <: Integer, T5 <: AbstractDistanceAlgorithm} <:
-       AbstractDistanceEstimator
+struct GeneralDistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
     dist::T1
     args::T2
     kwargs::T3
@@ -11,9 +9,7 @@ function GeneralDistanceDistance(; dist::Distances.Metric = Distances.Euclidean(
                                  args::Tuple = (), kwargs::NamedTuple = (;),
                                  power::Integer = 1,
                                  alg::AbstractDistanceAlgorithm = SimpleDistance())
-    return GeneralDistanceDistance{typeof(dist), typeof(args), typeof(kwargs),
-                                   typeof(power), typeof(alg)}(dist, args, kwargs, power,
-                                                               alg)
+    return GeneralDistanceDistance(dist, args, kwargs, power, alg)
 end
 function distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)

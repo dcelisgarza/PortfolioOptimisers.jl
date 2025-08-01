@@ -4,8 +4,7 @@ abstract type BudgetCostEstimator <: BudgetConstraintEstimator end
 function set_budget_costs!(args...)
     return nothing
 end
-struct BudgetRange{T1 <: Union{Nothing, <:Real}, T2 <: Union{Nothing, <:Real}} <:
-       BudgetEstimator
+struct BudgetRange{T1, T2} <: BudgetEstimator
     lb::T1
     ub::T2
 end
@@ -22,7 +21,7 @@ function BudgetRange(; lb::Union{Nothing, <:Real} = 1.0, ub::Union{Nothing, <:Re
     if !lb_flag && !ub_flag
         @smart_assert(lb <= ub)
     end
-    return BudgetRange{typeof(lb), typeof(ub)}(lb, ub)
+    return BudgetRange(lb, ub)
 end
 function budget_view(bgt::Union{<:Real, <:BudgetRange}, ::Any)
     return bgt
@@ -30,11 +29,7 @@ end
 function set_budget_constraints!(args...)
     return nothing
 end
-struct BudgetCosts{T1 <: Union{<:Real, <:BudgetEstimator}, T2 <: AbstractVector{<:Real},
-                   T3 <: Union{<:Real, <:AbstractVector{<:Real}},
-                   T4 <: Union{<:Real, <:AbstractVector{<:Real}},
-                   T5 <: Union{<:Real, <:AbstractVector{<:Real}},
-                   T6 <: Union{<:Real, <:AbstractVector{<:Real}}} <: BudgetCostEstimator
+struct BudgetCosts{T1, T2, T3, T4, T5, T6} <: BudgetCostEstimator
     bgt::T1
     w::T2
     vp::T3
@@ -68,8 +63,7 @@ function BudgetCosts(; bgt::Union{<:Real, <:BudgetRange} = 1.0, w::AbstractVecto
     else
         @smart_assert(un >= zero(un))
     end
-    return BudgetCosts{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up),
-                       typeof(un)}(bgt, w, vp, vn, up, un)
+    return BudgetCosts(bgt, w, vp, vn, up, un)
 end
 function budget_view(bgt::BudgetCosts, i::AbstractVector)
     w = view(bgt.w, i)
@@ -79,12 +73,7 @@ function budget_view(bgt::BudgetCosts, i::AbstractVector)
     un = nothing_scalar_array_view(bgt.un, i)
     return BudgetCosts(; bgt = bgt.bgt, w = w, vp = vp, vn = vn, up = up, un = un)
 end
-struct BudgetMarketImpact{T1 <: Union{<:Real, <:BudgetRange}, T2 <: AbstractVector{<:Real},
-                          T3 <: Union{<:Real, <:AbstractVector{<:Real}},
-                          T4 <: Union{<:Real, <:AbstractVector{<:Real}},
-                          T5 <: Union{<:Real, <:AbstractVector{<:Real}},
-                          T6 <: Union{<:Real, <:AbstractVector{<:Real}}, T7 <: Real} <:
-       BudgetCostEstimator
+struct BudgetMarketImpact{T1, T2, T3, T4, T5, T6, T7} <: BudgetCostEstimator
     bgt::T1
     w::T2
     vp::T3
@@ -122,8 +111,7 @@ function BudgetMarketImpact(; bgt::Union{<:Real, <:BudgetRange} = 1.0,
         @smart_assert(un >= zero(un))
     end
     @smart_assert(zero(beta) <= beta <= one(beta))
-    return BudgetMarketImpact{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up),
-                              typeof(un), typeof(beta)}(bgt, w, vp, vn, up, un, beta)
+    return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
 end
 function budget_view(bgt::BudgetMarketImpact, i::AbstractVector)
     w = view(bgt.w, i)

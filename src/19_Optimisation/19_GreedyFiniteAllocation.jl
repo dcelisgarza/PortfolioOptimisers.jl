@@ -1,6 +1,4 @@
-struct GreedyAllocationOptimisation{T1, T2 <: AbstractVector, T3 <: AbstractVector,
-                                    T4 <: AbstractVector, T5 <: OptimisationReturnCode,
-                                    T6 <: Real} <: OptimisationResult
+struct GreedyAllocationOptimisation{T1, T2, T3, T4, T5, T6} <: OptimisationResult
     oe::T1
     shares::T2
     cost::T3
@@ -8,14 +6,13 @@ struct GreedyAllocationOptimisation{T1, T2 <: AbstractVector, T3 <: AbstractVect
     retcode::T5
     cash::T6
 end
-struct GreedyAllocation{T1 <: Real, T2 <: Tuple, T3 <: NamedTuple} <:
-       BaseFiniteAllocationOptimisationEstimator
+struct GreedyAllocation{T1, T2, T3} <: BaseFiniteAllocationOptimisationEstimator
     unit::T1
     args::T2
     kwargs::T3
 end
 function GreedyAllocation(; unit::Real = 1, args::Tuple = (), kwargs::NamedTuple = (;))
-    return GreedyAllocation{typeof(unit), typeof(args), typeof(kwargs)}(unit, args, kwargs)
+    return GreedyAllocation(unit, args, kwargs)
 end
 function adjust_long_cash(bgt::Real, lcash::Real, scash::Real)
     if iszero(scash)

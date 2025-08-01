@@ -1,12 +1,11 @@
-struct TurnoverRiskMeasure{T1 <: RiskMeasureSettings, T2 <: AbstractVector{<:Real}} <:
-       RiskMeasure
+struct TurnoverRiskMeasure{T1, T2} <: RiskMeasure
     settings::T1
     w::T2
 end
 function TurnoverRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              w::AbstractVector{<:Real})
     @smart_assert(!isempty(w))
-    return TurnoverRiskMeasure{typeof(settings), typeof(w)}(settings, w)
+    return TurnoverRiskMeasure(settings, w)
 end
 function (r::TurnoverRiskMeasure)(w::AbstractVector)
     return norm(r.w - w, 1)

@@ -1,8 +1,8 @@
-struct MaximumDrawdown{T1 <: RiskMeasureSettings} <: RiskMeasure
+struct MaximumDrawdown{T1} <: RiskMeasure
     settings::T1
 end
 function MaximumDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings())
-    return MaximumDrawdown{typeof(settings)}(settings)
+    return MaximumDrawdown(settings)
 end
 function (::MaximumDrawdown)(x::AbstractVector)
     pushfirst!(x, 1)
@@ -21,13 +21,12 @@ function (::MaximumDrawdown)(x::AbstractVector)
     popfirst!(x)
     return val
 end
-struct RelativeMaximumDrawdown{T1 <: HierarchicalRiskMeasureSettings} <:
-       HierarchicalRiskMeasure
+struct RelativeMaximumDrawdown{T1} <: HierarchicalRiskMeasure
     settings::T1
 end
 function RelativeMaximumDrawdown(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
-    return RelativeMaximumDrawdown{typeof(settings)}(settings)
+    return RelativeMaximumDrawdown(settings)
 end
 function (::RelativeMaximumDrawdown)(x::AbstractVector)
     x .= pushfirst!(x, 0) .+ one(eltype(x))

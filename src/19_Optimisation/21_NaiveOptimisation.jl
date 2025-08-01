@@ -1,18 +1,15 @@
-struct NaiveOptimisation{T1 <: Type, T2 <: Union{Nothing, <:AbstractPriorResult},
-                         T3 <: AbstractVector, T4 <: OptimisationReturnCode} <:
-       OptimisationResult
+struct NaiveOptimisation{T1, T2, T3, T4} <: OptimisationResult
     oe::T1
     pr::T2
     w::T3
     retcode::T4
 end
-struct InverseVolatility{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult}} <:
-       OptimisationEstimator
+struct InverseVolatility{T1} <: OptimisationEstimator
     pe::T1
 end
 function InverseVolatility(;
                            pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior())
-    return InverseVolatility{typeof(pe)}(pe)
+    return InverseVolatility(pe)
 end
 function opt_view(opt::InverseVolatility, i::AbstractVector, args...)
     pe = prior_view(opt.pe, i)
@@ -34,11 +31,11 @@ function optimise!(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
                              range(; start = inv(N), stop = inv(N), length = N),
                              OptimisationSuccess(nothing))
 end
-struct RandomWeights{T1 <: Union{Nothing, <:AbstractRNG}} <: OptimisationEstimator
+struct RandomWeights{T1} <: OptimisationEstimator
     rng::T1
 end
 function RandomWeights(; rng::Union{Nothing, <:AbstractRNG} = nothing)
-    return RandomWeights{typeof(rng)}(rng)
+    return RandomWeights(rng)
 end
 function optimise!(rw::RandomWeights, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @smart_assert(!isnothing(rd.X))

@@ -9,28 +9,27 @@ function factory(alg::AbstractMomentMeasureAlgorithm, args...; kwargs...)
 end
 struct FirstLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
 abstract type DeviationLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
-struct SecondLowerMoment{T1 <: SecondMomentAlgorithm} <: DeviationLowerMoment
+struct SecondLowerMoment{T1} <: DeviationLowerMoment
     alg::T1
 end
 function SecondLowerMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
-    return SecondLowerMoment{typeof(alg)}(alg)
+    return SecondLowerMoment(alg)
 end
-struct SecondCentralMoment{T1 <: SecondMomentAlgorithm} <: DeviationLowerMoment
+struct SecondCentralMoment{T1} <: DeviationLowerMoment
     alg::T1
 end
 function SecondCentralMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
-    return SecondCentralMoment{typeof(alg)}(alg)
+    return SecondCentralMoment(alg)
 end
 struct MeanAbsoluteDeviation <: DeviationLowerMoment end
-struct LowOrderDeviation{T1 <: AbstractVarianceEstimator, T2 <: DeviationLowerMoment} <:
-       AbstractLowOrderDeviationMeasureAlgorithm
+struct LowOrderDeviation{T1, T2} <: AbstractLowOrderDeviationMeasureAlgorithm
     ve::T1
     alg::T2
 end
 function LowOrderDeviation(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
                            alg::DeviationLowerMoment = SecondLowerMoment())
     @smart_assert(!isa(alg, MeanAbsoluteDeviation))
-    return LowOrderDeviation{typeof(ve), typeof(alg)}(ve, alg)
+    return LowOrderDeviation(ve, alg)
 end
 abstract type AbstractUnionHighOrderMomentMeasureAlgorithm <: AbstractMomentMeasureAlgorithm end
 abstract type AbstractHighOrderMomentMeasureAlgorithm <:
@@ -40,16 +39,14 @@ abstract type AbstractHighOrderDeviationMeasureAlgorithm <:
 struct ThirdLowerMoment <: AbstractHighOrderMomentMeasureAlgorithm end
 struct FourthLowerMoment <: AbstractHighOrderMomentMeasureAlgorithm end
 struct FourthCentralMoment <: AbstractHighOrderMomentMeasureAlgorithm end
-struct HighOrderDeviation{T1 <: AbstractVarianceEstimator,
-                          T2 <: AbstractHighOrderMomentMeasureAlgorithm} <:
-       AbstractHighOrderDeviationMeasureAlgorithm
+struct HighOrderDeviation{T1, T2} <: AbstractHighOrderDeviationMeasureAlgorithm
     ve::T1
     alg::T2
 end
 function HighOrderDeviation(;
                             ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
                             alg::AbstractHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
-    return HighOrderDeviation{typeof(ve), typeof(alg)}(ve, alg)
+    return HighOrderDeviation(ve, alg)
 end
 for alg in (LowOrderDeviation, HighOrderDeviation)
     eval(quote
@@ -58,10 +55,7 @@ for alg in (LowOrderDeviation, HighOrderDeviation)
              end
          end)
 end
-struct LowOrderMoment{T1 <: RiskMeasureSettings, T2 <: Union{Nothing, <:AbstractWeights},
-                      T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                      T4 <: AbstractUnionLowOrderMomentMeasureAlgorithm} <:
-       AbstractMomentRiskMeasure
+struct LowOrderMoment{T1, T2, T3, T4} <: AbstractMomentRiskMeasure
     settings::T1
     w::T2
     mu::T3
@@ -79,13 +73,9 @@ function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return LowOrderMoment{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w,
-                                                                                mu, alg)
+    return LowOrderMoment(settings, w, mu, alg)
 end
-struct HighOrderMoment{T1 <: RiskMeasureSettings, T2 <: Union{Nothing, <:AbstractWeights},
-                       T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                       T4 <: AbstractUnionHighOrderMomentMeasureAlgorithm} <:
-       AbstractMomentHierarchicalRiskMeasure
+struct HighOrderMoment{T1, T2, T3, T4} <: AbstractMomentHierarchicalRiskMeasure
     settings::T1
     w::T2
     mu::T3
@@ -103,8 +93,7 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return HighOrderMoment{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings,
-                                                                                 w, mu, alg)
+    return HighOrderMoment(settings, w, mu, alg)
 end
 function calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},
                                     <:HighOrderMoment{<:Any, Nothing, Nothing, <:Any}},

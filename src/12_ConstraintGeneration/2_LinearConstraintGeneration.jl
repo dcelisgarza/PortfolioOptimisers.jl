@@ -1,22 +1,19 @@
-struct PartialLinearConstraint{T1 <: AbstractMatrix, T2 <: AbstractVector} <:
-       AbstractConstraintResult
+struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
     A::T1
     B::T2
 end
 function PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
     @smart_assert(!isempty(A) && !isempty(B))
-    return PartialLinearConstraint{typeof(A), typeof(B)}(A, B)
+    return PartialLinearConstraint(A, B)
 end
-struct LinearConstraint{T1 <: Union{Nothing, <:PartialLinearConstraint},
-                        T2 <: Union{Nothing, <:PartialLinearConstraint}} <:
-       AbstractConstraintResult
+struct LinearConstraint{T1, T2} <: AbstractConstraintResult
     ineq::T1
     eq::T2
 end
 function LinearConstraint(; ineq::Union{Nothing, <:PartialLinearConstraint} = nothing,
                           eq::Union{Nothing, <:PartialLinearConstraint} = nothing)
     @smart_assert(isnothing(ineq) ⊼ isnothing(eq))
-    return LinearConstraint{typeof(ineq), typeof(eq)}(ineq, eq)
+    return LinearConstraint(ineq, eq)
 end
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     return if sym == :A_ineq
@@ -142,20 +139,18 @@ end
 Base.length(res::AbstractParsingResult) = 1
 Base.iterate(res::AbstractParsingResult, state = 1) = state > 1 ? nothing : (res, state + 1)
 Base.getindex(res::AbstractParsingResult, i) = i == 1 ? res : throw(BoundsError(res, i))
-struct AssetSets{T1 <: AbstractString,
-                 T2 <: AbstractDict{<:Union{Symbol, <:AbstractString}, <:Any}} <:
-       AbstractEstimator
+struct AssetSets{T1, T2} <: AbstractEstimator
     key::T1
     dict::T2
 end
-Base.length(res::AssetSets) = 1
-Base.iterate(res::AssetSets, state = 1) = state > 1 ? nothing : (res, state + 1)
 function AssetSets(; key::AbstractString = "nx",
                    dict::AbstractDict{<:Union{Symbol, <:AbstractString}})
     @smart_assert(!isempty(dict))
     @smart_assert(haskey(dict, key))
     return AssetSets(key, dict)
 end
+Base.length(res::AssetSets) = 1
+Base.iterate(res::AssetSets, state = 1) = state > 1 ? nothing : (res, state + 1)
 function asset_sets_view(sets::AssetSets, i::AbstractVector)
     dict = Dict(k => v for (k, v) in sets.dict if k != sets.key)
     dict[sets.key] = view(sets.dict[sets.key], i)

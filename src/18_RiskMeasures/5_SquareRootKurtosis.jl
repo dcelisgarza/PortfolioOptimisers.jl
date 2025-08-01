@@ -1,9 +1,4 @@
-struct SquareRootKurtosis{T1 <: RiskMeasureSettings,
-                          T2 <: Union{Nothing, <:AbstractWeights},
-                          T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                          T4 <: Union{Nothing, <:AbstractMatrix},
-                          T5 <: Union{Nothing, <:Integer}, T6 <: AbstractMomentAlgorithm} <:
-       SquareRootKurtosisRiskMeasure
+struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6} <: SquareRootKurtosisRiskMeasure
     settings::T1
     w::T2
     mu::T3
@@ -37,8 +32,7 @@ function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSetting
     if !isnothing(N)
         @smart_assert(N > zero(N))
     end
-    return SquareRootKurtosis{typeof(settings), typeof(w), typeof(mu), typeof(kt),
-                              typeof(N), typeof(alg)}(settings, w, mu, kt, N, alg)
+    return SquareRootKurtosis(settings, w, mu, kt, N, alg)
 end
 function calc_moment_target(::SquareRootKurtosis{<:Any, Nothing, Nothing, <:Any, <:Any,
                                                  <:Any}, ::Any, x::AbstractVector)

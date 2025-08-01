@@ -1,7 +1,5 @@
 """
-    struct DistanceCovariance{T1 <: Distances.Metric, T2 <: Tuple, T3 <: NamedTuple,
-                              T4 <: Union{Nothing, <:AbstractWeights},
-                              T5 <: FLoops.Transducers.Executor} <: AbstractCovarianceEstimator
+    struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
         dist::T1
         args::T2
         kwargs::T3
@@ -37,9 +35,7 @@ Construct a `DistanceCovariance` estimator with the specified metric, arguments,
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
-struct DistanceCovariance{T1 <: Distances.Metric, T2 <: Tuple, T3 <: NamedTuple,
-                          T4 <: Union{Nothing, <:AbstractWeights},
-                          T5 <: FLoops.Transducers.Executor} <: AbstractCovarianceEstimator
+struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
     dist::T1
     args::T2
     kwargs::T3
@@ -91,8 +87,7 @@ function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
                             w::Union{Nothing, <:AbstractWeights} = nothing,
                             threads::FLoops.Transducers.Executor = ThreadedEx())
-    return DistanceCovariance{typeof(dist), typeof(args), typeof(kwargs), typeof(w),
-                              typeof(threads)}(dist, args, kwargs, w, threads)
+    return DistanceCovariance(dist, args, kwargs, w, threads)
 end
 
 function factory(ce::DistanceCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)

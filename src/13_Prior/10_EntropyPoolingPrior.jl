@@ -12,16 +12,14 @@ end
 function get_epw(::H2_EntropyPooling, w0::AbstractWeights, wi::AbstractWeights)
     return wi
 end
-struct CVaREntropyPooling{T1 <: Tuple, T2 <: NamedTuple} <: AbstractEntropyPoolingOptimiser
+struct CVaREntropyPooling{T1, T2} <: AbstractEntropyPoolingOptimiser
     args::T1
     kwargs::T2
 end
 function CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple = (;))
-    return CVaREntropyPooling{typeof(args), typeof(kwargs)}(args, kwargs)
+    return CVaREntropyPooling(args, kwargs)
 end
-struct OptimEntropyPooling{T1 <: Tuple, T2 <: NamedTuple, T3 <: Real, T4 <: Real,
-                           T5 <: AbstractEntropyPoolingOptAlgorithm} <:
-       AbstractEntropyPoolingOptimiser
+struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
     args::T1
     kwargs::T2
     sc1::T3
@@ -32,13 +30,9 @@ function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::
                              sc2::Real = 1e3,
                              alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     @smart_assert(sc1 >= zero(sc1))
-    return OptimEntropyPooling{typeof(args), typeof(kwargs), typeof(sc1), typeof(sc2),
-                               typeof(alg)}(args, kwargs, sc1, sc2, alg)
+    return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
 end
-struct JuMPEntropyPooling{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T2 <: Real,
-                          T3 <: Real, T4 <: Real,
-                          T5 <: AbstractEntropyPoolingOptAlgorithm} <:
-       AbstractEntropyPoolingOptimiser
+struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
     slv::T1
     sc1::T2
     sc2::T3
@@ -54,41 +48,13 @@ function JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
     @smart_assert(sc1 >= zero(sc1))
     @smart_assert(sc2 >= zero(sc2))
     @smart_assert(so >= zero(so))
-    return JuMPEntropyPooling{typeof(slv), typeof(sc1), typeof(sc2), typeof(so),
-                              typeof(alg)}(slv, sc1, sc2, so, alg)
+    return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
 function effective_number_scenarios(x::AbstractVector, y::AbstractVector)
     return exp(-kldivergence(x, y))
 end
-struct EntropyPoolingPrior{T1 <: AbstractLowOrderPriorEstimatorMap_1o2_1o2,
-                           T2 <: Union{Nothing, <:AbstractString, Expr,
-                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                           T3 <: Union{Nothing, <:AbstractString, Expr,
-                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                           T4 <: Union{Nothing, <:AbstractString, Expr,
-                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                           T5 <: Union{Nothing, <:AbstractString, Expr,
-                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                           T6 <: Union{Nothing, <:AbstractString, Expr,
-                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                           T7 <: Union{Nothing, <:AbstractString, Expr,
-                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                           T8 <: Union{Nothing, <:AbstractString, Expr,
-                                       <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                       <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                           T9 <: Real, T10 <: Real, T11 <: Union{Nothing, <:AssetSets},
-                           T12 <: Union{Nothing, <:CVaREntropyPooling},
-                           T13 <: Union{Nothing, <:OptimEntropyPooling},
-                           T14 <: Union{<:OptimEntropyPooling, <:JuMPEntropyPooling},
-                           T15 <: Union{Nothing, <:AbstractVector},
-                           T16 <: AbstractEntropyPoolingAlgorithm} <:
-       AbstractLowOrderPriorEstimator_1o2_1o2
+struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,
+                           T16} <: AbstractLowOrderPriorEstimator_1o2_1o2
     pe::T1
     mu_views::T2
     var_views::T3
@@ -185,25 +151,9 @@ function EntropyPoolingPrior(;
     end
     @smart_assert(zero(var_alpha) < var_alpha < one(var_alpha))
     @smart_assert(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha))
-    return EntropyPoolingPrior{typeof(pe), typeof(mu_views), typeof(var_views),
-                               typeof(cvar_views), typeof(sigma_views), typeof(sk_views),
-                               typeof(kt_views), typeof(rho_views), typeof(var_alpha),
-                               typeof(cvar_alpha), typeof(sets), typeof(ds_opt),
-                               typeof(dm_opt), typeof(opt), typeof(w), typeof(alg)}(pe,
-                                                                                    mu_views,
-                                                                                    var_views,
-                                                                                    cvar_views,
-                                                                                    sigma_views,
-                                                                                    sk_views,
-                                                                                    kt_views,
-                                                                                    rho_views,
-                                                                                    var_alpha,
-                                                                                    cvar_alpha,
-                                                                                    sets,
-                                                                                    ds_opt,
-                                                                                    dm_opt,
-                                                                                    opt, w,
-                                                                                    alg)
+    return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views, sk_views,
+                               kt_views, rho_views, var_alpha, cvar_alpha, sets, ds_opt,
+                               dm_opt, opt, w, alg)
 end
 function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
     return if sym == :me
@@ -705,7 +655,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
     corr_pattern = r"\(\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*,\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*\)"
     nx = sets.dict[sets.key]
     variables, coeffs = res.vars, res.coef
-    jk_idx = Vector{Union{Tuple{Int, Int}, Tuple{Vector{Int}, Vector{Int}}}}(undef, 0)
+    jk_idx = Vector{<:Union{Tuple{Int, Int}, Tuple{Vector{Int}, Vector{Int}}}}(undef, 0)
     idx_rm = Vector{Int}(undef, 0)
     rhs::typeof(res.rhs) = res.rhs
     non_prior = false

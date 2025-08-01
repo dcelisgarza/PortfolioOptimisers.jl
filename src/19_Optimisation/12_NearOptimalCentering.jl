@@ -1,19 +1,7 @@
 abstract type NearOptimalCenteringAlgorithm <: OptimisationAlgorithm end
 struct ConstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
 struct UnconstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
-struct NearOptimalCenteringOptimisation{T1 <: Type, T2 <: ProcessedJuMPOptimiserAttributes,
-                                        T3 <: Union{<:OptimisationReturnCode,
-                                                    <:AbstractVector{<:OptimisationReturnCode}},
-                                        T4 <: Union{<:OptimisationReturnCode,
-                                                    <:AbstractVector{<:OptimisationReturnCode}},
-                                        T5 <: Union{<:OptimisationReturnCode,
-                                                    <:AbstractVector{<:OptimisationReturnCode}},
-                                        T6 <: Union{<:OptimisationReturnCode,
-                                                    <:AbstractVector{<:OptimisationReturnCode}},
-                                        T7 <: OptimisationReturnCode,
-                                        T8 <: Union{<:JuMPOptimisationSolution,
-                                                    <:AbstractVector{<:JuMPOptimisationSolution}},
-                                        T9 <: Union{Nothing, JuMP.Model}} <:
+struct NearOptimalCenteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
        OptimisationResult
     oe::T1
     pa::T2
@@ -32,17 +20,7 @@ function Base.getproperty(r::NearOptimalCenteringOptimisation, sym::Symbol)
         getfield(r, sym)
     end
 end
-struct NearOptimalCentering{T1 <: JuMPOptimiser,
-                            T2 <: Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
-                            T3 <: Union{Nothing, <:ObjectiveFunction},
-                            T4 <: Union{Nothing, <:Real},
-                            T5 <: Union{Nothing, <:AbstractVector},
-                            T6 <: Union{Nothing, <:AbstractVector},
-                            T7 <: Union{Nothing, <:AbstractVector},
-                            T8 <: Union{Nothing, <:AbstractVector},
-                            T9 <: Union{Nothing, <:AbstractVector},
-                            T10 <: Union{Nothing, <:AbstractVector}, T11 <: Bool,
-                            T12 <: NearOptimalCenteringAlgorithm} <:
+struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
        JuMPOptimisationEstimator
     opt::T1
     r::T2
@@ -96,13 +74,8 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
     if isa(bins, Real)
         @smart_assert(isfinite(bins) && bins > 0)
     end
-    return NearOptimalCentering{typeof(opt), typeof(r), typeof(obj), typeof(bins),
-                                typeof(w_min), typeof(w_min_ini), typeof(w_opt),
-                                typeof(w_opt_ini), typeof(w_max), typeof(w_max_ini),
-                                typeof(ucs_flag), typeof(alg)}(opt, r, obj, bins, w_min,
-                                                               w_min_ini, w_opt, w_opt_ini,
-                                                               w_max, w_max_ini, ucs_flag,
-                                                               alg)
+    return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
+                                w_max, w_max_ini, ucs_flag, alg)
 end
 function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatrix)
     X = isa(noc.opt.pe, AbstractPriorResult) ? noc.opt.pe.X : X
@@ -538,11 +511,11 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                              opt.gcard,
                                                                              opt.sgcard,
                                                                              opt.smtx,
+                                                                             opt.sgmtx,
                                                                              opt.slt,
                                                                              opt.sst,
-                                                                             opt.sgmtx,
-                                                                             #  opt.sglt,
-                                                                             #  opt.sgst,
+                                                                             opt.sglt,
+                                                                             opt.sgst,
                                                                              opt.nplg,
                                                                              opt.cplg,
                                                                              opt.tn,
@@ -572,7 +545,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.nplg, opt.cplg, opt.lt,
                          opt.st, opt.fees, opt.ss)
     set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx, opt.sgmtx,
-                          opt.slt, opt.sst, nothing, nothing, opt.ss)
+                          opt.slt, opt.sst, opt.sglt, nothing, opt.ss)
     set_turnover_constraints!(model, opt.tn)
     set_tracking_error_constraints!(model, opt.pe, opt.te, noc, opt.nplg, opt.cplg,
                                     opt.fees)
@@ -600,11 +573,11 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                              opt.gcard,
                                                                              opt.sgcard,
                                                                              opt.smtx,
+                                                                             opt.sgmtx,
                                                                              opt.slt,
                                                                              opt.sst,
-                                                                             opt.sgmtx,
-                                                                             #  opt.sglt,
-                                                                             #  opt.sgst,
+                                                                             opt.sglt,
+                                                                             opt.sgst,
                                                                              opt.nplg,
                                                                              opt.cplg,
                                                                              opt.tn,
@@ -616,4 +589,4 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
 end
 
 export NearOptimalCentering, UnconstrainedNearOptimalCentering,
-       ConstrainedNearOptimalCentering
+       ConstrainedNearOptimalCentering, NearOptimalCenteringOptimisation

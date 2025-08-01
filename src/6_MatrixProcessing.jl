@@ -101,11 +101,7 @@ Keyword arguments correspond to the fields above. The constructor infers types a
   - [`matrix_processing`](@ref)
   - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
-struct DefaultMatrixProcessing{T1 <: Union{Nothing, <:Posdef},
-                               T2 <: Union{Nothing, <:Denoise},
-                               T3 <: Union{Nothing, <:Detone},
-                               T4 <: Union{Nothing, <:AbstractMatrixProcessingAlgorithm}} <:
-       AbstractMatrixProcessingEstimator
+struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
     pdm::T1
     denoise::T2
     detone::T3
@@ -165,8 +161,7 @@ function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
                                  denoise::Union{Nothing, <:Denoise} = nothing,
                                  detone::Union{Nothing, <:Detone} = nothing,
                                  alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
-    return DefaultMatrixProcessing{typeof(pdm), typeof(denoise), typeof(detone),
-                                   typeof(alg)}(pdm, denoise, detone, alg)
+    return DefaultMatrixProcessing(pdm, denoise, detone, alg)
 end
 
 """
@@ -199,11 +194,7 @@ Keyword arguments correspond to the fields above. The constructor infers types a
   - [`matrix_processing`](@ref)
   - [`DefaultMatrixProcessing`](@ref)
 """
-struct NonPositiveDefiniteMatrixProcessing{T1 <: Union{Nothing, <:Denoise},
-                                           T2 <: Union{Nothing, <:Detone},
-                                           T3 <: Union{Nothing,
-                                                       <:AbstractMatrixProcessingAlgorithm}} <:
-       AbstractMatrixProcessingEstimator
+struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
     denoise::T1
     detone::T2
     alg::T3
@@ -257,8 +248,7 @@ function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise
                                              detone::Union{Nothing, <:Detone} = nothing,
                                              alg::Union{Nothing,
                                                         <:AbstractMatrixProcessingAlgorithm} = nothing)
-    return NonPositiveDefiniteMatrixProcessing{typeof(denoise), typeof(detone),
-                                               typeof(alg)}(denoise, detone, alg)
+    return NonPositiveDefiniteMatrixProcessing(denoise, detone, alg)
 end
 
 """

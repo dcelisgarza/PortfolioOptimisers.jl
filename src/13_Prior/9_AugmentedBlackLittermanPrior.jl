@@ -1,32 +1,5 @@
-struct AugmentedBlackLittermanPrior{T1 <: AbstractLowOrderPriorEstimatorMap_2_1,
-                                    T2 <: AbstractLowOrderPriorEstimatorMap_2_1,
-                                    T3 <: AbstractMatrixProcessingEstimator,
-                                    T4 <: AbstractRegressionEstimator,
-                                    T5 <: AbstractVarianceEstimator,
-                                    T6 <: Union{<:AbstractString, Expr,
-                                                <:AbstractVector{<:AbstractString},
-                                                <:AbstractVector{Expr},
-                                                <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                      #! Start: to delete
-                                                <:BlackLittermanViewsEstimator,
-                                                <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                      #! End: to delete
-                                      },
-                                    T7 <: Union{<:AbstractString, Expr,
-                                                <:AbstractVector{<:AbstractString},
-                                                <:AbstractVector{Expr},
-                                                <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                      #! Start: to delete
-                                                <:BlackLittermanViewsEstimator,
-                                                <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                      #! End: to delete
-                                      }, T8 <: DataFrame, T9 <: DataFrame,
-                                    T10 <: Union{Nothing, <:AbstractVector},
-                                    T11 <: Union{Nothing, <:AbstractVector},
-                                    T12 <: Union{Nothing, <:AbstractVector}, T13 <: Real,
-                                    T14 <: Union{Nothing, <:Real},
-                                    T15 <: Union{Nothing, <:Real}} <:
-       AbstractLowOrderPriorEstimator_2_1
+struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13,
+                                    T14, T15} <: AbstractLowOrderPriorEstimator_2_1
     a_pe::T1
     f_pe::T2
     mp::T3
@@ -112,25 +85,8 @@ function AugmentedBlackLittermanPrior(;
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))
     end
-    return AugmentedBlackLittermanPrior{typeof(a_pe), typeof(f_pe), typeof(mp), typeof(re),
-                                        typeof(ve), typeof(a_views), typeof(f_views),
-                                        typeof(a_sets), typeof(f_sets),
-                                        typeof(a_views_conf), typeof(f_views_conf),
-                                        typeof(w), typeof(rf), typeof(l), typeof(tau)}(a_pe,
-                                                                                       f_pe,
-                                                                                       mp,
-                                                                                       re,
-                                                                                       ve,
-                                                                                       a_views,
-                                                                                       f_views,
-                                                                                       a_sets,
-                                                                                       f_sets,
-                                                                                       a_views_conf,
-                                                                                       f_views_conf,
-                                                                                       w,
-                                                                                       rf,
-                                                                                       l,
-                                                                                       tau)
+    return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, ve, a_views, f_views, a_sets,
+                                        f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
 function factory(pe::AugmentedBlackLittermanPrior,
                  w::Union{Nothing, <:AbstractWeights} = nothing)

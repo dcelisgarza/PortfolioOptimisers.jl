@@ -1,13 +1,4 @@
-struct FeesEstimator{T1 <: Union{Nothing, <:TurnoverEstimator, <:Turnover},
-                     T2 <: Union{Nothing, <:AbstractDict,
-                                 <:AbstractVector{<:Pair{<:Any, <:Real}}},
-                     T3 <: Union{Nothing, <:AbstractDict,
-                                 <:AbstractVector{<:Pair{<:Any, <:Real}}},
-                     T4 <: Union{Nothing, <:AbstractDict,
-                                 <:AbstractVector{<:Pair{<:Any, <:Real}}},
-                     T5 <: Union{Nothing, <:AbstractDict,
-                                 <:AbstractVector{<:Pair{<:Any, <:Real}}},
-                     T6 <: NamedTuple} <: AbstractEstimator
+struct FeesEstimator{T1, T2, T3, T4, T5, T6} <: AbstractEstimator
     tn::T1
     l::T2
     s::T3
@@ -37,8 +28,7 @@ function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = n
     if !isnothing(fs)
         @smart_assert(!isempty(fs))
     end
-    return FeesEstimator{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
-                         typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
+    return FeesEstimator(tn, l, s, fl, fs, kwargs)
 end
 function fees_view(fees::FeesEstimator, i::AbstractVector)
     tn = turnover_view(fees.tn, i)
@@ -55,12 +45,7 @@ function fees_constraints(fees::FeesEstimator, sets::AssetSets; strict::Bool = f
                 fl = estimator_to_val(fees.fl, sets, zero(datatype); strict = strict),
                 fs = estimator_to_val(fees.fs, sets, zero(datatype); strict = strict))
 end
-struct Fees{T1 <: Union{Nothing, <:Turnover},
-            T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-            T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-            T4 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-            T5 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}, T6 <: NamedTuple} <:
-       AbstractResult
+struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
     tn::T1
     l::T2
     s::T3
@@ -98,12 +83,7 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
     if !isnothing(fs)
         @smart_assert(any(x -> x > zero(x), fs))
     end
-    return Fees{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(kwargs)}(tn,
-                                                                                          l,
-                                                                                          s,
-                                                                                          fl,
-                                                                                          fs,
-                                                                                          kwargs)
+    return Fees(tn, l, s, fl, fs, kwargs)
 end
 Base.length(::Fees) = 1
 Base.iterate(::Fees, i = 1) = i <= 1 ? (i, nothing) : nothing

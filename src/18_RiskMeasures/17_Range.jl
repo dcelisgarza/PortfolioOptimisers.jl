@@ -1,8 +1,8 @@
-struct Range{T1 <: RiskMeasureSettings} <: RiskMeasure
+struct Range{T1} <: RiskMeasure
     settings::T1
 end
 function Range(; settings::RiskMeasureSettings = RiskMeasureSettings())
-    return Range{typeof(settings)}(settings)
+    return Range(settings)
 end
 function (::Range)(x::AbstractVector)
     lb, ub = extrema(x)

@@ -1,6 +1,6 @@
 abstract type ImpliedVolatilityAlgorithm <: AbstractAlgorithm end
 abstract type ImpliedVolatilityRegressionEstimator <: ImpliedVolatilityAlgorithm end
-struct ImpliedVolatilityRegression{T1 <: AbstractVarianceEstimator, T2 <: Real,
+struct ImpliedVolatilityRegression{T1, T2,
                                    #    T3 <: AbstractStepwiseRegressionCriterion,
                                    T3} <: ImpliedVolatilityAlgorithm
     ve::T1
@@ -13,17 +13,12 @@ function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVar
                                      #  crit::AbstractStepwiseRegressionCriterion = RSquared(),
                                      re::AbstractRegressionTarget = LinearModel())
     @smart_assert(ws > 2)
-    return ImpliedVolatilityRegression{typeof(ve), typeof(ws),
-                                       # typeof(crit),
-                                       typeof(re)}(ve, ws,
-                                                   #   crit,
-                                                   re)
+    return ImpliedVolatilityRegression(ve, ws,
+                                       #   crit,
+                                       re)
 end
 struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
-struct ImpliedVolatility{T1 <: AbstractCovarianceEstimator,
-                         T2 <: AbstractMatrixProcessingEstimator,
-                         T3 <: ImpliedVolatilityRegressionEstimator, T4 <: Real} <:
-       AbstractCovarianceEstimator
+struct ImpliedVolatility{T1, T2, T3, T4} <: AbstractCovarianceEstimator
     ce::T1
     mp::T2
     alg::T3
@@ -34,8 +29,7 @@ function ImpliedVolatility(; ce::AbstractCovarianceEstimator = Covariance(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
                            af::Real = 252)
     @smart_assert(isfinite(af) && af > zero(af))
-    return ImpliedVolatility{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg,
-                                                                              af)
+    return ImpliedVolatility(ce, mp, alg, af)
 end
 function factory(ce::ImpliedVolatility, w::Union{Nothing, <:AbstractWeights} = nothing)
     return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)

@@ -1,5 +1,4 @@
-struct ConditionalValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
-                              T3 <: Union{Nothing, <:AbstractVector}} <: RiskMeasure
+struct ConditionalValueatRisk{T1, T2, T3} <: RiskMeasure
     settings::T1
     alpha::T2
     w::T3
@@ -11,17 +10,13 @@ function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return ConditionalValueatRisk{typeof(settings), typeof(alpha), typeof(w)}(settings,
-                                                                              alpha, w)
+    return ConditionalValueatRisk(settings, alpha, w)
 end
 function factory(r::ConditionalValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
     return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
-struct DistributionallyRobustConditionalValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
-                                                    T3 <: Real, T4 <: Real,
-                                                    T5 <: Union{Nothing, <:AbstractWeights}} <:
-       RiskMeasure
+struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     alpha::T2
     l::T3
@@ -37,12 +32,7 @@ function DistributionallyRobustConditionalValueatRisk(;
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return DistributionallyRobustConditionalValueatRisk{typeof(settings), typeof(alpha),
-                                                        typeof(l), typeof(r), typeof(w)}(settings,
-                                                                                         alpha,
-                                                                                         l,
-                                                                                         r,
-                                                                                         w)
+    return DistributionallyRobustConditionalValueatRisk(settings, alpha, l, r, w)
 end
 function factory(r::DistributionallyRobustConditionalValueatRisk,
                  prior::AbstractPriorResult, args...; kwargs...)
@@ -81,8 +71,7 @@ function (r::Union{<:ConditionalValueatRisk{<:Any, <:Any, <:AbstractWeights},
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end
-struct ConditionalValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
-                                   T4 <: Union{Nothing, <:AbstractWeights}} <: RiskMeasure
+struct ConditionalValueatRiskRange{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     alpha::T2
     beta::T3
@@ -97,8 +86,7 @@ function ConditionalValueatRiskRange(;
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return ConditionalValueatRiskRange{typeof(settings), typeof(alpha), typeof(beta),
-                                       typeof(w)}(settings, alpha, beta, w)
+    return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
 function factory(r::ConditionalValueatRiskRange, prior::AbstractPriorResult, args...;
                  kwargs...)
@@ -106,11 +94,7 @@ function factory(r::ConditionalValueatRiskRange, prior::AbstractPriorResult, arg
     return ConditionalValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                        beta = r.beta, w = w)
 end
-struct DistributionallyRobustConditionalValueatRiskRange{T1 <: RiskMeasureSettings,
-                                                         T2 <: Real, T3 <: Real, T4 <: Real,
-                                                         T5 <: Real, T6 <: Real, T7 <: Real,
-                                                         T8 <:
-                                                         Union{Nothing, <:AbstractWeights}} <:
+struct DistributionallyRobustConditionalValueatRiskRange{T1, T2, T3, T4, T5, T6, T7, T8} <:
        RiskMeasure
     settings::T1
     alpha::T2
@@ -136,13 +120,8 @@ function DistributionallyRobustConditionalValueatRiskRange(;
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return DistributionallyRobustConditionalValueatRiskRange{typeof(settings),
-                                                             typeof(alpha), typeof(l_a),
-                                                             typeof(r_a), typeof(beta),
-                                                             typeof(l_b), typeof(r_b),
-                                                             typeof(w)}(settings, alpha,
-                                                                        l_a, r_a, beta, l_b,
-                                                                        r_b, w)
+    return DistributionallyRobustConditionalValueatRiskRange(settings, alpha, l_a, r_a,
+                                                             beta, l_b, r_b, w)
 end
 function factory(r::DistributionallyRobustConditionalValueatRiskRange,
                  prior::AbstractPriorResult, args...; kwargs...)
@@ -212,14 +191,14 @@ function (r::Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, <:Abstract
     end
     return loss - gain
 end
-struct ConditionalDrawdownatRisk{T1 <: RiskMeasureSettings, T2 <: Real} <: RiskMeasure
+struct ConditionalDrawdownatRisk{T1, T2} <: RiskMeasure
     settings::T1
     alpha::T2
 end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                    alpha::Real = 0.05)
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    return ConditionalDrawdownatRisk{typeof(settings), typeof(alpha)}(settings, alpha)
+    return ConditionalDrawdownatRisk(settings, alpha)
 end
 function (r::ConditionalDrawdownatRisk)(x::AbstractVector)
     aT = r.alpha * length(x)
@@ -243,8 +222,7 @@ function (r::ConditionalDrawdownatRisk)(x::AbstractVector)
     end
     return var - sum_var / aT
 end
-struct RelativeConditionalDrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings,
-                                         T2 <: Real} <: HierarchicalRiskMeasure
+struct RelativeConditionalDrawdownatRisk{T1, T2} <: HierarchicalRiskMeasure
     settings::T1
     alpha::T2
 end
@@ -252,8 +230,7 @@ function RelativeConditionalDrawdownatRisk(;
                                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                            alpha::Real = 0.05)
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    return RelativeConditionalDrawdownatRisk{typeof(settings), typeof(alpha)}(settings,
-                                                                              alpha)
+    return RelativeConditionalDrawdownatRisk(settings, alpha)
 end
 function (r::RelativeConditionalDrawdownatRisk)(x::AbstractVector)
     aT = r.alpha * length(x)

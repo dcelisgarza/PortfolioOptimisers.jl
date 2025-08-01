@@ -1,9 +1,4 @@
-struct DiscreteAllocationOptimisation{T1, T2 <: AbstractVector, T3 <: AbstractVector,
-                                      T4 <: AbstractVector, T5 <: OptimisationReturnCode,
-                                      T6 <: Union{Nothing, <:OptimisationReturnCode},
-                                      T7 <: Union{Nothing, <:OptimisationReturnCode},
-                                      T8 <: Union{Nothing, <:JuMP.Model},
-                                      T9 <: Union{Nothing, <:JuMP.Model}, T10 <: Real} <:
+struct DiscreteAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
        OptimisationResult
     oe::T1
     shares::T2
@@ -16,8 +11,7 @@ struct DiscreteAllocationOptimisation{T1, T2 <: AbstractVector, T3 <: AbstractVe
     l_model::T9
     cash::T10
 end
-struct DiscreteAllocation{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T2 <: Real,
-                          T3 <: Real} <: BaseFiniteAllocationOptimisationEstimator
+struct DiscreteAllocation{T1, T2, T3} <: BaseFiniteAllocationOptimisationEstimator
     slv::T1
     sc::T2
     so::T3
@@ -29,7 +23,7 @@ function DiscreteAllocation(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
     end
     @smart_assert(sc > zero(sc))
     @smart_assert(so > zero(so))
-    return DiscreteAllocation{typeof(slv), typeof(sc), typeof(so)}(slv, sc, so)
+    return DiscreteAllocation(slv, sc, so)
 end
 function discrete_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real,
                                   bgt::Real, da::DiscreteAllocation,

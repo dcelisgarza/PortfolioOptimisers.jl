@@ -1,7 +1,4 @@
-struct ArithmeticReturn{T1 <: Union{Nothing, <:AbstractUncertaintySetResult,
-                                    <:AbstractUncertaintySetEstimator},
-                        T2 <: Union{Nothing, <:Real, <:AbstractVector, <:Frontier}} <:
-       JuMPReturnsEstimator
+struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
     ucs::T1
     lb::T2
 end
@@ -18,7 +15,7 @@ function ArithmeticReturn(;
     elseif isa(lb, AbstractVector)
         @smart_assert(!isempty(lb) && all(isfinite, lb))
     end
-    return ArithmeticReturn{typeof(ucs), typeof(lb)}(ucs, lb)
+    return ArithmeticReturn(ucs, lb)
 end
 function jump_returns_view(r::ArithmeticReturn, i::AbstractVector, args...)
     uset = ucs_view(r.ucs, i)
@@ -27,9 +24,7 @@ end
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
     return flag ? ArithmeticReturn(; ucs = r.ucs) : ArithmeticReturn()
 end
-struct KellyReturn{T1 <: Union{Nothing, <:AbstractWeights},
-                   T2 <: Union{Nothing, <:Real, <:AbstractVector, <:Frontier}} <:
-       JuMPReturnsEstimator
+struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
     w::T1
     lb::T2
 end
@@ -43,7 +38,7 @@ function KellyReturn(; w::Union{Nothing, <:AbstractWeights} = nothing,
     elseif isa(lb, AbstractVector)
         @smart_assert(!isempty(lb) && all(isfinite, lb))
     end
-    return KellyReturn{typeof(w), typeof(lb)}(w, lb)
+    return KellyReturn(w, lb)
 end
 function no_bounds_returns_estimator(r::KellyReturn, args...)
     return KellyReturn(; w = r.w)
@@ -64,14 +59,14 @@ function jump_returns_factory(r::KellyReturn, pr::AbstractPriorResult, args...; 
     return KellyReturn(; w = nothing_scalar_array_factory(r.w, pr.w), lb = r.lb)
 end
 struct MinimumRisk <: ObjectiveFunction end
-struct MaximumUtility{T1 <: Real} <: ObjectiveFunction
+struct MaximumUtility{T1} <: ObjectiveFunction
     l::T1
 end
 function MaximumUtility(; l::Real = 2)
     @smart_assert(l >= zero(l))
-    return MaximumUtility{typeof(l)}(l)
+    return MaximumUtility(l)
 end
-struct MaximumRatio{T1 <: Real, T2 <: Union{Nothing, <:Real}} <: ObjectiveFunction
+struct MaximumRatio{T1, T2} <: ObjectiveFunction
     rf::T1
     ohf::T2
 end
@@ -79,7 +74,7 @@ function MaximumRatio(; rf::Real = 0.0, ohf::Union{Nothing, <:Real} = nothing)
     if !isnothing(ohf)
         @smart_assert(ohf > zero(ohf))
     end
-    return MaximumRatio{typeof(rf), typeof(ohf)}(rf, ohf)
+    return MaximumRatio(rf, ohf)
 end
 struct MaximumReturn <: ObjectiveFunction end
 function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::AbstractVector,

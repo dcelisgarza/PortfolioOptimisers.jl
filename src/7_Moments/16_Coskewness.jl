@@ -13,9 +13,7 @@ All concrete types implementing coskewness estimation algorithms should subtype 
 abstract type CoskewnessEstimator <: AbstractEstimator end
 
 """
-    struct Coskewness{T1 <: AbstractExpectedReturnsEstimator,
-                      T2 <: AbstractMatrixProcessingEstimator,
-                      T3 <: AbstractMomentAlgorithm} <: CoskewnessEstimator
+    struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
         me::T1
         mp::T2
         alg::T3
@@ -46,9 +44,7 @@ Construct a `Coskewness` estimator with the specified mean estimator, matrix pro
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
-struct Coskewness{T1 <: AbstractExpectedReturnsEstimator,
-                  T2 <: AbstractMatrixProcessingEstimator, T3 <: AbstractMomentAlgorithm} <:
-       CoskewnessEstimator
+struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
     me::T1
     mp::T2
     alg::T3
@@ -94,7 +90,7 @@ Coskewness
 function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
                     alg::AbstractMomentAlgorithm = Full())
-    return Coskewness{typeof(me), typeof(mp), typeof(alg)}(me, mp, alg)
+    return Coskewness(me, mp, alg)
 end
 function factory(ce::Coskewness, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)

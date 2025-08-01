@@ -1,12 +1,11 @@
-struct DeltaUncertaintySet{T1 <: AbstractPriorEstimator, T2 <: Real, T3 <: Real} <:
-       AbstractUncertaintySetEstimator
+struct DeltaUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetEstimator
     pe::T1
     dmu::T2
     dsigma::T3
 end
 function DeltaUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
                              dmu::Real = 0.1, dsigma::Real = 0.1)
-    return DeltaUncertaintySet{typeof(pe), typeof(dmu), typeof(dsigma)}(pe, dmu, dsigma)
+    return DeltaUncertaintySet(pe, dmu, dsigma)
 end
 function ucs(ue::DeltaUncertaintySet, X::AbstractMatrix, args...; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, args...; dims = dims, kwargs...)

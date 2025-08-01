@@ -1,9 +1,7 @@
 abstract type BrownianDistanceVarianceFormulation <: AbstractAlgorithm end
 struct NormOneConeBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
 struct IneqBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
-struct BrownianDistanceVariance{T1 <: RiskMeasureSettings,
-                                T2 <: Union{<:RSOCRiskExpr, <:QuadRiskExpr},
-                                T3 <: BrownianDistanceVarianceFormulation} <: RiskMeasure
+struct BrownianDistanceVariance{T1, T2, T3} <: RiskMeasure
     settings::T1
     alg::T2
     algc::T3
@@ -11,8 +9,7 @@ end
 function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   alg::Union{<:RSOCRiskExpr, <:QuadRiskExpr} = RSOCRiskExpr(),
                                   algc::BrownianDistanceVarianceFormulation = IneqBrownianDistanceVariance())
-    return BrownianDistanceVariance{typeof(settings), typeof(alg), typeof(algc)}(settings,
-                                                                                 alg, algc)
+    return BrownianDistanceVariance(settings, alg, algc)
 end
 function (::BrownianDistanceVariance)(x::AbstractVector)
     T = length(x)

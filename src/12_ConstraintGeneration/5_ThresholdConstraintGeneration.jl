@@ -1,15 +1,13 @@
-struct BuyInThresholdEstimator{T1 <: Union{<:AbstractDict,
-                                           <:AbstractVector{<:Pair{<:Any, <:Real}}}} <:
-       AbstractEstimator
+struct BuyInThresholdEstimator{T1} <: AbstractEstimator
     val::T1
 end
 function BuyInThresholdEstimator(;
                                  val::Union{<:AbstractDict,
                                             <:AbstractVector{<:Pair{<:Any, <:Real}}})
     @smart_assert(!isempty(val))
-    return BuyInThresholdEstimator{typeof(val)}(val)
+    return BuyInThresholdEstimator(val)
 end
-struct BuyInThreshold{T1 <: Union{<:Real, <:AbstractVector{<:Real}}} <: AbstractResult
+struct BuyInThreshold{T1} <: AbstractResult
     val::T1
 end
 function BuyInThreshold(; val::Union{<:Real, <:AbstractVector{<:Real}})
@@ -18,7 +16,7 @@ function BuyInThreshold(; val::Union{<:Real, <:AbstractVector{<:Real}})
     elseif isa(val, AbstractVector)
         @smart_assert(all(x -> (isfinite(x) && x >= 0), val))
     end
-    return BuyInThreshold{typeof(val)}(val)
+    return BuyInThreshold(val)
 end
 function threshold_view(t::Union{Nothing, <:BuyInThresholdEstimator,
                                  <:AbstractVector{<:Union{Nothing,

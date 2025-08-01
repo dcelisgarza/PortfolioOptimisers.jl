@@ -1,5 +1,5 @@
 """
-    struct SimpleExpectedReturns{T1 <: Union{Nothing, <:AbstractWeights}} <: AbstractExpectedReturnsEstimator
+    struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
         w::T1
     end
 
@@ -27,8 +27,7 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator with optional observation 
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)`](@ref)
 """
-struct SimpleExpectedReturns{T1 <: Union{Nothing, <:AbstractWeights}} <:
-       AbstractExpectedReturnsEstimator
+struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
     w::T1
 end
 """

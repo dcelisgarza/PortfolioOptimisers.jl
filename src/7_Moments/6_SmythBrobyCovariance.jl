@@ -239,12 +239,8 @@ Implements the second Gerber-style variant of the Smyth-Broby covariance algorit
 struct NormalisedSmythBrobyGerber2 <: NormalisedSmythBrobyCovarianceAlgorithm end
 
 """
-    struct SmythBrobyCovariance{T1 <: AbstractExpectedReturnsEstimator,
-                                T2 <: StatsBase.CovarianceEstimator,
-                                T3 <: Posdef,
-                                T4 <: Real, T5 <: Real, T6 <: Real, T7 <: Real, T8 <: Real,
-                                T9 <: SmythBrobyCovarianceAlgorithm,
-                                T10 <: FLoops.Transducers.Executor} <: BaseSmythBrobyCovariance
+    struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
+           BaseSmythBrobyCovariance
         me::T1
         ve::T2
         pdm::T3
@@ -309,11 +305,8 @@ Construct a `SmythBrobyCovariance` estimator with the specified algorithm, estim
   - [`NormalisedSmythBrobyGerber2`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
-struct SmythBrobyCovariance{T1 <: AbstractExpectedReturnsEstimator,
-                            T2 <: StatsBase.CovarianceEstimator, T3 <: Posdef, T4 <: Real,
-                            T5 <: Real, T6 <: Real, T7 <: Real, T8 <: Real,
-                            T9 <: SmythBrobyCovarianceAlgorithm,
-                            T10 <: FLoops.Transducers.Executor} <: BaseSmythBrobyCovariance
+struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
+       BaseSmythBrobyCovariance
     me::T1
     ve::T2
     pdm::T3
@@ -424,10 +417,7 @@ function SmythBrobyCovariance(;
     @smart_assert(zero(threshold) < threshold < one(threshold))
     @smart_assert(zero(c1) < c1 <= one(c1))
     @smart_assert(zero(c2) < c2 <= one(c2) && c3 > c2)
-    return SmythBrobyCovariance{typeof(me), typeof(ve), typeof(pdm), typeof(threshold),
-                                typeof(c1), typeof(c2), typeof(c3), typeof(n), typeof(alg),
-                                typeof(threads)}(me, ve, pdm, threshold, c1, c2, c3, n, alg,
-                                                 threads)
+    return SmythBrobyCovariance(me, ve, pdm, threshold, c1, c2, c3, n, alg, threads)
 end
 
 function factory(ce::SmythBrobyCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)

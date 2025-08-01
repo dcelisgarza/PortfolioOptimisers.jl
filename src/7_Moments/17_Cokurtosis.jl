@@ -13,9 +13,7 @@ All concrete types implementing cokurtosis estimation algorithms should subtype 
 abstract type CokurtosisEstimator <: AbstractEstimator end
 
 """
-    struct Cokurtosis{T1 <: AbstractExpectedReturnsEstimator,
-                      T2 <: AbstractMatrixProcessingEstimator,
-                      T3 <: AbstractMomentAlgorithm} <: CokurtosisEstimator
+    struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
         me::T1
         mp::T2
         alg::T3
@@ -46,9 +44,7 @@ Construct a `Cokurtosis` estimator with the specified mean estimator, matrix pro
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
-struct Cokurtosis{T1 <: AbstractExpectedReturnsEstimator,
-                  T2 <: AbstractMatrixProcessingEstimator, T3 <: AbstractMomentAlgorithm} <:
-       CokurtosisEstimator
+struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
     me::T1
     mp::T2
     alg::T3
@@ -95,7 +91,7 @@ Cokurtosis
 function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                     alg::AbstractMomentAlgorithm = Full())
-    return Cokurtosis{typeof(me), typeof(mp), typeof(alg)}(me, mp, alg)
+    return Cokurtosis(me, mp, alg)
 end
 function factory(ce::Cokurtosis, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Cokurtosis(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)

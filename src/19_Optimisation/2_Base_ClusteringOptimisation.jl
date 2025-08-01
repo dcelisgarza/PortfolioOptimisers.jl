@@ -5,21 +5,19 @@ Base.length(::BaseOptimisationEstimator) = 1
 function Base.iterate(::BaseOptimisationEstimator, state = 1)
     return state > 1 ? nothing : (:BaseOptimisationEstimator, state + 1)
 end
-struct IterativeWeightFiniliser{T1 <: Integer} <: WeightFinaliser
+struct IterativeWeightFiniliser{T1} <: WeightFinaliser
     iter::T1
 end
 function IterativeWeightFiniliser(; iter::Integer = 100)
     @smart_assert(iter > 0)
-    return IterativeWeightFiniliser{typeof(iter)}(iter)
+    return IterativeWeightFiniliser(iter)
 end
 abstract type JuMPWeightFiniliserFormulation <: AbstractAlgorithm end
 struct RelativeErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
 struct SquareRelativeErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
 struct AbsoluteErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
 struct SquareAbsoluteErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
-struct JuMPWeightFiniliser{T1 <: Union{<:Solver, <:AbstractVector{<:Solver}}, T2 <: Real,
-                           T3 <: Real, T4 <: JuMPWeightFiniliserFormulation} <:
-       WeightFinaliser
+struct JuMPWeightFiniliser{T1, T2, T3, T4} <: WeightFinaliser
     slv::T1
     sc::T2
     so::T3
@@ -33,8 +31,7 @@ function JuMPWeightFiniliser(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
     end
     @smart_assert(sc > zero(sc))
     @smart_assert(so > zero(so))
-    return JuMPWeightFiniliser{typeof(slv), typeof(sc), typeof(so), typeof(alg)}(slv, sc,
-                                                                                 so, alg)
+    return JuMPWeightFiniliser(slv, sc, so, alg)
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
                                               ::RelativeErrorWeightFiniliser,

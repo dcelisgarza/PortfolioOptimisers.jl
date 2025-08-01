@@ -1,9 +1,4 @@
-struct HierarchicalOptimisation{T1 <: Type, T2 <: AbstractPriorResult,
-                                T3 <: Union{Nothing, <:Fees},
-                                T4 <: Union{Nothing, <:WeightBounds},
-                                T5 <: AbstractClusteringResult,
-                                T6 <: OptimisationReturnCode, T7 <: AbstractVector} <:
-       OptimisationResult
+struct HierarchicalOptimisation{T1, T2, T3, T4, T5, T6, T7} <: OptimisationResult
     oe::T1
     pr::T2
     fees::T3
@@ -12,22 +7,7 @@ struct HierarchicalOptimisation{T1 <: Type, T2 <: AbstractPriorResult,
     retcode::T6
     w::T7
 end
-struct HierarchicalOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                             T2 <: Union{<:ClusteringEstimator, <:AbstractClusteringResult},
-                             T3 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                             T4 <: Union{Nothing, <:FeesEstimator, <:Fees},
-                             T5 <: Union{Nothing, <:WeightBounds, <:AbstractString, Expr,
-                                         <:AbstractVector{<:AbstractString},
-                                         <:AbstractVector{Expr},
-                                         <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                               #! Start: to delete
-                                         <:WeightBoundsEstimator
-                               #! End: to delete
-                               }, T6 <: Union{Nothing, <:AssetSets,
-                                    #! Start: to delete
-                                              <:DataFrame
-                                    #! End: to delete
-                                    }, T7 <: WeightFinaliser, T8 <: Bool} <:
+struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
        BaseClusteringOptimisationEstimator
     pe::T1
     cle::T2
@@ -62,15 +42,7 @@ function HierarchicalOptimiser(;
     if isa(wb, WeightBoundsEstimator)
         @smart_assert(!isnothing(sets))
     end
-    return HierarchicalOptimiser{typeof(pe), typeof(cle), typeof(slv), typeof(fees),
-                                 typeof(wb), typeof(sets), typeof(cwf), typeof(strict)}(pe,
-                                                                                        cle,
-                                                                                        slv,
-                                                                                        fees,
-                                                                                        wb,
-                                                                                        sets,
-                                                                                        cwf,
-                                                                                        strict)
+    return HierarchicalOptimiser(pe, cle, slv, fees, wb, sets, cwf, strict)
 end
 function opt_view(hco::HierarchicalOptimiser, i::AbstractVector)
     pe = prior_view(hco.pe, i)

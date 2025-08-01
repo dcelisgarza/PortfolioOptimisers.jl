@@ -8,16 +8,19 @@ struct OptimisationSuccess{T1} <: OptimisationReturnCode
     res::T1
 end
 function OptimisationSuccess(; res = nothing)
-    return OptimisationSuccess{typeof(res)}(res)
+    return OptimisationSuccess(res)
 end
 struct OptimisationFailure{T1} <: OptimisationReturnCode
     res::T1
 end
 function OptimisationFailure(; res = nothing)
-    return OptimisationFailure{typeof(res)}(res)
+    return OptimisationFailure(res)
 end
-struct SingletonOptimisation{T1 <: OptimisationReturnCode} <: OptimisationResult
+struct SingletonOptimisation{T1} <: OptimisationResult
     retcode::T1
+end
+function SingletonOptimisation(; retcode::OptimisationReturnCode)
+    return SingletonOptimisation(retcode)
 end
 abstract type OptimisationModelResult <: AbstractResult end
 Base.length(opt::OptimisationEstimator) = 1

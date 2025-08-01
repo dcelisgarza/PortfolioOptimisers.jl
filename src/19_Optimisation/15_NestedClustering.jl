@@ -1,9 +1,4 @@
-struct NestedClusteringOptimisation{T1 <: Type, T2 <: AbstractPriorResult,
-                                    T3 <: Union{Nothing, <:WeightBounds},
-                                    T4 <: AbstractClusteringResult,
-                                    T5 <: AbstractVector{<:OptimisationResult},
-                                    T6 <: OptimisationResult, T7 <: OptimisationReturnCode,
-                                    T8 <: AbstractVector} <: OptimisationResult
+struct NestedClusteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationResult
     oe::T1
     pr::T2
     wb::T3
@@ -13,21 +8,7 @@ struct NestedClusteringOptimisation{T1 <: Type, T2 <: AbstractPriorResult,
     retcode::T7
     w::T8
 end
-struct NestedClustering{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
-                        T2 <: Union{<:ClusteringEstimator, <:AbstractClusteringResult},
-                        T3 <: Union{Nothing, <:WeightBounds, <:AbstractString, Expr,
-                                    <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                                    <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                          #! Start: to delete
-                                    <:WeightBoundsEstimator
-                          #! End: to delete
-                          }, T4 <: Union{Nothing, <:AssetSets,
-                               #! Start: to delete
-                                         <:DataFrame
-                               #! End: to delete
-                               }, T5 <: OptimisationEstimator, T6 <: OptimisationEstimator,
-                        T7 <: WeightFinaliser, T8 <: Bool,
-                        T9 <: FLoops.Transducers.Executor} <:
+struct NestedClustering{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
        ClusteringOptimisationEstimator
     pe::T1
     cle::T2
@@ -108,16 +89,7 @@ function NestedClustering(;
     if isa(wb, WeightBoundsEstimator)
         @smart_assert(!isnothing(sets))
     end
-    return NestedClustering{typeof(pe), typeof(cle), typeof(wb), typeof(sets), typeof(opti),
-                            typeof(opto), typeof(cwf), typeof(strict), typeof(threads)}(pe,
-                                                                                        cle,
-                                                                                        wb,
-                                                                                        sets,
-                                                                                        opti,
-                                                                                        opto,
-                                                                                        cwf,
-                                                                                        strict,
-                                                                                        threads)
+    return NestedClustering(pe, cle, wb, sets, opti, opto, cwf, strict, threads)
 end
 function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
     X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X

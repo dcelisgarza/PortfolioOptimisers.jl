@@ -1,6 +1,5 @@
 """
-    struct EquilibriumExpectedReturns{T1 <: StatsBase.CovarianceEstimator,
-                                      T2 <: Union{Nothing, <:AbstractWeights}, T3 <: Real} <: AbstractShrunkExpectedReturnsEstimator
+    struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
         ce::T1
         w::T2
         l::T3
@@ -30,9 +29,7 @@ Construct an `EquilibriumExpectedReturns` estimator with the specified covarianc
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
-struct EquilibriumExpectedReturns{T1 <: StatsBase.CovarianceEstimator,
-                                  T2 <: Union{Nothing, <:AbstractWeights}, T3 <: Real} <:
-       AbstractShrunkExpectedReturnsEstimator
+struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
     ce::T1
     w::T2
     l::T3
@@ -91,7 +88,7 @@ function EquilibriumExpectedReturns(;
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return EquilibriumExpectedReturns{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
+    return EquilibriumExpectedReturns(ce, w, l)
 end
 
 """

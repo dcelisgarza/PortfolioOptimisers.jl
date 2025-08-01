@@ -13,15 +13,14 @@ struct EqualRoot <: DBHTRootMethod end
 abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
 struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
 struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
-struct GeneralExponentialSimilarity{T1 <: Real, T2 <: Real} <:
-       AbstractSimilarityMatrixAlgorithm
+struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
     coef::T1
     power::T2
 end
 function GeneralExponentialSimilarity(; coef::Real = 1.0, power::Real = 1.0)
     @smart_assert(coef >= zero(coef))
     @smart_assert(power >= zero(power))
-    return GeneralExponentialSimilarity{typeof(coef), typeof(power)}(coef, power)
+    return GeneralExponentialSimilarity(coef, power)
 end
 function dbht_similarity(::MaximumDistanceSimilarity; D::AbstractMatrix, kwargs...)
     return ceil(maximum(D)^2) .- D .^ 2
@@ -34,14 +33,13 @@ function dbht_similarity(se::GeneralExponentialSimilarity; D::AbstractMatrix, kw
     coef = se.coef
     return exp.(-coef * D .^ power)
 end
-struct DBHT{T1 <: AbstractSimilarityMatrixAlgorithm, T2 <: DBHTRootMethod} <:
-       AbstractClusteringAlgorithm
+struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
     sim::T1
     root::T2
 end
 function DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
               root::DBHTRootMethod = UniqueRoot())
-    return DBHT{typeof(sim), typeof(root)}(sim, root)
+    return DBHT(sim, root)
 end
 
 """
@@ -1210,8 +1208,7 @@ function J_LoGo(sigma, separators, cliques)
     jlogo!(jlogo, sigma, separators, -1)
     return jlogo
 end
-struct DBHTClustering{T1 <: Clustering.Hclust, T2 <: AbstractMatrix, T3 <: AbstractMatrix,
-                      T4 <: Integer} <: AbstractClusteringResult
+struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     clustering::T1
     S::T2
     D::T3
@@ -1222,8 +1219,7 @@ function DBHTClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
     @smart_assert(!isempty(S) && !isempty(D))
     @smart_assert(size(S) == size(D))
     @smart_assert(k >= one(k))
-    return DBHTClustering{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering,
-                                                                               S, D, k)
+    return DBHTClustering(clustering, S, D, k)
 end
 function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
                     X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
@@ -1240,14 +1236,13 @@ function logo!(::Nothing, args...; kwargs...)
     return nothing
 end
 abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
-struct LoGo{T1 <: AbstractDistanceEstimator, T2 <: AbstractSimilarityMatrixAlgorithm} <:
-       InverseMatrixSparsificationAlgorithm
+struct LoGo{T1, T2} <: InverseMatrixSparsificationAlgorithm
     dist::T1
     sim::T2
 end
 function LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
               sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
-    return LoGo{typeof(dist), typeof(sim)}(dist, sim)
+    return LoGo(dist, sim)
 end
 function LoGo_dist_assert(::Union{Distance{<:VariationInfoDistance},
                                   GeneralDistance{<:VariationInfoDistance, <:Any},

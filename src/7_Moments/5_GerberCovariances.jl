@@ -107,7 +107,7 @@ Implements the second variant of the Gerber covariance algorithm.
 struct Gerber2 <: UnNormalisedGerberCovarianceAlgorithm end
 
 """
-    struct NormalisedGerber0{T1 <: AbstractExpectedReturnsEstimator} <: NormalisedGerberCovarianceAlgorithm
+    struct NormalisedGerber0{T1} <: NormalisedGerberCovarianceAlgorithm
         me::T1
     end
 
@@ -130,8 +130,7 @@ Implements the original Gerber covariance algorithm on Z-transformed data.
   - [`NormalisedGerber1`](@ref)
   - [`NormalisedGerber2`](@ref)
 """
-struct NormalisedGerber0{T1 <: AbstractExpectedReturnsEstimator} <:
-       NormalisedGerberCovarianceAlgorithm
+struct NormalisedGerber0{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
 end
 """
@@ -164,11 +163,11 @@ NormalisedGerber0
   - [`SimpleExpectedReturns`](@ref)
 """
 function NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-    return NormalisedGerber0{typeof(me)}(me)
+    return NormalisedGerber0(me)
 end
 
 """
-    struct NormalisedGerber1{T1 <: AbstractExpectedReturnsEstimator} <: NormalisedGerberCovarianceAlgorithm
+    struct NormalisedGerber1{T1} <: NormalisedGerberCovarianceAlgorithm
         me::T1
     end
 
@@ -191,8 +190,7 @@ Implements the first variant of the Gerber covariance algorithm on Z-transformed
   - [`NormalisedGerber0`](@ref)
   - [`NormalisedGerber2`](@ref)
 """
-struct NormalisedGerber1{T1 <: AbstractExpectedReturnsEstimator} <:
-       NormalisedGerberCovarianceAlgorithm
+struct NormalisedGerber1{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
 end
 """
@@ -225,11 +223,11 @@ NormalisedGerber1
   - [`SimpleExpectedReturns`](@ref)
 """
 function NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-    return NormalisedGerber1{typeof(me)}(me)
+    return NormalisedGerber1(me)
 end
 
 """
-    struct NormalisedGerber2{T1 <: AbstractExpectedReturnsEstimator} <: NormalisedGerberCovarianceAlgorithm
+    struct NormalisedGerber2{T1} <: NormalisedGerberCovarianceAlgorithm
         me::T1
     end
 
@@ -254,8 +252,7 @@ These types are used to specify the algorithm when constructing a [`GerberCovari
   - [`NormalisedGerber0`](@ref)
   - [`NormalisedGerber1`](@ref)
 """
-struct NormalisedGerber2{T1 <: AbstractExpectedReturnsEstimator} <:
-       NormalisedGerberCovarianceAlgorithm
+struct NormalisedGerber2{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
 end
 """
@@ -288,7 +285,7 @@ NormalisedGerber2
   - [`SimpleExpectedReturns`](@ref)
 """
 function NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-    return NormalisedGerber2{typeof(me)}(me)
+    return NormalisedGerber2(me)
 end
 for alg in (Gerber0, Gerber1, Gerber2)
     eval(quote
@@ -306,10 +303,7 @@ for alg in (NormalisedGerber0, NormalisedGerber1, NormalisedGerber2)
 end
 
 """
-    struct GerberCovariance{T1 <: StatsBase.CovarianceEstimator,
-                            T2 <: Posdef,
-                            T3 <: Real,
-                            T4 <: GerberCovarianceAlgorithm} <: BaseGerberCovariance
+    struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
         ve::T1
         pdm::T2
         threshold::T3
@@ -350,8 +344,7 @@ Construct a `GerberCovariance` estimator with the specified algorithm, variance 
   - [`NormalisedGerber1`](@ref)
   - [`NormalisedGerber2`](@ref)
 """
-struct GerberCovariance{T1 <: StatsBase.CovarianceEstimator, T2 <: Posdef, T3 <: Real,
-                        T4 <: GerberCovarianceAlgorithm} <: BaseGerberCovariance
+struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
     ve::T1
     pdm::T2
     threshold::T3
@@ -416,10 +409,7 @@ function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance()
                           pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
                           alg::GerberCovarianceAlgorithm = Gerber1())
     @smart_assert(zero(threshold) < threshold < one(threshold))
-    return GerberCovariance{typeof(ve), typeof(pdm), typeof(threshold), typeof(alg)}(ve,
-                                                                                     pdm,
-                                                                                     threshold,
-                                                                                     alg)
+    return GerberCovariance(ve, pdm, threshold, alg)
 end
 
 """

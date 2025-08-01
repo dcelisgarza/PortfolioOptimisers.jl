@@ -60,14 +60,7 @@ end
 function select_kextremes(X::AbstractMatrix) end
 
 """
-    struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
-                         T2 <: Union{Nothing, <:AbstractMatrix},
-                         T3 <: Union{Nothing, <:AbstractVector},
-                         T4 <: Union{Nothing, <:AbstractMatrix},
-                         T5 <: Union{Nothing, <:AbstractVector},
-                         T6 <: Union{Nothing, <:AbstractMatrix},
-                         T7 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
-           AbstractReturnsResult
+    struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
         nx::T1
         X::T2
         nf::T3
@@ -103,14 +96,7 @@ Keyword arguments correspond to the fields above. The constructor performs inter
   - [`AbstractReturnsResult`](@ref)
   - [`prices_to_returns`](@ref)
 """
-struct ReturnsResult{T1 <: Union{Nothing, <:AbstractVector},
-                     T2 <: Union{Nothing, <:AbstractMatrix},
-                     T3 <: Union{Nothing, <:AbstractVector},
-                     T4 <: Union{Nothing, <:AbstractMatrix},
-                     T5 <: Union{Nothing, <:AbstractVector},
-                     T6 <: Union{Nothing, <:AbstractMatrix},
-                     T7 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
-       AbstractReturnsResult
+struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     nx::T1
     X::T2
     nf::T3
@@ -207,8 +193,7 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
             end
         end
     end
-    return ReturnsResult{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts),
-                         typeof(iv), typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
+    return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
 function returns_result_view(rd::ReturnsResult, i::AbstractVector)
     nx = nothing_scalar_array_view(rd.nx, i)
@@ -904,7 +889,7 @@ A new array with the same shape as `A`, but with a concrete element type inferre
 julia> A = Any[1, 2.0, 3];
 
 julia> PortfolioOptimisers.concrete_typed_array(A)
-3-element reshape(::Vector{Union{Float64, Int64}}, 3) with eltype Union{Float64, Int64}:
+3-element reshape(::Vector{<:Union{Float64, Int64}}, 3) with eltype Union{Float64, Int64}:
  1
  2.0
  3

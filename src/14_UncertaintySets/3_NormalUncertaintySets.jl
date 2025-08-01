@@ -1,8 +1,4 @@
-struct NormalUncertaintySet{T1 <: AbstractPriorEstimator,
-                            T2 <: AbstractUncertaintySetAlgorithm, T3 <: Integer,
-                            T4 <: Real, T5 <: AbstractRNG,
-                            T6 <: Union{Nothing, <:Integer}} <:
-       AbstractUncertaintySetEstimator
+struct NormalUncertaintySet{T1, T2, T3, T4, T5, T6} <: AbstractUncertaintySetEstimator
     pe::T1
     alg::T2
     n_sim::T3
@@ -17,8 +13,7 @@ function NormalUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
                               seed::Union{Nothing, <:Integer} = nothing)
     @smart_assert(n_sim > zero(n_sim))
     @smart_assert(zero(q) < q < one(q))
-    return NormalUncertaintySet{typeof(pe), typeof(alg), typeof(n_sim), typeof(q),
-                                typeof(rng), typeof(seed)}(pe, alg, n_sim, q, rng, seed)
+    return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed)
 end
 function commutation_matrix(x::AbstractMatrix)
     m, n = size(x)

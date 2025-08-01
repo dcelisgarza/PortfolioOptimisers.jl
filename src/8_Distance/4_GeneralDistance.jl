@@ -1,12 +1,11 @@
-struct GeneralDistance{T1 <: Integer, T2 <: AbstractDistanceAlgorithm} <:
-       AbstractDistanceEstimator
+struct GeneralDistance{T1, T2} <: AbstractDistanceEstimator
     power::T1
     alg::T2
 end
 function GeneralDistance(; power::Integer = 1,
                          alg::AbstractDistanceAlgorithm = SimpleDistance())
     @smart_assert(power >= one(power))
-    return GeneralDistance{typeof(power), typeof(alg)}(power, alg)
+    return GeneralDistance(power, alg)
 end
 function distance(de::GeneralDistance{<:Any, <:SimpleDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,

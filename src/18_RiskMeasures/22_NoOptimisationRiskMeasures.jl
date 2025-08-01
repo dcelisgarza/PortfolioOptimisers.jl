@@ -1,8 +1,8 @@
-struct MeanReturn{T1 <: Union{Nothing, <:AbstractWeights}} <: NoOptimisationRiskMeasure
+struct MeanReturn{T1} <: NoOptimisationRiskMeasure
     w::T1
 end
 function MeanReturn(; w::Union{Nothing, <:AbstractWeights} = nothing)
-    return MeanReturn{typeof(w)}(w)
+    return MeanReturn(w)
 end
 function (r::MeanReturn)(x::AbstractVector)
     return isnothing(r.w) ? mean(x) : mean(x, r.w)
@@ -14,9 +14,7 @@ end
 function risk_measure_view(r::MeanReturn, ::Any, args...)
     return r
 end
-struct ThirdCentralMoment{T1 <: Union{Nothing, <:AbstractWeights},
-                          T2 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
-       AbstractMomentNoOptimisationRiskMeasure
+struct ThirdCentralMoment{T1, T2} <: AbstractMomentNoOptimisationRiskMeasure
     w::T1
     mu::T2
 end
@@ -25,11 +23,9 @@ function ThirdCentralMoment(; w::Union{Nothing, <:AbstractWeights} = nothing,
     if isa(mu, AbstractVector)
         @smart_assert(!isempty(mu))
     end
-    return ThirdCentralMoment{typeof(w), typeof(mu)}(w, mu)
+    return ThirdCentralMoment(w, mu)
 end
-struct Skewness{T1 <: AbstractVarianceEstimator, T2 <: Union{Nothing, <:AbstractWeights},
-                T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
-       AbstractMomentNoOptimisationRiskMeasure
+struct Skewness{T1, T2, T3} <: AbstractMomentNoOptimisationRiskMeasure
     ve::T1
     w::T2
     mu::T3
@@ -40,11 +36,9 @@ function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
     if isa(mu, AbstractVector)
         @smart_assert(!isempty(mu))
     end
-    return Skewness{typeof(ve), typeof(w), typeof(mu)}(ve, w, mu)
+    return Skewness(ve, w, mu)
 end
-struct Kurtosis{T1 <: AbstractVarianceEstimator, T2 <: Union{Nothing, <:AbstractWeights},
-                T3 <: Union{Nothing, <:Real, <:AbstractVector{<:Real}}} <:
-       AbstractMomentNoOptimisationRiskMeasure
+struct Kurtosis{T1, T2, T3} <: AbstractMomentNoOptimisationRiskMeasure
     ve::T1
     w::T2
     mu::T3
@@ -55,7 +49,7 @@ function Kurtosis(; ve::AbstractVarianceEstimator = SimpleVariance(),
     if isa(mu, AbstractVector)
         @smart_assert(!isempty(mu))
     end
-    return Kurtosis{typeof(ve), typeof(w), typeof(mu)}(ve, w, mu)
+    return Kurtosis(ve, w, mu)
 end
 function calc_moment_target(::Union{<:ThirdCentralMoment{Nothing, Nothing},
                                     <:Skewness{<:Any, Nothing, Nothing},

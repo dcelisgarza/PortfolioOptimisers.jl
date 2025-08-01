@@ -1,11 +1,11 @@
-struct BlackLittermanViews{T1 <: AbstractMatrix, T2 <: AbstractVector} <: AbstractResult
+struct BlackLittermanViews{T1, T2} <: AbstractResult
     P::T1
     Q::T2
 end
 function BlackLittermanViews(; P::AbstractMatrix, Q::AbstractVector)
     @smart_assert(!isempty(P) && !isempty(Q))
     @smart_assert(size(P, 1) == length(Q))
-    return BlackLittermanViews{typeof(P), typeof(Q)}(P, Q)
+    return BlackLittermanViews(P, Q)
 end
 function black_litterman_views(::Nothing, args...; kwargs...)
     return nothing
@@ -56,13 +56,12 @@ function black_litterman_views(eqn::Union{<:AbstractString, Expr,
     return get_black_litterman_views(lcs, sets; datatype = datatype, strict = strict)
 end
 #! Start: to delete
-struct BlackLittermanViewsEstimator{T1 <: LinearConstraintSide, T2 <: Real} <:
-       AbstractEstimator
+struct BlackLittermanViewsEstimator{T1, T2} <: AbstractEstimator
     A::T1
     B::T2
 end
 function BlackLittermanViewsEstimator(; A::LinearConstraintSide, B::Real = 0.0)
-    return BlackLittermanViewsEstimator{typeof(A), typeof(B)}(A, B)
+    return BlackLittermanViewsEstimator(A, B)
 end
 function Base.iterate(S::BlackLittermanViewsEstimator, state = 1)
     return state > 1 ? nothing : (S, state + 1)

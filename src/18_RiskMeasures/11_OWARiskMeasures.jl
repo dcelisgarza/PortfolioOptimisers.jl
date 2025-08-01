@@ -1,18 +1,14 @@
 abstract type OrderedWeightsArrayFormulation <: AbstractAlgorithm end
 struct ExactOrderedWeightsArray <: OrderedWeightsArrayFormulation end
-struct ApproxOrderedWeightsArray{T1 <: AbstractVector{<:Real}} <:
-       OrderedWeightsArrayFormulation
+struct ApproxOrderedWeightsArray{T1} <: OrderedWeightsArrayFormulation
     p::T1
 end
 function ApproxOrderedWeightsArray(; p::AbstractVector{<:Real} = Float64[2, 3, 4, 10, 50])
     @smart_assert(!isempty(p))
     @smart_assert(all(x -> x > zero(x), p))
-    return ApproxOrderedWeightsArray{typeof(p)}(p)
+    return ApproxOrderedWeightsArray(p)
 end
-struct OrderedWeightsArray{T1 <: RiskMeasureSettings,
-                           T2 <: Union{Nothing, <:AbstractVector},
-                           T3 <: OrderedWeightsArrayFormulation} <:
-       OrderedWeightsArrayRiskMeasure
+struct OrderedWeightsArray{T1, T2, T3} <: OrderedWeightsArrayRiskMeasure
     settings::T1
     w::T2
     alg::T3
@@ -23,17 +19,13 @@ function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettin
     if isa(w, AbstractVector)
         @smart_assert(!isempty(w))
     end
-    return OrderedWeightsArray{typeof(settings), typeof(w), typeof(alg)}(settings, w, alg)
+    return OrderedWeightsArray(settings, w, alg)
 end
 function (r::OrderedWeightsArray)(x::AbstractVector)
     w = isnothing(r.w) ? owa_gmd(length(x)) : r.w
     return dot(w, sort!(x))
 end
-struct OrderedWeightsArrayRange{T1 <: RiskMeasureSettings,
-                                T2 <: Union{Nothing, <:AbstractVector},
-                                T3 <: Union{Nothing, <:AbstractVector},
-                                T4 <: OrderedWeightsArrayFormulation} <:
-       OrderedWeightsArrayRiskMeasure
+struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: OrderedWeightsArrayRiskMeasure
     settings::T1
     w1::T2
     w2::T3
@@ -58,10 +50,7 @@ function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureS
     if w1_flag && w2_flag
         @smart_assert(length(w1) == length(w2))
     end
-    return OrderedWeightsArrayRange{typeof(settings), typeof(w1), typeof(w2), typeof(alg)}(settings,
-                                                                                           w1,
-                                                                                           w2,
-                                                                                           alg)
+    return OrderedWeightsArrayRange(settings, w1, w2, alg)
 end
 function (r::OrderedWeightsArrayRange)(x::AbstractVector)
     w1 = isnothing(r.w1) ? owa_tg(length(x)) : r.w1

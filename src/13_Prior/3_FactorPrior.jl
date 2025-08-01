@@ -1,7 +1,4 @@
-struct FactorPrior{T1 <: AbstractLowOrderPriorEstimatorMap_2_1,
-                   T2 <: AbstractMatrixProcessingEstimator,
-                   T3 <: AbstractRegressionEstimator, T4 <: AbstractVarianceEstimator,
-                   T5 <: Bool} <: AbstractLowOrderPriorEstimator_2_1
+struct FactorPrior{T1, T2, T3, T4, T5} <: AbstractLowOrderPriorEstimator_2_1
     pe::T1
     mp::T2
     re::T3
@@ -12,9 +9,7 @@ function FactorPrior(; pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPrio
                      mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                      re::AbstractRegressionEstimator = StepwiseRegression(),
                      ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
-    return FactorPrior{typeof(pe), typeof(mp), typeof(re), typeof(ve), typeof(rsd)}(pe, mp,
-                                                                                    re, ve,
-                                                                                    rsd)
+    return FactorPrior(pe, mp, re, ve, rsd)
 end
 function factory(pe::FactorPrior, w::Union{Nothing, <:AbstractWeights} = nothing)
     return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = pe.re,

@@ -31,9 +31,7 @@ Construct a `SimpleVariance` estimator with the specified expected returns estim
   - [`var(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
 """
-struct SimpleVariance{T1 <: Union{Nothing, <:AbstractExpectedReturnsEstimator},
-                      T2 <: Union{Nothing, <:AbstractWeights}, T3 <: Bool} <:
-       AbstractVarianceEstimator
+struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
     me::T1
     w::T2
     corrected::T3
@@ -102,7 +100,7 @@ function SimpleVariance(;
     if isa(me, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return SimpleVariance{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
+    return SimpleVariance(me, w, corrected)
 end
 
 """

@@ -1,6 +1,5 @@
 """
-    GeneralWeightedCovariance{T1 <: StatsBase.CovarianceEstimator,
-                              T2 <: Union{Nothing, <:AbstractWeights}} <: AbstractCovarianceEstimator
+    GeneralWeightedCovariance{T1, T2} <: AbstractCovarianceEstimator
 
 A flexible covariance estimator for PortfolioOptimisers.jl supporting arbitrary covariance estimators and optional observation weights.
 
@@ -25,9 +24,7 @@ Construct a `GeneralWeightedCovariance` estimator with the specified covariance 
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-struct GeneralWeightedCovariance{T1 <: StatsBase.CovarianceEstimator,
-                                 T2 <: Union{Nothing, <:AbstractWeights}} <:
-       AbstractCovarianceEstimator
+struct GeneralWeightedCovariance{T1, T2} <: AbstractCovarianceEstimator
     ce::T1
     w::T2
 end
@@ -86,7 +83,7 @@ function GeneralWeightedCovariance(;
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return GeneralWeightedCovariance{typeof(ce), typeof(w)}(ce, w)
+    return GeneralWeightedCovariance(ce, w)
 end
 
 """
@@ -160,9 +157,7 @@ function factory(ce::GeneralWeightedCovariance,
 end
 
 """
-    struct Covariance{T1 <: AbstractExpectedReturnsEstimator,
-                      T2 <: StatsBase.CovarianceEstimator,
-                      T3 <: AbstractMomentAlgorithm} <: AbstractCovarianceEstimator
+    struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
         me::T1
         ce::T2
         alg::T3
@@ -194,9 +189,7 @@ Construct a `Covariance` estimator with the specified expected returns estimator
   - [`Full`](@ref)
   - [`Semi`](@ref)
 """
-struct Covariance{T1 <: AbstractExpectedReturnsEstimator,
-                  T2 <: StatsBase.CovarianceEstimator, T3 <: AbstractMomentAlgorithm} <:
-       AbstractCovarianceEstimator
+struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
     me::T1
     ce::T2
     alg::T3
@@ -245,7 +238,7 @@ Covariance
 function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance(),
                     alg::AbstractMomentAlgorithm = Full())
-    return Covariance{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)
+    return Covariance(me, ce, alg)
 end
 function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)

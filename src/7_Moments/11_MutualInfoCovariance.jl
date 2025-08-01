@@ -1,6 +1,9 @@
 """
-    struct MutualInfoCovariance{T1 <: AbstractVarianceEstimator,
-                                T2 <: Union{<:AbstractBins, <:Integer}, T3 <: Bool} <: AbstractCovarianceEstimator
+    struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+        ve::T1
+        bins::T2
+        normalise::T3
+    end
 
 Covariance estimator based on mutual information.
 
@@ -25,9 +28,7 @@ Creates a `MutualInfoCovariance` object with the specified variance estimator, b
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractBins`](@ref)
 """
-struct MutualInfoCovariance{T1 <: AbstractVarianceEstimator,
-                            T2 <: Union{<:AbstractBins, <:Integer}, T3 <: Bool} <:
-       AbstractCovarianceEstimator
+struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ve::T1
     bins::T2
     normalise::T3
@@ -81,8 +82,7 @@ function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance()
     if isa(bins, Integer)
         @smart_assert(bins > zero(bins))
     end
-    return MutualInfoCovariance{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins,
-                                                                             normalise)
+    return MutualInfoCovariance(ve, bins, normalise)
 end
 function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,

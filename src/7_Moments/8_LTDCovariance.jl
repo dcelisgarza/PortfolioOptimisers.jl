@@ -1,6 +1,9 @@
 """
-    struct LTDCovariance{T1 <: AbstractVarianceEstimator, T2 <: Real,
-                         T3 <: FLoops.Transducers.Executor} <: AbstractCovarianceEstimator
+    struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+        ve::T1
+        alpha::T2
+        threads::T3
+    end
 
 Lower tail dependence covariance estimator.
 
@@ -26,8 +29,7 @@ Creates a `LTDCovariance` object with the specified variance estimator, quantile
   - [`AbstractCovarianceEstimator`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
-struct LTDCovariance{T1 <: AbstractVarianceEstimator, T2 <: Real,
-                     T3 <: FLoops.Transducers.Executor} <: AbstractCovarianceEstimator
+struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ve::T1
     alpha::T2
     threads::T3
@@ -79,7 +81,7 @@ function LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                        alpha::Real = 0.05,
                        threads::FLoops.Transducers.Executor = ThreadedEx())
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    return LTDCovariance{typeof(ve), typeof(alpha), typeof(threads)}(ve, alpha, threads)
+    return LTDCovariance(ve, alpha, threads)
 end
 
 function factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)

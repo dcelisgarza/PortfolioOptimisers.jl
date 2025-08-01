@@ -86,7 +86,7 @@ Shrinkage target representing the mean squared error of expected returns.
 struct MeanSquareError <: AbstractShrunkExpectedReturnsTarget end
 
 """
-    struct JamesStein{T1 <: AbstractShrunkExpectedReturnsTarget} <: AbstractShrunkExpectedReturnsAlgorithm
+    struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
         target::T1
     end
 
@@ -111,8 +111,7 @@ Construct a `JamesStein` shrinkage algorithm with the specified target.
   - [`BayesStein`](@ref)
   - [`BodnarOkhrinParolya`](@ref)
 """
-struct JamesStein{T1 <: AbstractShrunkExpectedReturnsTarget} <:
-       AbstractShrunkExpectedReturnsAlgorithm
+struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
     target::T1
 end
 """
@@ -144,11 +143,11 @@ JamesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 function JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-    return JamesStein{typeof(target)}(target)
+    return JamesStein(target)
 end
 
 """
-    struct BayesStein{T1 <: AbstractShrunkExpectedReturnsTarget} <: AbstractShrunkExpectedReturnsAlgorithm
+    struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
         target::T1
     end
 
@@ -173,8 +172,7 @@ Construct a `BayesStein` shrinkage algorithm with the specified target.
   - [`JamesStein`](@ref)
   - [`BodnarOkhrinParolya`](@ref)
 """
-struct BayesStein{T1 <: AbstractShrunkExpectedReturnsTarget} <:
-       AbstractShrunkExpectedReturnsAlgorithm
+struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
     target::T1
 end
 """
@@ -206,11 +204,11 @@ BayesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 function BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-    return BayesStein{typeof(target)}(target)
+    return BayesStein(target)
 end
 
 """
-    struct BodnarOkhrinParolya{T1 <: AbstractShrunkExpectedReturnsTarget} <: AbstractShrunkExpectedReturnsAlgorithm
+    struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
         target::T1
     end
 
@@ -235,8 +233,7 @@ Construct a `BodnarOkhrinParolya` shrinkage algorithm with the specified target.
   - [`JamesStein`](@ref)
   - [`BayesStein`](@ref)
 """
-struct BodnarOkhrinParolya{T1 <: AbstractShrunkExpectedReturnsTarget} <:
-       AbstractShrunkExpectedReturnsAlgorithm
+struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
     target::T1
 end
 """
@@ -268,13 +265,11 @@ BodnarOkhrinParolya
   - [`BodnarOkhrinParolya`](@ref)
 """
 function BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-    return BodnarOkhrinParolya{typeof(target)}(target)
+    return BodnarOkhrinParolya(target)
 end
 
 """
-    struct ShrunkExpectedReturns{T1 <: AbstractExpectedReturnsEstimator,
-                                 T2 <: StatsBase.CovarianceEstimator,
-                                 T3 <: AbstractShrunkExpectedReturnsAlgorithm} <: AbstractShrunkExpectedReturnsEstimator
+    struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
         me::T1
         ce::T2
         alg::T3
@@ -305,10 +300,7 @@ Construct a `ShrunkExpectedReturns` estimator with the specified mean estimator,
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
 """
-struct ShrunkExpectedReturns{T1 <: AbstractExpectedReturnsEstimator,
-                             T2 <: StatsBase.CovarianceEstimator,
-                             T3 <: AbstractShrunkExpectedReturnsAlgorithm} <:
-       AbstractShrunkExpectedReturnsEstimator
+struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
     me::T1
     ce::T2
     alg::T3
@@ -366,7 +358,7 @@ function ShrunkExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
-    return ShrunkExpectedReturns{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)
+    return ShrunkExpectedReturns(me, ce, alg)
 end
 
 """

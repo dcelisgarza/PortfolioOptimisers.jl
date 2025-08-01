@@ -55,11 +55,11 @@ end
 function add_custom_constraint!(args...; kwargs...)
     return nothing
 end
-struct JuMPOptimisationSolution{T1 <: AbstractArray} <: OptimisationModelResult
+struct JuMPOptimisationSolution{T1} <: OptimisationModelResult
     w::T1
 end
 function JuMPOptimisationSolution(; w::AbstractArray)
-    return JuMPOptimisationSolution{typeof(w)}(w)
+    return JuMPOptimisationSolution(w)
 end
 function add_to_objective_penalty!(model::JuMP.Model, expr)
     op = if !haskey(model, :op)

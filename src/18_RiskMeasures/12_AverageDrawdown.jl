@@ -1,11 +1,10 @@
-struct AverageDrawdown{T1 <: RiskMeasureSettings,
-                       T2 <: Union{Nothing, <:AbstractWeights}} <: RiskMeasure
+struct AverageDrawdown{T1, T2} <: RiskMeasure
     settings::T1
     w::T2
 end
 function AverageDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                          w::Union{Nothing, <:AbstractWeights} = nothing)
-    return AverageDrawdown{typeof(settings), typeof(w)}(settings, w)
+    return AverageDrawdown(settings, w)
 end
 function (::AverageDrawdown{<:Any, Nothing})(x::AbstractVector)
     pushfirst!(x, 1)
@@ -43,16 +42,14 @@ function (r::AverageDrawdown{<:Any, <:AbstractWeights})(x::AbstractVector)
     popfirst!(x)
     return val / sum(r.w)
 end
-struct RelativeAverageDrawdown{T1 <: HierarchicalRiskMeasureSettings,
-                               T2 <: Union{Nothing, <:AbstractWeights}} <:
-       HierarchicalRiskMeasure
+struct RelativeAverageDrawdown{T1, T2} <: HierarchicalRiskMeasure
     settings::T1
     w::T2
 end
 function RelativeAverageDrawdown(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                  w::Union{Nothing, <:AbstractWeights} = nothing)
-    return RelativeAverageDrawdown{typeof(settings), typeof(w)}(settings, w)
+    return RelativeAverageDrawdown(settings, w)
 end
 function (r::RelativeAverageDrawdown{<:Any, Nothing})(x::AbstractVector)
     x .= pushfirst!(x, 0) .+ one(eltype(x))

@@ -1,27 +1,23 @@
 abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
-struct PCA{T1 <: NamedTuple} <: DimensionReductionTarget
+struct PCA{T1} <: DimensionReductionTarget
     kwargs::T1
 end
 function PCA(; kwargs::NamedTuple = (;))
-    return PCA{typeof(kwargs)}(kwargs)
+    return PCA(kwargs)
 end
 function MultivariateStats.fit(drtgt::PCA, X::AbstractMatrix)
     return MultivariateStats.fit(MultivariateStats.PCA, X; drtgt.kwargs...)
 end
-struct PPCA{T1 <: NamedTuple} <: DimensionReductionTarget
+struct PPCA{T1} <: DimensionReductionTarget
     kwargs::T1
 end
 function PPCA(; kwargs::NamedTuple = (;))
-    return PPCA{typeof(kwargs)}(kwargs)
+    return PPCA(kwargs)
 end
 function MultivariateStats.fit(drtgt::PPCA, X::AbstractMatrix)
     return MultivariateStats.fit(MultivariateStats.PPCA, X; drtgt.kwargs...)
 end
-struct DimensionReductionRegression{T1 <: AbstractExpectedReturnsEstimator,
-                                    T2 <: AbstractVarianceEstimator,
-                                    T3 <: DimensionReductionTarget,
-                                    T4 <: AbstractRegressionTarget} <:
-       AbstractRegressionEstimator
+struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimator
     me::T1
     ve::T2
     drtgt::T3
@@ -32,8 +28,7 @@ function DimensionReductionRegression(;
                                       ve::AbstractVarianceEstimator = SimpleVariance(),
                                       drtgt::DimensionReductionTarget = PCA(),
                                       retgt::AbstractRegressionTarget = LinearModel())
-    return DimensionReductionRegression{typeof(me), typeof(ve), typeof(drtgt),
-                                        typeof(retgt)}(me, ve, drtgt, retgt)
+    return DimensionReductionRegression(me, ve, drtgt, retgt)
 end
 function prep_dim_red_reg(drtgt::DimensionReductionTarget, X::AbstractMatrix)
     N = size(X, 1)

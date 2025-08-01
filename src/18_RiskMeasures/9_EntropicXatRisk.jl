@@ -32,10 +32,7 @@ function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:
         NaN
     end
 end
-struct EntropicValueatRisk{T1 <: RiskMeasureSettings,
-                           T2 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                           T3 <: Real, T4 <: Union{Nothing, <:AbstractWeights}} <:
-       SolverRiskMeasure
+struct EntropicValueatRisk{T1, T2, T3, T4} <: SolverRiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -52,10 +49,7 @@ function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettin
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return EntropicValueatRisk{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings,
-                                                                                        slv,
-                                                                                        alpha,
-                                                                                        w)
+    return EntropicValueatRisk(settings, slv, alpha, w)
 end
 function (r::EntropicValueatRisk)(x::AbstractVector)
     return ERM(x, r.slv, r.alpha, r.w)
@@ -67,11 +61,7 @@ function factory(r::EntropicValueatRisk, prior::AbstractPriorResult,
     slv = solver_factory(r.slv, slv)
     return EntropicValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
 end
-struct EntropicValueatRiskRange{T1 <: RiskMeasureSettings,
-                                T2 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                                T3 <: Real, T4 <: Real,
-                                T5 <: Union{Nothing, <:AbstractWeights}} <:
-       SolverRiskMeasure
+struct EntropicValueatRiskRange{T1, T2, T3, T4, T5} <: SolverRiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -90,8 +80,7 @@ function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureS
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return EntropicValueatRiskRange{typeof(settings), typeof(slv), typeof(alpha),
-                                    typeof(beta), typeof(w)}(settings, slv, alpha, beta, w)
+    return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
 function (r::EntropicValueatRiskRange)(x::AbstractVector)
     return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)
@@ -104,9 +93,7 @@ function factory(r::EntropicValueatRiskRange, prior::AbstractPriorResult,
     return EntropicValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
                                     beta = r.beta, w = w)
 end
-struct EntropicDrawdownatRisk{T1 <: RiskMeasureSettings,
-                              T2 <: Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                              T3 <: Real} <: SolverRiskMeasure
+struct EntropicDrawdownatRisk{T1, T2, T3} <: SolverRiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -118,8 +105,7 @@ function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
         @smart_assert(!isempty(slv))
     end
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    return EntropicDrawdownatRisk{typeof(settings), typeof(slv), typeof(alpha)}(settings,
-                                                                                slv, alpha)
+    return EntropicDrawdownatRisk(settings, slv, alpha)
 end
 function (r::EntropicDrawdownatRisk)(x::AbstractVector)
     pushfirst!(x, 1)
@@ -136,10 +122,7 @@ function (r::EntropicDrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     return ERM(dd, r.slv, r.alpha)
 end
-struct RelativeEntropicDrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings,
-                                      T2 <:
-                                      Union{Nothing, <:Solver, <:AbstractVector{<:Solver}},
-                                      T3 <: Real} <: SolverHierarchicalRiskMeasure
+struct RelativeEntropicDrawdownatRisk{T1, T2, T3} <: SolverHierarchicalRiskMeasure
     settings::T1
     slv::T2
     alpha::T3
@@ -153,9 +136,7 @@ function RelativeEntropicDrawdownatRisk(;
         @smart_assert(!isempty(slv))
     end
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    return RelativeEntropicDrawdownatRisk{typeof(settings), typeof(slv), typeof(alpha)}(settings,
-                                                                                        slv,
-                                                                                        alpha)
+    return RelativeEntropicDrawdownatRisk(settings, slv, alpha)
 end
 function (r::RelativeEntropicDrawdownatRisk)(x::AbstractVector)
     x .= pushfirst!(x, 0) .+ one(eltype(x))

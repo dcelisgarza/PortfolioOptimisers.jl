@@ -14,7 +14,7 @@ All concrete types representing detoning estimators (such as [`Detone`](@ref)) s
 abstract type AbstractDetoneEstimator <: AbstractEstimator end
 
 """
-    struct Detone{T1 <: Integer} <: AbstractDetoneEstimator
+    struct Detone{T1} <: AbstractDetoneEstimator
         n::T1
     end
 
@@ -30,7 +30,7 @@ A concrete detoning estimator for removing the top `n` principal components (mar
   - [`detone!`](@ref)
   - [`detone`](@ref)
 """
-struct Detone{T1 <: Integer} <: AbstractDetoneEstimator
+struct Detone{T1} <: AbstractDetoneEstimator
     n::T1
 end
 
@@ -62,7 +62,7 @@ Detone
 """
 function Detone(; n::Integer = 1)
     @smart_assert(n >= zero(n))
-    return Detone{typeof(n)}(n)
+    return Detone(n)
 end
 
 """

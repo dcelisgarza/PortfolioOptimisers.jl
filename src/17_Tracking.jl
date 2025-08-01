@@ -3,12 +3,12 @@ abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
 abstract type TrackingFormulation <: AbstractAlgorithm end
 abstract type NormTracking <: TrackingFormulation end
 abstract type VariableTracking <: TrackingFormulation end
-struct SOCTracking{T1 <: Integer} <: NormTracking
+struct SOCTracking{T1} <: NormTracking
     ddof::T1
 end
 function SOCTracking(; ddof::Integer = 1)
     @smart_assert(ddof > 0)
-    return SOCTracking{typeof(ddof)}(ddof)
+    return SOCTracking(ddof)
 end
 struct NOCTracking <: NormTracking end
 function norm_tracking(f::SOCTracking, a, b, N = nothing)
@@ -24,15 +24,14 @@ struct DependentVariableTracking <: VariableTracking end
 function tracking_view(::Nothing, ::Any)
     return nothing
 end
-struct WeightsTracking{T1 <: Union{Nothing, <:Fees}, T2 <: AbstractVector{<:Real}} <:
-       AbstractTrackingAlgorithm
+struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
     fees::T1
     w::T2
 end
 function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing,
                          w::AbstractVector{<:Real})
     @smart_assert(!isempty(w))
-    return WeightsTracking{typeof(fees), typeof(w)}(fees, w)
+    return WeightsTracking(fees, w)
 end
 function factory(tracking::WeightsTracking, w::AbstractVector)
     return WeightsTracking(; fees = factory(tracking.fees, tracking.w), w = w)
@@ -45,12 +44,12 @@ end
 function tracking_benchmark(tracking::WeightsTracking, X::AbstractMatrix{<:Real})
     return calc_net_returns(tracking.w, X, tracking.fees)
 end
-struct ReturnsTracking{T1 <: AbstractVector{<:Real}} <: AbstractTrackingAlgorithm
+struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
     w::T1
 end
 function ReturnsTracking(; w::AbstractVector{<:Real})
     @smart_assert(!isempty(w))
-    return ReturnsTracking{typeof(w)}(w)
+    return ReturnsTracking(w)
 end
 function tracking_view(tracking::ReturnsTracking, ::Any)
     return tracking
@@ -61,8 +60,7 @@ end
 function factory(tracking::ReturnsTracking, ::Any)
     return tracking
 end
-struct TrackingError{T1 <: AbstractTrackingAlgorithm, T2 <: Real, T3 <: NormTracking} <:
-       AbstractTracking
+struct TrackingError{T1, T2, T3} <: AbstractTracking
     tracking::T1
     err::T2
     alg::T3
@@ -70,7 +68,7 @@ end
 function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
                        alg::NormTracking = SOCTracking())
     @smart_assert(isfinite(err) && err >= zero(err))
-    return TrackingError{typeof(tracking), typeof(err), typeof(alg)}(tracking, err, alg)
+    return TrackingError(tracking, err, alg)
 end
 function tracking_view(tracking::TrackingError, i::AbstractVector, args...)
     return TrackingError(; tracking = tracking_view(tracking.tracking, i),

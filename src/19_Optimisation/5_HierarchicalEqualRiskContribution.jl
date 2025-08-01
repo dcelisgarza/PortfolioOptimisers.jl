@@ -1,10 +1,4 @@
-struct HierarchicalEqualRiskContribution{T1 <: HierarchicalOptimiser,
-                                         T2 <: Union{<:OptimisationRiskMeasure,
-                                                     <:AbstractVector{<:OptimisationRiskMeasure}},
-                                         T3 <: Union{<:OptimisationRiskMeasure,
-                                                     <:AbstractVector{<:OptimisationRiskMeasure}},
-                                         T4 <: Scalariser, T5 <: Scalariser,
-                                         T6 <: FLoops.Transducers.Executor} <:
+struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6} <:
        ClusteringOptimisationEstimator
     opt::T1
     ri::T2
@@ -28,13 +22,7 @@ function HierarchicalEqualRiskContribution(;
     if isa(ro, AbstractVector)
         @smart_assert(!isempty(ro))
     end
-    return HierarchicalEqualRiskContribution{typeof(opt), typeof(ri), typeof(ro),
-                                             typeof(scei), typeof(sceo), typeof(threads)}(opt,
-                                                                                          ri,
-                                                                                          ro,
-                                                                                          scei,
-                                                                                          sceo,
-                                                                                          threads)
+    return HierarchicalEqualRiskContribution(opt, ri, ro, scei, sceo, threads)
 end
 function opt_view(hec::HierarchicalEqualRiskContribution, i::AbstractVector,
                   X::AbstractMatrix)

@@ -1,8 +1,8 @@
-struct UlcerIndex{T1 <: RiskMeasureSettings} <: RiskMeasure
+struct UlcerIndex{T1} <: RiskMeasure
     settings::T1
 end
 function UlcerIndex(; settings::RiskMeasureSettings = RiskMeasureSettings())
-    return UlcerIndex{typeof(settings)}(settings)
+    return UlcerIndex(settings)
 end
 function (::UlcerIndex)(x::AbstractVector)
     pushfirst!(x, 1)
@@ -21,12 +21,12 @@ function (::UlcerIndex)(x::AbstractVector)
     popfirst!(x)
     return sqrt(val / length(x))
 end
-struct RelativeUlcerIndex{T1 <: HierarchicalRiskMeasureSettings} <: HierarchicalRiskMeasure
+struct RelativeUlcerIndex{T1} <: HierarchicalRiskMeasure
     settings::T1
 end
 function RelativeUlcerIndex(;
                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
-    return RelativeUlcerIndex{typeof(settings)}(settings)
+    return RelativeUlcerIndex(settings)
 end
 function (::RelativeUlcerIndex)(x::AbstractVector)
     x .= pushfirst!(x, 0) .+ one(eltype(x))

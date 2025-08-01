@@ -1,6 +1,5 @@
 abstract type ValueatRiskFormulation <: AbstractAlgorithm end
-struct MIPValueatRisk{T1 <: Union{Nothing, <:Real}, T2 <: Union{Nothing, <:Real}} <:
-       ValueatRiskFormulation
+struct MIPValueatRisk{T1, T2} <: ValueatRiskFormulation
     b::T1
     s::T2
 end
@@ -17,11 +16,9 @@ function MIPValueatRisk(; b::Union{Nothing, <:Real} = nothing,
     if bflag && sflag
         @smart_assert(b > s)
     end
-    return MIPValueatRisk{typeof(b), typeof(s)}(b, s)
+    return MIPValueatRisk(b, s)
 end
-struct DistributionValueatRisk{T1 <: Union{Nothing, <:AbstractVector},
-                               T2 <: Union{Nothing, <:AbstractMatrix},
-                               T3 <: Distribution} <: ValueatRiskFormulation
+struct DistributionValueatRisk{T1, T2, T3} <: ValueatRiskFormulation
     mu::T1
     sigma::T2
     dist::T3
@@ -35,11 +32,9 @@ function DistributionValueatRisk(; mu::Union{Nothing, <:AbstractVector} = nothin
     if !isnothing(sigma)
         @smart_assert(!isempty(sigma))
     end
-    return DistributionValueatRisk{typeof(mu), typeof(sigma), typeof(dist)}(mu, sigma, dist)
+    return DistributionValueatRisk(mu, sigma, dist)
 end
-struct ValueatRisk{T1 <: RiskMeasureSettings, T2 <: Real,
-                   T3 <: Union{Nothing, <:AbstractWeights}, T4 <: ValueatRiskFormulation} <:
-       RiskMeasure
+struct ValueatRisk{T1, T2, T3, T4} <: RiskMeasure
     settings::T1
     alpha::T2
     w::T3
@@ -52,9 +47,7 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return ValueatRisk{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings,
-                                                                                alpha, w,
-                                                                                alg)
+    return ValueatRisk(settings, alpha, w, alg)
 end
 function factory(r::ValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
@@ -73,9 +66,7 @@ function (r::ValueatRisk{<:Any, <:Any, <:AbstractWeights})(x::AbstractVector)
     idx = ifelse(idx > length(x), idx - 1, idx)
     return -sorted_x[idx]
 end
-struct ValueatRiskRange{T1 <: RiskMeasureSettings, T2 <: Real, T3 <: Real,
-                        T4 <: Union{Nothing, <:AbstractWeights},
-                        T5 <: ValueatRiskFormulation} <: RiskMeasure
+struct ValueatRiskRange{T1, T2, T3, T4, T5} <: RiskMeasure
     settings::T1
     alpha::T2
     beta::T3
@@ -91,8 +82,7 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
-    return ValueatRiskRange{typeof(settings), typeof(alpha), typeof(beta), typeof(w),
-                            typeof(alg)}(settings, alpha, beta, w, alg)
+    return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
 function factory(r::ValueatRiskRange, prior::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_factory(r.w, prior.w)
@@ -122,8 +112,7 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:AbstractWeights})(x::Abstra
     gain = -sorted_x[idx]
     return loss - gain
 end
-struct DrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real} <:
-       HierarchicalRiskMeasure
+struct DrawdownatRisk{T1, T2} <: HierarchicalRiskMeasure
     settings::T1
     alpha::T2
 end
@@ -131,7 +120,7 @@ function DrawdownatRisk(;
                         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                         alpha::Real = 0.05)
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    return DrawdownatRisk{typeof(settings), typeof(alpha)}(settings, alpha)
+    return DrawdownatRisk(settings, alpha)
 end
 function (r::DrawdownatRisk)(x::AbstractVector)
     pushfirst!(x, 1)
@@ -148,8 +137,7 @@ function (r::DrawdownatRisk)(x::AbstractVector)
     popfirst!(dd)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
-struct RelativeDrawdownatRisk{T1 <: HierarchicalRiskMeasureSettings, T2 <: Real} <:
-       HierarchicalRiskMeasure
+struct RelativeDrawdownatRisk{T1, T2} <: HierarchicalRiskMeasure
     settings::T1
     alpha::T2
 end
@@ -157,7 +145,7 @@ function RelativeDrawdownatRisk(;
                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                 alpha::Real = 0.05)
     @smart_assert(zero(alpha) < alpha < one(alpha))
-    return RelativeDrawdownatRisk{typeof(settings), typeof(alpha)}(settings, alpha)
+    return RelativeDrawdownatRisk(settings, alpha)
 end
 function (r::RelativeDrawdownatRisk)(x::AbstractVector)
     x .= pushfirst!(x, 0) .+ one(eltype(x))
