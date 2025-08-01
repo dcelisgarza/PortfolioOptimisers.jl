@@ -55,6 +55,7 @@
                                   "reduced_tol_infeas_abs" => 1e-4,
                                   "reduced_tol_infeas_rel" => 1e-4))]
     pr = prior(HighOrderPriorEstimator(), rd)
+    rf = 4.2 / 100 / 252
     @testset "Unconstrained Efficient Frontier" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier1.csv.gz"),
                       DataFrame)
