@@ -159,7 +159,6 @@
                                           rng = StableRNG(987654321),
                                           alg = EllipseUncertaintySetAlgorithm()), rd.X)
     rf = 4.2 / 100 / 252
-
     @testset "Mean Risk" begin
         objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf)]
         rets = [ArithmeticReturn(), KellyReturn()]
@@ -295,11 +294,11 @@
     end
     @testset "Weight bounds" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                            wb = WeightBoundsConstraint(;
-                                                        lb = ["group1" => -1,
-                                                              "group2" => 0.1],
-                                                        ub = Dict("group1" => -0.1,
-                                                                  "group2" => 1)))
+                            wb = WeightBoundsEstimator(;
+                                                       lb = ["group1" => -1,
+                                                             "group2" => 0.1],
+                                                       ub = Dict("group1" => -0.1,
+                                                                 "group2" => 1)))
         mr = MeanRisk(; opt = opt)
         res1 = optimise!(mr)
         @test isapprox(sum(res1.w), 1)

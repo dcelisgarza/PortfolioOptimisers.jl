@@ -134,16 +134,8 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T3 <: Union{Nothing, <:WeightBounds, <:WeightBoundsEstimator},
                      T4 <: Union{Nothing, <:Real, <:BudgetRange, <:BudgetCosts},
                      T5 <: Union{Nothing, <:Real, <:BudgetRange},
-                     T6 <: Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
-                       #! Start: to delete
-                                 <:AbstractDict, <:AbstractVector{<:Pair{<:Any, <:Real}}
-                       #! End: to delete
-                       },
-                     T7 <: Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
-                       #! Start: to delete
-                                 <:AbstractDict, <:AbstractVector{<:Pair{<:Any, <:Real}}
-                       #! End: to delete
-                       },
+                     T6 <: Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator},
+                     T7 <: Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator},
                      T8 <: Union{Nothing, <:AbstractString, Expr,
                                  <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
                                  <:AbstractVector{<:Union{<:AbstractString, Expr}},
@@ -178,18 +170,16 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T13 <: Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix,
                                   <:AbstractVector{Symbol}, <:AbstractVector{<:AbstractString},
                                   <:AbstractVector{<:AbstractMatrix}},
-                     T14 <: Union{Nothing, <:BuyInThreshold, <:AbstractDict,
-                                  <:AbstractVector{<:Pair{<:Any, <:Real}},
-                                  <:AbstractVector{<:AbstractDict},
-                                  <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                                  <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                                           <:AbstractVector{<:Pair{<:Any, <:Real}}}}},
-                     T15 <: Union{Nothing, <:BuyInThreshold, <:AbstractDict,
-                                  <:AbstractVector{<:Pair{<:Any, <:Real}},
-                                  <:AbstractVector{<:AbstractDict},
-                                  <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                                  <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                                           <:AbstractVector{<:Pair{<:Any, <:Real}}}}},
+                     T14 <: Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                                  <:AbstractVector{<:BuyInThreshold},
+                                  <:AbstractVector{<:BuyInThresholdEstimator},
+                                  <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                                           <:BuyInThresholdEstimator}}},
+                     T15 <: Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                                  <:AbstractVector{<:BuyInThreshold},
+                                  <:AbstractVector{<:BuyInThresholdEstimator},
+                                  <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                                           <:BuyInThresholdEstimator}}},
                      T16 <: Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix,
                                   <:AbstractVector{Symbol}, <:AbstractVector{<:AbstractString},
                                   <:AbstractVector{<:AbstractMatrix}},
@@ -280,10 +270,8 @@ function JuMPOptimiser(;
                        wb::Union{Nothing, <:WeightBounds, <:WeightBoundsEstimator} = WeightBounds(),
                        bgt::Union{Nothing, <:Real, <:BudgetConstraintEstimator} = 1.0,
                        sbgt::Union{Nothing, <:Real, <:BudgetRange} = nothing,
-                       lt::Union{Nothing, <:BuyInThreshold, <:AbstractDict,
-                                 <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
-                       st::Union{Nothing, <:BuyInThreshold, <:AbstractDict,
-                                 <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
+                       lt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator} = nothing,
+                       st::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator} = nothing,
                        lcs::Union{Nothing, <:AbstractString, Expr,
                                   <:AbstractVector{<:AbstractString},
                                   <:AbstractVector{Expr},
@@ -324,20 +312,16 @@ function JuMPOptimiser(;
                                    <:AbstractVector{Symbol},
                                    <:AbstractVector{<:AbstractString},
                                    <:AbstractVector{<:AbstractMatrix}} = nothing,
-                       slt::Union{Nothing, <:BuyInThreshold, <:AbstractDict,
-                                  <:AbstractVector{<:Pair{<:Any, <:Real}},
-                                  <:AbstractVector{<:AbstractDict},
-                                  <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                                  <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                                           <:AbstractVector{<:Pair{<:Any,
-                                                                                   <:Real}}}}} = nothing,
-                       sst::Union{Nothing, <:BuyInThreshold, <:AbstractDict,
-                                  <:AbstractVector{<:Pair{<:Any, <:Real}},
-                                  <:AbstractVector{<:AbstractDict},
-                                  <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                                  <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                                           <:AbstractVector{<:Pair{<:Any,
-                                                                                   <:Real}}}}} = nothing,
+                       slt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                                  <:AbstractVector{<:BuyInThreshold},
+                                  <:AbstractVector{<:BuyInThresholdEstimator},
+                                  <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                                           <:BuyInThresholdEstimator}}} = nothing,
+                       sst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                                  <:AbstractVector{<:BuyInThreshold},
+                                  <:AbstractVector{<:BuyInThresholdEstimator},
+                                  <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                                           <:BuyInThresholdEstimator}}} = nothing,
                        sgmtx::Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix,
                                     <:AbstractVector{Symbol},
                                     <:AbstractVector{<:AbstractString},
@@ -415,55 +399,36 @@ function JuMPOptimiser(;
     if isa(scard, Integer)
         @smart_assert(isfinite(scard) && scard > 0)
         @smart_assert(isa(smtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
-        @smart_assert(isa(slt,
-                          Union{Nothing, <:BuyInThreshold, <:AbstractDict,
-                                <:AbstractVector{<:Pair{<:Any, <:Real}}}))
-        @smart_assert(isa(sst,
-                          Union{Nothing, <:BuyInThreshold, <:AbstractDict,
-                                <:AbstractVector{<:Pair{<:Any, <:Real}}}))
+        @smart_assert(isa(slt, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
+        @smart_assert(isa(sst, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
     elseif isa(scard, AbstractVector)
         @smart_assert(!isempty(scard))
         @smart_assert(all(isfinite, scard) && all(x -> x > 0, scard))
-        @smart_assert(isa(smtx,
-                          Union{<:AbstractVector{Symbol},
-                                <:AbstractVector{<:AbstractString},
-                                <:AbstractVector{<:AbstractMatrix}}))
+        @smart_assert(isa(smtx, AbstractVector))
         @smart_assert(length(scard) == length(smtx))
-        if isa(slt,
-               Union{<:AbstractVector{<:AbstractDict},
-                     <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                     <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                              <:AbstractVector{<:Pair{<:Any, <:Real}}}}})
+        if isa(slt, AbstractVector)
+            @smart_assert(!isempty(slt))
             @smart_assert(length(scard) == length(slt))
         end
-        if isa(sst,
-               Union{<:AbstractVector{<:AbstractDict},
-                     <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                     <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                              <:AbstractVector{<:Pair{<:Any, <:Real}}}}})
+        if isa(sst, AbstractVector)
+            @smart_assert(!isempty(sst))
             @smart_assert(length(scard) == length(sst))
         end
-    elseif isnothing(scard) && (isa(slt,
-                                    Union{<:BuyInThreshold, <:AbstractDict,
-                                          <:AbstractVector{<:Pair{<:Any, <:Real}}}) || isa(sst,
-                                                                                           Union{<:BuyInThreshold, <:AbstractDict,
-                                                                                                 <:AbstractVector{<:Pair{<:Any, <:Real}}}))
+    elseif isnothing(scard) &&
+           (isa(slt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) ||
+            isa(sst, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}))
         @smart_assert(isa(smtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
-    elseif isnothing(scard) && (isa(slt,
-                                    Union{<:AbstractVector{<:AbstractDict},
-                                          <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                                          <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                                                   <:AbstractVector{<:Pair{<:Any, <:Real}}}}}) ||
-                                isa(sst,
-                                    Union{<:AbstractVector{<:AbstractDict},
-                                          <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                                          <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                                                                   <:AbstractVector{<:Pair{<:Any, <:Real}}}}}))
-        @smart_assert(isa(smtx,
-                          Union{<:AbstractVector{Symbol},
-                                <:AbstractVector{<:AbstractString},
-                                <:AbstractVector{<:AbstractMatrix}}))
-        @smart_assert(length(slt) == length(sst) == length(smtx))
+    elseif isnothing(scard) && (isa(slt, AbstractVector) || isa(sst, AbstractVector))
+        @smart_assert(isa(smtx, AbstractVector))
+        @smart_assert(!isempty(smtx))
+        if isa(slt, AbstractVector)
+            @smart_assert(!isempty(slt))
+            @smart_assert(length(slt) == length(smtx))
+        end
+        if isa(sst, AbstractVector)
+            @smart_assert(!isempty(sst))
+            @smart_assert(length(sst) == length(smtx))
+        end
     end
     if isa(gcard, AbstractVector)
         @smart_assert(!isempty(gcard))
@@ -491,10 +456,8 @@ function JuMPOptimiser(;
     elseif isa(sgcard,
                Union{<:AbstractVector{<:AbstractVector},
                      <:AbstractVector{<:LinearConstraint}})
-        @smart_assert(isa(sgmtx,
-                          Union{<:AbstractVector{Symbol},
-                                <:AbstractVector{<:AbstractString},
-                                <:AbstractVector{<:AbstractMatrix}}))
+        @smart_assert(isa(sgmtx, AbstractVector))
+        @smart_assert(!isempty(sgmtx))
         @smart_assert(length(sgcard) == length(sgmtx))
         # if isa(sglt,
         #        Union{<:AbstractVector{<:AbstractDict},
@@ -660,7 +623,7 @@ function no_bounds_optimiser(opt::JuMPOptimiser, args...)
                          NamedTuple{pnames}(getproperty.(Ref(opt), pnames))...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, #=sglt, sgst,=# nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(opt,
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(opt, #=sglt, sgst,=#
                                                                                                                                          rd;
                                                                                                                                          dims = dims)
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
