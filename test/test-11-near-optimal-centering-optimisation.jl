@@ -219,4 +219,31 @@
         end
         @test success
     end
+    @testset "Scalarisers" begin
+        r1 = NegativeSkewness(; alg = SqrtRiskExpr(),
+                              settings = RiskMeasureSettings(; scale = 50))
+        r2 = ConditionalValueatRisk(; settings = RiskMeasureSettings(;))
+
+        res_m1 = optimise!(NearOptimalCentering(; r = r1, obj = MaximumRatio(; rf = rf),
+                                                opt = JuMPOptimiser(; pe = pr, slv = slv)))
+        res_m2 = optimise!(NearOptimalCentering(; r = r2, obj = MaximumRatio(; rf = rf),
+                                                opt = JuMPOptimiser(; pe = pr, slv = slv)))
+
+        res1 = optimise!(NearOptimalCentering(; r = [r1, r2], obj = MaximumRatio(; rf = rf),
+                                              opt = JuMPOptimiser(; pe = pr, slv = slv)))
+        res2 = optimise!(NearOptimalCentering(; r = [r1, r2], obj = MaximumRatio(; rf = rf),
+                                              opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                  sce = MaxScalariser())))
+        res3 = optimise!(NearOptimalCentering(; r = [r1, r2], obj = MaximumRatio(; rf = rf),
+                                              opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                  sce = LogSumExpScalariser(;
+                                                                                            gamma = 8.5e-4))))
+        res4 = optimise!(NearOptimalCentering(; r = [r1, r2], obj = MaximumRatio(; rf = rf),
+                                              opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                  sce = LogSumExpScalariser(;
+                                                                                            gamma = 500))))
+        @test isapprox(res2.w, res_m1.w, rtol = 1e-4)
+        @test isapprox(res1.w, res3.w, rtol = 5e-4)
+        @test isapprox(res4.w, res_m1.w, rtol = 1e-4)
+    end
 end

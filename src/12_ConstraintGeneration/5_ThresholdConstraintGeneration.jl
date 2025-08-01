@@ -18,16 +18,14 @@ function BuyInThreshold(; val::Union{<:Real, <:AbstractVector{<:Real}})
     end
     return BuyInThreshold(val)
 end
-function threshold_view(t::Union{Nothing, <:BuyInThresholdEstimator,
-                                 <:AbstractVector{<:Union{Nothing,
-                                                          <:BuyInThresholdEstimator}}},
-                        ::Any)
+function threshold_view(t::Union{Nothing, <:BuyInThresholdEstimator}, ::Any)
     return t
 end
 function threshold_view(t::BuyInThreshold, i::AbstractVector)
     return BuyInThreshold(; val = nothing_scalar_array_view(t.val, i))
 end
-function threshold_view(t::AbstractVector{<:Union{Nothing, <:BuyInThreshold}},
+function threshold_view(t::AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                                  <:BuyInThresholdEstimator}},
                         i::AbstractVector)
     return threshold_view.(t, Ref(i))
 end
