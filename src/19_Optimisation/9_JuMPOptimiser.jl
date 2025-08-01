@@ -24,7 +24,7 @@ struct ProcessedJuMPOptimiserAttributes{T1 <: AbstractPriorResult,
                                         #              <:AbstractVector{<:Union{Nothing,
                                         #                                       <:BuyInThreshold}}},
                                         # T14 <: Union{Nothing, <:BuyInThreshold,
-                                        #              <:AbstractVector{<:BuyInThreshold},
+                                        #              
                                         #              <:AbstractVector{<:Union{Nothing,
                                         #                                       <:BuyInThreshold}}},
                                         T15 <: Union{Nothing, <:PhilogenyResult},
@@ -183,12 +183,11 @@ struct JuMPOptimiser{T1 <: Union{<:AbstractPriorEstimator, <:AbstractPriorResult
                      T16 <: Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix,
                                   <:AbstractVector{Symbol}, <:AbstractVector{<:AbstractString},
                                   <:AbstractVector{<:AbstractMatrix}},
-                     #  T17 <: Union{Nothing, <:BuyInThreshold, <:AbstractDict,
-                     #               <:AbstractVector{<:Pair{<:Any, <:Real}},
-                     #               <:AbstractVector{<:AbstractDict},
-                     #               <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                     #               <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                     #                                        <:AbstractVector{<:Pair{<:Any, <:Real}}}}},
+                     #  T17 <: Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                     #               <:AbstractVector{<:BuyInThreshold},
+                     #               <:AbstractVector{<:BuyInThresholdEstimator},
+                     #               <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                     #                                        <:BuyInThresholdEstimator}}},
                      #  T18 <: Union{Nothing, <:BuyInThreshold, <:AbstractDict,
                      #               <:AbstractVector{<:Pair{<:Any, <:Real}},
                      #               <:AbstractVector{<:AbstractDict},
@@ -326,13 +325,11 @@ function JuMPOptimiser(;
                                     <:AbstractVector{Symbol},
                                     <:AbstractVector{<:AbstractString},
                                     <:AbstractVector{<:AbstractMatrix}} = nothing,
-                       #    sglt::Union{Nothing, <:BuyInThreshold, <:AbstractDict,
-                       #                <:AbstractVector{<:Pair{<:Any, <:Real}},
-                       #                <:AbstractVector{<:AbstractDict},
-                       #                <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-                       #                <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-                       #                                         <:AbstractVector{<:Pair{<:Any,
-                       #                                                                 <:Real}}}}} = nothing,
+                       #    sglt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                       #                <:AbstractVector{<:BuyInThreshold},
+                       #                <:AbstractVector{<:BuyInThresholdEstimator},
+                       #                <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                       #                                         <:BuyInThresholdEstimator}}} = nothing,
                        #    sgst::Union{Nothing, <:BuyInThreshold, <:AbstractDict,
                        #                <:AbstractVector{<:Pair{<:Any, <:Real}},
                        #                <:AbstractVector{<:AbstractDict},
@@ -442,8 +439,7 @@ function JuMPOptimiser(;
                  <:LinearConstraint})
         @smart_assert(isa(sgmtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
         # @smart_assert(isa(sglt,
-        #                   Union{Nothing, <:BuyInThreshold, <:AbstractDict,
-        #                         <:AbstractVector{<:Pair{<:Any, <:Real}}}))
+        #                   Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
         # @smart_assert(isa(sgst,
         #                   Union{Nothing, <:BuyInThreshold, <:AbstractDict,
         #                         <:AbstractVector{<:Pair{<:Any, <:Real}}}))
@@ -459,11 +455,8 @@ function JuMPOptimiser(;
         @smart_assert(isa(sgmtx, AbstractVector))
         @smart_assert(!isempty(sgmtx))
         @smart_assert(length(sgcard) == length(sgmtx))
-        # if isa(sglt,
-        #        Union{<:AbstractVector{<:AbstractDict},
-        #              <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-        #              <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-        #                                       <:AbstractVector{<:Pair{<:Any, <:Real}}}}})
+        # if isa(sglt, AbstractVector)
+        #     @smart_assert(!isempty(sglt))
         #     @smart_assert(length(sgcard) == length(sglt))
         # end
         # if isa(sgst,
@@ -473,7 +466,7 @@ function JuMPOptimiser(;
         #                                       <:AbstractVector{<:Pair{<:Any, <:Real}}}}})
         #     @smart_assert(length(sgcard) == length(sgst))
         # end
-        for (sgc, smt) in zip(sgcard, smtx)
+        for (sgc, smt) in zip(sgcard, sgmtx)
             if isa(sgc, LinearConstraint) && isa(smt, AbstractMatrix)
                 N = size(smt, 1)
                 N_ineq = !isnothing(sgc.ineq) ? length(sgc.B_ineq) : 0
@@ -481,27 +474,33 @@ function JuMPOptimiser(;
                 @smart_assert(N == N_ineq + N_eq)
             end
         end
-        # elseif isnothing(sgcard) && (isa(sglt,
-        #                                  Union{<:BuyInThreshold, <:AbstractDict,
-        #                                        <:AbstractVector{<:Pair{<:Any, <:Real}}}) || isa(sgst,
-        #                                                                                         Union{<:BuyInThreshold, <:AbstractDict,
-        #                                                                                               <:AbstractVector{<:Pair{<:Any, <:Real}}}))
+        # elseif isnothing(sgcard) &&
+        #        (isa(sglt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) #=|| isa(sgst,
+        #                                                                                                                                                                                                                                                                                                              Union{<:BuyInThreshold, <:AbstractDict,
+        #                                                                                                                                                                                                                                                                                                                    <:AbstractVector{<:Pair{<:Any, <:Real}}})
+        #                                                                                                                                                                                                                                                                                                                    =#
+
+        #         )
         #     @smart_assert(isa(sgmtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
-        # elseif isnothing(sgcard) && (isa(sglt,
-        #                                  Union{<:AbstractVector{<:AbstractDict},
-        #                                        <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-        #                                        <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-        #                                                                 <:AbstractVector{<:Pair{<:Any, <:Real}}}}}) ||
-        #                              isa(sgst,
-        #                                  Union{<:AbstractVector{<:AbstractDict},
-        #                                        <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
-        #                                        <:AbstractVector{<:Union{Nothing, <:AbstractDict,
-        #                                                                 <:AbstractVector{<:Pair{<:Any, <:Real}}}}}))
-        #     @smart_assert(isa(sgmtx,
-        #                       Union{<:AbstractVector{Symbol},
-        #                             <:AbstractVector{<:AbstractString},
-        #                             <:AbstractVector{<:AbstractMatrix}}))
-        #     @smart_assert(length(sglt) == length(sgst) == length(sgmtx))
+        # elseif isnothing(sgcard) &&
+        #        (isa(sglt, AbstractVector{<:Union{<:BuyInThreshold, <:BuyInThresholdEstimator}}) #=||
+        #         isa(sgst,
+        #             Union{<:AbstractVector{<:AbstractDict},
+        #                   <:AbstractVector{<:AbstractVector{<:Pair{<:Any, <:Real}}},
+        #                   <:AbstractVector{<:Union{Nothing, <:AbstractDict,
+        #                                            <:AbstractVector{<:Pair{<:Any, <:Real}}}}})=#
+
+        #         )
+        #     @smart_assert(isa(sgmtx, AbstractVector))
+        #     @smart_assert(!isempty(sgmtx))
+        #     if isa(sglt, AbstractVector)
+        #         @smart_assert(!isempty(sglt))
+        #         @smart_assert(length(sglt) == length(sgmtx))
+        #     end
+        #     # if isa(sgst, AbstractVector)
+        #     #     @smart_assert(!isempty(sgst))
+        #     #     @smart_assert(length(sgst) == length(sgmtx))
+        #     # end
     end
     if isa(wb, WeightBoundsEstimator) ||
        !isa(lt, Union{Nothing, <:BuyInThreshold}) ||
@@ -529,7 +528,7 @@ function JuMPOptimiser(;
     return JuMPOptimiser{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                          typeof(lt), typeof(st), typeof(lcs), typeof(lcm), typeof(cent),
                          typeof(gcard), typeof(sgcard), typeof(smtx), typeof(slt),
-                         typeof(sst), typeof(sgmtx), #typeof(sglt), typeof(sgst),
+                         typeof(sst), typeof(sgmtx), #typeof(sglt), #typeof(sgst),
                          typeof(sets), typeof(nplg), typeof(cplg), typeof(tn), typeof(te),
                          typeof(fees), typeof(ret), typeof(sce), typeof(ccnt), typeof(cobj),
                          typeof(sc), typeof(so), typeof(card), typeof(scard), typeof(nea),
@@ -539,8 +538,7 @@ function JuMPOptimiser(;
                                                                              cent, gcard,
                                                                              sgcard, smtx,
                                                                              slt, sst,
-                                                                             sgmtx,
-                                                                             #sglt,sgst, 
+                                                                             sgmtx, #sglt,#sgst, 
                                                                              sets, nplg,
                                                                              cplg, tn, te,
                                                                              fees, ret, sce,
@@ -563,12 +561,16 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     slt = threshold_view(opt.slt, i)
     sst = threshold_view(opt.sst, i)
     sgmtx = if opt.smtx === opt.sgmtx
-        smtx#, slt, sst
+        smtx
     else
         asset_sets_matrix_view(opt.sgmtx, i)
-        # , threshold_view(opt.sglt, i),
         # threshold_view(opt.sgst, i)
     end
+    # sglt = if opt.slt === opt.sglt
+    #     slt
+    # else
+    #     threshold_view(opt.sglt, i)
+    # end
     sets = nothing_asset_sets_view(opt.sets, i)
     tn = turnover_view(opt.tn, i)
     te = tracking_view(opt.te, i, X)
@@ -579,7 +581,7 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = opt.lcs, lcm = opt.lcm, cent = opt.cent,
                          gcard = opt.gcard, sgcard = opt.sgcard, smtx = smtx, slt = slt,
-                         sst = sst, sgmtx = sgmtx, #sglt = sglt, sgst = sgst, 
+                         sst = sst, sgmtx = sgmtx, #sglt = sglt, #sgst = sgst, 
                          sets = sets, nplg = opt.nplg, cplg = opt.cplg, tn = tn, te = te,
                          fees = fees, ret = ret, sce = opt.sce, ccnt = ccnt, cobj = cobj,
                          sc = opt.sc, so = opt.so, card = opt.card, scard = opt.scard,
@@ -602,19 +604,23 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     slt = threshold_constraints(opt.slt, opt.sets; datatype = datatype, strict = opt.strict)
     sst = threshold_constraints(opt.sst, opt.sets; datatype = datatype, strict = opt.strict)
     sgmtx = if opt.smtx === opt.sgmtx
-        smtx#, slt, sst
+        smtx
     else
         asset_sets_matrix(opt.sgmtx, opt.sets)
-        # threshold_constraints(opt.sglt, opt.sets; datatype = datatype, strict = opt.strict),
-        # threshold_constraints(opt.sgst, opt.sets; datatype = datatype, strict = opt.strict)
     end
+    # sglt = if opt.slt === opt.sglt
+    #     slt#, sst
+    # else
+    #     threshold_constraints(opt.sglt, opt.sets; datatype = datatype, strict = opt.strict)
+    #     # threshold_constraints(opt.sgst, opt.sets; datatype = datatype, strict = opt.strict)
+    # end
     nplg = philogeny_constraints(opt.nplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     cplg = philogeny_constraints(opt.cplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     tn = turnover_constraints(opt.tn, opt.sets; strict = opt.strict, datatype = datatype)
     fees = fees_constraints(opt.fees, opt.sets; strict = opt.strict, datatype = datatype)
     ret = jump_returns_factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx,
-                                            slt, sst, sgmtx, #sglt, sgst, 
+                                            slt, sst, sgmtx, #glt, #sgst, 
                                             nplg, cplg, tn, fees, ret)
 end
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
@@ -623,13 +629,13 @@ function no_bounds_optimiser(opt::JuMPOptimiser, args...)
                          NamedTuple{pnames}(getproperty.(Ref(opt), pnames))...)
 end
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(opt, #=sglt, sgst,=#
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(opt,
                                                                                                                                          rd;
                                                                                                                                          dims = dims)
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcs = lcs, lcm = opt.lcm, cent = cent,
                          gcard = gcard, sgcard = sgcard, smtx = smtx, slt = slt, sst = sst,
-                         sgmtx = sgmtx,# sglt = sglt, sgst = sgst, 
+                         sgmtx = sgmtx, #sglt = sglt, #sgst = sgst, 
                          sets = opt.sets, nplg = nplg, cplg = cplg, tn = tn, te = opt.te,
                          fees = fees, ret = ret, sce = opt.sce, ccnt = opt.ccnt,
                          cobj = opt.cobj, sc = opt.sc, so = opt.so, card = opt.card,
