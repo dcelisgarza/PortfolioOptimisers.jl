@@ -105,8 +105,6 @@
         rkc = risk_contribution(r, res.w, pr.X)
         v1, m1 = findmin(rkc)
         v2, m2 = findmax(rkc)
-        df[!, "$i"] = [res.w; rkc]
-
         rtol = 1e-6
         success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
         if !success

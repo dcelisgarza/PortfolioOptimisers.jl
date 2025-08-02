@@ -1,4 +1,4 @@
-#=
+
 @safetestset "Prior tests" begin
     using PortfolioOptimisers, StatsBase, Random, StableRNGs, Test, CovarianceEstimation,
           CSV, DataFrames, LinearAlgebra, Clarabel, SparseArrays, Logging, TimeSeries
@@ -67,8 +67,7 @@
         rd = prices_to_returns(X[(end - 100):end][:AAPL, :BKNG, :COST, :GOOG, :MRK, :NFLX,
                                                   :SBUX, :TSLA, :TXN, :VRTX],
                                F[(end - 100):end][:GLOF, :QUAL])
-        pr1 = prior(FactorPrior(; rsd = false), transpose(rd.X), transpose(rd.F);
-                    dims = 2)
+        pr1 = prior(FactorPrior(; rsd = false), transpose(rd.X), transpose(rd.F); dims = 2)
         pm1_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-No-Residuals.csv"),
                          DataFrame)
         X_t = reshape(view(pm1_t, 1:1000, 1), 100, 10)
@@ -81,8 +80,7 @@
         @test isapprox(pr1.chol, chol_t)
         @test pr1 === prior(pr1)
 
-        pr2 = prior(FactorPrior(; rsd = true), transpose(rd.X), transpose(rd.F);
-                    dims = 2)
+        pr2 = prior(FactorPrior(; rsd = true), transpose(rd.X), transpose(rd.F); dims = 2)
         pm2_t = CSV.read(joinpath(@__DIR__, "./assets/Factor-Prior-Residuals.csv"),
                          DataFrame)
         X_t = reshape(view(pm2_t, 1:1000, 1), 100, 10)
@@ -95,8 +93,7 @@
         @test isapprox(pr2.chol, chol_t)
 
         pr1 = prior(FactorPrior(; re = StepwiseRegression(; alg = Backward())), rd)
-        pr2 = prior(FactorPrior(; re = StepwiseRegression(; alg = Backward())),
-                    rd.X, rd.F)
+        pr2 = prior(FactorPrior(; re = StepwiseRegression(; alg = Backward())), rd.X, rd.F)
         @test pr1.X == pr2.X
         @test pr1.mu == pr2.mu
         @test pr1.sigma == pr2.sigma
@@ -276,247 +273,247 @@
     end
     @testset "Black Litteman type tests" begin
         pe1 = BayesianBlackLittermanPrior(; tau = 1,
-                                                   views = BlackLittermanViewsEstimator(;
-                                                                                        A = LinearConstraintSide(;
-                                                                                                                 name = nothing,
-                                                                                                                 group = nothing)),
-                                                   pe = FactorPrior(;
-                                                                             pe = EmpiricalPrior(;
-                                                                                                          me = ShrunkExpectedReturns(;
-                                                                                                                                     alg = JamesStein()),
-                                                                                                          ce = PortfolioOptimisersCovariance(;
-                                                                                                                                             ce = GerberCovariance(;
-                                                                                                                                                                   alg = Gerber0())))))
+                                          views = BlackLittermanViewsEstimator(;
+                                                                               A = LinearConstraintSide(;
+                                                                                                        name = nothing,
+                                                                                                        group = nothing)),
+                                          pe = FactorPrior(;
+                                                           pe = EmpiricalPrior(;
+                                                                               me = ShrunkExpectedReturns(;
+                                                                                                          alg = JamesStein()),
+                                                                               ce = PortfolioOptimisersCovariance(;
+                                                                                                                  ce = GerberCovariance(;
+                                                                                                                                        alg = Gerber0())))))
         @test pe1.tau == 1
         @test isa(pe1.me, ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein{<:GrandMean}})
         @test isa(pe1.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0})
         pe2 = BayesianBlackLittermanPrior(;
-                                                   views = BlackLittermanViewsEstimator(;
-                                                                                        A = LinearConstraintSide(;
-                                                                                                                 name = nothing,
-                                                                                                                 group = nothing)),
-                                                   pe = FactorBlackLittermanPrior(;
-                                                                                           views = BlackLittermanViewsEstimator(;
-                                                                                                                                A = LinearConstraintSide(;
-                                                                                                                                                         name = nothing,
-                                                                                                                                                         group = nothing)),
-                                                                                           pe = EmpiricalPrior(;
-                                                                                                                        me = ShrunkExpectedReturns(;
-                                                                                                                                                   alg = BodnarOkhrinParolya()),
-                                                                                                                        ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                           ce = GerberCovariance(;
-                                                                                                                                                                                 alg = Gerber2())))))
+                                          views = BlackLittermanViewsEstimator(;
+                                                                               A = LinearConstraintSide(;
+                                                                                                        name = nothing,
+                                                                                                        group = nothing)),
+                                          pe = FactorBlackLittermanPrior(;
+                                                                         views = BlackLittermanViewsEstimator(;
+                                                                                                              A = LinearConstraintSide(;
+                                                                                                                                       name = nothing,
+                                                                                                                                       group = nothing)),
+                                                                         pe = EmpiricalPrior(;
+                                                                                             me = ShrunkExpectedReturns(;
+                                                                                                                        alg = BodnarOkhrinParolya()),
+                                                                                             ce = PortfolioOptimisersCovariance(;
+                                                                                                                                ce = GerberCovariance(;
+                                                                                                                                                      alg = Gerber2())))))
         @test isa(pe2.me,
                   ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya{<:GrandMean}})
         @test isa(pe2.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2})
         pe3 = BayesianBlackLittermanPrior(;
-                                                   views = BlackLittermanViewsEstimator(;
-                                                                                        A = LinearConstraintSide(;
-                                                                                                                 name = nothing,
-                                                                                                                 group = nothing)),
-                                                   pe = AugmentedBlackLittermanPrior(;
-                                                                                              a_views = BlackLittermanViewsEstimator(;
-                                                                                                                                     A = LinearConstraintSide(;
-                                                                                                                                                              name = nothing,
-                                                                                                                                                              group = nothing)),
-                                                                                              f_views = BlackLittermanViewsEstimator(;
-                                                                                                                                     A = LinearConstraintSide(;
-                                                                                                                                                              name = nothing,
-                                                                                                                                                              group = nothing)),
-                                                                                              a_pe = EmpiricalPrior(;
-                                                                                                                             me = ExcessExpectedReturns(),
-                                                                                                                             ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                                ce = GerberCovariance(;
-                                                                                                                                                                                      alg = Gerber1())))))
+                                          views = BlackLittermanViewsEstimator(;
+                                                                               A = LinearConstraintSide(;
+                                                                                                        name = nothing,
+                                                                                                        group = nothing)),
+                                          pe = AugmentedBlackLittermanPrior(;
+                                                                            a_views = BlackLittermanViewsEstimator(;
+                                                                                                                   A = LinearConstraintSide(;
+                                                                                                                                            name = nothing,
+                                                                                                                                            group = nothing)),
+                                                                            f_views = BlackLittermanViewsEstimator(;
+                                                                                                                   A = LinearConstraintSide(;
+                                                                                                                                            name = nothing,
+                                                                                                                                            group = nothing)),
+                                                                            a_pe = EmpiricalPrior(;
+                                                                                                  me = ExcessExpectedReturns(),
+                                                                                                  ce = PortfolioOptimisersCovariance(;
+                                                                                                                                     ce = GerberCovariance(;
+                                                                                                                                                           alg = Gerber1())))))
         @test isa(pe3.me, ExcessExpectedReturns{<:SimpleExpectedReturns{Nothing}, <:Any})
         @test isa(pe3.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1})
         pe4 = BayesianBlackLittermanPrior(;
-                                                   views = BlackLittermanViewsEstimator(;
-                                                                                        A = LinearConstraintSide(;
-                                                                                                                 name = nothing,
-                                                                                                                 group = nothing)),
-                                                   pe = BlackLittermanPrior(;
-                                                                                     views = BlackLittermanViewsEstimator(;
-                                                                                                                          A = LinearConstraintSide(;
-                                                                                                                                                   name = nothing,
-                                                                                                                                                   group = nothing)),
-                                                                                     pe = EmpiricalPrior(;
-                                                                                                                  me = EquilibriumExpectedReturns(),
-                                                                                                                  ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                     ce = SmythBrobyCovariance(;
-                                                                                                                                                                               alg = SmythBroby0())))))
+                                          views = BlackLittermanViewsEstimator(;
+                                                                               A = LinearConstraintSide(;
+                                                                                                        name = nothing,
+                                                                                                        group = nothing)),
+                                          pe = BlackLittermanPrior(;
+                                                                   views = BlackLittermanViewsEstimator(;
+                                                                                                        A = LinearConstraintSide(;
+                                                                                                                                 name = nothing,
+                                                                                                                                 group = nothing)),
+                                                                   pe = EmpiricalPrior(;
+                                                                                       me = EquilibriumExpectedReturns(),
+                                                                                       ce = PortfolioOptimisersCovariance(;
+                                                                                                                          ce = SmythBrobyCovariance(;
+                                                                                                                                                    alg = SmythBroby0())))))
         @test isa(pe4.me, EquilibriumExpectedReturns{<:Any, <:Any, <:Any})
         @test isa(pe4.ce.ce,
                   SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:SmythBroby0})
         pe5 = BayesianBlackLittermanPrior(;
-                                                   views = BlackLittermanViewsEstimator(;
-                                                                                        A = LinearConstraintSide(;
-                                                                                                                 name = nothing,
-                                                                                                                 group = nothing)),
-                                                   pe = BayesianBlackLittermanPrior(;
-                                                                                             views = BlackLittermanViewsEstimator(;
-                                                                                                                                  A = LinearConstraintSide(;
-                                                                                                                                                           name = nothing,
-                                                                                                                                                           group = nothing))))
+                                          views = BlackLittermanViewsEstimator(;
+                                                                               A = LinearConstraintSide(;
+                                                                                                        name = nothing,
+                                                                                                        group = nothing)),
+                                          pe = BayesianBlackLittermanPrior(;
+                                                                           views = BlackLittermanViewsEstimator(;
+                                                                                                                A = LinearConstraintSide(;
+                                                                                                                                         name = nothing,
+                                                                                                                                         group = nothing))))
         @test isa(pe5.me, EquilibriumExpectedReturns)
         @test isa(pe5.ce.ce, Covariance{<:Any, <:Any, <:Full})
         pe6 = BlackLittermanPrior(;
-                                           views = BlackLittermanViewsEstimator(;
-                                                                                A = LinearConstraintSide(;
-                                                                                                         name = nothing,
-                                                                                                         group = nothing)),
-                                           pe = EmpiricalPrior(;
-                                                                        me = ShrunkExpectedReturns(;
-                                                                                                   alg = BayesStein()),
-                                                                        ce = PortfolioOptimisersCovariance(;
-                                                                                                           ce = SmythBrobyCovariance(;
-                                                                                                                                     alg = NormalisedSmythBroby0()))))
+                                  views = BlackLittermanViewsEstimator(;
+                                                                       A = LinearConstraintSide(;
+                                                                                                name = nothing,
+                                                                                                group = nothing)),
+                                  pe = EmpiricalPrior(;
+                                                      me = ShrunkExpectedReturns(;
+                                                                                 alg = BayesStein()),
+                                                      ce = PortfolioOptimisersCovariance(;
+                                                                                         ce = SmythBrobyCovariance(;
+                                                                                                                   alg = NormalisedSmythBroby0()))))
         @test isa(pe6.me, ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein{<:GrandMean}})
         @test isa(pe6.ce.ce,
                   SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:NormalisedSmythBroby0})
         pe7 = BlackLittermanPrior(; tau = 0.5,
-                                           views = BlackLittermanViewsEstimator(;
-                                                                                A = LinearConstraintSide(;
-                                                                                                         name = nothing,
-                                                                                                         group = nothing)),
-                                           pe = FactorPrior(;
-                                                                     pe = EmpiricalPrior(;
-                                                                                                  me = ShrunkExpectedReturns(;
-                                                                                                                             alg = JamesStein()),
-                                                                                                  ce = PortfolioOptimisersCovariance(;
-                                                                                                                                     ce = GerberCovariance(;
-                                                                                                                                                           alg = NormalisedGerber0())))))
+                                  views = BlackLittermanViewsEstimator(;
+                                                                       A = LinearConstraintSide(;
+                                                                                                name = nothing,
+                                                                                                group = nothing)),
+                                  pe = FactorPrior(;
+                                                   pe = EmpiricalPrior(;
+                                                                       me = ShrunkExpectedReturns(;
+                                                                                                  alg = JamesStein()),
+                                                                       ce = PortfolioOptimisersCovariance(;
+                                                                                                          ce = GerberCovariance(;
+                                                                                                                                alg = NormalisedGerber0())))))
         @test pe7.tau == 0.5
         @test isa(pe7.me, ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein{<:GrandMean}})
         @test isa(pe7.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0})
         pe8 = BlackLittermanPrior(;
-                                           views = BlackLittermanViewsEstimator(;
-                                                                                A = LinearConstraintSide(;
-                                                                                                         name = nothing,
-                                                                                                         group = nothing)),
-                                           pe = FactorBlackLittermanPrior(;
-                                                                                   views = BlackLittermanViewsEstimator(;
-                                                                                                                        A = LinearConstraintSide(;
-                                                                                                                                                 name = nothing,
-                                                                                                                                                 group = nothing)),
-                                                                                   pe = EmpiricalPrior(;
-                                                                                                                me = ShrunkExpectedReturns(;
-                                                                                                                                           alg = BodnarOkhrinParolya()),
-                                                                                                                ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                   ce = GerberCovariance(;
-                                                                                                                                                                         alg = NormalisedGerber2())))))
+                                  views = BlackLittermanViewsEstimator(;
+                                                                       A = LinearConstraintSide(;
+                                                                                                name = nothing,
+                                                                                                group = nothing)),
+                                  pe = FactorBlackLittermanPrior(;
+                                                                 views = BlackLittermanViewsEstimator(;
+                                                                                                      A = LinearConstraintSide(;
+                                                                                                                               name = nothing,
+                                                                                                                               group = nothing)),
+                                                                 pe = EmpiricalPrior(;
+                                                                                     me = ShrunkExpectedReturns(;
+                                                                                                                alg = BodnarOkhrinParolya()),
+                                                                                     ce = PortfolioOptimisersCovariance(;
+                                                                                                                        ce = GerberCovariance(;
+                                                                                                                                              alg = NormalisedGerber2())))))
         @test isa(pe8.me,
                   ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya{<:GrandMean}})
         @test isa(pe8.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2})
         pe9 = BlackLittermanPrior(;
-                                           views = BlackLittermanViewsEstimator(;
-                                                                                A = LinearConstraintSide(;
-                                                                                                         name = nothing,
-                                                                                                         group = nothing)),
-                                           pe = AugmentedBlackLittermanPrior(;
-                                                                                      a_views = BlackLittermanViewsEstimator(;
-                                                                                                                             A = LinearConstraintSide(;
-                                                                                                                                                      name = nothing,
-                                                                                                                                                      group = nothing)),
-                                                                                      f_views = BlackLittermanViewsEstimator(;
-                                                                                                                             A = LinearConstraintSide(;
-                                                                                                                                                      name = nothing,
-                                                                                                                                                      group = nothing)),
-                                                                                      a_pe = EmpiricalPrior(;
-                                                                                                                     me = ExcessExpectedReturns(),
-                                                                                                                     ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                        ce = GerberCovariance(;
-                                                                                                                                                                              alg = NormalisedGerber1())))))
+                                  views = BlackLittermanViewsEstimator(;
+                                                                       A = LinearConstraintSide(;
+                                                                                                name = nothing,
+                                                                                                group = nothing)),
+                                  pe = AugmentedBlackLittermanPrior(;
+                                                                    a_views = BlackLittermanViewsEstimator(;
+                                                                                                           A = LinearConstraintSide(;
+                                                                                                                                    name = nothing,
+                                                                                                                                    group = nothing)),
+                                                                    f_views = BlackLittermanViewsEstimator(;
+                                                                                                           A = LinearConstraintSide(;
+                                                                                                                                    name = nothing,
+                                                                                                                                    group = nothing)),
+                                                                    a_pe = EmpiricalPrior(;
+                                                                                          me = ExcessExpectedReturns(),
+                                                                                          ce = PortfolioOptimisersCovariance(;
+                                                                                                                             ce = GerberCovariance(;
+                                                                                                                                                   alg = NormalisedGerber1())))))
         @test isa(pe9.me, ExcessExpectedReturns)
         @test isa(pe9.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1})
         pe10 = BlackLittermanPrior(;
-                                            views = BlackLittermanViewsEstimator(;
-                                                                                 A = LinearConstraintSide(;
-                                                                                                          name = nothing,
-                                                                                                          group = nothing)),
-                                            pe = BlackLittermanPrior(;
-                                                                              views = BlackLittermanViewsEstimator(;
-                                                                                                                   A = LinearConstraintSide(;
-                                                                                                                                            name = nothing,
-                                                                                                                                            group = nothing))))
+                                   views = BlackLittermanViewsEstimator(;
+                                                                        A = LinearConstraintSide(;
+                                                                                                 name = nothing,
+                                                                                                 group = nothing)),
+                                   pe = BlackLittermanPrior(;
+                                                            views = BlackLittermanViewsEstimator(;
+                                                                                                 A = LinearConstraintSide(;
+                                                                                                                          name = nothing,
+                                                                                                                          group = nothing))))
         @test isa(pe10.me, EquilibriumExpectedReturns)
         @test isa(pe5.ce.ce, Covariance{<:Any, <:Any, <:Full})
         pe11 = FactorPrior(;
-                                    pe = EmpiricalPrior(;
-                                                                 me = ShrunkExpectedReturns(;
-                                                                                            alg = BayesStein()),
-                                                                 ce = PortfolioOptimisersCovariance(;
-                                                                                                    ce = SmythBrobyCovariance(;
-                                                                                                                              alg = NormalisedSmythBroby0()))))
+                           pe = EmpiricalPrior(;
+                                               me = ShrunkExpectedReturns(;
+                                                                          alg = BayesStein()),
+                                               ce = PortfolioOptimisersCovariance(;
+                                                                                  ce = SmythBrobyCovariance(;
+                                                                                                            alg = NormalisedSmythBroby0()))))
         @test isa(pe11.me, ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein{<:GrandMean}})
         @test isa(pe11.ce.ce,
                   SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:NormalisedSmythBroby0})
         pe12 = FactorPrior(;
-                                    pe = BlackLittermanPrior(;
-                                                                      views = BlackLittermanViewsEstimator(;
-                                                                                                           A = LinearConstraintSide(;
-                                                                                                                                    name = nothing,
-                                                                                                                                    group = nothing)),
-                                                                      pe = EmpiricalPrior(;
-                                                                                                   me = ShrunkExpectedReturns(;
-                                                                                                                              alg = JamesStein()),
-                                                                                                   ce = PortfolioOptimisersCovariance(;
-                                                                                                                                      ce = GerberCovariance(;
-                                                                                                                                                            alg = NormalisedGerber2())))))
+                           pe = BlackLittermanPrior(;
+                                                    views = BlackLittermanViewsEstimator(;
+                                                                                         A = LinearConstraintSide(;
+                                                                                                                  name = nothing,
+                                                                                                                  group = nothing)),
+                                                    pe = EmpiricalPrior(;
+                                                                        me = ShrunkExpectedReturns(;
+                                                                                                   alg = JamesStein()),
+                                                                        ce = PortfolioOptimisersCovariance(;
+                                                                                                           ce = GerberCovariance(;
+                                                                                                                                 alg = NormalisedGerber2())))))
         @test isa(pe12.me, ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein{<:GrandMean}})
         @test isa(pe12.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2})
         pe13 = FactorBlackLittermanPrior(; tau = 0.3,
-                                                  views = BlackLittermanViewsEstimator(;
-                                                                                       A = LinearConstraintSide(;
-                                                                                                                name = nothing,
-                                                                                                                group = nothing)),
-                                                  pe = EmpiricalPrior(;
-                                                                               me = ShrunkExpectedReturns(;
-                                                                                                          alg = BayesStein()),
-                                                                               ce = PortfolioOptimisersCovariance(;
-                                                                                                                  ce = SmythBrobyCovariance(;
-                                                                                                                                            alg = NormalisedSmythBroby0()))))
+                                         views = BlackLittermanViewsEstimator(;
+                                                                              A = LinearConstraintSide(;
+                                                                                                       name = nothing,
+                                                                                                       group = nothing)),
+                                         pe = EmpiricalPrior(;
+                                                             me = ShrunkExpectedReturns(;
+                                                                                        alg = BayesStein()),
+                                                             ce = PortfolioOptimisersCovariance(;
+                                                                                                ce = SmythBrobyCovariance(;
+                                                                                                                          alg = NormalisedSmythBroby0()))))
         @test pe13.tau == 0.3
         @test isa(pe13.me, ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein{<:GrandMean}})
         @test isa(pe13.ce.ce,
                   SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:NormalisedSmythBroby0})
         pe14 = FactorBlackLittermanPrior(;
-                                                  views = BlackLittermanViewsEstimator(;
-                                                                                       A = LinearConstraintSide(;
-                                                                                                                name = nothing,
-                                                                                                                group = nothing)),
-                                                  pe = BlackLittermanPrior(;
-                                                                                    views = BlackLittermanViewsEstimator(;
-                                                                                                                         A = LinearConstraintSide(;
-                                                                                                                                                  name = nothing,
-                                                                                                                                                  group = nothing)),
-                                                                                    pe = EmpiricalPrior(;
-                                                                                                                 me = ShrunkExpectedReturns(;
-                                                                                                                                            alg = JamesStein()),
-                                                                                                                 ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                    ce = GerberCovariance(;
-                                                                                                                                                                          alg = NormalisedGerber2())))))
+                                         views = BlackLittermanViewsEstimator(;
+                                                                              A = LinearConstraintSide(;
+                                                                                                       name = nothing,
+                                                                                                       group = nothing)),
+                                         pe = BlackLittermanPrior(;
+                                                                  views = BlackLittermanViewsEstimator(;
+                                                                                                       A = LinearConstraintSide(;
+                                                                                                                                name = nothing,
+                                                                                                                                group = nothing)),
+                                                                  pe = EmpiricalPrior(;
+                                                                                      me = ShrunkExpectedReturns(;
+                                                                                                                 alg = JamesStein()),
+                                                                                      ce = PortfolioOptimisersCovariance(;
+                                                                                                                         ce = GerberCovariance(;
+                                                                                                                                               alg = NormalisedGerber2())))))
         @test isa(pe14.me, ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein{<:GrandMean}})
         @test isa(pe14.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2})
         pe15 = AugmentedBlackLittermanPrior(; tau = 0.2,
-                                                     a_views = BlackLittermanViewsEstimator(;
-                                                                                            A = LinearConstraintSide(;
-                                                                                                                     name = nothing,
-                                                                                                                     group = nothing)),
-                                                     f_views = BlackLittermanViewsEstimator(;
-                                                                                            A = LinearConstraintSide(;
-                                                                                                                     name = nothing,
-                                                                                                                     group = nothing)),
-                                                     a_pe = EmpiricalPrior(;
-                                                                                    me = ShrunkExpectedReturns(;
-                                                                                                               alg = BayesStein()),
-                                                                                    ce = PortfolioOptimisersCovariance(;
-                                                                                                                       ce = SmythBrobyCovariance(;
-                                                                                                                                                 alg = NormalisedSmythBroby0()))))
+                                            a_views = BlackLittermanViewsEstimator(;
+                                                                                   A = LinearConstraintSide(;
+                                                                                                            name = nothing,
+                                                                                                            group = nothing)),
+                                            f_views = BlackLittermanViewsEstimator(;
+                                                                                   A = LinearConstraintSide(;
+                                                                                                            name = nothing,
+                                                                                                            group = nothing)),
+                                            a_pe = EmpiricalPrior(;
+                                                                  me = ShrunkExpectedReturns(;
+                                                                                             alg = BayesStein()),
+                                                                  ce = PortfolioOptimisersCovariance(;
+                                                                                                     ce = SmythBrobyCovariance(;
+                                                                                                                               alg = NormalisedSmythBroby0()))))
         @test pe15.tau == 0.2
         @test isa(pe15.me, ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein{<:GrandMean}})
         @test isa(pe15.ce.ce,
@@ -525,25 +522,25 @@
         @test isa(pe15.f_me, SimpleExpectedReturns)
         @test isa(pe15.f_ce, PortfolioOptimisersCovariance)
         pe16 = AugmentedBlackLittermanPrior(;
-                                                     a_views = BlackLittermanViewsEstimator(;
-                                                                                            A = LinearConstraintSide(;
-                                                                                                                     name = nothing,
-                                                                                                                     group = nothing)),
-                                                     f_views = BlackLittermanViewsEstimator(;
-                                                                                            A = LinearConstraintSide(;
-                                                                                                                     name = nothing,
-                                                                                                                     group = nothing)),
-                                                     a_pe = BlackLittermanPrior(;
-                                                                                         views = BlackLittermanViewsEstimator(;
-                                                                                                                              A = LinearConstraintSide(;
-                                                                                                                                                       name = nothing,
-                                                                                                                                                       group = nothing)),
-                                                                                         pe = EmpiricalPrior(;
-                                                                                                                      me = ShrunkExpectedReturns(;
-                                                                                                                                                 alg = JamesStein()),
-                                                                                                                      ce = PortfolioOptimisersCovariance(;
-                                                                                                                                                         ce = GerberCovariance(;
-                                                                                                                                                                               alg = NormalisedGerber2())))))
+                                            a_views = BlackLittermanViewsEstimator(;
+                                                                                   A = LinearConstraintSide(;
+                                                                                                            name = nothing,
+                                                                                                            group = nothing)),
+                                            f_views = BlackLittermanViewsEstimator(;
+                                                                                   A = LinearConstraintSide(;
+                                                                                                            name = nothing,
+                                                                                                            group = nothing)),
+                                            a_pe = BlackLittermanPrior(;
+                                                                       views = BlackLittermanViewsEstimator(;
+                                                                                                            A = LinearConstraintSide(;
+                                                                                                                                     name = nothing,
+                                                                                                                                     group = nothing)),
+                                                                       pe = EmpiricalPrior(;
+                                                                                           me = ShrunkExpectedReturns(;
+                                                                                                                      alg = JamesStein()),
+                                                                                           ce = PortfolioOptimisersCovariance(;
+                                                                                                                              ce = GerberCovariance(;
+                                                                                                                                                    alg = NormalisedGerber2())))))
         @test isa(pe16.me, ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein{<:GrandMean}})
         @test isa(pe16.ce.ce, GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2})
     end
@@ -586,19 +583,17 @@
         views = [vc_1, vc_2, vc_3, vc_4, vc_5]
         pes = [BlackLittermanPrior(; views = views, sets = sets),
                BlackLittermanPrior(; views = views, sets = sets, rf = 0.0001),
+               BlackLittermanPrior(; pe = EmpiricalPrior(; me = ExcessExpectedReturns()),
+                                   views = views, sets = sets),
                BlackLittermanPrior(;
-                                            pe = EmpiricalPrior(;
-                                                                         me = ExcessExpectedReturns()),
-                                            views = views, sets = sets),
-               BlackLittermanPrior(;
-                                            pe = EmpiricalPrior(;
-                                                                         me = ExcessExpectedReturns(;
-                                                                                                    rf = 0.0001)),
-                                            views = views, sets = sets, rf = 0.0001),
+                                   pe = EmpiricalPrior(;
+                                                       me = ExcessExpectedReturns(;
+                                                                                  rf = 0.0001)),
+                                   views = views, sets = sets, rf = 0.0001),
                BlackLittermanPrior(; views = views, sets = sets,
-                                            views_conf = fill(eps(), length(views))),
+                                   views_conf = fill(eps(), length(views))),
                BlackLittermanPrior(; views = views, sets = sets,
-                                            views_conf = fill(1.0 - eps(), length(views)))]
+                                   views_conf = fill(1.0 - eps(), length(views)))]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Black-Litterman-Prior.csv"), DataFrame)
         for i in eachindex(pes)
             pr = prior(pes[i], transpose(X); dims = 2)
@@ -699,8 +694,7 @@
                                                                      name = 2, coef = 1.0),
                                             B = 0.001)
         views = [vc_1, vc_2, vc_3, vc_4, vc_5]
-        pe1 = FactorPrior(; re = StepwiseRegression(; alg = Backward()),
-                                   rsd = true)
+        pe1 = FactorPrior(; re = StepwiseRegression(; alg = Backward()), rsd = true)
         pr1 = prior(pe1, transpose(X), transpose(F); dims = 2)
 
         pe2 = BlackLittermanPrior(; pe = pe1, views = views, sets = sets)
@@ -737,29 +731,29 @@
                                             B = 0.002)
         views = [vc_1, vc_2, vc_3]
         pes = [BayesianBlackLittermanPrior(;
-                                                    pe = FactorPrior(;
-                                                                              pe = EmpiricalPrior(;
-                                                                                                           me = ExcessExpectedReturns(;
-                                                                                                                                      rf = 0.001))),
-                                                    mp = DefaultMatrixProcessing(),
-                                                    views = views, sets = sets, rf = 0.001),
+                                           pe = FactorPrior(;
+                                                            pe = EmpiricalPrior(;
+                                                                                me = ExcessExpectedReturns(;
+                                                                                                           rf = 0.001))),
+                                           mp = DefaultMatrixProcessing(), views = views,
+                                           sets = sets, rf = 0.001),
                BayesianBlackLittermanPrior(;
-                                                    pe = FactorPrior(;
-                                                                              pe = EmpiricalPrior(;
-                                                                                                           me = ExcessExpectedReturns(;
-                                                                                                                                      rf = 0.001))),
-                                                    mp = DefaultMatrixProcessing(),
-                                                    views = views, sets = sets, rf = 0.001,
-                                                    views_conf = fill(eps(), length(views))),
+                                           pe = FactorPrior(;
+                                                            pe = EmpiricalPrior(;
+                                                                                me = ExcessExpectedReturns(;
+                                                                                                           rf = 0.001))),
+                                           mp = DefaultMatrixProcessing(), views = views,
+                                           sets = sets, rf = 0.001,
+                                           views_conf = fill(eps(), length(views))),
                BayesianBlackLittermanPrior(;
-                                                    pe = FactorPrior(;
-                                                                              pe = EmpiricalPrior(;
-                                                                                                           me = ExcessExpectedReturns(;
-                                                                                                                                      rf = 0.001))),
-                                                    mp = DefaultMatrixProcessing(),
-                                                    views = views, sets = sets, rf = 0.001,
-                                                    views_conf = fill(1 - sqrt(eps()),
-                                                                      length(views)))]
+                                           pe = FactorPrior(;
+                                                            pe = EmpiricalPrior(;
+                                                                                me = ExcessExpectedReturns(;
+                                                                                                           rf = 0.001))),
+                                           mp = DefaultMatrixProcessing(), views = views,
+                                           sets = sets, rf = 0.001,
+                                           views_conf = fill(1 - sqrt(eps()),
+                                                             length(views)))]
         pet = CSV.read(joinpath(@__DIR__, "./assets/Bayesian-Black-Litterman-Prior.csv"),
                        DataFrame)
         for i in eachindex(pes)
@@ -845,43 +839,35 @@
         views = [vc_1, vc_2, vc_3]
         sets = DataFrame(:Factor => [1, 2, 3, 4])
 
-        pes = [FactorBlackLittermanPrior(; views = views, sets = sets,
-                                                  rsd = false),
+        pes = [FactorBlackLittermanPrior(; views = views, sets = sets, rsd = false),
                FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  rsd = false),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, rsd = false),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, w = (1:10) / sum(1:10),
-                                                  rsd = false),
+                                         rsd = false),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         rsd = false),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         w = (1:10) / sum(1:10), rsd = false),
                FactorBlackLittermanPrior(; views = views, sets = sets, rsd = false,
-                                                  views_conf = fill(eps(), length(views))),
+                                         views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  rsd = false,
-                                                  views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, rsd = false,
-                                                  views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, w = (1:10) / sum(1:10),
-                                                  rsd = false,
-                                                  views_conf = fill(eps(), length(views))),
+                                         rsd = false,
+                                         views_conf = fill(eps(), length(views))),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         rsd = false,
+                                         views_conf = fill(eps(), length(views))),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         w = (1:10) / sum(1:10), rsd = false,
+                                         views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPrior(; views = views, sets = sets, rsd = false,
-                                                  views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views))),
+                                         views_conf = fill(1 - sqrt(eps()), length(views))),
                FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  rsd = false,
-                                                  views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views))),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, rsd = false,
-                                                  views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views))),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, w = (1:10) / sum(1:10),
-                                                  rsd = false,
-                                                  views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views)))]
+                                         rsd = false,
+                                         views_conf = fill(1 - sqrt(eps()), length(views))),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         rsd = false,
+                                         views_conf = fill(1 - sqrt(eps()), length(views))),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         w = (1:10) / sum(1:10), rsd = false,
+                                         views_conf = fill(1 - sqrt(eps()), length(views)))]
 
         pm1_t = CSV.read(joinpath(@__DIR__,
                                   "./assets/Factor-Black-Litterman-Prior-No-Residuals.csv"),
@@ -947,38 +933,33 @@
 
         pes = [FactorBlackLittermanPrior(; views = views, sets = sets, rsd = true),
                FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  rsd = true),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, rsd = true),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, w = (1:10) / sum(1:10),
-                                                  rsd = true),
+                                         rsd = true),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         rsd = true),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         w = (1:10) / sum(1:10), rsd = true),
                FactorBlackLittermanPrior(; views = views, sets = sets, rsd = true,
-                                                  views_conf = fill(eps(), length(views))),
+                                         views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  rsd = true,
-                                                  views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, rsd = true,
-                                                  views_conf = fill(eps(), length(views))),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, w = (1:10) / sum(1:10), rsd = true,
-                                                  views_conf = fill(eps(), length(views))),
+                                         rsd = true,
+                                         views_conf = fill(eps(), length(views))),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         rsd = true,
+                                         views_conf = fill(eps(), length(views))),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         w = (1:10) / sum(1:10), rsd = true,
+                                         views_conf = fill(eps(), length(views))),
                FactorBlackLittermanPrior(; views = views, sets = sets, rsd = true,
-                                                  views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views))),
+                                         views_conf = fill(1 - sqrt(eps()), length(views))),
                FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  rsd = true,
-                                                  views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views))),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, rsd = true,
-                                                  views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views))),
-               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
-                                                  l = 1, w = (1:10) / sum(1:10), rsd = true,
-                                                  views_conf = fill(1 - sqrt(eps()),
-                                                                    length(views)))]
+                                         rsd = true,
+                                         views_conf = fill(1 - sqrt(eps()), length(views))),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         rsd = true,
+                                         views_conf = fill(1 - sqrt(eps()), length(views))),
+               FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001, l = 1,
+                                         w = (1:10) / sum(1:10), rsd = true,
+                                         views_conf = fill(1 - sqrt(eps()), length(views)))]
 
         pm1_t = CSV.read(joinpath(@__DIR__,
                                   "./assets/Factor-Black-Litterman-Prior-Residuals.csv"),
@@ -1076,73 +1057,59 @@
                                             B = 0.002)
         f_views = [vc_1, vc_2, vc_3]
         pes = [AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets),
+                                            f_views = f_views, f_sets = f_sets),
                AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets,
-                                                     rf = 0.001),
+                                            f_views = f_views, f_sets = f_sets, rf = 0.001),
                AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets,
-                                                     rf = 0.001, l = 1),
+                                            f_views = f_views, f_sets = f_sets, rf = 0.001,
+                                            l = 1),
                AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets,
-                                                     rf = 0.001, l = 1,
-                                                     w = (1:10) / sum(1:10)),
+                                            f_views = f_views, f_sets = f_sets, rf = 0.001,
+                                            l = 1, w = (1:10) / sum(1:10)),
                AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets,
-                                                     a_views_conf = fill(eps(),
-                                                                         length(a_views)),
-                                                     f_views_conf = fill(eps(),
-                                                                         length(f_views))),
+                                            f_views = f_views, f_sets = f_sets,
+                                            a_views_conf = fill(eps(), length(a_views)),
+                                            f_views_conf = fill(eps(), length(f_views))),
                AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets,
-                                                     rf = 0.001,
-                                                     a_views_conf = fill(eps(),
-                                                                         length(a_views)),
-                                                     f_views_conf = fill(eps(),
-                                                                         length(f_views))),
+                                            f_views = f_views, f_sets = f_sets, rf = 0.001,
+                                            a_views_conf = fill(eps(), length(a_views)),
+                                            f_views_conf = fill(eps(), length(f_views))),
                AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets,
-                                                     rf = 0.001, l = 1,
-                                                     a_views_conf = fill(eps(),
-                                                                         length(a_views)),
-                                                     f_views_conf = fill(eps(),
-                                                                         length(f_views))),
+                                            f_views = f_views, f_sets = f_sets, rf = 0.001,
+                                            l = 1,
+                                            a_views_conf = fill(eps(), length(a_views)),
+                                            f_views_conf = fill(eps(), length(f_views))),
                AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets,
-                                                     rf = 0.001, l = 1,
-                                                     w = (1:10) / sum(1:10),
-                                                     a_views_conf = fill(eps(),
-                                                                         length(a_views)),
-                                                     f_views_conf = fill(eps(),
-                                                                         length(f_views))),
+                                            f_views = f_views, f_sets = f_sets, rf = 0.001,
+                                            l = 1, w = (1:10) / sum(1:10),
+                                            a_views_conf = fill(eps(), length(a_views)),
+                                            f_views_conf = fill(eps(), length(f_views))),
                AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets,
-                                                     a_views_conf = fill(1 - sqrt(eps()),
-                                                                         length(a_views)),
-                                                     f_views_conf = fill(1 - sqrt(eps()),
-                                                                         length(f_views))),
+                                            f_views = f_views, f_sets = f_sets,
+                                            a_views_conf = fill(1 - sqrt(eps()),
+                                                                length(a_views)),
+                                            f_views_conf = fill(1 - sqrt(eps()),
+                                                                length(f_views))),
                AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets,
-                                                     rf = 0.001,
-                                                     a_views_conf = fill(1 - sqrt(eps()),
-                                                                         length(a_views)),
-                                                     f_views_conf = fill(1 - sqrt(eps()),
-                                                                         length(f_views))),
+                                            f_views = f_views, f_sets = f_sets, rf = 0.001,
+                                            a_views_conf = fill(1 - sqrt(eps()),
+                                                                length(a_views)),
+                                            f_views_conf = fill(1 - sqrt(eps()),
+                                                                length(f_views))),
                AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets,
-                                                     rf = 0.001, l = 1,
-                                                     a_views_conf = fill(1 - sqrt(eps()),
-                                                                         length(a_views)),
-                                                     f_views_conf = fill(1 - sqrt(eps()),
-                                                                         length(f_views))),
+                                            f_views = f_views, f_sets = f_sets, rf = 0.001,
+                                            l = 1,
+                                            a_views_conf = fill(1 - sqrt(eps()),
+                                                                length(a_views)),
+                                            f_views_conf = fill(1 - sqrt(eps()),
+                                                                length(f_views))),
                AugmentedBlackLittermanPrior(; a_views = a_views, a_sets = a_sets,
-                                                     f_views = f_views, f_sets = f_sets,
-                                                     rf = 0.001, l = 1,
-                                                     w = (1:10) / sum(1:10),
-                                                     a_views_conf = fill(1 - sqrt(eps()),
-                                                                         length(a_views)),
-                                                     f_views_conf = fill(1 - sqrt(eps()),
-                                                                         length(f_views)))]
+                                            f_views = f_views, f_sets = f_sets, rf = 0.001,
+                                            l = 1, w = (1:10) / sum(1:10),
+                                            a_views_conf = fill(1 - sqrt(eps()),
+                                                                length(a_views)),
+                                            f_views_conf = fill(1 - sqrt(eps()),
+                                                                length(f_views)))]
         pm_t = CSV.read(joinpath(@__DIR__, "./assets/Augmented-Black-Litterman-Prior.csv"),
                         DataFrame)
 
@@ -1288,21 +1255,21 @@
                                             alg = H2_EntropyPooling()),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             opt = JuMPEntropyPooling(;
-                                                                              slv = Solver(;
-                                                                                           solver = Clarabel.Optimizer,
-                                                                                           settings = Dict("verbose" => false)))),
+                                                                     slv = Solver(;
+                                                                                  solver = Clarabel.Optimizer,
+                                                                                  settings = Dict("verbose" => false)))),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H1_EntropyPooling(),
                                             opt = JuMPEntropyPooling(;
-                                                                              slv = Solver(;
-                                                                                           solver = Clarabel.Optimizer,
-                                                                                           settings = Dict("verbose" => false)))),
+                                                                     slv = Solver(;
+                                                                                  solver = Clarabel.Optimizer,
+                                                                                  settings = Dict("verbose" => false)))),
                EntropyPoolingPriorEstimator(; views = views, sets = sets,
                                             alg = H2_EntropyPooling(),
                                             opt = JuMPEntropyPooling(;
-                                                                              slv = Solver(;
-                                                                                           solver = Clarabel.Optimizer,
-                                                                                           settings = Dict("verbose" => false))))]
+                                                                     slv = Solver(;
+                                                                                  solver = Clarabel.Optimizer,
+                                                                                  settings = Dict("verbose" => false))))]
 
         ress = (0.03270155949442489, 0.030586876690884276, 0.03058687450109127,
                 0.032701560391104334, 0.03058687741491548, 0.030586877801521424)
@@ -1705,4 +1672,3 @@
         @test pv1.chol == view(pr1.chol, :, i)
     end
 end
-=#
