@@ -74,7 +74,7 @@ mr1 = MeanRisk(; r = r, opt = opt1)</code></pre><pre class="documenter-example-o
       |          |       f_mu | nothing
       |          |    f_sigma | nothing
       |          |        f_w | nothing
-      |      slv | Vector{Solver{Symbol, UnionAll, T3, @NamedTuple{allow_local::Bool, allow_almost::Bool}, Bool} where T3&lt;:(Union{Nothing, var&quot;#s234&quot;} where var&quot;#s234&quot;&lt;:AbstractDict)}: Solver{Symbol, UnionAll, T3, @NamedTuple{allow_local::Bool, allow_almost::Bool}, Bool} where T3&lt;:(Union{Nothing, var&quot;#s234&quot;} where var&quot;#s234&quot;&lt;:AbstractDict)[Solver
+      |      slv | Vector{Solver{Symbol, UnionAll, T3, @NamedTuple{allow_local::Bool, allow_almost::Bool}, Bool} where T3}: Solver{Symbol, UnionAll, T3, @NamedTuple{allow_local::Bool, allow_almost::Bool}, Bool} where T3[Solver
       |          name | Symbol: :clarabel1
       |        solver | UnionAll: Clarabel.MOIwrapper.Optimizer
       |      settings | Dict{String, Bool}: Dict{String, Bool}(&quot;verbose&quot; =&gt; 0)
@@ -112,9 +112,11 @@ mr1 = MeanRisk(; r = r, opt = opt1)</code></pre><pre class="documenter-example-o
       |    gcard | nothing
       |   sgcard | nothing
       |     smtx | nothing
+      |    sgmtx | nothing
       |      slt | nothing
       |      sst | nothing
-      |    sgmtx | nothing
+      |     sglt | nothing
+      |     sgst | nothing
       |     sets | nothing
       |     nplg | nothing
       |     cplg | nothing
@@ -400,9 +402,9 @@ res6 = optimise!(mr6)
 println(&quot;budget: $(sum(res6.w))&quot;)
 println(&quot;long budget: $(sum(res6.w[res6.w .&gt;= zero(eltype(res6.w))]))&quot;)
 println(&quot;short budget: $(sum(res6.w[res6.w .&lt; zero(eltype(res6.w))]))&quot;)
-println(&quot;weight bounds: $(all(x -&gt; -one(x) &lt;= x &lt;= one(x), res6.w))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: 0.17899899389376417
-long budget: 1.0999979749015787
-short budget: -0.9209989810078143
+println(&quot;weight bounds: $(all(x -&gt; -one(x) &lt;= x &lt;= one(x), res6.w))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: 0.2742918307098685
+long budget: 0.7742909366719533
+short budget: -0.49999910596208463
 weight bounds: true</code></pre><p>As you can see, the budget and weight constraints are satisfied, but not the short budget constraint. This happens even if we do not provide a short budget. This is a reflection of the fact that the weight and budget constraints are constraints on the actual weights. While the short budget constraints are constraints on relaxation variables, whose value must be greater than or equal to the absolute value of the negative weights. This gives them room to without violating the constraints and without directly constraining the short weights.</p><p>In order to remedy this, we can provide a <code>BudgetRange</code> to the short budget which eliminates the slack on the relaxation variables. It is worth noting that when providing a <code>BudgetRange</code> to the short budget, the bounds cannot be negative.</p><pre><code class="language-julia hljs">opt7 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Budget range.
                      bgt = BudgetRange(; lb = -0.6, ub = 0.6),
@@ -418,4 +420,4 @@ println(&quot;short budget: $(sum(res7.w[res7.w .&lt; zero(eltype(res7.w))]))&qu
 println(&quot;weight bounds: $(all(x -&gt; -one(x) &lt;= x &lt;= one(x), res7.w))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: 0.2742952851977851
 long budget: 0.7742943517521373
 short budget: -0.4999990665543521
-weight bounds: true</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../4-Pareto-Surface/">« Example 4: Pareto surface</a><a class="docs-footer-nextpage" href="../../7-18-Moments/">Regression »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Friday 1 August 2025 07:39">Friday 1 August 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+weight bounds: true</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../4-Pareto-Surface/">« Example 4: Pareto surface</a><a class="docs-footer-nextpage" href="../../7-18-Moments/">Regression »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Saturday 2 August 2025 10:41">Saturday 2 August 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
