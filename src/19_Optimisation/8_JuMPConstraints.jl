@@ -623,14 +623,14 @@ function smip_wb(model::JuMP.Model, wb::WeightBounds, smtx::AbstractMatrix,
     end
     return nothing
 end
-function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
-                                         smtx::Union{Nothing, <:AbstractMatrix},
-                                         lt::Union{Nothing, <:BuyInThreshold},
-                                         st::Union{Nothing, <:BuyInThreshold},
-                                         ss::Union{Nothing, <:Real}, lt_flag::Bool,
-                                         st_flag::Bool, key1::Symbol = :si,
-                                         key7::Symbol = :smtx_expr_,
-                                         key8::Symbol = :set_w_mip_, i::Integer = 1)
+function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
+                                          smtx::Union{Nothing, <:AbstractMatrix},
+                                          lt::Union{Nothing, <:BuyInThreshold},
+                                          st::Union{Nothing, <:BuyInThreshold},
+                                          ss::Union{Nothing, <:Real}, lt_flag::Bool,
+                                          st_flag::Bool, key1::Symbol = :si,
+                                          key7::Symbol = :smtx_expr_,
+                                          key8::Symbol = :set_w_mip_, i::Integer = 1)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -775,8 +775,8 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
     end
     sc = model[:sc]
     sib = if st_flag && haskey(model, :sw)
-        short_mip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
-                                        :smtx_expr_, :set_w_mip_, i)
+        short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
+                                         :smtx_expr_, :set_w_mip_, i)
     else
         smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sib_, :i_smip_, :isbf_,
                          :smtx_expr_, :set_w_mip_, :w_smip_lt_, i)
@@ -838,8 +838,8 @@ function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
     end
     sc = model[:sc]
     sib = if st_flag && haskey(model, :sw)
-        short_mip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
-                                        :smtx_expr_, :set_w_mip_, i)
+        short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
+                                         :smtx_expr_, :set_w_mip_, i)
     else
         smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sib_, :i_smip_, :isbf_,
                          :smtx_expr_, :set_w_mip_, :w_smip_lt_, i)
@@ -880,8 +880,8 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
     end
     sc = model[:sc]
     sib = if st_flag && haskey(model, :sw)
-        short_mip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :sgi,
-                                        :sgmtx_expr_, :setg_w_mip_, i)
+        short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag,
+                                         :sgi, :sgmtx_expr_, :setg_w_mip_, i)
     else
         smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sgib_, :i_sgmip_, :isgbf_,
                          :sgmtx_expr_, :setg_w_mip_, :w_sgmip_lt_, i)

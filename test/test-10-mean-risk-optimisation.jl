@@ -403,6 +403,13 @@
         @test sum(res.w) <= 0.41
         @test sum(res.w[res.w .< 0]) <= -0.35
         @test sum(res.w[res.w .>= 0]) <= 0.76
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = nothing,
+                            bgt = nothing, wb = WeightBounds(; lb = -1, ub = 1))
+        mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
+        res = optimise!(mr)
+        @test !haskey(res.model, :sbgt)
+        @test !haskey(res.model, :lbgt)
     end
     @testset "Cardinality" begin
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, card = 3)
@@ -536,5 +543,105 @@
         res = optimise!(mre)
         @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)
         @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<= -0.25)
+    end
+    @testset "Linear weight constraints" begin
+        sets.dict["group4"] = ["AMD", "BAC"]
+        sets.dict["group5"] = ["PG", "XOM"]
+        lcs = LinearConstraintEstimator(;
+                                        val = ["AAPL >= 0.2*MRK", "group4 >= 3*group5",
+                                               "RRC <=-0.02", "MSFT==0.01"])
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), lcs = lcs)
+        mr = MeanRisk(; obj = MinimumRisk(), opt = opt)
+        res = optimise!(mr)
+        @test res.w[findfirst(x -> x == "AAPL", rd.nx)] >=
+              0.2 * res.w[findfirst(x -> x == "MRK", rd.nx)]
+        @test sum(res.w[[findfirst(x -> x == a, rd.nx) for a in sets.dict["group4"]]]) >=
+              3 * sum(res.w[[findfirst(x -> x == a, rd.nx) for a in sets.dict["group5"]]])
+        @test res.w[findfirst(x -> x == "RRC", rd.nx)] <= -0.02
+        @test res.w[findfirst(x -> x == "MSFT", rd.nx)] == 0.01
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), lcs = res.lcs)
+        @test isapprox(res.w, optimise!(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
+    end
+    @testset "Regularisation" begin
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), l1 = 5e-6)
+        mr = MeanRisk(; opt = opt)
+        res = optimise!(mr)
+        @test isapprox(res.w,
+                       [-0.08259934606632031, -0.01735523094219388, -6.306917873785564e-9,
+                        -0.019964241234679967, 0.08433288155125772, 0.04082860469386889,
+                        0.0245444126670805, 0.38468746514362956, 0.025975231635603585,
+                        0.11323392647659213, -0.0455153966134236, 0.1769386350615763,
+                        0.04466740435373562, 0.12535190765089996, -0.01382516940599513,
+                        0.021879232823390448, -0.01259642910877665, -3.789411268851941e-9,
+                        0.09356110720420865, 0.05585501420587528], rtol = 1e-6)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), l1 = 1)
+        mr = MeanRisk(; opt = opt)
+        res = optimise!(mr)
+        @test isapprox(res.w,
+                       [4.1633941065577117e-7, 2.6448742701527e-7, 4.477941406289695e-6,
+                        4.854555411641452e-7, 0.07424358812530261, 0.00792596837274629,
+                        1.352652412857295e-6, 0.36980684793744134, 0.007584348893331609,
+                        0.11118617081059556, 3.753498265381272e-7, 0.17467158275776748,
+                        9.348289673318389e-7, 0.08974785581907543, 8.391727846180317e-7,
+                        0.023971871590369637, 3.3459673922392774e-7, 1.3947538587917836e-6,
+                        0.0935238000646315, 0.04732709005036381], rtol = 1e-6)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), l2 = 5e-6)
+        mr = MeanRisk(; opt = opt)
+        res = optimise!(mr)
+        @test isapprox(res.w,
+                       [-0.11064349447254161, -0.017854196186798618, -0.04397298675384868,
+                        -0.03145351033102496, 0.09495263689036014, 0.05053896454111151,
+                        0.03699197653220963, 0.38114357883139005, 0.06929867727498179,
+                        0.11865327291902569, -0.06633836583807416, 0.19538041855641222,
+                        0.07381248663128888, 0.13328230798627264, -0.037943963731425036,
+                        0.029972928788686973, -0.017281968260805896, -0.008700415062896462,
+                        0.09297968577516197, 0.05718196591051368], rtol = 1e-6)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), l2 = 1e-4)
+        mr = MeanRisk(; opt = opt)
+        res = optimise!(mr)
+        @test isapprox(res.w,
+                       [-0.03076204518648503, -0.03965358415790933, 0.01741465312222848,
+                        -0.014071169950968142, 0.08160008886554988, 0.038967358792986795,
+                        0.03853758826706406, 0.17170470580976588, 0.03806574632010554,
+                        0.10075437963820232, 0.024679044550725296, 0.1375839532075256,
+                        0.024805294188283956, 0.10194818468441112, 0.03329884602273654,
+                        0.08767866540531458, -0.0157785635897723, 0.03858247320319518,
+                        0.09776343657139772, 0.06688094423564199], rtol = 1e-6)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), l1 = 5e-6, l2 = 5e-6)
+        mr = MeanRisk(; opt = opt)
+        res = optimise!(mr)
+        @test isapprox(res.w,
+                       [-0.07591829609679655, -0.019207462900668874, -4.164287783441495e-9,
+                        -0.019697945739295775, 0.08623890830132815, 0.03970246984743602,
+                        0.024849760269582157, 0.3562105498789526, 0.028493593064519384,
+                        0.11264585349973763, -0.03577564886530365, 0.1762813917849517,
+                        0.03994057834010078, 0.12239469833440599, -0.007813742040459417,
+                        0.03415102550994622, -0.01302979483152005, -5.177412500119382e-10,
+                        0.09499371625016041, 0.05554035007495228], rtol = 1e-6)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), l1 = 1, l2 = 1e-4)
+        mr = MeanRisk(; opt = opt)
+        res = optimise!(mr)
+        @test isapprox(res.w,
+                       [2.0232629822283223e-6, 9.760082045106613e-7, 0.0025796058703603294,
+                        2.436499442593761e-6, 0.07216922707119579, 0.017185343248064092,
+                        0.012997513915337116, 0.17907277860116347, 0.03127342741481768,
+                        0.09864631045614426, 0.021928766640300995, 0.15045440958368198,
+                        4.894112955006514e-6, 0.09912274998209057, 0.035519395576107456,
+                        0.08660290480901828, 1.711128248182528e-6, 0.03477208922064647,
+                        0.09904023885895782, 0.05862319774028108], rtol = 1e-6)
     end
 end

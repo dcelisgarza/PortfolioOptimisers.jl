@@ -219,6 +219,25 @@
             find_tol(Matrix(df), hcat(res2.w...))
         end
         @test success
+
+        df = CSV.read(joinpath(@__DIR__,
+                               "./assets/NearOptimalCenteringParetoSurface3.csv.gz"),
+                      DataFrame)
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sce = MaxScalariser())
+        r1 = StandardDeviation(;
+                               settings = RiskMeasureSettings(; scale = 2e2,
+                                                              ub = Frontier(; N = 3)))
+        r2 = ConditionalValueatRisk(;
+                                    settings = RiskMeasureSettings(;
+                                                                   ub = Frontier(; N = 5)))
+        res3 = optimise!(NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(),
+                                              opt = opt,
+                                              alg = ConstrainedNearOptimalCentering()))
+        success = isapprox(Matrix(df), hcat(res3.w...); rtol = 5e-5)
+        if !success
+            find_tol(Matrix(df), hcat(res3.w...))
+        end
+        @test success
     end
     @testset "Scalarisers" begin
         r1 = NegativeSkewness(; alg = SqrtRiskExpr(),
