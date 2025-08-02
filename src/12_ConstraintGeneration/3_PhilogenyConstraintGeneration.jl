@@ -4,7 +4,9 @@ struct SemiDefinitePhilogenyEstimator{T1, T2} <: PhilogenyEstimator
     pe::T1
     p::T2
 end
-function SemiDefinitePhilogenyEstimator(; pe::AbstractPhilogenyEstimator = Network(),
+function SemiDefinitePhilogenyEstimator(;
+                                        pe::Union{<:AbstractPhilogenyEstimator,
+                                                  <:AbstractClusteringResult} = Network(),
                                         p::Real = 0.05)
     @smart_assert(p >= zero(p))
     return SemiDefinitePhilogenyEstimator(pe, p)
@@ -47,7 +49,9 @@ end
 function validate_length_integer_philogeny_constraint_B(args...)
     return nothing
 end
-function IntegerPhilogenyEstimator(; pe::AbstractPhilogenyEstimator = Network(),
+function IntegerPhilogenyEstimator(;
+                                   pe::Union{<:AbstractPhilogenyEstimator,
+                                             <:AbstractClusteringResult} = Network(),
                                    B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                                    scale::Real = 100_000.0)
     if isa(B, AbstractVector)

@@ -71,7 +71,7 @@ All concrete types that implement variance estimation (e.g., sample variance, ro
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 function Base.show(io::IO,
                    ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                              <:AbstractCovarianceEstimator, <:Clustering.Hclust})
+                              <:AbstractCovarianceEstimator})
     name = string(typeof(ear))
     fields = propertynames(ear)
     if isempty(fields)

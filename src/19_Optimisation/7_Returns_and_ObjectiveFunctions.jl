@@ -229,12 +229,12 @@ function set_return_constraints!(model::JuMP.Model, pret::KellyReturn,
     set_return_bounds!(model, lb)
     return nothing
 end
-function add_penalty_to_objective!(model::JuMP.Model, sign::Integer, expr)
+function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
     if !haskey(model, :op)
         return nothing
     end
     op = model[:op]
-    add_to_expression!(expr, sign, op)
+    add_to_expression!(expr, factor, op)
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,

@@ -1,22 +1,23 @@
-struct TurnoverEstimator{T1, T2} <: AbstractEstimator
+struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
     w::T1
     val::T2
+    default::T3
 end
 function TurnoverEstimator(; w::AbstractVector{<:Real},
                            val::Union{<:AbstractDict,
-                                      <:AbstractVector{<:Pair{<:Any, <:Real}}})
+                                      <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                           default::Real = 0.0)
     @smart_assert(!isempty(w))
     @smart_assert(!isempty(val))
-    return TurnoverEstimator(w, val)
+    @smart_assert(default >= zero(default))
+    return TurnoverEstimator(w, val, default)
 end
 function turnover_constraints(::Nothing, args...; kwargs...)
     return nothing
 end
-function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false,
-                              datatype::DataType = Float64)
+function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false)
     return Turnover(; w = tn.w,
-                    val = estimator_to_val(tn.val, sets, typemax(datatype);
-                                           strict = strict))
+                    val = estimator_to_val(tn.val, sets, tn.default; strict = strict))
 end
 struct Turnover{T1, T2} <: AbstractResult
     w::T1
@@ -41,16 +42,15 @@ function turnover_constraints(tn::Union{<:AbstractVector{<:TurnoverEstimator},
                                         <:AbstractVector{<:Turnover},
                                         <:AbstractVector{<:Union{<:TurnoverEstimator,
                                                                  <:Turnover}}},
-                              sets::AssetSets; strict::Bool = false,
-                              datatype::DataType = Float64)
-    return turnover_constraints.(tn, Ref(sets); strict = strict, datatype = datatype)
+                              sets::AssetSets; strict::Bool = false)
+    return turnover_constraints.(tn, Ref(sets); strict = strict)
 end
 function turnover_view(::Nothing, ::Any)
     return nothing
 end
 function turnover_view(tn::TurnoverEstimator, i::AbstractVector)
     w = view(tn.w, i)
-    return TurnoverEstimator(; w = w, val = tn.val)
+    return TurnoverEstimator(; w = w, val = tn.val, default = tn.default)
 end
 function turnover_view(tn::Turnover, i::AbstractVector)
     w = view(tn.w, i)

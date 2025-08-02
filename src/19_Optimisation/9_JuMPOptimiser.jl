@@ -398,8 +398,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     end
     nplg = philogeny_constraints(opt.nplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     cplg = philogeny_constraints(opt.cplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
-    tn = turnover_constraints(opt.tn, opt.sets; strict = opt.strict, datatype = datatype)
-    fees = fees_constraints(opt.fees, opt.sets; strict = opt.strict, datatype = datatype)
+    tn = turnover_constraints(opt.tn, opt.sets; strict = opt.strict)
+    fees = fees_constraints(opt.fees, opt.sets; datatype = datatype, strict = opt.strict)
     ret = jump_returns_factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx,
                                             sgmtx, slt, sst, sglt, sgst, nplg, cplg, tn,

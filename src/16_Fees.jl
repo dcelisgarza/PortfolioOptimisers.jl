@@ -35,11 +35,9 @@ function fees_view(fees::FeesEstimator, i::AbstractVector)
     return FeesEstimator(; tn = tn, l = fees.l, s = fees.s, fl = fees.fl, fs = fees.fs,
                          kwargs = fees.kwargs)
 end
-function fees_constraints(fees::FeesEstimator, sets::AssetSets; strict::Bool = false,
-                          datatype::DataType = Float64)
-    return Fees(;
-                tn = turnover_constraints(fees.tn, sets; strict = strict,
-                                          datatype = datatype),
+function fees_constraints(fees::FeesEstimator, sets::AssetSets;
+                          datatype::DataType = Float64, strict::Bool = false)
+    return Fees(; tn = turnover_constraints(fees.tn, sets; strict = strict),
                 l = estimator_to_val(fees.l, sets, zero(datatype); strict = strict),
                 s = estimator_to_val(fees.s, sets, zero(datatype); strict = strict),
                 fl = estimator_to_val(fees.fl, sets, zero(datatype); strict = strict),
@@ -87,10 +85,7 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
 end
 Base.length(::Fees) = 1
 Base.iterate(::Fees, i = 1) = i <= 1 ? (i, nothing) : nothing
-function fees_constraints(::Nothing, args...; kwargs...)
-    return nothing
-end
-function fees_constraints(fees::Fees, args...; kwargs...)
+function fees_constraints(fees::Union{Nothing, <:Fees}, args...; kwargs...)
     return fees
 end
 function fees_view(::Nothing, ::Any)
