@@ -1,0 +1,163 @@
+@safetestset "Risk Budgetting Optimisation" begin
+    using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, StatsBase
+    function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
+        for rtol in
+            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
+             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
+             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
+            if isapprox(a1, a2; rtol = rtol)
+                println("isapprox($name1, $name2, rtol = $(rtol))")
+                break
+            end
+        end
+        for atol in
+            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
+             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
+             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
+            if isapprox(a1, a2; atol = atol)
+                println("isapprox($name1, $name2, atol = $(atol))")
+                break
+            end
+        end
+    end
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
+    slv = [Solver(; name = :clarabel6, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "max_step_fraction" => 0.75)),
+           Solver(; name = :clarabel7, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "max_step_fraction" => 0.7)),
+           Solver(; name = :clarabel8, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false, "max_step_fraction" => 0.6,
+                                  "max_iter" => 1500, "tol_gap_abs" => 1e-4,
+                                  "tol_gap_rel" => 1e-4, "tol_ktratio" => 1e-3,
+                                  "tol_feas" => 1e-4, "tol_infeas_abs" => 1e-4,
+                                  "tol_infeas_rel" => 1e-4, "reduced_tol_gap_abs" => 1e-4,
+                                  "reduced_tol_gap_rel" => 1e-4,
+                                  "reduced_tol_ktratio" => 1e-3, "reduced_tol_feas" => 1e-4,
+                                  "reduced_tol_infeas_abs" => 1e-4,
+                                  "reduced_tol_infeas_rel" => 1e-4))]
+    sets = AssetSets(;
+                     dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
+                                 "group2" => rd.nx[2:2:end],
+                                 "clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
+                                                 3, 3, 3, 3, 3, 3],
+                                 "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
+                                                 3, 1, 2, 3, 1, 2]))
+    pr = prior(HighOrderPriorEstimator(), rd)
+    w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
+               length = size(pr.X, 2))
+    wp = pweights(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
+                        length = size(pr.X, 1)))
+    rf = 4.2 / 100 / 252
+    @testset "Risk Budgetting" begin
+        rs = [StandardDeviation(), Variance(), LowOrderMoment(),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondLowerMoment(;
+                                                                             alg = SqrtRiskExpr()))),
+              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+              LowOrderMoment(;
+                             alg = LowOrderDeviation(;
+                                                     alg = SecondCentralMoment(;
+                                                                               alg = SqrtRiskExpr()))),
+              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondCentralMoment())),
+              LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
+              ConditionalValueatRisk(), ConditionalValueatRiskRange(),
+              EntropicValueatRisk(), EntropicValueatRiskRange(), RelativisticValueatRisk(),
+              RelativisticValueatRiskRange(), MaximumDrawdown(), AverageDrawdown(),
+              UlcerIndex(), ConditionalDrawdownatRisk(), EntropicDrawdownatRisk(),
+              RelativisticDrawdownatRisk(), SquareRootKurtosis(; N = 2),
+              SquareRootKurtosis(), OrderedWeightsArray(; alg = ExactOrderedWeightsArray()),
+              OrderedWeightsArray(), OrderedWeightsArrayRange(), NegativeSkewness(),
+              NegativeSkewness(; alg = QuadRiskExpr())]
+        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgetting1.csv.gz"), DataFrame)
+        for (i, r) in enumerate(rs)
+            r = factory(r, pr, slv)
+            opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
+            rb = RiskBudgetting(; r = r, opt = opt)
+            res = optimise!(rb, rd)
+            @test isa(res.retcode, OptimisationSuccess)
+            rkc = risk_contribution(r, res.w, pr.X)
+            v1, m1 = findmin(rkc)
+            v2, m2 = findmax(rkc)
+            rtol = if i ∈ (3, 8, 12, 27)
+                5e-2
+            elseif i ∈ (9, 15)
+                2.5e-1
+            elseif i ∈ (10, 18, 22)
+                5e-1
+            elseif i ∈ (11, 14, 23)
+                5e-3
+            elseif i ∈ (13, 17, 20, 21)
+                1
+            elseif i == 16
+                1e-1
+            elseif i == 26
+                1e-2
+            elseif i ∈ (28, 29)
+                1e-3
+            else
+                5e-4
+            end
+            success = isapprox(v2 / v1, 1; rtol = rtol)
+            if !success
+                println("Extrema $i fails")
+                find_tol(v2 / v1, 1)
+            end
+            @test success
+
+            rtol = 1e-6
+            success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Weights and Contribution $i fails")
+                find_tol([res.w; rkc], df[!, "$i"])
+            end
+            @test success
+        end
+
+        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgetting2.csv.gz"), DataFrame)
+        for (i, r) in enumerate(rs)
+            r = factory(r, pr, slv)
+            opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
+            rb = RiskBudgetting(; r = r, opt = opt, alg = AssetRiskBudgetting(; w = 1:20))
+            res = optimise!(rb, rd)
+            @test isa(res.retcode, OptimisationSuccess)
+            rkc = risk_contribution(r, res.w, pr.X)
+            v1, m1 = findmin(rkc)
+            v2, m2 = findmax(rkc)
+            rtol = if i ∈ (3, 28)
+                1e-3
+            elseif i ∈ (8, 11, 13, 23, 27, 29)
+                5e-3
+            elseif i == 9
+                5e-1
+            elseif i ∈ (10, 19, 20, 21, 22)
+                2.5e-1
+            elseif i ∈ (14, 15, 17)
+                1e-1
+            elseif i ∈ (16, 18)
+                5e-2
+            else
+                5e-4
+            end
+            success = isapprox(v2 / v1, 20; rtol = rtol)
+            if !success
+                println("Extrema $i fails")
+                display(rkc)
+                find_tol(v2 / v1, 20)
+            end
+            @test success
+
+            rtol = 1e-6
+            success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Weights and Contribution $i fails")
+                find_tol([res.w; rkc], df[!, "$i"])
+            end
+            @test success
+        end
+    end
+end

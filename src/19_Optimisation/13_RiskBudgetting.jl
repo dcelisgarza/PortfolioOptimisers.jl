@@ -1,34 +1,34 @@
 abstract type RiskBudgettingAlgorithm <: OptimisationAlgorithm end
 struct AssetRiskBudgetting{T1} <: RiskBudgettingAlgorithm
-    rkb::T1
+    w::T1
 end
-function AssetRiskBudgetting(; rkb::Union{Nothing, <:AbstractVector} = nothing)
-    if isa(rkb, AbstractVector)
-        @smart_assert(!isempty(rkb))
+function AssetRiskBudgetting(; w::Union{Nothing, <:AbstractVector} = nothing)
+    if isa(w, AbstractVector)
+        @smart_assert(!isempty(w))
     end
-    return AssetRiskBudgetting(rkb)
+    return AssetRiskBudgetting(w)
 end
 function risk_budgetting_algorithm_view(r::AssetRiskBudgetting, i::AbstractVector)
-    rkb = nothing_scalar_array_view(r.rkb, i)
-    return AssetRiskBudgetting(; rkb = rkb)
+    w = nothing_scalar_array_view(r.w, i)
+    return AssetRiskBudgetting(; w = w)
 end
 struct FactorRiskBudgetting{T1, T2, T3} <: RiskBudgettingAlgorithm
     re::T1
-    rkb::T2
+    w::T2
     flag::T3
 end
 function FactorRiskBudgetting(;
                               re::Union{<:Regression, <:AbstractRegressionEstimator} = StepwiseRegression(),
-                              rkb::Union{Nothing, <:AbstractVector} = nothing,
+                              w::Union{Nothing, <:AbstractVector} = nothing,
                               flag::Bool = true)
-    if isa(rkb, AbstractVector)
-        @smart_assert(!isempty(rkb))
+    if isa(w, AbstractVector)
+        @smart_assert(!isempty(w))
     end
-    return FactorRiskBudgetting(re, rkb, flag)
+    return FactorRiskBudgetting(re, w, flag)
 end
 function risk_budgetting_algorithm_view(r::FactorRiskBudgetting, i::AbstractVector)
     re = regression_view(r.re, i)
-    return FactorRiskBudgetting(; re = re, rkb = r.rkb, flag = r.flag)
+    return FactorRiskBudgetting(; re = re, w = r.w, flag = r.flag)
 end
 struct RiskBudgetting{T1, T2, T3, T4} <: JuMPOptimisationEstimator
     opt::T1
@@ -58,7 +58,7 @@ function opt_view(rb::RiskBudgetting, i::AbstractVector, X::AbstractMatrix)
 end
 function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgetting, w)
     N = length(w)
-    rkb = rb.alg.rkb
+    rkb = rb.alg.w
     if isnothing(rkb)
         rkb = range(; start = inv(N), stop = inv(N), length = N)
     else
