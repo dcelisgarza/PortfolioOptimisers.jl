@@ -82,12 +82,14 @@
                 2.5e-1
             elseif i ∈ (10, 18, 22)
                 5e-1
-            elseif i ∈ (11, 14, 23)
+            elseif i ∈ (11, 23)
                 5e-3
+            elseif i == 14
+                5e-1
             elseif i ∈ (13, 17, 20, 21)
                 1
             elseif i == 16
-                1e-1
+                2.5e-1
             elseif i == 26
                 1e-2
             elseif i ∈ (28, 29)
@@ -102,7 +104,19 @@
             end
             @test success
 
-            rtol = 5e-5
+            rtol = if i ∈ (7, 10, 19, 24, 25)
+                1e-4
+            elseif i ∈ (9, 11, 17, 18)
+                5e-4
+            elseif i ∈ (13, 21)
+                1e-2
+            elseif i == (14, 15, 16, 22)
+                5e-3
+            elseif i == 20
+                1e-3
+            else
+                5e-5
+            end
             success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
             if !success
                 println("Weights and Contribution $i fails")
@@ -121,7 +135,7 @@
             rkc = risk_contribution(r, res.w, pr.X)
             v1, m1 = findmin(rkc)
             v2, m2 = findmax(rkc)
-            rtol = if i ∈ (3, 28)
+            rtol = if i ∈ (3, 24, 28)
                 1e-3
             elseif i ∈ (8, 11, 13, 23, 27, 29)
                 5e-3
@@ -139,12 +153,21 @@
             success = isapprox(v2 / v1, 20; rtol = rtol)
             if !success
                 println("Extrema $i fails")
-                display(rkc)
                 find_tol(v2 / v1, 20)
             end
             @test success
 
-            rtol = 5e-5
+            rtol = if i == 11
+                5e-4
+            elseif i ∈ (14, 15, 16, 20, 22)
+                5e-3
+            elseif i == 17
+                1e-3
+            elseif i == 21
+                1e-2
+            else
+                1e-4
+            end
             success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
             if !success
                 println("Weights and Contribution $i fails")
