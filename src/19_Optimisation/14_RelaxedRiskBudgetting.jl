@@ -10,28 +10,28 @@ function RegularisedPenalisedRelaxedRiskBudgetting(; p::Real = 1.0)
 end
 struct RelaxedRiskBudgetting{T1, T2, T3, T4} <: JuMPOptimisationEstimator
     opt::T1
-    rkb::T2
+    w::T2
     wi::T3
     alg::T4
 end
 function RelaxedRiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
-                               rkb::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                               w::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                alg::RelaxedRiskBudgettingAlgorithm = BasicRelaxedRiskBudgetting())
-    if isa(rkb, AbstractVector)
-        @smart_assert(!isempty(rkb))
+    if isa(w, AbstractVector)
+        @smart_assert(!isempty(w))
     end
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
-    return RelaxedRiskBudgetting(opt, rkb, wi, alg)
+    return RelaxedRiskBudgetting(opt, w, wi, alg)
 end
 function opt_view(rrb::RelaxedRiskBudgetting, i::AbstractVector, X::AbstractMatrix)
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
-    rkb = nothing_scalar_array_view(rrb.rkb, i)
+    w = nothing_scalar_array_view(rrb.w, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
-    return RelaxedRiskBudgetting(; opt = opt, rkb = rkb, wi = wi, alg = rrb.alg)
+    return RelaxedRiskBudgetting(; opt = opt, w = w, wi = wi, alg = rrb.alg)
 end
 function set_relaxed_risk_budgetting_alg_constraints!(::BasicRelaxedRiskBudgetting,
                                                       model::JuMP.Model,
@@ -86,7 +86,7 @@ function set_relaxed_risk_budgetting_constraints!(model::JuMP.Model,
                                                   sigma::AbstractMatrix)
     w = model[:w]
     N = length(w)
-    rkb = rrb.rkb
+    rkb = rrb.w
     if isnothing(rkb)
         rkb = range(; start = inv(N), stop = inv(N), length = N)
     else

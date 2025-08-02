@@ -39,13 +39,6 @@
                                   "reduced_tol_ktratio" => 1e-3, "reduced_tol_feas" => 1e-4,
                                   "reduced_tol_infeas_abs" => 1e-4,
                                   "reduced_tol_infeas_rel" => 1e-4))]
-    sets = AssetSets(;
-                     dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
-                                 "group2" => rd.nx[2:2:end],
-                                 "clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
-                                                 3, 3, 3, 3, 3, 3],
-                                 "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
-                                                 3, 1, 2, 3, 1, 2]))
     pr = prior(HighOrderPriorEstimator(), rd)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
                length = size(pr.X, 2))

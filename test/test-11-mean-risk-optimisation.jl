@@ -735,8 +735,7 @@
         @test all(value.(res.nplg.A * res.model[:ib]) .<= res.nplg.B)
         idx = [BitVector(res.nplg.A[:, i]) for i in axes(res.nplg.A, 2)]
         @test all([(count(abs.(getindex(res.w, i)) .> 1e-10) <= 2) for i in idx])
-        try
-            @test isapprox(res.w,
+        success = isapprox(res.w,
                            [-5.444667507634538e-13, -0.04740153354475791,
                             0.04898447042002428, -4.731467916273829e-13,
                             -1.130957000167328e-12, 0.0597898659303373,
@@ -746,8 +745,10 @@
                             0.030961713958730052, -1.3571762187763267e-12,
                             -1.3360278929964757e-12, 0.15024992711136434,
                             -3.250354013486661e-13, -1.2704328733491568e-12,
-                            0.1299170519311761, 0.12102324112001549], rtol = 1e-6)
-        catch
+                            0.1299170519311761, 0.12102324112001549]; rtol = 1e-6)
+        if success
+            @test success
+        else
             @test isapprox(res.w,
                            [-7.681434332864639e-13, 7.405561598382192e-14,
                             0.014250247570361224, -6.974708088175452e-13,
@@ -760,7 +761,6 @@
                             -1.4843816960768885e-12, 0.1276616300735639,
                             0.0696639310927601]; rtol = 1.0e-6)
         end
-
         plc = SemiDefinitePhilogenyEstimator(; pe = clr)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, cplg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
