@@ -95,8 +95,8 @@ function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
                             opto = opto, cwf = nco.cwf, strict = nco.strict,
                             threads = nco.threads)
 end
-function nested_clustering_finaliser(wb::Union{Nothing,
-                                               <:WeightBoundsEstimator <: WeightBounds},
+function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsEstimator,
+                                               <:WeightBounds},
                                      sets::Union{Nothing, <:AssetSets,
                                                  #! Start: to delete
                                                  <:DataFrame
