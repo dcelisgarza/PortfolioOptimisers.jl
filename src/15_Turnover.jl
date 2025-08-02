@@ -15,7 +15,8 @@ end
 function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false,
                               datatype::DataType = Float64)
     return Turnover(; w = tn.w,
-                    val = estimator_to_val(tn.val, sets, zero(datatype); strict = strict))
+                    val = estimator_to_val(tn.val, sets, typemax(datatype);
+                                           strict = strict))
 end
 struct Turnover{T1, T2} <: AbstractResult
     w::T1
@@ -27,7 +28,7 @@ function Turnover(; w::AbstractVector{<:Real},
     if isa(val, AbstractVector)
         @smart_assert(!isempty(val))
         @smart_assert(length(val) == length(w))
-        @smart_assert(all(isfinite, val) && all(x -> x >= zero(x), val))
+        @smart_assert(any(isfinite, val) && all(x -> x >= zero(x), val))
     else
         @smart_assert(isfinite(val) && val >= zero(eltype(val)))
     end
@@ -62,5 +63,6 @@ end
 function factory(tn::Turnover, w::AbstractVector)
     return Turnover(; w = w, val = tn.val)
 end
+Base.iterate(S::Turnover, state = 1) = state > 1 ? nothing : (S, state + 1)
 
 export TurnoverEstimator, Turnover, turnover_constraints

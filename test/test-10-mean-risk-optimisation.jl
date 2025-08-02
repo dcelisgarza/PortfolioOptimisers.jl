@@ -644,4 +644,65 @@
                         0.08660290480901828, 1.711128248182528e-6, 0.03477208922064647,
                         0.09904023885895782, 0.05862319774028108], rtol = 1e-6)
     end
+    @testset "Turnover" begin
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), tn = Turnover(; w = w0))
+        mr = MeanRisk(; opt = opt)
+        @test isapprox(w0, optimise!(mr).w)
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1),
+                            tn = [TurnoverEstimator(; w = w0,
+                                                    val = ["AAPL" => 0, "MRK" => 0.05])])
+        mr = MeanRisk(; opt = opt)
+        res = optimise!(mr)
+        @test isapprox(res.w,
+                       [0.049999999999993605, -0.04520519208370696, -0.04869401288598486,
+                        -0.04327195569636555, 0.11569334228575458, 0.0414229664404061,
+                        0.03303019511733334, 0.4429818998364995, 0.07583334507776132,
+                        0.10762664262865197, -0.04825139998117526, 0.09999541531046201,
+                        -0.0016373970470112344, 0.10510925375967227, -0.023144445601095607,
+                        0.043540146321535515, -0.01798434663243727, -0.023893575203165842,
+                        0.09199157017254597, 0.04485754818032653], rtol = 1e-6)
+    end
+    @testset "Number of effective assets" begin
+        opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 10)
+        mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre)
+        @test round(inv(dot(res.w, res.w))) >= 10
+    end
+    @testset "Tracking" begin
+        rdb = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
+                                                            "./assets/SP500_idx.csv.gz"));
+                                          timestamp = :Date)[(end - 252):end])
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            te = TrackingError(;
+                                               tracking = ReturnsTracking(; w = vec(rdb.X)),
+                                               err = 3e-3))
+        mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre)
+        @test norm(rd.X * res.w - vec(rdb.X)) / sqrt(size(rd.X, 1)) <= 3e-3
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            te = TrackingError(;
+                                               tracking = ReturnsTracking(; w = vec(rdb.X)),
+                                               err = 2.5e-3, alg = NOCTracking()))
+        mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre)
+        @test norm(rd.X * res.w - vec(rdb.X), 1) / size(rd.X, 1) <= 2.5e-3
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            te = TrackingError(; tracking = WeightsTracking(; w = w0),
+                                               err = 2e-3))
+        mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre)
+        @test norm(rd.X * (res.w - w0)) / sqrt(size(rd.X, 1)) <= 2e-3
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            te = [TrackingError(; tracking = WeightsTracking(; w = w0),
+                                                err = 2e-3, alg = NOCTracking())])
+        mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
+        res = optimise!(mre)
+        @test norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3
+    end
 end

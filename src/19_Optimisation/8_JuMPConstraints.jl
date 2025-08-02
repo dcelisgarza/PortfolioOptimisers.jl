@@ -994,7 +994,8 @@ end
 function set_tracking_error_constraints!(args...)
     return nothing
 end
-function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::AbstractPriorResult,
+function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
+                                         pr::AbstractPriorResult,
                                          te::TrackingError{<:Any, <:Any, <:NOCTracking},
                                          args...)
     X = pr.X
@@ -1019,7 +1020,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
                                                                         end)
     return nothing
 end
-function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::AbstractPriorResult,
+function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
+                                         pr::AbstractPriorResult,
                                          te::TrackingError{<:Any, <:Any, <:SOCTracking},
                                          args...)
     X = pr.X
@@ -1042,7 +1044,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
                                                                         end)
     return nothing
 end
-function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::AbstractPriorResult,
+function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
+                                         pr::AbstractPriorResult,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
@@ -1062,7 +1065,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
     model[Symbol(:cter_, i)] = @constraint(model, sc * (risk_expr - err * k) <= 0)
     return nothing
 end
-function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::AbstractPriorResult,
+function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
+                                         pr::AbstractPriorResult,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:DependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
@@ -1094,11 +1098,9 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Any, pr::Abstract
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
-                                         te::AbstractTracking, args...)
-    return set_tracking_error_constraints!(model, 1, pr, te, args...)
-end
-function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
-                                         tres::AbstractVector{AbstractTracking}, args...)
+                                         tres::Union{<:AbstractTracking,
+                                                     <:AbstractVector{<:AbstractTracking}},
+                                         args...)
     for (i, te) in enumerate(tres)
         set_tracking_error_constraints!(model, i, pr, te, args...)
     end
@@ -1107,7 +1109,7 @@ end
 function set_turnover_constraints!(args...)
     return nothing
 end
-function set_turnover_constraints!(model::JuMP.Model, i::Any, tn::Turnover)
+function _set_turnover_constraints!(model::JuMP.Model, tn::Turnover, i::Integer = 1)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -1128,12 +1130,10 @@ function set_turnover_constraints!(model::JuMP.Model, i::Any, tn::Turnover)
                                                                         end)
     return nothing
 end
-function set_turnover_constraints!(model::JuMP.Model, tn::Turnover)
-    return set_turnover_constraints!(model, 1, tn)
-end
-function set_turnover_constraints!(model::JuMP.Model, tns::AbstractVector{<:Turnover})
+function set_turnover_constraints!(model::JuMP.Model,
+                                   tns::Union{<:Turnover, <:AbstractVector{<:Turnover}})
     for (i, tn) in enumerate(tns)
-        set_turnover_constraints!(model, i, tn)
+        _set_turnover_constraints!(model, tn, i)
     end
     return nothing
 end

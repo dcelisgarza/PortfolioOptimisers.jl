@@ -162,4 +162,4 @@ function black_litterman_views(blves::Union{<:BlackLittermanViewsEstimator,
 end
 #! End: to delete
 =#
-export black_litterman_views, BlackLittermanViewsEstimator, BlackLittermanViews
+export black_litterman_views, BlackLittermanViews
