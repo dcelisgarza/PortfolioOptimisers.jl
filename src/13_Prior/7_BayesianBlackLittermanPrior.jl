@@ -17,11 +17,11 @@ function BayesianBlackLittermanPrior(;
                                                   <:AbstractVector{<:AbstractString},
                                                   <:AbstractVector{Expr},
                                                   <:AbstractVector{<:Union{<:AbstractString,
-                                                                           Expr}},
-                                                  #! Start: to delete
-                                                  <:BlackLittermanViewsEstimator,
-                                                  <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                                  #! End: to delete
+                                                                           Expr}}
+                                                  #   #! Start: to delete
+                                                  #   <:BlackLittermanViewsEstimator,
+                                                  #   <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                                  #   #! End: to delete
                                                   },
                                      sets::Union{<:AssetSets,
                                                  #! Start: to delete

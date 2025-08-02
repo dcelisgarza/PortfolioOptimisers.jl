@@ -215,7 +215,8 @@
               0.09641530015038421, 0.006088453496011643, 0.0783381784854751,
               0.06517803092186192, 0.01957181089902754]
         sets = AssetSets(; dict = Dict("nx" => rd.nx, "group1" => ["AAPL", "MSFT"]))
-        eqn = ["JNJ==0.03", "group1 >= 0.02", "PEP <= 0.08"]
+        eqn = WeightBoundsEstimator(; lb = ["JNJ" => 0.03, "group1" => 0.02],
+                                    ub = Dict("PEP" => 0.08, "JNJ" => 0.03))
         opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv, sets = sets, wb = eqn)
         res = optimise!(HierarchicalEqualRiskContribution(; opt = opt))
         @test isa(res.retcode, OptimisationSuccess)

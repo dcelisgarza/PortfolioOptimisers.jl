@@ -13,14 +13,7 @@ struct Variance{T1, T2, T3, T4} <: JuMPRiskContributionSigmaRiskMeasure
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   sigma::Union{Nothing, <:AbstractMatrix} = nothing,
-                  rc::Union{Nothing, <:AbstractString, Expr,
-                            <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                            <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                            #! Start: to delete
-                            <:LinearConstraintEstimator,
-                            <:AbstractVector{<:LinearConstraintEstimator},
-                            #! End: to delete
-                            <:LinearConstraint} = nothing,
+                  rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
                   alg::VarianceAlgorithm = SOCRiskExpr())
     if isa(sigma, AbstractMatrix)
         @smart_assert(!isempty(sigma))

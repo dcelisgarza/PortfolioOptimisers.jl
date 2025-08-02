@@ -23,15 +23,8 @@ function HierarchicalOptimiser(;
                                cle::Union{<:ClusteringEstimator,
                                           <:AbstractClusteringResult} = ClusteringEstimator(),
                                slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
-                               fees::Union{Nothing, <:Fees} = nothing,
-                               wb::Union{Nothing, <:WeightBounds, <:AbstractString, Expr,
-                                         <:AbstractVector{<:AbstractString},
-                                         <:AbstractVector{Expr},
-                                         <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                         #! Start: to delete
-                                         <:WeightBoundsEstimator
-                                         #! End: to delete
-                                         } = WeightBounds(),
+                               fees::Union{Nothing, <:FeesEstimator, <:Fees} = nothing,
+                               wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = WeightBounds(),
                                sets::Union{Nothing, <:AssetSets,
                                            #! Start: to delete
                                            <:DataFrame

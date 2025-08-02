@@ -26,21 +26,21 @@ function AugmentedBlackLittermanPrior(;
                                                      <:AbstractVector{<:AbstractString},
                                                      <:AbstractVector{Expr},
                                                      <:AbstractVector{<:Union{<:AbstractString,
-                                                                              Expr}},
-                                                     #! Start: to delete
-                                                     <:BlackLittermanViewsEstimator,
-                                                     <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                                     #! End: to delete
+                                                                              Expr}}
+                                                     #  #! Start: to delete
+                                                     #  <:BlackLittermanViewsEstimator,
+                                                     #  <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                                     #  #! End: to delete
                                                      },
                                       f_views::Union{<:AbstractString, Expr,
                                                      <:AbstractVector{<:AbstractString},
                                                      <:AbstractVector{Expr},
                                                      <:AbstractVector{<:Union{<:AbstractString,
-                                                                              Expr}},
-                                                     #! Start: to delete
-                                                     <:BlackLittermanViewsEstimator,
-                                                     <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                                     #! End: to delete
+                                                                              Expr}}
+                                                     #  #! Start: to delete
+                                                     #  <:BlackLittermanViewsEstimator,
+                                                     #  <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                                     #  #! End: to delete
                                                      },
                                       a_sets::Union{<:AssetSets,
                                                     #! Start: to delete

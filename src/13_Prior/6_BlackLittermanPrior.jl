@@ -24,11 +24,11 @@ function BlackLittermanPrior(;
                              views::Union{<:AbstractString, Expr,
                                           <:AbstractVector{<:AbstractString},
                                           <:AbstractVector{Expr},
-                                          <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                          #! Start: to delete
-                                          <:BlackLittermanViewsEstimator,
-                                          <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                          #! End: to delete
+                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}
+                                          #   #! Start: to delete
+                                          #   <:BlackLittermanViewsEstimator,
+                                          #   <:AbstractVector{<:BlackLittermanViewsEstimator}
+                                          #   #! End: to delete
                                           },
                              sets::Union{<:AssetSets,
                                          #! Start: to delete

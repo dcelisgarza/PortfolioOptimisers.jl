@@ -11,7 +11,7 @@ end
 function BudgetRange(; lb::Union{Nothing, <:Real} = 1.0, ub::Union{Nothing, <:Real} = 1.0)
     lb_flag = isnothing(lb)
     ub_flag = isnothing(ub)
-    # @smart_assert(lb_flag ⊼ ub_flag)
+    @smart_assert(lb_flag ⊼ ub_flag)
     if !lb_flag
         @smart_assert(isfinite(lb))
     end

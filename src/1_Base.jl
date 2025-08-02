@@ -71,7 +71,7 @@ All concrete types that implement variance estimation (e.g., sample variance, ro
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 function Base.show(io::IO,
                    ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                              <:AbstractCovarianceEstimator})
+                              <:AbstractCovarianceEstimator, <:Clustering.Hclust})
     name = string(typeof(ear))
     fields = propertynames(ear)
     if isempty(fields)
@@ -81,7 +81,11 @@ function Base.show(io::IO,
     println(io, name)
     padding = maximum(map(length, map(string, fields))) + 2
     for field in fields
-        val = getfield(ear, field)
+        val = try
+            getfield(ear, field)
+        catch
+            continue
+        end
         print(io, lpad(string(field), padding), " ")
         if isnothing(val)
             println(io, "| nothing")
@@ -91,7 +95,7 @@ function Base.show(io::IO,
             println(io, "| $(length(val))-element $(typeof(val))")
         elseif isa(val,
                    Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
-                         <:AbstractCovarianceEstimator, <:JuMP.Model})
+                         <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust})
             ioalg = IOBuffer()
             show(ioalg, val)
             algstr = String(take!(ioalg))

@@ -137,53 +137,28 @@ end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
                        slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                       wb::Union{Nothing, <:WeightBounds, <:WeightBoundsEstimator} = WeightBounds(),
+                       wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = WeightBounds(),
                        bgt::Union{Nothing, <:Real, <:BudgetConstraintEstimator} = 1.0,
                        sbgt::Union{Nothing, <:Real, <:BudgetRange} = nothing,
-                       lt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator} = nothing,
-                       st::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator} = nothing,
-                       lcs::Union{Nothing, <:AbstractString, Expr,
-                                  <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                  #! Start: to delete
-                                  <:LinearConstraintEstimator,
-                                  <:AbstractVector{<:LinearConstraintEstimator},
-                                  #! End: to delete
-                                  <:LinearConstraint} = nothing,
+                       lt::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold} = nothing,
+                       st::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold} = nothing,
+                       lcs::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
                        lcm::Union{Nothing, <:LinearConstraint} = nothing,
                        cent::Union{Nothing, <:CentralityEstimator,
                                    <:AbstractVector{<:CentralityEstimator},
                                    <:LinearConstraint} = nothing,
-                       gcard::Union{Nothing, <:AbstractString, Expr,
-                                    <:AbstractVector{<:AbstractString},
-                                    <:AbstractVector{Expr},
-                                    <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                    #! Start: to delete
-                                    <:LinearConstraintEstimator,
-                                    <:AbstractVector{<:LinearConstraintEstimator},
-                                    #! End: to delete
+                       gcard::Union{Nothing, <:LinearConstraintEstimator,
                                     <:LinearConstraint} = nothing,
-                       sgcard::Union{Nothing, <:AbstractString, Expr,
-                                     <:AbstractVector{<:AbstractString},
-                                     <:AbstractVector{Expr},
-                                     <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                     <:AbstractVector{<:AbstractVector{<:AbstractString}},
-                                     <:AbstractVector{<:AbstractVector{Expr}},
-                                     <:AbstractVector{<:AbstractVector{<:Union{<:AbstractString,
-                                                                               Expr}}},
-                                     #! Start: to delete
-                                     <:LinearConstraintEstimator,
-                                     <:AbstractVector{<:LinearConstraintEstimator},
-                                     #! End: to delete
+                       sgcard::Union{Nothing, <:LinearConstraintEstimator,
                                      <:LinearConstraint,
-                                     <:AbstractVector{<:LinearConstraint}} = nothing,
-                       smtx::Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix,
-                                   <:AbstractVector{Symbol},
-                                   <:AbstractVector{<:AbstractString},
-                                   <:AbstractVector{<:AbstractMatrix}} = nothing,
-                       sgmtx::Union{Nothing, Symbol, <:AbstractString, <:AbstractMatrix,
-                                    <:AbstractVector{Symbol},
-                                    <:AbstractVector{<:AbstractString},
-                                    <:AbstractVector{<:AbstractMatrix}} = nothing,
+                                     <:AbstractVector{<:Union{<:LinearConstraintEstimator,
+                                                              <:LinearConstraint}}} = nothing,
+                       smtx::Union{Nothing, <:AssetSetsMatrixEstimator, <:AbstractMatrix,
+                                   <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
+                                                            <:AbstractMatrix}}} = nothing,
+                       sgmtx::Union{Nothing, <:AssetSetsMatrixEstimator, <:AbstractMatrix,
+                                    <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
+                                                             <:AbstractMatrix}}} = nothing,
                        slt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
                                   <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                            <:BuyInThresholdEstimator}}} = nothing,
@@ -203,9 +178,7 @@ function JuMPOptimiser(;
                                    } = nothing,
                        nplg::Union{Nothing, <:PhilogenyEstimator, <:PhilogenyResult} = nothing,
                        cplg::Union{Nothing, <:PhilogenyEstimator, <:PhilogenyResult} = nothing,
-                       tn::Union{Nothing, <:TurnoverEstimator,
-                                 <:AbstractVector{<:TurnoverEstimator}, <:Turnover,
-                                 <:AbstractVector{<:Turnover},
+                       tn::Union{Nothing, <:TurnoverEstimator, <:Turnover,
                                  <:AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}}} = nothing,
                        te::Union{Nothing, <:AbstractTracking,
                                  <:AbstractVector{<:AbstractTracking}} = nothing,
@@ -227,24 +200,6 @@ function JuMPOptimiser(;
     end
     if isa(sbgt, Real)
         @smart_assert(isfinite(sbgt) && sbgt >= 0)
-    elseif isa(sbgt, BudgetRange)
-        lb = sbgt.lb
-        ub = sbgt.ub
-        lb_flag = isnothing(lb)
-        ub_flag = isnothing(ub)
-        @smart_assert(lb_flag ⊼ ub_flag)
-        if !lb_flag
-            @smart_assert(lb >= zero(lb))
-        end
-        if !ub_flag
-            @smart_assert(ub >= zero(ub))
-        end
-        if !lb_flag && !ub_flag
-            @smart_assert(lb <= ub)
-        end
-    end
-    if isa(lcs, AbstractVector)
-        @smart_assert(!isempty(lcs))
     end
     if isa(cent, AbstractVector)
         @smart_assert(!isempty(cent))
@@ -252,12 +207,9 @@ function JuMPOptimiser(;
     if !isnothing(card)
         @smart_assert(isfinite(card) && card > 0)
     end
-    if isa(gcard, AbstractVector)
-        @smart_assert(!isempty(gcard))
-    end
     if isa(scard, Integer)
         @smart_assert(isfinite(scard) && scard > 0)
-        @smart_assert(isa(smtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
+        @smart_assert(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
         @smart_assert(isa(slt, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
         @smart_assert(isa(sst, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
     elseif isa(scard, AbstractVector)
@@ -276,7 +228,7 @@ function JuMPOptimiser(;
     elseif isnothing(scard) &&
            (isa(slt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) ||
             isa(sst, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}))
-        @smart_assert(isa(smtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
+        @smart_assert(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
     elseif isnothing(scard) && (isa(slt, AbstractVector) || isa(sst, AbstractVector))
         @smart_assert(isa(smtx, AbstractVector))
         @smart_assert(!isempty(smtx))
@@ -289,11 +241,8 @@ function JuMPOptimiser(;
             @smart_assert(length(sst) == length(smtx))
         end
     end
-    if isa(sgcard,
-           Union{<:AbstractString, Expr, <:AbstractVector{<:AbstractString},
-                 <:AbstractVector{Expr}, <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                 <:LinearConstraint})
-        @smart_assert(isa(sgmtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
+    if isa(sgcard, Union{<:LinearConstraintEstimator, <:LinearConstraint})
+        @smart_assert(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
         @smart_assert(isa(sglt,
                           Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
         @smart_assert(isa(sgst,
@@ -304,9 +253,7 @@ function JuMPOptimiser(;
             N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
             @smart_assert(N == N_ineq + N_eq)
         end
-    elseif isa(sgcard,
-               Union{<:AbstractVector{<:AbstractVector},
-                     <:AbstractVector{<:LinearConstraint}})
+    elseif isa(sgcard, AbstractVector)
         @smart_assert(!isempty(sgcard))
         @smart_assert(isa(sgmtx, AbstractVector))
         @smart_assert(!isempty(sgmtx))
@@ -329,7 +276,7 @@ function JuMPOptimiser(;
     elseif isnothing(sgcard) &&
            (isa(sglt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) ||
             isa(sgst, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}))
-        @smart_assert(isa(sgmtx, Union{Symbol, <:AbstractString, <:AbstractMatrix}))
+        @smart_assert(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
     elseif isnothing(sgcard) && (isa(sglt, AbstractVector) || isa(sgst, AbstractVector))
         @smart_assert(isa(sgmtx, AbstractVector))
         @smart_assert(!isempty(sgmtx))
@@ -343,11 +290,11 @@ function JuMPOptimiser(;
         end
     end
     if isa(wb, WeightBoundsEstimator) ||
-       !isa(lt, Union{Nothing, <:BuyInThreshold}) ||
-       !isa(st, Union{Nothing, <:BuyInThreshold}) ||
-       !isa(lcs, Union{Nothing, <:LinearConstraint}) ||
-       !isa(cent, Union{Nothing, <:LinearConstraint}) ||
-       !isa(gcard, Union{Nothing, <:LinearConstraint}) ||
+       isa(lt, BuyInThresholdEstimator) ||
+       isa(st, BuyInThresholdEstimator) ||
+       isa(lcs, LinearConstraintEstimator) ||
+       isa(cent, LinearConstraintEstimator) ||
+       isa(gcard, LinearConstraintEstimator) ||
        !isa(sgcard,
             Union{Nothing, <:LinearConstraint, <:AbstractVector{<:LinearConstraint}}) ||
        !isnothing(scard)
@@ -477,4 +424,4 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                          l1 = opt.l1, l2 = opt.l2, ss = opt.ss, strict = opt.strict)
 end
 
-export JuMPOptimisation, JuMPOptimiser
+export ProcessedJuMPOptimiserAttributes, JuMPOptimisation, JuMPOptimiser

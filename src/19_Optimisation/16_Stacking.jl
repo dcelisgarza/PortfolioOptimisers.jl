@@ -31,21 +31,15 @@ function assert_internal_optimiser(opt::Stacking)
 end
 function Stacking(;
                   pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                  wb::Union{Nothing, <:WeightBounds, <:AbstractString, Expr,
-                            <:AbstractVector{<:AbstractString}, <:AbstractVector{Expr},
-                            <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                            #! Start: to delete
-                            <:WeightBoundsEstimator
-                            #! End: to delete
-                            } = nothing,
+                  wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
                   sets::Union{Nothing, <:AssetSets,
                               #! Start: to delete
                               <:DataFrame
                               #! End: to delete
                               } = nothing,
                   opti::AbstractVector{<:Union{<:OptimisationEstimator,
-                                               <:OptimisationResult}} = [MeanRisk()],
-                  opto::OptimisationEstimator = MeanRisk(),
+                                               <:OptimisationResult}},
+                  opto::OptimisationEstimator,
                   cwf::WeightFinaliser = IterativeWeightFiniliser(), strict::Bool = false,
                   threads::FLoops.Transducers.Executor = ThreadedEx())
     assert_external_optimiser(opto)

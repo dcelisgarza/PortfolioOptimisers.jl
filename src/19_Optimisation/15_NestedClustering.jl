@@ -65,19 +65,12 @@ end
 function NestedClustering(;
                           pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
                           cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult} = ClusteringEstimator(),
-                          wb::Union{Nothing, <:WeightBounds, <:AbstractString, Expr,
-                                    <:AbstractVector{<:AbstractString},
-                                    <:AbstractVector{Expr},
-                                    <:AbstractVector{<:Union{<:AbstractString, Expr}},
-                                    #! Start: to delete
-                                    <:WeightBoundsEstimator
-                                    #! End: to delete
-                                    } = nothing,
+                          wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
                           sets::Union{Nothing, <:AssetSets,
                                       #! Start: to delete
                                       <:DataFrame
                                       #! End: to delete
-                                      } = nothing, opti::OptimisationEstimator = MeanRisk(),
+                                      } = nothing, opti::OptimisationEstimator,
                           opto::OptimisationEstimator = opti,
                           cwf::WeightFinaliser = IterativeWeightFiniliser(),
                           strict::Bool = false,
@@ -102,15 +95,8 @@ function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
                             opto = opto, cwf = nco.cwf, strict = nco.strict,
                             threads = nco.threads)
 end
-function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBounds, <:AbstractString,
-                                               Expr, <:AbstractVector{<:AbstractString},
-                                               <:AbstractVector{Expr},
-                                               <:AbstractVector{<:Union{<:AbstractString,
-                                                                        Expr}},
-                                               #! Start: to delete
-                                               <:WeightBoundsEstimator
-                                               #! End: to delete
-                                               },
+function nested_clustering_finaliser(wb::Union{Nothing,
+                                               <:WeightBoundsEstimator <: WeightBounds},
                                      sets::Union{Nothing, <:AssetSets,
                                                  #! Start: to delete
                                                  <:DataFrame

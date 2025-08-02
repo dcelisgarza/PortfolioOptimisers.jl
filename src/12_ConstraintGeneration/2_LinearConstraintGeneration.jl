@@ -442,71 +442,16 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
         LinearConstraint(; ineq = ineq, eq = eq)
     end
 end
-function linear_constraints(lcs::LinearConstraint, args...; kwargs...)
+function linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwargs...)
     return lcs
 end
-function linear_constraints(::Nothing, args...; kwargs...)
-    return nothing
-end
 function linear_constraints(eqn::Union{<:AbstractString, Expr,
-                                       <:AbstractVector{<:AbstractString},
-                                       <:AbstractVector{Expr},
                                        <:AbstractVector{<:Union{<:AbstractString, Expr}}},
                             sets::AssetSets; datatype::DataType = Float64,
                             strict::Bool = false, bl_flag::Bool = false)
     lcs = parse_equation(eqn; datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
-end
-function linear_constraints(eqn::Union{<:AbstractVector{<:AbstractVector{<:AbstractString}},
-                                       <:AbstractVector{<:AbstractVector{Expr}},
-                                       <:AbstractVector{<:AbstractVector{<:Union{<:AbstractString,
-                                                                                 Expr}}}},
-                            sets::AssetSets; datatype::DataType = Float64,
-                            strict::Bool = false, bl_flag::Bool = false)
-    return linear_constraints.(eqn, Ref(sets); datatype = datatype, strict = strict,
-                               bl_flag = bl_flag)
-end
-function get_weight_bounds_constraints(lcs::Union{<:ParsingResult,
-                                                  <:AbstractVector{<:ParsingResult}},
-                                       sets::AssetSets; datatype::DataType = Float64,
-                                       strict::Bool = false)
-    nx = sets.dict[sets.key]
-    lb = zeros(promote_type(eltype(datatype), eltype(datatype)), length(nx))
-    ub = ones(promote_type(eltype(datatype), eltype(datatype)), length(nx))
-    At = falses(length(nx))
-    for lc in lcs
-        fill!(At, false)
-        for v in lc.vars
-            Ai = (nx .== v)
-            if !any(isone, Ai)
-                msg = "$(v) is not found in $(nx)."
-                strict ? throw(ArgumentError(msg)) : @warn(msg)
-                continue
-            end
-            At .= At .|| Ai
-        end
-        if lc.op == "<="
-            ub[At] .= lc.rhs
-        elseif lc.op == ">="
-            lb[At] .= lc.rhs
-        else
-            ub[At] .= lc.rhs
-            lb[At] .= lc.rhs
-        end
-    end
-    return WeightBounds(; lb = lb, ub = ub)
-end
-function weight_bounds_constraints(eqn::Union{<:AbstractString, Expr,
-                                              <:AbstractVector{<:AbstractString},
-                                              <:AbstractVector{Expr},
-                                              <:AbstractVector{<:Union{<:AbstractString,
-                                                                       Expr}}},
-                                   sets::AssetSets; datatype::DataType = Float64,
-                                   strict::Bool = false, kwargs...)
-    lcs = parse_equation(eqn; datatype = datatype)
-    lcs = replace_group_by_assets(lcs, sets)
-    return get_weight_bounds_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
 function get_risk_budget_constraints(lcs::Union{<:ParsingResult,
                                                 <:AbstractVector{<:ParsingResult}},
@@ -537,8 +482,6 @@ function get_risk_budget_constraints(lcs::Union{<:ParsingResult,
     return rb / sum(rb)
 end
 function risk_budget_constraints(eqn::Union{<:AbstractString, Expr,
-                                            <:AbstractVector{<:AbstractString},
-                                            <:AbstractVector{Expr},
                                             <:AbstractVector{<:Union{<:AbstractString,
                                                                      Expr}}},
                                  sets::AssetSets; datatype::DataType = Float64,
@@ -558,29 +501,67 @@ function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSet
     end
     return transpose(A)
 end
-function asset_sets_matrix(smtx::Union{<:AbstractVector{Symbol},
-                                       <:AbstractVector{<:AbstractString},
-                                       <:AbstractVector{<:Union{Symbol, <:AbstractString}}},
-                           sets::AssetSets)
-    return asset_sets_matrix.(smtx, Ref(sets))
-end
-function asset_sets_matrix(smtx::Union{Nothing, <:AbstractMatrix,
-                                       <:AbstractVector{<:AbstractMatrix}}, args...)
-    return smtx
-end
-function asset_sets_matrix_view(smtx::Union{Nothing, Symbol, <:AbstractString,
-                                            <:AbstractVector{Symbol},
-                                            <:AbstractVector{<:AbstractString}}, ::Any;
-                                kwargs...)
+function asset_sets_matrix(smtx::Union{Nothing, <:AbstractMatrix}, args...)
     return smtx
 end
 function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector; kwargs...)
     return view(smtx, :, i)
 end
-function asset_sets_matrix_view(smtx::AbstractVector{<:AbstractMatrix}, i::AbstractVector;
+struct LinearConstraintEstimator{T1} <: AbstractEstimator
+    val::T1
+end
+function LinearConstraintEstimator(;
+                                   val::Union{<:AbstractString, Expr,
+                                              <:AbstractVector{<:Union{<:AbstractString,
+                                                                       Expr}}})
+    if isa(val, Union{<:AbstractString, <:AbstractVector})
+        @smart_assert(!isempty(val))
+    end
+    return LinearConstraintEstimator(val)
+end
+function linear_constraints(lcs::LinearConstraintEstimator, sets::AssetSets;
+                            datatype::DataType = Float64, strict::Bool = false,
+                            bl_flag::Bool = false)
+    return linear_constraints(lcs.val, sets; datatype = datatype, strict = strict,
+                              bl_flag = bl_flag)
+end
+function linear_constraints(lcs::AbstractVector{<:LinearConstraintEstimator},
+                            sets::AssetSets; datatype::DataType = Float64,
+                            strict::Bool = false, bl_flag::Bool = false)
+    return linear_constraints.(lcs.val, Ref(sets); datatype = datatype, strict = strict,
+                               bl_flag = bl_flag)
+end
+function risk_budget_constraints(lcs::LinearConstraintEstimator, sets::AssetSets;
+                                 datatype::DataType = Float64, strict::Bool = false)
+    return risk_budget_constraints(lcs.val, sets; datatype = datatype, strict = strict)
+end
+struct AssetSetsMatrixEstimator{T1} <: AbstractEstimator
+    val::T1
+end
+function AssetSetsMatrixEstimator(; val::Union{<:Symbol, <:AbstractString})
+    if isa(val, AbstractString)
+        @smart_assert(!isempty(val))
+    end
+    return AssetSetsMatrixEstimator(val)
+end
+function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
+    return asset_sets_matrix(smtx.val, sets)
+end
+function asset_sets_matrix(smtx::AbstractVector{<:Union{Nothing, <:AbstractMatrix,
+                                                        <:AssetSetsMatrixEstimator}},
+                           sets::AssetSets)
+    return asset_sets_matrix.(smtx, Ref(sets))
+end
+function asset_sets_matrix_view(smtx::Union{Nothing, AssetSetsMatrixEstimator}, ::Any;
                                 kwargs...)
+    return smtx
+end
+function asset_sets_matrix_view(smtx::AbstractVector{<:Union{Nothing, <:AbstractMatrix,
+                                                             <:AssetSetsMatrixEstimator}},
+                                i::AbstractVector; kwargs...)
     return asset_sets_matrix_view.(smtx, Ref(i); kwargs...)
 end
 
-export AssetSets, PartialLinearConstraint, LinearConstraint, parse_equation,
-       replace_group_by_assets, linear_constraints, asset_sets_matrix
+export AssetSets, PartialLinearConstraint, LinearConstraintEstimator, LinearConstraint,
+       AssetSetsMatrixEstimator, parse_equation, replace_group_by_assets,
+       linear_constraints, asset_sets_matrix

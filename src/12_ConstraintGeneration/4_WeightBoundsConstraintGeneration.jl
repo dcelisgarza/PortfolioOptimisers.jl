@@ -69,6 +69,47 @@ function weight_bounds_view(wb::Union{<:AbstractString, Expr,
                                       <:WeightBoundsEstimator}, ::Any)
     return wb
 end
+function get_weight_bounds_constraints(lcs::Union{<:ParsingResult,
+                                                  <:AbstractVector{<:ParsingResult}},
+                                       sets::AssetSets; datatype::DataType = Float64,
+                                       strict::Bool = false)
+    nx = sets.dict[sets.key]
+    lb = zeros(promote_type(eltype(datatype), eltype(datatype)), length(nx))
+    ub = ones(promote_type(eltype(datatype), eltype(datatype)), length(nx))
+    At = falses(length(nx))
+    for lc in lcs
+        fill!(At, false)
+        for v in lc.vars
+            Ai = (nx .== v)
+            if !any(isone, Ai)
+                msg = "$(v) is not found in $(nx)."
+                strict ? throw(ArgumentError(msg)) : @warn(msg)
+                continue
+            end
+            At .= At .|| Ai
+        end
+        if lc.op == "<="
+            ub[At] .= lc.rhs
+        elseif lc.op == ">="
+            lb[At] .= lc.rhs
+        else
+            ub[At] .= lc.rhs
+            lb[At] .= lc.rhs
+        end
+    end
+    return WeightBounds(; lb = lb, ub = ub)
+end
+function weight_bounds_constraints(eqn::Union{<:AbstractString, Expr,
+                                              <:AbstractVector{<:AbstractString},
+                                              <:AbstractVector{Expr},
+                                              <:AbstractVector{<:Union{<:AbstractString,
+                                                                       Expr}}},
+                                   sets::AssetSets; datatype::DataType = Float64,
+                                   strict::Bool = false, kwargs...)
+    lcs = parse_equation(eqn; datatype = datatype)
+    lcs = replace_group_by_assets(lcs, sets)
+    return get_weight_bounds_constraints(lcs, sets; datatype = datatype, strict = strict)
+end
 function get_weight_bounds(wb::Union{Nothing, <:Real, <:AbstractVector}, args...; kwargs...)
     return wb
 end

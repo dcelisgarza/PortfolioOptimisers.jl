@@ -425,7 +425,10 @@
         @test count(abs.(w) .> 1e-10) <= 7
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
-                            gcard = [:(XOM + MRK + WMT <= 2), :(group2 == 5)], sets = sets)
+                            gcard = LinearConstraintEstimator(;
+                                                              val = [:(XOM + MRK + WMT <= 2),
+                                                                     :(group2 == 5)]),
+                            sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise!(mre)
         w = res.w
@@ -436,7 +439,10 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, wb = WeightBounds(; lb = -1, ub = 1),
                             sbgt = 1, bgt = 1,
-                            gcard = [:(XOM + MRK + WMT <= 2), :(group2 == 3)], sets = sets)
+                            gcard = LinearConstraintEstimator(;
+                                                              val = [:(XOM + MRK + WMT <= 2),
+                                                                     :(group2 == 3)]),
+                            sets = sets)
         mre = MeanRisk(; opt = opt)
         res = optimise!(mre)
         w = res.w
@@ -445,14 +451,16 @@
         @test count(w[.!iszero.(vec(res.gcard.A_ineq[1, :]))] .> 1e-10) <= 2
         @test count(w[.!iszero.(vec(res.gcard.A_eq[1, :]))] .> 1e-10) == 3
 
-        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1, smtx = "clusters1",
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1,
+                            smtx = AssetSetsMatrixEstimator(; val = "clusters1"),
                             sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
         @test sum(.!iszero.([sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)])) == 1
 
-        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 2, smtx = "clusters2",
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 2,
+                            smtx = AssetSetsMatrixEstimator(; val = "clusters2"),
                             sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
@@ -461,7 +469,9 @@
         @test sum(.!iszero.([sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)])) == 2
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = [1, 1],
-                            smtx = ["clusters1", "clusters2"], sets = sets)
+                            smtx = [AssetSetsMatrixEstimator(; val = "clusters1"),
+                                    AssetSetsMatrixEstimator(; val = "clusters2")],
+                            sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
         res = optimise!(mre, rd)
         w = res.w
@@ -477,17 +487,11 @@
             push!(clusters3, dict[cs])
         end
         sets.dict["clusters3"] = clusters3
-        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1, smtx = "clusters3",
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1,
+                            smtx = AssetSetsMatrixEstimator(; val = "clusters3"),
                             sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
         @test isapprox(res.w, optimise!(mre, rd).w)
-
-        # opt = JuMPOptimiser(; pe = pr, slv = mip_slv, scard = 1,
-        #                     smtx = "clusters1", sets = sets)
-        # mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
-        # res = optimise!(mre, rd)
-        # w = res.w
-        # [sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)]
     end
     @testset "Buy-in threshold" begin
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,

@@ -55,6 +55,7 @@ function black_litterman_views(eqn::Union{<:AbstractString, Expr,
     lcs = replace_group_by_assets(lcs, sets, true)
     return get_black_litterman_views(lcs, sets; datatype = datatype, strict = strict)
 end
+#=
 #! Start: to delete
 struct BlackLittermanViewsEstimator{T1, T2} <: AbstractEstimator
     A::T1
@@ -160,4 +161,5 @@ function black_litterman_views(blves::Union{<:BlackLittermanViewsEstimator,
     end
 end
 #! End: to delete
+=#
 export black_litterman_views, BlackLittermanViewsEstimator, BlackLittermanViews
