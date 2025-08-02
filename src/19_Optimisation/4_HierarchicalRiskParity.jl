@@ -70,7 +70,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
         end
     end
     retcode, w = clustering_optimisation_result(hrp.opt.cwf, wb, w / sum(w))
-    return HierarchicalOptimisation(pr, fees, wb, clr, retcode, w)
+    return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
 end
 function hrp_scalarised_risk(::SumScalariser, wu::AbstractMatrix, wk::AbstractVector,
                              rku::AbstractVector, lc::AbstractVector, rc::AbstractVector,
