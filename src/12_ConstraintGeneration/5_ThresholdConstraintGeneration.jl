@@ -2,7 +2,7 @@ struct BuyInThresholdEstimator{T1} <: AbstractEstimator
     val::T1
 end
 function BuyInThresholdEstimator(;
-                                 val::Union{<:AbstractDict,
+                                 val::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
                                             <:AbstractVector{<:Pair{<:Any, <:Real}}})
     @smart_assert(!isempty(val))
     return BuyInThresholdEstimator(val)

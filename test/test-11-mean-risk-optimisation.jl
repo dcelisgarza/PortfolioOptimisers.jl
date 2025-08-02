@@ -668,9 +668,12 @@
     end
     @testset "Number of effective assets" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 10)
-        mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
-        res = optimise!(mre)
+        res = optimise!(MeanRisk(; obj = MinimumRisk(), opt = opt))
         @test round(inv(dot(res.w, res.w))) >= 10
+
+        opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 15)
+        res = optimise!(MeanRisk(; obj = MaximumUtility(), opt = opt))
+        @test round(inv(dot(res.w, res.w))) >= 15
     end
     @testset "Tracking" begin
         rdb = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
@@ -714,6 +717,16 @@
         @test all(value.(res.cplg.A * res.model[:ib]) .<= res.cplg.B)
         idx = [BitVector(res.cplg.A[:, i]) for i in axes(res.cplg.A, 2)]
         @test all([(count(abs.(getindex(res.w, i)) .> 1e-10) <= 1) for i in idx])
+        @test isapprox(res.w,
+                       [-9.431976408001725e-15, -0.8782741689961527, -9.379228352184268e-15,
+                        -4.001985368795484e-15, 7.514829720676815e-15,
+                        -5.128614882277353e-15, -7.875395433680138e-15,
+                        -3.2602604140836353e-15, -6.293827026255587e-15,
+                        0.20017499085628088, 3.6505444231065125e-15, 0.6781009262835807,
+                        -9.805831650414789e-15, -2.2703996977265388e-15,
+                        -6.760480819135996e-15, -5.3508991062443464e-15,
+                        7.766000981009452e-15, -2.3067244875711246e-15,
+                        -3.831552897938868e-15, 0.999998251856358], rtol = 1e-6)
 
         plc = IntegerPhilogenyEstimator(; pe = Network(), B = 2)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, nplg = plc,
@@ -722,6 +735,15 @@
         @test all(value.(res.nplg.A * res.model[:ib]) .<= res.nplg.B)
         idx = [BitVector(res.nplg.A[:, i]) for i in axes(res.nplg.A, 2)]
         @test all([(count(abs.(getindex(res.w, i)) .> 1e-10) <= 2) for i in idx])
+        @test isapprox(res.w,
+                       [-5.444667507634538e-13, -0.04740153354475791, 0.04898447042002428,
+                        -4.731467916273829e-13, -1.130957000167328e-12, 0.0597898659303373,
+                        0.052442100113306786, 0.2536590009832417, -8.955374909922694e-13,
+                        -1.3470633211428974e-12, -1.3099269328335245e-12,
+                        0.20037416198655156, 0.030961713958730052, -1.3571762187763267e-12,
+                        -1.3360278929964757e-12, 0.15024992711136434,
+                        -3.250354013486661e-13, -1.2704328733491568e-12, 0.1299170519311761,
+                        0.12102324112001549], rtol = 1e-6)
 
         plc = SemiDefinitePhilogenyEstimator(; pe = clr)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, cplg = plc,
@@ -748,6 +770,14 @@
                                   obj = MaximumRatio(; rf = rf), opt = opt))
         @test isapprox(value.(res1.cplg.A .* res1.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
+        @test isapprox(res1.w,
+                       [2.630737181170687e-10, -0.19525137327795888, 3.3177497633887114e-10,
+                        0.09271805982152269, 4.871382112111268e-9, 2.2671963930992266e-9,
+                        2.6584599289863144e-9, 1.6537639325487554e-9, 2.290703448901857e-9,
+                        2.6855365271274973e-9, 9.376695285858486e-9, 0.5825009836198609,
+                        2.6508193716385394e-10, 2.015718914440205e-9, 3.243922600581835e-10,
+                        1.0969736485116875e-9, 1.2954614055481436e-9, 1.6973876211606508e-9,
+                        1.0651967980173403e-9, 0.5200322956777765], rtol = 1e-6)
 
         plc = SemiDefinitePhilogenyEstimator(; pe = clr, p = 5)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, nplg = plc,
@@ -757,6 +787,15 @@
         @test isapprox(value.(res2.nplg.A .* res2.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
         @test !isapprox(res1.w, res2.w; rtol = 0.25)
+        @test isapprox(res2.w,
+                       [7.563768267060532e-12, -0.011053444722900886,
+                        1.2744522552340983e-11, 0.13873005981734254, 1.5677466758219746e-11,
+                        1.8524261660343e-10, 2.3274378326879765e-11, 6.492695715288878e-12,
+                        8.40443486629485e-11, 7.959007116833366e-12, 3.029139212113755e-11,
+                        0.38059378591301724, 6.013140331476557e-12, 7.0627517783096286e-12,
+                        3.653187579176551e-12, 4.366490736778463e-12,
+                        1.2755045210929593e-11, 6.849289656481212e-12,
+                        5.543601714607396e-12, 0.4917295985730075], rtol = 1e-6)
 
         plc = SemiDefinitePhilogenyEstimator(; pe = clr)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, cplg = plc,
@@ -765,6 +804,15 @@
                                   opt = opt))
         @test isapprox(value.(res1.cplg.A .* res1.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
+        @test isapprox(res1.w,
+                       [4.427061986438287e-10, -1.5714922493260265e-9,
+                        1.5665474393730487e-9, 6.464906678384926e-10, 0.23327154351074547,
+                        6.883372665023997e-10, 0.10470164777556355, 0.2657824913228072,
+                        0.13530435887996797, 1.5888393849711381e-9, 2.076666772942388e-9,
+                        0.25666270299728206, 2.8318950831949517e-9, 1.4710404832889636e-9,
+                        6.474222570587401e-10, 1.4440379282232375e-9,
+                        3.9753828604501704e-10, 7.999899264306004e-10,
+                        2.0696138171794054e-9, 0.004277240413999178], rtol = 1e-6)
 
         plc = SemiDefinitePhilogenyEstimator(; pe = clr, p = 5)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, nplg = plc,
@@ -773,5 +821,73 @@
                                   opt = opt))
         @test isapprox(value.(res2.nplg.A .* res2.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
+        @test isapprox(res2.w,
+                       [2.17025563455507e-10, 6.087556118806929e-11, 7.438771978806892e-10,
+                        4.138039205626746e-10, 0.0687583562872231, 1.9489026251735372e-10,
+                        0.09508279540606476, 0.04281573130518989, 0.2378844989667673,
+                        2.088540397904443e-10, 2.9156834912252903e-10, 0.2931290462533088,
+                        4.4571619234844804e-10, 2.1531814553024086e-10,
+                        1.2031301343541658e-10, 2.5715975023297707e-10,
+                        9.683684671271267e-11, 1.1898969632271358e-10,
+                        1.7783204947614032e-10, 0.26232956821838505], rtol = 1e-6)
+    end
+    @testset "Fees" begin
+        r = ConditionalDrawdownatRisk()
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1))
+        w1 = optimise!(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)).w
+
+        fees = FeesEstimator(;
+                             tn = TurnoverEstimator(; w = w0,
+                                                    val = Dict("XOM" => 0.3 / 252)),
+                             l = Dict("JNJ" => 0.1 / 252), s = "BBY" => 0.2 / 252,
+                             fl = ["HD" => 0.016 / 252], fs = "PFE" => 0.03 / 252)
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), fees = fees, sets = sets)
+        res = optimise!(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+        @test isapprox(res.w,
+                       [-0.09154878925123214, -0.000997603027571535, -0.10856305089134274,
+                        -0.08390917925486328, 0.039259568394976366, -0.02505835967729264,
+                        0.148768780820147, 0.3885052932250303, 0.20819565141904295,
+                        0.18472171066329013, 0.13841620449649236, 0.15039298390094433,
+                        0.0742223213372, 0.33271399336428914, -0.415849263322291,
+                        -0.199084396381982, -0.07498935819338508, 0.10263523977758801,
+                        0.051767300799461936, 0.1804009518014979], rtol = 1e-6)
+
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1),
+                            fees = fees_constraints(fees, sets))
+        @test isapprox(res.w,
+                       optimise!(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)).w)
+
+        fees = FeesEstimator(; tn = TurnoverEstimator(; w = w0, val = Dict("XOM" => 1)),
+                             l = Dict("JNJ" => 1), s = "BBY" => 1, fl = ["HD" => 1],
+                             fs = "PFE" => 1)
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
+                            wb = WeightBounds(; lb = -1, ub = 1), fees = fees, sets = sets)
+        res = optimise!(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+        @test isapprox(res.w[findfirst(x -> x == "XOM", rd.nx)],
+                       w0[findfirst(x -> x == "XOM", rd.nx)])
+        @test isapprox(res.w[findfirst(x -> x == "JNJ", rd.nx)], 0)
+        @test isapprox(res.w[findfirst(x -> x == "BBY", rd.nx)], 0)
+        @test isapprox(res.w[findfirst(x -> x == "HD", rd.nx)], 0)
+        @test isapprox(res.w[findfirst(x -> x == "PFE", rd.nx)], 0)
+        @test isapprox(res.w,
+                       [0.05201790942682152, -0.004972845913212141, -0.5888432775595224,
+                        0.0, 0.22730252177448815, -0.02316379567148528, -0.0, 0.0,
+                        0.4423716947104361, 0.17060216343485277, -0.030706210074928315,
+                        0.2813132780743069, -0.03468309934130539, 0.40833226855001803, 0.0,
+                        -0.22737493979523524, -0.061270023409634534, 0.2636697569240946,
+                        0.07540459887030522, 0.05], rtol = 1e-6)
+
+        fees = FeesEstimator(; fl = ["JNJ" => 1])
+        opt = JuMPOptimiser(; pe = pr, slv = mip_slv, bgt = 1, fees = fees, sets = sets)
+        res = optimise!(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+        @test isapprox(res.w[findfirst(x -> x == "JNJ", rd.nx)], 0)
+        @test isapprox(res.w,
+                       [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.0, 0.0, 0.0,
+                        0.10628880639076618, 0.37971339847731767, 0.0, 0.0, 0.0, 0.0, 0.0,
+                        0.0996419548234818, 0.21860531676987255, 0.1957505235385615],
+                       rtol = 1e-6)
     end
 end

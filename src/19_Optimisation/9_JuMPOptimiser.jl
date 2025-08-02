@@ -297,7 +297,8 @@ function JuMPOptimiser(;
        isa(gcard, LinearConstraintEstimator) ||
        !isa(sgcard,
             Union{Nothing, <:LinearConstraint, <:AbstractVector{<:LinearConstraint}}) ||
-       !isnothing(scard)
+       !isnothing(scard) ||
+       isa(fees, FeesEstimator)
         @smart_assert(!isnothing(sets))
     end
     if isa(tn, AbstractVector)

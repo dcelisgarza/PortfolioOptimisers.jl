@@ -50,9 +50,9 @@ struct WeightBoundsEstimator{T1, T2} <: AbstractEstimator
     ub::T2
 end
 function WeightBoundsEstimator(;
-                               lb::Union{Nothing, <:AbstractDict,
+                               lb::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
                                          <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
-                               ub::Union{Nothing, <:AbstractDict,
+                               ub::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
                                          <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing)
     if !isnothing(lb)
         @smart_assert(!isempty(lb))
@@ -113,7 +113,7 @@ end
 function get_weight_bounds(wb::Union{Nothing, <:Real, <:AbstractVector}, args...; kwargs...)
     return wb
 end
-function get_weight_bounds(bounds::Union{<:AbstractDict,
+function get_weight_bounds(bounds::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
                                          <:AbstractVector{<:Pair{<:Any, <:Real}}}, lb::Bool,
                            sets::AssetSets; strict::Bool = false,
                            datatype::DataType = Float64)

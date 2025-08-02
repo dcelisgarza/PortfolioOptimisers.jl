@@ -4,7 +4,7 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
     default::T3
 end
 function TurnoverEstimator(; w::AbstractVector{<:Real},
-                           val::Union{<:AbstractDict,
+                           val::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
                                       <:AbstractVector{<:Pair{<:Any, <:Real}}},
                            default::Real = 0.0)
     @smart_assert(!isempty(w))

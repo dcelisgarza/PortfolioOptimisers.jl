@@ -7,13 +7,13 @@ struct FeesEstimator{T1, T2, T3, T4, T5, T6} <: AbstractEstimator
     kwargs::T6
 end
 function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
-                       l::Union{Nothing, <:AbstractDict,
+                       l::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
                                 <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
-                       s::Union{Nothing, <:AbstractDict,
+                       s::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
                                 <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
-                       fl::Union{Nothing, <:AbstractDict,
+                       fl::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
                                  <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
-                       fs::Union{Nothing, <:AbstractDict,
+                       fs::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
                                  <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))
     if !isnothing(l)
@@ -70,16 +70,16 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
         @smart_assert(!isempty(fs))
     end
     if !isnothing(l)
-        @smart_assert(any(x -> x > zero(x), l))
+        @smart_assert(all(x -> x >= zero(x), l))
     end
     if !isnothing(s)
-        @smart_assert(any(x -> x > zero(x), s))
+        @smart_assert(all(x -> x >= zero(x), s))
     end
     if !isnothing(fl)
-        @smart_assert(any(x -> x > zero(x), fl))
+        @smart_assert(all(x -> x >= zero(x), fl))
     end
     if !isnothing(fs)
-        @smart_assert(any(x -> x > zero(x), fs))
+        @smart_assert(all(x -> x >= zero(x), fs))
     end
     return Fees(tn, l, s, fl, fs, kwargs)
 end

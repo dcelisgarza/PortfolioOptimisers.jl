@@ -496,15 +496,13 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     if st_flag
         @constraint(model, w_mip_st, sc * (w + is ⊙ st.val - ss * (1 .- isb)) <= 0)
     end
-    if ffl_flag || ffs_flag
-        if ffl_flag
-            @expression(model, ffl, dot_scalar(ffl, ilb))
-            add_to_fees!(model, ffl)
-        end
-        if ffs_flag
-            @expression(model, ffs, dot_scalar(ffs, isb))
-            add_to_fees!(model, ffs)
-        end
+    if ffl_flag
+        @expression(model, ffl, dot_scalar(ffl, ilb))
+        add_to_fees!(model, ffl)
+    end
+    if ffs_flag
+        @expression(model, ffs, dot_scalar(ffs, isb))
+        add_to_fees!(model, ffs)
     end
     return i_mip
 end

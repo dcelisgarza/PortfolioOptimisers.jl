@@ -180,6 +180,27 @@ function estimator_to_val!(arr::AbstractArray,
     end
     return nothing
 end
+function estimator_to_val!(arr::AbstractArray, dict::Pair{<:Any, <:Real}, sets::AssetSets;
+                           strict::Bool = false)
+    nx = sets.dict[sets.key]
+    key, val = dict
+    if key in nx
+        arr[nx[key]] .= val
+    else
+        assets = get(sets.dict, key, nothing)
+        if isnothing(assets)
+            if strict
+                throw(ArgumentError("$(key) is not in $(keys(sets.dict)).\n$(dict)"))
+            else
+                @warn("$(key) is not in $(keys(sets.dict)).\n$(dict)")
+            end
+        else
+            unique!(assets)
+            arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
+        end
+    end
+    return nothing
+end
 function estimator_to_val(dict::Union{<:AbstractDict,
                                       <:AbstractVector{<:Pair{<:Any, <:Real}}},
                           sets::AssetSets, val::Real = 0.0; strict::Bool = false)
@@ -200,6 +221,28 @@ function estimator_to_val(dict::Union{<:AbstractDict,
                 unique!(assets)
                 arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
             end
+        end
+    end
+    return arr
+end
+function estimator_to_val(dict::Pair{<:Any, <:Real}, sets::AssetSets, val::Real = 0.0;
+                          strict::Bool = false)
+    nx = sets.dict[sets.key]
+    arr = fill(val, length(nx))
+    key, val = dict
+    if key in nx
+        arr[findfirst(x -> x == key, nx)] = val
+    else
+        assets = get(sets.dict, key, nothing)
+        if isnothing(assets)
+            if strict
+                throw(ArgumentError("$(key) is not in $(keys(sets.dict)).\n$(dict)"))
+            else
+                @warn("$(key) is not in $(keys(sets.dict)).\n$(dict)")
+            end
+        else
+            unique!(assets)
+            arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
         end
     end
     return arr
