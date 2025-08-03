@@ -108,10 +108,8 @@
                 1e-4
             elseif i ∈ (9, 11, 17, 18)
                 5e-4
-            elseif i ∈ (13, 21)
+            elseif i ∈ (13, 21, 14, 15, 16, 22)
                 1e-2
-            elseif i == (14, 15, 16, 22)
-                5e-3
             elseif i == 20
                 1e-3
             else

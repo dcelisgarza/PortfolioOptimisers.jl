@@ -64,9 +64,9 @@ function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kw
     return sigmas
 end
 function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any}, X::AbstractMatrix, args...;
-             dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                    <:Any, <:Any, <:Any}, X::AbstractMatrix,
+             F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus, sigmas = bootstrap_generator(ue, pr.X; kwargs...)
     q = ue.q * 0.5
@@ -88,9 +88,9 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, 
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any}, X::AbstractMatrix, args...;
-                dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                       <:Any, <:Any, <:Any}, X::AbstractMatrix,
+                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus = mu_bootstrap_generator(ue, pr.X; kwargs...)
     q = ue.q * 0.5
@@ -104,9 +104,9 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:An
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
 function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                          <:Any, <:Any, <:Any}, X::AbstractMatrix, args...;
-                   dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                          <:Any, <:Any, <:Any}, X::AbstractMatrix,
+                   F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     sigmas = sigma_bootstrap_generator(ue, pr.X; kwargs...)
     q = ue.q * 0.5
@@ -122,9 +122,9 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any}, X::AbstractMatrix, args...;
-             dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                    <:Any, <:Any, <:Any}, X::AbstractMatrix,
+             F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus, sigmas = bootstrap_generator(ue, pr.X; kwargs...)
     X_mu = Matrix{eltype(pr.X)}(undef, N, ue.n_sim)
@@ -148,9 +148,9 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:A
                                  class = SigmaEllipseUncertaintySet())
 end
 function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
-                args...; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                       <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix, F;
+                dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus = mu_bootstrap_generator(ue, pr.X; kwargs...)
     X_mu = Matrix{eltype(pr.X)}(undef, N, ue.n_sim)
@@ -168,9 +168,9 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, 
                                  class = MuEllipseUncertaintySet())
 end
 function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
-                                          <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
-                   args...; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                          <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix, F;
+                   dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     sigmas = sigma_bootstrap_generator(ue, pr.X; kwargs...)
     X_sigma = Matrix{eltype(pr.X)}(undef, N^2, ue.n_sim)

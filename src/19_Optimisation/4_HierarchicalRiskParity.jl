@@ -36,7 +36,7 @@ function split_factor_weight_constraints(alpha::Real, wb::WeightBounds, w::Abstr
 end
 function optimise!(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
-    pr = prior(hrp.opt.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    pr = prior(hrp.opt.pe, rd; dims = dims)
     clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)
@@ -138,7 +138,7 @@ end
 function optimise!(hrp::HierarchicalRiskParity{<:Any,
                                                <:AbstractVector{<:OptimisationRiskMeasure}},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
-    pr = prior(hrp.opt.pe, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
+    pr = prior(hrp.opt.pe, rd; dims = dims)
     clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(pr.X)}(undef, size(pr.X, 2), 2)

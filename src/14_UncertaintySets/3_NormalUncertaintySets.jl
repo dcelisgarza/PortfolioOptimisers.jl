@@ -24,9 +24,9 @@ function commutation_matrix(x::AbstractMatrix)
     return sparse(row, col, data, mn, mn)
 end
 function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                      <:Any}, X::AbstractMatrix, args...; dims::Int = 1,
-             kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                      <:Any}, X::AbstractMatrix,
+             F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     T, N = size(pr.X)
     sigma = pr.sigma
     q = ue.q * 0.5
@@ -53,9 +53,9 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                         <:Any}, X::AbstractMatrix, args...; dims::Int = 1,
-                kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                         <:Any}, X::AbstractMatrix,
+                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     sigma = pr.sigma
     q = ue.q * 0.5
     mu_u = cquantile(Normal(), q) * sqrt.(diag(sigma / size(pr.X, 1))) * 2
@@ -64,9 +64,9 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
 function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any,
-                                            <:Any, <:Any}, X::AbstractMatrix, args...;
-                   dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                            <:Any, <:Any}, X::AbstractMatrix,
+                   F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     T, N = size(pr.X)
     sigma = pr.sigma
     q = ue.q * 0.5
@@ -92,9 +92,9 @@ end
 function ucs(ue::NormalUncertaintySet{<:Any,
                                       <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
                                                                        <:Any}, <:Any, <:Any,
-                                      <:Any}, X::AbstractMatrix, args...; dims::Int = 1,
-             kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                      <:Any}, X::AbstractMatrix,
+             F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, mu, sigma) = pr
     T, N = size(X)
     sigma_mu = sigma / T
@@ -126,9 +126,9 @@ end
 function ucs(ue::NormalUncertaintySet{<:Any,
                                       <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
                                                                        <:Any}, <:Any, <:Any,
-                                      <:Any}, X::AbstractMatrix, args...; dims::Int = 1,
-             kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                      <:Any}, X::AbstractMatrix,
+             F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
@@ -148,9 +148,9 @@ function ucs(ue::NormalUncertaintySet{<:Any,
                                  class = SigmaEllipseUncertaintySet())
 end
 function ucs(ue::NormalUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
-                                      <:Any, <:Any, <:Any}, X::AbstractMatrix, args...;
-             dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                      <:Any, <:Any, <:Any}, X::AbstractMatrix,
+             F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
@@ -172,9 +172,9 @@ end
 function mu_ucs(ue::NormalUncertaintySet{<:Any,
                                          <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
                                                                           <:Any}, <:Any,
-                                         <:Any, <:Any}, X::AbstractMatrix, args...;
-                dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                         <:Any, <:Any}, X::AbstractMatrix,
+                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, mu, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
@@ -193,9 +193,9 @@ end
 function mu_ucs(ue::NormalUncertaintySet{<:Any,
                                          <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
                                                                           <:Any}, <:Any,
-                                         <:Any, <:Any}, X::AbstractMatrix, args...;
-                dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                         <:Any, <:Any}, X::AbstractMatrix,
+                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
@@ -209,9 +209,9 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
 end
 function mu_ucs(ue::NormalUncertaintySet{<:Any,
                                          <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
-                                         <:Any, <:Any, <:Any}, X::AbstractMatrix, args...;
-                dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                         <:Any, <:Any, <:Any}, X::AbstractMatrix,
+                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
@@ -226,9 +226,9 @@ end
 function sigma_ucs(ue::NormalUncertaintySet{<:Any,
                                             <:EllipseUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
                                                                              <:Any}, <:Any,
-                                            <:Any, <:Any}, X::AbstractMatrix, args...;
-                   dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                            <:Any, <:Any}, X::AbstractMatrix,
+                   F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, sigma) = pr
     T, N = size(X)
     sigma_mu = sigma / T
@@ -255,9 +255,9 @@ end
 function sigma_ucs(ue::NormalUncertaintySet{<:Any,
                                             <:EllipseUncertaintySetAlgorithm{<:ChiSqKUncertaintyAlgorithm,
                                                                              <:Any}, <:Any,
-                                            <:Any, <:Any}, X::AbstractMatrix, args...;
-                   dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+                                            <:Any, <:Any}, X::AbstractMatrix,
+                   F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
@@ -276,7 +276,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
                                             <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
                                             <:Any, <:Any, <:Any}, X::AbstractMatrix,
                    args...; dims::Int = 1, kwargs...)
-    pr = prior(ue.pe, X, args...; dims = dims, kwargs...)
+    pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, sigma) = pr
     T = size(X, 1)
     sigma_mu = sigma / T
