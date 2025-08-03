@@ -275,7 +275,7 @@ end
 function sigma_ucs(ue::NormalUncertaintySet{<:Any,
                                             <:EllipseUncertaintySetAlgorithm{<:Any, <:Any},
                                             <:Any, <:Any, <:Any}, X::AbstractMatrix,
-                   args...; dims::Int = 1, kwargs...)
+                   F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; X, sigma) = pr
     T = size(X, 1)
