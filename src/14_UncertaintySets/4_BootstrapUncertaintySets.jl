@@ -148,8 +148,8 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:A
                                  class = SigmaEllipseUncertaintySet())
 end
 function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix, F;
-                dims::Int = 1, kwargs...)
+                                       <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
+                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     mus = mu_bootstrap_generator(ue, pr.X; kwargs...)
@@ -168,8 +168,8 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, 
                                  class = MuEllipseUncertaintySet())
 end
 function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipseUncertaintySetAlgorithm, <:Any,
-                                          <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix, F;
-                   dims::Int = 1, kwargs...)
+                                          <:Any, <:Any, <:Any, <:Any}, X::AbstractMatrix,
+                   F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     N = size(pr.X, 2)
     sigmas = sigma_bootstrap_generator(ue, pr.X; kwargs...)
