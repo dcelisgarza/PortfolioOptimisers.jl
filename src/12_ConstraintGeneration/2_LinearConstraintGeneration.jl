@@ -290,7 +290,7 @@ function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = F
     return ParsingResult(variables, coefficients, opstr, rhs_val, formatted)
 end
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
-                        datatype::DataType = Float64)
+                        datatype::DataType = Float64, kwargs...)
     if occursin("++", eqn)
         throw(Meta.ParseError("Invalid operator '++' detected in equation."))
     end
@@ -313,7 +313,7 @@ function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
     return _parse_equation(lexpr, opstr, rexpr, datatype)
 end
 function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
-                        datatype::DataType = Float64)
+                        datatype::DataType = Float64, kwargs...)
     # 1. Identify the comparison operator in the expression
     if expr.head != :call || !(expr.args[1] in ops2[2:end])
         error("Expression must be a comparison $(join(ops2,", ")):\n$expr")
