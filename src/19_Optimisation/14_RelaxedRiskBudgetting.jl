@@ -10,28 +10,29 @@ function RegularisedPenalisedRelaxedRiskBudgetting(; p::Real = 1.0)
 end
 struct RelaxedRiskBudgetting{T1, T2, T3, T4} <: JuMPOptimisationEstimator
     opt::T1
-    w::T2
+    rkb::T2
     wi::T3
     alg::T4
 end
 function RelaxedRiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
-                               w::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                               rkb::Union{Nothing, <:RiskBudgetEstimator,
+                                          <:RiskBudgetResult} = nothing,
                                wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                alg::RelaxedRiskBudgettingAlgorithm = BasicRelaxedRiskBudgetting())
-    if isa(w, AbstractVector)
-        @smart_assert(!isempty(w))
+    if isa(rkb, AbstractVector)
+        @smart_assert(!isempty(rkb))
     end
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
-    return RelaxedRiskBudgetting(opt, w, wi, alg)
+    return RelaxedRiskBudgetting(opt, rkb, wi, alg)
 end
 function opt_view(rrb::RelaxedRiskBudgetting, i::AbstractVector, X::AbstractMatrix)
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
-    w = nothing_scalar_array_view(rrb.w, i)
+    rkb = risk_budget_view(rrb.rkb, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
-    return RelaxedRiskBudgetting(; opt = opt, w = w, wi = wi, alg = rrb.alg)
+    return RelaxedRiskBudgetting(; opt = opt, rkb = rkb, wi = wi, alg = rrb.alg)
 end
 function set_relaxed_risk_budgetting_alg_constraints!(::BasicRelaxedRiskBudgetting,
                                                       model::JuMP.Model,
@@ -86,12 +87,9 @@ function set_relaxed_risk_budgetting_constraints!(model::JuMP.Model,
                                                   sigma::AbstractMatrix)
     w = model[:w]
     N = length(w)
-    rkb = rrb.w
-    if isnothing(rkb)
-        rkb = range(; start = inv(N), stop = inv(N), length = N)
-    else
-        @smart_assert(length(rkb) == N)
-    end
+    rkb = risk_budget_constraints(rrb.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict,
+                                  datatype = eltype(sigma))
+    rb = rkb.val
     sc = model[:sc]
     @variables(model, begin
                    psi >= 0
@@ -105,11 +103,11 @@ function set_relaxed_risk_budgetting_constraints!(model::JuMP.Model,
                      crrp, sc * (zeta - sigma * w) == 0
                      crrp_soc[i = 1:N],
                      [sc * (w[i] + zeta[i])
-                      sc * (2 * gamma * sqrt(rkb[i]))
+                      sc * (2 * gamma * sqrt(rb[i]))
                       sc * (w[i] - zeta[i])] in SecondOrderCone()
                  end)
     set_relaxed_risk_budgetting_alg_constraints!(rrb.alg, model, sigma)
-    return nothing
+    return rkb
 end
 function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
@@ -135,19 +133,22 @@ function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult
     set_l1_regularisation!(model, rrb.opt.l1)
     set_l2_regularisation!(model, rrb.opt.l2)
     set_non_fixed_fees!(model, fees)
-    set_relaxed_risk_budgetting_constraints!(model, rrb, pr.sigma)
+    prb = set_relaxed_risk_budgetting_constraints!(model, rrb, pr.sigma)
     set_return_constraints!(model, ret, MinimumRisk(), pr; rd = rd)
     set_sdp_philogeny_constraints!(model, nplg, :sdp_nplg)
     set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
     add_custom_constraint!(model, rrb.opt.ccnt, rrb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rrb.opt.cobj, rrb, pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(pr.X))
-    return JuMPOptimisation(typeof(rrb),
-                            ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent,
-                                                             gcard, sgcard, smtx, sgmtx,
-                                                             slt, sst, sglt, sgst, nplg,
-                                                             cplg, tn, fees, ret), retcode,
-                            sol, ifelse(save, model, nothing))
+    return JuMPOptimisationRiskBudgetting(typeof(rrb),
+                                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st,
+                                                                           lcs, cent, gcard,
+                                                                           sgcard, smtx,
+                                                                           sgmtx, slt, sst,
+                                                                           sglt, sgst, nplg,
+                                                                           cplg, tn, fees,
+                                                                           ret), prb,
+                                          retcode, sol, ifelse(save, model, nothing))
 end
 
 export BasicRelaxedRiskBudgetting, RegularisedRelaxedRiskBudgetting,

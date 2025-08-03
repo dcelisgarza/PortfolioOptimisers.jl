@@ -1,34 +1,28 @@
 abstract type RiskBudgettingAlgorithm <: OptimisationAlgorithm end
 struct AssetRiskBudgetting{T1} <: RiskBudgettingAlgorithm
-    w::T1
+    rkb::T1
 end
-function AssetRiskBudgetting(; w::Union{Nothing, <:AbstractVector} = nothing)
-    if isa(w, AbstractVector)
-        @smart_assert(!isempty(w))
-    end
-    return AssetRiskBudgetting(w)
+function AssetRiskBudgetting(;
+                             rkb::Union{Nothing, <:RiskBudgetEstimator, <:RiskBudgetResult} = nothing)
+    return AssetRiskBudgetting(rkb)
 end
 function risk_budgetting_algorithm_view(r::AssetRiskBudgetting, i::AbstractVector)
-    w = nothing_scalar_array_view(r.w, i)
-    return AssetRiskBudgetting(; w = w)
+    return AssetRiskBudgetting(; rkb = risk_budget_view(r.rkb, i))
 end
 struct FactorRiskBudgetting{T1, T2, T3} <: RiskBudgettingAlgorithm
     re::T1
-    w::T2
+    rkb::T2
     flag::T3
 end
 function FactorRiskBudgetting(;
                               re::Union{<:Regression, <:AbstractRegressionEstimator} = StepwiseRegression(),
-                              w::Union{Nothing, <:AbstractVector} = nothing,
-                              flag::Bool = true)
-    if isa(w, AbstractVector)
-        @smart_assert(!isempty(w))
-    end
-    return FactorRiskBudgetting(re, w, flag)
+                              rkb::Union{Nothing, <:RiskBudgetEstimator,
+                                         <:RiskBudgetResult} = nothing, flag::Bool = true)
+    return FactorRiskBudgetting(re, rkb, flag)
 end
 function risk_budgetting_algorithm_view(r::FactorRiskBudgetting, i::AbstractVector)
     re = regression_view(r.re, i)
-    return FactorRiskBudgetting(; re = re, w = r.w, flag = r.flag)
+    return FactorRiskBudgetting(; re = re, rkb = r.rkb, flag = r.flag)
 end
 struct RiskBudgetting{T1, T2, T3, T4} <: JuMPOptimisationEstimator
     opt::T1
@@ -46,6 +40,9 @@ function RiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
+    if isa(alg.rkb, RiskBudgetEstimator)
+        @smart_assert(!isnothing(opt.sets))
+    end
     return RiskBudgetting(opt, r, alg, wi)
 end
 function opt_view(rb::RiskBudgetting, i::AbstractVector, X::AbstractMatrix)
@@ -56,14 +53,16 @@ function opt_view(rb::RiskBudgetting, i::AbstractVector, X::AbstractMatrix)
     wi = nothing_scalar_array_view(rb.wi, i)
     return RiskBudgetting(; opt = opt, r = r, alg = alg, wi = wi)
 end
-function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgetting, w)
+function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgetting,
+                                           w::AbstractVector{<:AbstractJuMPScalar},
+                                           sets::Union{Nothing, <:AssetSets} = nothing;
+                                           strict::Bool = false,
+                                           datatype::DataType = Float64)
     N = length(w)
-    rkb = rb.alg.w
-    if isnothing(rkb)
-        rkb = range(; start = inv(N), stop = inv(N), length = N)
-    else
-        @smart_assert(length(rkb) == N)
-    end
+    rkb = risk_budget_constraints(rb.alg.rkb, sets; N = N, strict = strict,
+                                  datatype = datatype)
+    rb = rkb.val
+    @smart_assert(length(rb) == N)
     sc = model[:sc]
     @variables(model, begin
                    k
@@ -74,28 +73,33 @@ function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgetting
                  begin
                      clog_w[i = 1:N],
                      [sc * log_w[i], sc, sc * w[i]] in MOI.ExponentialCone()
-                     crkb, sc * (dot(rkb, log_w) - c) >= 0
+                     crkb, sc * (dot(rb, log_w) - c) >= 0
                  end)
-    return nothing
+    return rkb
 end
 function set_risk_budgetting_constraints!(model::JuMP.Model,
                                           rb::RiskBudgetting{<:Any, <:Any,
                                                              <:AssetRiskBudgetting, <:Any},
+                                          sets::Union{Nothing, <:AssetSets},
                                           pr::AbstractPriorResult, wb::WeightBounds,
                                           args...)
     set_w!(model, pr.X, rb.wi)
-    _set_risk_budgetting_constraints!(model, rb, model[:w])
+    rkb = _set_risk_budgetting_constraints!(model, rb, model[:w], sets;
+                                            strict = rb.opt.strict, datatype = eltype(pr.X))
     set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
-    return nothing
+    return ProcessedAssetRiskBudgettingAttributes(rkb)
 end
 function set_risk_budgetting_constraints!(model::JuMP.Model,
                                           rb::RiskBudgetting{<:Any, <:Any,
                                                              <:FactorRiskBudgetting, <:Any},
-                                          ::Any, wb::WeightBounds, rd::ReturnsResult)
-    set_factor_risk_contribution_constraints!(model, rb.alg.re, rd, rb.alg.flag, rb.wi)
-    _set_risk_budgetting_constraints!(model, rb, model[:w1])
+                                          sets::Union{Nothing, <:AssetSets},
+                                          pr::AbstractPriorResult, wb::WeightBounds,
+                                          rd::ReturnsResult)
+    b1 = set_factor_risk_contribution_constraints!(model, rb.alg.re, rd, rb.alg.flag, rb.wi)
+    rkb = _set_risk_budgetting_constraints!(model, rb, model[:w1], sets;
+                                            strict = rb.opt.strict, datatype = eltype(pr.X))
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
-    return nothing
+    return ProcessedFactorRiskBudgettingAttributes(rkb, b1)
 end
 function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
@@ -105,7 +109,7 @@ function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
-    set_risk_budgetting_constraints!(model, rb, pr, wb, rd)
+    prb = set_risk_budgetting_constraints!(model, rb, rb.opt.sets, pr, wb, rd)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, rb.opt.lcm, :lcm_ineq, :lcm_eq)
@@ -126,12 +130,15 @@ function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims
     add_custom_constraint!(model, rb.opt.ccnt, rb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
-    return JuMPOptimisation(typeof(rb),
-                            ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent,
-                                                             gcard, sgcard, smtx, sgmtx,
-                                                             slt, sst, sglt, sgst, nplg,
-                                                             cplg, tn, fees, ret), retcode,
-                            sol, ifelse(save, model, nothing))
+    return JuMPOptimisationRiskBudgetting(typeof(rb),
+                                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st,
+                                                                           lcs, cent, gcard,
+                                                                           sgcard, smtx,
+                                                                           sgmtx, slt, sst,
+                                                                           sglt, sgst, nplg,
+                                                                           cplg, tn, fees,
+                                                                           ret), prb,
+                                          retcode, sol, ifelse(save, model, nothing))
 end
 
 export AssetRiskBudgetting, FactorRiskBudgetting, RiskBudgetting

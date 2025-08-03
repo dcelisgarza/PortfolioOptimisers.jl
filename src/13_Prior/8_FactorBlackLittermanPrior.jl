@@ -20,16 +20,7 @@ function FactorBlackLittermanPrior(;
                                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                    re::AbstractRegressionEstimator = StepwiseRegression(),
                                    ve::AbstractVarianceEstimator = SimpleVariance(),
-                                   views::Union{<:AbstractString, Expr,
-                                                <:AbstractVector{<:AbstractString},
-                                                <:AbstractVector{Expr},
-                                                <:AbstractVector{<:Union{<:AbstractString,
-                                                                         Expr}}
-                                                # #! Start: to delete
-                                                # <:BlackLittermanViewsEstimator,
-                                                # <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                                # #! End: to delete
-                                                },
+                                   views::LinearConstraintEstimator,
                                    sets::Union{<:AssetSets,
                                                #! Start: to delete
                                                <:DataFrame
@@ -40,15 +31,10 @@ function FactorBlackLittermanPrior(;
                                    rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
                                    tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)
     if isa(views_conf, AbstractVector)
-        @smart_assert(isa(views, AbstractVector))
-        @smart_assert(!isempty(views))
+        @smart_assert(isa(views.val, AbstractVector))
         @smart_assert(!isempty(views_conf))
-        @smart_assert(length(views) == length(views_conf))
+        @smart_assert(length(views.val) == length(views_conf))
         @smart_assert(all(x -> zero(x) < x < one(x), views_conf))
-    else
-        if isa(views, AbstractVector)
-            @smart_assert(!isempty(views))
-        end
     end
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))

@@ -74,41 +74,13 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
 end
 function EntropyPoolingPrior(;
                              pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
-                             mu_views::Union{Nothing, <:AbstractString, Expr,
-                                             <:AbstractVector{<:AbstractString},
-                                             <:AbstractVector{Expr},
-                                             <:AbstractVector{<:Union{<:AbstractString,
-                                                                      Expr}}} = nothing,
-                             var_views::Union{Nothing, <:AbstractString, Expr,
-                                              <:AbstractVector{<:AbstractString},
-                                              <:AbstractVector{Expr},
-                                              <:AbstractVector{<:Union{<:AbstractString,
-                                                                       Expr}}} = nothing,
-                             cvar_views::Union{Nothing, <:AbstractString, Expr,
-                                               <:AbstractVector{<:AbstractString},
-                                               <:AbstractVector{Expr},
-                                               <:AbstractVector{<:Union{<:AbstractString,
-                                                                        Expr}}} = nothing,
-                             sigma_views::Union{Nothing, <:AbstractString, Expr,
-                                                <:AbstractVector{<:AbstractString},
-                                                <:AbstractVector{Expr},
-                                                <:AbstractVector{<:Union{<:AbstractString,
-                                                                         Expr}}} = nothing,
-                             sk_views::Union{Nothing, <:AbstractString, Expr,
-                                             <:AbstractVector{<:AbstractString},
-                                             <:AbstractVector{Expr},
-                                             <:AbstractVector{<:Union{<:AbstractString,
-                                                                      Expr}}} = nothing,
-                             kt_views::Union{Nothing, <:AbstractString, Expr,
-                                             <:AbstractVector{<:AbstractString},
-                                             <:AbstractVector{Expr},
-                                             <:AbstractVector{<:Union{<:AbstractString,
-                                                                      Expr}}} = nothing,
-                             rho_views::Union{Nothing, <:AbstractString, Expr,
-                                              <:AbstractVector{<:AbstractString},
-                                              <:AbstractVector{Expr},
-                                              <:AbstractVector{<:Union{<:AbstractString,
-                                                                       Expr}}} = nothing,
+                             mu_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                             var_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                             cvar_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                             sigma_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                             sk_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                             kt_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
+                             rho_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
                              var_alpha::Real = 0.05, cvar_alpha::Real = 0.05,
                              sets::Union{Nothing, <:AssetSets} = nothing,
                              ds_opt::Union{Nothing, <:CVaREntropyPooling} = nothing,
@@ -116,27 +88,6 @@ function EntropyPoolingPrior(;
                              opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
                              w::Union{Nothing, AbstractVector} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
-    if isa(mu_views, AbstractVector)
-        @smart_assert(!isempty(mu_views))
-    end
-    if isa(var_views, AbstractVector)
-        @smart_assert(!isempty(var_views))
-    end
-    if isa(cvar_views, AbstractVector)
-        @smart_assert(!isempty(cvar_views))
-    end
-    if isa(sigma_views, AbstractVector)
-        @smart_assert(!isempty(sigma_views))
-    end
-    if isa(sk_views, AbstractVector)
-        @smart_assert(!isempty(sk_views))
-    end
-    if isa(kt_views, AbstractVector)
-        @smart_assert(!isempty(kt_views))
-    end
-    if isa(rho_views, AbstractVector)
-        @smart_assert(!isempty(rho_views))
-    end
     if isa(w, AbstractWeights)
         @smart_assert(!isempty(w))
     end
@@ -233,13 +184,9 @@ end
 function ep_mu_views!(mu_views::Nothing, args...; kwargs...)
     return nothing
 end
-function ep_mu_views!(mu_views::Union{<:AbstractString, Expr,
-                                      <:AbstractVector{<:AbstractString},
-                                      <:AbstractVector{Expr},
-                                      <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                      epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets;
-                      strict::Bool = false)
-    mu_views = parse_equation(mu_views)
+function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
+                      pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+    mu_views = parse_equation(mu_views.val; datatype = eltype(pr.X))
     mu_views = replace_group_by_assets(mu_views, sets, false, true, false)
     mu_views = replace_prior_views(mu_views, pr, sets, :mu; strict = strict)
     lcs = get_linear_constraints(mu_views, sets; datatype = eltype(pr.X), strict = strict)
@@ -269,13 +216,11 @@ end
 function ep_var_views!(var_views::Nothing, args...; kwargs...)
     return nothing
 end
-function ep_var_views!(var_views::Union{<:AbstractString, Expr,
-                                        <:AbstractVector{<:AbstractString},
-                                        <:AbstractVector{Expr},
-                                        <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                       epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets,
-                       alpha::Real; strict::Bool = false)
-    var_views = parse_equation(var_views)
+function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
+                       pr::AbstractPriorResult, sets::AssetSets, alpha::Real;
+                       strict::Bool = false)
+    var_views = parse_equation(var_views.val; ops1 = ("==", ">="),
+                               ops2 = (:call, :(==), :(>=)), datatype = eltype(pr.X))
     var_views = replace_group_by_assets(var_views, sets, false, true, false)
     var_views = replace_prior_views(var_views, pr, sets, :var, alpha; strict = strict)
     lcs = get_linear_constraints(var_views, sets; datatype = eltype(pr.X), strict = strict)
@@ -529,18 +474,14 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::
     #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
     return ConditionalValueatRisk(; alpha = alpha)(pr.X[:, i])
 end
-function ep_cvar_views_solve!(cvar_views::Union{<:AbstractString, Expr,
-                                                <:AbstractVector{<:AbstractString},
-                                                <:AbstractVector{Expr},
-                                                <:AbstractVector{<:Union{<:AbstractString,
-                                                                         Expr}}},
-                              epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets,
-                              alpha::Real, w::AbstractWeights,
-                              opt::AbstractEntropyPoolingOptimiser,
+function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
+                              pr::AbstractPriorResult, sets::AssetSets, alpha::Real,
+                              w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
                               ds_opt::Union{Nothing, <:CVaREntropyPooling},
                               dm_opt::Union{Nothing, <:OptimEntropyPooling};
                               strict::Bool = false)
-    cvar_views = parse_equation(cvar_views)
+    cvar_views = parse_equation(cvar_views.val; ops1 = ("==",), ops2 = (:call, :(==)),
+                                datatype = eltype(pr.x))
     cvar_views = replace_group_by_assets(cvar_views, sets, false, true, false)
     cvar_views = replace_prior_views(cvar_views, pr, sets, :cvar, alpha; strict = strict)
     lcs = get_linear_constraints(cvar_views, sets; datatype = eltype(pr.X), strict = strict)
@@ -613,14 +554,9 @@ end
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:sigma}, args...)
     return diag(pr.sigma)[i]
 end
-function ep_sigma_views!(sigma_views::Union{<:AbstractString, Expr,
-                                            <:AbstractVector{<:AbstractString},
-                                            <:AbstractVector{Expr},
-                                            <:AbstractVector{<:Union{<:AbstractString,
-                                                                     Expr}}},
-                         epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets;
-                         strict::Bool = false)
-    sigma_views = parse_equation(sigma_views)
+function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
+                         pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+    sigma_views = parse_equation(sigma_views.val; datatype = eltype(pr.X))
     sigma_views = replace_group_by_assets(sigma_views, sets, false, true, false)
     sigma_views = replace_prior_views(sigma_views, pr, sets, :sigma; strict = strict)
     lcs = get_linear_constraints(sigma_views, sets; datatype = eltype(pr.X),
@@ -745,13 +681,9 @@ function get_pr_value(pr::AbstractPriorResult, i::AbstractVector{<:Integer},
                       j::AbstractVector{<:Integer}, args...)
     return norm(cov2cor(pr.sigma)[i, j]) / length(i)
 end
-function ep_rho_views!(rho_views::Union{<:AbstractString, Expr,
-                                        <:AbstractVector{<:AbstractString},
-                                        <:AbstractVector{Expr},
-                                        <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                       epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets;
-                       strict::Bool = false)
-    rho_views = parse_equation(rho_views)
+function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
+                       pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+    rho_views = parse_equation(rho_views.val; datatype = eltype(pr.X))
     rho_views = replace_group_by_assets(rho_views, sets, false, true, true)
     rho_views = replace_prior_views(rho_views, pr, sets; strict = strict)
     to_fix = falses(size(pr.X, 2))
@@ -782,13 +714,9 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, args...
     #! Think about how to include pr.w
     return Skewness()([1], reshape(pr.X[:, i], :, 1))
 end
-function ep_sk_views!(skew_views::Union{<:AbstractString, Expr,
-                                        <:AbstractVector{<:AbstractString},
-                                        <:AbstractVector{Expr},
-                                        <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                      epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets;
-                      strict::Bool = false)
-    skew_views = parse_equation(skew_views)
+function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
+                      pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+    skew_views = parse_equation(skew_views.val; datatype = eltype(pr.X))
     skew_views = replace_group_by_assets(skew_views, sets, false, true, false)
     skew_views = replace_prior_views(skew_views, pr, sets, :skew; strict = strict)
     lcs = get_linear_constraints(skew_views, sets; datatype = eltype(pr.X), strict = strict)
@@ -814,14 +742,9 @@ function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, arg
                                                                                               :,
                                                                                               1))
 end
-function ep_kt_views!(kurtosis_views::Union{<:AbstractString, Expr,
-                                            <:AbstractVector{<:AbstractString},
-                                            <:AbstractVector{Expr},
-                                            <:AbstractVector{<:Union{<:AbstractString,
-                                                                     Expr}}},
-                      epc::AbstractDict, pr::AbstractPriorResult, sets::AssetSets;
-                      strict::Bool = false)
-    kurtosis_views = parse_equation(kurtosis_views)
+function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,
+                      pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+    kurtosis_views = parse_equation(kurtosis_views.val; datatype = eltype(pr.X))
     kurtosis_views = replace_group_by_assets(kurtosis_views, sets, false, true, false)
     kurtosis_views = replace_prior_views(kurtosis_views, pr, sets, :kurtosis;
                                          strict = strict)

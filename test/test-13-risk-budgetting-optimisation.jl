@@ -129,7 +129,10 @@
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
             opt = JuMPOptimiser(; pe = pr, slv = slv)
-            rb = RiskBudgetting(; r = r, opt = opt, alg = AssetRiskBudgetting(; w = 1:20))
+            rb = RiskBudgetting(; r = r, opt = opt,
+                                alg = AssetRiskBudgetting(;
+                                                          rkb = RiskBudgetResult(;
+                                                                                 val = 1:20)))
             res = optimise!(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)

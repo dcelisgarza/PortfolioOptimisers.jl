@@ -50,7 +50,6 @@
             @test success
         end
     end
-
     @testset "Factor Prior" begin
         pes = [FactorPrior(; rsd = false), FactorPrior(; rsd = true)]
         df = CSV.read(joinpath(@__DIR__, "./assets/FactorPrior1.csv.gz"), DataFrame)
@@ -117,4 +116,41 @@
         end
         @test success
     end
+    @testset "High Order Prior" begin
+        pr = prior(HighOrderPriorEstimator(), rd)
+        @test isapprox(pr.X, rd.X)
+        @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), rd.X)))
+        @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), rd.X))
+        @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Full()), rd.X))
+        @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Full()), rd.X)))
+
+        pe = HighOrderPriorEstimator(; kte = Cokurtosis(; alg = Semi()),
+                                     ske = Coskewness(; alg = Semi()))
+        pr = prior(pe, transpose(rd.X); dims = 2)
+        @test isapprox(pr.X, rd.X)
+        @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), rd.X)))
+        @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), rd.X))
+        @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Semi()), rd.X))
+        @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Semi()), rd.X)))
+
+        pe1 = FactorPrior(; re = DimensionReductionRegression(;), rsd = true)
+        pr1 = prior(pe1, rd)
+
+        pe2 = HighOrderPriorEstimator(; pe = pe1)
+        pr2 = prior(pe2, rd)
+        @test isa(pe2.me, SimpleExpectedReturns)
+        @test isa(pe2.ce, PortfolioOptimisersCovariance)
+
+        @test pr1.X == pr2.X
+        @test pr1.mu == pr2.mu
+        @test pr1.sigma == pr2.sigma
+        @test isapprox(pr2.kt,
+                       cokurtosis(Cokurtosis(; alg = Full()), pr2.X;
+                                  mean = transpose(pr2.mu)))
+        @test (pr2.sk, pr2.V) ==
+              coskewness(Coskewness(; alg = Full()), pr2.X; mean = transpose(pr2.mu))
+    end
+    # @testset "Black Litterman" begin
+
+    # end
 end

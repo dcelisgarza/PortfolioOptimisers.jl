@@ -69,6 +69,7 @@ function weight_bounds_view(wb::Union{<:AbstractString, Expr,
                                       <:WeightBoundsEstimator}, ::Any)
     return wb
 end
+#=
 function get_weight_bounds_constraints(lcs::Union{<:ParsingResult,
                                                   <:AbstractVector{<:ParsingResult}},
                                        sets::AssetSets; datatype::DataType = Float64,
@@ -110,6 +111,7 @@ function weight_bounds_constraints(eqn::Union{<:AbstractString, Expr,
     lcs = replace_group_by_assets(lcs, sets)
     return get_weight_bounds_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
+=#
 function get_weight_bounds(wb::Union{Nothing, <:Real, <:AbstractVector}, args...; kwargs...)
     return wb
 end

@@ -46,14 +46,18 @@ function get_black_litterman_views(lcs::Union{<:ParsingResult,
     end
 end
 function black_litterman_views(eqn::Union{<:AbstractString, Expr,
-                                          <:AbstractVector{<:AbstractString},
-                                          <:AbstractVector{Expr},
                                           <:AbstractVector{<:Union{<:AbstractString, Expr}}},
                                sets::AssetSets; datatype::DataType = Float64,
                                strict::Bool = false)
-    lcs = parse_equation(eqn; datatype = datatype)
+    lcs = parse_equation(eqn; ops1 = ("==",), ops2 = (:call, :(==)), datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, true)
     return get_black_litterman_views(lcs, sets; datatype = datatype, strict = strict)
+end
+function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
+                               datatype::DataType = Float64, strict::Bool = false,
+                               bl_flag::Bool = false)
+    return black_litterman_views(lcs.val, sets; datatype = datatype, strict = strict,
+                                 bl_flag = bl_flag)
 end
 #=
 #! Start: to delete

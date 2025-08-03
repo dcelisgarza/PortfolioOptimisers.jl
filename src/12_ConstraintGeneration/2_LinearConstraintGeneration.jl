@@ -289,17 +289,17 @@ function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = F
 
     return ParsingResult(variables, coefficients, opstr, rhs_val, formatted)
 end
-function parse_equation(eqn::AbstractString; datatype::DataType = Float64)
+function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
+                        datatype::DataType = Float64)
     if occursin("++", eqn)
         throw(Meta.ParseError("Invalid operator '++' detected in equation."))
     end
     # 1. Identify the comparison operator
-    ops = ("==", "<=", ">=")
-    op = findfirst(op -> occursin(op, eqn), ops)
+    op = findfirst(op -> occursin(op, eqn), ops1)
     if isnothing(op)
-        error("Equation must contain a comparison operator (==, <=, >=).\n$(eqn)")
+        error("Equation must contain a comparison operator $(join(ops1,", ")).\n$(eqn)")
     end
-    opstr = ops[op]
+    opstr = ops1[op]
     parts = split(eqn, opstr)
     if length(parts) != 2
         error("Equation must have exactly one comparison operator.\n$(eqn)")
@@ -312,21 +312,21 @@ function parse_equation(eqn::AbstractString; datatype::DataType = Float64)
     _rethrow_parse_error(rexpr, :rhs)
     return _parse_equation(lexpr, opstr, rexpr, datatype)
 end
-function parse_equation(expr::Expr; datatype::DataType = Float64)
+function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
+                        datatype::DataType = Float64)
     # 1. Identify the comparison operator in the expression
-    ops = (:call, :(==), :(<=), :(>=))
-    if expr.head != :call || !(expr.args[1] in (:(==), :(<=), :(>=)))
-        error("Expression must be a comparison (==, <=, >=):\n$expr")
+    if expr.head != :call || !(expr.args[1] in ops2[2:end])
+        error("Expression must be a comparison $(join(ops2,", ")):\n$expr")
     end
     opstr = string(expr.args[1])
     lhs, rhs = expr.args[2], expr.args[3]
     return _parse_equation(lhs, opstr, rhs, datatype)
 end
-function parse_equation(eqn::Union{<:AbstractVector{<:AbstractString},
-                                   <:AbstractVector{Expr},
-                                   <:AbstractVector{<:Union{<:AbstractString, Expr}}};
+function parse_equation(eqn::AbstractVector{<:Union{<:AbstractString, Expr}};
+                        ops1::Tuple = ("==", "<=", ">="),
+                        ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64)
-    return parse_equation.(eqn; datatype = datatype)
+    return parse_equation.(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
 end
 function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::Bool = false,
                                  prior_flag::Bool = false, rho_flag::Bool = false)
@@ -490,12 +490,15 @@ function linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwar
 end
 function linear_constraints(eqn::Union{<:AbstractString, Expr,
                                        <:AbstractVector{<:Union{<:AbstractString, Expr}}},
-                            sets::AssetSets; datatype::DataType = Float64,
-                            strict::Bool = false, bl_flag::Bool = false)
-    lcs = parse_equation(eqn; datatype = datatype)
+                            sets::AssetSets; ops1::Tuple = ("==", "<=", ">="),
+                            ops2::Tuple = (:call, :(==), :(<=), :(>=)),
+                            datatype::DataType = Float64, strict::Bool = false,
+                            bl_flag::Bool = false)
+    lcs = parse_equation(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
+#=
 function get_risk_budget_constraints(lcs::Union{<:ParsingResult,
                                                 <:AbstractVector{<:ParsingResult}},
                                      sets::AssetSets; datatype::DataType = Float64,
@@ -529,9 +532,63 @@ function risk_budget_constraints(eqn::Union{<:AbstractString, Expr,
                                                                      Expr}}},
                                  sets::AssetSets; datatype::DataType = Float64,
                                  strict::Bool = false)
-    lcs = parse_equation(eqn; datatype = datatype)
+    lcs = parse_equation(eqn; ops1 = ("==",), ops2 = (:call, :(==)), datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets)
     return get_risk_budget_constraints(lcs, sets; datatype = datatype, strict = strict)
+end
+=#
+struct RiskBudgetResult{T1} <: AbstractResult
+    val::T1
+end
+function RiskBudgetResult(; val::AbstractVector{<:Real})
+    @smart_assert(!isempty(val))
+    @smart_assert(all(x -> x >= zero(x), val))
+    return RiskBudgetResult(val)
+end
+function risk_budget_view(rb::RiskBudgetResult, i::AbstractVector)
+    val = nothing_scalar_array_view(rb.val, i)
+    return RiskBudgetResult(; val = val)
+end
+function risk_budget_constraints(::Nothing, args...; N::Real, datatype::DataType = Float64,
+                                 kwargs...)
+    iN = datatype(inv(N))
+    return RiskBudgetResult(; val = range(; start = iN, stop = iN, length = N))
+end
+function risk_budget_constraints(rb::RiskBudgetResult, args...; kwargs...)
+    return rb
+end
+function risk_budget_constraints(rb::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
+                                           <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                                 sets::AssetSets; N::Real = length(sets.dict[sets.key]),
+                                 strict::Bool = false, datatype::DataType = Float64)
+    val = estimator_to_val(rb, sets, inv(N); strict = strict, datatype = datatype)
+    return RiskBudgetResult(; val = val / sum(val))
+end
+struct RiskBudgetEstimator{T1} <: AbstractEstimator
+    val::T1
+end
+function RiskBudgetEstimator(;
+                             val::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
+                                        <:AbstractVector{<:Union{<:Pair{<:Any, <:Real}}}})
+    if isa(val, Union{<:AbstractDict, <:AbstractVector})
+        @smart_assert(!isempty(val))
+        if isa(val, AbstractDict)
+            @smart_assert(all(x -> x >= zero(x), values(val)))
+        elseif isa(val, AbstractVector{<:Pair})
+            @smart_assert(all(x -> x >= zero(x), getproperty.(val, :second)))
+        end
+    elseif isa(val, Pair)
+        @smart_assert(val.second >= zero(val.second))
+    end
+    return RiskBudgetEstimator(val)
+end
+function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
+    return rb
+end
+function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
+                                 strict::Bool = false, datatype::DataType = Float64,
+                                 kwargs...)
+    return risk_budget_constraints(rb.val, sets; strict = strict, datatype = datatype)
 end
 function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
     @smart_assert(haskey(sets.dict, smtx))
@@ -606,5 +663,5 @@ function asset_sets_matrix_view(smtx::AbstractVector{<:Union{Nothing, <:Abstract
 end
 
 export AssetSets, PartialLinearConstraint, LinearConstraintEstimator, LinearConstraint,
-       AssetSetsMatrixEstimator, parse_equation, replace_group_by_assets,
-       linear_constraints, asset_sets_matrix
+       AssetSetsMatrixEstimator, RiskBudgetResult, RiskBudgetEstimator, parse_equation,
+       replace_group_by_assets, linear_constraints, asset_sets_matrix

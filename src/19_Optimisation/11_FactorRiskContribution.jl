@@ -81,7 +81,7 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
     set_maximum_ratio_factor_variables!(model, pr.mu, frc.obj)
-    b1 = set_risk_budgetting_constraints!(model, frc.re, rd, frc.flag, frc.wi)
+    b1 = set_factor_risk_contribution_constraints!(model, frc.re, rd, frc.flag, frc.wi)
     set_weight_constraints!(model, wb, frc.opt.bgt, frc.opt.sbgt)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)

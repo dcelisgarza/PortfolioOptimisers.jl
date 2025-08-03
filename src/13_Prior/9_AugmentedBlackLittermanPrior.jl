@@ -22,26 +22,8 @@ function AugmentedBlackLittermanPrior(;
                                       mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                       re::AbstractRegressionEstimator = StepwiseRegression(),
                                       ve::AbstractVarianceEstimator = SimpleVariance(),
-                                      a_views::Union{<:AbstractString, Expr,
-                                                     <:AbstractVector{<:AbstractString},
-                                                     <:AbstractVector{Expr},
-                                                     <:AbstractVector{<:Union{<:AbstractString,
-                                                                              Expr}}
-                                                     #  #! Start: to delete
-                                                     #  <:BlackLittermanViewsEstimator,
-                                                     #  <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                                     #  #! End: to delete
-                                                     },
-                                      f_views::Union{<:AbstractString, Expr,
-                                                     <:AbstractVector{<:AbstractString},
-                                                     <:AbstractVector{Expr},
-                                                     <:AbstractVector{<:Union{<:AbstractString,
-                                                                              Expr}}
-                                                     #  #! Start: to delete
-                                                     #  <:BlackLittermanViewsEstimator,
-                                                     #  <:AbstractVector{<:BlackLittermanViewsEstimator}
-                                                     #  #! End: to delete
-                                                     },
+                                      a_views::LinearConstraintEstimator,
+                                      f_views::LinearConstraintEstimator,
                                       a_sets::Union{<:AssetSets,
                                                     #! Start: to delete
                                                     <:DataFrame
@@ -61,26 +43,16 @@ function AugmentedBlackLittermanPrior(;
         @smart_assert(!isempty(w))
     end
     if isa(a_views_conf, AbstractVector)
-        @smart_assert(isa(a_views, AbstractVector))
-        @smart_assert(!isempty(a_views))
+        @smart_assert(isa(a_views.val, AbstractVector))
         @smart_assert(!isempty(a_views_conf))
-        @smart_assert(length(a_views) == length(a_views_conf))
+        @smart_assert(length(a_views.val) == length(a_views_conf))
         @smart_assert(all(x -> zero(x) < x < one(x), a_views_conf))
-    else
-        if isa(a_views, AbstractVector)
-            @smart_assert(!isempty(a_views))
-        end
     end
     if isa(f_views_conf, AbstractVector)
-        @smart_assert(isa(f_views, AbstractVector))
-        @smart_assert(!isempty(f_views))
+        @smart_assert(isa(f_views.val, AbstractVector))
         @smart_assert(!isempty(f_views_conf))
-        @smart_assert(length(f_views) == length(f_views_conf))
+        @smart_assert(length(f_views.val) == length(f_views_conf))
         @smart_assert(all(x -> zero(x) < x < one(x), f_views_conf))
-    else
-        if isa(f_views, AbstractVector)
-            @smart_assert(!isempty(f_views))
-        end
     end
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))

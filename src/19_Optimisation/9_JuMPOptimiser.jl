@@ -20,6 +20,13 @@ struct ProcessedJuMPOptimiserAttributes{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10,
     fees::T18
     ret::T19
 end
+struct ProcessedFactorRiskBudgettingAttributes{T1, T2} <: AbstractResult
+    rkb::T1
+    b1::T2
+end
+struct ProcessedAssetRiskBudgettingAttributes{T1} <: AbstractResult
+    rkb::T1
+end
 struct JuMPOptimisation{T1, T2, T3, T4, T5} <: OptimisationResult
     oe::T1
     pa::T2
@@ -36,6 +43,14 @@ struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
     retcode::T5
     sol::T6
     model::T7
+end
+struct JuMPOptimisationRiskBudgetting{T1, T2, T3, T4, T5, T6} <: OptimisationResult
+    oe::T1
+    pa::T2
+    prb::T3
+    retcode::T4
+    sol::T5
+    model::T6
 end
 function Base.getproperty(r::Union{<:JuMPOptimisation,
                                    <:JuMPOptimisationFactorRiskContribution}, sym::Symbol)
@@ -77,6 +92,55 @@ function Base.getproperty(r::Union{<:JuMPOptimisation,
         r.pa.fees
     elseif sym == :ret
         r.pa.ret
+    elseif sym == :w
+        !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, :w)
+    else
+        getfield(r, sym)
+    end
+end
+function Base.getproperty(r::JuMPOptimisationRiskBudgetting, sym::Symbol)
+    return if sym == :pr
+        r.pa.pr
+    elseif sym == :wb
+        r.pa.wb
+    elseif sym == :lt
+        r.pa.lt
+    elseif sym == :st
+        r.pa.st
+    elseif sym == :lcs
+        r.pa.lcs
+    elseif sym == :cent
+        r.pa.cent
+    elseif sym == :gcard
+        r.pa.gcard
+    elseif sym == :sgcard
+        r.pa.sgcard
+    elseif sym == :smtx
+        r.pa.smtx
+    elseif sym == :slt
+        r.pa.slt
+    elseif sym == :sst
+        r.pa.sst
+    elseif sym == :sgmtx
+        r.pa.sgmtx
+    elseif sym == :sglt
+        r.pa.sglt
+    elseif sym == :sgst
+        r.pa.sgst
+    elseif sym == :nplg
+        r.pa.nplg
+    elseif sym == :cplg
+        r.pa.cplg
+    elseif sym == :tn
+        r.pa.tn
+    elseif sym == :fees
+        r.pa.fees
+    elseif sym == :ret
+        r.pa.ret
+    elseif sym == :rkb
+        r.prb.rkb
+    elseif sym == :b1
+        r.prb.b1
     elseif sym == :w
         !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, :w)
     else
@@ -425,4 +489,5 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                          l1 = opt.l1, l2 = opt.l2, ss = opt.ss, strict = opt.strict)
 end
 
-export ProcessedJuMPOptimiserAttributes, JuMPOptimisation, JuMPOptimiser
+export ProcessedJuMPOptimiserAttributes, JuMPOptimisation, JuMPOptimisationRiskBudgetting,
+       JuMPOptimisationFactorRiskContribution, JuMPOptimiser
