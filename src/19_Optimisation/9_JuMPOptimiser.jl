@@ -52,99 +52,31 @@ struct JuMPOptimisationRiskBudgetting{T1, T2, T3, T4, T5, T6} <: OptimisationRes
     sol::T5
     model::T6
 end
-function Base.getproperty(r::Union{<:JuMPOptimisation,
-                                   <:JuMPOptimisationFactorRiskContribution}, sym::Symbol)
-    return if sym == :pr
-        r.pa.pr
-    elseif sym == :wb
-        r.pa.wb
-    elseif sym == :lt
-        r.pa.lt
-    elseif sym == :st
-        r.pa.st
-    elseif sym == :lcs
-        r.pa.lcs
-    elseif sym == :cent
-        r.pa.cent
-    elseif sym == :gcard
-        r.pa.gcard
-    elseif sym == :sgcard
-        r.pa.sgcard
-    elseif sym == :smtx
-        r.pa.smtx
-    elseif sym == :slt
-        r.pa.slt
-    elseif sym == :sst
-        r.pa.sst
-    elseif sym == :sgmtx
-        r.pa.sgmtx
-    elseif sym == :sglt
-        r.pa.sglt
-    elseif sym == :sgst
-        r.pa.sgst
-    elseif sym == :nplg
-        r.pa.nplg
-    elseif sym == :cplg
-        r.pa.cplg
-    elseif sym == :tn
-        r.pa.tn
-    elseif sym == :fees
-        r.pa.fees
-    elseif sym == :ret
-        r.pa.ret
-    elseif sym == :w
-        !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, :w)
-    else
+function Base.getproperty(r::JuMPOptimisation, sym::Symbol)
+    return if sym == :w
+        !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
+    elseif sym in (:oe, :pa, :retcode, :sol, :model)
         getfield(r, sym)
+    else
+        getfield(r.pa, sym)
+    end
+end
+function Base.getproperty(r::JuMPOptimisationFactorRiskContribution, sym::Symbol)
+    return if sym == :w
+        !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
+    elseif sym in (:oe, :pa, :frc_nplg, :frc_cplg, :retcode, :sol, :model)
+        getfield(r, sym)
+    else
+        getfield(r.pa, sym)
     end
 end
 function Base.getproperty(r::JuMPOptimisationRiskBudgetting, sym::Symbol)
-    return if sym == :pr
-        r.pa.pr
-    elseif sym == :wb
-        r.pa.wb
-    elseif sym == :lt
-        r.pa.lt
-    elseif sym == :st
-        r.pa.st
-    elseif sym == :lcs
-        r.pa.lcs
-    elseif sym == :cent
-        r.pa.cent
-    elseif sym == :gcard
-        r.pa.gcard
-    elseif sym == :sgcard
-        r.pa.sgcard
-    elseif sym == :smtx
-        r.pa.smtx
-    elseif sym == :slt
-        r.pa.slt
-    elseif sym == :sst
-        r.pa.sst
-    elseif sym == :sgmtx
-        r.pa.sgmtx
-    elseif sym == :sglt
-        r.pa.sglt
-    elseif sym == :sgst
-        r.pa.sgst
-    elseif sym == :nplg
-        r.pa.nplg
-    elseif sym == :cplg
-        r.pa.cplg
-    elseif sym == :tn
-        r.pa.tn
-    elseif sym == :fees
-        r.pa.fees
-    elseif sym == :ret
-        r.pa.ret
-    elseif sym == :rkb
-        r.prb.rkb
-    elseif sym == :b1
-        r.prb.b1
-    elseif sym == :w
-        !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, :w)
-    else
+    return if sym == :w
+        r.sol.w
+    elseif sym in (:oe, :pa, :prb, :retcode, :sol, :model)
         getfield(r, sym)
+    else
+        getfield(r.pa, sym)
     end
 end
 function assert_finite_nonnegative_real_or_vec(val::Real)

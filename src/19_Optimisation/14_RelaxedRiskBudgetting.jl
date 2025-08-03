@@ -19,9 +19,6 @@ function RelaxedRiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
                                           <:RiskBudgetResult} = nothing,
                                wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                alg::RelaxedRiskBudgettingAlgorithm = BasicRelaxedRiskBudgetting())
-    if isa(rkb, AbstractVector)
-        @smart_assert(!isempty(rkb))
-    end
     if isa(wi, AbstractVector)
         @smart_assert(!isempty(wi))
     end
