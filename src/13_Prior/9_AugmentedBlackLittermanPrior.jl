@@ -90,8 +90,8 @@ function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractM
         X = transpose(X)
         F = transpose(F)
     end
-    @smart_assert(nrow(pe.a_sets) == size(X, 2))
-    @smart_assert(nrow(pe.f_sets) == size(F, 2))
+    @smart_assert(length(pe.a_sets.dict[pe.a_sets.key]) == size(X, 2))
+    @smart_assert(length(pe.f_sets.dict[pe.f_sets.key]) == size(F, 2))
     if !isnothing(pe.l)
         w = if !isnothing(pe.w)
             @smart_assert(length(pe.w) == size(X, 2))

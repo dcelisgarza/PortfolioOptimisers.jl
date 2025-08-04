@@ -65,6 +65,7 @@ function prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatr
         X = transpose(X)
         F = transpose(F)
     end
+    @smart_assert(length(pe.sets.dict[pe.sets.key]) == size(F, 2))
     # Factor prior.
     f_prior = prior(pe.pe, F; strict = strict)
     f_prior_mu, f_prior_sigma = f_prior.mu, f_prior.sigma

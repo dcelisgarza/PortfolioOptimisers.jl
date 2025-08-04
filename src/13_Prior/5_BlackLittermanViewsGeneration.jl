@@ -54,10 +54,8 @@ function black_litterman_views(eqn::Union{<:AbstractString, Expr,
     return get_black_litterman_views(lcs, sets; datatype = datatype, strict = strict)
 end
 function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
-                               datatype::DataType = Float64, strict::Bool = false,
-                               bl_flag::Bool = false)
-    return black_litterman_views(lcs.val, sets; datatype = datatype, strict = strict,
-                                 bl_flag = bl_flag)
+                               datatype::DataType = Float64, strict::Bool = false)
+    return black_litterman_views(lcs.val, sets; datatype = datatype, strict = strict)
 end
 #=
 #! Start: to delete

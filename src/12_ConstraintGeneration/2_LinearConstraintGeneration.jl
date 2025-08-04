@@ -297,7 +297,7 @@ function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
     # 1. Identify the comparison operator
     op = findfirst(op -> occursin(op, eqn), ops1)
     if isnothing(op)
-        error("Equation must contain a comparison operator $(join(ops1,", ")).\n$(eqn)")
+        error("Equation must contain a valid comparison operator $(join(ops1,", ")) .\n$(eqn)")
     end
     opstr = ops1[op]
     parts = split(eqn, opstr)
@@ -316,7 +316,7 @@ function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64, kwargs...)
     # 1. Identify the comparison operator in the expression
     if expr.head != :call || !(expr.args[1] in ops2[2:end])
-        error("Expression must be a comparison $(join(ops2,", ")):\n$expr")
+        error("Expression must be a valid comparison $(join(ops2,", ")) .\n$expr")
     end
     opstr = string(expr.args[1])
     lhs, rhs = expr.args[2], expr.args[3]

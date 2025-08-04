@@ -1,5 +1,6 @@
 @safetestset "Prior" begin
-    using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, StatsBase
+    using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, StatsBase,
+          CovarianceEstimation
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -24,6 +25,13 @@
                                      timestamp = :Date)[(end - 252 * 4):end],
                            TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
                                      timestamp = :Date)[(end - 252 * 4):end])
+    sets = AssetSets(;
+                     dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
+                                 "group2" => rd.nx[2:2:end],
+                                 "clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
+                                                 3, 3, 3, 3, 3, 3],
+                                 "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
+                                                 3, 1, 2, 3, 1, 2]))
     @testset "Empirical Prior" begin
         pes = [EmpiricalPrior(), EmpiricalPrior(; horizon = 252)]
         df = CSV.read(joinpath(@__DIR__, "./assets/EmpiricalPrior.csv.gz"), DataFrame)
@@ -150,7 +158,35 @@
         @test (pr2.sk, pr2.V) ==
               coskewness(Coskewness(; alg = Full()), pr2.X; mean = transpose(pr2.mu))
     end
-    # @testset "Black Litterman" begin
+    @testset "Black Litterman" begin
+        fsets = AssetSets(; dict = Dict("nx" => rd.nf))
+        df = CSV.read(joinpath(@__DIR__, "./assets/BlackLitterman.csv.gz"), DataFrame)
+        pes = [BlackLittermanPrior(; sets = sets, tau = 1 / size(rd.X, 1),
+                                   views = LinearConstraintEstimator(;
+                                                                     val = ["AAPL == 0.00002",
+                                                                            "BAC == CVX",
+                                                                            "WMT == group2",
+                                                                            "RRC-group1 == 0.0005"])),
+               BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = EmpiricalPrior(;)),
+                                           sets = fsets, tau = 1 / size(rd.X, 1),
+                                           views = LinearConstraintEstimator(;
+                                                                             val = ["MTUM == 0.0001",
+                                                                                    "QUAL - USMV == -0.0003"]))]
+        for (i, pe) in enumerate(pes)
+            pr = prior(pe, rd)
+            success = isapprox(pr.mu, df[1:20, i]; rtol = 1e-6)
+            if !success
+                println("Mu $i fails")
+                find_tol(pr.mu, df[1:20, i])
+            end
+            @test success
 
-    # end
+            success = isapprox(vec(pr.sigma), df[21:420, i]; rtol = 1e-6)
+            if !success
+                println("Sigma $i fails")
+                find_tol(vec(pr.sigma), df[21:420, i])
+            end
+            @test success
+        end
+    end
 end

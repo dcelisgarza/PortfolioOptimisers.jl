@@ -55,7 +55,7 @@ function prior(pe::BlackLittermanPrior, X::AbstractMatrix,
             F = transpose(F)
         end
     end
-    @smart_assert(nrow(pe.sets) == size(X, 2))
+    @smart_assert(length(pe.sets.dict[pe.sets.key]) == size(X, 2))
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
     (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
