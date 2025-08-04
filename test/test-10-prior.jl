@@ -158,7 +158,7 @@
         @test (pr2.sk, pr2.V) ==
               coskewness(Coskewness(; alg = Full()), pr2.X; mean = transpose(pr2.mu))
     end
-    @testset "Black Litterman" begin
+    @testset "Vanilla and Bayesian Black Litterman" begin
         fsets = AssetSets(; dict = Dict("nx" => rd.nf))
         df = CSV.read(joinpath(@__DIR__, "./assets/BlackLitterman.csv.gz"), DataFrame)
         pes = [BlackLittermanPrior(; sets = sets, tau = 1 / size(rd.X, 1),
@@ -189,4 +189,49 @@
             @test success
         end
     end
+    @testset "Factor Black Litterman" begin
+        df = CSV.read(joinpath(@__DIR__, "./assets/FactorBlackLitterman.csv.gz"), DataFrame)
+        pr = prior(pe, rd)
+
+        success = isapprox(pr.mu, df[1:20, 1]; rtol = 1e-6)
+        if !success
+            println("Mu $i fails")
+            find_tol(pr.mu, df[1:20, i])
+        end
+        @test success
+
+        success = isapprox(vec(pr.sigma), df[21:420, 1]; rtol = 1e-6)
+        if !success
+            println("Sigma $i fails")
+            find_tol(vec(pr.sigma), df[21:420, i])
+        end
+        @test success
+
+        success = isapprox(vec(pr.chol), df[421:end, 1]; rtol = 1e-6)
+        if !success
+            println("Chol $i fails")
+            find_tol(vec(pr.chol), df[421:end, i])
+        end
+        @test success
+    end
 end
+#=
+using PortfolioOptimiser
+portfolio = Portfolio(;
+                      prices = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                           "./assets/SP500.csv.gz"));
+                                         timestamp = :Date)[(end - 252 * 4):end],
+                      f_prices = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                             "./assets/Factors.csv.gz"));
+                                           timestamp = :Date)[(end - 252 * 4):end])
+asset_statistics!(portfolio)
+factor_statistics!(portfolio)
+views_factors = DataFrame("Enabled" => [true, true], "Factor" => ["MTUM", "USMV"],
+                          "Sign" => [">=", "<="], "Value" => [0.0001, 0.0003],
+                          "Relative_Factor" => ["", "QUAL"])
+
+f_P, f_Q = factor_views(views_factors, portfolio.loadings)
+
+bl_type = ABLType(; delta = 2, eq = false)
+black_litterman_factor_statistics!(portfolio; f_P = f_P, f_Q = f_Q, bl_type = bl_type)
+=#

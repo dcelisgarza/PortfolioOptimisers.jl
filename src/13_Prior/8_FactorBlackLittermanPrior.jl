@@ -68,40 +68,39 @@ function prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatr
     @smart_assert(length(pe.sets.dict[pe.sets.key]) == size(F, 2))
     # Factor prior.
     f_prior = prior(pe.pe, F; strict = strict)
-    f_prior_mu, f_prior_sigma = f_prior.mu, f_prior.sigma
+    prior_mu, prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors.
     loadings = regression(pe.re, X, F)
     (; b, M) = loadings
     posterior_X = F * transpose(M) .+ transpose(b)
-    f_views = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
-                                    strict = strict)
-    f_P, f_Q = f_views.P, f_views.Q
+    (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
+                                     strict = strict)
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
     views_conf = pe.views_conf
     f_omega = tau * Diagonal(if isnothing(views_conf)
-                                 f_P * f_prior_sigma * transpose(f_P)
+                                 P * prior_sigma * transpose(P)
                              else
                                  idx = iszero.(views_conf)
                                  views_conf[idx] .= eps(eltype(views_conf))
                                  alphas = inv.(views_conf) .- 1
-                                 alphas ⊙ f_P * f_prior_sigma * transpose(f_P)
+                                 alphas ⊙ P * prior_sigma * transpose(P)
                              end)
-    f_prior_mu = if !isnothing(pe.l)
+    prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
             @smart_assert(length(pe.w) == size(X, 2))
             pe.w
         else
-            fill(inv(size(X, 2)), size(X, 2))
+            range(; start = inv(size(X, 2)), stop = inv(size(X, 2)), length = size(X, 2))
         end
-        pe.l * (f_prior_sigma * transpose(M)) * w
+        pe.l * (prior_sigma * transpose(M)) * w
     else
-        f_prior_mu .- pe.rf
+        prior_mu .- pe.rf
     end
-    v1 = tau * f_prior_sigma * transpose(f_P)
-    v2 = f_P * v1 + f_omega
-    v3 = f_Q - f_P * f_prior_mu
-    f_posterior_mu = (f_prior_mu + v1 * (v2 \ v3)) .+ pe.rf
-    f_posterior_sigma = f_prior_sigma + tau * f_prior_sigma - v1 * (v2 \ transpose(v1))
+    v1 = tau * prior_sigma * transpose(P)
+    v2 = P * v1 + f_omega
+    v3 = Q - P * prior_mu
+    f_posterior_mu = (prior_mu + v1 * (v2 \ v3)) .+ pe.rf
+    f_posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     matrix_processing!(pe.f_mp, f_posterior_sigma, F)
     # Reconstruct the posteriors using the black litterman adjusted factor statistics.
     posterior_mu = M * f_posterior_mu + b
