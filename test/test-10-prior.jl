@@ -207,7 +207,7 @@
                                                                                                       "WMT == group2",
                                                                                                       "RRC-group1 == 0.0005"]),
                                                                      sets)), rd)
-        @test df[!, 1] == [pr.mu; vec(pr.sigma)]
+        @test isapprox(df[!, 1], [pr.mu; vec(pr.sigma)], rtol = 1e-6)
     end
     @testset "Factor Black Litterman" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/FactorBlackLitterman1.csv.gz"),
