@@ -116,24 +116,8 @@ function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractM
                                     strict = strict)
     f_P, f_Q = f_views.P, f_views.Q
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    a_views_conf = pe.a_views_conf
-    a_omega = tau * Diagonal(if isnothing(a_views_conf)
-                                 P * a_prior_sigma * transpose(P)
-                             else
-                                 idx = iszero.(a_views_conf)
-                                 a_views_conf[idx] .= eps(eltype(a_views_conf))
-                                 alphas = inv.(a_views_conf) .- 1
-                                 alphas ⊙ P * a_prior_sigma * transpose(P)
-                             end)
-    f_views_conf = pe.f_views_conf
-    f_omega = tau * Diagonal(if isnothing(f_views_conf)
-                                 f_P * f_prior_sigma * transpose(f_P)
-                             else
-                                 idx = iszero.(f_views_conf)
-                                 f_views_conf[idx] .= eps(eltype(f_views_conf))
-                                 alphas = inv.(f_views_conf) .- 1
-                                 alphas ⊙ f_P * f_prior_sigma * transpose(f_P)
-                             end)
+    a_omega = tau * calc_omega(pe.a_views_conf, P, a_prior_sigma)
+    f_omega = tau * calc_omega(pe.f_views_conf, f_P, f_prior_sigma)
     aug_prior_sigma = hcat(vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
                            vcat(M * f_prior_sigma, f_prior_sigma))
     aug_P = hcat(vcat(P, zeros(size(f_P, 1), size(P, 2))),
@@ -146,12 +130,17 @@ function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractM
     else
         vcat(a_prior_mu, f_prior_mu) .- pe.rf
     end
+    #=
     v1 = tau * aug_prior_sigma * transpose(aug_P)
     v2 = aug_P * v1 + aug_omega
     v3 = aug_Q - aug_P * aug_prior_mu
     aug_posterior_mu = aug_prior_mu + v1 * (v2 \ v3)
     aug_posterior_sigma = aug_prior_sigma + tau * aug_prior_sigma -
                           v1 * (v2 \ transpose(v1))
+    =#
+    aug_posterior_mu, aug_posterior_sigma = vanilla_posteriors(tau, pe.rf, aug_prior_mu,
+                                                               aug_prior_sigma, aug_omega,
+                                                               aug_P, aug_Q)
     matrix_processing!(pe.mp, aug_posterior_sigma, hcat(posterior_X, F))
     posterior_mu = (aug_posterior_mu[1:size(X, 2)] + b) .+ pe.rf
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]

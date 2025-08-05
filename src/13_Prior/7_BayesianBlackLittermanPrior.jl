@@ -63,15 +63,7 @@ function prior(pe::BayesianBlackLittermanPrior, X::AbstractMatrix, F::AbstractMa
     (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
                                      strict = strict)
     tau = isnothing(pe.tau) ? inv(size(F, 1)) : pe.tau
-    views_conf = pe.views_conf
-    f_omega = tau * Diagonal(if isnothing(views_conf)
-                                 P * f_sigma * transpose(P)
-                             else
-                                 idx = iszero.(views_conf)
-                                 views_conf[idx] .= eps(eltype(views_conf))
-                                 alphas = inv.(views_conf) .- 1
-                                 alphas ⊙ P * f_sigma * transpose(P)
-                             end)
+    f_omega = tau * calc_omega(pe.views_conf, P, f_sigma)
     (; b, M) = loadings
     sigma_hat = f_sigma \ I + transpose(P) * (f_omega \ P)
     mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (f_omega \ Q))

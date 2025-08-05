@@ -76,15 +76,7 @@ function prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatr
     (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
                                      strict = strict)
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    views_conf = pe.views_conf
-    f_omega = tau * Diagonal(if isnothing(views_conf)
-                                 P * prior_sigma * transpose(P)
-                             else
-                                 idx = iszero.(views_conf)
-                                 views_conf[idx] .= eps(eltype(views_conf))
-                                 alphas = inv.(views_conf) .- 1
-                                 alphas ⊙ P * prior_sigma * transpose(P)
-                             end)
+    omega = tau * calc_omega(pe.views_conf, P, prior_sigma)
     prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
             @smart_assert(length(pe.w) == size(X, 2))
@@ -96,11 +88,8 @@ function prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatr
     else
         prior_mu .- pe.rf
     end
-    v1 = tau * prior_sigma * transpose(P)
-    v2 = P * v1 + f_omega
-    v3 = Q - P * prior_mu
-    f_posterior_mu = (prior_mu + v1 * (v2 \ v3)) .+ pe.rf
-    f_posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
+    f_posterior_mu, f_posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu,
+                                                           prior_sigma, omega, P, Q)
     matrix_processing!(pe.f_mp, f_posterior_sigma, F)
     # Reconstruct the posteriors using the black litterman adjusted factor statistics.
     posterior_mu = M * f_posterior_mu + b

@@ -32,6 +32,7 @@
                                                  3, 3, 3, 3, 3, 3],
                                  "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
                                                  3, 1, 2, 3, 1, 2]))
+    fsets = AssetSets(; dict = Dict("nx" => rd.nf))
     @testset "Empirical Prior" begin
         pes = [EmpiricalPrior(), EmpiricalPrior(; horizon = 252)]
         df = CSV.read(joinpath(@__DIR__, "./assets/EmpiricalPrior.csv.gz"), DataFrame)
@@ -159,7 +160,6 @@
               coskewness(Coskewness(; alg = Full()), pr2.X; mean = transpose(pr2.mu))
     end
     @testset "Vanilla and Bayesian Black Litterman" begin
-        fsets = AssetSets(; dict = Dict("nx" => rd.nf))
         df = CSV.read(joinpath(@__DIR__, "./assets/BlackLitterman.csv.gz"), DataFrame)
         pes = [BlackLittermanPrior(; sets = sets, tau = 1 / size(rd.X, 1),
                                    views = LinearConstraintEstimator(;
@@ -191,6 +191,11 @@
     end
     @testset "Factor Black Litterman" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/FactorBlackLitterman.csv.gz"), DataFrame)
+        pe = FactorBlackLittermanPrior(; pe = EmpiricalPrior(;), rsd = false, sets = fsets,
+                                       tau = 1 / size(rd.X, 1),
+                                       views = LinearConstraintEstimator(;
+                                                                         val = ["MTUM == 0.0001",
+                                                                                "QUAL - USMV == -0.0003"]))
         pr = prior(pe, rd)
 
         success = isapprox(pr.mu, df[1:20, 1]; rtol = 1e-6)

@@ -45,6 +45,25 @@ function factory(pe::BlackLittermanPrior, w::Union{Nothing, <:AbstractWeights} =
                                sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
                                tau = pe.tau)
 end
+function calc_omega(::Nothing, P::AbstractMatrix, sigma::AbstractMatrix)
+    return Diagonal(P * sigma * transpose(P))
+end
+function calc_omega(views_conf::AbstractVector, P::AbstractMatrix, sigma::AbstractMatrix)
+    idx = iszero.(views_conf)
+    views_conf[idx] .= eps(eltype(views_conf))
+    alphas = inv.(views_conf) .- one(eltype(views_conf))
+    return Diagonal(alphas .* P * sigma * transpose(P))
+end
+function vanilla_posteriors(tau::Real, rf::Real, prior_mu::AbstractVector,
+                            prior_sigma::AbstractMatrix, omega::AbstractMatrix,
+                            P::AbstractMatrix, Q::AbstractVector)
+    v1 = tau * prior_sigma * transpose(P)
+    v2 = P * v1 + omega
+    v3 = Q - P * prior_mu
+    posterior_mu = (prior_mu + v1 * (v2 \ v3)) .+ rf
+    posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
+    return posterior_mu, posterior_sigma
+end
 function prior(pe::BlackLittermanPrior, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
@@ -61,20 +80,9 @@ function prior(pe::BlackLittermanPrior, X::AbstractMatrix,
     (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
                                      strict = strict)
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    views_conf = pe.views_conf
-    omega = tau * Diagonal(if isnothing(views_conf)
-                               P * prior_sigma * transpose(P)
-                           else
-                               idx = iszero.(views_conf)
-                               views_conf[idx] .= eps(eltype(views_conf))
-                               alphas = inv.(views_conf) .- 1
-                               alphas ⊙ P * prior_sigma * transpose(P)
-                           end)
-    v1 = tau * prior_sigma * transpose(P)
-    v2 = P * v1 + omega
-    v3 = Q - P * prior_mu
-    posterior_mu = (prior_mu + v1 * (v2 \ v3)) .+ pe.rf
-    posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
+    omega = tau * calc_omega(pe.views_conf, P, prior_sigma)
+    posterior_mu, posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu, prior_sigma,
+                                                       omega, P, Q)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma)
 end
