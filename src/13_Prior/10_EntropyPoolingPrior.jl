@@ -481,7 +481,7 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
                               dm_opt::Union{Nothing, <:OptimEntropyPooling};
                               strict::Bool = false)
     cvar_views = parse_equation(cvar_views.val; ops1 = ("==",), ops2 = (:call, :(==)),
-                                datatype = eltype(pr.x))
+                                datatype = eltype(pr.X))
     cvar_views = replace_group_by_assets(cvar_views, sets, false, true, false)
     cvar_views = replace_prior_views(cvar_views, pr, sets, :cvar, alpha; strict = strict)
     lcs = get_linear_constraints(cvar_views, sets; datatype = eltype(pr.X), strict = strict)
@@ -591,7 +591,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
     corr_pattern = r"\(\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*,\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*\)"
     nx = sets.dict[sets.key]
     variables, coeffs = res.vars, res.coef
-    jk_idx = Vector{<:Union{Tuple{Int, Int}, Tuple{Vector{Int}, Vector{Int}}}}(undef, 0)
+    jk_idx = Vector{Union{Tuple{Int, Int}, Tuple{Vector{Int}, Vector{Int}}}}(undef, 0)
     idx_rm = Vector{Int}(undef, 0)
     rhs::typeof(res.rhs) = res.rhs
     non_prior = false
