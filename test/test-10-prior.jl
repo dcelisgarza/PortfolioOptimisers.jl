@@ -314,4 +314,58 @@
             @test success
         end
     end
+    @testset "Entropy pooling" begin
+        pr0 = prior(EmpiricalPrior(), rd)
+        pr = prior(EntropyPoolingPrior(; sets = sets,
+                                       mu_views = LinearConstraintEstimator(;
+                                                                            val = "AAPL == 0.002")),
+                   rd)
+        @test isapprox(pr.mu[1], 0.002)
+
+        pr = prior(EntropyPoolingPrior(; sets = sets,
+                                       mu_views = LinearConstraintEstimator(;
+                                                                            val = "AAPL >= 0.0025")),
+                   rd)
+        @test pr.mu[1] >= 0.0025
+
+        pr = prior(EntropyPoolingPrior(; sets = sets,
+                                       mu_views = LinearConstraintEstimator(;
+                                                                            val = "AAPL <= 0.001")),
+                   rd)
+        @test pr.mu[1] <= 0.001
+
+        pr = prior(EntropyPoolingPrior(; sets = sets,
+                                       var_views = LinearConstraintEstimator(;
+                                                                             val = "AAPL == 0.12865204867438676")),
+                   rd)
+        @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) == WorstRealisation()(rd.X[:, 1])
+
+        pr = prior(EntropyPoolingPrior(; sets = sets, var_alpha = 0.07,
+                                       var_views = LinearConstraintEstimator(;
+                                                                             val = ["AAPL == 0.028",
+                                                                                    "XOM >= 0.027"])),
+                   rd)
+        @test isapprox(ValueatRisk(; alpha = 0.07, w = pr.w)(rd.X[:, 1]), 0.028,
+                       rtol = 7e-3)
+        @test ValueatRisk(; alpha = 0.07, w = pr.w)(rd.X[:, end]) >= 0.027
+
+        pr = prior(EntropyPoolingPrior(; sets = sets,
+                                       sigma_views = LinearConstraintEstimator(;
+                                                                               val = "AAPL == 0.0007")),
+                   rd)
+        r = LowOrderMoment(; w = pr.w, mu = pr.mu[1],
+                           alg = LowOrderDeviation(; ve = SimpleVariance(; w = pr.w),
+                                                   alg = SecondCentralMoment()))
+        @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007, rtol = 1e-3)
+        @test isapprox(pr.sigma[1, 1], r([1], reshape(pr.X[:, 1], :, 1)))
+
+        pr = prior(EntropyPoolingPrior(; sets = sets,
+                                       mu_views = LinearConstraintEstimator(;
+                                                                            val = "AAPL == 1.7*prior(AAPL)"),
+                                       sigma_views = LinearConstraintEstimator(;
+                                                                               val = "AAPL == 0.0008")),
+                   rd)
+        @test isapprox(pr.mu[1], pr0.mu[1] * 1.7)
+        @test isapprox(pr.sigma[1, 1], 0.0008, rtol = 1e-3)
+    end
 end
