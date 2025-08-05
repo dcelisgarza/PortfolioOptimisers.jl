@@ -21,20 +21,16 @@ function BlackLittermanPrior(;
                              pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(;
                                                                                             me = EquilibriumExpectedReturns()),
                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                             views::LinearConstraintEstimator,
+                             views::Union{<:LinearConstraintEstimator,
+                                          <:BlackLittermanViews},
                              sets::Union{<:AssetSets,
                                          #! Start: to delete
                                          <:DataFrame
                                          #! End: to delete
                                          } = DataFrame(),
-                             views_conf::Union{Nothing, <:AbstractVector} = nothing,
+                             views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                              rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
-    if isa(views_conf, AbstractVector)
-        @smart_assert(isa(views.val, AbstractVector))
-        @smart_assert(!isempty(views_conf))
-        @smart_assert(length(views.val) == length(views_conf))
-        @smart_assert(all(x -> zero(x) < x < one(x), views_conf))
-    end
+    assert_bl_views_conf(views_conf, views)
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))
     end
@@ -49,9 +45,11 @@ function calc_omega(::Nothing, P::AbstractMatrix, sigma::AbstractMatrix)
     return Diagonal(P * sigma * transpose(P))
 end
 function calc_omega(views_conf::AbstractVector, P::AbstractMatrix, sigma::AbstractMatrix)
-    idx = iszero.(views_conf)
-    views_conf[idx] .= eps(eltype(views_conf))
     alphas = inv.(views_conf) .- one(eltype(views_conf))
+    return Diagonal(alphas .* P * sigma * transpose(P))
+end
+function calc_omega(views_conf::Real, P::AbstractMatrix, sigma::AbstractMatrix)
+    alphas = inv(views_conf) - one(eltype(views_conf))
     return Diagonal(alphas .* P * sigma * transpose(P))
 end
 function vanilla_posteriors(tau::Real, rf::Real, prior_mu::AbstractVector,

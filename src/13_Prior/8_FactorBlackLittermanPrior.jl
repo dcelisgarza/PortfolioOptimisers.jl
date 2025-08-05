@@ -20,7 +20,8 @@ function FactorBlackLittermanPrior(;
                                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                    re::AbstractRegressionEstimator = StepwiseRegression(),
                                    ve::AbstractVarianceEstimator = SimpleVariance(),
-                                   views::LinearConstraintEstimator,
+                                   views::Union{<:LinearConstraintEstimator,
+                                                <:BlackLittermanViews},
                                    sets::Union{<:AssetSets,
                                                #! Start: to delete
                                                <:DataFrame
@@ -30,12 +31,7 @@ function FactorBlackLittermanPrior(;
                                    w::Union{Nothing, <:AbstractWeights} = nothing,
                                    rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
                                    tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)
-    if isa(views_conf, AbstractVector)
-        @smart_assert(isa(views.val, AbstractVector))
-        @smart_assert(!isempty(views_conf))
-        @smart_assert(length(views.val) == length(views_conf))
-        @smart_assert(all(x -> zero(x) < x < one(x), views_conf))
-    end
+    assert_bl_views_conf(views_conf, views)
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))
     end
@@ -82,7 +78,8 @@ function prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatr
             @smart_assert(length(pe.w) == size(X, 2))
             pe.w
         else
-            range(; start = inv(size(X, 2)), stop = inv(size(X, 2)), length = size(X, 2))
+            iN = inv(size(X, 2))
+            range(; start = iN, stop = iN, length = size(X, 2))
         end
         pe.l * (prior_sigma * transpose(M)) * w
     else

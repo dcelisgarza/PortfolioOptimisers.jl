@@ -13,7 +13,8 @@ function BayesianBlackLittermanPrior(;
                                                                                              pe = EmpiricalPrior(;
                                                                                                                  me = EquilibriumExpectedReturns())),
                                      mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                                     views::LinearConstraintEstimator,
+                                     views::Union{<:LinearConstraintEstimator,
+                                                  <:BlackLittermanViews},
                                      sets::Union{<:AssetSets,
                                                  #! Start: to delete
                                                  <:DataFrame
@@ -21,12 +22,7 @@ function BayesianBlackLittermanPrior(;
                                                  } = DataFrame(),
                                      views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                      rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
-    if isa(views_conf, AbstractVector)
-        @smart_assert(isa(views.val, AbstractVector))
-        @smart_assert(!isempty(views_conf))
-        @smart_assert(length(views.val) == length(views_conf))
-        @smart_assert(all(x -> zero(x) < x < one(x), views_conf))
-    end
+    assert_bl_views_conf(views_conf, views)
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))
     end

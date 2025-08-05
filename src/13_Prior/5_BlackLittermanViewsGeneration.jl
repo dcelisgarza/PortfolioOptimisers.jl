@@ -10,7 +10,7 @@ end
 function black_litterman_views(::Nothing, args...; kwargs...)
     return nothing
 end
-function black_litterman_views(blves::BlackLittermanViews, args...; kwargs...)
+function black_litterman_views(blves::LinearConstraintEstimator, args...; kwargs...)
     return blves
 end
 function get_black_litterman_views(lcs::Union{<:ParsingResult,
@@ -56,6 +56,36 @@ end
 function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
                                datatype::DataType = Float64, strict::Bool = false)
     return black_litterman_views(lcs.val, sets; datatype = datatype, strict = strict)
+end
+function black_litterman_views(views::BlackLittermanViews, args...; kwargs...)
+    return views
+end
+function assert_bl_views_conf(::Nothing, args...)
+    return nothing
+end
+function assert_bl_views_conf(views_conf::Real,
+                              val::Union{<:AbstractString, Expr,
+                                         <:AbstractVector{<:Union{<:AbstractString, Expr}}})
+    @smart_assert(!isa(val, AbstractVector))
+    @smart_assert(zero(views_conf) < views_conf < one(views_conf))
+    return nothing
+end
+function assert_bl_views_conf(views_conf::AbstractVector{<:Real},
+                              val::Union{<:AbstractString, Expr,
+                                         <:AbstractVector{<:Union{<:AbstractString, Expr}}})
+    @smart_assert(isa(val, AbstractVector))
+    @smart_assert(!isempty(views_conf))
+    @smart_assert(length(val) == length(views_conf))
+    @smart_assert(all(x -> zero(x) < x < one(x), views_conf))
+    return nothing
+end
+function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
+                              views::LinearConstraintEstimator)
+    return assert_bl_views_conf(views_conf, views.val)
+end
+function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
+                              views::BlackLittermanViews)
+    return @smart_assert(length(views_conf) == length(views.Q))
 end
 #=
 #! Start: to delete

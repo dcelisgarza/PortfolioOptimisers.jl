@@ -22,8 +22,10 @@ function AugmentedBlackLittermanPrior(;
                                       mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                       re::AbstractRegressionEstimator = StepwiseRegression(),
                                       ve::AbstractVarianceEstimator = SimpleVariance(),
-                                      a_views::LinearConstraintEstimator,
-                                      f_views::LinearConstraintEstimator,
+                                      a_views::Union{<:LinearConstraintEstimator,
+                                                     <:BlackLittermanViews},
+                                      f_views::Union{<:LinearConstraintEstimator,
+                                                     <:BlackLittermanViews},
                                       a_sets::Union{<:AssetSets,
                                                     #! Start: to delete
                                                     <:DataFrame
@@ -36,24 +38,14 @@ function AugmentedBlackLittermanPrior(;
                                                     } = DataFrame(),
                                       a_views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                       f_views_conf::Union{Nothing, <:AbstractVector} = nothing,
-                                      w::Union{Nothing, <:AbstractWeights} = nothing,
+                                      w::Union{Nothing, <:AbstractVector} = nothing,
                                       rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
                                       tau::Union{Nothing, <:Real} = nothing)
-    if isa(w, AbstractWeights)
+    if isa(w, AbstractVector)
         @smart_assert(!isempty(w))
     end
-    if isa(a_views_conf, AbstractVector)
-        @smart_assert(isa(a_views.val, AbstractVector))
-        @smart_assert(!isempty(a_views_conf))
-        @smart_assert(length(a_views.val) == length(a_views_conf))
-        @smart_assert(all(x -> zero(x) < x < one(x), a_views_conf))
-    end
-    if isa(f_views_conf, AbstractVector)
-        @smart_assert(isa(f_views.val, AbstractVector))
-        @smart_assert(!isempty(f_views_conf))
-        @smart_assert(length(f_views.val) == length(f_views_conf))
-        @smart_assert(all(x -> zero(x) < x < one(x), f_views_conf))
-    end
+    assert_bl_views_conf(a_views_conf, a_views)
+    assert_bl_views_conf(f_views_conf, f_views)
     if !isnothing(tau)
         @smart_assert(tau > zero(tau))
     end
@@ -61,7 +53,7 @@ function AugmentedBlackLittermanPrior(;
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
 function factory(pe::AugmentedBlackLittermanPrior,
-                 w::Union{Nothing, <:AbstractWeights} = nothing)
+                 w::Union{Nothing, <:AbstractVector} = nothing)
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
                                         f_pe = factory(pe.f_pe, w), mp = pe.mp, re = pe.re,
                                         ve = factory(pe.ve, w), a_views = pe.a_views,
@@ -92,14 +84,6 @@ function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractM
     end
     @smart_assert(length(pe.a_sets.dict[pe.a_sets.key]) == size(X, 2))
     @smart_assert(length(pe.f_sets.dict[pe.f_sets.key]) == size(F, 2))
-    if !isnothing(pe.l)
-        w = if !isnothing(pe.w)
-            @smart_assert(length(pe.w) == size(X, 2))
-            pe.w
-        else
-            fill(inv(size(X, 2)), size(X, 2))
-        end
-    end
     # Asset prior.
     a_prior = prior(pe.a_pe, X; strict = strict, kwargs...)
     a_prior_mu, a_prior_sigma = a_prior.mu, a_prior.sigma
@@ -126,18 +110,17 @@ function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractM
     aug_omega = hcat(vcat(a_omega, zeros(size(f_omega, 1), size(a_omega, 1))),
                      vcat(zeros(size(a_omega, 1), size(f_omega, 1)), f_omega))
     aug_prior_mu = if !isnothing(pe.l)
+        w = if !isnothing(pe.w)
+            @smart_assert(length(pe.w) == size(X, 2))
+            pe.w
+        else
+            iN = inv(size(X, 2))
+            range(; start = iN, stop = iN, length = size(X, 2))
+        end
         pe.l * (vcat(a_prior_sigma, f_prior_sigma * transpose(M))) * w
     else
         vcat(a_prior_mu, f_prior_mu) .- pe.rf
     end
-    #=
-    v1 = tau * aug_prior_sigma * transpose(aug_P)
-    v2 = aug_P * v1 + aug_omega
-    v3 = aug_Q - aug_P * aug_prior_mu
-    aug_posterior_mu = aug_prior_mu + v1 * (v2 \ v3)
-    aug_posterior_sigma = aug_prior_sigma + tau * aug_prior_sigma -
-                          v1 * (v2 \ transpose(v1))
-    =#
     aug_posterior_mu, aug_posterior_sigma = vanilla_posteriors(tau, pe.rf, aug_prior_mu,
                                                                aug_prior_sigma, aug_omega,
                                                                aug_P, aug_Q)
