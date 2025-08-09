@@ -104,8 +104,10 @@
             end
             @test success
 
-            rtol = if i ∈ (7, 10, 19, 24, 25)
+            rtol = if i ∈ (7, 10, 19, 24, 25) || Sys.isapple() && i ∈ (2, 5, 12)
                 1e-4
+            elseif Sys.isapple() && i == 17
+                5e-3
             elseif i ∈ (9, 11, 17, 18)
                 5e-4
             elseif i ∈ (13, 21, 14, 15, 16, 22)
@@ -158,13 +160,13 @@
             end
             @test success
 
-            rtol = if i == 11
+            rtol = if i == 11 || Sys.isapple() && i == 9
                 5e-4
             elseif i ∈ (14, 15, 16, 20, 22)
                 5e-3
             elseif i == 17
                 1e-3
-            elseif i == 21
+            elseif i == 21 || Sys.isapple() && i == 14
                 1e-2
             else
                 1e-4

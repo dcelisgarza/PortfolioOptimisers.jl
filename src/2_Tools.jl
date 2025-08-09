@@ -83,7 +83,7 @@ It supports both asset and factor returns, as well as optional time series and i
   - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix (observations × factors).
   - `ts::Union{Nothing, AbstractVector}`: Optional time series (e.g., timestamps) for each observation.
   - `iv::Union{Nothing, AbstractMatrix}`: Implied volatilities matrix.
-  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: Implied volatility risk premium adjustment.
+  - `ivpa::Union{Nothing, <:Real, AbstractVector{<:Real}}`: Implied volatility risk premium adjustment.
 
 # Constructor
 
@@ -124,7 +124,7 @@ Construct a [`ReturnsResult`](@ref) object, validating dimensions and types for 
   - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix.
   - `ts::Union{Nothing, AbstractVector}`: Time series (e.g., timestamps).
   - `iv::Union{Nothing, AbstractMatrix}`: Implied volatility matrix.
-  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: Implied volatility risk premium adjustment.
+  - `ivpa::Union{Nothing, <:Real, AbstractVector{<:Real}}`: Implied volatility risk premium adjustment.
 
 # Validation
 
@@ -225,11 +225,11 @@ ReturnsResult a [`ReturnsResult`](@ref) containing asset and factor returns, tim
   - `X::TimeArray`: Asset price data (timestamps × assets).
   - `F::TimeArray`: (Optional) Factor price data (timestamps × factors).
   - `iv::Union{Nothing, TimeArray}`: (Optional) Implied volatility data.
-  - `ivpa::Union{Nothing, Real, AbstractVector{<:Real}}`: (Optional) Implied volatility risk premium adjustment.
+  - `ivpa::Union{Nothing, <:Real, AbstractVector{<:Real}}`: (Optional) Implied volatility risk premium adjustment.
   - `ret_method::Symbol`: Return calculation method (`:simple` or `:log`).
   - `padding::Bool`: Whether to pad missing values in returns calculation.
   - `missing_col_percent::Real`: Maximum allowed fraction of missing values per column (asset/factor).
-  - `missing_row_percent::Union{Nothing, Real}`: Maximum allowed fraction of missing values per row (timestamp).
+  - `missing_row_percent::Union{Nothing, <:Real}`: Maximum allowed fraction of missing values per row (timestamp).
   - `collapse_args::Tuple`: Arguments for collapsing the time series (e.g., to lower frequency).
   - `map_func::Union{Nothing, Function}`: Optional function to apply to the data before returns calculation.
   - `join_method::Symbol`: How to join asset and factor data (`:outer`, `:inner`, etc.).
