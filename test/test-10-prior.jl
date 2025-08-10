@@ -341,6 +341,12 @@
 
         pr = prior(EntropyPoolingPrior(; sets = sets,
                                        var_views = LinearConstraintEstimator(;
+                                                                             val = "AAPL >= 1.5*prior(AAPL)")),
+                   rd)
+        @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) >= 1.5 * ValueatRisk(;)(rd.X[:, 1])
+
+        pr = prior(EntropyPoolingPrior(; sets = sets,
+                                       var_views = LinearConstraintEstimator(;
                                                                              val = "AAPL == 0.12865204867438676")),
                    rd)
         @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) == WorstRealisation()(rd.X[:, 1])
@@ -445,6 +451,13 @@
         @test isapprox(cov2cor(pr.sigma)[1, end], 0.35, rtol = 5e-6)
 
         pr = prior(EntropyPoolingPrior(; sets = sets,
+                                       rho_views = LinearConstraintEstimator(;
+                                                                             val = "(AAPL, XOM) == prior(AAPL,XOM)*0.67")),
+                   rd)
+        @test isapprox(cov2cor(pr.sigma)[1, end], cov2cor(pr0.sigma)[1, end] * 0.67,
+                       rtol = 1e-6)
+
+        pr = prior(EntropyPoolingPrior(; sets = sets,
                                        mu_views = LinearConstraintEstimator(;
                                                                             val = ["AAPL<=0.75*prior(AAPL)",
                                                                                    "XOM >= 0.4*prior(XOM)"]),
@@ -465,6 +478,13 @@
                                                                               val = "AAPL == 0.07")),
                    rd)
         @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.07, rtol = 1e-6)
+
+        pr = prior(EntropyPoolingPrior(; sets = sets,
+                                       cvar_views = LinearConstraintEstimator(;
+                                                                              val = "AAPL == prior(AAPL)*1.37")),
+                   rd)
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]),
+                       ConditionalValueatRisk(;)(rd.X[:, 1]) * 1.37, rtol = 1e-6)
 
         pr = prior(EntropyPoolingPrior(; sets = sets,
                                        cvar_views = LinearConstraintEstimator(;

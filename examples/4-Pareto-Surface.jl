@@ -203,7 +203,7 @@ using StatsPlots, GraphRecipes
 plot_stacked_area_composition(res3.w, rd.nx)
 
 #=
-Now we can view the parteo surface using the PlotlyJS backend. For the z-axis and colourbar, we will use the conditional drawdown at risk to return ratio.
+Now we can view the parteo surface. For the z-axis and colourbar, we will use the conditional drawdown at risk to return ratio.
 =#
 
 plot_measures(res3.w, pr; x = r1, y = r2,
