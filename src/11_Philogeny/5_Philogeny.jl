@@ -18,7 +18,7 @@ struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
     kwargs::T2
 end
 function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
-    @smart_assert(kind in 0:2)
+    @argcheck(kind in 0:2)
     return DegreeCentrality(kind, kwargs)
 end
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
@@ -34,9 +34,9 @@ struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
     epsilon::T3
 end
 function Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
-    @smart_assert(n > 0)
-    @smart_assert(zero(alpha) < alpha < one(alpha))
-    @smart_assert(epsilon > zero(epsilon))
+    @argcheck(n > 0)
+    @argcheck(zero(alpha) < alpha < one(alpha))
+    @argcheck(epsilon > zero(epsilon))
     return Pagerank(n, alpha, epsilon)
 end
 struct RadialityCentrality <: AbstractCentralityAlgorithm end

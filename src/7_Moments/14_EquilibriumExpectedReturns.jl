@@ -86,7 +86,7 @@ function EquilibriumExpectedReturns(;
                                     w::Union{Nothing, <:AbstractWeights} = nothing,
                                     l::Real = 1.0)
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     return EquilibriumExpectedReturns(ce, w, l)
 end

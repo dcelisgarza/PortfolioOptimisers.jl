@@ -15,22 +15,22 @@ function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSetting
     mu_flag = isa(mu, AbstractVector)
     kt_flag = isa(kt, AbstractMatrix)
     if mu_flag
-        @smart_assert(!isempty(mu) && all(isfinite, mu))
+        @argcheck(!isempty(mu) && all(isfinite, mu))
     elseif isa(mu, Real)
-        @smart_assert(isfinite(mu))
+        @argcheck(isfinite(mu))
     end
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     if kt_flag
-        @smart_assert(!isempty(kt))
+        @argcheck(!isempty(kt))
         assert_matrix_issquare(kt)
     end
     if mu_flag && kt_flag
-        @smart_assert(length(mu)^2 == size(kt, 2))
+        @argcheck(length(mu)^2 == size(kt, 2))
     end
     if !isnothing(N)
-        @smart_assert(N > zero(N))
+        @argcheck(N > zero(N))
     end
     return SquareRootKurtosis(settings, w, mu, kt, N, alg)
 end

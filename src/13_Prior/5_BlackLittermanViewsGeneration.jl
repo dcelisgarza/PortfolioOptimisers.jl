@@ -3,8 +3,8 @@ struct BlackLittermanViews{T1, T2} <: AbstractResult
     Q::T2
 end
 function BlackLittermanViews(; P::AbstractMatrix, Q::AbstractVector)
-    @smart_assert(!isempty(P) && !isempty(Q))
-    @smart_assert(size(P, 1) == length(Q))
+    @argcheck(!isempty(P) && !isempty(Q))
+    @argcheck(size(P, 1) == length(Q))
     return BlackLittermanViews(P, Q)
 end
 function black_litterman_views(::Nothing, args...; kwargs...)
@@ -18,7 +18,7 @@ function get_black_litterman_views(lcs::Union{<:ParsingResult,
                                    sets::AssetSets; datatype::DataType = Float64,
                                    strict::Bool = false)
     if isa(lcs, AbstractVector)
-        @smart_assert(!isempty(lcs))
+        @argcheck(!isempty(lcs))
     end
     P = Vector{datatype}(undef, 0)
     Q = Vector{datatype}(undef, 0)
@@ -66,17 +66,17 @@ end
 function assert_bl_views_conf(views_conf::Real,
                               val::Union{<:AbstractString, Expr,
                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}})
-    @smart_assert(!isa(val, AbstractVector))
-    @smart_assert(zero(views_conf) < views_conf < one(views_conf))
+    @argcheck(!isa(val, AbstractVector))
+    @argcheck(zero(views_conf) < views_conf < one(views_conf))
     return nothing
 end
 function assert_bl_views_conf(views_conf::AbstractVector{<:Real},
                               val::Union{<:AbstractString, Expr,
                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}})
-    @smart_assert(isa(val, AbstractVector))
-    @smart_assert(!isempty(views_conf))
-    @smart_assert(length(val) == length(views_conf))
-    @smart_assert(all(x -> zero(x) < x < one(x), views_conf))
+    @argcheck(isa(val, AbstractVector))
+    @argcheck(!isempty(views_conf))
+    @argcheck(length(val) == length(views_conf))
+    @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end
 function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
@@ -85,7 +85,7 @@ function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}
 end
 function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
                               views::BlackLittermanViews)
-    return @smart_assert(length(views_conf) == length(views.Q))
+    return @argcheck(length(views_conf) == length(views.Q))
 end
 #=
 #! Start: to delete
@@ -172,9 +172,9 @@ function black_litterman_views(blves::Union{<:BlackLittermanViewsEstimator,
                                sets::DataFrame; datatype::DataType = Float64,
                                strict::Bool = false)
     if isa(blves, AbstractVector)
-        @smart_assert(!isempty(blves))
+        @argcheck(!isempty(blves))
     end
-    @smart_assert(!isempty(sets))
+    @argcheck(!isempty(sets))
     P = Vector{datatype}(undef, 0)
     Q = Vector{datatype}(undef, 0)
     for blve in blves

@@ -16,29 +16,29 @@ function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractM
                        f_mu::Union{Nothing, <:AbstractVector} = nothing,
                        f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
                        f_w::Union{Nothing, <:AbstractVector} = nothing)
-    @smart_assert(!isempty(X) && !isempty(mu) && !isempty(sigma))
-    @smart_assert(size(X, 2) == length(mu))
+    @argcheck(!isempty(X) && !isempty(mu) && !isempty(sigma))
+    @argcheck(size(X, 2) == length(mu))
     assert_matrix_issquare(sigma)
     if !isnothing(w)
-        @smart_assert(!isempty(w))
-        @smart_assert(length(w) == size(X, 1))
+        @argcheck(!isempty(w))
+        @argcheck(length(w) == size(X, 1))
     end
     loadings_flag = !isnothing(loadings)
     f_mu_flag = !isnothing(f_mu)
     f_sigma_flag = !isnothing(f_sigma)
     if loadings_flag || f_mu_flag || f_sigma_flag
-        @smart_assert(loadings_flag && f_mu_flag && f_sigma_flag)
-        @smart_assert(!isempty(f_mu) && !isempty(f_sigma))
+        @argcheck(loadings_flag && f_mu_flag && f_sigma_flag)
+        @argcheck(!isempty(f_mu) && !isempty(f_sigma))
         assert_matrix_issquare(f_sigma)
-        @smart_assert(size(loadings.M, 2) == length(f_mu) == size(f_sigma, 1))
-        @smart_assert(size(loadings.M, 1) == length(mu))
+        @argcheck(size(loadings.M, 2) == length(f_mu) == size(f_sigma, 1))
+        @argcheck(size(loadings.M, 1) == length(mu))
         if !isnothing(chol)
-            @smart_assert(!isempty(chol))
-            @smart_assert(length(mu) == size(chol, 2))
+            @argcheck(!isempty(chol))
+            @argcheck(length(mu) == size(chol, 2))
         end
         if !isnothing(f_w)
-            @smart_assert(!isempty(f_w))
-            @smart_assert(length(f_w) == size(X, 1))
+            @argcheck(!isempty(f_w))
+            @argcheck(length(f_w) == size(X, 1))
         end
     end
     return LowOrderPrior(X, mu, sigma, chol, w, loadings, f_mu, f_sigma, f_w)
@@ -67,7 +67,7 @@ function factory(pe::EmpiricalPrior, w::Union{Nothing, <:AbstractWeights} = noth
 end
 function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, args...;
                dims::Int = 1, kwargs...)
-    @smart_assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -77,7 +77,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, arg
 end
 function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Real}, X::AbstractMatrix, args...;
                dims::Int = 1, kwargs...)
-    @smart_assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

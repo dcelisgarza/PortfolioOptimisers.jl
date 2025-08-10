@@ -147,13 +147,13 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
 end
 function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
                     b::Union{Nothing, <:AbstractVector})
-    @smart_assert(!isempty(M))
+    @argcheck(!isempty(M))
     if isa(b, AbstractVector)
-        @smart_assert(!isempty(b))
-        @smart_assert(length(b) == size(M, 1))
+        @argcheck(!isempty(b))
+        @argcheck(length(b) == size(M, 1))
     end
     if !isnothing(L)
-        @smart_assert(size(M, 1) == size(L, 1))
+        @argcheck(size(M, 1) == size(L, 1))
     end
     return Regression(M, L, b)
 end

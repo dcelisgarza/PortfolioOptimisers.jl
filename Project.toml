@@ -4,6 +4,7 @@ authors = ["Daniel Celis Garza <daniel.celis.garza@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+ArgCheck = "dce04be8-c92d-5529-be00-80e4d2c0e197"
 AverageShiftedHistograms = "77b51b56-6f8f-5c3a-9cb4-d71f9594ea6e"
 Clustering = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -24,7 +25,6 @@ PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
-SmartAsserts = "56560af0-ab70-43fe-a531-155d81972b00"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
@@ -38,6 +38,7 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 PortfolioOptimisersPlotsExt = ["GraphRecipes", "StatsPlots"]
 
 [compat]
+ArgCheck = "2.5.0"
 AverageShiftedHistograms = "0.8.9"
 Clustering = "0.15.8"
 DataFrames = "1.7.0"
@@ -59,7 +60,6 @@ PythonCall = "0.9.26"
 Random = "1.11.0"
 Roots = "2.2.8"
 SimpleWeightedGraphs = "1.5.0"
-SmartAsserts = "0.2.1"
 SparseArrays = "1.11.0"
 Statistics = "1.11.1"
 StatsBase = "0.34.6"

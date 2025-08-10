@@ -17,10 +17,10 @@ function HierarchicalEqualRiskContribution(;
                                            sceo::Scalariser = scei,
                                            threads::FLoops.Transducers.Executor = ThreadedEx())
     if isa(ri, AbstractVector)
-        @smart_assert(!isempty(ri))
+        @argcheck(!isempty(ri))
     end
     if isa(ro, AbstractVector)
-        @smart_assert(!isempty(ro))
+        @argcheck(!isempty(ro))
     end
     return HierarchicalEqualRiskContribution(opt, ri, ro, scei, sceo, threads)
 end

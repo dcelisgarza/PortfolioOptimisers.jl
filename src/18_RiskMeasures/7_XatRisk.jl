@@ -8,13 +8,13 @@ function MIPValueatRisk(; b::Union{Nothing, <:Real} = nothing,
     bflag = !isnothing(b)
     sflag = !isnothing(s)
     if bflag
-        @smart_assert(b > zero(b))
+        @argcheck(b > zero(b))
     end
     if sflag
-        @smart_assert(s > zero(s))
+        @argcheck(s > zero(s))
     end
     if bflag && sflag
-        @smart_assert(b > s)
+        @argcheck(b > s)
     end
     return MIPValueatRisk(b, s)
 end
@@ -27,10 +27,10 @@ function DistributionValueatRisk(; mu::Union{Nothing, <:AbstractVector} = nothin
                                  sigma::Union{Nothing, <:AbstractMatrix} = nothing,
                                  dist::Distribution = Normal())
     if !isnothing(mu)
-        @smart_assert(!isempty(mu))
+        @argcheck(!isempty(mu))
     end
     if !isnothing(sigma)
-        @smart_assert(!isempty(sigma))
+        @argcheck(!isempty(sigma))
     end
     return DistributionValueatRisk(mu, sigma, dist)
 end
@@ -43,9 +43,9 @@ end
 function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alpha::Real = 0.05, w::Union{Nothing, <:AbstractWeights} = nothing,
                      alg::ValueatRiskFormulation = MIPValueatRisk())
-    @smart_assert(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(alpha) < alpha < one(alpha))
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     return ValueatRisk(settings, alpha, w, alg)
 end
@@ -77,10 +77,10 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           alpha::Real = 0.05, beta::Real = 0.05,
                           w::Union{Nothing, <:AbstractWeights} = nothing,
                           alg::ValueatRiskFormulation = MIPValueatRisk())
-    @smart_assert(zero(alpha) < alpha < one(alpha))
-    @smart_assert(zero(beta) < beta < one(beta))
+    @argcheck(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(beta) < beta < one(beta))
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
@@ -119,7 +119,7 @@ end
 function DrawdownatRisk(;
                         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                         alpha::Real = 0.05)
-    @smart_assert(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(alpha) < alpha < one(alpha))
     return DrawdownatRisk(settings, alpha)
 end
 function (r::DrawdownatRisk)(x::AbstractVector)
@@ -144,7 +144,7 @@ end
 function RelativeDrawdownatRisk(;
                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                 alpha::Real = 0.05)
-    @smart_assert(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(alpha) < alpha < one(alpha))
     return RelativeDrawdownatRisk(settings, alpha)
 end
 function (r::RelativeDrawdownatRisk)(x::AbstractVector)

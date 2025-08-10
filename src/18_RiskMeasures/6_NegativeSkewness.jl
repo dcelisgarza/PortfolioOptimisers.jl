@@ -13,12 +13,11 @@ function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(
     sk_flag = isnothing(sk)
     V_flag = isnothing(V)
     if sk_flag || V_flag
-        @smart_assert(sk_flag && V_flag,
-                      "If either sk or V, is nothing, both must be nothing.")
+        @argcheck(sk_flag && V_flag, "If either sk or V, is nothing, both must be nothing.")
     else
-        @smart_assert(!isempty(sk))
-        @smart_assert(!isempty(V))
-        @smart_assert(size(sk, 1)^2 == size(sk, 2))
+        @argcheck(!isempty(sk))
+        @argcheck(!isempty(V))
+        @argcheck(size(sk, 1)^2 == size(sk, 2))
         assert_matrix_issquare(V)
     end
     return NegativeSkewness(settings, mp, sk, V, alg)

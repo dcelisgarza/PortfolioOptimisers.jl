@@ -592,7 +592,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     b = !isnothing(r.alg.b) ? r.alg.b : 1e3
     s = !isnothing(r.alg.s) ? r.alg.s : 1e-5
-    @smart_assert(b > s)
+    @argcheck(b > s)
     key = Symbol(:var_risk_, i)
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
@@ -627,7 +627,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     b = !isnothing(r.alg.b) ? r.alg.b : 1e3
     s = !isnothing(r.alg.s) ? r.alg.s : 1e-5
-    @smart_assert(b > s)
+    @argcheck(b > s)
     key = Symbol(:var_range_risk_, i)
     sc = model[:sc]
     net_X = set_net_portfolio_returns!(model, pr.X)
@@ -696,7 +696,7 @@ function compute_value_at_risk_z(dist::Normal, alpha::Real)
 end
 function compute_value_at_risk_z(dist::TDist, alpha::Real)
     d = dof(dist)
-    @smart_assert(d > 2)
+    @argcheck(d > 2)
     return cquantile(dist, alpha) * sqrt((d - 2) / d)
 end
 function compute_value_at_risk_z(::Laplace, alpha::Real)

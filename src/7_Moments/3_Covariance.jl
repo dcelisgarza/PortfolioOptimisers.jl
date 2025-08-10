@@ -81,7 +81,7 @@ function GeneralWeightedCovariance(;
                                                                                                   corrected = true),
                                    w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     return GeneralWeightedCovariance(ce, w)
 end

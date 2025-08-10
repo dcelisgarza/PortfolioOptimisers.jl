@@ -112,7 +112,7 @@ function entropy_pooling(w::AbstractVector, epcs::Union{Nothing, <:LinearConstra
     N = length(B)
     ialpha = inv(alpha)
     function g(x)
-        @smart_assert(all(zero(eltype(x)) .< x .<= B))
+        @argcheck(all(zero(eltype(x)) .< x .<= B))
         pos_part = max.(-A .- x, zero(eltype(x)))
         A_eq = vcat(epcs.A_eq, pos_part * ialpha)
         B_eq = vcat(epcs.B_eq, B .- x)
@@ -173,17 +173,17 @@ function EntropyPoolingPriorEstimator(;
                                       w::Union{Nothing, <:AbstractWeights} = nothing,
                                       alg::AbstractEntropyPoolingAlgorithm = H0_EntropyPooling())
     if isa(views, AbstractVector)
-        @smart_assert(!isempty(views))
+        @argcheck(!isempty(views))
     end
     if !isnothing(d_views)
         if isa(d_views, AbstractVector)
-            @smart_assert(!isempty(d_views))
+            @argcheck(!isempty(d_views))
         end
     else
-        @smart_assert(isnothing(d_opt1) && isnothing(d_opt2))
+        @argcheck(isnothing(d_opt1) && isnothing(d_opt2))
     end
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     return EntropyPoolingPriorEstimator(pe, views, d_views, sets, opt, d_opt1, d_opt2, w,
                                         alg)
@@ -207,7 +207,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
                                                 <:Any, <:Any, <:H0_EntropyPooling},
                X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    @smart_assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
@@ -220,8 +220,8 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
     else
         pweights(pe.w)
     end
-    @smart_assert(length(w) == T)
-    @smart_assert(nrow(pe.sets) == N)
+    @argcheck(length(w) == T)
+    @argcheck(nrow(pe.sets) == N)
     pe = factory(pe, w)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     d_V = entropy_pooling_views(pr, pe.d_views, pe.sets; strict = strict)
@@ -240,7 +240,7 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
                                                         <:H2_EntropyPooling}},
                X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    @smart_assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
@@ -253,8 +253,8 @@ function prior(pe::EntropyPoolingPriorEstimator{<:Any, <:Any, <:Any, <:Any, <:An
     else
         pweights(pe.w)
     end
-    @smart_assert(length(w0) == T)
-    @smart_assert(nrow(pe.sets) == N)
+    @argcheck(length(w0) == T)
+    @argcheck(nrow(pe.sets) == N)
     views = sort(pe.views)
     vls = get_view_level.(views)
     uvls = sort!(unique(vls))

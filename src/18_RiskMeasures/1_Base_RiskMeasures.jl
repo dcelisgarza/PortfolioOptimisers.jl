@@ -28,14 +28,14 @@ struct Frontier{T1, T2, T3} <: AbstractAlgorithm
     flag::T3
 end
 function Frontier(; N::Integer = 20)
-    @smart_assert(N > zero(N))
+    @argcheck(N > zero(N))
     factor = 1
     flag = true
     return Frontier(N, 1, true)
 end
 function _Frontier(; N::Integer = 20, factor::Real, flag::Bool)
-    @smart_assert(N > zero(N))
-    @smart_assert(isfinite(factor) && factor > zero(factor))
+    @argcheck(N > zero(N))
+    @argcheck(isfinite(factor) && factor > zero(factor))
     return Frontier(N, factor, flag)
 end
 struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
@@ -47,11 +47,11 @@ function RiskMeasureSettings(; scale::Real = 1.0,
                              ub::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing,
                              rke::Bool = true)
     if isa(ub, Real)
-        @smart_assert(isfinite(ub) && ub > zero(ub))
+        @argcheck(isfinite(ub) && ub > zero(ub))
     elseif isa(ub, AbstractVector)
-        @smart_assert(!isempty(ub) && all(isfinite, ub) && all(x -> x > zero(x), ub))
+        @argcheck(!isempty(ub) && all(isfinite, ub) && all(x -> x > zero(x), ub))
     end
-    @smart_assert(isfinite(scale))
+    @argcheck(isfinite(scale))
     return RiskMeasureSettings(scale, ub, rke)
 end
 struct HierarchicalRiskMeasureSettings{T1} <: AbstractRiskMeasureSettings
@@ -87,7 +87,7 @@ struct LogSumExpScalariser{T1} <: Scalariser
     gamma::T1
 end
 function LogSumExpScalariser(; gamma::Real = 1.0)
-    @smart_assert(gamma > zero(gamma))
+    @argcheck(gamma > zero(gamma))
     return LogSumExpScalariser(gamma)
 end
 function expected_risk end

@@ -7,7 +7,7 @@ struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArray
     g::T1
 end
 function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
-    @smart_assert(zero(g) < g < one(g))
+    @argcheck(zero(g) < g < one(g))
     return NormalisedConstantRelativeRiskAversion(g)
 end
 struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
@@ -21,11 +21,11 @@ function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
                  max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
                  alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
     if isa(slv, AbstractVector)
-        @smart_assert(!isempty(slv))
+        @argcheck(!isempty(slv))
     end
-    @smart_assert(zero(max_phi) < max_phi < one(max_phi))
-    @smart_assert(sc > zero(sc))
-    @smart_assert(so > zero(so))
+    @argcheck(zero(max_phi) < max_phi < one(max_phi))
+    @argcheck(sc > zero(sc))
+    @argcheck(so > zero(so))
     return OWAJuMP(slv, max_phi, sc, so, alg)
 end
 function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real)
@@ -134,7 +134,7 @@ function owa_gmd(T::Integer)
     return (4 * range(1; stop = T) .- 2 * (T + 1)) / (T * (T - 1))
 end
 function owa_cvar(T::Integer, alpha::Real = 0.05)
-    @smart_assert(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(alpha) < alpha < one(alpha))
     k = floor(Int, T * alpha)
     w = zeros(typeof(alpha), T)
     w[1:k] .= -1 / (T * alpha)
@@ -150,8 +150,8 @@ function owa_wcvar(T::Integer, alphas::AbstractVector{<:Real},
     return w
 end
 function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
-    @smart_assert(zero(alpha) < alpha_i < alpha < one(alpha))
-    @smart_assert(a_sim > zero(a_sim))
+    @argcheck(zero(alpha) < alpha_i < alpha < one(alpha))
+    @argcheck(a_sim > zero(a_sim))
     alphas = range(; start = alpha_i, stop = alpha, length = a_sim)
     n = length(alphas)
     w = Vector{typeof(alpha)}(undef, n)
@@ -209,7 +209,7 @@ function owa_l_moment(T::Integer, k::Integer = 2)
 end
 function owa_l_moment_crm(T::Integer; k::Integer = 2,
                           method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
-    @smart_assert(k >= 2)
+    @argcheck(k >= 2)
     rg = 2:k
     weights = Matrix{typeof(inv(T * k))}(undef, T, length(rg))
     for i in rg

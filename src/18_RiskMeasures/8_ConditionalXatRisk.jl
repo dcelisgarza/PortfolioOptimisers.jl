@@ -6,9 +6,9 @@ end
 function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 alpha::Real = 0.05,
                                 w::Union{Nothing, <:AbstractWeights} = nothing)
-    @smart_assert(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(alpha) < alpha < one(alpha))
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     return ConditionalValueatRisk(settings, alpha, w)
 end
@@ -28,9 +28,9 @@ function DistributionallyRobustConditionalValueatRisk(;
                                                       alpha::Real = 0.05, l::Real = 1.0,
                                                       r::Real = 0.02,
                                                       w::Union{Nothing, <:AbstractWeights} = nothing)
-    @smart_assert(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(alpha) < alpha < one(alpha))
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     return DistributionallyRobustConditionalValueatRisk(settings, alpha, l, r, w)
 end
@@ -81,10 +81,10 @@ function ConditionalValueatRiskRange(;
                                      settings::RiskMeasureSettings = RiskMeasureSettings(),
                                      alpha::Real = 0.05, beta::Real = 0.05,
                                      w::Union{Nothing, <:AbstractWeights} = nothing)
-    @smart_assert(zero(alpha) < alpha < one(alpha))
-    @smart_assert(zero(beta) < beta < one(beta))
+    @argcheck(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(beta) < beta < one(beta))
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
@@ -115,10 +115,10 @@ function DistributionallyRobustConditionalValueatRiskRange(;
                                                            r_b::Real = 0.02,
                                                            w::Union{Nothing,
                                                                     <:AbstractWeights} = nothing)
-    @smart_assert(zero(alpha) < alpha < one(alpha))
-    @smart_assert(zero(beta) < beta < one(beta))
+    @argcheck(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(beta) < beta < one(beta))
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     return DistributionallyRobustConditionalValueatRiskRange(settings, alpha, l_a, r_a,
                                                              beta, l_b, r_b, w)
@@ -197,7 +197,7 @@ struct ConditionalDrawdownatRisk{T1, T2} <: RiskMeasure
 end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                    alpha::Real = 0.05)
-    @smart_assert(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(alpha) < alpha < one(alpha))
     return ConditionalDrawdownatRisk(settings, alpha)
 end
 function (r::ConditionalDrawdownatRisk)(x::AbstractVector)
@@ -229,7 +229,7 @@ end
 function RelativeConditionalDrawdownatRisk(;
                                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                            alpha::Real = 0.05)
-    @smart_assert(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(alpha) < alpha < one(alpha))
     return RelativeConditionalDrawdownatRisk(settings, alpha)
 end
 function (r::RelativeConditionalDrawdownatRisk)(x::AbstractVector)

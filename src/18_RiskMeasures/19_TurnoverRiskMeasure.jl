@@ -4,7 +4,7 @@ struct TurnoverRiskMeasure{T1, T2} <: RiskMeasure
 end
 function TurnoverRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              w::AbstractVector{<:Real})
-    @smart_assert(!isempty(w))
+    @argcheck(!isempty(w))
     return TurnoverRiskMeasure(settings, w)
 end
 function (r::TurnoverRiskMeasure)(w::AbstractVector)

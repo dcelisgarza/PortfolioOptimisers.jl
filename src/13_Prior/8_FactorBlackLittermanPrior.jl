@@ -33,7 +33,7 @@ function FactorBlackLittermanPrior(;
                                    tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)
     assert_bl_views_conf(views_conf, views)
     if !isnothing(tau)
-        @smart_assert(tau > zero(tau))
+        @argcheck(tau > zero(tau))
     end
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
@@ -56,12 +56,12 @@ function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
 end
 function prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    @smart_assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         F = transpose(F)
     end
-    @smart_assert(length(pe.sets.dict[pe.sets.key]) == size(F, 2))
+    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(F, 2))
     # Factor prior.
     f_prior = prior(pe.pe, F; strict = strict)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma
@@ -75,7 +75,7 @@ function prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatr
     omega = tau * calc_omega(pe.views_conf, P, prior_sigma)
     prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
-            @smart_assert(length(pe.w) == size(X, 2))
+            @argcheck(length(pe.w) == size(X, 2))
             pe.w
         else
             iN = inv(size(X, 2))

@@ -11,15 +11,15 @@ end
 function BudgetRange(; lb::Union{Nothing, <:Real} = 1.0, ub::Union{Nothing, <:Real} = 1.0)
     lb_flag = isnothing(lb)
     ub_flag = isnothing(ub)
-    @smart_assert(lb_flag ⊼ ub_flag)
+    @argcheck(lb_flag ⊼ ub_flag)
     if !lb_flag
-        @smart_assert(isfinite(lb))
+        @argcheck(isfinite(lb))
     end
     if !ub_flag
-        @smart_assert(isfinite(ub))
+        @argcheck(isfinite(ub))
     end
     if !lb_flag && !ub_flag
-        @smart_assert(lb <= ub)
+        @argcheck(lb <= ub)
     end
     return BudgetRange(lb, ub)
 end
@@ -42,26 +42,26 @@ function BudgetCosts(; bgt::Union{<:Real, <:BudgetRange} = 1.0, w::AbstractVecto
                      vn::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
                      up::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
                      un::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
-    @smart_assert(!isempty(w))
+    @argcheck(!isempty(w))
     if isa(vp, AbstractVector)
-        @smart_assert(!isempty(vp) && all(x -> x >= zero(x), vp))
+        @argcheck(!isempty(vp) && all(x -> x >= zero(x), vp))
     else
-        @smart_assert(vp >= zero(vp))
+        @argcheck(vp >= zero(vp))
     end
     if isa(vn, AbstractVector)
-        @smart_assert(!isempty(vn) && all(x -> x >= zero(x), vn))
+        @argcheck(!isempty(vn) && all(x -> x >= zero(x), vn))
     else
-        @smart_assert(vn >= zero(vn))
+        @argcheck(vn >= zero(vn))
     end
     if isa(up, AbstractVector)
-        @smart_assert(!isempty(up) && all(x -> x >= zero(x), up))
+        @argcheck(!isempty(up) && all(x -> x >= zero(x), up))
     else
-        @smart_assert(up >= zero(up))
+        @argcheck(up >= zero(up))
     end
     if isa(un, AbstractVector)
-        @smart_assert(!isempty(un) && all(x -> x >= zero(x), un))
+        @argcheck(!isempty(un) && all(x -> x >= zero(x), un))
     else
-        @smart_assert(un >= zero(un))
+        @argcheck(un >= zero(un))
     end
     return BudgetCosts(bgt, w, vp, vn, up, un)
 end
@@ -89,28 +89,28 @@ function BudgetMarketImpact(; bgt::Union{<:Real, <:BudgetRange} = 1.0,
                             up::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
                             un::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
                             beta::Real = 2 / 3)
-    @smart_assert(!isempty(w))
+    @argcheck(!isempty(w))
     if isa(vp, AbstractVector)
-        @smart_assert(!isempty(vp) && all(x -> x >= zero(x), vp))
+        @argcheck(!isempty(vp) && all(x -> x >= zero(x), vp))
     else
-        @smart_assert(vp >= zero(vp))
+        @argcheck(vp >= zero(vp))
     end
     if isa(vn, AbstractVector)
-        @smart_assert(!isempty(vn) && all(x -> x >= zero(x), vn))
+        @argcheck(!isempty(vn) && all(x -> x >= zero(x), vn))
     else
-        @smart_assert(vn >= zero(vn))
+        @argcheck(vn >= zero(vn))
     end
     if isa(up, AbstractVector)
-        @smart_assert(!isempty(up) && all(x -> x >= zero(x), up))
+        @argcheck(!isempty(up) && all(x -> x >= zero(x), up))
     else
-        @smart_assert(up >= zero(up))
+        @argcheck(up >= zero(up))
     end
     if isa(un, AbstractVector)
-        @smart_assert(!isempty(un) && all(x -> x >= zero(x), un))
+        @argcheck(!isempty(un) && all(x -> x >= zero(x), un))
     else
-        @smart_assert(un >= zero(un))
+        @argcheck(un >= zero(un))
     end
-    @smart_assert(zero(beta) <= beta <= one(beta))
+    @argcheck(zero(beta) <= beta <= one(beta))
     return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
 end
 function budget_view(bgt::BudgetMarketImpact, i::AbstractVector)
@@ -365,7 +365,7 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
     lb = wb.lb
     ub = wb.ub
     flag = w_neg_flag(lb) || w_neg_flag(ub)
-    @smart_assert(long ⊼ flag, "Long-only strategy cannot have negative weight limits")
+    @argcheck(long ⊼ flag, "Long-only strategy cannot have negative weight limits")
     w = model[:w]
     N = length(w)
     k = model[:k]

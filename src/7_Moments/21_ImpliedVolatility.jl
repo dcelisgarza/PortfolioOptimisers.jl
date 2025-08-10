@@ -12,7 +12,7 @@ function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVar
                                      ws::Real = 20,
                                      #  crit::AbstractStepwiseRegressionCriterion = RSquared(),
                                      re::AbstractRegressionTarget = LinearModel())
-    @smart_assert(ws > 2)
+    @argcheck(ws > 2)
     return ImpliedVolatilityRegression(ve, ws,
                                        #   crit,
                                        re)
@@ -28,7 +28,7 @@ function ImpliedVolatility(; ce::AbstractCovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
                            af::Real = 252)
-    @smart_assert(isfinite(af) && af > zero(af))
+    @argcheck(isfinite(af) && af > zero(af))
     return ImpliedVolatility(ce, mp, alg, af)
 end
 function factory(ce::ImpliedVolatility, w::Union{Nothing, <:AbstractWeights} = nothing)
@@ -68,10 +68,10 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::AbstractMat
                                X::AbstractMatrix, ::Any)
     T, N = size(X)
     chunk = div(T, alg.ws)
-    @smart_assert(chunk > 2)
+    @argcheck(chunk > 2)
     rv = realised_vol(alg.ve, X, alg.ws, chunk, T, N)
     iv = implied_vol(iv, alg.ws, chunk, T, N)
-    @smart_assert(size(rv) == size(iv))
+    @argcheck(size(rv) == size(iv))
     T2 = size(iv, 1)
     rv = log.(rv)
     iv = log.(iv)
@@ -122,4 +122,4 @@ function Statistics.cor(ce::ImpliedVolatility, X::AbstractMatrix; dims::Int = 1,
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
 end
-export ImpliedVolatility, predict_realised_vols
+export ImpliedVolatility

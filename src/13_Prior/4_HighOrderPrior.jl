@@ -200,26 +200,25 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:Abstract
     L2_flag = isa(L2, AbstractMatrix)
     S2_flag = isa(S2, AbstractMatrix)
     if kt_flag || L2_flag || S2_flag
-        @smart_assert(kt_flag && L2_flag && S2_flag)
-        @smart_assert(!isempty(kt) && !isempty(L2) && !isempty(S2))
+        @argcheck(kt_flag && L2_flag && S2_flag)
+        @argcheck(!isempty(kt) && !isempty(L2) && !isempty(S2))
         assert_matrix_issquare(kt)
         N = length(pr.mu)
-        @smart_assert(length(pr.mu)^2 == size(kt, 1))
-        @smart_assert(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
+        @argcheck(length(pr.mu)^2 == size(kt, 1))
+        @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
     end
     sk_flag = isa(sk, AbstractMatrix)
     V_flag = isa(V, AbstractMatrix)
     if sk_flag
-        @smart_assert(!isempty(sk))
-        @smart_assert(length(pr.mu)^2 == size(sk, 2))
+        @argcheck(!isempty(sk))
+        @argcheck(length(pr.mu)^2 == size(sk, 2))
     end
     if V_flag
-        @smart_assert(!isempty(V))
+        @argcheck(!isempty(V))
         assert_matrix_issquare(V)
     end
     if sk_flag || V_flag
-        @smart_assert(sk_flag && V_flag,
-                      "If either sk or V, is nothing, both must be nothing.")
+        @argcheck(sk_flag && V_flag, "If either sk or V, is nothing, both must be nothing.")
     end
     return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
 end
@@ -293,7 +292,7 @@ function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
 end
 function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
-    @smart_assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)

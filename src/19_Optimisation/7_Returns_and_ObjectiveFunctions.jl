@@ -7,13 +7,12 @@ function ArithmeticReturn(;
                                      <:AbstractUncertaintySetEstimator} = nothing,
                           lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing)
     if isa(ucs, EllipseUncertaintySet)
-        @smart_assert(isa(ucs,
-                          EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
+        @argcheck(isa(ucs, EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
     end
     if isa(lb, Real)
-        @smart_assert(isfinite(lb))
+        @argcheck(isfinite(lb))
     elseif isa(lb, AbstractVector)
-        @smart_assert(!isempty(lb) && all(isfinite, lb))
+        @argcheck(!isempty(lb) && all(isfinite, lb))
     end
     return ArithmeticReturn(ucs, lb)
 end
@@ -31,12 +30,12 @@ end
 function KellyReturn(; w::Union{Nothing, <:AbstractWeights} = nothing,
                      lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing)
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     if isa(lb, Real)
-        @smart_assert(isfinite(lb))
+        @argcheck(isfinite(lb))
     elseif isa(lb, AbstractVector)
-        @smart_assert(!isempty(lb) && all(isfinite, lb))
+        @argcheck(!isempty(lb) && all(isfinite, lb))
     end
     return KellyReturn(w, lb)
 end
@@ -63,7 +62,7 @@ struct MaximumUtility{T1} <: ObjectiveFunction
     l::T1
 end
 function MaximumUtility(; l::Real = 2)
-    @smart_assert(l >= zero(l))
+    @argcheck(l >= zero(l))
     return MaximumUtility(l)
 end
 struct MaximumRatio{T1, T2} <: ObjectiveFunction
@@ -72,7 +71,7 @@ struct MaximumRatio{T1, T2} <: ObjectiveFunction
 end
 function MaximumRatio(; rf::Real = 0.0, ohf::Union{Nothing, <:Real} = nothing)
     if !isnothing(ohf)
-        @smart_assert(ohf > zero(ohf))
+        @argcheck(ohf > zero(ohf))
     end
     return MaximumRatio(rf, ohf)
 end
@@ -82,7 +81,7 @@ function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::AbstractVect
     ohf = if isnothing(obj.ohf)
         min(1e3, max(1e-3, mean(abs.(mu))))
     else
-        @smart_assert(obj.ohf > zero(obj.ohf))
+        @argcheck(obj.ohf > zero(obj.ohf))
         obj.ohf
     end
     @expression(model, ohf, ohf)

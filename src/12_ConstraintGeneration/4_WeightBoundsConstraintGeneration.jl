@@ -1,28 +1,28 @@
 function validate_bounds(lb::Real, ub::Real)
-    @smart_assert(lb <= ub)
+    @argcheck(lb <= ub)
     return nothing
 end
 function validate_bounds(lb::AbstractVector, ub::Real)
-    @smart_assert(!isempty(lb) && all(x -> x <= ub, lb))
+    @argcheck(!isempty(lb) && all(x -> x <= ub, lb))
     return nothing
 end
 function validate_bounds(lb::Real, ub::AbstractVector)
-    @smart_assert(!isempty(ub) && all(x -> lb <= x, ub))
+    @argcheck(!isempty(ub) && all(x -> lb <= x, ub))
     return nothing
 end
 function validate_bounds(lb::AbstractVector, ub::AbstractVector)
-    @smart_assert(!isempty(lb) &&
-                  !isempty(ub) &&
-                  length(lb) == length(ub) &&
-                  all(map((x, y) -> x <= y, lb, ub)))
+    @argcheck(!isempty(lb) &&
+              !isempty(ub) &&
+              length(lb) == length(ub) &&
+              all(map((x, y) -> x <= y, lb, ub)))
     return nothing
 end
 function validate_bounds(lb::AbstractVector, ::Any)
-    @smart_assert(!isempty(lb))
+    @argcheck(!isempty(lb))
     return nothing
 end
 function validate_bounds(::Any, ub::AbstractVector)
-    @smart_assert(!isempty(ub))
+    @argcheck(!isempty(ub))
     return nothing
 end
 function validate_bounds(args...)
@@ -55,10 +55,10 @@ function WeightBoundsEstimator(;
                                ub::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
                                          <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing)
     if !isnothing(lb)
-        @smart_assert(!isempty(lb))
+        @argcheck(!isempty(lb))
     end
     if !isnothing(ub)
-        @smart_assert(!isempty(ub))
+        @argcheck(!isempty(ub))
     end
     return WeightBoundsEstimator(lb, ub)
 end

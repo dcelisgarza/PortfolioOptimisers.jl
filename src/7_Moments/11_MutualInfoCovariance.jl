@@ -80,7 +80,7 @@ function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance()
                               bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                               normalise::Bool = true)
     if isa(bins, Integer)
-        @smart_assert(bins > zero(bins))
+        @argcheck(bins > zero(bins))
     end
     return MutualInfoCovariance(ve, bins, normalise)
 end
@@ -119,7 +119,7 @@ This method computes the pairwise mutual information correlation matrix for the 
 """
 function Statistics.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
                         kwargs...)
-    @smart_assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -158,7 +158,7 @@ This method computes the pairwise mutual information covariance matrix for the i
 """
 function Statistics.cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
                         kwargs...)
-    @smart_assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

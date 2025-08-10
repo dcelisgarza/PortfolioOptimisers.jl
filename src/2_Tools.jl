@@ -20,7 +20,7 @@ abstract type AbstractReturnsResult <: AbstractResult end
 Assert that `A` is a square matrix.
 """
 function assert_matrix_issquare(A::AbstractMatrix)
-    @smart_assert(size(A, 1) == size(A, 2))
+    @argcheck(size(A, 1) == size(A, 2))
 end
 function drop_correlated(X::AbstractMatrix; threshold::Real = 0.95, absolute::Bool = false)
     N = size(X, 2)
@@ -163,33 +163,33 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
     nxs_flag = !isnothing(nx)
     X_flag = !isnothing(X)
     if nxs_flag || X_flag
-        @smart_assert(nxs_flag && X_flag)
-        @smart_assert(!isempty(nx) && !isempty(X))
-        @smart_assert(length(nx) == size(X, 2))
+        @argcheck(nxs_flag && X_flag)
+        @argcheck(!isempty(nx) && !isempty(X))
+        @argcheck(length(nx) == size(X, 2))
     end
     nfs_flag = !isnothing(nf)
     F_flag = !isnothing(F)
     if (nfs_flag || F_flag) && nxs_flag
-        @smart_assert(nfs_flag && F_flag)
-        @smart_assert(!isempty(nf) && !isempty(F))
-        @smart_assert(length(nf) == size(F, 2))
-        @smart_assert(size(X, 1) == size(F, 1))
+        @argcheck(nfs_flag && F_flag)
+        @argcheck(!isempty(nf) && !isempty(F))
+        @argcheck(length(nf) == size(F, 2))
+        @argcheck(size(X, 1) == size(F, 1))
     end
     if !isnothing(ts)
-        @smart_assert(!isempty(ts))
-        @smart_assert(length(ts) == size(X, 1))
+        @argcheck(!isempty(ts))
+        @argcheck(length(ts) == size(X, 1))
     end
     if !isnothing(iv)
-        @smart_assert(!isempty(iv))
-        @smart_assert(size(iv) == size(X))
-        @smart_assert(all(x -> x > zero(eltype(iv)), iv))
+        @argcheck(!isempty(iv))
+        @argcheck(size(iv) == size(X))
+        @argcheck(all(x -> x > zero(eltype(iv)), iv))
         if !isnothing(ivpa)
             if isa(ivpa, Real)
-                @smart_assert(isfinite(ivpa) && ivpa > zero(ivpa))
+                @argcheck(isfinite(ivpa) && ivpa > zero(ivpa))
             elseif isa(ivpa, AbstractVector)
-                @smart_assert(!isempty(ivpa))
-                @smart_assert(all(isfinite, ivpa) && all(x -> x > zero(eltype(ivpa)), ivpa))
-                @smart_assert(length(ivpa) == size(iv, 2))
+                @argcheck(!isempty(ivpa))
+                @argcheck(all(isfinite, ivpa) && all(x -> x > zero(eltype(ivpa)), ivpa))
+                @argcheck(length(ivpa) == size(iv, 2))
             end
         end
     end
@@ -286,13 +286,11 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                            map_func::Union{Nothing, Function} = nothing,
                            join_method::Symbol = :outer,
                            impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
-    @smart_assert(zero(missing_col_percent) <
-                  missing_col_percent <=
-                  one(missing_col_percent))
+    @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent))
     if !isnothing(missing_row_percent)
-        @smart_assert(zero(missing_row_percent) <
-                      missing_row_percent <=
-                      one(missing_row_percent))
+        @argcheck(zero(missing_row_percent) <
+                  missing_row_percent <=
+                  one(missing_row_percent))
     end
     if !isempty(F)
         asset_names = string.(colnames(X))
@@ -337,7 +335,7 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     oc = setdiff(col_names, union(nx, nf))
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
-        @smart_assert(ts == timestamp(iv))
+        @argcheck(ts == timestamp(iv))
     end
     if isempty(nf)
         nf = nothing

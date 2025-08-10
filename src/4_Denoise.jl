@@ -114,7 +114,7 @@ ShrunkDenoise
 ```
 """
 function ShrunkDenoise(; alpha::Real = 0.0)
-    @smart_assert(zero(alpha) <= alpha <= one(alpha))
+    @argcheck(zero(alpha) <= alpha <= one(alpha))
     return ShrunkDenoise(alpha)
 end
 

@@ -97,10 +97,10 @@ end
 function optimise!(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
                    cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
                    fees::Union{Nothing, <:Fees} = nothing; kwargs...)
-    @smart_assert(!isempty(w) && !isempty(p) && length(w) == length(p))
-    @smart_assert(cash > zero(cash))
+    @argcheck(!isempty(w) && !isempty(p) && length(w) == length(p))
+    @argcheck(cash > zero(cash))
     if !isnothing(fees)
-        @smart_assert(!isnothing(T))
+        @argcheck(!isnothing(T))
     end
     cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, cash, T, fees)
     sshares, scost, sw, scash = greedy_sub_allocation!(-view(w, sidx), view(p, sidx), scash,

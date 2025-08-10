@@ -10,7 +10,7 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
                 settings::Union{Nothing, <:AbstractDict} = nothing,
                 check_sol::NamedTuple = (;), add_bridges::Bool = true)
     if !isnothing(settings)
-        @smart_assert(!isempty(settings))
+        @argcheck(!isempty(settings))
     end
     return Solver(name, solver, settings, check_sol, add_bridges)
 end

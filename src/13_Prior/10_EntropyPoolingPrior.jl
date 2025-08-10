@@ -29,7 +29,7 @@ end
 function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Real = 1,
                              sc2::Real = 1e3,
                              alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
-    @smart_assert(sc1 >= zero(sc1))
+    @argcheck(sc1 >= zero(sc1))
     return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
 end
 struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
@@ -43,11 +43,11 @@ function JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                             sc1::Real = 1, sc2::Real = 1e5, so::Real = 1,
                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     if isa(slv, AbstractVector)
-        @smart_assert(!isempty(slv))
+        @argcheck(!isempty(slv))
     end
-    @smart_assert(sc1 >= zero(sc1))
-    @smart_assert(sc2 >= zero(sc2))
-    @smart_assert(so >= zero(so))
+    @argcheck(sc1 >= zero(sc1))
+    @argcheck(sc2 >= zero(sc2))
+    @argcheck(so >= zero(so))
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
 function effective_number_scenarios(x::AbstractVector, y::AbstractVector)
@@ -89,7 +89,7 @@ function EntropyPoolingPrior(;
                              w::Union{Nothing, AbstractVector} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
     if isa(w, AbstractWeights)
-        @smart_assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     if !isnothing(mu_views) ||
        !isnothing(var_views) ||
@@ -98,10 +98,10 @@ function EntropyPoolingPrior(;
        !isnothing(sk_views) ||
        !isnothing(kt_views) ||
        !isnothing(rho_views)
-        @smart_assert(!isnothing(sets))
+        @argcheck(!isnothing(sets))
     end
-    @smart_assert(zero(var_alpha) < var_alpha < one(var_alpha))
-    @smart_assert(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha))
+    @argcheck(zero(var_alpha) < var_alpha < one(var_alpha))
+    @argcheck(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha))
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views, sk_views,
                                kt_views, rho_views, var_alpha, cvar_alpha, sets, ds_opt,
                                dm_opt, opt, w, alg)
@@ -485,7 +485,7 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
     cvar_views = replace_group_by_assets(cvar_views, sets, false, true, false)
     cvar_views = replace_prior_views(cvar_views, pr, sets, :cvar, alpha; strict = strict)
     lcs = get_linear_constraints(cvar_views, sets; datatype = eltype(pr.X), strict = strict)
-    @smart_assert(isnothing(lcs.ineq), "`cvar_view` can only have equality constraints.")
+    @argcheck(isnothing(lcs.ineq), "`cvar_view` can only have equality constraints.")
     if any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2))
         throw(ArgumentError("Cannot mix multiple assets in a single `cvar_view`."))
     end
@@ -522,7 +522,7 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
     end
     function func(etas)
         delete!(epc, :cvar_eq)
-        @smart_assert(all(zero(eltype(etas)) .<= etas .<= B))
+        @argcheck(all(zero(eltype(etas)) .<= etas .<= B))
         pos_part = max.(-X .- transpose(etas), zero(eltype(X)))
         add_ep_constraint!(epc, transpose(pos_part / alpha), B .- etas, :cvar_eq)
         wi = entropy_pooling(w, epc, opt)
@@ -689,10 +689,10 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
     to_fix = falses(size(pr.X, 2))
     sigma = diag(pr.sigma)
     for rho_view in rho_views
-        @smart_assert(length(rho_view.vars) == 1,
-                      "Cannot mix multiple correlation pairs in a single view `$(rho_view.eqn)`.")
-        @smart_assert(-one(eltype(pr.X)) <= rho_view.rhs <= one(eltype(pr.X)),
-                      "Correlation prior rho_view `$(rho_view.eqn)` must be in [-1, 1].")
+        @argcheck(length(rho_view.vars) == 1,
+                  "Cannot mix multiple correlation pairs in a single view `$(rho_view.eqn)`.")
+        @argcheck(-one(eltype(pr.X)) <= rho_view.rhs <= one(eltype(pr.X)),
+                  "Correlation prior rho_view `$(rho_view.eqn)` must be in [-1, 1].")
         d = ifelse(rho_view.op == ">=", -1, 1)
         i, j = rho_view.ij[1]
         sigma_ij = if !isa(i, AbstractVector)
@@ -772,7 +772,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Union{<:H1_EntropyPooling, <:H2_EntropyPooling}},
                X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    @smart_assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
@@ -783,7 +783,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     w1 = w0 = if isnothing(pe.w)
         pweights(range(; start = inv(T), stop = inv(T), length = T))
     else
-        @smart_assert(length(pe.w) == T)
+        @argcheck(length(pe.w) == T)
         pweights(pe.w)
     end
     fixed = falses(N, 2)
@@ -845,7 +845,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:H0_EntropyPooling}, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    @smart_assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
@@ -856,7 +856,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     w0 = if isnothing(pe.w)
         pweights(range(; start = inv(T), stop = inv(T), length = T))
     else
-        @smart_assert(length(pe.w) == T)
+        @argcheck(length(pe.w) == T)
         pweights(pe.w)
     end
     epc = Dict{Symbol, Tuple{<:AbstractMatrix, <:AbstractVector}}()

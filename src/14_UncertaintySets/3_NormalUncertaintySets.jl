@@ -11,8 +11,8 @@ function NormalUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
                               n_sim::Integer = 3_000, q::Real = 0.05,
                               rng::AbstractRNG = Random.default_rng(),
                               seed::Union{Nothing, <:Integer} = nothing)
-    @smart_assert(n_sim > zero(n_sim))
-    @smart_assert(zero(q) < q < one(q))
+    @argcheck(n_sim > zero(n_sim))
+    @argcheck(zero(q) < q < one(q))
     return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed)
 end
 function commutation_matrix(x::AbstractMatrix)

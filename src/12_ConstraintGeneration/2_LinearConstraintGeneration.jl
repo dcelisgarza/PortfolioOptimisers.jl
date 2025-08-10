@@ -3,7 +3,7 @@ struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
     B::T2
 end
 function PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
-    @smart_assert(!isempty(A) && !isempty(B))
+    @argcheck(!isempty(A) && !isempty(B))
     return PartialLinearConstraint(A, B)
 end
 struct LinearConstraint{T1, T2} <: AbstractConstraintResult
@@ -12,7 +12,7 @@ struct LinearConstraint{T1, T2} <: AbstractConstraintResult
 end
 function LinearConstraint(; ineq::Union{Nothing, <:PartialLinearConstraint} = nothing,
                           eq::Union{Nothing, <:PartialLinearConstraint} = nothing)
-    @smart_assert(isnothing(ineq) ⊼ isnothing(eq))
+    @argcheck(isnothing(ineq) ⊼ isnothing(eq))
     return LinearConstraint(ineq, eq)
 end
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
@@ -145,8 +145,8 @@ struct AssetSets{T1, T2} <: AbstractEstimator
 end
 function AssetSets(; key::AbstractString = "nx",
                    dict::AbstractDict{<:Union{Symbol, <:AbstractString}})
-    @smart_assert(!isempty(dict))
-    @smart_assert(haskey(dict, key))
+    @argcheck(!isempty(dict))
+    @argcheck(haskey(dict, key))
     return AssetSets(key, dict)
 end
 Base.length(res::AssetSets) = 1
@@ -371,8 +371,8 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
-                @smart_assert(!isnothing(asset1) && !isnothing(asset2))
-                @smart_assert(length(asset1) == length(asset2))
+                @argcheck(!isnothing(asset1) && !isnothing(asset2))
+                @argcheck(length(asset1) == length(asset2))
                 push!(variables_tmp, "([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
                 push!(idx_rm, i)
@@ -405,8 +405,8 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
-                @smart_assert(!isnothing(asset1) && !isnothing(asset2))
-                @smart_assert(length(asset1) == length(asset2))
+                @argcheck(!isnothing(asset1) && !isnothing(asset2))
+                @argcheck(length(asset1) == length(asset2))
                 push!(variables_tmp,
                       "prior([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
@@ -435,7 +435,7 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
                                 sets::AssetSets; datatype::DataType = Float64,
                                 strict::Bool = false)
     if isa(lcs, AbstractVector)
-        @smart_assert(!isempty(lcs))
+        @argcheck(!isempty(lcs))
     end
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)
@@ -454,7 +454,7 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
             end
             At += Ai * c
         end
-        @smart_assert(any(x -> !iszero(x), At))
+        @argcheck(any(x -> !iszero(x), At))
         d = ifelse(lc.op == ">=", -1, 1)
         flag = d == -1 || lc.op == "<="
         A = At .* d
@@ -541,8 +541,8 @@ struct RiskBudgetResult{T1} <: AbstractResult
     val::T1
 end
 function RiskBudgetResult(; val::AbstractVector{<:Real})
-    @smart_assert(!isempty(val))
-    @smart_assert(all(x -> x >= zero(x), val))
+    @argcheck(!isempty(val))
+    @argcheck(all(x -> x >= zero(x), val))
     return RiskBudgetResult(val)
 end
 function risk_budget_view(rb::RiskBudgetResult, i::AbstractVector)
@@ -571,14 +571,14 @@ function RiskBudgetEstimator(;
                              val::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
                                         <:AbstractVector{<:Union{<:Pair{<:Any, <:Real}}}})
     if isa(val, Union{<:AbstractDict, <:AbstractVector})
-        @smart_assert(!isempty(val))
+        @argcheck(!isempty(val))
         if isa(val, AbstractDict)
-            @smart_assert(all(x -> x >= zero(x), values(val)))
+            @argcheck(all(x -> x >= zero(x), values(val)))
         elseif isa(val, AbstractVector{<:Pair})
-            @smart_assert(all(x -> x >= zero(x), getproperty.(val, :second)))
+            @argcheck(all(x -> x >= zero(x), getproperty.(val, :second)))
         end
     elseif isa(val, Pair)
-        @smart_assert(val.second >= zero(val.second))
+        @argcheck(val.second >= zero(val.second))
     end
     return RiskBudgetEstimator(val)
 end
@@ -591,9 +591,9 @@ function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
     return risk_budget_constraints(rb.val, sets; strict = strict, datatype = datatype)
 end
 function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
-    @smart_assert(haskey(sets.dict, smtx))
+    @argcheck(haskey(sets.dict, smtx))
     all_sets = sets.dict[smtx]
-    @smart_assert(length(sets.dict[sets.key]) == length(all_sets))
+    @argcheck(length(sets.dict[sets.key]) == length(all_sets))
     unique_sets = unique(all_sets)
     A = BitMatrix(undef, length(all_sets), length(unique_sets))
     for (i, val) in pairs(unique_sets)
@@ -615,7 +615,7 @@ function LinearConstraintEstimator(;
                                               <:AbstractVector{<:Union{<:AbstractString,
                                                                        Expr}}})
     if isa(val, Union{<:AbstractString, <:AbstractVector})
-        @smart_assert(!isempty(val))
+        @argcheck(!isempty(val))
     end
     return LinearConstraintEstimator(val)
 end
@@ -640,7 +640,7 @@ struct AssetSetsMatrixEstimator{T1} <: AbstractEstimator
 end
 function AssetSetsMatrixEstimator(; val::Union{<:Symbol, <:AbstractString})
     if isa(val, AbstractString)
-        @smart_assert(!isempty(val))
+        @argcheck(!isempty(val))
     end
     return AssetSetsMatrixEstimator(val)
 end
