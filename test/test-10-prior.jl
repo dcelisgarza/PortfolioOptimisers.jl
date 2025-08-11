@@ -494,4 +494,27 @@
         @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.07, rtol = 5e-6)
         @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.02, rtol = 5e-6)
     end
+    @testset "Opinion pooling" begin
+        pr0 = prior(EmpiricalPrior(), rd)
+        pr = prior(OpinionPoolingPrior(;
+                                       pes = [EntropyPoolingPrior(; sets = sets,
+                                                                  mu_views = LinearConstraintEstimator(;
+                                                                                                       val = "AAPL == prior(AAPL)*1.5")),
+                                              EntropyPoolingPrior(; sets = sets,
+                                                                  mu_views = LinearConstraintEstimator(;
+                                                                                                       val = "AAPL == prior(AAPL)*2"))],
+                                       w = [0.4, 0.4]), rd)
+        @test isapprox(pr.mu[1], 0.0022963115075039417, rtol = 1e-6)
+
+        pr = prior(OpinionPoolingPrior(;
+                                       pes = [EntropyPoolingPrior(; sets = sets,
+                                                                  mu_views = LinearConstraintEstimator(;
+                                                                                                       val = "AAPL == prior(AAPL)*1.5")),
+                                              EntropyPoolingPrior(; sets = sets,
+                                                                  mu_views = LinearConstraintEstimator(;
+                                                                                                       val = "AAPL == prior(AAPL)*2"))],
+                                       w = [0.5, 0.5], alg = LogarithmicOpinionPooling(),
+                                       p = 5), rd)
+        @test isapprox(pr.mu[1], 0.002511023272287914, rtol = 1e-6)
+    end
 end

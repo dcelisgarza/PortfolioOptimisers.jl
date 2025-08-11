@@ -12,41 +12,43 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <:
     threads::T7
 end
 function OpinionPoolingPrior(;
-                             pes::AbstractVector{<:AbstractLowOrderPriorEstimator_1o2_1o2},
-                             pe1::Union{Nothing, <:AbstractLowOrderPriorEstimator_1o2_1o2} = nothing,
-                             pe2::Union{Nothing, <:AbstractLowOrderPriorEstimator_1o2_1o2} = nothing,
+                             pes::AbstractVector{<:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
+                             pe1::Union{Nothing,
+                                        <:AbstractLowOrderPriorEstimatorMap_1o2_1o2} = nothing,
+                             pe2::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
                              p::Union{Nothing, <:Real} = nothing,
-                             w::Union{Nothing, <:AbstractWeights} = nothing,
+                             w::Union{Nothing, <:AbstractVector} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
                              threads::FLoops.Transducers.Executor = ThreadedEx())
     @assert(!isempty(pes))
     if !isnothing(p)
-        @assert(p > zero(p))
+        @assert(p >= zero(p))
     end
-    if isa(w, AbstractWeights)
+    if isa(w, AbstractVector)
         @assert(!isempty(w) && length(w) == length(pes))
+        @assert(all(x -> zero(x) <= x <= one(x), w))
         @assert(sum(w) <= one(eltype(w)))
     end
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)
 end
-function robust_probabilities(::AbstractMatrix, ow::AbstractVector, ::Nothing)
+function robust_probabilities(ow::AbstractVector, args...)
     return ow
 end
-function robust_probabilities(pw::AbstractMatrix, ow::AbstractVector, p::Real)
+function robust_probabilities(ow::AbstractVector, pw::AbstractMatrix, p::Real)
     c = pw * ow
     kldivs = [sum(kldivergence(view(pw, :, i), c)) for i in axes(pw, 2)]
     ow .*= exp.(-p * kldivs)
     ow /= sum(ow)
     return ow
 end
-function compute_pooling(::LinearOpinionPooling, pw::AbstractMatrix, ow::AbstractVector)
-    return pw * ow
+function compute_pooling(::LinearOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
+    return pweights(pw * ow)
 end
-function compute_pooling(::LogarithmicOpinionPooling, pw::AbstractMatrix,
-                         ow::AbstractVector)
+function compute_pooling(::LogarithmicOpinionPooling, ow::AbstractVector,
+                         pw::AbstractMatrix)
     u = log.(pw) * ow
     lse = logsumexp(u)
-    return vec(exp.(u .- lse))
+    return pweights(vec(exp.(u .- lse)))
 end
 function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
@@ -61,30 +63,30 @@ function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
     X = !isnothing(pe.pe1) ? prior(pe.pe1, X, F; strict = strict, kwargs...).X : X
     T = size(X, 1)
     M = length(pe.pes)
-    pw = Vector{eltype(X)}(undef, T * M)
-    @floop pe.threads for (i, pe) in enumerate(pe.pes)
-        pr = prior(pe, X, F; strict = strict, kwargs...)
-        @assert(!isnothing(pr.w))
-        pw[(1 + (i - 1) * M):(i * M)] = pr.w
-    end
     ow = isnothing(pe.w) ? range(; start = inv(M), stop = inv(M), length = M) : pe.w
     rw = one(eltype(ow)) - sum(ow)
     if rw > eps(typeof(rw))
+        pw = Matrix{eltype(X)}(undef, T, M + 1)
         push!(ow, rw)
-        append!(pw, range(; start = inv(T), stop = inv(T), length = T))
-    end
-    pw = reshape(pw, T, :)
-    ow = robust_probabilities(pw, ow, pe.p)
-    w = pweights(compute_pooling(pe.alg, pw, ow))
-    pe2 = if !isnothing(pe.pe2)
-        factory(pe.pe2, w)
+        pw[:, end] .= inv(T)
     else
-        factory(EmpiricalPrior(), w)
+        pw = Matrix{eltype(X)}(undef, T, M)
     end
+    let X = X, F = F, pw = pw
+        @floop pe.threads for (i, pe) in enumerate(pe.pes)
+            pr = prior(pe, X, F; strict = strict, kwargs...)
+            @assert(!isnothing(pr.w))
+            pw[:, i] = pr.w
+        end
+    end
+    ow = robust_probabilities(ow, pw, pe.p)
+    w = compute_pooling(pe.alg, ow, pw)
+    pe2 = factory(pe.pe2, w)
     (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = prior(pe2, X, F; strict = strict,
                                                             kwargs...)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w,
                          loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
                          f_w = !isnothing(loadings) ? w : nothing)
-    return nothing
 end
+
+export LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior

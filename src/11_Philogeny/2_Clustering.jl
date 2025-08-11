@@ -11,9 +11,8 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
 end
 function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
                                 D::AbstractMatrix, k::Integer)
-    @assert(!isempty(S) && !isempty(D))
-    @assert(size(S) == size(D))
-    @assert(k >= one(k))
+    @assert(!isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
+            AssertionError("The following conditions must hold:\n`S` must be non-empty => $(!isempty(S))\n`D` must be non-empty => $(!isempty(D))\n`S` and `D` must have the same size => $(size(S) == size(D))\nk must be greater than or equal to 1 => $k"))
     return HierarchicalClustering(clustering, S, D, k)
 end
 function clusterise(cle::AbstractClusteringResult, args...; kwargs...)

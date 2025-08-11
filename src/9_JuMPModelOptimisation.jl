@@ -50,7 +50,7 @@ function optimise_JuMP_model!(model::JuMP.Model,
             trials[solver.name] = Dict(:set_optimizer => err)
             continue
         end
-        set_solver_attributes(model, slv.settings)
+        set_solver_attributes(model, solver.settings)
         try
             JuMP.optimize!(model)
         catch err

@@ -1,3 +1,12 @@
+
+#=
+struct ReturnsDistribution{T1, T2, T3, T4} <: AbstractResult
+    X::T1
+    mu::T2
+    sigma::T3
+    w::T4
+end
+=#
 struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractPriorResult
     X::T1
     mu::T2
