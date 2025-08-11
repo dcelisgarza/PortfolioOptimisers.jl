@@ -7,10 +7,10 @@ struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
     add_bridges::T5
 end
 function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
-                settings::Union{Nothing, <:AbstractDict, <:AbstractVector{<:Pair}} = nothing,
+                settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}} = nothing,
                 check_sol::NamedTuple = (;), add_bridges::Bool = true)
-    if !isnothing(settings)
-        @assert(!isempty(settings))
+    if isa(settings, Union{<:AbstractDict, <:AbstractVector})
+        @assert(!isempty(settings), AssertionError("`settings` must be non-empty."))
     end
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
@@ -25,6 +25,20 @@ function JuMPResult(; trials::AbstractDict, success::Bool)
     end
     return JuMPResult(trials, success)
 end
+function set_solver_attributes(args...)
+    return nothing
+end
+function set_solver_attributes(model::JuMP.Model,
+                               settings::Union{<:AbstractDict, <:AbstractVector{<:Pair}})
+    for (k, v) in settings
+        set_attribute(model, k, v)
+    end
+    return nothing
+end
+function set_solver_attributes(model::JuMP.Model, settings::Pair)
+    set_attribute(model, settings...)
+    return nothing
+end
 function optimise_JuMP_model!(model::JuMP.Model,
                               slv::Union{<:Solver, <:AbstractVector{<:Solver}})
     trials = Dict()
@@ -36,11 +50,7 @@ function optimise_JuMP_model!(model::JuMP.Model,
             trials[solver.name] = Dict(:set_optimizer => err)
             continue
         end
-        if !isnothing(solver.settings)
-            for (k, v) in solver.settings
-                set_attribute(model, k, v)
-            end
-        end
+        set_solver_attributes(model, slv.settings)
         try
             JuMP.optimize!(model)
         catch err

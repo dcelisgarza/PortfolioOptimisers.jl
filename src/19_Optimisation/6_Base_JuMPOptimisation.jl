@@ -177,11 +177,7 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
             trials[solver.name] = Dict(:set_optimizer => err)
             continue
         end
-        if !isnothing(solver.settings)
-            for (k, v) in solver.settings
-                set_attribute(model, k, v)
-            end
-        end
+        set_solver_attributes(model, solver.settings)
         try
             JuMP.optimize!(model)
         catch err

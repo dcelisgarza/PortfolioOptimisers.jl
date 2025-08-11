@@ -55,10 +55,10 @@ function WeightBoundsEstimator(;
                                ub::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
                                          <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing)
     if !isnothing(lb)
-        @assert(!isempty(lb))
+        @assert(!isempty(lb), AssertionError("`lb` must be non-empty."))
     end
     if !isnothing(ub)
-        @assert(!isempty(ub))
+        @assert(!isempty(ub), AssertionError("`ub` must be non-empty."))
     end
     return WeightBoundsEstimator(lb, ub)
 end

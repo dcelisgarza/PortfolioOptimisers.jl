@@ -18,7 +18,7 @@ struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
     kwargs::T2
 end
 function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
-    @assert(kind in 0:2)
+    @assert(kind in 0:2, DomainError("`kind` must be in (0:2):\nkind => $kind"))
     return DegreeCentrality(kind, kwargs)
 end
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end

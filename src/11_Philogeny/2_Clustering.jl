@@ -24,7 +24,7 @@ struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm
     k::T1
 end
 function PredefinedNumberClusters(; k::Integer = 1)
-    @assert(k >= one(k))
+    @assert(k >= one(k), DomainError("`k` must be greater than or equal to 1:\nk => $k"))
     return PredefinedNumberClusters(k)
 end
 struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
@@ -41,7 +41,8 @@ end
 function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
                                alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
     if !isnothing(max_k)
-        @assert(max_k >= one(max_k))
+        @assert(max_k >= one(max_k),
+                DomainError("`max_k` must be greater than or equal to 1:\nmax_k => $max_k"))
     end
     return OptimalNumberClusters(max_k, alg)
 end

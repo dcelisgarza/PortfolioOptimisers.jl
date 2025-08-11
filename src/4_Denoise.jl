@@ -115,7 +115,7 @@ ShrunkDenoise
 """
 function ShrunkDenoise(; alpha::Real = 0.0)
     @assert(zero(alpha) <= alpha <= one(alpha),
-            ArgumentError("`alpha` must be in [0, 1]:\nalpha => $alpha"))
+            DomainError("`alpha` must be in [0, 1]:\nalpha => $alpha"))
     return ShrunkDenoise(alpha)
 end
 

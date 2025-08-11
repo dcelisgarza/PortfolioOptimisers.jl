@@ -16,17 +16,17 @@ function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = n
                        fs::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
                                  <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))
-    if !isnothing(l)
-        @assert(!isempty(l))
+    if isa(l, Union{<:AbstractDict, <:AbstractVector})
+        @assert(!isempty(l), AssertionError("`l` must be non-empty."))
     end
-    if !isnothing(s)
-        @assert(!isempty(s))
+    if isa(s, Union{<:AbstractDict, <:AbstractVector})
+        @assert(!isempty(s), AssertionError("`s` must be non-empty."))
     end
-    if !isnothing(fl)
-        @assert(!isempty(fl))
+    if isa(fl, Union{<:AbstractDict, <:AbstractVector})
+        @assert(!isempty(fl), AssertionError("`fl` must be non-empty."))
     end
-    if !isnothing(fs)
-        @assert(!isempty(fs))
+    if isa(fs, Union{<:AbstractDict, <:AbstractVector}s)
+        @assert(!isempty(fs), AssertionError("`fs` must be non-empty."))
     end
     return FeesEstimator(tn, l, s, fl, fs, kwargs)
 end
@@ -57,29 +57,29 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
               fl::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
               fs::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
               kwargs::NamedTuple = (; atol = 1e-8))
-    if isa(l, AbstractVector)
-        @assert(!isempty(l))
+    if isa(l, Real)
+        @assert(l >= zero(l), DomainError("`l` must be non-negative:\nl => $l"))
+    elseif isa(l, AbstractVector)
+        @assert(!isempty(l) && all(x -> x >= zero(x), l),
+                AssertionError("`l` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), l) => $(all(x -> x >= zero(x), l))"))
     end
-    if isa(s, AbstractVector)
-        @assert(!isempty(s))
+    if isa(s, Real)
+        @assert(s >= zero(s), DomainError("`s` must be non-negative:\ns => $s"))
+    elseif isa(s, AbstractVector)
+        @assert(!isempty(s) && all(x -> x >= zero(x), s),
+                AssertionError("`s` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), s) => $(all(x -> x >= zero(x), s))"))
     end
-    if isa(fl, AbstractVector)
-        @assert(!isempty(fl))
+    if isa(fl, Real)
+        @assert(fl >= zero(fl), DomainError("`fl` must be non-negative:\nfl => $fl"))
+    elseif isa(fl, AbstractVector)
+        @assert(!isempty(fl) && all(x -> x >= zero(x), fl),
+                AssertionError("`fl` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), fl) => $(all(x -> x >= zero(x), fl))"))
     end
-    if isa(fs, AbstractVector)
-        @assert(!isempty(fs))
-    end
-    if !isnothing(l)
-        @assert(all(x -> x >= zero(x), l))
-    end
-    if !isnothing(s)
-        @assert(all(x -> x >= zero(x), s))
-    end
-    if !isnothing(fl)
-        @assert(all(x -> x >= zero(x), fl))
-    end
-    if !isnothing(fs)
-        @assert(all(x -> x >= zero(x), fs))
+    if isa(fs, Real)
+        @assert(fs >= zero(fs), DomainError("`fs` must be non-negative:\nfs => $fs"))
+    elseif isa(fs, AbstractVector)
+        @assert(!isempty(fs) && all(x -> x >= zero(x), fs),
+                AssertionError("`fs` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), fs) => $(all(x -> x >= zero(x), fs))"))
     end
     return Fees(tn, l, s, fl, fs, kwargs)
 end

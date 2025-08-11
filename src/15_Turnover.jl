@@ -7,9 +7,8 @@ function TurnoverEstimator(; w::AbstractVector{<:Real},
                            val::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
                                       <:AbstractVector{<:Pair{<:Any, <:Real}}},
                            default::Real = 0.0)
-    @assert(!isempty(w))
-    @assert(!isempty(val))
-    @assert(default >= zero(default))
+    @assert(!isempty(w) && !isempty(val) && default >= zero(default),
+            AssertionError("The following conditions must hold:\n`w` must be non-empty => $(!isempty(w))\n`val` must be non-empty => $(!isempty(val))\n`default` must be non-negative: $default"))
     return TurnoverEstimator(w, val, default)
 end
 function turnover_constraints(::Nothing, args...; kwargs...)
@@ -25,13 +24,16 @@ struct Turnover{T1, T2} <: AbstractResult
 end
 function Turnover(; w::AbstractVector{<:Real},
                   val::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
-    @assert(!isempty(w))
+    @assert(!isempty(w), AssertionError("`w` must be non-empty."))
     if isa(val, AbstractVector)
-        @assert(!isempty(val))
-        @assert(length(val) == length(w))
-        @assert(any(isfinite, val) && all(x -> x >= zero(x), val))
+        @assert(!isempty(val) &&
+                length(val) == length(w) &&
+                any(isfinite, val) &&
+                all(x -> x >= zero(x), val),
+                AssertionError("The following conditions must hold:\n`val` must be non-empty => $(!isempty(val))\n`val` must have the same length as `w` => $(length(val) == length(w))\n`val` must be non-negative and finite => $(all(x -> isfinite(x) && x >= zero(x), val))"))
     else
-        @assert(isfinite(val) && val >= zero(eltype(val)))
+        @assert(isfinite(val) && val >= zero(eltype(val)),
+                DomainError("`val` must be non-negative and finite:\nval => $val"))
     end
     return Turnover(w, val)
 end

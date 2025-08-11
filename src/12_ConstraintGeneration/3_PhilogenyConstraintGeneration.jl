@@ -8,7 +8,7 @@ function SemiDefinitePhilogenyEstimator(;
                                         pe::Union{<:AbstractPhilogenyEstimator,
                                                   <:AbstractClusteringResult} = Network(),
                                         p::Real = 0.05)
-    @assert(p >= zero(p))
+    @assert(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
     return SemiDefinitePhilogenyEstimator(pe, p)
 end
 struct SemiDefinitePhilogeny{T1, T2} <: PhilogenyResult
@@ -32,7 +32,8 @@ struct IntegerPhilogenyEstimator{T1, T2, T3} <: PhilogenyEstimator
 end
 function _validate_length_integer_philogeny_constraint_B(alg::PredefinedNumberClusters,
                                                          B::AbstractVector)
-    @assert(length(B) <= alg.k)
+    @assert(length(B) <= alg.k,
+            DomainError("`length(B) <= alg.k`:\nlength(B) => $(length(B))\nalg.k => $(alg.k)"))
     return nothing
 end
 function _validate_length_integer_philogeny_constraint_B(args...)
@@ -41,7 +42,8 @@ end
 function validate_length_integer_philogeny_constraint_B(pe::ClusteringEstimator,
                                                         B::AbstractVector)
     if !isnothing(pe.onc.max_k)
-        @assert(length(B) <= pe.onc.max_k)
+        @assert(length(B) <= pe.onc.max_k,
+                DomainError("`length(B) <= pe.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(pe.onc.max_k)"))
     end
     _validate_length_integer_philogeny_constraint_B(pe.onc.alg, B)
     return nothing
