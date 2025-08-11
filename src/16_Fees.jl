@@ -17,16 +17,16 @@ function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = n
                                  <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))
     if !isnothing(l)
-        @argcheck(!isempty(l))
+        @assert(!isempty(l))
     end
     if !isnothing(s)
-        @argcheck(!isempty(s))
+        @assert(!isempty(s))
     end
     if !isnothing(fl)
-        @argcheck(!isempty(fl))
+        @assert(!isempty(fl))
     end
     if !isnothing(fs)
-        @argcheck(!isempty(fs))
+        @assert(!isempty(fs))
     end
     return FeesEstimator(tn, l, s, fl, fs, kwargs)
 end
@@ -58,28 +58,28 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
               fs::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
               kwargs::NamedTuple = (; atol = 1e-8))
     if isa(l, AbstractVector)
-        @argcheck(!isempty(l))
+        @assert(!isempty(l))
     end
     if isa(s, AbstractVector)
-        @argcheck(!isempty(s))
+        @assert(!isempty(s))
     end
     if isa(fl, AbstractVector)
-        @argcheck(!isempty(fl))
+        @assert(!isempty(fl))
     end
     if isa(fs, AbstractVector)
-        @argcheck(!isempty(fs))
+        @assert(!isempty(fs))
     end
     if !isnothing(l)
-        @argcheck(all(x -> x >= zero(x), l))
+        @assert(all(x -> x >= zero(x), l))
     end
     if !isnothing(s)
-        @argcheck(all(x -> x >= zero(x), s))
+        @assert(all(x -> x >= zero(x), s))
     end
     if !isnothing(fl)
-        @argcheck(all(x -> x >= zero(x), fl))
+        @assert(all(x -> x >= zero(x), fl))
     end
     if !isnothing(fs)
-        @argcheck(all(x -> x >= zero(x), fs))
+        @assert(all(x -> x >= zero(x), fs))
     end
     return Fees(tn, l, s, fl, fs, kwargs)
 end

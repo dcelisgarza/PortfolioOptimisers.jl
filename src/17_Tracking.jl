@@ -7,7 +7,7 @@ struct SOCTracking{T1} <: NormTracking
     ddof::T1
 end
 function SOCTracking(; ddof::Integer = 1)
-    @argcheck(ddof > 0)
+    @assert(ddof > 0)
     return SOCTracking(ddof)
 end
 struct NOCTracking <: NormTracking end
@@ -30,7 +30,7 @@ struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
 end
 function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing,
                          w::AbstractVector{<:Real})
-    @argcheck(!isempty(w))
+    @assert(!isempty(w))
     return WeightsTracking(fees, w)
 end
 function factory(tracking::WeightsTracking, w::AbstractVector)
@@ -48,7 +48,7 @@ struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
     w::T1
 end
 function ReturnsTracking(; w::AbstractVector{<:Real})
-    @argcheck(!isempty(w))
+    @assert(!isempty(w))
     return ReturnsTracking(w)
 end
 function tracking_view(tracking::ReturnsTracking, ::Any)
@@ -67,7 +67,7 @@ struct TrackingError{T1, T2, T3} <: AbstractTracking
 end
 function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
                        alg::NormTracking = SOCTracking())
-    @argcheck(isfinite(err) && err >= zero(err))
+    @assert(isfinite(err) && err >= zero(err))
     return TrackingError(tracking, err, alg)
 end
 function tracking_view(tracking::TrackingError, i::AbstractVector, args...)

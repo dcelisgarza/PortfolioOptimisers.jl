@@ -114,7 +114,8 @@ ShrunkDenoise
 ```
 """
 function ShrunkDenoise(; alpha::Real = 0.0)
-    @argcheck(zero(alpha) <= alpha <= one(alpha))
+    @assert(zero(alpha) <= alpha <= one(alpha),
+            ArgumentError("`alpha` must be in [0, 1]:\nalpha => $alpha"))
     return ShrunkDenoise(alpha)
 end
 

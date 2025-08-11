@@ -98,7 +98,7 @@ function SimpleVariance(;
                         w::Union{Nothing, <:AbstractWeights} = nothing,
                         corrected::Bool = true)
     if isa(me, AbstractWeights)
-        @argcheck(!isempty(w))
+        @assert(!isempty(w))
     end
     return SimpleVariance(me, w, corrected)
 end

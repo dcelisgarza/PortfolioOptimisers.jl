@@ -19,10 +19,10 @@ end
 function DiscreteAllocation(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                             sc::Real = 1, so::Real = 1)
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
+        @assert(!isempty(slv))
     end
-    @argcheck(sc > zero(sc))
-    @argcheck(so > zero(so))
+    @assert(sc > zero(sc))
+    @assert(so > zero(so))
     return DiscreteAllocation(slv, sc, so)
 end
 function discrete_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real,
@@ -76,10 +76,10 @@ function optimise!(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
                    cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
                    fees::Union{Nothing, <:Fees} = nothing; str_names::Bool = false,
                    save::Bool = true, kwargs...)
-    @argcheck(!isempty(w) && !isempty(p) && length(w) == length(p))
-    @argcheck(cash > zero(cash))
+    @assert(!isempty(w) && !isempty(p) && length(w) == length(p))
+    @assert(cash > zero(cash))
     if !isnothing(fees)
-        @argcheck(!isnothing(T))
+        @assert(!isnothing(T))
     end
     cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, cash, T, fees)
     sshares, scost, sw, scash, sretcode, smodel = discrete_sub_allocation!(-view(w, sidx),

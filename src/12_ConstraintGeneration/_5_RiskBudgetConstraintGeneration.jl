@@ -51,9 +51,9 @@ function risk_budget_constraints(plcas::Union{<:LinearConstraintSide,
                                  sets::DataFrame; datatype::DataType = Float64,
                                  strict::Bool = false)
     if isa(plcas, AbstractVector)
-        @argcheck(!isempty(plcas))
+        @assert(!isempty(plcas))
     end
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     rb = Vector{datatype}(undef, nrow(sets))
     fill!(rb, inv(nrow(sets)))
     for plc in plcas

@@ -19,13 +19,13 @@ function OpinionPoolingPrior(;
                              w::Union{Nothing, <:AbstractWeights} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
                              threads::FLoops.Transducers.Executor = ThreadedEx())
-    @argcheck(!isempty(pes))
+    @assert(!isempty(pes))
     if !isnothing(p)
-        @argcheck(p > zero(p))
+        @assert(p > zero(p))
     end
     if isa(w, AbstractWeights)
-        @argcheck(!isempty(w) && length(w) == length(pes))
-        @argcheck(sum(w) <= one(eltype(w)))
+        @assert(!isempty(w) && length(w) == length(pes))
+        @assert(sum(w) <= one(eltype(w)))
     end
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)
 end
@@ -51,7 +51,7 @@ end
 function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
@@ -64,7 +64,7 @@ function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
     pw = Vector{eltype(X)}(undef, T * M)
     @floop pe.threads for (i, pe) in enumerate(pe.pes)
         pr = prior(pe, X, F; strict = strict, kwargs...)
-        @argcheck(!isnothing(pr.w))
+        @assert(!isnothing(pr.w))
         pw[(1 + (i - 1) * M):(i * M)] = pr.w
     end
     ow = isnothing(pe.w) ? range(; start = inv(M), stop = inv(M), length = M) : pe.w

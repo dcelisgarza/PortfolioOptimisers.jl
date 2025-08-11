@@ -23,8 +23,8 @@ function optimise!(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
 end
 struct EqualWeighted <: OptimisationEstimator end
 function optimise!(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
-    @argcheck(!isnothing(rd.X))
-    @argcheck(dims in (1, 2))
+    @assert(!isnothing(rd.X))
+    @assert(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
     N = size(rd.X, dims)
     return NaiveOptimisation(typeof(ew), nothing,
@@ -38,8 +38,8 @@ function RandomWeights(; rng::Union{Nothing, <:AbstractRNG} = nothing)
     return RandomWeights(rng)
 end
 function optimise!(rw::RandomWeights, rd::ReturnsResult; dims::Int = 1, kwargs...)
-    @argcheck(!isnothing(rd.X))
-    @argcheck(dims in (1, 2))
+    @assert(!isnothing(rd.X))
+    @assert(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
     N = size(rd.X, dims)
     w = isnothing(rw.rng) ? rand(Dirichlet(N, 1)) : rand(rw.rng, Dirichlet(N, 1))

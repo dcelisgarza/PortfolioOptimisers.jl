@@ -48,31 +48,31 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               ucs_flag::Bool = true,
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering())
     if isa(r, AbstractVector)
-        @argcheck(!isempty(r))
-        @argcheck(!any(x -> isa(x, QuadExpressionRiskMeasures), r))
+        @assert(!isempty(r))
+        @assert(!any(x -> isa(x, QuadExpressionRiskMeasures), r))
     else
-        @argcheck(!isa(r, QuadExpressionRiskMeasures))
+        @assert(!isa(r, QuadExpressionRiskMeasures))
     end
     if isa(w_min, AbstractVector)
-        @argcheck(!isempty(w_min))
+        @assert(!isempty(w_min))
     end
     if isa(w_min_ini, AbstractVector)
-        @argcheck(!isempty(w_min_ini))
+        @assert(!isempty(w_min_ini))
     end
     if isa(w_opt, AbstractVector)
-        @argcheck(!isempty(w_opt))
+        @assert(!isempty(w_opt))
     end
     if isa(w_opt_ini, AbstractVector)
-        @argcheck(!isempty(w_opt_ini))
+        @assert(!isempty(w_opt_ini))
     end
     if isa(w_max, AbstractVector)
-        @argcheck(!isempty(w_max))
+        @assert(!isempty(w_max))
     end
     if isa(w_max_ini, AbstractVector)
-        @argcheck(!isempty(w_max_ini))
+        @assert(!isempty(w_max_ini))
     end
     if isa(bins, Real)
-        @argcheck(isfinite(bins) && bins > 0)
+        @assert(isfinite(bins) && bins > 0)
     end
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg)

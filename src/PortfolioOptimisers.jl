@@ -1,7 +1,7 @@
 module PortfolioOptimisers
 
-using ArgCheck, AverageShiftedHistograms, Clustering, Distances, Distributions, FLoops, GLM,
-      Impute, InteractiveUtils, JuMP, LinearAlgebra, LogExpFunctions, MultivariateStats,
+using AverageShiftedHistograms, Clustering, Distances, Distributions, FLoops, GLM, Impute,
+      InteractiveUtils, JuMP, LinearAlgebra, LogExpFunctions, MultivariateStats,
       NearestCorrelationMatrix, Optim, Graphs, SimpleWeightedGraphs, PythonCall, Random,
       Roots, SparseArrays, Statistics, StatsBase, DataFrames, TimeSeries
 

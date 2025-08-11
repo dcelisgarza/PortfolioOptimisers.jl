@@ -7,12 +7,12 @@ function ArithmeticReturn(;
                                      <:AbstractUncertaintySetEstimator} = nothing,
                           lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing)
     if isa(ucs, EllipseUncertaintySet)
-        @argcheck(isa(ucs, EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
+        @assert(isa(ucs, EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
     end
     if isa(lb, Real)
-        @argcheck(isfinite(lb))
+        @assert(isfinite(lb))
     elseif isa(lb, AbstractVector)
-        @argcheck(!isempty(lb) && all(isfinite, lb))
+        @assert(!isempty(lb) && all(isfinite, lb))
     end
     return ArithmeticReturn(ucs, lb)
 end
@@ -30,12 +30,12 @@ end
 function KellyReturn(; w::Union{Nothing, <:AbstractWeights} = nothing,
                      lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing)
     if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
+        @assert(!isempty(w))
     end
     if isa(lb, Real)
-        @argcheck(isfinite(lb))
+        @assert(isfinite(lb))
     elseif isa(lb, AbstractVector)
-        @argcheck(!isempty(lb) && all(isfinite, lb))
+        @assert(!isempty(lb) && all(isfinite, lb))
     end
     return KellyReturn(w, lb)
 end
@@ -62,7 +62,7 @@ struct MaximumUtility{T1} <: ObjectiveFunction
     l::T1
 end
 function MaximumUtility(; l::Real = 2)
-    @argcheck(l >= zero(l))
+    @assert(l >= zero(l))
     return MaximumUtility(l)
 end
 struct MaximumRatio{T1, T2} <: ObjectiveFunction
@@ -71,7 +71,7 @@ struct MaximumRatio{T1, T2} <: ObjectiveFunction
 end
 function MaximumRatio(; rf::Real = 0.0, ohf::Union{Nothing, <:Real} = nothing)
     if !isnothing(ohf)
-        @argcheck(ohf > zero(ohf))
+        @assert(ohf > zero(ohf))
     end
     return MaximumRatio(rf, ohf)
 end
@@ -81,7 +81,7 @@ function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::AbstractVect
     ohf = if isnothing(obj.ohf)
         min(1e3, max(1e-3, mean(abs.(mu))))
     else
-        @argcheck(obj.ohf > zero(obj.ohf))
+        @assert(obj.ohf > zero(obj.ohf))
         obj.ohf
     end
     @expression(model, ohf, ohf)

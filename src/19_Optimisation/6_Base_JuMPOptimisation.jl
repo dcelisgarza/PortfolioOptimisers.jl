@@ -81,7 +81,7 @@ function set_initial_w!(args...)
     return nothing
 end
 function set_initial_w!(w::AbstractVector, wi::AbstractVector{<:Real})
-    @argcheck(length(wi) == length(w))
+    @assert(length(wi) == length(w))
     set_start_value.(w, wi)
     return nothing
 end

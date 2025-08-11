@@ -26,15 +26,15 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                 flag::Bool = true)
     if isa(r, AbstractVector)
-        @argcheck(!isempty(r))
+        @assert(!isempty(r))
     end
     if isa(wi, AbstractVector)
-        @argcheck(!isempty(wi))
+        @assert(!isempty(wi))
     end
-    @argcheck(!isa(opt.nplg,
-                   Union{<:SemiDefinitePhilogenyEstimator, <:SemiDefinitePhilogeny}))
-    @argcheck(!isa(opt.cplg,
-                   Union{<:SemiDefinitePhilogenyEstimator, <:SemiDefinitePhilogeny}))
+    @assert(!isa(opt.nplg,
+                 Union{<:SemiDefinitePhilogenyEstimator, <:SemiDefinitePhilogeny}))
+    @assert(!isa(opt.cplg,
+                 Union{<:SemiDefinitePhilogenyEstimator, <:SemiDefinitePhilogeny}))
     return FactorRiskContribution(opt, re, r, obj, nplg, cplg, sets, wi, flag)
 end
 function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMatrix)

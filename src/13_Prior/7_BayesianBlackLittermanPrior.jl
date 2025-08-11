@@ -24,7 +24,7 @@ function BayesianBlackLittermanPrior(;
                                      rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
     assert_bl_views_conf(views_conf, views)
     if !isnothing(tau)
-        @argcheck(tau > zero(tau))
+        @assert(tau > zero(tau))
     end
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
@@ -45,12 +45,12 @@ function Base.getproperty(obj::BayesianBlackLittermanPrior, sym::Symbol)
 end
 function prior(pe::BayesianBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         F = transpose(F)
     end
-    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(F, 2))
+    @assert(length(pe.sets.dict[pe.sets.key]) == size(F, 2))
     prior_result = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_sigma, f_mu, f_sigma, loadings = prior_result.X, prior_result.sigma,
                                                         prior_result.f_mu,

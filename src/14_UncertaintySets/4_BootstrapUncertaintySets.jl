@@ -26,9 +26,9 @@ function ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
                             n_sim::Integer = 3_000, block_size::Integer = 3, q::Real = 0.05,
                             seed::Union{Nothing, <:Integer} = nothing,
                             bootstrap::ARCHBootstrapSet = StationaryBootstrap())
-    @argcheck(n_sim > zero(n_sim))
-    @argcheck(block_size > zero(block_size))
-    @argcheck(zero(q) < q < one(q))
+    @assert(n_sim > zero(n_sim))
+    @assert(block_size > zero(block_size))
+    @assert(zero(q) < q < one(q))
     return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, seed, bootstrap)
 end
 function bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)

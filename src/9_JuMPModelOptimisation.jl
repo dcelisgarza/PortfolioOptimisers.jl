@@ -7,10 +7,10 @@ struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
     add_bridges::T5
 end
 function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
-                settings::Union{Nothing, <:AbstractDict} = nothing,
+                settings::Union{Nothing, <:AbstractDict, <:AbstractVector{<:Pair}} = nothing,
                 check_sol::NamedTuple = (;), add_bridges::Bool = true)
     if !isnothing(settings)
-        @argcheck(!isempty(settings))
+        @assert(!isempty(settings))
     end
     return Solver(name, solver, settings, check_sol, add_bridges)
 end

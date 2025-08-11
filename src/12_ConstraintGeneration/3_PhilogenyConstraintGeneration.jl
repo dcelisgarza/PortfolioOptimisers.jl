@@ -8,7 +8,7 @@ function SemiDefinitePhilogenyEstimator(;
                                         pe::Union{<:AbstractPhilogenyEstimator,
                                                   <:AbstractClusteringResult} = Network(),
                                         p::Real = 0.05)
-    @argcheck(p >= zero(p))
+    @assert(p >= zero(p))
     return SemiDefinitePhilogenyEstimator(pe, p)
 end
 struct SemiDefinitePhilogeny{T1, T2} <: PhilogenyResult
@@ -16,8 +16,8 @@ struct SemiDefinitePhilogeny{T1, T2} <: PhilogenyResult
     p::T2
 end
 function SemiDefinitePhilogeny(; A::AbstractMatrix{<:Real}, p::Real = 0.05)
-    @argcheck(!isempty(A))
-    @argcheck(p >= zero(p))
+    @assert(!isempty(A))
+    @assert(p >= zero(p))
     return SemiDefinitePhilogeny(A, p)
 end
 function philogeny_constraints(plc::SemiDefinitePhilogenyEstimator, X::AbstractMatrix;
@@ -32,7 +32,7 @@ struct IntegerPhilogenyEstimator{T1, T2, T3} <: PhilogenyEstimator
 end
 function _validate_length_integer_philogeny_constraint_B(alg::PredefinedNumberClusters,
                                                          B::AbstractVector)
-    @argcheck(length(B) <= alg.k)
+    @assert(length(B) <= alg.k)
     return nothing
 end
 function _validate_length_integer_philogeny_constraint_B(args...)
@@ -41,7 +41,7 @@ end
 function validate_length_integer_philogeny_constraint_B(pe::ClusteringEstimator,
                                                         B::AbstractVector)
     if !isnothing(pe.onc.max_k)
-        @argcheck(length(B) <= pe.onc.max_k)
+        @assert(length(B) <= pe.onc.max_k)
     end
     _validate_length_integer_philogeny_constraint_B(pe.onc.alg, B)
     return nothing
@@ -55,11 +55,11 @@ function IntegerPhilogenyEstimator(;
                                    B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                                    scale::Real = 100_000.0)
     if isa(B, AbstractVector)
-        @argcheck(!isempty(B))
-        @argcheck(all(x -> x >= zero(x), B))
+        @assert(!isempty(B))
+        @assert(all(x -> x >= zero(x), B))
         validate_length_integer_philogeny_constraint_B(pe, B)
     else
-        @argcheck(B >= zero(B))
+        @assert(B >= zero(B))
     end
     return IntegerPhilogenyEstimator(pe, B, scale)
 end
@@ -71,14 +71,14 @@ end
 function IntegerPhilogeny(; A::AbstractMatrix{<:Real},
                           B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                           scale::Real = 100_000.0)
-    @argcheck(!isempty(A))
+    @assert(!isempty(A))
     A = unique(A + I; dims = 1)
     if isa(B, AbstractVector)
-        @argcheck(!isempty(B))
-        @argcheck(size(A, 1) == length(B))
-        @argcheck(all(x -> x >= zero(x), B))
+        @assert(!isempty(B))
+        @assert(size(A, 1) == length(B))
+        @assert(all(x -> x >= zero(x), B))
     else
-        @argcheck(B >= zero(B))
+        @assert(B >= zero(B))
     end
     return IntegerPhilogeny(A, B, scale)
 end
@@ -131,7 +131,7 @@ function centrality_constraints(ccs::Union{<:CentralityEstimator,
                                            <:AbstractVector{<:CentralityEstimator}},
                                 X::AbstractMatrix; dims::Int = 1, kwargs...)
     if isa(ccs, AbstractVector)
-        @argcheck(!isempty(ccs))
+        @assert(!isempty(ccs))
     end
     A_ineq = Vector{eltype(X)}(undef, 0)
     B_ineq = Vector{eltype(X)}(undef, 0)

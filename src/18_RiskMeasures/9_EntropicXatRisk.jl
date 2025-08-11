@@ -1,7 +1,7 @@
 function ERM(x::AbstractVector{<:Real}, slv::Union{<:Solver, <:AbstractVector{<:Solver}},
              alpha::Real = 0.05, w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
+        @assert(!isempty(slv))
     end
     model = JuMP.Model()
     set_string_names_on_creation(model, false)
@@ -43,11 +43,11 @@ function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettin
                              alpha::Real = 0.05,
                              w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
+        @assert(!isempty(slv))
     end
-    @argcheck(zero(alpha) < alpha < one(alpha))
+    @assert(zero(alpha) < alpha < one(alpha))
     if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
+        @assert(!isempty(w))
     end
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
@@ -73,12 +73,12 @@ function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureS
                                   alpha::Real = 0.05, beta::Real = 0.05,
                                   w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
+        @assert(!isempty(slv))
     end
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    @argcheck(zero(beta) < beta < one(beta))
+    @assert(zero(alpha) < alpha < one(alpha))
+    @assert(zero(beta) < beta < one(beta))
     if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
+        @assert(!isempty(w))
     end
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
@@ -102,9 +102,9 @@ function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSet
                                 slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
                                 alpha::Real = 0.05)
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
+        @assert(!isempty(slv))
     end
-    @argcheck(zero(alpha) < alpha < one(alpha))
+    @assert(zero(alpha) < alpha < one(alpha))
     return EntropicDrawdownatRisk(settings, slv, alpha)
 end
 function (r::EntropicDrawdownatRisk)(x::AbstractVector)
@@ -133,9 +133,9 @@ function RelativeEntropicDrawdownatRisk(;
                                                    <:AbstractVector{<:Solver}} = nothing,
                                         alpha::Real = 0.05)
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
+        @assert(!isempty(slv))
     end
-    @argcheck(zero(alpha) < alpha < one(alpha))
+    @assert(zero(alpha) < alpha < one(alpha))
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha)
 end
 function (r::RelativeEntropicDrawdownatRisk)(x::AbstractVector)

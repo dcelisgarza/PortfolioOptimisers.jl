@@ -4,8 +4,8 @@ struct ApproxOrderedWeightsArray{T1} <: OrderedWeightsArrayFormulation
     p::T1
 end
 function ApproxOrderedWeightsArray(; p::AbstractVector{<:Real} = Float64[2, 3, 4, 10, 50])
-    @argcheck(!isempty(p))
-    @argcheck(all(x -> x > zero(x), p))
+    @assert(!isempty(p))
+    @assert(all(x -> x > zero(x), p))
     return ApproxOrderedWeightsArray(p)
 end
 struct OrderedWeightsArray{T1, T2, T3} <: OrderedWeightsArrayRiskMeasure
@@ -17,7 +17,7 @@ function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettin
                              w::Union{Nothing, <:AbstractVector} = nothing,
                              alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
     if isa(w, AbstractVector)
-        @argcheck(!isempty(w))
+        @assert(!isempty(w))
     end
     return OrderedWeightsArray(settings, w, alg)
 end
@@ -39,16 +39,16 @@ function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureS
     w1_flag = !isnothing(w1)
     w2_flag = !isnothing(w2)
     if w1_flag
-        @argcheck(!isempty(w1))
+        @assert(!isempty(w1))
     end
     if w2_flag
-        @argcheck(!isempty(w2))
+        @assert(!isempty(w2))
         if !rev
             w2 = reverse(w2)
         end
     end
     if w1_flag && w2_flag
-        @argcheck(length(w1) == length(w2))
+        @assert(length(w1) == length(w2))
     end
     return OrderedWeightsArrayRange(settings, w1, w2, alg)
 end

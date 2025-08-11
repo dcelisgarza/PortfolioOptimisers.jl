@@ -42,9 +42,9 @@ function C0_LinearEntropyPoolingConstraintEstimator(; group, name,
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
     if group_flag || name_flag || coef_flag
-        @argcheck(group_flag && name_flag && coef_flag)
-        @argcheck(!isempty(group) && !isempty(name) && !isempty(coef))
-        @argcheck(length(group) == length(name) == length(coef))
+        @assert(group_flag && name_flag && coef_flag)
+        @assert(!isempty(group) && !isempty(name) && !isempty(coef))
+        @assert(length(group) == length(name) == length(coef))
     end
     return C0_LinearEntropyPoolingConstraintEstimator(group, name, coef, kind)
 end
@@ -63,9 +63,9 @@ function C1_LinearEntropyPoolingConstraintEstimator(; group, name,
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
     if group_flag || name_flag || coef_flag
-        @argcheck(group_flag && name_flag && coef_flag)
-        @argcheck(!isempty(group) && !isempty(name) && !isempty(coef))
-        @argcheck(length(group) == length(name) == length(coef))
+        @assert(group_flag && name_flag && coef_flag)
+        @assert(!isempty(group) && !isempty(name) && !isempty(coef))
+        @assert(length(group) == length(name) == length(coef))
     end
     return C1_LinearEntropyPoolingConstraintEstimator(group, name, coef, exponent)
 end
@@ -87,9 +87,9 @@ function C2_LinearEntropyPoolingConstraintEstimator(; group, name,
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
     if group_flag || name_flag || coef_flag
-        @argcheck(group_flag && name_flag && coef_flag)
-        @argcheck(!isempty(group) && !isempty(name) && !isempty(coef))
-        @argcheck(length(group) == length(name) == length(coef))
+        @assert(group_flag && name_flag && coef_flag)
+        @assert(!isempty(group) && !isempty(name) && !isempty(coef))
+        @assert(length(group) == length(name) == length(coef))
     end
     return C2_LinearEntropyPoolingConstraintEstimator(group, name, coef, kind)
 end
@@ -110,17 +110,17 @@ function C4_LinearEntropyPoolingConstraintEstimator(; group1, name1, group2, nam
     group2_flag = isa(group2, AbstractVector)
     name2_flag = isa(name2, AbstractVector)
     if group1_flag || name1_flag || coef_flag || group2_flag || name2_flag
-        @argcheck(group1_flag && name1_flag && coef_flag && group2_flag && name2_flag)
-        @argcheck(!isempty(group1) &&
-                  !isempty(name1) &&
-                  !isempty(coef) &&
-                  !isempty(group2) &&
-                  !isempty(name2))
-        @argcheck(length(group1) ==
-                  length(name1) ==
-                  length(coef) ==
-                  length(group2) ==
-                  length(name2))
+        @assert(group1_flag && name1_flag && coef_flag && group2_flag && name2_flag)
+        @assert(!isempty(group1) &&
+                !isempty(name1) &&
+                !isempty(coef) &&
+                !isempty(group2) &&
+                !isempty(name2))
+        @assert(length(group1) ==
+                length(name1) ==
+                length(coef) ==
+                length(group2) ==
+                length(name2))
     end
     return C4_LinearEntropyPoolingConstraintEstimator(group1, group2, name1, name2, coef)
 end
@@ -294,7 +294,7 @@ function freeze_B_view(pr::AbstractPriorResult,
                        w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                            length = size(pr.X, 1))),
                        kwargs...)
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     (; group, name, coef) = epv
     return ConstantEntropyPoolingConstraintEstimator(;
@@ -336,7 +336,7 @@ function freeze_B_view(pr::AbstractPriorResult,
                        w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                            length = size(pr.X, 1))),
                        kwargs...)
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     B = Vector{eltype(pr.X)}(undef, 0)
     for (group, name, coef) in zip(epv.group, epv.name, epv.coef)
@@ -370,7 +370,7 @@ function freeze_B_view(pr::AbstractPriorResult,
                        w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                            length = size(pr.X, 1))),
                        kwargs...)
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     (; group1, group2, name1, name2, coef) = epv
     return ConstantEntropyPoolingConstraintEstimator(;
@@ -411,7 +411,7 @@ function freeze_B_view(pr::AbstractPriorResult,
                        w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                            length = size(pr.X, 1))),
                        kwargs...)
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     B = Vector{eltype(pr.X)}(undef, 0)
     for (group1, group2, name1, name2, coef) in
@@ -484,9 +484,9 @@ function ConditionalValueatRiskPoolingConstraintEstimator(; group, name,
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
     if group_flag || name_flag || coef_flag
-        @argcheck(group_flag && name_flag && coef_flag)
-        @argcheck(!isempty(group) && !isempty(name) && !isempty(coef))
-        @argcheck(length(group) == length(name) == length(coef))
+        @assert(group_flag && name_flag && coef_flag)
+        @assert(!isempty(group) && !isempty(name) && !isempty(coef))
+        @assert(length(group) == length(name) == length(coef))
     end
     return ConditionalValueatRiskPoolingConstraintEstimator(group, name, coef, alpha)
 end
@@ -502,11 +502,11 @@ function DiscontinuousEntropyPoolingViewEstimator(;
                                                            <:AbstractVector{<:AbstractDiscontinuousEntropyPoolingConstraintEstimator},
                                                            <:AbstractVector{<:ConstantEntropyPoolingConstraintEstimator}})
     if isa(B, AbstractVector)
-        @argcheck(!isempty(B))
+        @assert(!isempty(B))
         idx = isa.(B, AbstractDiscontinuousEntropyPoolingConstraintEstimator)
-        @argcheck(all(x -> x == A.alpha, getproperty.(B[idx], :alpha)))
+        @assert(all(x -> x == A.alpha, getproperty.(B[idx], :alpha)))
     else
-        @argcheck(A.alpha == B.alpha)
+        @assert(A.alpha == B.alpha)
     end
     return DiscontinuousEntropyPoolingViewEstimator(A, B, EQ())
 end
@@ -578,7 +578,7 @@ function _get_B_entropy_pooling_view_data(epv::C0_LinearEntropyPoolingConstraint
     # X = view(pr.X, :, idx)
     # j = ceil(Int, alpha * size(X, 1))
     # var = sum([-partialsort(view(X, :, i), j) for i in idx])
-    # @argcheck(all(var .>= zero(eltype(var))))
+    # @assert(all(var .>= zero(eltype(var))))
     X = pr.X
     idx = [sortperm(view(X, :, i)) for i in axes(X, 2)]
     sw = sum(w)
@@ -597,8 +597,8 @@ function set_var_cvar_A_B(epv::C0_LinearEntropyPoolingConstraintEstimator{<:Any,
                                                                           <:ValueatRiskEntropyPoolingAlgorithm},
                           A::AbstractVector, B::Real)
     idx = A .<= -abs(B)
-    @argcheck(count(idx) > 0,
-              "Value at risk view too extreme, please increase `alpha`, lower the value of the view, or use a prior that accounts that includes more extreme loss values.")
+    @assert(count(idx) > 0,
+            "Value at risk view too extreme, please increase `alpha`, lower the value of the view, or use a prior that accounts that includes more extreme loss values.")
     ea = eltype(A)
     A = zeros(ea, length(idx))
     A[idx] .= one(ea)
@@ -606,8 +606,8 @@ function set_var_cvar_A_B(epv::C0_LinearEntropyPoolingConstraintEstimator{<:Any,
 end
 function set_var_cvar_A_B(::ConditionalValueatRiskPoolingConstraintEstimator,
                           A::AbstractVector, B::Real)
-    @argcheck(B >= -minimum(A),
-              "Conditional value at risk view too extreme, please increase `alpha`, lower the value of the view, or use a prior that accounts that includes more extreme loss values.")
+    @assert(B >= -minimum(A),
+            "Conditional value at risk view too extreme, please increase `alpha`, lower the value of the view, or use a prior that accounts that includes more extreme loss values.")
     return A, B
 end
 #########
@@ -698,7 +698,7 @@ function get_B_entropy_pooling_view_data(pr::AbstractPriorResult,
                                                                              stop = 1,
                                                                              length = size(pr.X,
                                                                                            1))))
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     (; group1, group2, name1, name2, coef) = epv
     B = if !(isnothing(group1) ||
@@ -736,7 +736,7 @@ function get_B_entropy_pooling_view_data(pr::AbstractPriorResult,
                                                                              stop = 1,
                                                                              length = size(pr.X,
                                                                                            1))))
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     B = zero(eltype(pr.X))
     for (group1, group2, name1, name2, coef) in
@@ -785,7 +785,7 @@ function get_B_entropy_pooling_view_data(pr::AbstractPriorResult,
                                                                              stop = 1,
                                                                              length = size(pr.X,
                                                                                            1))))
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     (; group, name, coef) = epv
     B = if !(isnothing(group) || string(group) ∉ group_names)
@@ -823,7 +823,7 @@ function get_view_index(epv::Union{<:C0_LinearEntropyPoolingConstraintEstimator{
                                                                                       <:AbstractVector,
                                                                                       <:Any}},
                         sets::DataFrame, strict::Bool = false, args...)
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     return for (group, name) in zip(epv.group, epv.name)
         if !(isnothing(group) || string(group) ∉ group_names)
@@ -846,7 +846,7 @@ function get_view_index(epv::Union{<:C0_LinearEntropyPoolingConstraintEstimator{
                                                                                 <:Real,
                                                                                 <:Any}},
                         sets::DataFrame, strict::Bool = false, args...)
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     (; group, name) = epv
     return if !(isnothing(group) || string(group) ∉ group_names)
@@ -877,7 +877,7 @@ function get_B_entropy_pooling_view_data(pr::AbstractPriorResult,
                                                                              stop = 1,
                                                                              length = size(pr.X,
                                                                                            1))))
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     B = zero(eltype(pr.X))
     for (group, name, coef) in zip(epv.group, epv.name, epv.coef)
@@ -952,7 +952,7 @@ function get_A_entropy_pooling_view_data(pr::AbstractPriorResult,
                                                                                          <:Any,
                                                                                          <:Real},
                                          sets::DataFrame, strict::Bool = false)
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     (; group1, group2, name1, name2, coef) = epv
     A = if !(isnothing(group1) ||
@@ -985,7 +985,7 @@ function get_A_entropy_pooling_view_data(pr::AbstractPriorResult,
                                                                                          <:AbstractVector,
                                                                                          <:AbstractVector},
                                          sets::DataFrame, strict::Bool = false)
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     A = Vector{eltype(pr.X)}(undef, 0)
     for (group1, group2, name1, name2, coef) in
@@ -1030,7 +1030,7 @@ function get_A_entropy_pooling_view_data(pr::AbstractPriorResult,
                                                                                                  <:Any},
                                                     <:ConditionalValueatRiskPoolingConstraintEstimator},
                                          sets::DataFrame, strict::Bool = false)
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     (; group, name, coef) = epv
     A = if !(isnothing(group) || string(group) ∉ group_names)
@@ -1065,7 +1065,7 @@ function get_A_entropy_pooling_view_data(pr::AbstractPriorResult,
                                                                                                  <:AbstractVector,
                                                                                                  <:Any}},
                                          sets::DataFrame, strict::Bool = false)
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     group_names = names(sets)
     A = Vector{eltype(pr.X)}(undef, 0)
     for (group, name, coef) in zip(epv.group, epv.name, epv.coef)
@@ -1100,9 +1100,9 @@ function entropy_pooling_views(pr::AbstractPriorResult,
                                w::AbstractWeights = pweights(range(; start = 1, stop = 1,
                                                                    length = size(pr.X, 1))))
     if isa(epvs, AbstractVector)
-        @argcheck(!isempty(epvs))
+        @assert(!isempty(epvs))
     end
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     A_ineq = Vector{eltype(pr.X)}(undef, 0)
     B_ineq = Vector{eltype(pr.X)}(undef, 0)
     A_eq = Vector{eltype(pr.X)}(undef, 0)

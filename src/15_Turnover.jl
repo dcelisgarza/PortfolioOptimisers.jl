@@ -7,9 +7,9 @@ function TurnoverEstimator(; w::AbstractVector{<:Real},
                            val::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
                                       <:AbstractVector{<:Pair{<:Any, <:Real}}},
                            default::Real = 0.0)
-    @argcheck(!isempty(w))
-    @argcheck(!isempty(val))
-    @argcheck(default >= zero(default))
+    @assert(!isempty(w))
+    @assert(!isempty(val))
+    @assert(default >= zero(default))
     return TurnoverEstimator(w, val, default)
 end
 function turnover_constraints(::Nothing, args...; kwargs...)
@@ -25,13 +25,13 @@ struct Turnover{T1, T2} <: AbstractResult
 end
 function Turnover(; w::AbstractVector{<:Real},
                   val::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
-    @argcheck(!isempty(w))
+    @assert(!isempty(w))
     if isa(val, AbstractVector)
-        @argcheck(!isempty(val))
-        @argcheck(length(val) == length(w))
-        @argcheck(any(isfinite, val) && all(x -> x >= zero(x), val))
+        @assert(!isempty(val))
+        @assert(length(val) == length(w))
+        @assert(any(isfinite, val) && all(x -> x >= zero(x), val))
     else
-        @argcheck(isfinite(val) && val >= zero(eltype(val)))
+        @assert(isfinite(val) && val >= zero(eltype(val)))
     end
     return Turnover(w, val)
 end

@@ -21,7 +21,7 @@ end
 function ThirdCentralMoment(; w::Union{Nothing, <:AbstractWeights} = nothing,
                             mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
     if isa(mu, AbstractVector)
-        @argcheck(!isempty(mu))
+        @assert(!isempty(mu))
     end
     return ThirdCentralMoment(w, mu)
 end
@@ -34,7 +34,7 @@ function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   w::Union{Nothing, <:AbstractWeights} = nothing,
                   mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
     if isa(mu, AbstractVector)
-        @argcheck(!isempty(mu))
+        @assert(!isempty(mu))
     end
     return Skewness(ve, w, mu)
 end
@@ -47,7 +47,7 @@ function Kurtosis(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   w::Union{Nothing, <:AbstractWeights} = nothing,
                   mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
     if isa(mu, AbstractVector)
-        @argcheck(!isempty(mu))
+        @assert(!isempty(mu))
     end
     return Kurtosis(ve, w, mu)
 end

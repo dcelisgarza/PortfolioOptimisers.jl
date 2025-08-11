@@ -76,7 +76,7 @@ SimpleExpectedReturns
 """
 function SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
+        @assert(!isempty(w))
     end
     return SimpleExpectedReturns(w)
 end

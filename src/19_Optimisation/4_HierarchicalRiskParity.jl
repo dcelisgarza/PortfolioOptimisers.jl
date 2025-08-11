@@ -8,7 +8,7 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
                                          <:AbstractVector{<:OptimisationRiskMeasure}} = Variance(),
                                 sce::Scalariser = SumScalariser())
     if isa(r, AbstractVector)
-        @argcheck(!isempty(r))
+        @assert(!isempty(r))
     end
     return HierarchicalRiskParity(opt, r, sce)
 end

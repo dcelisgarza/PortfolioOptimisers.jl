@@ -20,7 +20,8 @@ abstract type AbstractReturnsResult <: AbstractResult end
 Assert that `A` is a square matrix.
 """
 function assert_matrix_issquare(A::AbstractMatrix)
-    @argcheck(size(A, 1) == size(A, 2))
+    @assert(size(A, 1) == size(A, 2),
+            DimensionMismatch("matrix is not square: dimensions are $(size(A))"))
 end
 function drop_correlated(X::AbstractMatrix; threshold::Real = 0.95, absolute::Bool = false)
     N = size(X, 2)
@@ -163,34 +164,50 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
     nxs_flag = !isnothing(nx)
     X_flag = !isnothing(X)
     if nxs_flag || X_flag
-        @argcheck(nxs_flag && X_flag)
-        @argcheck(!isempty(nx) && !isempty(X))
-        @argcheck(length(nx) == size(X, 2))
+        @assert(nxs_flag &&
+                X_flag &&
+                !isempty(nx) &&
+                !isempty(X) &&
+                length(nx) == size(X, 2),
+                ArgumentError("If `nx` or `X` are not `nothing`, the following conditions must hold:\n!isnothing(nx) => $nxs_flag\n!isnothing(X) => $X_flag\n!isempty(nx) => $(!isempty(nx))\n!isempty(X) => $(!isempty(X))\n(length(nx) == size(X, 2)) => ($(length(nx)) == $(size(X, 2))) => $(length(nx) == size(X, 2))"))
     end
     nfs_flag = !isnothing(nf)
     F_flag = !isnothing(F)
-    if (nfs_flag || F_flag) && nxs_flag
-        @argcheck(nfs_flag && F_flag)
-        @argcheck(!isempty(nf) && !isempty(F))
-        @argcheck(length(nf) == size(F, 2))
-        @argcheck(size(X, 1) == size(F, 1))
+    if nfs_flag || F_flag
+        @assert(nfs_flag &&
+                F_flag &&
+                !isempty(nf) &&
+                !isempty(F) &&
+                length(nf) == size(F, 2),
+                ArgumentError("If `nf` or `F` are not `nothing`, the following conditions must hold:\n!isnothing(nf) => $nfs_flag\n!isnothing(F) => $X_flag\n!isempty(nf) => $(!isempty(nf))\n!isempty(F) => $(!isempty(F))\n(length(nf) == size(F, 2)) => ($(length(nf)) == $(size(F, 2))) => $(length(nf) == size(F, 2))"))
+    end
+    if X_flag && F_flag
+        @assert(size(X, 1) == size(F, 1),
+                ArgumentError("If `X` and `F` are not `nothing`, they must have the same number of rows:\n(size(X, 1) == size(F, 1)) => ($(size(X, 1)) == $(size(F, 1))) => $(size(X, 1) == size(F, 1))"))
     end
     if !isnothing(ts)
-        @argcheck(!isempty(ts))
-        @argcheck(length(ts) == size(X, 1))
+        @assert(!isempty(ts),
+                ArgumentError("If `ts` is not `nothing`, it must be non-empty:\n!isempty(ts) => $(!isempty(ts))"))
+        if X_flag
+            @assert(length(ts) == size(X, 1),
+                    ArgumentError("If `ts` and `X` are not `nothing`, they must have the same number of rows:\n(length(ts) == size(X, 1)) => ($(length(ts)) == $(size(X, 1))) => $(length(ts) == size(X, 1))"))
+        elseif F_flag
+            @assert(length(ts) == size(F, 1),
+                    ArgumentError("If `ts` and `F` are not `nothing`, they must have the same number of rows:\n(length(ts) == size(F, 1)) => ($(length(ts)) == $(size(F, 1))) => $(length(ts) == size(F, 1))"))
+        end
     end
     if !isnothing(iv)
-        @argcheck(!isempty(iv))
-        @argcheck(size(iv) == size(X))
-        @argcheck(all(x -> x > zero(eltype(iv)), iv))
-        if !isnothing(ivpa)
-            if isa(ivpa, Real)
-                @argcheck(isfinite(ivpa) && ivpa > zero(ivpa))
-            elseif isa(ivpa, AbstractVector)
-                @argcheck(!isempty(ivpa))
-                @argcheck(all(isfinite, ivpa) && all(x -> x > zero(eltype(ivpa)), ivpa))
-                @argcheck(length(ivpa) == size(iv, 2))
-            end
+        @assert(!isempty(iv) && size(iv) == size(X) && all(x -> x > zero(eltype(iv)), iv),
+                ArgumentError("If `iv` is not `nothing`, it must be non-empty, have the same size as `X`, and all elements must be positive:\n!isempty(iv) => $(!isempty(iv))\n(size(iv) == size(X)) => $(size(iv) == size(X))\n(all(x -> x > zero(eltype(iv)), iv)) => $(all(x -> x > zero(eltype(iv)), iv))"))
+        if isa(ivpa, Real)
+            @assert(isfinite(ivpa) && ivpa > zero(ivpa),
+                    ArgumentError("If `ivpa` is not `nothing`, it must be finite and positive:\nisfinite(ivpa) => $(isfinite(ivpa))\nivpa > zero(ivpa) => $(ivpa > zero(ivpa))"))
+        elseif isa(ivpa, AbstractVector)
+            @assert(!isempty(ivpa) &&
+                    length(ivpa) == size(iv, 2) &&
+                    all(isfinite, ivpa) &&
+                    all(x -> x > zero(eltype(ivpa)), ivpa),
+                    ArgumentError("If `ivpa` is a vector, it must be non-empty, have the same length as the number of columns in `iv`, and all elements must be finite and positive:\n!isempty(ivpa) => $(!isempty(ivpa))\n(length(ivpa) == size(iv, 2)) => ($(length(ivpa)) == $(size(iv, 2))) => $(length(ivpa) == size(iv, 2))\n(all(isfinite, ivpa)) => $(all(isfinite, ivpa))\n(all(x -> x > zero(eltype(ivpa)), ivpa)) => $(all(x -> x > zero(eltype(ivpa)), ivpa))"))
         end
     end
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
@@ -286,11 +303,11 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                            map_func::Union{Nothing, Function} = nothing,
                            join_method::Symbol = :outer,
                            impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
-    @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent))
+    @assert(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
+            ArgumentError("`missing_col_percent` must be in (0, 1]:\nmissing_col_percent => $missing_col_percent"))
     if !isnothing(missing_row_percent)
-        @argcheck(zero(missing_row_percent) <
-                  missing_row_percent <=
-                  one(missing_row_percent))
+        @assert(zero(missing_row_percent) < missing_row_percent <= one(missing_row_percent),
+                ArgumentError("`missing_row_percent` must be in (0, 1]:\nmissing_row_percent => $missing_row_percent"))
     end
     if !isempty(F)
         asset_names = string.(colnames(X))
@@ -335,7 +352,9 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     oc = setdiff(col_names, union(nx, nf))
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
-        @argcheck(ts == timestamp(iv))
+        iv = iv[ts]
+        # @assert(ts == timestamp(iv),
+        #         ArgumentError("If the returns series contains a timestamp and `iv` is not `nothing`, then the timestamps must match exactly."))
     end
     if isempty(nf)
         nf = nothing

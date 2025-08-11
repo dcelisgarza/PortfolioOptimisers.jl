@@ -2,7 +2,7 @@ struct PValue{T1} <: AbstractStepwiseRegressionCriterion
     threshold::T1
 end
 function PValue(; threshold::Real = 0.05)
-    @argcheck(zero(threshold) < threshold < one(threshold))
+    @assert(zero(threshold) < threshold < one(threshold))
     return PValue(threshold)
 end
 struct Forward <: AbstractStepwiseRegressionAlgorithm end

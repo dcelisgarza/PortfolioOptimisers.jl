@@ -42,12 +42,12 @@ function AugmentedBlackLittermanPrior(;
                                       rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
                                       tau::Union{Nothing, <:Real} = nothing)
     if isa(w, AbstractVector)
-        @argcheck(!isempty(w))
+        @assert(!isempty(w))
     end
     assert_bl_views_conf(a_views_conf, a_views)
     assert_bl_views_conf(f_views_conf, f_views)
     if !isnothing(tau)
-        @argcheck(tau > zero(tau))
+        @assert(tau > zero(tau))
     end
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, ve, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
@@ -77,13 +77,13 @@ function Base.getproperty(obj::AugmentedBlackLittermanPrior, sym::Symbol)
 end
 function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         F = transpose(F)
     end
-    @argcheck(length(pe.a_sets.dict[pe.a_sets.key]) == size(X, 2))
-    @argcheck(length(pe.f_sets.dict[pe.f_sets.key]) == size(F, 2))
+    @assert(length(pe.a_sets.dict[pe.a_sets.key]) == size(X, 2))
+    @assert(length(pe.f_sets.dict[pe.f_sets.key]) == size(F, 2))
     # Asset prior.
     a_prior = prior(pe.a_pe, X; strict = strict, kwargs...)
     a_prior_mu, a_prior_sigma = a_prior.mu, a_prior.sigma
@@ -111,7 +111,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractM
                      vcat(zeros(size(a_omega, 1), size(f_omega, 1)), f_omega))
     aug_prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
-            @argcheck(length(pe.w) == size(X, 2))
+            @assert(length(pe.w) == size(X, 2))
             pe.w
         else
             iN = inv(size(X, 2))

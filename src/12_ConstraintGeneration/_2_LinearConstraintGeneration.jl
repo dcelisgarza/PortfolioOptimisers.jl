@@ -9,9 +9,9 @@ function LinearConstraintSide(; group, name,
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
     if group_flag || name_flag || coef_flag
-        @argcheck(group_flag && name_flag && coef_flag)
-        @argcheck(!isempty(group) && !isempty(name) && !isempty(coef))
-        @argcheck(length(group) == length(name) == length(coef))
+        @assert(group_flag && name_flag && coef_flag)
+        @assert(!isempty(group) && !isempty(name) && !isempty(coef))
+        @assert(length(group) == length(name) == length(coef))
     end
     return LinearConstraintSide(group, name, coef)
 end
@@ -106,9 +106,9 @@ function linear_constraints(lcs::Union{<:LinearConstraintEstimator,
                             sets::DataFrame; datatype::DataType = Float64,
                             strict::Bool = false)
     if isa(lcs, AbstractVector)
-        @argcheck(!isempty(lcs))
+        @assert(!isempty(lcs))
     end
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)
     A_eq = Vector{datatype}(undef, 0)

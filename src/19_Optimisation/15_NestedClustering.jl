@@ -21,22 +21,22 @@ struct NestedClustering{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     threads::T9
 end
 function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
-    @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
+    @assert(!isa(opt.opt.cle, AbstractClusteringResult))
     return nothing
 end
 function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
-    @argcheck(!isa(opt.opt.lcs, LinearConstraint))
-    @argcheck(!isa(opt.opt.lcm, LinearConstraint))
-    @argcheck(!isa(opt.opt.cent, LinearConstraint))
-    @argcheck(!isa(opt.opt.gcard, LinearConstraint))
-    @argcheck(!isa(opt.opt.sgcard, LinearConstraint))
-    # @argcheck(!isa(opt.opt.smtx, AbstractMatrix))
-    @argcheck(!isa(opt.opt.nplg, PhilogenyResult))
-    @argcheck(!isa(opt.opt.cplg, PhilogenyResult))
+    @assert(!isa(opt.opt.lcs, LinearConstraint))
+    @assert(!isa(opt.opt.lcm, LinearConstraint))
+    @assert(!isa(opt.opt.cent, LinearConstraint))
+    @assert(!isa(opt.opt.gcard, LinearConstraint))
+    @assert(!isa(opt.opt.sgcard, LinearConstraint))
+    # @assert(!isa(opt.opt.smtx, AbstractMatrix))
+    @assert(!isa(opt.opt.nplg, PhilogenyResult))
+    @assert(!isa(opt.opt.cplg, PhilogenyResult))
     return nothing
 end
 function assert_internal_optimiser(opt::NestedClustering)
-    @argcheck(!isa(opt.cle, AbstractClusteringResult))
+    @assert(!isa(opt.cle, AbstractClusteringResult))
     return nothing
 end
 function assert_internal_optimiser(opt::AbstractVector{<:OptimisationEstimator})
@@ -44,17 +44,17 @@ function assert_internal_optimiser(opt::AbstractVector{<:OptimisationEstimator})
     return nothing
 end
 function assert_external_optimiser(opt::ClusteringOptimisationEstimator)
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
+    @assert(!isa(opt.opt.pe, AbstractPriorResult))
     assert_internal_optimiser(opt)
     return nothing
 end
 function assert_external_optimiser(opt::JuMPOptimisationEstimator)
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
+    @assert(!isa(opt.opt.pe, AbstractPriorResult))
     assert_internal_optimiser(opt)
     return nothing
 end
 function assert_external_optimiser(opt::NestedClustering)
-    @argcheck(!isa(opt.pe, AbstractPriorResult))
+    @assert(!isa(opt.pe, AbstractPriorResult))
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -80,7 +80,7 @@ function NestedClustering(;
         assert_internal_optimiser(opti)
     end
     if isa(wb, WeightBoundsEstimator)
-        @argcheck(!isnothing(sets))
+        @assert(!isnothing(sets))
     end
     return NestedClustering(pe, cle, wb, sets, opti, opto, cwf, strict, threads)
 end
@@ -147,7 +147,7 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
             res = optimise!(optic, rdc; dims = dims, branchorder = branchorder,
                             str_names = str_names, save = save, kwargs...)
             #! Support efficient frontier?
-            @argcheck(!isa(res.retcode, AbstractVector))
+            @assert(!isa(res.retcode, AbstractVector))
             wi[cl, i] = res.w
             resi[i] = res
         end

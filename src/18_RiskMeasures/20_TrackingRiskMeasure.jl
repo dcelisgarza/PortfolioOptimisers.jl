@@ -7,7 +7,7 @@ end
 function RiskTrackingError(; tracking::WeightsTracking,
                            r::AbstractBaseRiskMeasure = Variance(), err::Real = 0.0,
                            alg::VariableTracking = IndependentVariableTracking())
-    @argcheck(isfinite(err) && err >= zero(err))
+    @assert(isfinite(err) && err >= zero(err))
     r = no_bounds_no_risk_expr_risk_measure(r)
     return RiskTrackingError(tracking, r, err, alg)
 end

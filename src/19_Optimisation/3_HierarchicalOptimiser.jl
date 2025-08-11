@@ -33,7 +33,7 @@ function HierarchicalOptimiser(;
                                cwf::WeightFinaliser = IterativeWeightFiniliser(),
                                strict::Bool = false)
     if isa(wb, WeightBoundsEstimator)
-        @argcheck(!isnothing(sets))
+        @assert(!isnothing(sets))
     end
     return HierarchicalOptimiser(pe, cle, slv, fees, wb, sets, cwf, strict)
 end

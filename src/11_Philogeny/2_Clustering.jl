@@ -11,9 +11,9 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
 end
 function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
                                 D::AbstractMatrix, k::Integer)
-    @argcheck(!isempty(S) && !isempty(D))
-    @argcheck(size(S) == size(D))
-    @argcheck(k >= one(k))
+    @assert(!isempty(S) && !isempty(D))
+    @assert(size(S) == size(D))
+    @assert(k >= one(k))
     return HierarchicalClustering(clustering, S, D, k)
 end
 function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
@@ -24,7 +24,7 @@ struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm
     k::T1
 end
 function PredefinedNumberClusters(; k::Integer = 1)
-    @argcheck(k >= one(k))
+    @assert(k >= one(k))
     return PredefinedNumberClusters(k)
 end
 struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
@@ -41,7 +41,7 @@ end
 function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
                                alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
     if !isnothing(max_k)
-        @argcheck(max_k >= one(max_k))
+        @assert(max_k >= one(max_k))
     end
     return OptimalNumberClusters(max_k, alg)
 end

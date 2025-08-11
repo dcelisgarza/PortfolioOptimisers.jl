@@ -408,7 +408,7 @@ GerberCovariance
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                           pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
                           alg::GerberCovarianceAlgorithm = Gerber1())
-    @argcheck(zero(threshold) < threshold < one(threshold))
+    @assert(zero(threshold) < threshold < one(threshold))
     return GerberCovariance(ve, pdm, threshold, alg)
 end
 
@@ -761,7 +761,7 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:UnNormalisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -803,7 +803,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:UnNormalisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -845,7 +845,7 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:NormalisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -891,7 +891,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:NormalisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

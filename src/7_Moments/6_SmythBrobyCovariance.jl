@@ -414,9 +414,9 @@ function SmythBrobyCovariance(;
                               c3::Real = 4.0, n::Real = 2.0,
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
                               threads::FLoops.Transducers.Executor = ThreadedEx())
-    @argcheck(zero(threshold) < threshold < one(threshold))
-    @argcheck(zero(c1) < c1 <= one(c1))
-    @argcheck(zero(c2) < c2 <= one(c2) && c3 > c2)
+    @assert(zero(threshold) < threshold < one(threshold))
+    @assert(zero(c1) < c1 <= one(c1))
+    @assert(zero(c2) < c2 <= one(c2) && c3 > c2)
     return SmythBrobyCovariance(me, ve, pdm, threshold, c1, c2, c3, n, alg, threads)
 end
 
@@ -1485,7 +1485,7 @@ function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
                                                  <:UnNormalisedSmythBrobyCovarianceAlgorithm,
                                                  <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -1540,7 +1540,7 @@ function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
                                                  <:UnNormalisedSmythBrobyCovarianceAlgorithm,
                                                  <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -1598,7 +1598,7 @@ function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
                                                  <:NormalisedSmythBrobyCovarianceAlgorithm,
                                                  <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -1658,7 +1658,7 @@ function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
                                                  <:NormalisedSmythBrobyCovarianceAlgorithm,
                                                  <:Any}, X::AbstractMatrix; dims::Int = 1,
                         mean = nothing, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

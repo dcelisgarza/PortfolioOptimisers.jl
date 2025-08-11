@@ -2,7 +2,7 @@ function RRM(x::AbstractVector, slv::Union{<:Solver, <:AbstractVector{<:Solver}}
              alpha::Real = 0.05, kappa::Real = 0.3,
              w::Union{Nothing, AbstractWeights} = nothing)
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
+        @assert(!isempty(slv))
     end
     T = length(x)
     model = JuMP.Model()
@@ -88,12 +88,12 @@ function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSe
                                  alpha::Real = 0.05, kappa::Real = 0.3,
                                  w::Union{Nothing, AbstractWeights} = nothing)
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
+        @assert(!isempty(slv))
     end
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    @argcheck(zero(kappa) < kappa < one(kappa))
+    @assert(zero(alpha) < alpha < one(alpha))
+    @assert(zero(kappa) < kappa < one(kappa))
     if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
+        @assert(!isempty(w))
     end
     return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
@@ -125,14 +125,14 @@ function RelativisticValueatRiskRange(;
                                       beta::Real = 0.05, kappa_b::Real = 0.3,
                                       w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
+        @assert(!isempty(slv))
     end
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    @argcheck(zero(kappa_a) < kappa_a < one(kappa_a))
-    @argcheck(zero(beta) < beta < one(beta))
-    @argcheck(zero(kappa_b) < kappa_b < one(kappa_b))
+    @assert(zero(alpha) < alpha < one(alpha))
+    @assert(zero(kappa_a) < kappa_a < one(kappa_a))
+    @assert(zero(beta) < beta < one(beta))
+    @assert(zero(kappa_b) < kappa_b < one(kappa_b))
     if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
+        @assert(!isempty(w))
     end
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
@@ -158,10 +158,10 @@ function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(),
                                                <:AbstractVector{<:Solver}} = nothing,
                                     alpha::Real = 0.05, kappa::Real = 0.3)
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
+        @assert(!isempty(slv))
     end
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    @argcheck(zero(kappa) < kappa < one(kappa))
+    @assert(zero(alpha) < alpha < one(alpha))
+    @assert(zero(kappa) < kappa < one(kappa))
     return RelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
 function (r::RelativisticDrawdownatRisk)(x::AbstractVector)
@@ -191,10 +191,10 @@ function RelativeRelativisticDrawdownatRisk(;
                                                        <:AbstractVector{<:Solver}} = nothing,
                                             alpha::Real = 0.05, kappa = 0.3)
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
+        @assert(!isempty(slv))
     end
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    @argcheck(zero(kappa) < kappa < one(kappa))
+    @assert(zero(alpha) < alpha < one(alpha))
+    @assert(zero(kappa) < kappa < one(kappa))
     return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
 function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)

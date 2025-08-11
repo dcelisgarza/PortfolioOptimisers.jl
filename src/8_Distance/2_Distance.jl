@@ -81,7 +81,7 @@ function distance(::Distance{<:LogDistance}, rho::AbstractMatrix, args...; kwarg
 end
 function distance(de::Distance{<:VariationInfoDistance}, ::Any, X::AbstractMatrix;
                   dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -90,7 +90,7 @@ end
 function cor_and_dist(de::Distance{<:VariationInfoDistance},
                       ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                       kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     rho = cor(ce, X; dims = dims, kwargs...)
     if dims == 2
         X = transpose(X)

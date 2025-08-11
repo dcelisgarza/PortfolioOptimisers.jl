@@ -4,9 +4,9 @@ function CardinalityConstraintSide(; group, name,
     name_flag = isa(name, AbstractVector)
     coef_flag = isa(coef, AbstractVector)
     if group_flag || name_flag || coef_flag
-        @argcheck(group_flag && name_flag && coef_flag)
-        @argcheck(!isempty(group) && !isempty(name))
-        @argcheck(length(group) == length(name) == length(coef))
+        @assert(group_flag && name_flag && coef_flag)
+        @assert(!isempty(group) && !isempty(name))
+        @assert(length(group) == length(name) == length(coef))
     end
     return LinearConstraintSide(group, name, coef)
 end
@@ -16,7 +16,7 @@ function CardinalityConstraint(; A::LinearConstraintSide, B::Integer = 1,
 end
 function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::DataFrame;
                            kwargs...)
-    @argcheck(!isempty(sets))
+    @assert(!isempty(sets))
     sets = sets[!, smtx]
     unique_sets = unique(sets)
     A = BitMatrix(undef, length(sets), length(unique_sets))

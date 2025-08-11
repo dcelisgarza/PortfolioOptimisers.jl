@@ -35,13 +35,13 @@ function RiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
                         alg::RiskBudgettingAlgorithm = AssetRiskBudgetting(),
                         wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
     if isa(r, AbstractVector)
-        @argcheck(!isempty(r))
+        @assert(!isempty(r))
     end
     if isa(wi, AbstractVector)
-        @argcheck(!isempty(wi))
+        @assert(!isempty(wi))
     end
     if isa(alg.rkb, RiskBudgetEstimator)
-        @argcheck(!isnothing(opt.sets))
+        @assert(!isnothing(opt.sets))
     end
     return RiskBudgetting(opt, r, alg, wi)
 end
@@ -62,7 +62,7 @@ function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgetting
     rkb = risk_budget_constraints(rb.alg.rkb, sets; N = N, strict = strict,
                                   datatype = datatype)
     rb = rkb.val
-    @argcheck(length(rb) == N)
+    @assert(length(rb) == N)
     sc = model[:sc]
     @variables(model, begin
                    k

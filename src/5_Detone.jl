@@ -61,7 +61,7 @@ Detone
   - [`detone`](@ref)
 """
 function Detone(; n::Integer = 1)
-    @argcheck(n >= zero(n))
+    @assert(n >= zero(n), ArgumentError("`n` must be non-negative:\nn => $n"))
     return Detone(n)
 end
 
@@ -128,7 +128,8 @@ function detone!(::Nothing, args...)
 end
 function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
     n = ce.n
-    @argcheck(one(size(X, 1)) <= n <= size(X, 1))
+    @assert(one(size(X, 1)) <= n <= size(X, 1),
+            ArgumentError("`n` must be in [1, size(X, 1)]:\nn => $n, size(X, 1) => $(size(X, 1))"))
     n -= 1
     s = diag(X)
     iscov = any(!isone, s)

@@ -4,7 +4,7 @@ struct GeneralDistance{T1, T2} <: AbstractDistanceEstimator
 end
 function GeneralDistance(; power::Integer = 1,
                          alg::AbstractDistanceAlgorithm = SimpleDistance())
-    @argcheck(power >= one(power))
+    @assert(power >= one(power))
     return GeneralDistance(power, alg)
 end
 function distance(de::GeneralDistance{<:Any, <:SimpleDistance},
@@ -95,7 +95,7 @@ function distance(de::GeneralDistance{<:Any, <:LogDistance}, rho::AbstractMatrix
 end
 function distance(de::GeneralDistance{<:Any, <:VariationInfoDistance}, ::Any,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -104,7 +104,7 @@ end
 function cor_and_dist(de::GeneralDistance{<:Any, <:VariationInfoDistance},
                       ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                       kwargs...)
-    @argcheck(dims in (1, 2))
+    @assert(dims in (1, 2))
     rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     if dims == 2
         X = transpose(X)

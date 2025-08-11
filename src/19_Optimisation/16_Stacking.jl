@@ -19,7 +19,7 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8} <: BaseStackingOptimisationEstim
     threads::T8
 end
 function assert_external_optimiser(opt::Stacking)
-    @argcheck(!isa(opt.pe, AbstractPriorResult))
+    @assert(!isa(opt.pe, AbstractPriorResult))
     assert_external_optimiser(opt.opti)
     assert_external_optimiser(opt.opto)
     return nothing
@@ -44,7 +44,7 @@ function Stacking(;
                   threads::FLoops.Transducers.Executor = ThreadedEx())
     assert_external_optimiser(opto)
     if isa(wb, WeightBoundsEstimator)
-        @argcheck(!isnothing(sets))
+        @assert(!isnothing(sets))
     end
     return Stacking(pe, wb, sets, opti, opto, cwf, strict, threads)
 end
@@ -70,7 +70,7 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
         res = optimise!(opt, rd; dims = dims, branchorder = branchorder,
                         str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?
-        @argcheck(!isa(res.retcode, AbstractVector))
+        @assert(!isa(res.retcode, AbstractVector))
         wi[:, i] = res.w
         resi[i] = res
     end

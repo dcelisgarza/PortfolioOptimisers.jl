@@ -36,8 +36,8 @@ struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
     ub::T2
 end
 function BoxUncertaintySet(; lb::AbstractArray, ub::AbstractArray)
-    @argcheck(!isempty(lb) && !isempty(ub))
-    @argcheck(size(lb) == size(ub))
+    @assert(!isempty(lb) && !isempty(ub))
+    @assert(size(lb) == size(ub))
     return BoxUncertaintySet(lb, ub)
 end
 struct NormalKUncertaintyAlgorithm{T1} <: AbstractUncertaintyKAlgorithm
@@ -82,9 +82,9 @@ struct EllipseUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
 end
 function EllipseUncertaintySet(; sigma::AbstractMatrix, k::Real,
                                class::AbstractEllipseUncertaintySetResultClass)
-    @argcheck(!isempty(sigma))
+    @assert(!isempty(sigma))
     assert_matrix_issquare(sigma)
-    @argcheck(zero(k) < k)
+    @assert(zero(k) < k)
     return EllipseUncertaintySet(sigma, k, class)
 end
 
