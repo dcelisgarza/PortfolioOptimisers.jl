@@ -269,4 +269,33 @@
                          for i in sets.dict["group1"]]] .>= 0.02)
         @test abs(res.w[findfirst(x -> x == "PEP", sets.dict[sets.key])] - 0.08) < 5e-10
     end
+    #=
+    # @testset "NestedClustering" begin
+    jopt = JuMPOptimiser(; pe = pr, slv = slv)
+    opts = [NestedClustering(; cle = clr, opti = MeanRisk(; opt = jopt),
+                             opto = HierarchicalEqualRiskContribution()),
+            NestedClustering(; cle = clr, opti = NearOptimalCentering(; opt = jopt),
+                             opto = HierarchicalEqualRiskContribution()),
+            NestedClustering(; cle = clr, opti = RiskBudgetting(; opt = jopt),
+                             opto = HierarchicalEqualRiskContribution()),
+            NestedClustering(; cle = clr, opti = RelaxedRiskBudgetting(; opt = jopt),
+                             opto = HierarchicalEqualRiskContribution())]
+    res = optimise!(opt, rd)
+    opt = NestedClustering(; pe = pr, cle = clr,
+                           opti = NestedClustering(; pe = pr,
+                                                   opti = NestedClustering(; pe = pr,
+                                                                           opti = MeanRisk(;
+                                                                                           opt = jopt),
+                                                                           opto = NestedClustering(;
+                                                                                                   #    pe = pr,
+                                                                                                   #    cle = clr,
+                                                                                                   opti = MeanRisk(;
+                                                                                                                   opt = JuMPOptimiser(;
+                                                                                                                                       slv = slv)),
+                                                                                                   opto = HierarchicalEqualRiskContribution())),
+                                                   opto = HierarchicalEqualRiskContribution()),
+                           opto = HierarchicalEqualRiskContribution())
+    res = optimise!(opt, rd)
+    =#
+    # end
 end

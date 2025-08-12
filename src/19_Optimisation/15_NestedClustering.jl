@@ -37,6 +37,10 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
 end
 function assert_internal_optimiser(opt::NestedClustering)
     @assert(!isa(opt.cle, AbstractClusteringResult))
+    assert_external_optimiser(opt.opto)
+    if !(opt.opti === opt.opto)
+        assert_internal_optimiser(opt.opti)
+    end
     return nothing
 end
 function assert_internal_optimiser(opt::AbstractVector{<:OptimisationEstimator})
@@ -45,6 +49,7 @@ function assert_internal_optimiser(opt::AbstractVector{<:OptimisationEstimator})
 end
 function assert_external_optimiser(opt::ClusteringOptimisationEstimator)
     @assert(!isa(opt.opt.pe, AbstractPriorResult))
+    @assert(!isa(opt.opt.cle, AbstractClusteringResult))
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -55,11 +60,15 @@ function assert_external_optimiser(opt::JuMPOptimisationEstimator)
 end
 function assert_external_optimiser(opt::NestedClustering)
     @assert(!isa(opt.pe, AbstractPriorResult))
-    assert_internal_optimiser(opt)
+    @assert(!isa(opt.cle, AbstractClusteringResult))
+    assert_external_optimiser(opt.opto)
+    if !(opt.opti === opt.opto)
+        assert_external_optimiser(opt.opti)
+    end
     return nothing
 end
 function assert_external_optimiser(opt::AbstractVector{<:OptimisationEstimator})
-    assert_internal_optimiser.(opt)
+    assert_external_optimiser.(opt)
     return nothing
 end
 function NestedClustering(;

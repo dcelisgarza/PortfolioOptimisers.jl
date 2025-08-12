@@ -30,7 +30,7 @@ function opt_view(hec::HierarchicalEqualRiskContribution, i::AbstractVector,
     ri = hec.ri
     ro = hec.ro
     if ri === ro
-        ri, ro = risk_measure_view(ri, i, X)
+        ri = ro = risk_measure_view(ri, i, X)
     else
         ri = risk_measure_view(ri, i, X)
         ro = risk_measure_view(ro, i, X)
