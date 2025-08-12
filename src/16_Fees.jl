@@ -25,7 +25,7 @@ function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = n
     if isa(fl, Union{<:AbstractDict, <:AbstractVector})
         @assert(!isempty(fl), AssertionError("`fl` must be non-empty."))
     end
-    if isa(fs, Union{<:AbstractDict, <:AbstractVector}s)
+    if isa(fs, Union{<:AbstractDict, <:AbstractVector})
         @assert(!isempty(fs), AssertionError("`fs` must be non-empty."))
     end
     return FeesEstimator(tn, l, s, fl, fs, kwargs)
