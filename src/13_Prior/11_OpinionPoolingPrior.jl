@@ -84,9 +84,11 @@ function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
     pe2 = factory(pe.pe2, w)
     (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = prior(pe2, X, F; strict = strict,
                                                             kwargs...)
-    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w,
-                         loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
-                         f_w = !isnothing(loadings) ? w : nothing)
+    ens = exp(entropy(w))
+    kld = [kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
+    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w, ens = ens,
+                         kld = kld, ow = ow, loadings = loadings, f_mu = f_mu,
+                         f_sigma = f_sigma, f_w = ifelse(!isnothing(loadings), w, nothing))
 end
 
 export LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior

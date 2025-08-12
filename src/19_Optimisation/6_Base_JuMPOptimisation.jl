@@ -14,14 +14,17 @@ end
 function get_chol_or_sigma_pm(model::JuMP.Model,
                               pr::Union{<:LowOrderPrior{<:Any, <:Any, <:Any,
                                                         <:AbstractMatrix, <:Any, <:Any,
-                                                        <:Any, <:Any, <:Any},
+                                                        <:Any, <:Any, <:Any, <:Any, <:Any,
+                                                        <:Any},
                                         <:HighOrderPrior{<:LowOrderPrior{<:Any, <:Any,
                                                                          <:Any,
                                                                          <:AbstractMatrix,
                                                                          <:Any, <:Any,
                                                                          <:Any, <:Any,
-                                                                         <:Any}, <:Any,
-                                                         <:Any, <:Any, <:Any, <:Any, <:Any}})
+                                                                         <:Any, <:Any,
+                                                                         <:Any, <:Any},
+                                                         <:Any, <:Any, <:Any, <:Any, <:Any,
+                                                         <:Any}})
     if !haskey(model, :G)
         G = pr.chol
         @expression(model, G, G)

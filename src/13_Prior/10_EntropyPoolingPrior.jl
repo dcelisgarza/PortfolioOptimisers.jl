@@ -50,9 +50,6 @@ function JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
     @assert(so >= zero(so))
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
-function effective_number_scenarios(x::AbstractVector, y::AbstractVector)
-    return exp(-kldivergence(x, y))
-end
 struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,
                            T16} <: AbstractLowOrderPriorEstimator_1o2_1o2
     pe::T1
@@ -836,8 +833,10 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
     (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = pr
-    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1,
-                         loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
+    ens = exp(entropy(w1))
+    kld = kldivergence(w1, w0)
+    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1, ens = ens,
+                         kld = kld, loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
                          f_w = !isnothing(loadings) ? w1 : nothing)
 end
 function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -888,8 +887,10 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     pe = factory(pe, w1)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = pr
-    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1,
-                         loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
+    ens = exp(entropy(w1))
+    kld = kldivergence(w1, w0)
+    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1, ens = ens,
+                         kld = kld, loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
                          f_w = !isnothing(loadings) ? w1 : nothing)
 end
 

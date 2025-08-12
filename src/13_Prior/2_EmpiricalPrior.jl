@@ -1,26 +1,24 @@
-
-#=
-struct ReturnsDistribution{T1, T2, T3, T4} <: AbstractResult
-    X::T1
-    mu::T2
-    sigma::T3
-    w::T4
-end
-=#
-struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: AbstractPriorResult
+struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
+       AbstractPriorResult
     X::T1
     mu::T2
     sigma::T3
     chol::T4
     w::T5
-    loadings::T6
-    f_mu::T7
-    f_sigma::T8
-    f_w::T9
+    ens::T6
+    kld::T7
+    ow::T8
+    loadings::T9
+    f_mu::T10
+    f_sigma::T11
+    f_w::T12
 end
 function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
                        chol::Union{Nothing, <:AbstractMatrix} = nothing,
                        w::Union{Nothing, <:AbstractWeights} = nothing,
+                       ens::Union{Nothing, <:Real} = nothing,
+                       kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                       ow::Union{Nothing, <:AbstractVector} = nothing,
                        loadings::Union{Nothing, <:Regression} = nothing,
                        f_mu::Union{Nothing, <:AbstractVector} = nothing,
                        f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
@@ -31,6 +29,12 @@ function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractM
     if !isnothing(w)
         @assert(!isempty(w))
         @assert(length(w) == size(X, 1))
+    end
+    if isa(kld, AbstractVector)
+        @assert(!isempty(kld))
+    end
+    if !isnothing(ow)
+        @assert(!isempty(ow))
     end
     loadings_flag = !isnothing(loadings)
     f_mu_flag = !isnothing(f_mu)
@@ -50,12 +54,13 @@ function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractM
             @assert(length(f_w) == size(X, 1))
         end
     end
-    return LowOrderPrior(X, mu, sigma, chol, w, loadings, f_mu, f_sigma, f_w)
+    return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, loadings, f_mu, f_sigma, f_w)
 end
 function prior_view(pr::LowOrderPrior, i::AbstractVector)
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
     return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
-                         sigma = view(pr.sigma, i, i), chol = chol, w = pr.w,
+                         sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
+                         kld = pr.kld, ow = pr.ow,
                          loadings = regression_view(pr.loadings, i), f_mu = pr.f_mu,
                          f_sigma = pr.f_sigma, f_w = pr.f_w)
 end
