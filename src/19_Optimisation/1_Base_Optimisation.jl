@@ -35,6 +35,12 @@ function optimise! end
 function optimise!(or::OptimisationResult, args...)
     return or
 end
+function assert_internal_optimiser(::OptimisationResult)
+    return nothing
+end
+function assert_external_optimiser(::OptimisationResult)
+    return nothing
+end
 function efficient_frontier! end
 
 export optimise!, efficient_frontier!, OptimisationSuccess, OptimisationFailure

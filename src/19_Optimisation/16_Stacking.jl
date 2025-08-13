@@ -20,13 +20,17 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8} <: BaseStackingOptimisationEstim
 end
 function assert_external_optimiser(opt::Stacking)
     @assert(!isa(opt.pe, AbstractPriorResult))
-    assert_external_optimiser(opt.opti)
     assert_external_optimiser(opt.opto)
+    if !(opt.opti === opt.opto)
+        assert_external_optimiser(opt.opti)
+    end
     return nothing
 end
 function assert_internal_optimiser(opt::Stacking)
-    assert_internal_optimiser(opt.opti)
-    assert_internal_optimiser(opt.opto)
+    assert_external_optimiser(opt.opto)
+    if !(opt.opti === opt.opto)
+        assert_internal_optimiser(opt.opti)
+    end
     return nothing
 end
 function Stacking(;

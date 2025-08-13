@@ -43,7 +43,8 @@ function assert_internal_optimiser(opt::NestedClustering)
     end
     return nothing
 end
-function assert_internal_optimiser(opt::AbstractVector{<:OptimisationEstimator})
+function assert_internal_optimiser(opt::AbstractVector{<:Union{<:OptimisationEstimator,
+                                                               <:OptimisationResult}})
     assert_internal_optimiser.(opt)
     return nothing
 end
@@ -67,7 +68,8 @@ function assert_external_optimiser(opt::NestedClustering)
     end
     return nothing
 end
-function assert_external_optimiser(opt::AbstractVector{<:OptimisationEstimator})
+function assert_external_optimiser(opt::AbstractVector{<:Union{<:OptimisationEstimator,
+                                                               <:OptimisationResult}})
     assert_external_optimiser.(opt)
     return nothing
 end

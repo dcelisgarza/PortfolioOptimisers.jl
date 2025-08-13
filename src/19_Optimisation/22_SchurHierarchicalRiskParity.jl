@@ -10,14 +10,20 @@ struct SchurHierarchicalRiskParityOptimisation{T1, T2, T3, T4, T5, T6, T7} <:
 end
 abstract type SchurAlgorithm <: AbstractAlgorithm end
 struct NonMonotonicSchur <: SchurAlgorithm end
-struct MonotonicSchur{T1, T2} <: SchurAlgorithm
+struct MonotonicSchur{T1, T2, T3, T4} <: SchurAlgorithm
     N::T1
     tol::T2
+    iter::T3
+    strict::T4
 end
-function MonotonicSchur(; N::Integer = 10, tol::Real = 1e-4)
+function MonotonicSchur(; N::Integer = 10, tol::Real = 1e-4,
+                        iter::Union{Nothing, Integer} = nothing, strict::Bool = false)
     @assert(N > 0)
     @assert(tol > 0)
-    return MonotonicSchur(N, tol)
+    if !isnothing(iter)
+        @assert(iter > 0)
+    end
+    return MonotonicSchur(N, tol, iter, strict)
 end
 struct SchurParams{T1, T2, T3, T4} <: AbstractAlgorithm
     r::T1
@@ -139,8 +145,12 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::Weigh
     return w, gamma
 end
 function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lrisk::Real,
-                             tol::Real = 1e-4)
-    iter = ceil(Int, log2((hgamma - lgamma) / tol) * 4 + 1)
+                             tol::Real = 1e-4, iter::Union{Nothing, <:Integer} = nothing,
+                             strict::Bool = false)
+    w = nothing
+    if isnothing(iter)
+        iter = ceil(Int, log2((hgamma - lgamma) / tol) * 4 + 10)
+    end
     for _ in 1:iter
         mgamma = (lgamma + hgamma) * 0.5
         w, risk, hrisk = try
@@ -156,6 +166,7 @@ function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lr
             # If risk at midpoint is lower than at the lower bound and lower than the risk just below the midpoint, we can update the lower bound to the midpoint.
             lgamma = mgamma
             lrisk = risk
+            # println("$hgamma\t$lgamma\t$((hgamma - lgamma))")
             if (hgamma - lgamma) <= tol
                 # Return if the difference between upper and lower bounds is within the tolerance.
                 return w, lgamma
@@ -165,7 +176,13 @@ function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lr
             hgamma = mgamma
         end
     end
-    throw(ArgumentError("Binary search did not converge within the specified tolerance."))
+    msg = "Binary search did not converge within the specified tolerance: tol => $tol"
+    if strict
+        throw(ArgumentError(msg))
+    else
+        @warn(msg)
+        return w, lgamma
+    end
 end
 function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::WeightBounds,
                        params::SchurParams{<:Any, <:Any, <:MonotonicSchur, <:Any})
@@ -193,7 +210,7 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::Weigh
             # Turning point is strictly between [gammas[i-2], gammas[i]].
             lidx = max(1, i - 2)
             return schur_binary_search(objective, gammas[lidx], gammas[i], risks[lidx],
-                                       params.alg.tol)
+                                       params.alg.tol, params.alg.iter, params.alg.strict)
         end
     end
     # If there's no turning point in the range of gammas, check the derivative at the last gamma.
@@ -202,7 +219,7 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::Weigh
     end
     # If the turning point exists and was not found within the range, or the last gamma, it is between the last two gammas.
     return schur_binary_search(objective, gammas[end - 1], gammas[end], risks[end - 1],
-                               params.alg.tol)
+                               params.alg.tol, params.alg.iter, params.alg.strict)
 end
 function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)

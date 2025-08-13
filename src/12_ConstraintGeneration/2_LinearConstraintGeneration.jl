@@ -545,6 +545,9 @@ function RiskBudgetResult(; val::AbstractVector{<:Real})
     @assert(all(x -> x >= zero(x), val))
     return RiskBudgetResult(val)
 end
+function risk_budget_view(::Nothing, args...)
+    return nothing
+end
 function risk_budget_view(rb::RiskBudgetResult, i::AbstractVector)
     val = nothing_scalar_array_view(rb.val, i)
     return RiskBudgetResult(; val = val)
