@@ -115,7 +115,8 @@ function Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovari
                  n::Integer = 1)
     return Network(ce, de, alg, n)
 end
-struct Centrality{T1, T2}
+abstract type AbstractCentralityEstimator <: AbstractPhilogenyEstimator end
+struct Centrality{T1, T2} <: AbstractCentralityEstimator
     ne::T1
     cent::T2
 end
