@@ -181,7 +181,8 @@ end
 function regression_view(r::AbstractRegressionEstimator, args...)
     return r
 end
-function regression(re::Regression, args...)
+function regression(re::Union{<:AbstractRegressionEstimator, <:Regression},
+                    args...)
     return re
 end
 function regression(re::Union{<:AbstractRegressionEstimator, <:Regression},
