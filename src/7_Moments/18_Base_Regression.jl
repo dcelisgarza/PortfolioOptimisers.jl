@@ -184,5 +184,9 @@ end
 function regression(re::Regression, args...)
     return re
 end
+function regression(re::Union{<:AbstractRegressionEstimator, <:Regression},
+                    rd::ReturnsResult)
+    return regression(re, rd.X, rd.F)
+end
 
 export regression, Regression

@@ -20,9 +20,10 @@ struct ProcessedJuMPOptimiserAttributes{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10,
     fees::T18
     ret::T19
 end
-struct ProcessedFactorRiskBudgettingAttributes{T1, T2} <: AbstractResult
+struct ProcessedFactorRiskBudgettingAttributes{T1, T2, T3} <: AbstractResult
     rkb::T1
     b1::T2
+    loadings::T3
 end
 struct ProcessedAssetRiskBudgettingAttributes{T1} <: AbstractResult
     rkb::T1
@@ -34,15 +35,16 @@ struct JuMPOptimisation{T1, T2, T3, T4, T5} <: OptimisationResult
     sol::T4
     model::T5
 end
-struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
+struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8} <:
        OptimisationResult
     oe::T1
     pa::T2
-    frc_nplg::T3
-    frc_cplg::T4
-    retcode::T5
-    sol::T6
-    model::T7
+    loadings::T3
+    frc_nplg::T4
+    frc_cplg::T5
+    retcode::T6
+    sol::T7
+    model::T8
 end
 struct JuMPOptimisationRiskBudgetting{T1, T2, T3, T4, T5, T6} <: OptimisationResult
     oe::T1

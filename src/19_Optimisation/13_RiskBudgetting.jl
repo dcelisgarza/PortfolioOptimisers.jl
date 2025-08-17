@@ -95,11 +95,12 @@ function set_risk_budgetting_constraints!(model::JuMP.Model,
                                           sets::Union{Nothing, <:AssetSets},
                                           pr::AbstractPriorResult, wb::WeightBounds,
                                           rd::ReturnsResult)
-    b1 = set_factor_risk_contribution_constraints!(model, rb.alg.re, rd, rb.alg.flag, rb.wi)
+    b1, loadings = set_factor_risk_contribution_constraints!(model, rb.alg.re, rd,
+                                                             rb.alg.flag, rb.wi)
     rkb = _set_risk_budgetting_constraints!(model, rb, model[:w1], sets;
                                             strict = rb.opt.strict, datatype = eltype(pr.X))
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
-    return ProcessedFactorRiskBudgettingAttributes(rkb, b1)
+    return ProcessedFactorRiskBudgettingAttributes(rkb, b1, loadings)
 end
 function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
