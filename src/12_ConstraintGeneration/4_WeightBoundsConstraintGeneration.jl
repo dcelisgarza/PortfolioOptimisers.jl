@@ -138,12 +138,12 @@ function weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...;
     end
     lb = wb.lb
     ub = wb.ub
-    if isnothing(lb)
+    if isnothing(lb) || isinf(lb)
         lb = fill(-Inf, N)
     elseif isa(lb, Real)
         lb = range(; start = lb, stop = lb, length = N)
     end
-    if isnothing(ub)
+    if isnothing(ub) || isinf(ub)
         ub = fill(Inf, N)
     elseif isa(ub, Real)
         ub = range(; start = ub, stop = ub, length = N)

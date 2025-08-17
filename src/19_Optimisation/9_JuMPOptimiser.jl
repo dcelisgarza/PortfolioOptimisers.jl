@@ -23,7 +23,7 @@ end
 struct ProcessedFactorRiskBudgettingAttributes{T1, T2, T3} <: AbstractResult
     rkb::T1
     b1::T2
-    loadings::T3
+    rr::T3
 end
 struct ProcessedAssetRiskBudgettingAttributes{T1} <: AbstractResult
     rkb::T1
@@ -39,7 +39,7 @@ struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8} <:
        OptimisationResult
     oe::T1
     pa::T2
-    loadings::T3
+    rr::T3
     frc_nplg::T4
     frc_cplg::T5
     retcode::T6

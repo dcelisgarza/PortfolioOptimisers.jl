@@ -21,6 +21,8 @@
         end
     end
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end],
+                           TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
     slv = [Solver(; name = :clarabel6, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
@@ -45,37 +47,37 @@
     wp = pweights(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
                         length = size(pr.X, 1)))
     rf = 4.2 / 100 / 252
+    rs = [StandardDeviation(), Variance(), LowOrderMoment(),
+          LowOrderMoment(;
+                         alg = LowOrderDeviation(;
+                                                 alg = SecondLowerMoment(;
+                                                                         alg = SqrtRiskExpr()))),
+          LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+          LowOrderMoment(;
+                         alg = LowOrderDeviation(;
+                                                 alg = SecondCentralMoment(;
+                                                                           alg = SqrtRiskExpr()))),
+          LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondCentralMoment())),
+          LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
+          ConditionalValueatRisk(), ConditionalValueatRiskRange(), EntropicValueatRisk(),
+          EntropicValueatRiskRange(), RelativisticValueatRisk(),
+          RelativisticValueatRiskRange(), MaximumDrawdown(), AverageDrawdown(),
+          UlcerIndex(), ConditionalDrawdownatRisk(), EntropicDrawdownatRisk(),
+          RelativisticDrawdownatRisk(), SquareRootKurtosis(; N = 2), SquareRootKurtosis(),
+          OrderedWeightsArray(; alg = ExactOrderedWeightsArray()), OrderedWeightsArray(),
+          OrderedWeightsArrayRange(), NegativeSkewness(),
+          NegativeSkewness(; alg = QuadRiskExpr())]
     @testset "Risk Budgetting" begin
-        rs = [StandardDeviation(), Variance(), LowOrderMoment(),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     alg = SecondLowerMoment(;
-                                                                             alg = SqrtRiskExpr()))),
-              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondLowerMoment())),
-              LowOrderMoment(;
-                             alg = LowOrderDeviation(;
-                                                     alg = SecondCentralMoment(;
-                                                                               alg = SqrtRiskExpr()))),
-              LowOrderMoment(; alg = LowOrderDeviation(; alg = SecondCentralMoment())),
-              LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
-              ConditionalValueatRisk(), ConditionalValueatRiskRange(),
-              EntropicValueatRisk(), EntropicValueatRiskRange(), RelativisticValueatRisk(),
-              RelativisticValueatRiskRange(), MaximumDrawdown(), AverageDrawdown(),
-              UlcerIndex(), ConditionalDrawdownatRisk(), EntropicDrawdownatRisk(),
-              RelativisticDrawdownatRisk(), SquareRootKurtosis(; N = 2),
-              SquareRootKurtosis(), OrderedWeightsArray(; alg = ExactOrderedWeightsArray()),
-              OrderedWeightsArray(), OrderedWeightsArrayRange(), NegativeSkewness(),
-              NegativeSkewness(; alg = QuadRiskExpr())]
         df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgetting1.csv.gz"), DataFrame)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
-            opt = JuMPOptimiser(; pe = pr, slv = slv)
             rb = RiskBudgetting(; r = r, opt = opt)
             res = optimise!(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)
-            v1, m1 = findmin(rkc)
-            v2, m2 = findmax(rkc)
+            v1 = minimum(rkc)
+            v2 = maximum(rkc)
             rtol = if i ∈ (3, 8, 12, 27)
                 5e-2
             elseif i ∈ (9, 15)
@@ -128,7 +130,6 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgetting2.csv.gz"), DataFrame)
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
-            opt = JuMPOptimiser(; pe = pr, slv = slv)
             rb = RiskBudgetting(; r = r, opt = opt,
                                 alg = AssetRiskBudgetting(;
                                                           rkb = RiskBudgetResult(;
@@ -138,6 +139,8 @@
             rkc = risk_contribution(r, res.w, pr.X)
             v1, m1 = findmin(rkc)
             v2, m2 = findmax(rkc)
+            @test m1 == 1
+            @test m2 == 20
             rtol = if i ∈ (3, 24, 28)
                 1e-3
             elseif i ∈ (8, 11, 13, 23, 27, 29)
@@ -179,4 +182,131 @@
             @test success
         end
     end
+    #=
+    # @testset "Factor Risk Budgetting" begin
+    # df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgetting1.csv.gz"), DataFrame)
+    rer = PortfolioOptimisers.regression(StepwiseRegression(; crit = PortfolioOptimisers.AIC(),
+                                                            alg = Backward()), rd)
+    opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = Inf, bgt = 1,
+                        wb = WeightBounds(; lb = -Inf, ub = Inf))
+    # for (i, r) in enumerate(rs)
+    rb = RiskBudgetting(; r = ConditionalDrawdownatRisk(), opt = opt,
+                        alg = FactorRiskBudgetting(; re = rer))
+    @time res = PortfolioOptimisers.optimise!(rb, rd)
+
+    #############
+    using PortfolioOptimiser
+    port = Portfolio(;
+                     prices = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                        timestamp = :Date)[(end - 252):end],
+                     f_prices = TimeArray(CSV.File(joinpath(@__DIR__,
+                                                            "./assets/Factors.csv.gz"));
+                                          timestamp = :Date)[(end - 252):end],
+                     solvers = PortOptSolver(; name = :Clarabel, solver = Clarabel.Optimizer,
+                                             check_sol = (; allow_local = true,
+                                                          allow_almost = true),
+                                             params = Dict("verbose" => false,
+                                                           "max_step_fraction" => 0.75)))
+    reg = BReg(PortfolioOptimiser.AIC())
+    asset_statistics!(port)
+    factor_statistics!(port; factor_type = FactorType(; type = reg))
+    port.short = true
+    @time w1 = PortfolioOptimiser.optimise!(port, RB(; rm = CDaR(), class = FC()))
+
+    rr = loadings_matrix(DataFrame(rd.F, rd.nf), DataFrame(rd.X, rd.nx), re)
+    #############
+
+    @test isa(res.retcode, OptimisationSuccess)
+    rkc = PortfolioOptimisers.factor_risk_contribution(factory(PortfolioOptimisers.ConditionalDrawdownatRisk(),
+                                                               pr, slv), res.w, pr.X;
+                                                       re = res.prb.rr)
+    frc1 = PortfolioOptimiser.factor_risk_contribution(port, :RB; rm = CDaR())
+    v1 = minimum(rkc[1:5])
+    v2 = maximum(rkc[1:5])
+    rtol = if i ∈ (1, 2)
+        5e-1
+    else
+        1e-6
+    end
+    success = isapprox(v2 / v1, 1; rtol = rtol)
+    if !success
+        println("Extrema $i fails")
+        find_tol(v2 / v1, 1)
+    end
+    @test success
+
+    rtol = if i ∈ (7, 10, 19, 24, 25) || Sys.isapple() && i ∈ (2, 5, 12)
+        1e-4
+    elseif Sys.isapple() && i == 17
+        5e-3
+    elseif i ∈ (9, 11, 17, 18)
+        5e-4
+    elseif i ∈ (13, 21, 14, 15, 16, 22)
+        1e-2
+    elseif i == 20
+        1e-3
+    else
+        5e-5
+    end
+    success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
+    if !success
+        println("Weights and Contribution $i fails")
+        find_tol([res.w; rkc], df[!, "$i"])
+    end
+    @test success
+    # end
+
+    df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgetting2.csv.gz"), DataFrame)
+    # for (i, r) in enumerate(rs)
+    r = factory(r, pr, slv)
+    opt = JuMPOptimiser(; pe = pr, slv = slv)
+    rb = RiskBudgetting(; r = r, opt = opt,
+                        alg = AssetRiskBudgetting(; rkb = RiskBudgetResult(; val = 1:20)))
+    res = optimise!(rb, rd)
+    @test isa(res.retcode, OptimisationSuccess)
+    rkc = risk_contribution(r, res.w, pr.X)
+    v1, m1 = findmin(rkc)
+    v2, m2 = findmax(rkc)
+    rtol = if i ∈ (3, 24, 28)
+        1e-3
+    elseif i ∈ (8, 11, 13, 23, 27, 29)
+        5e-3
+    elseif i == 9
+        5e-1
+    elseif i ∈ (10, 19, 20, 21, 22)
+        2.5e-1
+    elseif i ∈ (14, 15, 17)
+        1e-1
+    elseif i ∈ (16, 18)
+        5e-2
+    else
+        5e-4
+    end
+    success = isapprox(v2 / v1, 20; rtol = rtol)
+    if !success
+        println("Extrema $i fails")
+        find_tol(v2 / v1, 20)
+    end
+    @test success
+
+    rtol = if i == 11 || Sys.isapple() && i == 9
+        5e-4
+    elseif i == 17
+        1e-3
+    elseif i == 21 || Sys.isapple() && i == 14
+        1e-2
+    elseif i ∈ (14, 15, 16, 20, 22)
+        5e-3
+    else
+        1e-4
+    end
+    success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
+    if !success
+        println("Weights and Contribution $i fails")
+        find_tol([res.w; rkc], df[!, "$i"])
+    end
+    @test success
+    # end
+    # end
+    =#
 end

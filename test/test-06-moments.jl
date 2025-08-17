@@ -161,11 +161,11 @@
                DimensionReductionRegression(; drtgt = PPCA())]
         df = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv.gz"), DataFrame)
         for (i, re) in pairs(res)
-            loadings = regression(re, rd.X, rd.F)
+            rr = regression(re, rd.X, rd.F)
             if i == 14
                 continue
             end
-            lt = [loadings.b; vec(loadings.M)]
+            lt = [rr.b; vec(rr.M)]
             success = isapprox(lt, df[!, i])
             if !success
                 println("Counter: $i")

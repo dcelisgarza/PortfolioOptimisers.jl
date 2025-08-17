@@ -163,7 +163,7 @@
         @test argmax(rkc[1:10]) == 1
 
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgetting(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.rr,
                                                                  flag = false), r = r,
                              opt = opt)
         w = optimise!(rbe, rd).w
@@ -179,12 +179,12 @@
                         0.14788981842448914, 0.06142183846683361, -0.007038174119001148,
                         0.09645573593912729, -0.019522980148066686, 0.03734678491498499],
                        rtol = 5.0e-5)
-        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.loadings)
+        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.rr)
         lo, hi = extrema(rkc[1:10])
         @test isapprox(hi / lo, 1, rtol = 5e-4)
 
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgetting(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.rr,
                                                                  flag = false, rkb = 1:10),
                              r = r, opt = opt)
         w = optimise!(rbe, rd).w
@@ -200,14 +200,14 @@
                         0.12106775081177601, 0.05668171991912606, 0.002146375959345128,
                         0.0882119760653703, 0.011142165451508668, 0.03420537804186409],
                        rtol = 1e-4)
-        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.loadings)
+        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.rr)
         lo, hi = extrema(rkc[1:10])
         @test isapprox(hi / lo, 10, rtol = 5e-4)
         @test argmin(rkc[1:10]) == 1
         @test argmax(rkc[1:10]) == 10
 
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgetting(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.rr,
                                                                  flag = false,
                                                                  rkb = 10:-1:1), r = r,
                              opt = opt)
@@ -224,7 +224,7 @@
                         0.16726434595527243, 0.05843900321136253, -0.01278014016775593,
                         0.1009543951494394, -0.04492126492093387, 0.04002577481426828],
                        rtol = 1e-4)
-        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.loadings)
+        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.rr)
         lo, hi = extrema(rkc[1:10])
         @test isapprox(hi / lo, 10, rtol = 2e-1)
         @test argmin(rkc[1:10]) == 10
@@ -237,7 +237,7 @@
                             pe = pr, slv = slv)
         r = PortfolioOptimisers.factory(StandardDeviation(), pr)
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgetting(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.rr,
                                                                  flag = true), r = r,
                              opt = opt)
         w = optimise!(rbe, rd1).w
@@ -253,12 +253,12 @@
                         -1.0358602218946893e-6, 0.02626647898595665, 0.4741702555519734,
                         0.16008224134499954, -0.12417321787098044, -6.032588016028627e-7,
                         0.015317594457270269], rtol = 1e-6)
-        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.loadings)
+        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.rr)
         lo, hi = extrema(rkc[1:7])
         @test isapprox(hi / lo, 6, rtol = 5e-3)
 
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgetting(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.rr,
                                                                  flag = true, rkb = 1:2:14),
                              r = r, opt = opt)
         w = optimise!(rbe, rd1).w
@@ -274,14 +274,14 @@
                         1.6254963543200377e-6, 0.120765022577743, 0.2538353941495069,
                         0.17802829513377977, -0.057977306925939935, 0.014226507397193345,
                         0.05461740608042893], rtol = 5e-5)
-        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.loadings)
+        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.rr)
         lo, hi = extrema(rkc[1:7])
         @test isapprox(hi / lo, 22, rtol = 1e-2)
         @test argmin(rkc[1:7]) == 1
         @test argmax(rkc[1:7]) == 7
 
         rbe = RiskBudgetting(;
-                             alg = FactorRiskBudgetting(; re = pr1.loadings,
+                             alg = FactorRiskBudgetting(; re = pr1.rr,
                                                                  rkb = [1, 2, 3, 10, 4, 5,
                                                                         6], flag = true),
                              r = r, opt = opt)
@@ -298,7 +298,7 @@
                         0.10553752059398809, 0.37592456693350323, 0.04682377207070844,
                         -0.0760455032190121, 0.09519674537510957, 0.010505721652976434],
                        rtol = 5e-5)
-        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.loadings)
+        rkc = PortfolioOptimisers.factor_risk_contribution(r, w, pr.X; re = pr1.rr)
         lo, hi = extrema(rkc[1:7])
         @test isapprox(hi / lo, 10, rtol = 5e-1)
         @test argmin(rkc[1:7]) == 1

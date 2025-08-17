@@ -91,8 +91,8 @@ function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractM
     f_prior = prior(pe.f_pe, F; strict = strict)
     f_prior_mu, f_prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors.
-    loadings = regression(pe.re, X, F)
-    (; b, M) = loadings
+    rr = regression(pe.re, X, F)
+    (; b, M) = rr
     posterior_X = F * transpose(M) .+ transpose(b)
     (; P, Q) = black_litterman_views(pe.a_views, pe.a_sets; datatype = eltype(posterior_X),
                                      strict = strict)
@@ -128,7 +128,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::AbstractMatrix, F::AbstractM
     posterior_mu = (aug_posterior_mu[1:size(X, 2)] + b) .+ pe.rf
     posterior_sigma = aug_posterior_sigma[1:size(X, 2), 1:size(X, 2)]
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         loadings = loadings, f_mu = f_prior_mu, f_sigma = f_prior_sigma,
+                         rr = rr, f_mu = f_prior_mu, f_sigma = f_prior_sigma,
                          f_w = f_prior.w)
 end
 

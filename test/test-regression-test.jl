@@ -44,22 +44,22 @@
            DimensionReductionRegression(), DimensionReductionRegression(; drtgt = PPCA())]
     res_t = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv"), DataFrame)
     for (i, re) in enumerate(res)
-        loadings = regression(re, X, F)
-        lt = [loadings.b; vec(loadings.M)]
+        rr = regression(re, X, F)
+        lt = [rr.b; vec(rr.M)]
         result = isapprox(lt, res_t[!, i])
         if !result
             if i == length(res)
                 continue
             end
             println("Test $i fails.\n$(res[i])")
-            find_tol(lt, res_t[!, i]; name1 = :loadings, name2 = :loadings_t)
+            find_tol(lt, res_t[!, i]; name1 = :rr, name2 = :loadings_t)
         end
         @test result
     end
     @test res[1] === regression_view(res[1])
-    loadings = regression(res[1], X, F)
-    lv = regression_view(loadings, [2, 5, 17, 4])
-    @test lv.b == view(loadings.b, [2, 5, 17, 4])
-    @test lv.M == view(loadings.M, [2, 5, 17, 4], :)
+    rr = regression(res[1], X, F)
+    lv = regression_view(rr, [2, 5, 17, 4])
+    @test lv.b == view(rr.b, [2, 5, 17, 4])
+    @test lv.M == view(rr.M, [2, 5, 17, 4], :)
 end
 =#

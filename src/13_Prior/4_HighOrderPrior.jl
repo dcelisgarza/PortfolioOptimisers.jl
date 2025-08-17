@@ -251,8 +251,8 @@ function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
         obj.pr.chol
     elseif sym == :w
         obj.pr.w
-    elseif sym == :loadings
-        obj.pr.loadings
+    elseif sym == :rr
+        obj.pr.rr
     elseif sym == :f_mu
         obj.pr.f_mu
     elseif sym == :f_sigma

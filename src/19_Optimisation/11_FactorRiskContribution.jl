@@ -53,13 +53,13 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
                                                              <:AbstractRegressionEstimator},
                                                    rd::ReturnsResult, flag::Bool,
                                                    wi::Union{Nothing, AbstractVector})
-    loadings = regression(re, rd.X, rd.F)
-    Bt = transpose(loadings.L)
+    rr = regression(re, rd.X, rd.F)
+    Bt = transpose(rr.L)
     b1 = pinv(Bt)
     Nf = size(b1, 2)
     if flag
         b2 = pinv(transpose(nullspace(Bt)))
-        N = size(loadings.M, 1)
+        N = size(rr.M, 1)
         @variables(model, begin
                        w1[1:Nf]
                        w2[1:(N - Nf)]
@@ -70,7 +70,7 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
         @expression(model, w, b1 * w1)
     end
     set_initial_w!(w1, wi)
-    return b1, loadings
+    return b1, rr
 end
 function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
@@ -81,8 +81,7 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
     set_maximum_ratio_factor_variables!(model, pr.mu, frc.obj)
-    b1, loadings = set_factor_risk_contribution_constraints!(model, frc.re, rd, frc.flag,
-                                                             frc.wi)
+    b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, frc.flag, frc.wi)
     set_weight_constraints!(model, wb, frc.opt.bgt, frc.opt.sbgt)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
@@ -122,9 +121,9 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                                                                    nplg,
                                                                                    cplg, tn,
                                                                                    fees,
-                                                                                   ret),
-                                                  loadings, frc_nplg, frc_cplg, retcode,
-                                                  sol, ifelse(save, model, nothing))
+                                                                                   ret), rr,
+                                                  frc_nplg, frc_cplg, retcode, sol,
+                                                  ifelse(save, model, nothing))
 end
 
 export FactorRiskContribution

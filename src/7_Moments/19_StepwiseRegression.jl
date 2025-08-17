@@ -211,20 +211,20 @@ function regression(re::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix
     cols = size(F, 2) + 1
     N, rows = size(X)
     ovec = range(; start = 1, stop = 1, length = N)
-    loadings = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
-    for i in axes(loadings, 1)
+    rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
+    for i in axes(rr, 1)
         included = regression(re, view(X, :, i), F)
         x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)
         fri = fit(re.target, x1, view(X, :, i))
         params = coef(fri)
-        loadings[i, 1] = params[1]
+        rr[i, 1] = params[1]
         if isempty(included)
             continue
         end
         idx = [findfirst(x -> x == i, features) + 1 for i in included]
-        loadings[i, idx] .= params[2:end]
+        rr[i, idx] .= params[2:end]
     end
-    return Regression(; b = view(loadings, :, 1), M = view(loadings, :, 2:cols))
+    return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols))
 end
 
 export AIC, AICC, BIC, RSquared, AdjustedRSquared, PValue, Forward, Backward,

@@ -8,7 +8,7 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     ens::T6
     kld::T7
     ow::T8
-    loadings::T9
+    rr::T9
     f_mu::T10
     f_sigma::T11
     f_w::T12
@@ -19,7 +19,7 @@ function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractM
                        ens::Union{Nothing, <:Real} = nothing,
                        kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                        ow::Union{Nothing, <:AbstractVector} = nothing,
-                       loadings::Union{Nothing, <:Regression} = nothing,
+                       rr::Union{Nothing, <:Regression} = nothing,
                        f_mu::Union{Nothing, <:AbstractVector} = nothing,
                        f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
                        f_w::Union{Nothing, <:AbstractVector} = nothing)
@@ -36,15 +36,15 @@ function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractM
     if !isnothing(ow)
         @assert(!isempty(ow))
     end
-    loadings_flag = !isnothing(loadings)
+    loadings_flag = !isnothing(rr)
     f_mu_flag = !isnothing(f_mu)
     f_sigma_flag = !isnothing(f_sigma)
     if loadings_flag || f_mu_flag || f_sigma_flag
         @assert(loadings_flag && f_mu_flag && f_sigma_flag)
         @assert(!isempty(f_mu) && !isempty(f_sigma))
         assert_matrix_issquare(f_sigma)
-        @assert(size(loadings.M, 2) == length(f_mu) == size(f_sigma, 1))
-        @assert(size(loadings.M, 1) == length(mu))
+        @assert(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1))
+        @assert(size(rr.M, 1) == length(mu))
         if !isnothing(chol)
             @assert(!isempty(chol))
             @assert(length(mu) == size(chol, 2))
@@ -54,15 +54,14 @@ function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractM
             @assert(length(f_w) == size(X, 1))
         end
     end
-    return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, loadings, f_mu, f_sigma, f_w)
+    return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w)
 end
 function prior_view(pr::LowOrderPrior, i::AbstractVector)
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
     return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
-                         kld = pr.kld, ow = pr.ow,
-                         loadings = regression_view(pr.loadings, i), f_mu = pr.f_mu,
-                         f_sigma = pr.f_sigma, f_w = pr.f_w)
+                         kld = pr.kld, ow = pr.ow, rr = regression_view(pr.rr, i),
+                         f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w)
 end
 struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_1_0
     ce::T1

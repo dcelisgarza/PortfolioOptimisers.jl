@@ -100,8 +100,8 @@
         @test pr1.chol == pr2.chol
         @test pr1.f_mu == pr2.f_mu
         @test pr1.f_sigma == pr2.f_sigma
-        @test pr1.loadings.b == pr2.loadings.b
-        @test pr1.loadings.M == pr2.loadings.M
+        @test pr1.rr.b == pr2.rr.b
+        @test pr1.rr.M == pr2.rr.M
 
         pe1 = FactorPrior(; rsd = false)
         ew = eweights(1:10, 0.3)
@@ -122,8 +122,8 @@
         @test pv1.X == view(pr1.X, :, i)
         @test pv1.f_mu == pr1.f_mu
         @test pv1.f_sigma == pr1.f_sigma
-        @test pv1.loadings.b == view(pr1.loadings.b, i)
-        @test pv1.loadings.M == view(pr1.loadings.M, i, :)
+        @test pv1.rr.b == view(pr1.rr.b, i)
+        @test pv1.rr.M == view(pr1.rr.M, i, :)
         @test pv1.chol == view(pr1.chol, :, i)
     end
     @testset "High Order Prior" begin
@@ -240,8 +240,8 @@
         @test pv1.X == view(pr1.X, :, i)
         @test pv1.f_mu == pr1.f_mu
         @test pv1.f_sigma == pr1.f_sigma
-        @test pv1.loadings.b == view(pr1.loadings.b, i)
-        @test pv1.loadings.M == view(pr1.loadings.M, i, :)
+        @test pv1.rr.b == view(pr1.rr.b, i)
+        @test pv1.rr.M == view(pr1.rr.M, i, :)
         @test pv1.chol == view(pr1.chol, :, i)
     end
     @testset "Black Litterman Views" begin
@@ -781,8 +781,8 @@
             @test length(pr.f_mu) ==
                   size(pr.f_sigma, 1) ==
                   size(pr.f_sigma, 2) ==
-                  size(pr.loadings.M, 2)
-            @test length(pr.mu) == size(pr.loadings.M, 1) == length(pr.loadings.b)
+                  size(pr.rr.M, 2)
+            @test length(pr.mu) == size(pr.rr.M, 1) == length(pr.rr.b)
             @test pr === prior(pr)
         end
         pe1 = pes[1]
@@ -799,8 +799,8 @@
         @test pr1.sigma == pr2.sigma
         @test pr1.f_mu == pr2.f_mu
         @test pr1.f_sigma == pr2.f_sigma
-        @test pr1.loadings.b == pr2.loadings.b
-        @test pr1.loadings.M == pr2.loadings.M
+        @test pr1.rr.b == pr2.rr.b
+        @test pr1.rr.M == pr2.rr.M
 
         i = [10, 5, 9]
         pes[1] === prior_view(pes[1], i)
@@ -810,8 +810,8 @@
         @test pv1.X == view(pr1.X, :, i)
         @test pv1.f_mu == pr1.f_mu
         @test pv1.f_sigma == pr1.f_sigma
-        @test pv1.loadings.b == view(pr1.loadings.b, i)
-        @test pv1.loadings.M == view(pr1.loadings.M, i, :)
+        @test pv1.rr.b == view(pr1.rr.b, i)
+        @test pv1.rr.M == view(pr1.rr.M, i, :)
     end
     @testset "Factor Black Litterman Prior" begin
         rng = StableRNG(123456789)
@@ -906,8 +906,8 @@
             @test length(pr.f_mu) ==
                   size(pr.f_sigma, 1) ==
                   size(pr.f_sigma, 2) ==
-                  size(pr.loadings.M, 2)
-            @test length(pr.mu) == size(pr.loadings.M, 1) == length(pr.loadings.b)
+                  size(pr.rr.M, 2)
+            @test length(pr.mu) == size(pr.rr.M, 1) == length(pr.rr.b)
             @test pr === prior(pr)
         end
         pe1 = pes[1]
@@ -928,8 +928,8 @@
         @test pr1.chol == pr2.chol
         @test pr1.f_mu == pr2.f_mu
         @test pr1.f_sigma == pr2.f_sigma
-        @test pr1.loadings.b == pr2.loadings.b
-        @test pr1.loadings.M == pr2.loadings.M
+        @test pr1.rr.b == pr2.rr.b
+        @test pr1.rr.M == pr2.rr.M
 
         pes = [FactorBlackLittermanPrior(; views = views, sets = sets, rsd = true),
                FactorBlackLittermanPrior(; views = views, sets = sets, rf = 0.001,
@@ -1140,8 +1140,8 @@
             @test length(pr.f_mu) ==
                   size(pr.f_sigma, 1) ==
                   size(pr.f_sigma, 2) ==
-                  size(pr.loadings.M, 2)
-            @test length(pr.mu) == size(pr.loadings.M, 1) == length(pr.loadings.b)
+                  size(pr.rr.M, 2)
+            @test length(pr.mu) == size(pr.rr.M, 1) == length(pr.rr.b)
             @test pr === prior(pr)
         end
         pe1 = pes[1]
@@ -1163,8 +1163,8 @@
         @test pr1.sigma == pr2.sigma
         @test pr1.f_mu == pr2.f_mu
         @test pr1.f_sigma == pr2.f_sigma
-        @test pr1.loadings.b == pr2.loadings.b
-        @test pr1.loadings.M == pr2.loadings.M
+        @test pr1.rr.b == pr2.rr.b
+        @test pr1.rr.M == pr2.rr.M
     end
     @testset "Entropy Pooling Prior" begin
         rng = StableRNG(123456789)
@@ -1667,8 +1667,8 @@
         @test pv1.X == view(pr1.X, :, i)
         @test pv1.f_mu == pr1.f_mu
         @test pv1.f_sigma == pr1.f_sigma
-        @test pv1.loadings.b == view(pr1.loadings.b, i)
-        @test pv1.loadings.M == view(pr1.loadings.M, i, :)
+        @test pv1.rr.b == view(pr1.rr.b, i)
+        @test pv1.rr.M == view(pr1.rr.M, i, :)
         @test pv1.chol == view(pr1.chol, :, i)
     end
 end

@@ -18,7 +18,7 @@ abstract type AbstractRegressionEstimator <: AbstractEstimator end
 
 Abstract supertype for all regression result types in PortfolioOptimisers.jl.
 
-All concrete types representing the output of regression-based moment estimation should subtype `AbstractRegressionResult`. This enables a consistent interface for handling regression results, such as fitted parameters, loadings, and intercepts, throughout the package.
+All concrete types representing the output of regression-based moment estimation should subtype `AbstractRegressionResult`. This enables a consistent interface for handling regression results, such as fitted parameters, rr, and intercepts, throughout the package.
 
 # Related
 
@@ -157,32 +157,31 @@ function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = n
     end
     return Regression(M, L, b)
 end
-function Base.getproperty(r::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
+function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
     return if sym == :L
-        getfield(r, :M)
+        getfield(re, :M)
     else
-        getfield(r, sym)
+        getfield(re, sym)
     end
 end
-function Base.getproperty(r::Regression{<:Any, <:AbstractMatrix, <:Any}, sym::Symbol)
+function Base.getproperty(re::Regression{<:Any, <:AbstractMatrix, <:Any}, sym::Symbol)
     return if sym == :L
-        getfield(r, :L)
+        getfield(re, :L)
     else
-        getfield(r, sym)
+        getfield(re, sym)
     end
 end
-function regression_view(r::Regression, i::AbstractVector)
-    return Regression(; M = view(r.M, i, :), L = isnothing(r.L) ? nothing : view(r.L, i, :),
-                      b = view(r.b, i))
+function regression_view(re::Regression, i::AbstractVector)
+    return Regression(; M = view(re.M, i, :),
+                      L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
 function regression_view(::Nothing, args...)
     return nothing
 end
-function regression_view(r::AbstractRegressionEstimator, args...)
-    return r
+function regression_view(re::AbstractRegressionEstimator, args...)
+    return re
 end
-function regression(re::Union{<:AbstractRegressionEstimator, <:Regression},
-                    args...)
+function regression(re::Union{<:AbstractRegressionEstimator, <:Regression}, args...)
     return re
 end
 function regression(re::Union{<:AbstractRegressionEstimator, <:Regression},

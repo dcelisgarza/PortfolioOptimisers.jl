@@ -52,15 +52,14 @@ function prior(pe::BayesianBlackLittermanPrior, X::AbstractMatrix, F::AbstractMa
     end
     @assert(length(pe.sets.dict[pe.sets.key]) == size(F, 2))
     prior_result = prior(pe.pe, X, F; strict = strict, kwargs...)
-    posterior_X, prior_sigma, f_mu, f_sigma, loadings = prior_result.X, prior_result.sigma,
-                                                        prior_result.f_mu,
-                                                        prior_result.f_sigma,
-                                                        prior_result.loadings
+    posterior_X, prior_sigma, f_mu, f_sigma, rr = prior_result.X, prior_result.sigma,
+                                                  prior_result.f_mu, prior_result.f_sigma,
+                                                  prior_result.rr
     (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
                                      strict = strict)
     tau = isnothing(pe.tau) ? inv(size(F, 1)) : pe.tau
     f_omega = tau * calc_omega(pe.views_conf, P, f_sigma)
-    (; b, M) = loadings
+    (; b, M) = rr
     sigma_hat = f_sigma \ I + transpose(P) * (f_omega \ P)
     mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (f_omega \ Q))
     v1 = prior_sigma \ M
@@ -70,7 +69,7 @@ function prior(pe::BayesianBlackLittermanPrior, X::AbstractMatrix, F::AbstractMa
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)
     posterior_mu = (posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b) .+ pe.rf
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
-                         loadings = loadings, f_mu = f_mu, f_sigma = f_sigma)
+                         rr = rr, f_mu = f_mu, f_sigma = f_sigma)
 end
 
 export BayesianBlackLittermanPrior

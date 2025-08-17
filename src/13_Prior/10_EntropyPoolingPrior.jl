@@ -832,12 +832,12 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
-    (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = pr
+    (; X, mu, sigma, chol, rr, f_mu, f_sigma) = pr
     ens = exp(entropy(w1))
     kld = kldivergence(w1, w0)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1, ens = ens,
-                         kld = kld, loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
-                         f_w = !isnothing(loadings) ? w1 : nothing)
+                         kld = kld, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
+                         f_w = !isnothing(rr) ? w1 : nothing)
 end
 function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -886,12 +886,12 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                               pe.ds_opt, pe.dm_opt; strict = strict)
     pe = factory(pe, w1)
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
-    (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = pr
+    (; X, mu, sigma, chol, rr, f_mu, f_sigma) = pr
     ens = exp(entropy(w1))
     kld = kldivergence(w1, w0)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w1, ens = ens,
-                         kld = kld, loadings = loadings, f_mu = f_mu, f_sigma = f_sigma,
-                         f_w = !isnothing(loadings) ? w1 : nothing)
+                         kld = kld, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
+                         f_w = !isnothing(rr) ? w1 : nothing)
 end
 
 export LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior

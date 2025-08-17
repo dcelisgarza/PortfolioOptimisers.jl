@@ -26,7 +26,7 @@
         assets = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
                   "ten"]
         clusters = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3]
-        loadings = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
+        rr = DataFrame(; MTUM = [3, 1, 1, 3, 4, 3, 1, 2, 4, 2],
                              QUAL = [1, 1, 3, 2, 3, 2, 2, 1, 3, 3])
         sets = AssetSets(;
                          dict = Dict("nx" => assets, "c1" => assets[clusters .== 1],
@@ -34,14 +34,14 @@
                                      "c3" => assets[clusters .== 3]))
         scs = ["one == 0.35", "1*one + -0*one -0.3*three <= 0.25", "five == 0.5",
                "c3*2 - 3*c2>=0", "-c1 + 2*c3+ -3*c2<=-0.1",
-               join(["$(-loadings.MTUM[i]) * $(assets[i]) + $(loadings.QUAL[i]) * $(assets[i])"
+               join(["$(-rr.MTUM[i]) * $(assets[i]) + $(rr.QUAL[i]) * $(assets[i])"
                      for i in 1:10], " ") * ">=0.9", "-c2 - seven==0.7", "one == 4",
                "one - one + three <= 5", "five == 7", "c3 - 3 >= c2", "-c1+c2-14<=-7+c3",
                "-8 == c2 + seven"]
 
         ecs = [:(one == 0.35), :(1 * one + -0 * one - 0.3 * three <= 0.25), :(five == 0.5),
                :(c3 * 2 - 3 * c2 >= 0), :(-c1 + 2 * c3 + -3 * c2 <= -0.1),
-               Meta.parse(join(["$(-loadings.MTUM[i]) * $(assets[i]) + $(loadings.QUAL[i]) * $(assets[i])"
+               Meta.parse(join(["$(-rr.MTUM[i]) * $(assets[i]) + $(rr.QUAL[i]) * $(assets[i])"
                                 for i in 1:10], " ") * " >= 0.9"), :(-c2 - seven == 0.7),
                :(one == 4), :(one - one + three <= 5), :(five == 7), :(c3 - 3 >= c2),
                :(-c1 + c2 - 14 <= -7 + c3), :(-8 == c2 + seven)]
@@ -414,8 +414,8 @@ end
              LinearConstraintEstimator(;
                               A = LinearConstraintSide(; group = fill(:Assets, 20),
                                                        name = [assets; assets],
-                                                       coef = [-loadings.MTUM;
-                                                               loadings.QUAL]), B = 0.9,
+                                                       coef = [-rr.MTUM;
+                                                               rr.QUAL]), B = 0.9,
                               comp = GEQ()),
              LinearConstraintEstimator(;
                               A = LinearConstraintSide(; group = [:Clusters, :Assets],

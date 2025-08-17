@@ -33,8 +33,8 @@ function prior(pe::FactorPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int 
     end
     f_prior = prior(pe.pe, F)
     f_mu, f_sigma = f_prior.mu, f_prior.sigma
-    loadings = regression(pe.re, X, F)
-    (; b, M) = loadings
+    rr = regression(pe.re, X, F)
+    (; b, M) = rr
     posterior_X = F * transpose(M) .+ transpose(b)
     posterior_mu = M * f_mu + b
     posterior_sigma = M * f_sigma * transpose(M)
@@ -48,8 +48,8 @@ function prior(pe::FactorPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int 
     end
     return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
                          chol = transpose(reshape(posterior_csigma, length(posterior_mu),
-                                                  :)), w = f_prior.w, loadings = loadings,
-                         f_mu = f_mu, f_sigma = f_sigma, f_w = f_prior.w)
+                                                  :)), w = f_prior.w, rr = rr, f_mu = f_mu,
+                         f_sigma = f_sigma, f_w = f_prior.w)
 end
 
 export FactorPrior

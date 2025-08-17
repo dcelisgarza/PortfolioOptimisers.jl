@@ -51,16 +51,16 @@ end
 function regression(re::DimensionReductionRegression, X::AbstractMatrix, F::AbstractMatrix)
     cols = size(F, 2) + 1
     rows = size(X, 2)
-    loadings = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
+    rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     f1, Vp = prep_dim_red_reg(re.drtgt, F)
     mu = mean(re.me, F; dims = 1)
     sigma = vec(std(re.ve, F; mean = mu, dims = 1))
     mu = vec(mu)
-    for i in axes(loadings, 1)
-        loadings[i, :] .= regression(re.retgt, view(X, :, i), mu, sigma, f1, Vp)
+    for i in axes(rr, 1)
+        rr[i, :] .= regression(re.retgt, view(X, :, i), mu, sigma, f1, Vp)
     end
-    b = view(loadings, :, 1)
-    M = view(loadings, :, 2:cols)
+    b = view(rr, :, 1)
+    M = view(rr, :, 2:cols)
     L = transpose(pinv(Vp) * transpose(M .* transpose(sigma)))
     return Regression(; b = b, M = M, L = L)
 end

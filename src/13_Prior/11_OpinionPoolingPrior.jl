@@ -82,13 +82,12 @@ function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
     ow = robust_probabilities(ow, pw, pe.p)
     w = compute_pooling(pe.alg, ow, pw)
     pe2 = factory(pe.pe2, w)
-    (; X, mu, sigma, chol, loadings, f_mu, f_sigma) = prior(pe2, X, F; strict = strict,
-                                                            kwargs...)
+    (; X, mu, sigma, chol, rr, f_mu, f_sigma) = prior(pe2, X, F; strict = strict, kwargs...)
     ens = exp(entropy(w))
     kld = [kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w, ens = ens,
-                         kld = kld, ow = ow, loadings = loadings, f_mu = f_mu,
-                         f_sigma = f_sigma, f_w = ifelse(!isnothing(loadings), w, nothing))
+                         kld = kld, ow = ow, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
+                         f_w = ifelse(!isnothing(rr), w, nothing))
 end
 
 export LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior
