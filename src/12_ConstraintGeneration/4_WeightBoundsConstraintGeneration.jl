@@ -131,24 +131,26 @@ function weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets;
                         ub = get_weight_bounds(wb.ub, false, sets; strict = strict,
                                                datatype = datatype))
 end
+function weight_bounds_constraints_side(::Nothing, N::Integer, val::Real)
+    return fill(val, N)
+end
+function weight_bounds_constraints_side(wb::Real, N::Integer, val::Real)
+    return if isinf(wb)
+        fill(val, N)
+    elseif isa(wb, Real)
+        range(; start = wb, stop = wb, length = N)
+    end
+end
+function weight_bounds_constraints_side(wb::AbstractVector, args...)
+    return wb
+end
 function weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...;
                                    scalar::Bool = false, N::Integer = 0, kwargs...)
     if scalar || iszero(N)
         return wb
     end
-    lb = wb.lb
-    ub = wb.ub
-    if isnothing(lb) || isinf(lb)
-        lb = fill(-Inf, N)
-    elseif isa(lb, Real)
-        lb = range(; start = lb, stop = lb, length = N)
-    end
-    if isnothing(ub) || isinf(ub)
-        ub = fill(Inf, N)
-    elseif isa(ub, Real)
-        ub = range(; start = ub, stop = ub, length = N)
-    end
-    return WeightBounds(; lb = lb, ub = ub)
+    return WeightBounds(; lb = weight_bounds_constraints_side(wb.lb, N, -Inf),
+                        ub = weight_bounds_constraints_side(wb.ub, N, Inf))
 end
 function weight_bounds_constraints(wb::WeightBounds{<:AbstractVector, <:AbstractVector},
                                    args...; kwargs...)

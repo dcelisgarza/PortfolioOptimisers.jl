@@ -165,7 +165,8 @@ function process_model(model::JuMP.Model, ::JuMPOptimisationEstimator)
     if termination_status(model) == JuMP.OPTIMIZE_NOT_CALLED
         return JuMPOptimisationSolution(; w = fill(NaN, length(model[:w])))
     end
-    ik = inv(value(model[:k]))
+    k = value(model[:k])
+    ik = !iszero(k) ? inv(k) : 1
     w = value.(model[:w]) * ik
     return JuMPOptimisationSolution(; w = w)
 end
