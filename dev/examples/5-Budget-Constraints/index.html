@@ -52,34 +52,34 @@ mip_slv = Solver(; name = :highs1, solver = HiGHS.Optimizer,
                  settings = Dict(&quot;log_to_console&quot; =&gt; false),
                  check_sol = (; allow_local = true, allow_almost = true));</code></pre><p>This time we will use the <code>EntropicValueatRisk</code> measure and we will once again precompute prior.</p><pre><code class="language-julia hljs">r = EntropicValueatRisk()
 pr = prior(EmpiricalPrior(), rd)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LowOrderPrior
-         X | 252×20 Matrix{Float64}
-        mu | 20-element Vector{Float64}
-     sigma | 20×20 Matrix{Float64}
-      chol | nothing
-         w | nothing
-       ens | nothing
-       kld | nothing
-        ow | nothing
-  loadings | nothing
-      f_mu | nothing
-   f_sigma | nothing
-       f_w | nothing
+        X | 252×20 Matrix{Float64}
+       mu | 20-element Vector{Float64}
+    sigma | 20×20 Matrix{Float64}
+     chol | nothing
+        w | nothing
+      ens | nothing
+      kld | nothing
+       ow | nothing
+       rr | nothing
+     f_mu | nothing
+  f_sigma | nothing
+      f_w | nothing
 </code></pre><h2 id="3.-Exact-budget-constraints"><a class="docs-heading-anchor" href="#3.-Exact-budget-constraints">3. Exact budget constraints</a><a id="3.-Exact-budget-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#3.-Exact-budget-constraints" title="Permalink"></a></h2><p>The <code>budget</code> is the value of the sum of a portfolio&#39;s weights.</p><p>Here we will showcase various budget constraints. We will start simple, with a strict budget constraint. We will also show the impact this has on the finite allocation.</p><h3 id="3.1-Strict-budget-constraints"><a class="docs-heading-anchor" href="#3.1-Strict-budget-constraints">3.1 Strict budget constraints</a><a id="3.1-Strict-budget-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#3.1-Strict-budget-constraints" title="Permalink"></a></h3><h4 id="3.1.1-Fully-invested-long-only-portfolio"><a class="docs-heading-anchor" href="#3.1.1-Fully-invested-long-only-portfolio">3.1.1 Fully invested long-only portfolio</a><a id="3.1.1-Fully-invested-long-only-portfolio-1"></a><a class="docs-heading-anchor-permalink" href="#3.1.1-Fully-invested-long-only-portfolio" title="Permalink"></a></h4><p>First the default case, where the budget is equal to 1, <code>bgt = 1</code>. This means the portfolio will be fully invested.</p><pre><code class="language-julia hljs">opt1 = JuMPOptimiser(; pe = pr, slv = slv)
 mr1 = MeanRisk(; r = r, opt = opt1)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">MeanRisk
   opt | JuMPOptimiser
       |       pe | LowOrderPrior
-      |          |          X | 252×20 Matrix{Float64}
-      |          |         mu | 20-element Vector{Float64}
-      |          |      sigma | 20×20 Matrix{Float64}
-      |          |       chol | nothing
-      |          |          w | nothing
-      |          |        ens | nothing
-      |          |        kld | nothing
-      |          |         ow | nothing
-      |          |   loadings | nothing
-      |          |       f_mu | nothing
-      |          |    f_sigma | nothing
-      |          |        f_w | nothing
+      |          |         X | 252×20 Matrix{Float64}
+      |          |        mu | 20-element Vector{Float64}
+      |          |     sigma | 20×20 Matrix{Float64}
+      |          |      chol | nothing
+      |          |         w | nothing
+      |          |       ens | nothing
+      |          |       kld | nothing
+      |          |        ow | nothing
+      |          |        rr | nothing
+      |          |      f_mu | nothing
+      |          |   f_sigma | nothing
+      |          |       f_w | nothing
       |      slv | Vector{Solver{Symbol, UnionAll, T3, @NamedTuple{allow_local::Bool, allow_almost::Bool}, Bool} where T3}: Solver{Symbol, UnionAll, T3, @NamedTuple{allow_local::Bool, allow_almost::Bool}, Bool} where T3[Solver
       |          name | Symbol: :clarabel1
       |        solver | UnionAll: Clarabel.MOIwrapper.Optimizer
@@ -426,4 +426,4 @@ println(&quot;short budget: $(sum(res7.w[res7.w .&lt; zero(eltype(res7.w))]))&qu
 println(&quot;weight bounds: $(all(x -&gt; -one(x) &lt;= x &lt;= one(x), res7.w))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">budget: 0.2742952851977851
 long budget: 0.7742943517521373
 short budget: -0.4999990665543521
-weight bounds: true</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../4-Pareto-Surface/">« Example 4: Pareto surface</a><a class="docs-footer-nextpage" href="../../7-18-Moments/">Regression »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Sunday 17 August 2025 12:35">Sunday 17 August 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+weight bounds: true</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../4-Pareto-Surface/">« Example 4: Pareto surface</a><a class="docs-footer-nextpage" href="../../7-18-Moments/">Regression »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Sunday 17 August 2025 17:50">Sunday 17 August 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
