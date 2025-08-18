@@ -34,9 +34,8 @@ struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
     epsilon::T3
 end
 function Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
-    @assert(n > 0)
-    @assert(zero(alpha) < alpha < one(alpha))
-    @assert(epsilon > zero(epsilon))
+    @assert(n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
+            DomainError("The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon"))
     return Pagerank(n, alpha, epsilon)
 end
 struct RadialityCentrality <: AbstractCentralityAlgorithm end

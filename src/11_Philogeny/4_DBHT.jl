@@ -18,8 +18,8 @@ struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
     power::T2
 end
 function GeneralExponentialSimilarity(; coef::Real = 1.0, power::Real = 1.0)
-    @assert(coef >= zero(coef))
-    @assert(power >= zero(power))
+    @assert(coef >= zero(coef) && power >= zero(power),
+            AssertionError("The following conditions must hold:\n`coef` must be non-negative: coef => $coef\n`power` must be non-negative: power => $power"))
     return GeneralExponentialSimilarity(coef, power)
 end
 function dbht_similarity(::MaximumDistanceSimilarity; D::AbstractMatrix, kwargs...)
@@ -64,11 +64,8 @@ Constructs a Triangulated Maximally Filtered Graph (TMFG) starting from a tetrah
 """
 function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
     N = size(W, 1)
-
-    @assert(N >= 9)
-    @assert(all(x -> x >= zero(x), W),
-            "All entries in matrix must be greater than or equal to 0.")
-
+    @assert(N >= 9 && all(x -> x >= zero(x), W),
+            AssertionError("The following conditions must hold:\nN >= 9 => N = $N\nAll entries in `W` must be non-negative"))
     A = spzeros(N, N)  # Initialize adjacency matrix
     in_v = zeros(Int, N)    # Initialize list of inserted vertices
     tri = zeros(Int, 2 * N - 4, 3)  # Initialize list of triangles
@@ -1111,9 +1108,8 @@ Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering a
 """
 function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
                branchorder::Symbol = :optimal, root::DBHTRootMethod = UniqueRoot())
-    @assert(issymmetric(D), "Distance matrix should be symmetric.")
-    @assert(issymmetric(S), "Similarity matrix should be symmetric.")
-
+    @assert(!isempty(S) && !isempty(D) && size(S) == size(D),
+            DimensionMismatch("The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))"))
     Rpm = PMFG_T2s(S)[1]
     Apm = copy(Rpm)
     Apm[Apm .!= 0] .= D[Apm .!= 0]
@@ -1216,9 +1212,8 @@ struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
 end
 function DBHTClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
                         D::AbstractMatrix, k::Integer)
-    @assert(!isempty(S) && !isempty(D))
-    @assert(size(S) == size(D))
-    @assert(k >= one(k))
+    @assert(!isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
+            AssertionError("The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))\nk >= 1 => k = $k"))
     return DBHTClustering(clustering, S, D, k)
 end
 function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
@@ -1251,7 +1246,8 @@ function LoGo_dist_assert(::Union{Distance{<:VariationInfoDistance},
                                   GeneralDistanceDistance{<:VariationInfoDistance, <:Any,
                                                           <:Any, <:Any, <:Any}},
                           sigma::AbstractMatrix, X::AbstractMatrix)
-    @assert(size(sigma, 1) == size(X, 2))
+    @assert(size(sigma, 1) == size(X, 2),
+            DimensionMismatch("Number of columns of `sigma` must be equal to the number of rows of `X`:\nsize(sigma, 1) == size(X, 2) => $(size(sigma,1)) != $(size(X,2))"))
     return nothing
 end
 function LoGo_dist_assert(args...)
