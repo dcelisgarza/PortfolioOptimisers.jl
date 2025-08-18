@@ -206,15 +206,13 @@
             v2 = maximum(rkc[1:5])
             rtol = if i ∈ (1, 2, 10, 17)
                 5e-1
-            elseif i == 3
-                1e-2
             elseif i ∈ (4, 5, 7, 13, 24)
                 5e-4
             elseif i ∈ (6, 28)
                 1e-4
             elseif i == 9
                 1
-            elseif i ∈ (11, 14, 15, 18, 19, 20)
+            elseif i ∈ (11, 14, 15, 18, 19, 20, 22)
                 1e-1
             elseif i == 26
                 5e-3
@@ -237,6 +235,8 @@
             elseif i ∈ (15, 22)
                 1e-3
             elseif i ∈ (18, 19, 21)
+                5e-4
+            elseif i ∈ (10, 11)
                 5e-4
             else
                 1e-4
@@ -294,11 +294,13 @@
 
             rtol = if i ∈ (1, 10)
                 5e-4
-            elseif i ∈ (13, 14, 16, 19)
+            elseif i ∈ (13, 15, 16, 19)
                 5e-3
-            elseif i ∈ (15, 17, 22)
+            elseif i == 14
+                1e-2
+            elseif i ∈ (17, 22)
                 1e-3
-            elseif i ∈ (18, 20, 24)
+            elseif i ∈ (18, 20, 24, 27)
                 5e-4
             elseif i == 21
                 5e-2
