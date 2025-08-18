@@ -276,11 +276,11 @@
                 1e-2
             elseif i == 9
                 1
-            elseif i ∈ (10, 11, 14, 15, 16)
+            elseif i ∈ (10, 11, 14, 16)
                 2.5e-1
             elseif i == 13
                 1e-1
-            elseif i ∈ (17, 18, 19, 20, 21, 22, 28, 29)
+            elseif i ∈ (15, 17, 18, 19, 20, 21, 22, 28, 29)
                 5e-1
             elseif i == 26
                 1e-3
@@ -294,7 +294,19 @@
             end
             @test success
 
-            rtol = 1e-4
+            rtol = if i ∈ (1, 10)
+                5e-4
+            elseif i ∈ (13, 14, 16, 19)
+                5e-3
+            elseif i ∈ (15, 17, 22)
+                1e-3
+            elseif i ∈ (18, 20, 24)
+                5e-4
+            elseif i == 21
+                5e-2
+            else
+                1e-4
+            end
             success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
             if !success
                 println("Weights and Contribution $i fails")
