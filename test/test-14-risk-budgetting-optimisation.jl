@@ -182,80 +182,60 @@
             @test success
         end
     end
+    @testset "Factor Risk Budgetting" begin
+        df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgetting1.csv.gz"),
+                      DataFrame)
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            sbgt = BudgetRange(; lb = 0, ub = nothing), bgt = 1,
+                            wb = WeightBounds(; lb = nothing, ub = nothing))
+        rer = regression(StepwiseRegression(), rd)
+        for (i, r) in enumerate(rs)
+            if i == 25
+                continue
+            end
+            rb = RiskBudgetting(; r = r, opt = opt, alg = FactorRiskBudgetting(; re = rer))
+            res = optimise!(rb, rd)
+            @test isa(res.retcode, OptimisationSuccess)
+            rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
+                                           re = res.prb.rr)
+            v1 = minimum(rkc[1:5])
+            v2 = maximum(rkc[1:5])
+            rtol = if i ∈ (1, 2, 10, 17)
+                5e-1
+            elseif i ∈ (3, 16)
+                1e-2
+            elseif i ∈ (4, 5, 7, 24)
+                5e-4
+            elseif i ∈ (6, 13, 28)
+                1e-4
+            elseif i == 9
+                1
+            elseif i ∈ (11, 14, 19)
+                1e-1
+            elseif i == 26
+                5e-3
+            elseif i == 29
+                1e-3
+            else
+                5e-2
+            end
+            success = isapprox(v2 / v1, 1; rtol = rtol)
+            if !success
+                println("Extrema $i fails")
+                find_tol(v2 / v1, 1)
+            end
+            @test success
+
+            rtol = 1e-6
+            success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Weights and Contribution $i fails")
+                find_tol([res.w; rkc], df[!, "$i"])
+            end
+            @test success
+        end
+    end
     #=
-    # @testset "Factor Risk Budgetting" begin
-    # df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgetting1.csv.gz"), DataFrame)
-    rer = PortfolioOptimisers.regression(StepwiseRegression(; crit = PortfolioOptimisers.AIC(),
-                                                            alg = Backward()), rd)
-    opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = Inf, bgt = 1,
-                        wb = WeightBounds(; lb = -Inf, ub = Inf))
-    # for (i, r) in enumerate(rs)
-    rb = RiskBudgetting(; r = ConditionalDrawdownatRisk(), opt = opt,
-                        alg = FactorRiskBudgetting(; re = rer))
-    @time res = PortfolioOptimisers.optimise!(rb, rd)
-
-    #############
-    using PortfolioOptimiser
-    port = Portfolio(;
-                     prices = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                        timestamp = :Date)[(end - 252):end],
-                     f_prices = TimeArray(CSV.File(joinpath(@__DIR__,
-                                                            "./assets/Factors.csv.gz"));
-                                          timestamp = :Date)[(end - 252):end],
-                     solvers = PortOptSolver(; name = :Clarabel, solver = Clarabel.Optimizer,
-                                             check_sol = (; allow_local = true,
-                                                          allow_almost = true),
-                                             params = Dict("verbose" => false,
-                                                           "max_step_fraction" => 0.75)))
-    reg = BReg(PortfolioOptimiser.AIC())
-    asset_statistics!(port)
-    factor_statistics!(port; factor_type = FactorType(; type = reg))
-    port.short = true
-    @time w1 = PortfolioOptimiser.optimise!(port, RB(; rm = CDaR(), class = FC()))
-
-    rr = loadings_matrix(DataFrame(rd.F, rd.nf), DataFrame(rd.X, rd.nx), re)
-    #############
-
-    @test isa(res.retcode, OptimisationSuccess)
-    rkc = PortfolioOptimisers.factor_risk_contribution(factory(PortfolioOptimisers.ConditionalDrawdownatRisk(),
-                                                               pr, slv), res.w, pr.X;
-                                                       re = res.prb.rr)
-    frc1 = PortfolioOptimiser.factor_risk_contribution(port, :RB; rm = CDaR())
-    v1 = minimum(rkc[1:5])
-    v2 = maximum(rkc[1:5])
-    rtol = if i ∈ (1, 2)
-        5e-1
-    else
-        1e-6
-    end
-    success = isapprox(v2 / v1, 1; rtol = rtol)
-    if !success
-        println("Extrema $i fails")
-        find_tol(v2 / v1, 1)
-    end
-    @test success
-
-    rtol = if i ∈ (7, 10, 19, 24, 25) || Sys.isapple() && i ∈ (2, 5, 12)
-        1e-4
-    elseif Sys.isapple() && i == 17
-        5e-3
-    elseif i ∈ (9, 11, 17, 18)
-        5e-4
-    elseif i ∈ (13, 21, 14, 15, 16, 22)
-        1e-2
-    elseif i == 20
-        1e-3
-    else
-        5e-5
-    end
-    success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
-    if !success
-        println("Weights and Contribution $i fails")
-        find_tol([res.w; rkc], df[!, "$i"])
-    end
-    @test success
-    # end
-
     df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgetting2.csv.gz"), DataFrame)
     # for (i, r) in enumerate(rs)
     r = factory(r, pr, slv)
@@ -306,7 +286,7 @@
         find_tol([res.w; rkc], df[!, "$i"])
     end
     @test success
-    # end
-    # end
     =#
+    # end
+    # end
 end
