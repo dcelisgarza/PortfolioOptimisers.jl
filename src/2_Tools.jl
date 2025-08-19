@@ -201,22 +201,49 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
         end
     end
     if !isnothing(ts)
-        @assert(!isempty(ts),
-                AssertionError("If `ts` is not `nothing`, it must be non-empty."))
+        if isempty(ts)
+            throw(IsEmptyError(non_empty_msg("`ts`", ts) * "."))
+        end
         if X_flag
-            @assert(length(ts) == size(X, 1),
-                    DimensionMismatch("If `ts` and `X` are not `nothing`, they must have the same number of rows:\n(length(ts) == size(X, 1)) => ($(length(ts)) == $(size(X, 1))) => $(length(ts) == size(X, 1))"))
+            if length(ts) != size(X, 1)
+                throw(DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
+                                                                "number of rows of `X`",
+                                                                :eq, length(ts),
+                                                                size(X, 1)))))
+            end
         elseif F_flag
-            @assert(length(ts) == size(F, 1),
-                    DimensionMismatch("If `ts` and `F` are not `nothing`, they must have the same number of rows:\n(length(ts) == size(F, 1)) => ($(length(ts)) == $(size(F, 1))) => $(length(ts) == size(F, 1))"))
+            if length(ts) != size(F, 1)
+                throw(DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
+                                                                "number of rows of `F`",
+                                                                :eq, length(ts),
+                                                                size(F, 1)))))
+            end
+        else
+            throw(ArgumentError(throw(IsNothingEmptyError(uppercasefirst("At least one of " *
+                                                                         mul_cond_msg(nothing_non_empty_msg("`X`",
+                                                                                                            X),
+                                                                                      nothing_non_empty_msg("`F`",
+                                                                                                            F)))))))
         end
     end
     if !isnothing(iv)
-        @assert(!isempty(iv) && size(iv) == size(X) && all(x -> x > zero(eltype(iv)), iv),
-                AssertionError("If `iv` is not `nothing`, it must be non-empty, have the same size as `X`, and all elements must be positive:\n!isempty(iv) => $(!isempty(iv))\n(size(iv) == size(X)) => $(size(iv) == size(X))\n(all(x -> x > zero(eltype(iv)), iv)) => $(all(x -> x > zero(eltype(iv)), iv))"))
+        if isempty(iv)
+            throw(IsEmptyError(non_empty_msg("`iv`", iv) * "."))
+        end
+        if size(iv) != size(X)
+            throw(DimensionMismatch(uppercasefirst(comp_msg("size of `iv`", "size of `X`",
+                                                            :eq, size(iv), size(X)))))
+        end
+        if any(x -> x < zero(eltype(iv)), iv)
+            throw(DomainError(iv, "all entries of " * non_neg_msg("`iv`")))
+        end
         if isa(ivpa, Real)
-            @assert(isfinite(ivpa) && ivpa > zero(ivpa),
-                    AssertionError("If `ivpa` is not `nothing`, it must be finite and positive:\nisfinite(ivpa) => $(isfinite(ivpa))\nivpa > zero(ivpa) => $(ivpa > zero(ivpa))"))
+            if !isfinite(ivpa)
+                throw(DomainError(ivpa, non_finite_msg("`ivpa`")))
+            end
+            if ivpa <= zero(ivpa)
+                throw(DomainError(ivpa, comp_msg("`ivpa`", zero(ivpa), :gt)))
+            end
         elseif isa(ivpa, AbstractVector)
             @assert(!isempty(ivpa) &&
                     length(ivpa) == size(iv, 2) &&

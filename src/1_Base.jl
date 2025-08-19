@@ -136,10 +136,19 @@ end
 struct IsEmptyError{T1} <: PortfolioOptimisersError
     msg::T1
 end
+struct IsNothingEmptyError{T1} <: PortfolioOptimisersError
+    msg::T1
+end
+struct IsNonFiniteError{T1} <: PortfolioOptimisersError
+    msg::T1
+end
 function Base.showerror(io::IO, err::PortfolioOptimisersError)
     name = string(typeof(err))
     name = name[1:(findfirst(x -> (x == '{' || x == '('), name) - 1)]
     return print(io, "$name: $(err.msg)")
+end
+function non_finite_msg(a, va = nothing)
+    return "$a$(isfinite(va) ? " ($va)" : "") must finite"
 end
 function non_zero_msg(a, va = nothing)
     return "$a$(!isnothing(va) ? " ($va)" : "") must be non-zero"
@@ -156,12 +165,17 @@ end
 function non_empty_msg(a, va = nothing)
     return "$a$(!isnothing(va) ? " (isempty($a) => $(isempty(va)))" : "") must be non-empty"
 end
-function domain_msg(a, b, c, va = nothing, bi::Bool = false, ci::Bool = false)
+function nothing_non_empty_msg(a, va = nothing)
+    return "$a (isnothing($a) => $(isnothing(va))) must not be `nothing`, and non-empty$(!isnothing(va) ? " (isempty($a) => $(isempty(va)))" : "")"
+end
+function range_msg(a, b, c, va = nothing, bi::Bool = false, ci::Bool = false)
     return "$a$(!isnothing(va) ? " ($va)" : "") must be in $(bi ? '[' : '(')$b, $c $(ci ? ']' : ')')"
 end
 function comp_msg(a, b, c = :eq, va = nothing, vb = nothing)
-    msg = (; :eq => "must be equal to", :ge => "must be greater than",
-           :le => "must be smaller than", :geq => "must be greater than or equal to",
+    msg = (; :eq => "must be equal to", :gt => "must be greater than",
+           :lt => "must be smaller than", :geq => "must be greater than or equal to",
            :leq => "must be smaller than or equal to")
     return "$a$(!isnothing(va) ? " ($va)" : "") $(msg[c]) $b$(!isnothing(vb) ? " ($vb)" : "")"
 end
+
+export IsEmptyError, IsNothingError, IsNothingEmptyError
