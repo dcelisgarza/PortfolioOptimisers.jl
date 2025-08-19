@@ -960,4 +960,14 @@
                         0.0996419548234818, 0.21860531676987255, 0.1957505235385615],
                        rtol = 1e-6)
     end
+    #=
+    # @testset "Risk contribution variance" begin
+    opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets)
+    r = Variance(; rc = LinearConstraintEstimator(; val = "nx==20"))
+    mr = MeanRisk(; opt = opt, r = r)
+    res = optimise!(mr)
+    rkc = risk_contribution(factory(r, pr, slv), res.w, pr.X)
+
+    # end
+    =#
 end

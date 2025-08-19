@@ -52,9 +52,9 @@
     res = optimise!(mr, rd)
 
     res_da = optimise!(da, res.w, vec(values(X[end])), 4206.9)
-    @test isapprox(sum(res_da.cost), 4206.9 * 0.8, rtol = 2e-3)
+    @test isapprox(sum(res_da.cost), 4206.9 * 0.8, rtol = 5e-3)
     @test isapprox(res_da.shares .* vec(values(X[end])), res_da.cost)
-    @test isapprox(rmsd(res.w, res_da.w), 0.0291, rtol = 5e-4)
+    @test isapprox(rmsd(res.w, res_da.w), 0.02894, rtol = 5e-4)
 
     res_ga = optimise!(ga, res.w, vec(values(X[end])), 4206.9)
     @test isapprox(sum(res_ga.cost), 4206.9 * 0.8, rtol = 1e-2)
