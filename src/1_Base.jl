@@ -120,3 +120,48 @@ function Base.show(io::IO,
     end
     return nothing
 end
+function mul_cond_msg(conds::AbstractString...)
+    N = isa(conds, Tuple) ? length(conds) : 1
+    msg = "the following conditions must hold:\n"
+    for (i, val) in enumerate(conds)
+        mi = i == N ? "$val." : "$val.\n"
+        msg *= mi
+    end
+    return msg
+end
+abstract type PortfolioOptimisersError <: Exception end
+struct IsNothingError{T1} <: PortfolioOptimisersError
+    msg::T1
+end
+struct IsEmptyError{T1} <: PortfolioOptimisersError
+    msg::T1
+end
+function Base.showerror(io::IO, err::PortfolioOptimisersError)
+    name = string(typeof(err))
+    name = name[1:(findfirst(x -> (x == '{' || x == '('), name) - 1)]
+    return print(io, "$name: $(err.msg)")
+end
+function non_zero_msg(a, va = nothing)
+    return "$a$(!isnothing(va) ? " ($va)" : "") must be non-zero"
+end
+function non_neg_msg(a, va = nothing)
+    return "$a$(!isnothing(va) ? " ($va)" : "") must be non-negative"
+end
+function non_pos_msg(a, va = nothing)
+    return "$a$(!isnothing(va) ? " ($va)" : "") must be non-positive"
+end
+function some_msg(a, va = nothing)
+    return "$a (isnothing($a) => $(isnothing(va))) must not be `nothing`"
+end
+function non_empty_msg(a, va = nothing)
+    return "$a$(!isnothing(va) ? " (isempty($a) => $(isempty(va)))" : "") must be non-empty"
+end
+function domain_msg(a, b, c, va = nothing, bi::Bool = false, ci::Bool = false)
+    return "$a$(!isnothing(va) ? " ($va)" : "") must be in $(bi ? '[' : '(')$b, $c $(ci ? ']' : ')')"
+end
+function comp_msg(a, b, c = :eq, va = nothing, vb = nothing)
+    msg = (; :eq => "must be equal to", :ge => "must be greater than",
+           :le => "must be smaller than", :geq => "must be greater than or equal to",
+           :leq => "must be smaller than or equal to")
+    return "$a$(!isnothing(va) ? " ($va)" : "") $(msg[c]) $b$(!isnothing(vb) ? " ($vb)" : "")"
+end

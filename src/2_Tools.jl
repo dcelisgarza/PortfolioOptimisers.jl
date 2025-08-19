@@ -164,26 +164,41 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
     nxs_flag = !isnothing(nx)
     X_flag = !isnothing(X)
     if nxs_flag || X_flag
-        @assert(nxs_flag &&
-                X_flag &&
-                !isempty(nx) &&
-                !isempty(X) &&
-                length(nx) == size(X, 2),
-                AssertionError("If `nx` or `X` are not `nothing`, the following conditions must hold:\n!isnothing(nx) => $nxs_flag\n!isnothing(X) => $X_flag\n!isempty(nx) => $(!isempty(nx))\n!isempty(X) => $(!isempty(X))\n(length(nx) == size(X, 2)) => ($(length(nx)) == $(size(X, 2))) => $(length(nx) == size(X, 2))"))
+        if !(nxs_flag && X_flag)
+            throw(IsNothingError(uppercasefirst(mul_cond_msg(some_msg("`nx`", nx),
+                                                             some_msg("`X`", X)))))
+        end
+        if !(!isempty(nx) && !isempty(X))
+            throw(IsEmptyError(uppercasefirst(mul_cond_msg(non_empty_msg(`nx`, nx),
+                                                           non_empty_msg("`X`", X)))))
+        end
+        if length(nx) != size(X, 2)
+            throw(DimensionMismatch(comp_msg("length of `nx`", "number of columns of `X`",
+                                             :eq, length(nx), size(X, 2)) * "."))
+        end
     end
     nfs_flag = !isnothing(nf)
     F_flag = !isnothing(F)
     if nfs_flag || F_flag
-        @assert(nfs_flag &&
-                F_flag &&
-                !isempty(nf) &&
-                !isempty(F) &&
-                length(nf) == size(F, 2),
-                AssertionError("If `nf` or `F` are not `nothing`, the following conditions must hold:\n!isnothing(nf) => $nfs_flag\n!isnothing(F) => $X_flag\n!isempty(nf) => $(!isempty(nf))\n!isempty(F) => $(!isempty(F))\n(length(nf) == size(F, 2)) => ($(length(nf)) == $(size(F, 2))) => $(length(nf) == size(F, 2))"))
+        if !(nfs_flag && F_flag)
+            throw(IsNothingError(uppercasefirst(mul_cond_msg(some_msg("`nf`", nf),
+                                                             some_msg("`F`", F)))))
+        end
+        if !(!isempty(nf) && !isempty(F))
+            throw(IsEmptyError(uppercasefirst(mul_cond_msg(non_empty_msg(`nf`, nf),
+                                                           non_empty_msg("`F`", F)))))
+        end
+        if length(nf) != size(F, 2)
+            throw(DimensionMismatch(comp_msg("length of `nf`", "number of columns of `F`",
+                                             :eq, length(nf), size(F, 2)) * "."))
+        end
     end
     if X_flag && F_flag
-        @assert(size(X, 1) == size(F, 1),
-                DimensionMismatch("If `X` and `F` are not `nothing`, they must have the same number of rows:\n(size(X, 1) == size(F, 1)) => ($(size(X, 1)) == $(size(F, 1))) => $(size(X, 1) == size(F, 1))"))
+        if size(X, 1) != size(F, 1)
+            throw(DimensionMismatch(comp_msg("number of rows of `X`",
+                                             "number of rows of `F`", :eq, size(X, 1),
+                                             size(F, 1)) * "."))
+        end
     end
     if !isnothing(ts)
         @assert(!isempty(ts),
