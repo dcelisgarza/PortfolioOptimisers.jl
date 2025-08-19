@@ -847,6 +847,60 @@
                         9.683684671271267e-11, 1.1898969632271358e-10,
                         1.7783204947614032e-10, 0.26232956821838505], rtol = 1e-6)
     end
+    @testset "Centrality" begin
+        ces = [CentralityEstimator(; A = Centrality(), B = MinValue(), comp = GEQ()),
+               CentralityEstimator(; A = Centrality(; cent = EigenvectorCentrality()),
+                                   B = MeanValue(), comp = LEQ()),
+               CentralityEstimator(; A = Centrality(; cent = ClosenessCentrality()),
+                                   B = MedianValue(), comp = EQ()),
+               CentralityEstimator(; A = Centrality(; cent = StressCentrality()),
+                                   B = MaxValue(), comp = EQ()),
+               CentralityEstimator(; A = Centrality(; cent = RadialityCentrality()),
+                                   B = 0.63, comp = EQ())]
+
+        res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
+                                                     bgt = 1, cent = ces[1],
+                                                     wb = WeightBounds(; lb = -1, ub = 1))))
+        @test average_centrality(ces[1].A, res.w, pr.X) >=
+              minimum(centrality_vector(ces[1].A, pr.X))
+
+        res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
+                                                     bgt = 1, cent = ces[2],
+                                                     wb = WeightBounds(; lb = -1, ub = 1))))
+        @test average_centrality(ces[2].A, res.w, pr.X) <=
+              mean(centrality_vector(ces[2].A, pr.X))
+
+        res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
+                                                     bgt = 1, cent = ces[3],
+                                                     wb = WeightBounds(; lb = -1, ub = 1))))
+        @test isapprox(average_centrality(ces[3].A, res.w, pr.X),
+                       median(centrality_vector(ces[3].A, pr.X)))
+
+        res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
+                                                     bgt = 1, cent = ces[4],
+                                                     wb = WeightBounds(; lb = -1, ub = 1))))
+        @test isapprox(average_centrality(ces[4].A, res.w, pr.X),
+                       maximum(centrality_vector(ces[4].A, pr.X)))
+
+        res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
+                                                     bgt = 1, cent = ces[5],
+                                                     wb = WeightBounds(; lb = -1, ub = 1))))
+        @test isapprox(average_centrality(ces[5].A, res.w, pr.X), 0.63)
+
+        @test isapprox(res.w,
+                       optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                          opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                              sbgt = 1, bgt = 1,
+                                                              cent = centrality_constraints(ces[5],
+                                                                                            pr.X),
+                                                              wb = WeightBounds(; lb = -1,
+                                                                                ub = 1)))).w)
+    end
     @testset "Fees" begin
         r = ConditionalDrawdownatRisk()
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,

@@ -14,18 +14,6 @@ end
 function GreedyAllocation(; unit::Real = 1, args::Tuple = (), kwargs::NamedTuple = (;))
     return GreedyAllocation(unit, args, kwargs)
 end
-function adjust_long_cash(bgt::Real, lcash::Real, scash::Real)
-    if iszero(scash)
-        return lcash
-    end
-    return if bgt >= one(bgt)
-        # If we're reinvesting short winnings, and we there is leftover cash from the short allocation that we do not have to reinvest, remove it from the long cash.
-        lcash - scash
-    elseif bgt < one(bgt)
-        # If we're not reinvesting short winnings, and we there is leftover cash from the short allocation that we had planned on using on shorts but aren't, we can use it for longs instead.
-        lcash + scash
-    end
-end
 function roundmult(val::Real, prec::Real, args...; kwargs...)
     return round(div(val, prec) * prec, args...; kwargs...)
 end
