@@ -147,8 +147,8 @@ function Base.showerror(io::IO, err::PortfolioOptimisersError)
     name = name[1:(findfirst(x -> (x == '{' || x == '('), name) - 1)]
     return print(io, "$name: $(err.msg)")
 end
-function non_finite_msg(a, va = nothing)
-    return "$a$(isfinite(va) ? " ($va)" : "") must finite"
+function non_finite_msg(a)
+    return "$a must finite"
 end
 function non_zero_msg(a, va = nothing)
     return "$a$(!isnothing(va) ? " ($va)" : "") must be non-zero"

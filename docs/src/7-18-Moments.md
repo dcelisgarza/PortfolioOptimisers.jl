@@ -7,5 +7,19 @@ PortfolioOptimisers.AbstractRegressionAlgorithm
 PortfolioOptimisers.AbstractStepwiseRegressionAlgorithm
 PortfolioOptimisers.AbstractStepwiseRegressionCriterion
 PortfolioOptimisers.AbstractRegressionTarget
+LinearModel
+PortfolioOptimisers.fit(::LinearModel, ::AbstractMatrix, ::AbstractVector)
+GeneralisedLinearModel
+PortfolioOptimisers.fit(::GeneralisedLinearModel, ::AbstractMatrix, ::AbstractVector)
+PortfolioOptimisers.AbstractMinValStepwiseRegressionCriterion
+PortfolioOptimisers.AbstractMaxValStepwiseRegressionCriteria
+AIC
+AICC
+BIC
+RSquared
+AdjustedRSquared
+PortfolioOptimisers.regression_criterion_func
 Regression
+regression
+PortfolioOptimisers.regression_view
 ```

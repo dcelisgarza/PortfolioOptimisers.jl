@@ -160,7 +160,7 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                        F::Union{Nothing, <:AbstractMatrix} = nothing,
                        ts::Union{Nothing, <:AbstractVector} = nothing,
                        iv::Union{Nothing, <:AbstractMatrix} = nothing,
-                       ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+                       ivpa::Union{Nothing, <:Real, <:AbstractVector} = nothing)
     nxs_flag = !isnothing(nx)
     X_flag = !isnothing(X)
     if nxs_flag || X_flag
@@ -209,21 +209,22 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                 throw(DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
                                                                 "number of rows of `X`",
                                                                 :eq, length(ts),
-                                                                size(X, 1)))))
+                                                                size(X, 1))) * "."))
             end
         elseif F_flag
             if length(ts) != size(F, 1)
                 throw(DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
                                                                 "number of rows of `F`",
                                                                 :eq, length(ts),
-                                                                size(F, 1)))))
+                                                                size(F, 1))) * "."))
             end
         else
-            throw(ArgumentError(throw(IsNothingEmptyError(uppercasefirst("At least one of " *
-                                                                         mul_cond_msg(nothing_non_empty_msg("`X`",
-                                                                                                            X),
-                                                                                      nothing_non_empty_msg("`F`",
-                                                                                                            F)))))))
+            throw(IsNothingEmptyError(uppercasefirst("at least one of " *
+                                                     mul_cond_msg(nothing_non_empty_msg("`X`",
+                                                                                        X),
+                                                                  nothing_non_empty_msg("`F`",
+                                                                                        F))) *
+                                      "."))
         end
     end
     if !isnothing(iv)
@@ -232,24 +233,35 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
         end
         if size(iv) != size(X)
             throw(DimensionMismatch(uppercasefirst(comp_msg("size of `iv`", "size of `X`",
-                                                            :eq, size(iv), size(X)))))
+                                                            :eq, size(iv), size(X))) * "."))
         end
         if any(x -> x < zero(eltype(iv)), iv)
-            throw(DomainError(iv, "all entries of " * non_neg_msg("`iv`")))
+            throw(DomainError(iv, "all entries of " * non_neg_msg("`iv`") * "."))
         end
         if isa(ivpa, Real)
             if !isfinite(ivpa)
-                throw(DomainError(ivpa, non_finite_msg("`ivpa`")))
+                throw(DomainError(ivpa, non_finite_msg("`ivpa`") * "."))
             end
             if ivpa <= zero(ivpa)
-                throw(DomainError(ivpa, comp_msg("`ivpa`", zero(ivpa), :gt)))
+                throw(DomainError(ivpa, comp_msg("`ivpa`", zero(ivpa), :gt) * "."))
             end
         elseif isa(ivpa, AbstractVector)
-            @assert(!isempty(ivpa) &&
-                    length(ivpa) == size(iv, 2) &&
-                    all(isfinite, ivpa) &&
-                    all(x -> x > zero(eltype(ivpa)), ivpa),
-                    AssertionError("If `ivpa` is a vector, it must be non-empty, have the same length as the number of columns in `iv`, and all elements must be finite and positive:\n!isempty(ivpa) => $(!isempty(ivpa))\n(length(ivpa) == size(iv, 2)) => ($(length(ivpa)) == $(size(iv, 2))) => $(length(ivpa) == size(iv, 2))\n(all(isfinite, ivpa)) => $(all(isfinite, ivpa))\n(all(x -> x > zero(eltype(ivpa)), ivpa)) => $(all(x -> x > zero(eltype(ivpa)), ivpa))"))
+            if isempty(ivpa)
+                throw(IsEmptyError(non_empty_msg("`ivpa`", ivpa) * "."))
+            end
+            if length(ivpa) != size(iv, 2)
+                throw(DimensionMismatch(uppercasefirst(comp_msg("length of `ivpa`",
+                                                                "number of columns of `iv`",
+                                                                :eq, length(ivpa),
+                                                                size(iv, 2))) * "."))
+            end
+            if any(x -> !isfinite(x), ivpa)
+                throw(DomainError(ivpa, "all entries of " * non_finite_msg("`ivpa`") * "."))
+            end
+            if any(x -> x < zero(eltype(ivpa)), ivpa)
+                throw(DomainError(ivpa,
+                                  "all entries of " * comp_msg("`ivpa`", "0", :geq) * "."))
+            end
         end
     end
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
@@ -262,7 +274,6 @@ function returns_result_view(rd::ReturnsResult, i::AbstractVector)
     return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts, iv = iv,
                          ivpa = ivpa)
 end
-
 """
     prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
                       iv::Union{Nothing, <:TimeArray} = nothing,

@@ -188,7 +188,7 @@ function set_return_constraints!(model::JuMP.Model,
     lb = pret.lb
     ucs = pret.ucs
     mu = pr.mu
-    set_ucs_return_constraints!(model, mu_ucs(ucs, rd.X, rd.F; kwargs...), mu)
+    set_ucs_return_constraints!(model, mu_ucs(ucs, rd; kwargs...), mu)
     set_max_ratio_return_constraints!(model, obj, mu)
     set_return_bounds!(model, lb)
     return nothing
