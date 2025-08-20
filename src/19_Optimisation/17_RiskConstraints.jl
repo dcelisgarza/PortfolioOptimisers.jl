@@ -248,7 +248,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
-    rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
+    rc = linear_constraints(r.rc, opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
     key = Symbol(:variance_risk_, i)
     set_sdp_frc_constraints!(model)

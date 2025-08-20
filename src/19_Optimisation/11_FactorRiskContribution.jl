@@ -42,11 +42,9 @@ function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMat
     opt = opt_view(frc.opt, i, X)
     re = regression_view(frc.re, i)
     r = risk_measure_view(frc.r, i, X)
-    sets = nothing_asset_sets_view(frc.sets, i)
-    wi = nothing_scalar_array_view(frc.wi, i)
     return FactorRiskContribution(; opt = opt, re = re, r = r, obj = frc.obj,
-                                  nplg = frc.nplg, cplg = frc.cplg, sets = sets, wi = wi,
-                                  flag = frc.flag)
+                                  nplg = frc.nplg, cplg = frc.cplg, sets = frc.sets,
+                                  wi = frc.wi, flag = frc.flag)
 end
 function set_factor_risk_contribution_constraints!(model::JuMP.Model,
                                                    re::Union{<:Regression,

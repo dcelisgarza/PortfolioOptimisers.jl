@@ -31,8 +31,7 @@ end
 function risk_measure_view(r::Variance, i::AbstractVector, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     @assert(!isa(r.rc, LinearConstraint),
-            "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific cluster.")
-    # rc = linear_constraint_view(r.rc, i)
+            "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
     return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
 end
 struct StandardDeviation{T1, T2} <: SigmaRiskMeasure
