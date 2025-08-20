@@ -58,10 +58,10 @@ for file in code_files
                       preprocess = pre_process_content_nb, documenter = true, credit = true)
 end
 
-const page_rename = Dict("developer.md" => "Developer docs") # Without the numbers
-const numbered_pages = [file
-                        for file in readdir(joinpath(@__DIR__, "src"))
-                        if file != "index.md" && splitext(file)[2] == ".md"]
+page_rename = Dict("developer.md" => "Developer docs") # Without the numbers
+numbered_pages = [file
+                  for file in readdir(joinpath(@__DIR__, "src"))
+                  if file != "index.md" && splitext(file)[2] == ".md"]
 
 makedocs(; #modules = [PortfolioOptimisers],
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
@@ -70,8 +70,8 @@ makedocs(; #modules = [PortfolioOptimisers],
          format = Documenter.HTML(;
                                   canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl",),
          pages = ["index.md"; "Examples" => examples_nav;
-                  numbered_pages[24:end];
-                  "API" => [numbered_pages[1:6]; "Moments" => numbered_pages[7:23]]],
+                  numbered_pages[25:end];
+                  "API" => [numbered_pages[1:6]; "Moments" => numbered_pages[7:24]]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 

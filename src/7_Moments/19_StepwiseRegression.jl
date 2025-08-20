@@ -1,22 +1,198 @@
+"""
+    struct PValue{T1} <: AbstractStepwiseRegressionCriterion
+        threshold::T1
+    end
+
+Stepwise regression criterion based on p-value thresholding.
+
+`PValue` is used as a criterion for stepwise regression algorithms, where variables are included or excluded from the model based on their statistical significance (p-value). The `threshold` field specifies the maximum p-value for a variable to be considered significant and included in the model.
+
+# Fields
+
+  - `threshold::Real`: The p-value threshold for variable inclusion (default: `0.05`).
+
+# Related
+
+  - [`AbstractStepwiseRegressionCriterion`](@ref)
+  - [`StepwiseRegression`](@ref)
+"""
 struct PValue{T1} <: AbstractStepwiseRegressionCriterion
     threshold::T1
 end
+"""
+    PValue(; threshold::Real = 0.05)
+
+Construct a [`PValue`](@ref) stepwise regression criterion.
+
+This constructor creates a `PValue` object with the specified p-value threshold. The threshold must be strictly between 0 and 1.
+
+# Arguments
+
+  - `threshold::Real`: The p-value threshold for variable inclusion (default: `0.05`).
+
+# Returns
+
+  - `PValue`: A p-value-based stepwise regression criterion.
+
+# Validation
+
+  - Asserts that `0 < threshold < 1`.
+
+# Examples
+
+```jldoctest
+julia> PValue()
+PValue
+  threshold | Float64: 0.05
+```
+
+# Related
+
+  - [`PValue`](@ref)
+  - [`StepwiseRegression`](@ref)
+"""
 function PValue(; threshold::Real = 0.05)
     @assert(zero(threshold) < threshold < one(threshold))
     return PValue(threshold)
 end
+
+"""
+    struct Forward <: AbstractStepwiseRegressionAlgorithm end
+
+Stepwise regression algorithm: forward selection.
+
+`Forward` specifies the forward selection strategy for stepwise regression. In forward selection, variables are added to the model one at a time based on a criterion (such as p-value or information criterion), starting from an empty model and including the variable that most improves the model at each step. The process continues until no further improvement is possible or a stopping criterion is met.
+
+# Related
+
+  - [`AbstractStepwiseRegressionAlgorithm`](@ref)
+  - [`Backward`](@ref)
+  - [`StepwiseRegression`](@ref)
+"""
 struct Forward <: AbstractStepwiseRegressionAlgorithm end
+
+"""
+    struct Backward <: AbstractStepwiseRegressionAlgorithm end
+
+Stepwise regression algorithm: backward elimination.
+
+`Backward` specifies the backward elimination strategy for stepwise regression. In backward elimination, all candidate variables are initially included in the model, and variables are removed one at a time based on a criterion (such as p-value or information criterion). At each step, the variable whose removal most improves the model (or least degrades it) is excluded, until no further improvement is possible or a stopping criterion is met.
+
+# Related
+
+  - [`AbstractStepwiseRegressionAlgorithm`](@ref)
+  - [`Forward`](@ref)
+  - [`StepwiseRegression`](@ref)
+"""
 struct Backward <: AbstractStepwiseRegressionAlgorithm end
+
+"""
+    struct StepwiseRegression{T1, T2, T3} <: AbstractRegressionEstimator
+        crit::T1
+        alg::T2
+        target::T3
+    end
+
+Estimator for stepwise regression-based moment estimation.
+
+`StepwiseRegression` is a flexible estimator type for performing stepwise regression, supporting both forward selection and backward elimination strategies. It allows users to specify the criterion for variable selection (such as p-value, AIC, BIC, or R²), the stepwise algorithm, and the regression target (e.g., linear or generalised linear models).
+
+# Fields
+
+  - `crit::AbstractStepwiseRegressionCriterion`: Criterion for variable selection.
+  - `alg::AbstractStepwiseRegressionAlgorithm`: Stepwise algorithm.
+  - `target::AbstractRegressionTarget`: Regression target type.
+
+# Constructor
+
+    StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
+                        alg::AbstractStepwiseRegressionAlgorithm = Forward(),
+                        target::AbstractRegressionTarget = LinearModel())
+
+# Related
+
+  - [`AbstractStepwiseRegressionCriterion`](@ref)
+  - [`AbstractStepwiseRegressionAlgorithm`](@ref)
+  - [`AbstractRegressionTarget`](@ref)
+"""
 struct StepwiseRegression{T1, T2, T3} <: AbstractRegressionEstimator
     crit::T1
     alg::T2
     target::T3
 end
+"""
+    StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
+                        alg::AbstractStepwiseRegressionAlgorithm = Forward(),
+                        target::AbstractRegressionTarget = LinearModel())
+
+Construct a [`StepwiseRegression`](@ref) estimator for stepwise regression-based moment estimation.
+
+This constructor creates a `StepwiseRegression` object with the specified criterion, algorithm, and regression target. By default, it uses p-value thresholding (`PValue()`), forward selection (`Forward()`), and a standard linear model (`LinearModel()`).
+
+# Arguments
+
+  - `crit::AbstractStepwiseRegressionCriterion`: Criterion for variable selection.
+  - `alg::AbstractStepwiseRegressionAlgorithm`: Stepwise algorithm.
+  - `target::AbstractRegressionTarget`: Regression target type.
+
+# Returns
+
+  - `StepwiseRegression`: A configured stepwise regression estimator.
+
+# Examples
+
+```jldoctest
+julia> StepwiseRegression()
+StepwiseRegression
+    crit | PValue
+         |   threshold | Float64: 0.05
+     alg | Forward()
+  target | LinearModel
+         |   kwargs | @NamedTuple{}: NamedTuple()
+```
+
+# Related
+
+  - [`AbstractStepwiseRegressionCriterion`](@ref)
+  - [`AbstractStepwiseRegressionAlgorithm`](@ref)
+  - [`AbstractRegressionTarget`](@ref)
+"""
 function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = Forward(),
                             target::AbstractRegressionTarget = LinearModel())
     return StepwiseRegression(crit, alg, target)
 end
+
+"""
+    add_best_asset_after_failure_pval!(target::AbstractRegressionTarget,
+                                      included::AbstractVector,
+                                      F::AbstractMatrix,
+                                      x::AbstractVector)
+
+Helper for stepwise regression: add the "best" asset by p-value if no variables are included.
+
+This function is used in stepwise regression routines when no variables meet the p-value threshold for inclusion. It scans all excluded variables, fits a regression for each, and selects the variable with the lowest p-value (even if above the threshold). The index of this variable is pushed to `included`, ensuring the model always includes at least one variable.
+
+# Arguments
+
+  - `target::AbstractRegressionTarget`: Regression target type (e.g., `LinearModel()`).
+  - `included::AbstractVector`: Indices of currently included variables (modified in-place).
+  - `F::AbstractMatrix`: Factor matrix (features × observations).
+  - `x::AbstractVector`: Response vector.
+
+# Returns
+
+  - `nothing`: Modifies `included` in-place.
+
+# Details
+
+If `included` is not empty, the function does nothing. Otherwise, it evaluates each excluded variable by fitting a regression and extracting its p-value, then adds the variable with the lowest p-value to `included`. A warning is issued if no variable meets the threshold.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`regression`](@ref)
+"""
 function add_best_asset_after_failure_pval!(target::AbstractRegressionTarget,
                                             included::AbstractVector, F::AbstractMatrix,
                                             x::AbstractVector)
@@ -45,6 +221,37 @@ function add_best_asset_after_failure_pval!(target::AbstractRegressionTarget,
     push!(included, new_feature)
     return nothing
 end
+
+"""
+    regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector, F::AbstractMatrix)
+
+Perform forward stepwise regression using a p-value criterion.
+
+This method implements forward selection for stepwise regression, where variables (columns of `F`) are added to the model one at a time based on their statistical significance (p-value), starting from an empty model. At each step, the variable with the lowest p-value (and all p-values below the specified threshold) is added. The process continues until no remaining variable meets the p-value threshold. If no variable meets the threshold at any step, the variable with the lowest p-value is included to ensure at least one variable is selected.
+
+# Arguments
+
+  - `re::StepwiseRegression{<:PValue, <:Forward}`: Stepwise regression estimator with a `PValue` criterion and `Forward` algorithm.
+  - `x::AbstractVector`: Response vector.
+  - `F::AbstractMatrix`: Feature matrix (observations × variables).
+
+# Returns
+
+  - `included::Vector{Int}`: Indices of variables selected by the forward stepwise regression.
+
+# Details
+
+  - At each iteration, the method fits a regression model for each excluded variable, computes p-values, and adds the variable with the lowest p-value if it is below the threshold.
+  - If no variable meets the threshold, the variable with the lowest p-value is included (see [`add_best_asset_after_failure_pval!`](@ref)).
+  - The process stops when no further variables can be added under the criterion.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`PValue`](@ref)
+  - [`Forward`](@ref)
+  - [`add_best_asset_after_failure_pval!`](@ref)
+"""
 function regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector,
                     F::AbstractMatrix)
     ovec = range(; start = 1, stop = 1, length = length(x))
@@ -77,8 +284,45 @@ function regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVect
     add_best_asset_after_failure_pval!(re.target, included, F, x)
     return included
 end
-function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion, value,
-                                    excluded, included, threshold)
+
+"""
+    get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
+                               value::AbstractVector,
+                               excluded::AbstractVector,
+                               included::AbstractVector,
+                               threshold::Real)
+
+Helper for forward stepwise regression with minimum-value criteria (e.g., p-value, AIC).
+
+This function updates the `included` and `excluded` variable sets in forward stepwise regression when the selection criterion is minimized (such as p-value or AIC). It finds the variable among `excluded` with the lowest value, and if this value is less than the current `threshold`, moves it from `excluded` to `included` and updates the threshold.
+
+# Arguments
+
+  - `::AbstractMinValStepwiseRegressionCriterion`: Stepwise regression criterion type where lower values are better.
+  - `value::AbstractVector`: Vector of criterion values for each variable.
+  - `excluded::AbstractVector`: Indices of currently excluded variables (modified in-place).
+  - `included::AbstractVector`: Indices of currently included variables (modified in-place).
+  - `threshold::Real`: Current threshold value for inclusion.
+
+# Returns
+
+  - `threshold::Real`: Updated threshold value after inclusion (if any).
+
+# Details
+
+  - Finds the variable in `excluded` with the minimum value in `value`.
+  - If this value is less than `threshold`, moves the variable from `excluded` to `included` and updates `threshold`.
+  - If no variable meets the criterion, the sets remain unchanged and the threshold is not updated.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
+  - [`regression`](@ref)
+"""
+function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
+                                    value::AbstractVector, excluded::AbstractVector,
+                                    included::AbstractVector, threshold::Real)
     val, key = findmin(value)
     idx = findfirst(x -> x == key, excluded)
     if val < threshold
@@ -87,8 +331,45 @@ function get_forward_reg_incl_excl!(::AbstractMinValStepwiseRegressionCriterion,
     end
     return threshold
 end
-function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria, value,
-                                    excluded, included, threshold)
+
+"""
+    get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
+                               value::AbstractVector,
+                               excluded::AbstractVector,
+                               included::AbstractVector,
+                               threshold::Real)
+
+Helper for forward stepwise regression with maximum-value criteria (e.g., R²).
+
+This function updates the `included` and `excluded` variable sets in forward stepwise regression when the selection criterion is maximized (such as R²). It finds the variable among `excluded` with the highest value, and if this value is greater than the current `threshold`, moves it from `excluded` to `included` and updates the threshold.
+
+# Arguments
+
+  - `::AbstractMaxValStepwiseRegressionCriteria`: Stepwise regression criterion type where higher values are better.
+  - `value::AbstractVector`: Vector of criterion values for each variable.
+  - `excluded::AbstractVector`: Indices of currently excluded variables (modified in-place).
+  - `included::AbstractVector`: Indices of currently included variables (modified in-place).
+  - `threshold::Real`: Current threshold value for inclusion.
+
+# Returns
+
+  - `threshold::Real`: Updated threshold value after inclusion (if any).
+
+# Details
+
+  - Finds the variable in `excluded` with the maximum value in `value`.
+  - If this value is greater than `threshold`, moves the variable from `excluded` to `included` and updates `threshold`.
+  - If no variable meets the criterion, the sets remain unchanged and the threshold is not updated.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
+  - [`regression`](@ref)
+"""
+function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
+                                    value::AbstractVector, excluded::AbstractVector,
+                                    included::AbstractVector, threshold::Real)
     val, key = findmax(value)
     idx = findfirst(x -> x == key, excluded)
     if val > threshold
@@ -227,5 +508,4 @@ function regression(re::StepwiseRegression, X::AbstractMatrix, F::AbstractMatrix
     return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols))
 end
 
-export AIC, AICC, BIC, RSquared, AdjustedRSquared, PValue, Forward, Backward,
-       StepwiseRegression
+export PValue, Forward, Backward, StepwiseRegression

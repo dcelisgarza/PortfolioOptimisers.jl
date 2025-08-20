@@ -607,7 +607,7 @@ function regression(re::Regression, args...)
 end
 
 """
-    regression(re::Union{<:AbstractRegressionEstimator, <:Regression}, rd::ReturnsResult)
+    regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
 
 Compute or extract a regression result from an estimator or result and a [`ReturnsResult`](@ref).
 
@@ -615,7 +615,7 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 
 # Arguments
 
-  - `re::Union{<:AbstractRegressionEstimator, <:Regression}`: A regression estimator or result object.
+  - `re::AbstractRegressionEstimator`: A regression estimator or result object.
   - `rd::ReturnsResult`: A returns result object containing data matrices `X` and `F`.
 
 # Returns
@@ -627,11 +627,7 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
   - [`Regression`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function regression(re::Regression, args...)
-    return re
-end
-function regression(re::Union{<:AbstractRegressionEstimator, <:Regression},
-                    rd::ReturnsResult)
+function regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
     return regression(re, rd.X, rd.F)
 end
 
