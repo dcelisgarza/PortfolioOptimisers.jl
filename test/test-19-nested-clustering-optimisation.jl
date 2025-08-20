@@ -150,11 +150,19 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustering.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise!(opt, rd)
-            success = isapprox(res.w, df[!, i]; rtol = 1e-6)
+            rtol = if i ∈ (2, 3)
+                5e-5
+            elseif i == 4 || Sys.isapple() && i == 12
+                5e-6
+            else
+                1e-6
+            end
+            success = isapprox(res.w, df[!, i]; rtol = rtol)
             if !success
                 println("Failed iteration: $i")
                 find_tol(res.w, df[!, i])
             end
+            @test success
         end
         #=
         opt = NestedClustering(; pe = pr, cle = clr,
