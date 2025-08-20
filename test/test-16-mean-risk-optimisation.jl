@@ -145,7 +145,8 @@
                                  "clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
                                                  3, 3, 3, 3, 3, 3],
                                  "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
-                                                 3, 1, 2, 3, 1, 2]))
+                                                 3, 1, 2, 3, 1, 2], "c1" => rd.nx[1:3:end],
+                                 "c2" => rd.nx[2:3:end], "c3" => rd.nx[3:3:end]))
     pr = prior(HighOrderPriorEstimator(), rd)
     clr = clusterise(ClusteringEstimator(), pr)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
@@ -960,14 +961,18 @@
                         0.0996419548234818, 0.21860531676987255, 0.1957505235385615],
                        rtol = 1e-6)
     end
-    #=
-    # @testset "Risk contribution variance" begin
-    opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets)
-    r = Variance(; rc = LinearConstraintEstimator(; val = "nx==20"))
-    mr = MeanRisk(; opt = opt, r = r)
-    res = optimise!(mr)
-    rkc = risk_contribution(factory(r, pr, slv), res.w, pr.X)
-
-    # end
-    =#
+    @testset "Variance risk contribution" begin
+        opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets)
+        lcs = LinearConstraintEstimator(;
+                                        val = [["$a <= 0.2" for a in rd.nx];
+                                               ["c3 <= 0.1"]])
+        r = Variance(; rc = lcs)
+        obj = MaximumRatio()
+        mr = MeanRisk(; obj = obj, opt = opt, r = r)
+        res = optimise!(mr)
+        rkc = risk_contribution(factory(r, pr, slv), res.w, pr)
+        rkc = rkc / sum(rkc)
+        @test all(rkc .- 0.2 .- 20 * sqrt(eps()) .< 0)
+        @test abs(sum(rkc[3:3:end]) - 0.1) < 20 * sqrt(eps())
+    end
 end
