@@ -59,7 +59,8 @@ end
 function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                   opt::Union{<:MeanRisk,
                                                              <:NearOptimalCentering,
-                                                             <:RiskBudgetting},
+                                                             <:RiskBudgetting,
+                                                             <:FactorRiskContribution},
                                                   r_expr_ub::AbstractJuMPScalar,
                                                   ub::Union{Nothing, <:Real,
                                                             <:AbstractVector, <:Frontier},
@@ -242,29 +243,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
     return nothing
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
-                               opt::FactorRiskContribution,
-                               pr::Union{<:LowOrderPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any, <:Any, <:Any, <:Regression,
-                                                         <:Any, <:Any, <:Any},
-                                         <:HighOrderPrior{<:LowOrderPrior{<:Any, <:Any,
-                                                                          <:Any, <:Any,
-                                                                          <:Any, <:Any,
-                                                                          <:Any, <:Any,
-                                                                          <:Regression,
-                                                                          <:Any, <:Any,
-                                                                          <:Any}, <:Any,
-                                                          <:Any, <:Any, <:Any, <:Any,
-                                                          <:Any}}, ::Any, ::Any,
-                               b1::AbstractMatrix,
-                               sets::Union{Nothing, <:AssetSets,
-                                           #! Start: to delete
-                                           <:DataFrame
-                                           #! End: to delete
-                                           }, args...; kwargs...)
+                               opt::FactorRiskContribution, pr::AbstractPriorResult, ::Any,
+                               ::Any, b1::AbstractMatrix, args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
-    rc = linear_constraints(r.rc, sets; datatype = eltype(pr.X), strict = opt.opt.strict)
+    rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
+                            strict = opt.opt.strict)
     key = Symbol(:variance_risk_, i)
     set_sdp_frc_constraints!(model)
     W = model[:W]

@@ -96,7 +96,7 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_l1_regularisation!(model, frc.opt.l1)
     set_l2_regularisation!(model, frc.opt.l2)
     set_non_fixed_fees!(model, fees)
-    set_risk_constraints!(model, frc.r, frc, pr, nplg, cplg, b1, frc.sets; rd = rd)
+    set_risk_constraints!(model, frc.r, frc, pr, nplg, cplg, b1; rd = rd)
     scalarise_risk_expression!(model, frc.opt.sce)
     set_return_constraints!(model, ret, frc.obj, pr; rd = rd)
     frc_nplg = philogeny_constraints(frc.nplg, rd.F)

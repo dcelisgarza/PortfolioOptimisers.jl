@@ -94,6 +94,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     fees::Union{Nothing, <:Fees} = nothing;
                                                     nx::AbstractVector = 1:length(w),
                                                     N::Union{Nothing, <:Real} = nothing,
+                                                    percentage::Bool = false,
                                                     delta::Real = 1e-6,
                                                     marginal::Bool = false,
                                                     kwargs::NamedTuple = (title = "Risk Contribution",
@@ -103,6 +104,9 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                                           legend = false),
                                                     ekwargs...)
     rc = risk_contribution(r, w, X, fees; delta = delta, marginal = marginal)
+    if percentage
+        rc /= sum(rc)
+    end
     return PortfolioOptimisers.plot_composition(rc, nx; N = N, kwargs = kwargs, ekwargs...)
 end
 function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:AbstractVector{<:Real},

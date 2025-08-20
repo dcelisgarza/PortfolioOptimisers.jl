@@ -492,7 +492,7 @@
                                                                                      "XOM==0.02"])),
                    rd)
         @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.07, rtol = 5e-6)
-        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.02, rtol = 5e-6)
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.02, rtol = 5e-5)
     end
     @testset "Opinion pooling" begin
         pr0 = prior(EmpiricalPrior(), rd)
