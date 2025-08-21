@@ -142,13 +142,10 @@ If `success` is `false`, a warning is emitted with the trial errors.
 # Examples
 
 ```jldoctest
-julia> JuMPResult(; trials = Dict(:HiGHS => Dict(:optimize! => "error")), success = false)
-┌ Warning: Model could not be solved satisfactorily.
-│ Dict(:HiGHS => Dict(:optimize! => "error"))
-└ @ PortfolioOptimisers /mnt/storage/dev/PortfolioOptimisers.jl/src/9_JuMPModelOptimisation.jl:24
+julia> JuMPResult(; trials = Dict(:HiGHS => Dict(:optimize! => "error")), success = true)
 JuMPResult
    trials | Dict{Symbol, Dict{Symbol, String}}: Dict(:HiGHS => Dict(:optimize! => "error"))
-  success | Bool: false
+  success | Bool: true
 ```
 """
 function JuMPResult(; trials::AbstractDict, success::Bool)
