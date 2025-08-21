@@ -2,7 +2,8 @@
 
 ```@docs
 DistanceDistance
-distance(::DistanceDistance, ::StatsBase.CovarianceEstimator, ::AbstractMatrix; kwargs...)
-distance(::DistanceDistance, ::AbstractMatrix, args...; kwargs...)
-cor_and_dist(::DistanceDistance, ::StatsBase.CovarianceEstimator, ::AbstractMatrix; kwargs...)
+DistanceDistance()
+distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
+distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
+cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```

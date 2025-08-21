@@ -3,11 +3,14 @@
 ```@docs
 PortfolioOptimisers.DimensionReductionTarget
 PCA
-PortfolioOptimisers.fit(::PCA, ::AbstractMatrix)
+PCA()
+PortfolioOptimisers.fit(drtgt::PCA, X::AbstractMatrix)
 PPCA
-PortfolioOptimisers.fit(::PPCA, ::AbstractMatrix)
+PPCA()
+PortfolioOptimisers.fit(drtgt::PPCA, X::AbstractMatrix)
 DimensionReductionRegression
+DimensionReductionRegression()
 PortfolioOptimisers.prep_dim_red_reg
-regression(::PortfolioOptimisers.AbstractRegressionTarget, ::AbstractVector, ::AbstractVector, ::AbstractVector, ::AbstractMatrix, ::AbstractMatrix)
-regression(::DimensionReductionRegression, ::AbstractMatrix, ::AbstractMatrix)
+regression(retgt::PortfolioOptimisers.AbstractRegressionTarget, y::AbstractVector, mu::AbstractVector, sigma::AbstractVector, x1::AbstractMatrix, Vp::AbstractMatrix)
+regression(re::DimensionReductionRegression, X::AbstractMatrix, F::AbstractMatrix)
 ```

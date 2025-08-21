@@ -9,5 +9,5 @@ LogDistance
 CorrelationDistance
 CanonicalDistance
 VariationInfoDistance
-Distance
+VariationInfoDistance()
 ```

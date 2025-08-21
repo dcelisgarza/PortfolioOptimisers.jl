@@ -8,9 +8,11 @@ PortfolioOptimisers.AbstractStepwiseRegressionAlgorithm
 PortfolioOptimisers.AbstractStepwiseRegressionCriterion
 PortfolioOptimisers.AbstractRegressionTarget
 LinearModel
-PortfolioOptimisers.fit(::LinearModel, ::AbstractMatrix, ::AbstractVector)
+LinearModel()
+PortfolioOptimisers.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
 GeneralisedLinearModel
-PortfolioOptimisers.fit(::GeneralisedLinearModel, ::AbstractMatrix, ::AbstractVector)
+GeneralisedLinearModel()
+PortfolioOptimisers.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
 PortfolioOptimisers.AbstractMinValStepwiseRegressionCriterion
 PortfolioOptimisers.AbstractMaxValStepwiseRegressionCriteria
 AIC
@@ -20,7 +22,8 @@ RSquared
 AdjustedRSquared
 PortfolioOptimisers.regression_criterion_func
 Regression
-regression(::Regression, args...)
-regression(::PortfolioOptimisers.AbstractRegressionEstimator, ::ReturnsResult)
+Regression()
 PortfolioOptimisers.regression_view
+regression(re::Regression, args...)
+regression(re::PortfolioOptimisers.AbstractRegressionEstimator, rd::ReturnsResult)
 ```
