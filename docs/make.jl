@@ -1,6 +1,6 @@
 using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
-      Handcalcs
+      Handcalcs, StatsBase
 
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers);
                     recursive = true)
@@ -70,8 +70,9 @@ makedocs(; #modules = [PortfolioOptimisers],
          format = Documenter.HTML(;
                                   canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl",),
          pages = ["index.md"; "Examples" => examples_nav;
-                  numbered_pages[27:end];
-                  "API" => [numbered_pages[1:6]; "Moments" => numbered_pages[7:26]]],
+                  numbered_pages[31:end];
+                  "API" => [numbered_pages[1:6]; "Moments" => numbered_pages[7:27];
+                            "Distance" => numbered_pages[28:30]]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 
