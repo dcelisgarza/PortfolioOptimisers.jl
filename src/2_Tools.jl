@@ -82,7 +82,7 @@ It supports both asset and factor returns, as well as optional time series and i
   - `X::Union{Nothing, AbstractMatrix}`: Asset returns matrix (observations × assets).
   - `nf::Union{Nothing, AbstractVector}`: Names or identifiers of factor columns.
   - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix (observations × factors).
-  - `ts::Union{Nothing, AbstractVector}`: Optional time series (e.g., timestamps) for each observation.
+  - `ts::Union{Nothing, AbstractVector}`: Optional timestamps for each observation.
   - `iv::Union{Nothing, AbstractMatrix}`: Implied volatilities matrix.
   - `ivpa::Union{Nothing, <:Real, AbstractVector{<:Real}}`: Implied volatility risk premium adjustment.
 
@@ -123,7 +123,7 @@ Construct a [`ReturnsResult`](@ref) object, validating dimensions and types for 
   - `X::Union{Nothing, AbstractMatrix}`: Asset returns matrix.
   - `nf::Union{Nothing, AbstractVector}`: Factor names or identifiers.
   - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix.
-  - `ts::Union{Nothing, AbstractVector}`: Time series (e.g., timestamps).
+  - `ts::Union{Nothing, AbstractVector}`: Timestamps.
   - `iv::Union{Nothing, AbstractMatrix}`: Implied volatility matrix.
   - `ivpa::Union{Nothing, <:Real, AbstractVector{<:Real}}`: Implied volatility risk premium adjustment.
 

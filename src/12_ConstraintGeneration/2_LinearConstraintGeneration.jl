@@ -208,17 +208,6 @@ function estimator_to_val!(arr::AbstractArray, dict::Pair{<:Any, <:Real}, sets::
         arr[nx[key]] .= val
     else
         group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
-        # assets = get(sets.dict, key, nothing)
-        # if isnothing(assets)
-        #     if strict
-        #         throw(ArgumentError("$(key) is not in $(keys(sets.dict)).\n$(dict)"))
-        #     else
-        #         @warn("$(key) is not in $(keys(sets.dict)).\n$(dict)")
-        #     end
-        # else
-        #     unique!(assets)
-        #     arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
-        # end
     end
     return nothing
 end
@@ -232,17 +221,6 @@ function estimator_to_val(dict::Union{<:AbstractDict,
             arr[findfirst(x -> x == key, nx)] = val
         else
             group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
-            # assets = get(sets.dict, key, nothing)
-            # if isnothing(assets)
-            #     if strict
-            #         throw(ArgumentError("$(key) is not in $(keys(sets.dict)).\n$(dict)"))
-            #     else
-            #         @warn("$(key) is not in $(keys(sets.dict)).\n$(dict)")
-            #     end
-            # else
-            #     unique!(assets)
-            #     arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
-            # end
         end
     end
     return arr
@@ -256,17 +234,6 @@ function estimator_to_val(dict::Pair{<:Any, <:Real}, sets::AssetSets, val::Real 
         arr[findfirst(x -> x == key, nx)] = val
     else
         group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
-        # assets = get(sets.dict, key, nothing)
-        # if isnothing(assets)
-        #     if strict
-        #         throw(ArgumentError("$(key) is not in $(keys(sets.dict)).\n$(dict)"))
-        #     else
-        #         @warn("$(key) is not in $(keys(sets.dict)).\n$(dict)")
-        #     end
-        # else
-        #     unique!(assets)
-        #     arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
-        # end
     end
     return arr
 end

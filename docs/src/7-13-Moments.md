@@ -1,4 +1,4 @@
-# Shrunk expected returns
+# Shrunk Expected Returns
 
 ```@docs
 PortfolioOptimisers.AbstractShrunkExpectedReturnsEstimator

@@ -20,6 +20,7 @@ RSquared
 AdjustedRSquared
 PortfolioOptimisers.regression_criterion_func
 Regression
-regression
+regression(::Regression, args...)
+regression(::PortfolioOptimisers.AbstractRegressionEstimator, ::ReturnsResult)
 PortfolioOptimisers.regression_view
 ```
