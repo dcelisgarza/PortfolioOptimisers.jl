@@ -110,7 +110,10 @@ function BudgetMarketImpact(; bgt::Union{<:Real, <:BudgetRange} = 1.0,
     else
         @argcheck(un >= zero(un))
     end
-    @argcheck(zero(beta) <= beta <= one(beta))
+    @argcheck(zero(beta) <= beta <= one(beta),
+              DomainError(beta,
+                          range_msg("`beta`", zero(beta), one(beta), nothing, true, true) *
+                          "."))
     return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
 end
 function budget_view(bgt::BudgetMarketImpact, i::AbstractVector)

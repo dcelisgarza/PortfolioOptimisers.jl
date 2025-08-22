@@ -30,7 +30,7 @@ struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
 end
 function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing,
                          w::AbstractVector{<:Real})
-    @argcheck(!isempty(w), AssertionError("`w` must be non-empty."))
+    @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
     return WeightsTracking(fees, w)
 end
 function factory(tracking::WeightsTracking, w::AbstractVector)
@@ -48,7 +48,7 @@ struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
     w::T1
 end
 function ReturnsTracking(; w::AbstractVector{<:Real})
-    @argcheck(!isempty(w), AssertionError("`w` must be non-empty."))
+    @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
     return ReturnsTracking(w)
 end
 function tracking_view(tracking::ReturnsTracking, ::Any)

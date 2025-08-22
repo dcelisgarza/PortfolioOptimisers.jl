@@ -26,7 +26,10 @@ function OpinionPoolingPrior(;
     end
     if isa(w, AbstractVector)
         @argcheck(!isempty(w) && length(w) == length(pes))
-        @argcheck(all(x -> zero(x) <= x <= one(x), w))
+        @argcheck(all(x -> zero(x) <= x <= one(x), w),
+                  DomainError(w,
+                              range_msg("all entries of `w`", zero(w), one(w), nothing,
+                                        true, true) * "."))
         @argcheck(sum(w) <= one(eltype(w)))
     end
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)

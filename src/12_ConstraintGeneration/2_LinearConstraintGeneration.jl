@@ -429,8 +429,7 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
                                 sets::AssetSets; datatype::DataType = Float64,
                                 strict::Bool = false)
     if isa(lcs, AbstractVector)
-        @argcheck(!isempty(lcs),
-                  AssertionError("lcs must be non-empty:\n!isempty(lcs) => $(!isempty(lcs))"))
+        @argcheck(!isempty(lcs), IsEmptyError(non_empty_msg("lcs") * "."))
     end
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)
@@ -531,7 +530,7 @@ function RiskBudgetEstimator(;
                              val::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
                                         <:AbstractVector{<:Union{<:Pair{<:Any, <:Real}}}})
     if isa(val, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(val), AssertionError("`val` must be non-empty"))
+        @argcheck(!isempty(val), IsEmptyError(non_empty_msg("`val`") * "."))
         if isa(val, AbstractDict)
             @argcheck(all(x -> x >= zero(x), values(val)),
                       DomainError("All entries of `val` must be non-negative"))

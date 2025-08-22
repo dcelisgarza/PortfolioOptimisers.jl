@@ -415,8 +415,13 @@ function SmythBrobyCovariance(;
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
                               threads::FLoops.Transducers.Executor = ThreadedEx())
     @argcheck(zero(threshold) < threshold < one(threshold))
-    @argcheck(zero(c1) < c1 <= one(c1))
-    @argcheck(zero(c2) < c2 <= one(c2) && c3 > c2)
+    @argcheck(zero(c1) < c1 <= one(c1),
+              DomainError(c1,
+                          range_msg("`c1`", zero(c1), one(c1), nothing, true, true) * "."))
+    @argcheck(zero(c2) < c2 <= one(c2),
+              DomainError(c2,
+                          range_msg("`c2`", zero(c2), one(c2), nothing, false, true) * "."))
+    @argcheck(c3 > c2)
     return SmythBrobyCovariance(me, ve, pdm, threshold, c1, c2, c3, n, alg, threads)
 end
 

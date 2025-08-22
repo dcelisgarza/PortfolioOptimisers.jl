@@ -227,7 +227,7 @@ function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
                  max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
                  alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
     if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv), AssertionError("`slv` must be non-empty."))
+        @argcheck(!isempty(slv), IsEmptyError(non_empty_msg("`slv`") * "."))
     end
     @argcheck(zero(max_phi) < max_phi < one(max_phi) &&
               isfinite(sc) &&

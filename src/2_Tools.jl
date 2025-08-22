@@ -194,7 +194,7 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                                              size(F, 1)) * "."))
     end
     if !isnothing(ts)
-        @argcheck(!isempty(ts), IsEmptyError(non_empty_msg("`ts`", ts) * "."))
+        @argcheck(!isempty(ts), IsEmptyError(non_empty_msg("`ts`") * "."))
         if X_flag
             @argcheck(length(ts) == size(X, 1),
                       DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
@@ -217,7 +217,7 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
         end
     end
     if !isnothing(iv)
-        @argcheck(!isempty(iv), IsEmptyError(non_empty_msg("`iv`", iv) * "."))
+        @argcheck(!isempty(iv), IsEmptyError(non_empty_msg("`iv`") * "."))
         @argcheck(size(iv) == size(X),
                   DimensionMismatch(uppercasefirst(comp_msg("size of `iv`", "size of `X`",
                                                             :eq, size(iv), size(X))) * "."))
@@ -228,7 +228,7 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
             @argcheck(ivpa > zero(ivpa),
                       DomainError(ivpa, comp_msg("`ivpa`", zero(ivpa), :gt) * "."))
         elseif isa(ivpa, AbstractVector)
-            @argcheck(!isempty(ivpa), IsEmptyError(non_empty_msg("`ivpa`", ivpa) * "."))
+            @argcheck(!isempty(ivpa), IsEmptyError(non_empty_msg("`ivpa`") * "."))
             @argcheck(length(ivpa) == size(iv, 2),
                       DimensionMismatch(uppercasefirst(comp_msg("length of `ivpa`",
                                                                 "number of columns of `iv`",
@@ -334,12 +334,17 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
                            join_method::Symbol = :outer,
                            impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
     @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
-              DomainError("`missing_col_percent` must be in (0, 1]:\nmissing_col_percent => $missing_col_percent"))
+              DomainError(missing_col_percent,
+                          range_msg("`missing_col_percent`", zero(missing_col_percent),
+                                    one(missing_col_percent), nothing, false, true) * "."))
     if !isnothing(missing_row_percent)
         @argcheck(zero(missing_row_percent) <
                   missing_row_percent <=
                   one(missing_row_percent),
-                  DomainError("`missing_row_percent` must be in (0, 1]:\nmissing_row_percent => $missing_row_percent"))
+                  DomainError(missing_row_percent,
+                              range_msg("`missing_row_percent`", nothing,
+                                        zero(missing_row_percent), one(missing_row_percent),
+                                        false, true) * "."))
     end
     if !isempty(F)
         asset_names = string.(colnames(X))
@@ -385,8 +390,6 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
         iv = iv[ts]
-        # @argcheck(ts == timestamp(iv),
-        #         AssertionError("If the returns series contains a timestamp and `iv` is not `nothing`, then the timestamps must match exactly."))
     end
     if isempty(nf)
         nf = nothing

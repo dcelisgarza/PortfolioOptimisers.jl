@@ -17,16 +17,16 @@ function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = n
                                  <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))
     if isa(l, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(l), AssertionError("`l` must be non-empty."))
+        @argcheck(!isempty(l), IsEmptyError(non_empty_msg("`l`") * "."))
     end
     if isa(s, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(s), AssertionError("`s` must be non-empty."))
+        @argcheck(!isempty(s), IsEmptyError(non_empty_msg("`s`") * "."))
     end
     if isa(fl, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(fl), AssertionError("`fl` must be non-empty."))
+        @argcheck(!isempty(fl), IsEmptyError(non_empty_msg("`fl`") * "."))
     end
     if isa(fs, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(fs), AssertionError("`fs` must be non-empty."))
+        @argcheck(!isempty(fs), IsEmptyError(non_empty_msg("`fs`") * "."))
     end
     return FeesEstimator(tn, l, s, fl, fs, kwargs)
 end

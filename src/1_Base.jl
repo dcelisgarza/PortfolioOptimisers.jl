@@ -169,7 +169,7 @@ function nothing_non_empty_msg(a, va = nothing)
     return "$a (isnothing($a) => $(isnothing(va))) must not be `nothing`, and non-empty$(!isnothing(va) ? " (isempty($a) => $(isempty(va)))" : "")"
 end
 function range_msg(a, b, c, va = nothing, bi::Bool = false, ci::Bool = false)
-    return "$a$(!isnothing(va) ? " ($va)" : "") must be in $(bi ? '[' : '(')$b, $c $(ci ? ']' : ')')"
+    return "$a$(!isnothing(va) ? " ($va)" : "") must be in $(bi ? '[' : '(')$b, $c$(ci ? ']' : ')')"
 end
 function comp_msg(a, b, c = :eq, va = nothing, vb = nothing)
     msg = (; :eq => "must be equal to", :gt => "must be greater than",

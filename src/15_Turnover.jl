@@ -24,7 +24,7 @@ struct Turnover{T1, T2} <: AbstractResult
 end
 function Turnover(; w::AbstractVector{<:Real},
                   val::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
-    @argcheck(!isempty(w), AssertionError("`w` must be non-empty."))
+    @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
     if isa(val, AbstractVector)
         @argcheck(!isempty(val) &&
                   length(val) == length(w) &&
