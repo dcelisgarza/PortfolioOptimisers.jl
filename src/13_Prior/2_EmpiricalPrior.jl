@@ -23,35 +23,35 @@ function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractM
                        f_mu::Union{Nothing, <:AbstractVector} = nothing,
                        f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
                        f_w::Union{Nothing, <:AbstractVector} = nothing)
-    @assert(!isempty(X) && !isempty(mu) && !isempty(sigma))
-    @assert(size(X, 2) == length(mu))
+    @argcheck(!isempty(X) && !isempty(mu) && !isempty(sigma))
+    @argcheck(size(X, 2) == length(mu))
     assert_matrix_issquare(sigma)
     if !isnothing(w)
-        @assert(!isempty(w))
-        @assert(length(w) == size(X, 1))
+        @argcheck(!isempty(w))
+        @argcheck(length(w) == size(X, 1))
     end
     if isa(kld, AbstractVector)
-        @assert(!isempty(kld))
+        @argcheck(!isempty(kld))
     end
     if !isnothing(ow)
-        @assert(!isempty(ow))
+        @argcheck(!isempty(ow))
     end
     loadings_flag = !isnothing(rr)
     f_mu_flag = !isnothing(f_mu)
     f_sigma_flag = !isnothing(f_sigma)
     if loadings_flag || f_mu_flag || f_sigma_flag
-        @assert(loadings_flag && f_mu_flag && f_sigma_flag)
-        @assert(!isempty(f_mu) && !isempty(f_sigma))
+        @argcheck(loadings_flag && f_mu_flag && f_sigma_flag)
+        @argcheck(!isempty(f_mu) && !isempty(f_sigma))
         assert_matrix_issquare(f_sigma)
-        @assert(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1))
-        @assert(size(rr.M, 1) == length(mu))
+        @argcheck(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1))
+        @argcheck(size(rr.M, 1) == length(mu))
         if !isnothing(chol)
-            @assert(!isempty(chol))
-            @assert(length(mu) == size(chol, 2))
+            @argcheck(!isempty(chol))
+            @argcheck(length(mu) == size(chol, 2))
         end
         if !isnothing(f_w)
-            @assert(!isempty(f_w))
-            @assert(length(f_w) == size(X, 1))
+            @argcheck(!isempty(f_w))
+            @argcheck(length(f_w) == size(X, 1))
         end
     end
     return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w)
@@ -80,7 +80,7 @@ function factory(pe::EmpiricalPrior, w::Union{Nothing, <:AbstractWeights} = noth
 end
 function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, args...;
                dims::Int = 1, kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -90,7 +90,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, arg
 end
 function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Real}, X::AbstractMatrix, args...;
                dims::Int = 1, kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

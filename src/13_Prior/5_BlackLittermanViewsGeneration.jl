@@ -3,8 +3,8 @@ struct BlackLittermanViews{T1, T2} <: AbstractResult
     Q::T2
 end
 function BlackLittermanViews(; P::AbstractMatrix, Q::AbstractVector)
-    @assert(!isempty(P) && !isempty(Q))
-    @assert(size(P, 1) == length(Q))
+    @argcheck(!isempty(P) && !isempty(Q))
+    @argcheck(size(P, 1) == length(Q))
     return BlackLittermanViews(P, Q)
 end
 function black_litterman_views(::Nothing, args...; kwargs...)
@@ -18,7 +18,7 @@ function get_black_litterman_views(lcs::Union{<:ParsingResult,
                                    sets::AssetSets; datatype::DataType = Float64,
                                    strict::Bool = false)
     if isa(lcs, AbstractVector)
-        @assert(!isempty(lcs))
+        @argcheck(!isempty(lcs))
     end
     P = Vector{datatype}(undef, 0)
     Q = Vector{datatype}(undef, 0)
@@ -66,17 +66,17 @@ end
 function assert_bl_views_conf(views_conf::Real,
                               val::Union{<:AbstractString, Expr,
                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}})
-    @assert(!isa(val, AbstractVector))
-    @assert(zero(views_conf) < views_conf < one(views_conf))
+    @argcheck(!isa(val, AbstractVector))
+    @argcheck(zero(views_conf) < views_conf < one(views_conf))
     return nothing
 end
 function assert_bl_views_conf(views_conf::AbstractVector{<:Real},
                               val::Union{<:AbstractString, Expr,
                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}})
-    @assert(isa(val, AbstractVector))
-    @assert(!isempty(views_conf))
-    @assert(length(val) == length(views_conf))
-    @assert(all(x -> zero(x) < x < one(x), views_conf))
+    @argcheck(isa(val, AbstractVector))
+    @argcheck(!isempty(views_conf))
+    @argcheck(length(val) == length(views_conf))
+    @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end
 function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
@@ -85,7 +85,7 @@ function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}
 end
 function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
                               views::BlackLittermanViews)
-    return @assert(length(views_conf) == length(views.Q))
+    return @argcheck(length(views_conf) == length(views.Q))
 end
 
 export black_litterman_views, BlackLittermanViews

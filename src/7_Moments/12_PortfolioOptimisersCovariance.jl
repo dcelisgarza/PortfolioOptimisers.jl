@@ -113,7 +113,7 @@ This method computes the covariance matrix for the input data matrix `X` using t
 """
 function Statistics.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
                         kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -152,7 +152,7 @@ This method computes the correlation matrix for the input data matrix `X` using 
 """
 function Statistics.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
                         kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

@@ -26,7 +26,7 @@ function Base.getproperty(obj::FactorPrior, sym::Symbol)
 end
 function prior(pe::FactorPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
                kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         F = transpose(F)

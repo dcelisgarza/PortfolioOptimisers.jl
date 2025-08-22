@@ -181,7 +181,7 @@ function VariationInfoDistance(;
                                bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                                normalise::Bool = true)
     if isa(bins, Integer)
-        @assert(bins > zero(bins))
+        @argcheck(bins > zero(bins))
     end
     return VariationInfoDistance(bins, normalise)
 end

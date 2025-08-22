@@ -28,7 +28,7 @@ struct LowOrderDeviation{T1, T2} <: AbstractLowOrderDeviationMeasureAlgorithm
 end
 function LowOrderDeviation(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
                            alg::DeviationLowerMoment = SecondLowerMoment())
-    @assert(!isa(alg, MeanAbsoluteDeviation))
+    @argcheck(!isa(alg, MeanAbsoluteDeviation))
     return LowOrderDeviation(ve, alg)
 end
 abstract type AbstractUnionHighOrderMomentMeasureAlgorithm <: AbstractMomentMeasureAlgorithm end
@@ -66,12 +66,12 @@ function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                         alg::AbstractUnionLowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     if isa(mu, AbstractVector)
-        @assert(!isempty(mu) && all(isfinite, mu))
+        @argcheck(!isempty(mu) && all(isfinite, mu))
     elseif isa(mu, Real)
-        @assert(isfinite(mu))
+        @argcheck(isfinite(mu))
     end
     if isa(w, AbstractWeights)
-        @assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     return LowOrderMoment(settings, w, mu, alg)
 end
@@ -86,12 +86,12 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
                          mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                          alg::AbstractUnionHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     if isa(mu, AbstractVector)
-        @assert(!isempty(mu) && all(isfinite, mu))
+        @argcheck(!isempty(mu) && all(isfinite, mu))
     elseif isa(mu, Real)
-        @assert(isfinite(mu))
+        @argcheck(isfinite(mu))
     end
     if isa(w, AbstractWeights)
-        @assert(!isempty(w))
+        @argcheck(!isempty(w))
     end
     return HighOrderMoment(settings, w, mu, alg)
 end

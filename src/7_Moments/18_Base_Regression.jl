@@ -493,13 +493,13 @@ Regression
 """
 function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
                     b::Union{Nothing, <:AbstractVector} = nothing)
-    @assert(!isempty(M))
+    @argcheck(!isempty(M))
     if isa(b, AbstractVector)
-        @assert(!isempty(b))
-        @assert(length(b) == size(M, 1))
+        @argcheck(!isempty(b))
+        @argcheck(length(b) == size(M, 1))
     end
     if !isnothing(L)
-        @assert(size(M, 1) == size(L, 1))
+        @argcheck(size(M, 1) == size(L, 1))
     end
     return Regression(M, L, b)
 end

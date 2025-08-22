@@ -128,7 +128,7 @@ NormalisedConstantRelativeRiskAversion
   - [`owa_l_moment_crm`](@ref)
 """
 function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
-    @assert(zero(g) < g < one(g), DomainError("`g` must be in (0, 1):\ng => $g"))
+    @argcheck(zero(g) < g < one(g), DomainError("`g` must be in (0, 1):\ng => $g"))
     return NormalisedConstantRelativeRiskAversion(g)
 end
 
@@ -227,14 +227,14 @@ function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
                  max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
                  alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
     if isa(slv, AbstractVector)
-        @assert(!isempty(slv), AssertionError("`slv` must be non-empty."))
+        @argcheck(!isempty(slv), AssertionError("`slv` must be non-empty."))
     end
-    @assert(zero(max_phi) < max_phi < one(max_phi) &&
-            isfinite(sc) &&
-            sc > zero(sc) &&
-            isfinite(so) &&
-            so > zero(so),
-            AssertionError("The following conditions must hold:\n`max_phi` in (0, 1) => $max_phi\nisfinite(sc) && sc > 0 => $sc\nisfinite(so) && so > 0 => $so"))
+    @argcheck(zero(max_phi) < max_phi < one(max_phi) &&
+              isfinite(sc) &&
+              sc > zero(sc) &&
+              isfinite(so) &&
+              so > zero(so),
+              AssertionError("The following conditions must hold:\n`max_phi` in (0, 1) => $max_phi\nisfinite(sc) && sc > 0 => $sc\nisfinite(so) && so > 0 => $so"))
     return OWAJuMP(slv, max_phi, sc, so, alg)
 end
 
@@ -489,8 +489,8 @@ function owa_gmd(T::Integer)
     return (4 * range(1; stop = T) .- 2 * (T + 1)) / (T * (T - 1))
 end
 function owa_cvar(T::Integer, alpha::Real = 0.05)
-    @assert(zero(alpha) < alpha < one(alpha),
-            DomainError("`alpha` must be in (0, 1):\nalpha => $alpha"))
+    @argcheck(zero(alpha) < alpha < one(alpha),
+              DomainError("`alpha` must be in (0, 1):\nalpha => $alpha"))
     k = floor(Int, T * alpha)
     w = zeros(typeof(alpha), T)
     w[1:k] .= -1 / (T * alpha)
@@ -506,8 +506,8 @@ function owa_wcvar(T::Integer, alphas::AbstractVector{<:Real},
     return w
 end
 function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
-    @assert(zero(alpha) < alpha_i < alpha < one(alpha) && a_sim > zero(a_sim),
-            AssertionError("The following conditions must hold:\n`alpha_i` in (0, `alpha`) => $alpha_i\n`alpha` in (0, 1) => $alpha\n`a_sim` > 0 => $a_sim"))
+    @argcheck(zero(alpha) < alpha_i < alpha < one(alpha) && a_sim > zero(a_sim),
+              AssertionError("The following conditions must hold:\n`alpha_i` in (0, `alpha`) => $alpha_i\n`alpha` in (0, 1) => $alpha\n`a_sim` > 0 => $a_sim"))
     alphas = range(; start = alpha_i, stop = alpha, length = a_sim)
     n = length(alphas)
     w = Vector{typeof(alpha)}(undef, n)
@@ -620,7 +620,7 @@ This function constructs the OWA linear moment CRM weights matrix for order stat
 """
 function owa_l_moment_crm(T::Integer; k::Integer = 2,
                           method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
-    @assert(k >= 2, DomainError("`k` must be at least 2:\nk => $k"))
+    @argcheck(k >= 2, DomainError("`k` must be at least 2:\nk => $k"))
     rg = 2:k
     weights = Matrix{typeof(inv(T * k))}(undef, T, length(rg))
     for i in rg

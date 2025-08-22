@@ -3,8 +3,8 @@ struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
     B::T2
 end
 function PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
-    @assert(!isempty(A) && !isempty(B),
-            DimensionMismatch("`A` and `B` must be non-empty:\nisempty(A) => $(isempty(A))\nisempty(B) => $(isempty(B))"))
+    @argcheck(!isempty(A) && !isempty(B),
+              DimensionMismatch("`A` and `B` must be non-empty:\nisempty(A) => $(isempty(A))\nisempty(B) => $(isempty(B))"))
     return PartialLinearConstraint(A, B)
 end
 struct LinearConstraint{T1, T2} <: AbstractConstraintResult
@@ -13,8 +13,8 @@ struct LinearConstraint{T1, T2} <: AbstractConstraintResult
 end
 function LinearConstraint(; ineq::Union{Nothing, <:PartialLinearConstraint} = nothing,
                           eq::Union{Nothing, <:PartialLinearConstraint} = nothing)
-    @assert(isnothing(ineq) ⊼ isnothing(eq),
-            AssertionError("`ineq` and `eq` cannot both be `nothing`:\nisnothing(ineq) => $(isnothing(ineq))\nisnothing(eq) => $(isnothing(eq))"))
+    @argcheck(isnothing(ineq) ⊼ isnothing(eq),
+              AssertionError("`ineq` and `eq` cannot both be `nothing`:\nisnothing(ineq) => $(isnothing(ineq))\nisnothing(eq) => $(isnothing(eq))"))
     return LinearConstraint(ineq, eq)
 end
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
@@ -147,8 +147,8 @@ struct AssetSets{T1, T2} <: AbstractEstimator
 end
 function AssetSets(; key::Union{Symbol, <:AbstractString} = "nx",
                    dict::AbstractDict{<:Union{Symbol, <:AbstractString}})
-    @assert(!isempty(dict) && haskey(dict, key),
-            AssertionError("The following conditions must be met:\n`dict` must be non-empty => !isempty(dict) = $(!isempty(dict))\n`dict` must contain `key` = $key, typeof(key) = $(typeof(key)) => haskey(dict, key) = $(haskey(dict, key))"))
+    @argcheck(!isempty(dict) && haskey(dict, key),
+              AssertionError("The following conditions must be met:\n`dict` must be non-empty => !isempty(dict) = $(!isempty(dict))\n`dict` must contain `key` = $key, typeof(key) = $(typeof(key)) => haskey(dict, key) = $(haskey(dict, key))"))
     return AssetSets(key, dict)
 end
 Base.length(res::AssetSets) = 1
@@ -361,10 +361,10 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
-                @assert(!isnothing(asset1) &&
-                        !isnothing(asset2) &&
-                        length(asset1) == length(asset2),
-                        AssertionError("The following conditions must be met:\n`asset1` must not be `nothing` => !isnothing(asset1) = $(!isnothing(asset1))\n`asset2` must not be `nothing` => !isnothing(asset2) = $(!isnothing(asset2))\nlength(asset1) == length(asset2) => $(length(asset1)) == $(length(asset2))"))
+                @argcheck(!isnothing(asset1) &&
+                          !isnothing(asset2) &&
+                          length(asset1) == length(asset2),
+                          AssertionError("The following conditions must be met:\n`asset1` must not be `nothing` => !isnothing(asset1) = $(!isnothing(asset1))\n`asset2` must not be `nothing` => !isnothing(asset2) = $(!isnothing(asset2))\nlength(asset1) == length(asset2) => $(length(asset1)) == $(length(asset2))"))
                 push!(variables_tmp, "([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
                 push!(idx_rm, i)
@@ -397,10 +397,10 @@ function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::B
                 if isnothing(asset1) && isnothing(asset2)
                     continue
                 end
-                @assert(!isnothing(asset1) &&
-                        !isnothing(asset2) &&
-                        length(asset1) == length(asset2),
-                        AssertionError("The following conditions must be met:\n`asset1` must not be `nothing` => !isnothing(asset1) = $(!isnothing(asset1))\n`asset2` must not be `nothing` => !isnothing(asset2) = $(!isnothing(asset2))\nlength(asset1) == length(asset2) => $(length(asset1)) == $(length(asset2))"))
+                @argcheck(!isnothing(asset1) &&
+                          !isnothing(asset2) &&
+                          length(asset1) == length(asset2),
+                          AssertionError("The following conditions must be met:\n`asset1` must not be `nothing` => !isnothing(asset1) = $(!isnothing(asset1))\n`asset2` must not be `nothing` => !isnothing(asset2) = $(!isnothing(asset2))\nlength(asset1) == length(asset2) => $(length(asset1)) == $(length(asset2))"))
                 push!(variables_tmp,
                       "prior([$(join(asset1, ", "))], [$(join(asset2, ", "))])")
                 push!(coeffs_tmp, coeffs[i])
@@ -429,8 +429,8 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
                                 sets::AssetSets; datatype::DataType = Float64,
                                 strict::Bool = false)
     if isa(lcs, AbstractVector)
-        @assert(!isempty(lcs),
-                AssertionError("lcs must be non-empty:\n!isempty(lcs) => $(!isempty(lcs))"))
+        @argcheck(!isempty(lcs),
+                  AssertionError("lcs must be non-empty:\n!isempty(lcs) => $(!isempty(lcs))"))
     end
     A_ineq = Vector{datatype}(undef, 0)
     B_ineq = Vector{datatype}(undef, 0)
@@ -449,8 +449,8 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
             end
             At += Ai * c
         end
-        @assert(any(x -> !iszero(x), At),
-                DomainError("At least one entry in At must be non-zero:\nany(x -> !iszero(x), At) => $(any(x -> !iszero(x), At))"))
+        @argcheck(any(x -> !iszero(x), At),
+                  DomainError("At least one entry in At must be non-zero:\nany(x -> !iszero(x), At) => $(any(x -> !iszero(x), At))"))
         d = ifelse(lc.op == ">=", -1, 1)
         flag = d == -1 || lc.op == "<="
         A = At .* d
@@ -498,8 +498,8 @@ struct RiskBudgetResult{T1} <: AbstractResult
     val::T1
 end
 function RiskBudgetResult(; val::AbstractVector{<:Real})
-    @assert(!isempty(val) && all(x -> x >= zero(x), val),
-            AssertionError("`val` must be non-empty and all its entries must be non-negative:\n!isempty(val) => $(!isempty(val))\nall(x -> x >= zero(x), val) => $(all(x -> x >= zero(x), val))"))
+    @argcheck(!isempty(val) && all(x -> x >= zero(x), val),
+              AssertionError("`val` must be non-empty and all its entries must be non-negative:\n!isempty(val) => $(!isempty(val))\nall(x -> x >= zero(x), val) => $(all(x -> x >= zero(x), val))"))
     return RiskBudgetResult(val)
 end
 function risk_budget_view(::Nothing, args...)
@@ -531,17 +531,17 @@ function RiskBudgetEstimator(;
                              val::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
                                         <:AbstractVector{<:Union{<:Pair{<:Any, <:Real}}}})
     if isa(val, Union{<:AbstractDict, <:AbstractVector})
-        @assert(!isempty(val), AssertionError("`val` must be non-empty"))
+        @argcheck(!isempty(val), AssertionError("`val` must be non-empty"))
         if isa(val, AbstractDict)
-            @assert(all(x -> x >= zero(x), values(val)),
-                    DomainError("All entries of `val` must be non-negative"))
+            @argcheck(all(x -> x >= zero(x), values(val)),
+                      DomainError("All entries of `val` must be non-negative"))
         elseif isa(val, AbstractVector{<:Pair})
-            @assert(all(x -> x >= zero(x), getproperty.(val, :second)),
-                    DomainError("The numerical value of all entries of `val` must be non-negative"))
+            @argcheck(all(x -> x >= zero(x), getproperty.(val, :second)),
+                      DomainError("The numerical value of all entries of `val` must be non-negative"))
         end
     elseif isa(val, Pair)
-        @assert(val.second >= zero(val.second),
-                DomainError("The numerical value of `val` must be non-negative:\nval.second => $(val.second)"))
+        @argcheck(val.second >= zero(val.second),
+                  DomainError("The numerical value of `val` must be non-negative:\nval.second => $(val.second)"))
     end
     return RiskBudgetEstimator(val)
 end
@@ -554,10 +554,10 @@ function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
     return risk_budget_constraints(rb.val, sets; strict = strict, datatype = datatype)
 end
 function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
-    @assert(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
+    @argcheck(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
     all_sets = sets.dict[smtx]
-    @assert(length(sets.dict[sets.key]) == length(all_sets),
-            AssertionError("The following conditions must be met:\n`sets.dict` must contain key $smtx => haskey(sets.dict, smtx) = $(haskey(sets.dict, smtx))\nlengths of sets.dict[sets.key] and `all_sets` must be equal:\nlength(sets.dict[sets.key]) => length(sets.dict[$(sets.key)]) => $(length(sets.dict[sets.key]))\nlength(all_sets) => $(length(all_sets))"))
+    @argcheck(length(sets.dict[sets.key]) == length(all_sets),
+              AssertionError("The following conditions must be met:\n`sets.dict` must contain key $smtx => haskey(sets.dict, smtx) = $(haskey(sets.dict, smtx))\nlengths of sets.dict[sets.key] and `all_sets` must be equal:\nlength(sets.dict[sets.key]) => length(sets.dict[$(sets.key)]) => $(length(sets.dict[sets.key]))\nlength(all_sets) => $(length(all_sets))"))
     unique_sets = unique(all_sets)
     A = BitMatrix(undef, length(all_sets), length(unique_sets))
     for (i, val) in pairs(unique_sets)
@@ -579,7 +579,7 @@ function LinearConstraintEstimator(;
                                               <:AbstractVector{<:Union{<:AbstractString,
                                                                        Expr}}})
     if isa(val, Union{<:AbstractString, <:AbstractVector})
-        @assert(!isempty(val))
+        @argcheck(!isempty(val))
     end
     return LinearConstraintEstimator(val)
 end
@@ -604,7 +604,7 @@ struct AssetSetsMatrixEstimator{T1} <: AbstractEstimator
 end
 function AssetSetsMatrixEstimator(; val::Union{<:Symbol, <:AbstractString})
     if isa(val, AbstractString)
-        @assert(!isempty(val))
+        @argcheck(!isempty(val))
     end
     return AssetSetsMatrixEstimator(val)
 end

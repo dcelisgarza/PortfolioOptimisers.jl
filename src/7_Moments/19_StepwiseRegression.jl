@@ -52,7 +52,7 @@ PValue
   - [`StepwiseRegression`](@ref)
 """
 function PValue(; threshold::Real = 0.05)
-    @assert(zero(threshold) < threshold < one(threshold))
+    @argcheck(zero(threshold) < threshold < one(threshold))
     return PValue(threshold)
 end
 

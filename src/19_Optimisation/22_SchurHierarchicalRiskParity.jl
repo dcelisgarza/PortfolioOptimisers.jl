@@ -18,10 +18,10 @@ struct MonotonicSchur{T1, T2, T3, T4} <: SchurAlgorithm
 end
 function MonotonicSchur(; N::Integer = 10, tol::Real = 1e-4,
                         iter::Union{Nothing, Integer} = nothing, strict::Bool = false)
-    @assert(N > 0)
-    @assert(tol > 0)
+    @argcheck(N > 0)
+    @argcheck(tol > 0)
     if !isnothing(iter)
-        @assert(iter > 0)
+        @argcheck(iter > 0)
     end
     return MonotonicSchur(N, tol, iter, strict)
 end
@@ -34,7 +34,7 @@ end
 function SchurParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
                      gamma::Real = 0.5, alg::SchurAlgorithm = MonotonicSchur(),
                      flag::Bool = true)
-    @assert(one(gamma) >= gamma >= zero(gamma))
+    @argcheck(one(gamma) >= gamma >= zero(gamma))
     return SchurParams(r, gamma, alg, flag)
 end
 function schur_params_view(sp::SchurParams, i::AbstractVector, X::AbstractMatrix)
@@ -49,7 +49,7 @@ function SchurHierarchicalRiskParity(; opt::HierarchicalOptimiser = Hierarchical
                                      params::Union{<:SchurParams,
                                                    <:AbstractVector{<:SchurParams}} = SchurParams())
     if isa(params, AbstractVector)
-        @assert(!isempty(params))
+        @argcheck(!isempty(params))
     end
     return SchurHierarchicalRiskParity(opt, params)
 end
@@ -60,7 +60,7 @@ function opt_view(sh::SchurHierarchicalRiskParity, i::AbstractVector, X::Abstrac
     return SchurHierarchicalRiskParity(; opt = opt, params = params)
 end
 function symmetric_step_up_matrix(n1::Integer, n2::Integer)
-    @assert(abs(n1 - n2) <= 1)
+    @argcheck(abs(n1 - n2) <= 1)
     if n1 == n2
         return I(n1)
     elseif n1 < n2

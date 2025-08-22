@@ -20,7 +20,7 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8} <: BaseStackingOptimisationEstim
 end
 function assert_external_optimiser(opt::Stacking)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @assert(!isa(opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.pe, AbstractPriorResult))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
         assert_external_optimiser(opt.opti)
@@ -45,7 +45,7 @@ function Stacking(;
                   threads::FLoops.Transducers.Executor = ThreadedEx())
     assert_external_optimiser(opto)
     if isa(wb, WeightBoundsEstimator)
-        @assert(!isnothing(sets))
+        @argcheck(!isnothing(sets))
     end
     return Stacking(pe, wb, sets, opti, opto, cwf, strict, threads)
 end
@@ -71,7 +71,7 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
         res = optimise!(opt, rd; dims = dims, branchorder = branchorder,
                         str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?
-        @assert(!isa(res.retcode, AbstractVector))
+        @argcheck(!isa(res.retcode, AbstractVector))
         wi[:, i] = res.w
         resi[i] = res
     end

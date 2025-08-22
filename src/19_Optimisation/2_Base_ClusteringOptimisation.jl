@@ -9,7 +9,7 @@ struct IterativeWeightFiniliser{T1} <: WeightFinaliser
     iter::T1
 end
 function IterativeWeightFiniliser(; iter::Integer = 100)
-    @assert(iter > 0)
+    @argcheck(iter > 0)
     return IterativeWeightFiniliser(iter)
 end
 abstract type JuMPWeightFiniliserFormulation <: AbstractAlgorithm end
@@ -27,10 +27,10 @@ function JuMPWeightFiniliser(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                              sc::Real = 1.0, so::Real = 1.0,
                              alg::JuMPWeightFiniliserFormulation = RelativeErrorWeightFiniliser())
     if isa(slv, AbstractVector)
-        @assert(!isempty(slv))
+        @argcheck(!isempty(slv))
     end
-    @assert(sc > zero(sc))
-    @assert(so > zero(so))
+    @argcheck(sc > zero(sc))
+    @argcheck(so > zero(so))
     return JuMPWeightFiniliser(slv, sc, so, alg)
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,

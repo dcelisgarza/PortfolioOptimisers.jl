@@ -16,7 +16,7 @@ function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
                   alg::VarianceAlgorithm = SOCRiskExpr())
     if isa(sigma, AbstractMatrix)
-        @assert(!isempty(sigma))
+        @argcheck(!isempty(sigma))
         assert_matrix_issquare(sigma)
     end
     return Variance(settings, sigma, rc, alg)
@@ -30,8 +30,8 @@ function factory(r::Variance, prior::AbstractPriorResult, args...; kwargs...)
 end
 function risk_measure_view(r::Variance, i::AbstractVector, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
-    @assert(!isa(r.rc, LinearConstraint),
-            "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
+    @argcheck(!isa(r.rc, LinearConstraint),
+              "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
     return Variance(; settings = r.settings, sigma = sigma, rc = r.rc, alg = r.alg)
 end
 struct StandardDeviation{T1, T2} <: SigmaRiskMeasure
@@ -41,7 +41,7 @@ end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                            sigma::Union{Nothing, <:AbstractMatrix} = nothing)
     if isa(sigma, AbstractMatrix)
-        @assert(!isempty(sigma))
+        @argcheck(!isempty(sigma))
         assert_matrix_issquare(sigma)
     end
     return StandardDeviation(settings, sigma)
@@ -67,7 +67,7 @@ function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSet
                                            <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(;),
                                 sigma::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing)
     if isa(sigma, AbstractMatrix)
-        @assert(!isempty(sigma))
+        @argcheck(!isempty(sigma))
     end
     return UncertaintySetVariance(settings, ucs, sigma)
 end

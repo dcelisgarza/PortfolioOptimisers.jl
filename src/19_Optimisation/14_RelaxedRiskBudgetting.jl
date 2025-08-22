@@ -5,7 +5,7 @@ struct RegularisedPenalisedRelaxedRiskBudgetting{T1} <: RelaxedRiskBudgettingAlg
     p::T1
 end
 function RegularisedPenalisedRelaxedRiskBudgetting(; p::Real = 1.0)
-    @assert(isfinite(p) && p > zero(p))
+    @argcheck(isfinite(p) && p > zero(p))
     return RegularisedPenalisedRelaxedRiskBudgetting(p)
 end
 struct RelaxedRiskBudgetting{T1, T2, T3, T4} <: JuMPOptimisationEstimator
@@ -20,7 +20,7 @@ function RelaxedRiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
                                wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                alg::RelaxedRiskBudgettingAlgorithm = BasicRelaxedRiskBudgetting())
     if isa(wi, AbstractVector)
-        @assert(!isempty(wi))
+        @argcheck(!isempty(wi))
     end
     return RelaxedRiskBudgetting(opt, rkb, wi, alg)
 end

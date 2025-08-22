@@ -18,7 +18,7 @@ struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
     kwargs::T2
 end
 function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
-    @assert(kind in 0:2, DomainError("`kind` must be in (0:2):\nkind => $kind"))
+    @argcheck(kind in 0:2, DomainError("`kind` must be in (0:2):\nkind => $kind"))
     return DegreeCentrality(kind, kwargs)
 end
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
@@ -34,8 +34,8 @@ struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
     epsilon::T3
 end
 function Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
-    @assert(n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
-            DomainError("The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon"))
+    @argcheck(n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
+              DomainError("The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon"))
     return Pagerank(n, alpha, epsilon)
 end
 struct RadialityCentrality <: AbstractCentralityAlgorithm end

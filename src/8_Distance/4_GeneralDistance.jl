@@ -70,7 +70,7 @@ GeneralDistance
 """
 function GeneralDistance(; power::Integer = 1,
                          alg::AbstractDistanceAlgorithm = SimpleDistance())
-    @assert(power >= one(power))
+    @argcheck(power >= one(power))
     return GeneralDistance(power, alg)
 end
 
@@ -537,7 +537,7 @@ This method computes the VI distance matrix for the input data matrix `X` using 
 """
 function distance(de::GeneralDistance{<:Any, <:VariationInfoDistance}, ::Any,
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -578,7 +578,7 @@ This method computes the correlation matrix from the data matrix `X` using the p
 function cor_and_dist(de::GeneralDistance{<:Any, <:VariationInfoDistance},
                       ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                       kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     if dims == 2
         X = transpose(X)

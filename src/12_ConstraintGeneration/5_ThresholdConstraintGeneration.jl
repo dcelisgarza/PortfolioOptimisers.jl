@@ -4,7 +4,7 @@ end
 function BuyInThresholdEstimator(;
                                  val::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
                                             <:AbstractVector{<:Pair{<:Any, <:Real}}})
-    @assert(!isempty(val))
+    @argcheck(!isempty(val))
     return BuyInThresholdEstimator(val)
 end
 struct BuyInThreshold{T1} <: AbstractResult
@@ -12,9 +12,9 @@ struct BuyInThreshold{T1} <: AbstractResult
 end
 function BuyInThreshold(; val::Union{<:Real, <:AbstractVector{<:Real}})
     if isa(val, Real)
-        @assert(isfinite(val) && val >= zero(val))
+        @argcheck(isfinite(val) && val >= zero(val))
     elseif isa(val, AbstractVector)
-        @assert(all(x -> (isfinite(x) && x >= 0), val))
+        @argcheck(all(x -> (isfinite(x) && x >= 0), val))
     end
     return BuyInThreshold(val)
 end

@@ -24,7 +24,7 @@ function opt_view(opt::InverseVolatility, i::AbstractVector, args...)
 end
 function assert_external_optimiser(opt::InverseVolatility)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @assert(!isa(opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.pe, AbstractPriorResult))
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -36,8 +36,8 @@ function optimise!(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
 end
 struct EqualWeighted <: NaiveOptimisationEstimator end
 function optimise!(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
-    @assert(!isnothing(rd.X))
-    @assert(dims in (1, 2))
+    @argcheck(!isnothing(rd.X))
+    @argcheck(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
     N = size(rd.X, dims)
     return NaiveOptimisation(typeof(ew), nothing,
@@ -51,8 +51,8 @@ function RandomWeights(; rng::Union{Nothing, <:AbstractRNG} = nothing)
     return RandomWeights(rng)
 end
 function optimise!(rw::RandomWeights, rd::ReturnsResult; dims::Int = 1, kwargs...)
-    @assert(!isnothing(rd.X))
-    @assert(dims in (1, 2))
+    @argcheck(!isnothing(rd.X))
+    @argcheck(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
     N = size(rd.X, dims)
     w = isnothing(rw.rng) ? rand(Dirichlet(N, 1)) : rand(rw.rng, Dirichlet(N, 1))

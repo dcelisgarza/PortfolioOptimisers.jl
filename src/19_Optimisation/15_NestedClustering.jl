@@ -21,7 +21,7 @@ struct NestedClustering{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     threads::T9
 end
 function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
-    @assert(!isa(opt.opt.cle, AbstractClusteringResult))
+    @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
     return nothing
 end
 function assert_rc_variance(::Any)
@@ -30,29 +30,29 @@ end
 function assert_rc_variance(opt::Union{<:MeanRisk, <:FactorRiskContribution,
                                        <:NearOptimalCentering, <:RiskBudgetting})
     if isa(opt.r, Variance)
-        @assert(!isa(opt.r.rc, LinearConstraint),
-                "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
+        @argcheck(!isa(opt.r.rc, LinearConstraint),
+                  "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
     elseif isa(opt.r, AbstractVector) && any(x -> isa(x, Variance), opt.r)
         idx = findall(x -> isa(x, Variance), opt.r)
-        @assert(!any(x -> isa(x.rc, LinearConstraint), view(opt.r, idx)),
-                "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
+        @argcheck(!any(x -> isa(x.rc, LinearConstraint), view(opt.r, idx)),
+                  "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
     end
     return nothing
 end
 function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     assert_rc_variance(opt)
-    @assert(!isa(opt.opt.lcs, LinearConstraint))
-    @assert(!isa(opt.opt.lcm, LinearConstraint))
-    @assert(!isa(opt.opt.cent, LinearConstraint))
-    @assert(!isa(opt.opt.gcard, LinearConstraint))
-    @assert(!isa(opt.opt.sgcard, LinearConstraint))
-    # @assert(!isa(opt.opt.smtx, AbstractMatrix))
-    @assert(!isa(opt.opt.nplg, PhilogenyResult))
-    @assert(!isa(opt.opt.cplg, PhilogenyResult))
+    @argcheck(!isa(opt.opt.lcs, LinearConstraint))
+    @argcheck(!isa(opt.opt.lcm, LinearConstraint))
+    @argcheck(!isa(opt.opt.cent, LinearConstraint))
+    @argcheck(!isa(opt.opt.gcard, LinearConstraint))
+    @argcheck(!isa(opt.opt.sgcard, LinearConstraint))
+    # @argcheck(!isa(opt.opt.smtx, AbstractMatrix))
+    @argcheck(!isa(opt.opt.nplg, PhilogenyResult))
+    @argcheck(!isa(opt.opt.cplg, PhilogenyResult))
     return nothing
 end
 function assert_internal_optimiser(opt::NestedClustering)
-    @assert(!isa(opt.cle, AbstractClusteringResult))
+    @argcheck(!isa(opt.cle, AbstractClusteringResult))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
         assert_internal_optimiser(opt.opti)
@@ -66,21 +66,21 @@ function assert_internal_optimiser(opt::AbstractVector{<:Union{<:OptimisationEst
 end
 function assert_external_optimiser(opt::ClusteringOptimisationEstimator)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @assert(!isa(opt.opt.pe, AbstractPriorResult))
-    @assert(!isa(opt.opt.cle, AbstractClusteringResult))
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
     assert_internal_optimiser(opt)
     return nothing
 end
 function assert_external_optimiser(opt::JuMPOptimisationEstimator)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @assert(!isa(opt.opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
     assert_internal_optimiser(opt)
     return nothing
 end
 function assert_external_optimiser(opt::NestedClustering)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @assert(!isa(opt.pe, AbstractPriorResult))
-    @assert(!isa(opt.cle, AbstractClusteringResult))
+    @argcheck(!isa(opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.cle, AbstractClusteringResult))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
         assert_external_optimiser(opt.opti)
@@ -106,7 +106,7 @@ function NestedClustering(;
         assert_internal_optimiser(opti)
     end
     if isa(wb, WeightBoundsEstimator)
-        @assert(!isnothing(sets))
+        @argcheck(!isnothing(sets))
     end
     return NestedClustering(pe, cle, wb, sets, opti, opto, cwf, strict, threads)
 end
@@ -170,7 +170,7 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
             res = optimise!(optic, rdc; dims = dims, branchorder = branchorder,
                             str_names = str_names, save = save, kwargs...)
             #! Support efficient frontier?
-            @assert(!isa(res.retcode, AbstractVector))
+            @argcheck(!isa(res.retcode, AbstractVector))
             wi[cl, i] = res.w
             resi[i] = res
         end

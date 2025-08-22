@@ -80,7 +80,7 @@ LTDCovariance
 function LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                        alpha::Real = 0.05,
                        threads::FLoops.Transducers.Executor = ThreadedEx())
-    @assert(zero(alpha) < alpha < one(alpha))
+    @argcheck(zero(alpha) < alpha < one(alpha))
     return LTDCovariance(ve, alpha, threads)
 end
 
@@ -168,7 +168,7 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
   - [`lower_tail_dependence`](@ref)
 """
 function Statistics.cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -202,7 +202,7 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
   - [`lower_tail_dependence`](@ref)
 """
 function Statistics.cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end

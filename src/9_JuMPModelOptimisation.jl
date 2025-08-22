@@ -90,7 +90,7 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
                 settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}} = nothing,
                 check_sol::NamedTuple = (;), add_bridges::Bool = true)
     if isa(settings, Union{<:AbstractDict, <:AbstractVector})
-        @assert(!isempty(settings), AssertionError("`settings` must be non-empty."))
+        @argcheck(!isempty(settings), AssertionError("`settings` must be non-empty."))
     end
     return Solver(name, solver, settings, check_sol, add_bridges)
 end

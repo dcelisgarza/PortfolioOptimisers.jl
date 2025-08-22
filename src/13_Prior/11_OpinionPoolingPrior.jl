@@ -20,14 +20,14 @@ function OpinionPoolingPrior(;
                              w::Union{Nothing, <:AbstractVector} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
                              threads::FLoops.Transducers.Executor = ThreadedEx())
-    @assert(!isempty(pes))
+    @argcheck(!isempty(pes))
     if !isnothing(p)
-        @assert(p >= zero(p))
+        @argcheck(p >= zero(p))
     end
     if isa(w, AbstractVector)
-        @assert(!isempty(w) && length(w) == length(pes))
-        @assert(all(x -> zero(x) <= x <= one(x), w))
-        @assert(sum(w) <= one(eltype(w)))
+        @argcheck(!isempty(w) && length(w) == length(pes))
+        @argcheck(all(x -> zero(x) <= x <= one(x), w))
+        @argcheck(sum(w) <= one(eltype(w)))
     end
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)
 end
@@ -53,7 +53,7 @@ end
 function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
@@ -75,7 +75,7 @@ function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
     let X = X, F = F, pw = pw
         @floop pe.threads for (i, pe) in enumerate(pe.pes)
             pr = prior(pe, X, F; strict = strict, kwargs...)
-            @assert(!isnothing(pr.w))
+            @argcheck(!isnothing(pr.w))
             pw[:, i] = pr.w
         end
     end

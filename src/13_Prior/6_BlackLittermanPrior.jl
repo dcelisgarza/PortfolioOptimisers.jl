@@ -27,11 +27,11 @@ function BlackLittermanPrior(;
                              views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                              rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
     if isa(views, LinearConstraintEstimator)
-        @assert(!isnothing(sets))
+        @argcheck(!isnothing(sets))
     end
     assert_bl_views_conf(views_conf, views)
     if !isnothing(tau)
-        @assert(tau > zero(tau))
+        @argcheck(tau > zero(tau))
     end
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
@@ -64,14 +64,14 @@ end
 function prior(pe::BlackLittermanPrior, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
             F = transpose(F)
         end
     end
-    @assert(length(pe.sets.dict[pe.sets.key]) == size(X, 2))
+    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(X, 2))
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
     (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),

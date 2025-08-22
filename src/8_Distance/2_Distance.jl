@@ -471,7 +471,7 @@ This method computes the VI distance matrix for the input data matrix `X` using 
 """
 function distance(de::Distance{<:VariationInfoDistance}, ::Any, X::AbstractMatrix;
                   dims::Int = 1, kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
@@ -512,7 +512,7 @@ This method returns a tuple containing the correlation matrix and the correspond
 function cor_and_dist(de::Distance{<:VariationInfoDistance},
                       ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                       kwargs...)
-    @assert(dims in (1, 2))
+    @argcheck(dims in (1, 2))
     rho = cor(ce, X; dims = dims, kwargs...)
     if dims == 2
         X = transpose(X)

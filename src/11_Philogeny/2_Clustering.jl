@@ -11,8 +11,8 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
 end
 function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
                                 D::AbstractMatrix, k::Integer)
-    @assert(!isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
-            AssertionError("The following conditions must hold:\n`S` must be non-empty => $(!isempty(S))\n`D` must be non-empty => $(!isempty(D))\n`S` and `D` must have the same size => $(size(S) == size(D))\nk must be greater than or equal to 1 => $k"))
+    @argcheck(!isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
+              AssertionError("The following conditions must hold:\n`S` must be non-empty => $(!isempty(S))\n`D` must be non-empty => $(!isempty(D))\n`S` and `D` must have the same size => $(size(S) == size(D))\nk must be greater than or equal to 1 => $k"))
     return HierarchicalClustering(clustering, S, D, k)
 end
 function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
@@ -23,7 +23,7 @@ struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm
     k::T1
 end
 function PredefinedNumberClusters(; k::Integer = 1)
-    @assert(k >= one(k), DomainError("`k` must be greater than or equal to 1:\nk => $k"))
+    @argcheck(k >= one(k), DomainError("`k` must be greater than or equal to 1:\nk => $k"))
     return PredefinedNumberClusters(k)
 end
 struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
@@ -40,8 +40,8 @@ end
 function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
                                alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
     if !isnothing(max_k)
-        @assert(max_k >= one(max_k),
-                DomainError("`max_k` must be greater than or equal to 1:\nmax_k => $max_k"))
+        @argcheck(max_k >= one(max_k),
+                  DomainError("`max_k` must be greater than or equal to 1:\nmax_k => $max_k"))
     end
     return OptimalNumberClusters(max_k, alg)
 end
