@@ -65,17 +65,20 @@ function assert_internal_optimiser(opt::AbstractVector{<:Union{<:OptimisationEst
     return nothing
 end
 function assert_external_optimiser(opt::ClusteringOptimisationEstimator)
+    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @assert(!isa(opt.opt.pe, AbstractPriorResult))
     @assert(!isa(opt.opt.cle, AbstractClusteringResult))
     assert_internal_optimiser(opt)
     return nothing
 end
 function assert_external_optimiser(opt::JuMPOptimisationEstimator)
+    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @assert(!isa(opt.opt.pe, AbstractPriorResult))
     assert_internal_optimiser(opt)
     return nothing
 end
 function assert_external_optimiser(opt::NestedClustering)
+    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @assert(!isa(opt.pe, AbstractPriorResult))
     @assert(!isa(opt.cle, AbstractClusteringResult))
     assert_external_optimiser(opt.opto)
@@ -93,12 +96,8 @@ function NestedClustering(;
                           pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
                           cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult} = ClusteringEstimator(),
                           wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
-                          sets::Union{Nothing, <:AssetSets,
-                                      #! Start: to delete
-                                      <:DataFrame
-                                      #! End: to delete
-                                      } = nothing, opti::OptimisationEstimator,
-                          opto::OptimisationEstimator = opti,
+                          sets::Union{Nothing, <:AssetSets} = nothing,
+                          opti::OptimisationEstimator, opto::OptimisationEstimator,
                           cwf::WeightFinaliser = IterativeWeightFiniliser(),
                           strict::Bool = false,
                           threads::FLoops.Transducers.Executor = ThreadedEx())
@@ -124,11 +123,8 @@ function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
 end
 function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsEstimator,
                                                <:WeightBounds},
-                                     sets::Union{Nothing, <:AssetSets,
-                                                 #! Start: to delete
-                                                 <:DataFrame
-                                                 #! End: to delete
-                                                 }, cwf::WeightFinaliser, strict::Bool,
+                                     sets::Union{Nothing, <:AssetSets},
+                                     cwf::WeightFinaliser, strict::Bool,
                                      resi::AbstractVector{<:OptimisationResult},
                                      res::OptimisationResult, w::AbstractVector;
                                      datatype::DataType = Float64)

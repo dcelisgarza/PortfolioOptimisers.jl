@@ -25,11 +25,7 @@ function HierarchicalOptimiser(;
                                slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
                                fees::Union{Nothing, <:FeesEstimator, <:Fees} = nothing,
                                wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = WeightBounds(),
-                               sets::Union{Nothing, <:AssetSets,
-                                           #! Start: to delete
-                                           <:DataFrame
-                                           #! End: to delete
-                                           } = nothing,
+                               sets::Union{Nothing, <:AssetSets} = nothing,
                                cwf::WeightFinaliser = IterativeWeightFiniliser(),
                                strict::Bool = false)
     if isa(wb, WeightBoundsEstimator)

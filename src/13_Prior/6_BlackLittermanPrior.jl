@@ -23,13 +23,12 @@ function BlackLittermanPrior(;
                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                              views::Union{<:LinearConstraintEstimator,
                                           <:BlackLittermanViews},
-                             sets::Union{<:AssetSets,
-                                         #! Start: to delete
-                                         <:DataFrame
-                                         #! End: to delete
-                                         } = DataFrame(),
+                             sets::Union{Nothing, <:AssetSets} = nothing,
                              views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                              rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
+    if isa(views, LinearConstraintEstimator)
+        @assert(!isnothing(sets))
+    end
     assert_bl_views_conf(views_conf, views)
     if !isnothing(tau)
         @assert(tau > zero(tau))

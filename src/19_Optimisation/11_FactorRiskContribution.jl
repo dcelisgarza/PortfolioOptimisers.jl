@@ -18,11 +18,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                             <:SemiDefinitePhilogeny} = nothing,
                                 cplg::Union{Nothing, <:SemiDefinitePhilogenyEstimator,
                                             <:SemiDefinitePhilogeny} = nothing,
-                                sets::Union{Nothing, <:AssetSets,
-                                            #! Start: to delete
-                                            <:DataFrame
-                                            #! Start: to delete
-                                            } = nothing,
+                                sets::Union{Nothing, <:AssetSets} = nothing,
                                 wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                 flag::Bool = true)
     if isa(r, AbstractVector)

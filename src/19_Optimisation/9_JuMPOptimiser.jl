@@ -167,11 +167,7 @@ function JuMPOptimiser(;
                        sgst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
                                    <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                             <:BuyInThresholdEstimator}}} = nothing,
-                       sets::Union{Nothing, <:AssetSets,
-                                   #! Start: to delete
-                                   <:DataFrame
-                                   #! End: to delete
-                                   } = nothing,
+                       sets::Union{Nothing, <:AssetSets} = nothing,
                        nplg::Union{Nothing, <:PhilogenyEstimator, <:PhilogenyResult} = nothing,
                        cplg::Union{Nothing, <:PhilogenyEstimator, <:PhilogenyResult} = nothing,
                        tn::Union{Nothing, <:TurnoverEstimator, <:Turnover,

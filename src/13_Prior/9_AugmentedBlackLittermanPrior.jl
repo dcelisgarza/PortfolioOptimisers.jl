@@ -26,16 +26,8 @@ function AugmentedBlackLittermanPrior(;
                                                      <:BlackLittermanViews},
                                       f_views::Union{<:LinearConstraintEstimator,
                                                      <:BlackLittermanViews},
-                                      a_sets::Union{<:AssetSets,
-                                                    #! Start: to delete
-                                                    <:DataFrame
-                                                    #! End: to delete
-                                                    } = DataFrame(),
-                                      f_sets::Union{<:AssetSets,
-                                                    #! Start: to delete
-                                                    <:DataFrame
-                                                    #! End: to delete
-                                                    } = DataFrame(),
+                                      a_sets::Union{Nothing, <:AssetSets} = nothing,
+                                      f_sets::Union{Nothing, <:AssetSets} = nothing,
                                       a_views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                       f_views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                       w::Union{Nothing, <:AbstractVector} = nothing,
@@ -43,6 +35,12 @@ function AugmentedBlackLittermanPrior(;
                                       tau::Union{Nothing, <:Real} = nothing)
     if isa(w, AbstractVector)
         @assert(!isempty(w))
+    end
+    if isa(a_views, LinearConstraintEstimator)
+        @assert(!isnothing(a_sets))
+    end
+    if isa(f_views, LinearConstraintEstimator)
+        @assert(!isnothing(f_sets))
     end
     assert_bl_views_conf(a_views_conf, a_views)
     assert_bl_views_conf(f_views_conf, f_views)

@@ -22,15 +22,14 @@ function FactorBlackLittermanPrior(;
                                    ve::AbstractVarianceEstimator = SimpleVariance(),
                                    views::Union{<:LinearConstraintEstimator,
                                                 <:BlackLittermanViews},
-                                   sets::Union{<:AssetSets,
-                                               #! Start: to delete
-                                               <:DataFrame
-                                               #! End: to delete
-                                               } = DataFrame(),
+                                   sets::Union{Nothing, <:AssetSets} = nothing,
                                    views_conf::Union{Nothing, <:AbstractVector} = nothing,
                                    w::Union{Nothing, <:AbstractWeights} = nothing,
                                    rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
                                    tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)
+    if isa(views, LinearConstraintEstimator)
+        @assert(!isnothing(sets))
+    end
     assert_bl_views_conf(views_conf, views)
     if !isnothing(tau)
         @assert(tau > zero(tau))

@@ -19,6 +19,7 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8} <: BaseStackingOptimisationEstim
     threads::T8
 end
 function assert_external_optimiser(opt::Stacking)
+    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @assert(!isa(opt.pe, AbstractPriorResult))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
@@ -36,11 +37,7 @@ end
 function Stacking(;
                   pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
                   wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
-                  sets::Union{Nothing, <:AssetSets,
-                              #! Start: to delete
-                              <:DataFrame
-                              #! End: to delete
-                              } = nothing,
+                  sets::Union{Nothing, <:AssetSets} = nothing,
                   opti::AbstractVector{<:Union{<:OptimisationEstimator,
                                                <:OptimisationResult}},
                   opto::OptimisationEstimator,
