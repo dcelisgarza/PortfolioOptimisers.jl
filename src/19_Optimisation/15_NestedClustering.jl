@@ -24,7 +24,23 @@ function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
     @assert(!isa(opt.opt.cle, AbstractClusteringResult))
     return nothing
 end
+function assert_rc_variance(::Any)
+    return nothing
+end
+function assert_rc_variance(opt::Union{<:MeanRisk, <:FactorRiskContribution,
+                                       <:NearOptimalCentering, <:RiskBudgetting})
+    if isa(opt.r, Variance)
+        @assert(!isa(opt.r.rc, LinearConstraint),
+                "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
+    elseif isa(opt.r, AbstractVector) && any(x -> isa(x, Variance), opt.r)
+        idx = findall(x -> isa(x, Variance), opt.r)
+        @assert(!any(x -> isa(x.rc, LinearConstraint), view(opt.r, idx)),
+                "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
+    end
+    return nothing
+end
 function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
+    assert_rc_variance(opt)
     @assert(!isa(opt.opt.lcs, LinearConstraint))
     @assert(!isa(opt.opt.lcm, LinearConstraint))
     @assert(!isa(opt.opt.cent, LinearConstraint))

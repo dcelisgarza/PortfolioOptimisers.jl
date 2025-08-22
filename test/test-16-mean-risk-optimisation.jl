@@ -25,10 +25,10 @@
                                      timestamp = :Date)[(end - 252):end])
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
-                  settings = Dict("verbose" => false)),
+                  settings = "verbose" => false),
            Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
-                  settings = Dict("verbose" => false, "max_step_fraction" => 0.95)),
+                  settings = ["verbose" => false, "max_step_fraction" => 0.95]),
            Solver(; name = :clarabel3, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
                   settings = Dict("verbose" => false, "max_step_fraction" => 0.9)),

@@ -153,7 +153,7 @@ function AssetSets(; key::Union{Symbol, <:AbstractString} = "nx",
 end
 Base.length(res::AssetSets) = 1
 Base.iterate(res::AssetSets, state = 1) = state > 1 ? nothing : (res, state + 1)
-function asset_sets_view(sets::AssetSets, i::AbstractVector)
+function nothing_asset_sets_view(sets::AssetSets, i::AbstractVector)
     dict = Dict(k => v for (k, v) in sets.dict if k != sets.key)
     dict[sets.key] = view(sets.dict[sets.key], i)
     return AssetSets(; key = sets.key, dict = dict)

@@ -318,9 +318,6 @@ function opt_view(opt::JuMPOptimiser, i::AbstractVector, X::AbstractMatrix)
     bgt = budget_view(opt.bgt, i)
     lt = threshold_view(opt.lt, i)
     st = threshold_view(opt.st, i)
-    # lcs = linear_constraint_view(opt.lcs, i)
-    # gcard = linear_constraint_view(opt.gcard, i)
-    # sgcard = linear_constraint_view(opt.sgcard, i)
     if opt.smtx === opt.sgmtx
         smtx = sgmtx = asset_sets_matrix_view(opt.smtx, i)
     else

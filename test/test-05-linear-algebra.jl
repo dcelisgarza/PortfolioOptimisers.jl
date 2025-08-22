@@ -45,12 +45,17 @@
         sigma1 = cov(X)
         sigma2 = copy(sigma1)
         sigma3 = copy(sigma1)
+        sigma4 = posdef(Posdef(), sigma1)
+
         posdef!(Posdef(), sigma1)
         @test isposdef(sigma1)
+        @test sigma4 == sigma1
 
         posdef!(nothing, sigma2)
         @test !isposdef(sigma2)
         @test isapprox(sigma2, sigma3)
+
+        @test isnothing(posdef(nothing))
     end
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
@@ -71,6 +76,11 @@
             end
             @test success
         end
+        @test isnothing(denoise(nothing))
+        sigma1 = copy(pr.sigma)
+        sigma2 = denoise(des[2], sigma1, q, Posdef())
+        denoise!(des[2], sigma1, q, Posdef())
+        @test sigma1 == sigma2
     end
     @testset "Detone" begin
         des = [nothing, Detone(), Detone(; n = 3)]
@@ -85,5 +95,22 @@
             end
             @test success
         end
+        @test isnothing(detone(nothing))
+        sigma1 = copy(pr.sigma)
+        sigma2 = detone(des[2], sigma1, Posdef())
+        detone!(des[2], sigma1, Posdef())
+        @test sigma1 == sigma2
+    end
+    @testset "Matrix processing" begin
+        @test isnothing(matrix_processing!(nothing))
+        @test isnothing(matrix_processing(nothing))
+        @test isnothing(PortfolioOptimisers.matrix_processing_algorithm(nothing))
+        sigma1 = copy(pr.sigma)
+        sigma2 = copy(pr.sigma)
+        sigma3 = copy(pr.sigma)
+        sigma4 = matrix_processing(DefaultMatrixProcessing(), sigma1, pr.X)
+        sigma5 = matrix_processing(NonPositiveDefiniteMatrixProcessing(), sigma1, pr.X)
+        sigma4 == matrix_processing!(DefaultMatrixProcessing(), sigma2, pr.X)
+        sigma5 == matrix_processing!(NonPositiveDefiniteMatrixProcessing(), sigma3, pr.X)
     end
 end
