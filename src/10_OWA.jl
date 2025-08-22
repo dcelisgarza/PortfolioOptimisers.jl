@@ -1,15 +1,171 @@
+"""
+    abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
+
+Abstract supertype for all Ordered Weights Array (OWA) estimator types in PortfolioOptimisers.jl.
+
+All concrete types implementing OWA estimation algorithms should subtype `AbstractOrderedWeightsArrayEstimator`. This enables a consistent interface for OWA-based estimators throughout the package.
+
+# Related
+
+  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`OWAJuMP`](@ref)
+  - [`NormalisedConstantRelativeRiskAversion`](@ref)
+"""
 abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
+
+"""
+    abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
+
+Abstract supertype for all Ordered Weights Array (OWA) algorithm types in PortfolioOptimisers.jl.
+
+All concrete types implementing specific OWA algorithms should subtype `AbstractOrderedWeightsArrayAlgorithm`. This enables flexible extension and dispatch of OWA routines.
+
+# Related
+
+  - [`MaximumEntropy`](@ref)
+  - [`MinimumSquareDistance`](@ref)
+  - [`MinimumSumSquares`](@ref)
+"""
 abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
+
+"""
+    struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
+
+Represents the Maximum Entropy algorithm for Ordered Weights Array (OWA) estimation.
+
+The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resulting in the most "uninformative" or uniform distribution of weights subject to the imposed constraints. This is often used as a default or reference OWA weighting scheme.
+
+# Related
+
+  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`OWAJuMP`](@ref)
+"""
 struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
+
+"""
+    struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
+
+Represents the Minimum Square Distance algorithm for Ordered Weights Array (OWA) estimation.
+
+The Minimum Square Distance algorithm finds OWA weights that minimize the squared distance from a target or reference vector, subject to the OWA constraints. This approach is useful for regularizing OWA weights towards a desired profile.
+
+# Related
+
+  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`OWAJuMP`](@ref)
+"""
 struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
+
+"""
+    struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
+
+Represents the Minimum Sum of Squares algorithm for Ordered Weights Array (OWA) estimation.
+
+The Minimum Sum of Squares algorithm minimizes the sum of squared OWA weights, promoting sparsity or concentration in the resulting weights. This can be used to emphasize extreme order statistics in OWA-based risk measures.
+
+# Related
+
+  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`OWAJuMP`](@ref)
+"""
 struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
+
+"""
+    struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
+        g::T1
+    end
+
+Estimator type for normalised constant relative risk aversion (CRRA) OWA weights.
+
+This struct represents an estimator for Ordered Weights Array (OWA) weights based on a normalised constant relative risk aversion parameter `g`. The CRRA approach generates OWA weights that interpolate between risk-neutral and risk-averse profiles, controlled by the parameter `g`.
+
+# Fields
+
+  - `g::Real`: Risk aversion parameter, must satisfy `0 < g < 1`.
+
+# Constructor
+
+    NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
+
+# Related
+
+  - [`AbstractOrderedWeightsArrayEstimator`](@ref)
+  - [`owa_l_moment_crm`](@ref)
+"""
 struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
     g::T1
 end
+"""
+    NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
+
+Construct a [`NormalisedConstantRelativeRiskAversion`](@ref) estimator for OWA weights.
+
+Creates an estimator using the specified risk aversion parameter `g`, which must be in the open interval `(0, 1)`. The resulting estimator can be used with OWA-based risk measures and moment calculations.
+
+# Arguments
+
+  - `g::Real=0.5`: Risk aversion parameter.
+
+# Returns
+
+  - `NormalisedConstantRelativeRiskAversion`: Configured estimator.
+
+# Validation
+
+  - Asserts that `0 < g < 1`.
+
+# Examples
+
+```jldoctest
+julia> NormalisedConstantRelativeRiskAversion()
+NormalisedConstantRelativeRiskAversion
+  g | Float64: 0.5
+```
+
+# Related
+
+  - [`NormalisedConstantRelativeRiskAversion`](@ref)
+  - [`owa_l_moment_crm`](@ref)
+"""
 function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
     @assert(zero(g) < g < one(g), DomainError("`g` must be in (0, 1):\ng => $g"))
     return NormalisedConstantRelativeRiskAversion(g)
 end
+
+"""
+    struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
+        slv::T1
+        max_phi::T2
+        sc::T3
+        so::T4
+        alg::T5
+    end
+
+Estimator type for OWA weights using JuMP-based optimization.
+
+`OWAJuMP` encapsulates all configuration required to estimate OWA weights via mathematical programming using JuMP. It supports multiple algorithms and solver backends, and allows fine control over constraints and scaling.
+
+# Fields
+
+  - `slv`: Solver or vector of solvers to use.
+  - `max_phi::Real`: Maximum allowed value for any OWA weight.
+  - `sc::Real`: Scaling parameter for constraints.
+  - `so::Real`: Scaling parameter for the objective.
+  - `alg::AbstractOrderedWeightsArrayAlgorithm`: Algorithm for OWA weight estimation.
+
+# Constructor
+
+    OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
+             max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
+             alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+
+# Related
+
+  - [`AbstractOrderedWeightsArrayEstimator`](@ref)
+  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`owa_l_moment_crm`](@ref)
+  - [`Solver`](@ref)
+"""
 struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
     slv::T1
     max_phi::T2
@@ -17,6 +173,56 @@ struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
     so::T4
     alg::T5
 end
+"""
+    OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
+             max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
+             alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+
+Construct a [`OWAJuMP`](@ref) estimator for OWA weights using JuMP-based optimization.
+
+Creates an estimator with the specified solver(s), maximum OWA weight, constraint/objective scaling, and OWA algorithm. This estimator can be used for flexible OWA weight estimation in portfolio optimization workflows.
+
+# Arguments
+
+  - `slv::Union{<:Solver, <:AbstractVector{<:Solver}}`: Solver or vector of solvers to use.
+  - `max_phi::Real`: Maximum allowed value for any OWA weight.
+  - `sc::Real`: Scaling parameter for constraints.
+  - `so::Real`: Scaling parameter for the objective.
+  - `alg::AbstractOrderedWeightsArrayAlgorithm`: Algorithm for OWA weight estimation.
+
+# Returns
+
+  - `OWAJuMP`: Configured estimator.
+
+# Validation
+
+  - Asserts that `slv` is non-empty if a vector.
+  - Asserts that `0 < max_phi < 1`.
+  - Asserts that `sc` and `so` are positive and finite.
+
+# Examples
+
+```jldoctest
+julia> OWAJuMP()
+OWAJuMP
+      slv | Solver
+          |          name | String: ""
+          |        solver | nothing
+          |      settings | nothing
+          |     check_sol | @NamedTuple{}: NamedTuple()
+          |   add_bridges | Bool: true
+  max_phi | Float64: 0.5
+       sc | Float64: 1.0
+       so | Float64: 1.0
+      alg | MaximumEntropy()
+```
+
+# Related
+
+  - [`OWAJuMP`](@ref)
+  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`owa_l_moment_crm`](@ref)
+"""
 function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
                  max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
                  alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
@@ -31,7 +237,57 @@ function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
             AssertionError("The following conditions must hold:\n`max_phi` in (0, 1) => $max_phi\nisfinite(sc) && sc > 0 => $sc\nisfinite(so) && so > 0 => $so"))
     return OWAJuMP(slv, max_phi, sc, so, alg)
 end
-function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real)
+
+"""
+    ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real = 0.5)
+
+Compute normalised constant relative risk aversion (CRRA) Ordered Weights Array (OWA) weights.
+
+This function generates OWA weights using a normalised CRRA scheme, parameterised by `g`. The CRRA approach interpolates between risk-neutral and risk-averse weighting profiles, controlled by the risk aversion parameter `g`. The resulting weights are normalised to sum to one and are suitable for use in OWA-based risk measures.
+
+# Arguments
+
+  - `weights::AbstractMatrix{<:Real}`: Matrix of weights (typically order statistics or moment weights).
+  - `g::Real`: Risk aversion parameter, must satisfy `0 < g < 1`.
+
+# Returns
+
+  - `w::Vector`: Vector of OWA weights, normalised to sum to one.
+
+# Details
+
+The function computes the OWA weights as follows:
+
+ 1. For each order statistic, recursively compute the CRRA weight using the formula:
+
+    ```julia
+    e *= g + i - 1
+    phis[i] = e / factorial(i + 1)
+    ```
+
+ 2. The vector `phis` is normalised to sum to one.
+ 3. The final OWA weights are computed as a weighted sum of the input `weights` and `phis`, with monotonicity enforced by taking the maximum up to each index.
+
+# Examples
+
+```jldoctest
+julia> w = [1.0 0.5; 0.5 1.0]
+2×2 Matrix{Float64}:
+ 1.0  0.5
+ 0.5  1.0
+
+julia> PortfolioOptimisers.ncrra_weights(w, 0.5)
+2-element Vector{Float64}:
+ 0.8333333333333333
+ 0.8333333333333333
+```
+
+# Related
+
+  - [`NormalisedConstantRelativeRiskAversion`](@ref)
+  - [`owa_l_moment_crm`](@ref)
+"""
+function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real = 0.5)
     N = size(weights, 2)
     phis = Vector{eltype(weights)}(undef, N)
     e = 1
@@ -49,10 +305,35 @@ function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real)
     end
     return w
 end
-function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion,
-                          weights::AbstractMatrix{<:Real})
-    return ncrra_weights(weights, method.g)
-end
+
+"""
+    owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
+
+Construct a JuMP model for Ordered Weights Array (OWA) weight estimation.
+
+This function sets up a JuMP optimization model for OWA weights, given an `OWAJuMP` estimator and a matrix of weights (e.g., order statistics or moment weights). The model includes variables for the OWA weights (`phi`) and auxiliary variables (`theta`), and enforces constraints for non-negativity, upper bounds, sum-to-one, monotonicity, and consistency with the input weights.
+
+# Arguments
+
+  - `method::OWAJuMP`: OWA estimator containing solver, scaling, and algorithm configuration.
+  - `weights::AbstractMatrix{<:Real}`: Matrix of weights (typically order statistics or moment weights).
+
+# Returns
+
+  - `model::JuMP.Model`: Configured JuMP model with variables and constraints for OWA weight estimation.
+
+# Constraints
+
+  - `phi` (OWA weights) are non-negative and bounded above by `max_phi`.
+  - The sum of `phi` is 1.
+  - `theta` is constrained to be equal to the weighted sum of the input weights and `phi`.
+  - Monotonicity is enforced on `phi` and `theta`.
+
+# Related
+
+  - [`OWAJuMP`](@ref)
+  - [`owa_l_moment_crm`](@ref)
+"""
 function owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
     T, N = size(weights)
     model = JuMP.Model()
@@ -72,6 +353,35 @@ function owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
                  end)
     return model
 end
+
+"""
+    owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMatrix)
+
+Solve a JuMP model for OWA weight estimation and extract the resulting OWA weights.
+
+This function solves the provided JuMP model using the solver(s) specified in the `OWAJuMP` estimator. If the optimization is successful, it extracts the OWA weights (`phi`), normalises them to sum to one, and computes the final OWA weights as a weighted sum with the input `weights`. If the optimization fails, a warning is issued and a fallback to `ncrra_weights` is used.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP model for OWA weight estimation.
+  - `method::OWAJuMP`: OWA estimator containing solver configuration.
+  - `weights::AbstractMatrix`: Matrix of weights (typically order statistics or moment weights).
+
+# Returns
+
+  - `w::Vector`: Vector of OWA weights, normalised to sum to one.
+
+# Details
+
+  - If the solver succeeds, the solution is extracted from the `phi` variable and normalised.
+  - If the solver fails, a warning is issued and the fallback `ncrra_weights(weights, 0.5)` is returned.
+
+# Related
+
+  - [`owa_model_setup`](@ref)
+  - [`OWAJuMP`](@ref)
+  - [`ncrra_weights`](@ref)
+"""
 function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMatrix)
     slv = method.slv
     return if optimise_JuMP_model!(model, slv).success
@@ -83,6 +393,47 @@ function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMa
         @warn("Type: $method\nReverting to ncrra_weights.")
         w = ncrra_weights(weights, 0.5)
     end
+end
+
+"""
+    owa_l_moment_crm(method, weights)
+
+Compute Ordered Weights Array (OWA) linear moment convex risk measure (CRM) weights using various estimation methods.
+
+This function dispatches on the estimator `method` to compute OWA weights from a matrix of moment or order-statistic weights. It supports several OWA estimation approaches, including normalised constant relative risk aversion (CRRA) and JuMP-based optimization with different algorithms.
+
+# Methods
+
+  - `owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion, weights::AbstractMatrix{<:Real})`
+    Computes OWA weights using the normalised CRRA scheme, parameterised by the risk aversion parameter `g` in `method`. The resulting weights interpolate between risk-neutral and risk-averse profiles and are normalised to sum to one.
+  - `owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy}, weights::AbstractMatrix{<:Real})`
+    Computes OWA weights by solving a maximum entropy optimization problem using JuMP. This yields the most "uninformative" or uniform OWA weights subject to the imposed constraints.
+  - `owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumSquareDistance}, weights::AbstractMatrix{<:Real})`
+    Computes OWA weights by minimizing the squared distance from a target or reference vector, regularizing the OWA weights towards a desired profile.
+  - `owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumSumSquares}, weights::AbstractMatrix{<:Real})`
+    Computes OWA weights by minimizing the sum of squared OWA weights, promoting sparsity or concentration in the resulting weights.
+
+# Arguments
+
+  - `method`: An OWA estimator, such as [`NormalisedConstantRelativeRiskAversion`](@ref) or [`OWAJuMP`](@ref) with a specific algorithm.
+  - `weights::AbstractMatrix{<:Real}`: Matrix of weights (e.g., order statistics or moment weights).
+
+# Returns
+
+  - `w::Vector`: Vector of OWA weights, normalised to sum to one.
+
+# Related
+
+  - [`NormalisedConstantRelativeRiskAversion`](@ref)
+  - [`OWAJuMP`](@ref)
+  - [`MaximumEntropy`](@ref)
+  - [`MinimumSquareDistance`](@ref)
+  - [`MinimumSumSquares`](@ref)
+  - [`ncrra_weights`](@ref)
+"""
+function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion,
+                          weights::AbstractMatrix{<:Real})
+    return ncrra_weights(weights, method.g)
 end
 function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy},
                           weights::AbstractMatrix{<:Real})
@@ -128,6 +479,7 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumS
     @objective(model, Min, so * t)
     return owa_model_solve(model, method, weights)
 end
+
 function owa_gmd(T::Integer)
     # w = Vector{typeof(inv(T))}(undef, T)
     # for i in eachindex(w)
@@ -195,6 +547,27 @@ function owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,
 
     return w
 end
+
+"""
+    owa_l_moment(T::Integer, k::Integer = 2)
+
+Compute the linear moment weights for the linear moments convex risk measure (CRM).
+
+This function returns the vector of weights for the OWA linear moment of order `k` for `T` observations. The weights are derived from combinatorial expressions and are used to construct higher-order moment risk measures.
+
+# Arguments
+
+  - `T::Integer`: Number of observations.
+  - `k::Integer`: Moment order.
+
+# Returns
+
+  - `w::Vector`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_l_moment_crm`](@ref)
+"""
 function owa_l_moment(T::Integer, k::Integer = 2)
     T, k = promote(T, k)
     w = Vector{typeof(inv(T * k))}(undef, T)
@@ -211,6 +584,40 @@ function owa_l_moment(T::Integer, k::Integer = 2)
     end
     return w
 end
+
+"""
+    owa_l_moment_crm(T::Integer; k::Integer = 2,
+                     method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
+
+Compute the ordered weights array (OWA) linear moments convex risk measure (CRM) weights for a given number of observations and moment order.
+
+This function constructs the OWA linear moment CRM weights matrix for order statistics of size `T` and moment orders from 2 up to `k`, and then applies the specified OWA estimation method to produce the final OWA weights.
+
+# Arguments
+
+  - `T::Integer`: Number of observations.
+  - `k::Integer`: Highest moment order to include.
+  - `method::AbstractOrderedWeightsArrayEstimator`: OWA estimator.
+
+# Validation
+
+  - Asserts that `k >= 2`.
+
+# Returns
+
+  - `w::Vector`: Vector of OWA weights of length `T`, normalised to sum to one.
+
+# Details
+
+  - Constructs a matrix of OWA moment weights for each moment order from 2 to `k`.
+  - Applies the specified OWA estimation method to aggregate the moment weights into a single OWA weight vector.
+
+# Related
+
+  - [`owa_l_moment`](@ref)
+  - [`NormalisedConstantRelativeRiskAversion`](@ref)
+  - [`OWAJuMP`](@ref)
+"""
 function owa_l_moment_crm(T::Integer; k::Integer = 2,
                           method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
     @assert(k >= 2, DomainError("`k` must be at least 2:\nk => $k"))

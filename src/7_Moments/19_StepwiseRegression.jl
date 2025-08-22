@@ -24,7 +24,7 @@ end
 
 Construct a [`PValue`](@ref) stepwise regression criterion.
 
-This constructor creates a `PValue` object with the specified p-value threshold. The threshold must be strictly between 0 and 1.
+This constructor creates a `PValue` object with the specified p-value threshold.
 
 # Arguments
 

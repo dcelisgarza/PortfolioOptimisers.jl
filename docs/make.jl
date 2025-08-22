@@ -70,10 +70,11 @@ makedocs(; #modules = [PortfolioOptimisers],
          format = Documenter.HTML(;
                                   canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl",),
          pages = ["index.md"; "Examples" => examples_nav;
-                  numbered_pages[34:end];
+                  numbered_pages[36:end];
                   "API" => [numbered_pages[1:6]; "Moments" => numbered_pages[7:27];
-                            "Distance" => numbered_pages[28:32];
-                            "JuMP Model Optimisation" => numbered_pages[33]]],
+                            "Distance" => numbered_pages[28:33];
+                            "JuMP Model Optimisation" => numbered_pages[34];
+                            "Ordered Weights Array" => numbered_pages[35]]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 
