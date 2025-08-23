@@ -59,7 +59,7 @@
             end
             @test res
         end
-        @test_throws AssertionError OWAJuMP(slv = Solver[])
+        @test_throws IsEmptyError OWAJuMP(slv = Solver[])
     end
     @testset "OWA weight vectors" begin
         owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_weights.csv.gz"), DataFrame)
