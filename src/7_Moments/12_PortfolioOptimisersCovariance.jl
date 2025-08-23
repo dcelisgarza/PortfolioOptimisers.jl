@@ -160,6 +160,9 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; di
         X = transpose(X)
     end
     rho = cor(ce.ce, X; kwargs...)
+    if !ismutable(rho)
+        rho = Matrix(rho)
+    end
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
 end
