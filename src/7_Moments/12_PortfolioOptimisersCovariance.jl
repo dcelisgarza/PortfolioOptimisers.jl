@@ -118,6 +118,9 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; di
         X = transpose(X)
     end
     sigma = cov(ce.ce, X; kwargs...)
+    if !ismutable(sigma)
+        sigma = Matrix(sigma)
+    end
     matrix_processing!(ce.mp, sigma, X; kwargs...)
     return sigma
 end
