@@ -128,7 +128,7 @@ function detone!(::Nothing, args...)
 end
 function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
     n = ce.n
-    @argcheck(one(n) <= n <= one(size(X, 2)),
+    @argcheck(one(n) <= n <= size(X, 2),
               DomainError(n, range_msg("`n`", one(n), size(X, 2), n, true, true) * "."))
     n -= 1
     s = diag(X)
