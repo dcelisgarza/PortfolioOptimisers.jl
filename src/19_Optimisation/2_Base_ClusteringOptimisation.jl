@@ -1,10 +1,6 @@
 abstract type BaseClusteringOptimisationEstimator <: BaseOptimisationEstimator end
 abstract type ClusteringOptimisationEstimator <: OptimisationEstimator end
 abstract type WeightFinaliser <: AbstractAlgorithm end
-Base.length(::BaseOptimisationEstimator) = 1
-function Base.iterate(::BaseOptimisationEstimator, state = 1)
-    return state > 1 ? nothing : (:BaseOptimisationEstimator, state + 1)
-end
 struct IterativeWeightFiniliser{T1} <: WeightFinaliser
     iter::T1
 end
