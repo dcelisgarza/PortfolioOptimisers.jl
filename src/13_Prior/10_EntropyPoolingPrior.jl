@@ -382,25 +382,26 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
     @expression(model, obj_expr, so * t)
     if haskey(epc, :eq)
         A, B = epc[:eq]
-        @constraint(model, ceq, sc1 * (A * x - B) == 0)
+        @constraint(model, ceq, sc1 * (A * x ⊖ B) == 0)
     end
     if haskey(epc, :ineq)
         A, B = epc[:ineq]
-        @constraint(model, cineq, sc1 * (A * x - B) <= 0)
+        @constraint(model, cineq, sc1 * (A * x ⊖ B) <= 0)
     end
     if haskey(epc, :cvar_eq)
         A, B = epc[:cvar_eq]
-        @constraint(model, ccvareq, sc1 * (A * x - B) == 0)
+        @constraint(model, ccvareq, sc1 * (A * x ⊖ B) == 0)
     end
     if haskey(epc, :feq)
         A, B = epc[:feq]
+        N = length(B)
         @variables(model, begin
                        tc
-                       c[1:T]
+                       c[1:N]
                    end)
         @constraints(model, begin
-                         cfeq, sc1 * (A * x - B - c) == 0
-                         [sc1 * tc; sc1 * c] in MOI.NormOneCone(T + 1)
+                         cfeq, sc1 * (A * x ⊖ B ⊖ c) == 0
+                         [sc1 * tc; sc1 * c] in MOI.NormOneCone(N + 1)
                      end)
         add_to_expression!(obj_expr, so * sc2 * tc)
     end
@@ -431,25 +432,26 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                  end)
     if haskey(epc, :eq)
         A, B = epc[:eq]
-        @constraint(model, ceq, sc1 * (A * x - B) == 0)
+        @constraint(model, ceq, sc1 * (A * x ⊖ B) == 0)
     end
     if haskey(epc, :ineq)
         A, B = epc[:ineq]
-        @constraint(model, cineq, sc1 * (A * x - B) <= 0)
+        @constraint(model, cineq, sc1 * (A * x ⊖ B) <= 0)
     end
     if haskey(epc, :cvar_eq)
         A, B = epc[:cvar_eq]
-        @constraint(model, ccvareq, sc1 * (A * x - B) == 0)
+        @constraint(model, ccvareq, sc1 * (A * x ⊖ B) == 0)
     end
     if haskey(epc, :feq)
         A, B = epc[:feq]
+        N = length(B)
         @variables(model, begin
                        tc
-                       c[1:T]
+                       c[1:N]
                    end)
         @constraints(model, begin
-                         cfeq, sc1 * (A * x - B - c) == 0
-                         [sc1 * tc; sc1 * c] in MOI.NormOneCone(T + 1)
+                         cfeq, sc1 * (A * x ⊖ B ⊖ c) == 0
+                         [sc1 * tc; sc1 * c] in MOI.NormOneCone(N + 1)
                      end)
         add_to_expression!(obj_expr, so * sc2 * tc)
     end
