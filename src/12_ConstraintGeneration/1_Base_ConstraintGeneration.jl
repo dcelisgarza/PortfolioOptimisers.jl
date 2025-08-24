@@ -1,6 +1,5 @@
-abstract type AbstractConstraintSide <: AbstractEstimator end
-abstract type AbstractConstraint <: AbstractEstimator end
 abstract type AbstractConstraintResult <: AbstractResult end
+abstract type AbstractConstraintEstimator <: AbstractEstimator end
 abstract type ComparisonOperators end
 abstract type EqualityComparisonOperators <: ComparisonOperators end
 abstract type InequalityComparisonOperators <: ComparisonOperators end

@@ -238,7 +238,7 @@ function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Union{Nothing, <:CustomObjective},
+                                           cobj::Union{Nothing, <:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
@@ -251,7 +251,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtility,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Union{Nothing, <:CustomObjective},
+                                           cobj::Union{Nothing, <:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
@@ -266,7 +266,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtilit
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::KellyReturn,
-                                           cobj::Union{Nothing, <:CustomObjective},
+                                           cobj::Union{Nothing, <:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
@@ -279,7 +279,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Union{Nothing, <:CustomObjective},
+                                           cobj::Union{Nothing, <:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]
@@ -300,7 +300,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Union{Nothing, <:CustomObjective},
+                                           cobj::Union{Nothing, <:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult)
     so = model[:so]

@@ -122,7 +122,7 @@ function _rethrow_parse_error(expr::Expr, side = :lhs)
     end
     return nothing
 end
-abstract type AbstractParsingResult <: AbstractResult end
+abstract type AbstractParsingResult <: AbstractConstraintResult end
 struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
     vars::T1
     coef::T2
@@ -493,7 +493,7 @@ function linear_constraints(eqn::Union{<:AbstractString, Expr,
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
-struct RiskBudgetResult{T1} <: AbstractResult
+struct RiskBudgetResult{T1} <: AbstractConstraintResult
     val::T1
 end
 function RiskBudgetResult(; val::AbstractVector{<:Real})
@@ -523,7 +523,7 @@ function risk_budget_constraints(rb::Union{<:AbstractDict, <:Pair{<:Any, <:Real}
     val = estimator_to_val(rb, sets, inv(N); strict = strict, datatype = datatype)
     return RiskBudgetResult(; val = val / sum(val))
 end
-struct RiskBudgetEstimator{T1} <: AbstractEstimator
+struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
     val::T1
 end
 function RiskBudgetEstimator(;
@@ -570,7 +570,7 @@ end
 function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector; kwargs...)
     return view(smtx, :, i)
 end
-struct LinearConstraintEstimator{T1} <: AbstractEstimator
+struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
     val::T1
 end
 function LinearConstraintEstimator(;
@@ -598,7 +598,7 @@ function risk_budget_constraints(lcs::LinearConstraintEstimator, sets::AssetSets
                                  datatype::DataType = Float64, strict::Bool = false)
     return risk_budget_constraints(lcs.val, sets; datatype = datatype, strict = strict)
 end
-struct AssetSetsMatrixEstimator{T1} <: AbstractEstimator
+struct AssetSetsMatrixEstimator{T1} <: AbstractConstraintEstimator
     val::T1
 end
 function AssetSetsMatrixEstimator(; val::Union{<:Symbol, <:AbstractString})

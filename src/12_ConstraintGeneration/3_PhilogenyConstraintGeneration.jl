@@ -1,5 +1,5 @@
-abstract type PhilogenyEstimator <: AbstractEstimator end
-abstract type PhilogenyResult <: AbstractResult end
+abstract type PhilogenyEstimator <: AbstractConstraintEstimator end
+abstract type PhilogenyResult <: AbstractConstraintResult end
 struct SemiDefinitePhilogenyEstimator{T1, T2} <: PhilogenyEstimator
     pe::T1
     p::T2

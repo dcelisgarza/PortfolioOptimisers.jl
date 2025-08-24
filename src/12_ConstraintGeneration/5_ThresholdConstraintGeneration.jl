@@ -1,4 +1,4 @@
-struct BuyInThresholdEstimator{T1} <: AbstractEstimator
+struct BuyInThresholdEstimator{T1} <: AbstractConstraintEstimator
     val::T1
 end
 function BuyInThresholdEstimator(;
@@ -7,7 +7,7 @@ function BuyInThresholdEstimator(;
     @argcheck(!isempty(val))
     return BuyInThresholdEstimator(val)
 end
-struct BuyInThreshold{T1} <: AbstractResult
+struct BuyInThreshold{T1} <: AbstractConstraintResult
     val::T1
 end
 function BuyInThreshold(; val::Union{<:Real, <:AbstractVector{<:Real}})
@@ -37,6 +37,9 @@ function threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
     return BuyInThreshold(;
                           val = estimator_to_val(t.val, sets, zero(datatype);
                                                  strict = strict))
+end
+function threshold_constraints(bounds::UniformScaledBounds, sets::AssetSets; kwargs...)
+    return BuyInThreshold(; val = inv(length(sets.dict[sets.key])))
 end
 function threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresholdEstimator,
                                                          <:BuyInThreshold}},

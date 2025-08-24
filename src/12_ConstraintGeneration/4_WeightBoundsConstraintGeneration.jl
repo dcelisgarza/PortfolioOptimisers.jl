@@ -31,7 +31,7 @@ end
 function weight_bounds_view(::Nothing, ::Any)
     return nothing
 end
-struct WeightBounds{T1, T2} <: AbstractResult
+struct WeightBounds{T1, T2} <: AbstractConstraintResult
     lb::T1
     ub::T2
 end
@@ -45,19 +45,23 @@ function weight_bounds_view(wb::WeightBounds, i::AbstractVector)
     ub = nothing_scalar_array_view(wb.ub, i)
     return WeightBounds(; lb = lb, ub = ub)
 end
-struct WeightBoundsEstimator{T1, T2} <: AbstractEstimator
+abstract type CustomWeightBoundsConstraint <: AbstractConstraintEstimator end
+struct UniformScaledBounds <: CustomWeightBoundsConstraint end
+struct WeightBoundsEstimator{T1, T2} <: AbstractConstraintEstimator
     lb::T1
     ub::T2
 end
 function WeightBoundsEstimator(;
                                lb::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
-                                         <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
+                                         <:AbstractVector{<:Pair{<:Any, <:Real}},
+                                         <:CustomWeightBoundsConstraint} = nothing,
                                ub::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
-                                         <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing)
-    if !isnothing(lb)
+                                         <:AbstractVector{<:Pair{<:Any, <:Real}},
+                                         <:CustomWeightBoundsConstraint} = nothing)
+    if isa(lb, Union{<:AbstractDict, <:AbstractVector})
         @argcheck(!isempty(lb), IsEmptyError(non_empty_msg("`lb`") * "."))
     end
-    if !isnothing(ub)
+    if isa(ub, Union{<:AbstractDict, <:AbstractVector})
         @argcheck(!isempty(ub), IsEmptyError(non_empty_msg("`ub`") * "."))
     end
     return WeightBoundsEstimator(lb, ub)
@@ -73,11 +77,15 @@ function get_weight_bounds(wb::Union{Nothing, <:Real, <:AbstractVector}, args...
     return wb
 end
 function get_weight_bounds(bounds::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
-                                         <:AbstractVector{<:Pair{<:Any, <:Real}}}, lb::Bool,
-                           sets::AssetSets; strict::Bool = false,
+                                         <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                           lub::Bool, sets::AssetSets; strict::Bool = false,
                            datatype::DataType = Float64)
-    return estimator_to_val(bounds, sets, ifelse(lb, zero(datatype), one(datatype));
+    return estimator_to_val(bounds, sets, ifelse(lub, zero(datatype), one(datatype));
                             strict = strict)
+end
+function get_weight_bounds(bounds::UniformScaledBounds, lub::Bool, sets::AssetSets;
+                           datatype::DataType = Float64, kwargs...)
+    return lub ? inv(length(sets.dict[sets.key])) : one(datatype)
 end
 function weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets;
                                    strict::Bool = false, datatype::DataType = Float64,
@@ -121,4 +129,4 @@ function weight_bounds_constraints(wb::Nothing, args...; scalar::Bool = false,
     return WeightBounds(; lb = fill(-Inf, N), ub = fill(Inf, N))
 end
 
-export WeightBoundsEstimator, WeightBounds, weight_bounds_constraints
+export WeightBoundsEstimator, WeightBounds, weight_bounds_constraints, UniformScaledBounds
