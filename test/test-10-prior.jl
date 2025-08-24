@@ -478,19 +478,19 @@
                                        sigma_views = sigma_views, kt_views = kt_views), rd)
         @test pr.mu[1] <= 1.5 * pr0.mu[1]
         @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1], rtol = 1e-3)
-        @test HighOrderMoment(; w = pr.w,
+        @test abs(HighOrderMoment(; w = pr.w,
                               alg = HighOrderDeviation(; alg = FourthCentralMoment(),
                                                        ve = SimpleVariance(; w = pr.w)))([1],
                                                                                          reshape(pr.X[:,
                                                                                                       1],
                                                                                                  :,
-                                                                                                 1)) >=
+                                                                                                 1)) -
               HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()))([1],
                                                                                          reshape(pr.X[:,
                                                                                                       1],
                                                                                                  :,
                                                                                                  1)) *
-              0.87
+              0.87) <= sqrt(eps())
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                                  mu_views = mu_views,
