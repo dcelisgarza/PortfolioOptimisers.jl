@@ -376,7 +376,7 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                end)
     @constraints(model,
                  begin
-                     sc1 * (sum(x) - 1) == 0
+                     sc1 * (sum(x) - one(eltype(w))) == 0
                      [sc1 * t; sc1 * w; sc1 * x] in MOI.RelativeEntropyCone(2 * T + 1)
                  end)
     @expression(model, obj_expr, so * t)
@@ -423,6 +423,12 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                    x[1:T]
                    t
                end)
+    # Equality constraints from A_eq and B_eq and probabilities equal to 1
+    @constraints(model,
+                 begin
+                     sc1 * (sum(x) - one(eltype(w))) == 0
+                     [sc1 * t; fill(sc1, T); sc1 * x] in MOI.RelativeEntropyCone(2 * T + 1)
+                 end)
     if haskey(epc, :eq)
         A, B = epc[:eq]
         @constraint(model, ceq, sc1 * (A * x - B) == 0)
@@ -447,12 +453,6 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                      end)
         add_to_expression!(obj_expr, so * sc2 * tc)
     end
-    # Equality constraints from A_eq and B_eq and probabilities equal to 1
-    @constraints(model,
-                 begin
-                     sc1 * (sum(x) - one(eltype(w))) == 0
-                     [sc1 * t; fill(sc1, T); sc1 * x] in MOI.RelativeEntropyCone(2 * T + 1)
-                 end)
     @objective(model, Min, so * (t - dot(x, log_p)))
     # Solve the optimization problem
     return if optimise_JuMP_model!(model, slv).success
@@ -894,4 +894,5 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                          f_w = !isnothing(rr) ? w1 : nothing)
 end
 
-export LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior
+export LogEntropyPooling, ExpEntropyPooling, EntropyPoolingPrior, H0_EntropyPooling,
+       H1_EntropyPooling, H2_EntropyPooling, JuMPEntropyPooling, OptimEntropyPooling

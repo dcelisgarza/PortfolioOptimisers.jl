@@ -1,5 +1,5 @@
 @safetestset "Prior" begin
-    using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, StatsBase
+    using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, StatsBase, Clarabel
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -314,11 +314,48 @@
         end
     end
     @testset "Entropy pooling" begin
+        slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = "verbose" => false),
+               Solver(; name = :clarabel2, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = ["verbose" => false, "max_step_fraction" => 0.95]),
+               Solver(; name = :clarabel3, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.9)),
+               Solver(; name = :clarabel4, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.85)),
+               Solver(; name = :clarabel5, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.80)),
+               Solver(; name = :clarabel6, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.75)),
+               Solver(; name = :clarabel7, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.7)),
+               Solver(; name = :clarabel8, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.6,
+                                      "max_iter" => 1500, "tol_gap_abs" => 1e-4,
+                                      "tol_gap_rel" => 1e-4, "tol_ktratio" => 1e-3,
+                                      "tol_feas" => 1e-4, "tol_infeas_abs" => 1e-4,
+                                      "tol_infeas_rel" => 1e-4,
+                                      "reduced_tol_gap_abs" => 1e-4,
+                                      "reduced_tol_gap_rel" => 1e-4,
+                                      "reduced_tol_ktratio" => 1e-3,
+                                      "reduced_tol_feas" => 1e-4,
+                                      "reduced_tol_infeas_abs" => 1e-4,
+                                      "reduced_tol_infeas_rel" => 1e-4))]
         pr0 = prior(EmpiricalPrior(), rd)
-        pr = prior(EntropyPoolingPrior(; sets = sets,
-                                       mu_views = LinearConstraintEstimator(;
-                                                                            val = "AAPL == 0.002")),
-                   rd)
+
+        mu_views = LinearConstraintEstimator(; val = "AAPL == 0.002")
+        pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views), rd)
+        @test isapprox(pr.mu[1], 0.002)
+
+        pr = prior(EntropyPoolingPrior(; sets = sets, opt = JuMPEntropyPooling(; slv = slv),
+                                       mu_views = mu_views), rd)
         @test isapprox(pr.mu[1], 0.002)
 
         pr = prior(EntropyPoolingPrior(; sets = sets,
@@ -457,15 +494,18 @@
         @test isapprox(cov2cor(pr.sigma)[1, end], cov2cor(pr0.sigma)[1, end] * 0.67,
                        rtol = 1e-6)
 
-        pr = prior(EntropyPoolingPrior(; sets = sets,
-                                       mu_views = LinearConstraintEstimator(;
-                                                                            val = ["AAPL<=0.75*prior(AAPL)",
-                                                                                   "XOM >= 0.4*prior(XOM)"]),
-                                       sigma_views = LinearConstraintEstimator(;
-                                                                               val = ["AAPL==0.2prior(AAPL)",
-                                                                                      "WMT==1.4prior(WMT)"]),
-                                       rho_views = LinearConstraintEstimator(;
-                                                                             val = "(AAPL, XOM) == 0.35")),
+        pr = prior(HighOrderPriorEstimator(;
+                                           pe = EntropyPoolingPrior(;
+                                                                    alg = H2_EntropyPooling(),
+                                                                    sets = sets,
+                                                                    mu_views = LinearConstraintEstimator(;
+                                                                                                         val = ["AAPL<=0.75*prior(AAPL)",
+                                                                                                                "XOM >= 0.4*prior(XOM)"]),
+                                                                    sigma_views = LinearConstraintEstimator(;
+                                                                                                            val = ["AAPL==0.2prior(AAPL)",
+                                                                                                                   "WMT==1.4prior(WMT)"]),
+                                                                    rho_views = LinearConstraintEstimator(;
+                                                                                                          val = "(AAPL, XOM) == 0.35"))),
                    rd)
         @test pr.mu[1] <= 0.75 * pr0.mu[1]
         @test pr.mu[end] >= 0.4 * pr0.mu[end]
@@ -486,13 +526,57 @@
         @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]),
                        ConditionalValueatRisk(;)(rd.X[:, 1]) * 1.37, rtol = 1e-6)
 
-        pr = prior(EntropyPoolingPrior(; sets = sets,
-                                       cvar_views = LinearConstraintEstimator(;
-                                                                              val = ["AAPL == 0.07",
-                                                                                     "XOM==0.02"])),
+        pr = prior(HighOrderPriorEstimator(;
+                                           pe = EntropyPoolingPrior(; sets = sets,
+                                                                    alg = H2_EntropyPooling(),
+                                                                    cvar_views = LinearConstraintEstimator(;
+                                                                                                           val = ["AAPL == 0.07",
+                                                                                                                  "XOM==0.02"]))),
                    rd)
         @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.07, rtol = 1e-5)
         @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.02, rtol = 1e-4)
+
+        pr = prior(HighOrderPriorEstimator(;
+                                           pe = EntropyPoolingPrior(;
+                                                                    alg = H0_EntropyPooling(),
+                                                                    sets = sets,
+                                                                    mu_views = LinearConstraintEstimator(;
+                                                                                                         val = ["AAPL<=0.75*prior(AAPL)",
+                                                                                                                "XOM >= 0.4*prior(XOM)"]),
+                                                                    sigma_views = LinearConstraintEstimator(;
+                                                                                                            val = ["AAPL==0.2prior(AAPL)",
+                                                                                                                   "WMT==1.4prior(WMT)"]),
+                                                                    rho_views = LinearConstraintEstimator(;
+                                                                                                          val = "(AAPL, XOM) == 0.35"),
+                                                                    kt_views = LinearConstraintEstimator(;
+                                                                                                         val = "AAPL >= prior(AAPL)*0.3"),
+                                                                    sk_views = LinearConstraintEstimator(;
+                                                                                                         val = "WMT == prior(WMT)*1.4"))),
+                   rd)
+        @test pr.mu[1] <= 0.75 * pr0.mu[1]
+        @test pr.mu[end] >= 0.4 * pr0.mu[end]
+        @test isapprox(pr.sigma[1, 1], 0.2 * pr0.sigma[1, 1], rtol = 1e-2)
+        @test isapprox(pr.sigma[19, 19], 1.4 * pr0.sigma[19, 19], rtol = 5e-3)
+        @test !isapprox(cov2cor(pr.sigma)[1, end], 0.35; rtol = 5e-4)
+        @test HighOrderMoment(; w = pr.w,
+                              alg = HighOrderDeviation(; alg = FourthCentralMoment(),
+                                                       ve = SimpleVariance(; w = pr.w)))([1],
+                                                                                         reshape(pr.X[:,
+                                                                                                      1],
+                                                                                                 :,
+                                                                                                 1)) >=
+              HighOrderMoment(; alg = HighOrderDeviation(; alg = FourthCentralMoment()))([1],
+                                                                                         reshape(pr.X[:,
+                                                                                                      1],
+                                                                                                 :,
+                                                                                                 1)) *
+              0.3
+        @test !isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
+                                                                              reshape(pr.X[:,
+                                                                                           end - 1],
+                                                                                      :, 1)),
+                        1.4 * Skewness()([1], reshape(pr0.X[:, end - 1], :, 1));
+                        rtol = 5e-3)
     end
     @testset "Opinion pooling" begin
         pr0 = prior(EmpiricalPrior(), rd)
