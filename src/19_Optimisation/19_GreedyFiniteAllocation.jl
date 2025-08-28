@@ -31,7 +31,7 @@ function greedy_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real
     N = length(w)
     acash = cash
     shares = zeros(eltype(w), N)
-    w ./= sum(w)
+    w /= sum(w)
     unit = ga.unit
 
     # First loop

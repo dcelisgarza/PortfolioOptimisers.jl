@@ -23,6 +23,7 @@
     X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
     rd = prices_to_returns(X)
     pr = prior(EmpiricalPrior(), rd)
+    rf = 4.2 / 100 / 252
     w = fill(inv(size(pr.X, 2)), size(pr.X, 2))
     slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
@@ -37,17 +38,50 @@
     fes = [fees_constraints(fest, sets),
            Fees(; tn = Turnover(; val = 0.001, w = w), l = 0.002, s = 0.003, fl = 0.005,
                 fs = 0.007)]
+    T, N = size(pr.X)
     res = optimise!(MeanRisk(;
                              opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),
                                                  sbgt = 1, bgt = 1, pe = pr, slv = slv)))
-    df = CSV.read(joinpath(@__DIR__, "./assets/Fees.csv.gz"), DataFrame)
-    f1s = [0.02002313426946848, 0.12149580659357644]
-    for (i, fe) in pairs(fes)
-        f1 = calc_fees(res.w, fe)
-        @test isapprox(f1s[i], f1)
-        f2 = calc_asset_fees(res.w, fe)
-        @test isapprox(df[!, "$(2*(i-1)+1)"], f2)
-        f3 = calc_asset_fees(res.w, vec(values(X[end])), fe)
-        @test isapprox(df[!, "$(2*(i-1)+2)"], f3)
+    @testset "Fees" begin
+        df = CSV.read(joinpath(@__DIR__, "./assets/Fees.csv.gz"), DataFrame)
+        f1s = [0.02002313426946848, 0.12149580659357644]
+        for (i, fe) in pairs(fes)
+            f1 = calc_fees(res.w, fe)
+            @test isapprox(f1s[i], f1)
+            f2 = calc_asset_fees(res.w, fe)
+            @test isapprox(df[!, "$(2*(i-1)+1)"], f2)
+            f3 = calc_asset_fees(res.w, vec(values(X[end])), fe)
+            @test isapprox(df[!, "$(2*(i-1)+2)"], f3)
+        end
+    end
+    @testset "Expected Returns" begin
+        r = factory(Variance(), pr, slv)
+        f = calc_fees(res.w, fes[1])
+        rt = expected_return(res.ret, res.w, pr)
+        rtf = expected_return(res.ret, res.w, pr, fes[1])
+        rk = expected_risk(r, res.w, pr, fes[1])
+        sr = (rt - rf) / rk
+        srf = (rt - rf - f) / rk
+        sric = sr - N / (T * sr)
+        srfic = srf - N / (T * srf)
+
+        @test rtf == rt - f
+        @test srf == expected_ratio(r, res.ret, res.w, pr, fes[1]; rf = rf)
+        @test sr == expected_ratio(r, res.ret, res.w, pr; rf = rf)
+        @test (rk, rtf, srf) ==
+              expected_risk_ret_ratio(r, res.ret, res.w, pr, fes[1]; rf = rf)
+        @test (rk, rt, sric) == expected_risk_ret_sric(r, res.ret, res.w, pr; rf = rf)
+    end
+    @testset "Finite allocation fees" begin
+        p = vec(values(X[end]))
+        res = optimise!(MeanRisk(;
+                                 opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),
+                                                     sbgt = 1, bgt = 1, pe = pr, slv = slv)))
+        resa = optimise!(DiscreteAllocation(; slv = slv), res.w, p, 1000, T, fes[1])
+        @test isapprox(sum(resa.cost) + calc_fees(res.w, p, fes[1]) * T + resa.cash, 1000)
+
+        res = optimise!(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv)))
+        resa = optimise!(DiscreteAllocation(; slv = slv), res.w, p, 1000, T, fes[1])
+        @test isapprox(sum(resa.cost) + calc_fees(res.w, p, fes[1]) * T + resa.cash, 1000)
     end
 end
