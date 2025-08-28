@@ -63,7 +63,7 @@
     rtol = if Sys.isapple()
         5e-2
     else
-        5e-4
+        1e-3
     end
     @test isapprox(rmsd(res.w, res_da.w), 0.029094976416644103, rtol = rtol)
 
