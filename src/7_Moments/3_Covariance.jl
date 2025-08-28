@@ -7,8 +7,8 @@ A flexible covariance estimator for PortfolioOptimisers.jl supporting arbitrary 
 
 # Fields
 
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional weights for each observation. If `nothing`, the estimator is unweighted.
+  - `ce`: Covariance estimator.
+  - `w`: Optional weights for each observation. If `nothing`, the estimator is unweighted.
 
 # Constructor
 
@@ -39,10 +39,10 @@ This constructor creates a `GeneralWeightedCovariance` object using the specifie
 
 # Arguments
 
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use.
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional observation weights. If `nothing`, the estimator is unweighted. If provided, must be non-empty.
+  - `ce`: Covariance estimator to use.
+  - `w`: Optional observation weights. If `nothing`, the estimator is unweighted. If provided, must be non-empty.
 
-# ReturnsResult
+# Returns
 
   - `GeneralWeightedCovariance`: A covariance estimator configured with the specified method and optional weights.
 
@@ -95,13 +95,13 @@ This method dispatches to [`robust_cov`](@ref), using the specified covariance e
 
 # Arguments
 
-  - `ce::GeneralWeightedCovariance`: Covariance estimator containing the method and optional weights.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
+  - `ce`: Covariance estimator containing the method and optional weights.
+  - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the covariance.
   - `mean`: Optional mean vector to use for centering.
   - `kwargs...`: Additional keyword arguments passed to [`robust_cov`](@ref).
 
-# ReturnsResult
+# Returns
 
   - Covariance matrix as computed by the estimator and optional weights.
 
@@ -128,13 +128,13 @@ This method dispatches to [`robust_cor`](@ref), using the specified covariance e
 
 # Arguments
 
-  - `ce::GeneralWeightedCovariance`: Covariance estimator containing the method and optional weights.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
+  - `ce`: Covariance estimator containing the method and optional weights.
+  - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the correlation.
   - `mean`: Optional mean vector to use for centering.
   - `kwargs...`: Additional keyword arguments passed to [`robust_cor`](@ref).
 
-# ReturnsResult
+# Returns
 
   - Correlation matrix as computed by the estimator and optional weights.
 
@@ -169,9 +169,9 @@ A flexible container type for configuring and applying joint expected returns an
 
 # Fields
 
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
-  - `alg::AbstractMomentAlgorithm`: Moment algorithm.
+  - `me`: Expected returns estimator.
+  - `ce`: Covariance estimator.
+  - `alg`: Moment algorithm.
 
 # Constructor
 
@@ -205,11 +205,11 @@ This constructor creates a `Covariance` object using the specified expected retu
 
 # Arguments
 
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
-  - `alg::AbstractMomentAlgorithm`: Moment algorithm.
+  - `me`: Expected returns estimator.
+  - `ce`: Covariance estimator.
+  - `alg`: Moment algorithm.
 
-# ReturnsResult
+# Returns
 
   - `Covariance`: A configured joint mean and covariance estimator.
 
@@ -251,13 +251,13 @@ Compute the full covariance matrix using a [`Covariance`](@ref) estimator.
 
 # Arguments
 
-  - `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with `Full` moment algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance.
+  - `ce`: Covariance estimator with `Full` moment algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the covariance.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
 
-# ReturnsResult
+# Returns
 
   - Covariance matrix as computed by the estimator and moment algorithm.
 
@@ -284,13 +284,13 @@ Compute the semi covariance matrix using a [`Covariance`](@ref) estimator.
 
 # Arguments
 
-  - `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with `Semi` moment algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance.
+  - `ce`: Covariance estimator with `Semi` moment algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the covariance.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
 
-# ReturnsResult
+# Returns
 
   - Covariance matrix as computed by the estimator and moment algorithm.
 
@@ -319,13 +319,13 @@ Compute the full correlation matrix using a [`Covariance`](@ref) estimator.
 
 # Arguments
 
-  - `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with `Full` moment algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `ce`: Covariance estimator with `Full` moment algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
 
-# ReturnsResult
+# Returns
 
   - Correlation matrix as computed by the estimator and moment algorithm.
 
@@ -352,13 +352,13 @@ Compute the semi correlation matrix using a [`Covariance`](@ref) estimator.
 
 # Arguments
 
-  - `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with `Semi` moment algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `ce`: Covariance estimator with `Semi` moment algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
 
-# ReturnsResult
+# Returns
 
   - Correlation matrix as computed by the estimator and moment algorithm.
 

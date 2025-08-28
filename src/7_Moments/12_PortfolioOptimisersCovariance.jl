@@ -42,7 +42,7 @@ This constructor creates a `PortfolioOptimisersCovariance` object using the spec
   - `ce::AbstractCovarianceEstimator`: Covariance estimator to use.
   - `mp::AbstractMatrixProcessingEstimator`: Matrix post-processing estimator.
 
-# ReturnsResult
+# Returns
 
   - `PortfolioOptimisersCovariance`: A composite covariance estimator with post-processing.
 
@@ -97,7 +97,7 @@ This method computes the covariance matrix for the input data matrix `X` using t
   - `dims`: Dimension along which to compute the covariance (1 = columns/assets, 2 = rows). Default is `1`.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
-# ReturnsResult
+# Returns
 
   - `sigma::Matrix{Float64}`: The processed covariance matrix.
 
@@ -139,7 +139,7 @@ This method computes the correlation matrix for the input data matrix `X` using 
   - `dims`: Dimension along which to compute the correlation (1 = columns/assets, 2 = rows). Default is `1`.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The processed correlation matrix.
 

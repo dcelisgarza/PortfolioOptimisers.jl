@@ -27,7 +27,7 @@ Principal Component Analysis (PCA) dimension reduction target.
 
 # Fields
 
-  - `kwargs::NamedTuple`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
+  - `kwargs`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
 
 # Related
 
@@ -47,7 +47,7 @@ This constructor creates a `PCA` object with the specified keyword arguments, wh
 
 # Arguments
 
-  - `kwargs::NamedTuple`: Keyword arguments for configuring the PCA algorithm.
+  - `kwargs`: Keyword arguments for configuring the PCA algorithm.
 
 # Returns
 
@@ -112,7 +112,7 @@ Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
 
 # Fields
 
-  - `kwargs::NamedTuple`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
+  - `kwargs`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
 
 # Constructor
 
@@ -136,7 +136,7 @@ This constructor creates a `PPCA` object with the specified keyword arguments, w
 
 # Arguments
 
-  - `kwargs::NamedTuple`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
+  - `kwargs`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
 
 # Returns
 

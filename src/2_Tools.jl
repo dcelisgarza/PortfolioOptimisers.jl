@@ -78,13 +78,13 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Fields
 
-  - `nx::Union{Nothing, AbstractVector}`: Names or identifiers of asset columns.
-  - `X::Union{Nothing, AbstractMatrix}`: Asset returns matrix (observations × assets).
-  - `nf::Union{Nothing, AbstractVector}`: Names or identifiers of factor columns.
-  - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix (observations × factors).
-  - `ts::Union{Nothing, AbstractVector}`: Optional timestamps for each observation.
-  - `iv::Union{Nothing, AbstractMatrix}`: Implied volatilities matrix.
-  - `ivpa::Union{Nothing, <:Real, AbstractVector{<:Real}}`: Implied volatility risk premium adjustment.
+  - `nx`: Names or identifiers of asset columns.
+  - `X`: Asset returns matrix (observations × assets).
+  - `nf`: Names or identifiers of factor columns.
+  - `F`: Factor returns matrix (observations × factors).
+  - `ts`: Optional timestamps for each observation.
+  - `iv`: Implied volatilities matrix.
+  - `ivpa`: Implied volatility risk premium adjustment.
 
 # Constructor
 
@@ -119,13 +119,13 @@ Construct a [`ReturnsResult`](@ref) object, validating dimensions and types for 
 
 # Arguments
 
-  - `nx::Union{Nothing, AbstractVector}`: Asset names or identifiers.
-  - `X::Union{Nothing, AbstractMatrix}`: Asset returns matrix.
-  - `nf::Union{Nothing, AbstractVector}`: Factor names or identifiers.
-  - `F::Union{Nothing, AbstractMatrix}`: Factor returns matrix.
-  - `ts::Union{Nothing, AbstractVector}`: Timestamps.
-  - `iv::Union{Nothing, AbstractMatrix}`: Implied volatility matrix.
-  - `ivpa::Union{Nothing, <:Real, AbstractVector{<:Real}}`: Implied volatility risk premium adjustment.
+  - `nx`: Asset names or identifiers.
+  - `X`: Asset returns matrix.
+  - `nf`: Factor names or identifiers.
+  - `F`: Factor returns matrix.
+  - `ts`: Timestamps.
+  - `iv`: Implied volatility matrix.
+  - `ivpa`: Implied volatility risk premium adjustment.
 
 # Validation
 
@@ -269,20 +269,20 @@ ReturnsResult a [`ReturnsResult`](@ref) containing asset and factor returns, tim
 
 # Arguments
 
-  - `X::TimeArray`: Asset price data (timestamps × assets).
-  - `F::TimeArray`: (Optional) Factor price data (timestamps × factors).
-  - `iv::Union{Nothing, TimeArray}`: (Optional) Implied volatility data.
-  - `ivpa::Union{Nothing, <:Real, AbstractVector{<:Real}}`: (Optional) Implied volatility risk premium adjustment.
-  - `ret_method::Symbol`: Return calculation method (`:simple` or `:log`).
-  - `padding::Bool`: Whether to pad missing values in returns calculation.
-  - `missing_col_percent::Real`: Maximum allowed fraction of missing values per column (asset/factor).
-  - `missing_row_percent::Union{Nothing, <:Real}`: Maximum allowed fraction of missing values per row (timestamp).
-  - `collapse_args::Tuple`: Arguments for collapsing the time series (e.g., to lower frequency).
-  - `map_func::Union{Nothing, Function}`: Optional function to apply to the data before returns calculation.
-  - `join_method::Symbol`: How to join asset and factor data (`:outer`, `:inner`, etc.).
-  - `impute_method::Union{Nothing, Impute.Imputor}`: Optional imputation method for missing data.
+  - `X`: Asset price data (timestamps × assets).
+  - `F`: Optional Factor price data (timestamps × factors).
+  - `iv`: Optional Implied volatility data.
+  - `ivpa`: Optional Implied volatility risk premium adjustment.
+  - `ret_method`: Return calculation method (`:simple` or `:log`).
+  - `padding`: Whether to pad missing values in returns calculation.
+  - `missing_col_percent`: Maximum allowed fraction of missing values per column (asset/factor).
+  - `missing_row_percent`: Maximum allowed fraction of missing values per row (timestamp).
+  - `collapse_args`: Arguments for collapsing the time series (e.g., to lower frequency).
+  - `map_func`: Optional function to apply to the data before returns calculation.
+  - `join_method`: How to join asset and factor data (`:outer`, `:inner`, etc.).
+  - `impute_method`: Optional imputation method for missing data.
 
-# ReturnsResult
+# Returns
 
   - [`ReturnsResult`](@ref): Struct containing asset/factor returns, names, time series, and optional implied volatility data.
 
@@ -621,7 +621,7 @@ Efficient scalar and vector dot product utility.
   - `a::AbstractVector`, `b::Real`: Multiplies the sum of `a` by `b`.
   - `a::AbstractVector`, `b::AbstractVector`: Computes the dot product of `a` and `b`.
 
-# ReturnsResult
+# Returns
 
   - `Real`: The resulting scalar.
 
@@ -664,7 +664,7 @@ Utility for safely viewing or indexing into possibly `nothing`, scalar, or array
   - `x`: Input value, which may be `nothing`, a scalar, vector, or array.
   - `i`: Index or indices to view.
 
-# ReturnsResult
+# Returns
 
   - The corresponding view or value, or `nothing` if `x` is `nothing`.
 
@@ -716,7 +716,7 @@ Utility for safely viewing or indexing into possibly `nothing` or array values w
   - `x`: Input value, which may be `nothing` or an array.
   - `i`, `j`: Indices to view.
 
-# ReturnsResult
+# Returns
 
   - The corresponding view or `nothing`.
 
@@ -753,7 +753,7 @@ Utility for safely indexing into possibly `nothing`, scalar, vector, or array va
   - `x`: Input value, which may be `nothing`, a scalar, vector, or matrix.
   - `i`, `j`: Indices.
 
-# ReturnsResult
+# Returns
 
   - The corresponding value or `nothing`.
 
@@ -795,67 +795,18 @@ function nothing_scalar_array_getindex(x::AbstractMatrix, i, j)
 end
 
 """
-    nothing_asset_sets_view(x, i)
-
-Utility for safely viewing or indexing into possibly `nothing` or DataFrame values.
-
-  - If `x` is `nothing`, returns `nothing`.
-  - If `x` is a DataFrame, returns `view(x, i, :)`.
-
-# Arguments
-
-  - `x`: Input value, which may be `nothing` or a DataFrame.
-  - `i`: Indices.
-
-# ReturnsResult
-
-  - The corresponding view or `nothing`.
-
-# Examples
-
-```jldoctest
-julia> using DataFrames
-
-julia> df = DataFrame(; A = 1:5, B = 6:10, C = 11:15)
-5×3 DataFrame
- Row │ A      B      C
-     │ Int64  Int64  Int64
-─────┼─────────────────────
-   1 │     1      6     11
-   2 │     2      7     12
-   3 │     3      8     13
-   4 │     4      9     14
-   5 │     5     10     15
-
-julia> PortfolioOptimisers.nothing_asset_sets_view(df, 1:2)
-2×3 SubDataFrame
- Row │ A      B      C
-     │ Int64  Int64  Int64
-─────┼─────────────────────
-   1 │     1      6     11
-   2 │     2      7     12
-```
-"""
-function nothing_asset_sets_view(::Nothing, ::Any)
-    return nothing
-end
-function nothing_asset_sets_view(x::AbstractDataFrame, i)
-    return view(x, i, :)
-end
-
-"""
     fourth_moment_index_factory(N::Integer, i::AbstractVector)
 
 Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N × N`.
 
 # Arguments
 
-  - `N::Integer`: Size of the full covariance matrix.
-  - `i::AbstractVector`: Indices of the variables of interest.
+  - `N`: Size of the full covariance matrix.
+  - `i`: Indices of the variables of interest.
 
-# ReturnsResult
+# Returns
 
-  - `Vector{Int}`: Indices for extracting the fourth moment submatrix.
+  - `idx::Vector{Int}`: Indices for extracting the fourth moment submatrix.
 
 # Examples
 
@@ -884,9 +835,9 @@ Recursively traverse all subtypes of the given abstract type `t` and collect all
 # Arguments
 
   - `t`: An abstract type whose subtypes will be traversed.
-  - `ctarr::Union{Nothing, <:AbstractVector}`: (Optional) An array to collect the concrete types. If not provided, a new empty array is created.
+  - `ctarr`: Optional An array to collect the concrete types. If not provided, a new empty array is created.
 
-# ReturnsResult
+# Returns
 
 An array containing all concrete struct types that are subtypes (direct or indirect) of `types`.
 
@@ -929,9 +880,9 @@ This is useful for converting arrays with abstract element types to arrays with 
 
 # Arguments
 
-  - `A::AbstractArray`: The input array.
+  - `A`: The input array.
 
-# ReturnsResult
+# Returns
 
 A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
 

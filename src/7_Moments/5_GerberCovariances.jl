@@ -115,7 +115,7 @@ Implements the original Gerber covariance algorithm on Z-transformed data.
 
 # Fields
 
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator used for mean-centering prior to normalisation.
+  - `me`: Expected returns estimator used for mean-centering prior to normalisation.
 
 # Constructor
 
@@ -140,9 +140,9 @@ Creates a [`NormalisedGerber0`](@ref) object using the specified expected return
 
 # Arguments
 
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator used for mean-centering before normalisation.
+  - `me`: Expected returns estimator used for mean-centering before normalisation.
 
-# ReturnsResult
+# Returns
 
   - `NormalisedGerber0`: An instance of the original normalised Gerber covariance algorithm.
 
@@ -175,7 +175,7 @@ Implements the first variant of the Gerber covariance algorithm on Z-transformed
 
 # Fields
 
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator used for mean-centering prior to normalisation.
+  - `me`: Expected returns estimator used for mean-centering prior to normalisation.
 
 # Constructor
 
@@ -200,9 +200,9 @@ Creates a [`NormalisedGerber1`](@ref) object using the specified expected return
 
 # Arguments
 
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator used for mean-centering before normalisation.
+  - `me`: Expected returns estimator used for mean-centering before normalisation.
 
-# ReturnsResult
+# Returns
 
   - `NormalisedGerber1`: An instance of the original normalised Gerber covariance algorithm.
 
@@ -235,7 +235,7 @@ Implements the second variant of the Gerber covariance algorithm on Z-transforme
 
 # Fields
 
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator used for mean-centering prior to normalisation.
+  - `me`: Expected returns estimator used for mean-centering prior to normalisation.
 
 # Constructors
 
@@ -262,9 +262,9 @@ Creates a [`NormalisedGerber2`](@ref) object using the specified expected return
 
 # Arguments
 
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator used for mean-centering before normalisation.
+  - `me`: Expected returns estimator used for mean-centering before normalisation.
 
-# ReturnsResult
+# Returns
 
   - `NormalisedGerber2`: An instance of the original normalised Gerber covariance algorithm.
 
@@ -316,10 +316,10 @@ A flexible container type for configuring and applying Gerber covariance estimat
 
 # Fields
 
-  - `ve::StatsBase.CovarianceEstimator`: Variance estimator.
-  - `pdm::Posdef`: Positive definite matrix estimator (see [`Posdef`](@ref)).
-  - `threshold::Real`: Threshold parameter for Gerber covariance computation (typically in (0, 1)).
-  - `alg::GerberCovarianceAlgorithm`: Gerber covariance algorithm variant.
+  - `ve`: Variance estimator.
+  - `pdm`: Positive definite matrix estimator (see [`Posdef`](@ref)).
+  - `threshold`: Threshold parameter for Gerber covariance computation (typically in (0, 1)).
+  - `alg`: Gerber covariance algorithm variant.
 
 # Constructor
 
@@ -362,12 +362,12 @@ This constructor creates a `GerberCovariance` object using the specified Gerber 
 
 # Arguments
 
-  - `ve::StatsBase.CovarianceEstimator`: Variance estimator.
-  - `pdm::Union{Nothing, <:Posdef}`: Positive definite matrix estimator.
-  - `threshold::Real`: Threshold parameter for Gerber covariance computation.
-  - `alg::GerberCovarianceAlgorithm`: Gerber covariance algorithm variant.
+  - `ve`: Variance estimator.
+  - `pdm`: Positive definite matrix estimator.
+  - `threshold`: Threshold parameter for Gerber covariance computation.
+  - `alg`: Gerber covariance algorithm variant.
 
-# ReturnsResult
+# Returns
 
   - `GerberCovariance`: A configured Gerber covariance estimator.
 
@@ -421,11 +421,11 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Arguments
 
-  - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}`: Gerber correlation estimator configured with the `Gerber0` algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `std_vec::AbstractArray`: Vector of standard deviations for each asset, used to scale the threshold.
+  - `ce`: Gerber correlation estimator configured with the `Gerber0` algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `std_vec`: Vector of standard deviations for each asset, used to scale the threshold.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Gerber correlation, projected to be positive definite using the estimator's `pdm` field.
 
@@ -474,10 +474,10 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Arguments
 
-  - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0}`: Gerber correlation estimator configured with the `NormalisedGerber0` algorithm.
-  - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
+  - `ce`: Gerber correlation estimator configured with the `NormalisedGerber0` algorithm.
+  - `X`: Z-transformed data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -525,11 +525,11 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Arguments
 
-  - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}`: Gerber correlation estimator configured with the `Gerber1` algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `std_vec::AbstractArray`: Vector of standard deviations for each asset, used to scale the threshold.
+  - `ce`: Gerber correlation estimator configured with the `Gerber1` algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `std_vec`: Vector of standard deviations for each asset, used to scale the threshold.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -574,10 +574,10 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Arguments
 
-  - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1}`: Gerber correlation estimator configured with the `NormalisedGerber1` algorithm.
-  - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
+  - `ce`: Gerber correlation estimator configured with the `NormalisedGerber1` algorithm.
+  - `X`: Z-transformed data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -627,11 +627,11 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Arguments
 
-  - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}`: Gerber correlation estimator configured with the `Gerber2` algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `std_vec::AbstractArray`: Vector of standard deviations for each asset, used to scale the threshold.
+  - `ce`: Gerber correlation estimator configured with the `Gerber2` algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `std_vec`: Vector of standard deviations for each asset, used to scale the threshold.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Gerber correlation or correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -682,10 +682,10 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Arguments
 
-  - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}`: Gerber correlation estimator configured with the `NormalisedGerber2` algorithm.
-  - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
+  - `ce`: Gerber correlation estimator configured with the `NormalisedGerber2` algorithm.
+  - `X`: Z-transformed data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -737,12 +737,12 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 
 # Arguments
 
-  - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm}`: Gerber covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `ce`: Gerber covariance estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix.
 
@@ -779,12 +779,12 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 
 # Arguments
 
-  - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm}`: Gerber covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance.
+  - `ce`: Gerber covariance estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# ReturnsResult
+# Returns
 
   - `sigma::Matrix{Float64}`: The Gerber covariance matrix.
 
@@ -821,12 +821,12 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 
 # Arguments
 
-  - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm}`: Gerber covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `ce`: Gerber covariance estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Gerber correlation matrix.
 
@@ -867,12 +867,12 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 
 # Arguments
 
-  - `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm}`: Gerber covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance.
+  - `ce`: Gerber covariance estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
 
-# ReturnsResult
+# Returns
 
   - `sigma::Matrix{Float64}`: The Gerber covariance matrix.
 

@@ -123,7 +123,7 @@ Construct a [`JamesStein`](@ref) shrinkage algorithm for expected returns estima
 
   - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target.
 
-# ReturnsResult
+# Returns
 
   - `JamesStein`: Configured James-Stein shrinkage algorithm.
 
@@ -184,7 +184,7 @@ Construct a [`BayesStein`](@ref) shrinkage algorithm for expected returns estima
 
   - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target.
 
-# ReturnsResult
+# Returns
 
   - `BayesStein`: Configured Bayes-Stein shrinkage algorithm.
 
@@ -245,7 +245,7 @@ Construct a [`BodnarOkhrinParolya`](@ref) shrinkage algorithm for expected retur
 
   - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target.
 
-# ReturnsResult
+# Returns
 
   - `BodnarOkhrinParolya`: Configured Bodnar-Okhrin-Parolya shrinkage algorithm.
 
@@ -318,7 +318,7 @@ Construct a [`ShrunkExpectedReturns`](@ref) estimator for shrinkage-based expect
   - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
   - `alg::AbstractShrunkExpectedReturnsAlgorithm`: Shrinkage algorithm.
 
-# ReturnsResult
+# Returns
 
   - `ShrunkExpectedReturns`: Configured shrinkage-based expected returns estimator.
 
@@ -379,7 +379,7 @@ Compute the shrinkage target vector for expected returns estimation.
   - `sigma::AbstractMatrix`: Covariance matrix of asset returns.
   - `kwargs...`: Additional keyword arguments, such as `T` (number of observations) or `isigma` (inverse covariance matrix).
 
-# ReturnsResult
+# Returns
 
   - `b::AbstractArray`: Target vector for shrinkage estimation.
 
@@ -432,7 +432,7 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
   - `dims::Int`: Dimension along which to compute the mean.
   - `kwargs...`: Additional keyword arguments passed to the mean and covariance estimators.
 
-# ReturnsResult
+# Returns
 
   - `mu::AbstractArray`: Shrunk expected returns vector.
 

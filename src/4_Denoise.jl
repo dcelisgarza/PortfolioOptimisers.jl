@@ -77,6 +77,10 @@ struct FixedDenoise <: AbstractDenoiseAlgorithm end
 
 A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a covariance or correlation matrix towards their diagonal, controlled by the shrinkage parameter `alpha`. This approach interpolates between no shrinkage (`alpha = 0`) and full shrinkage (`alpha = 1`), providing a flexible way to regularize noisy eigenvalues.
 
+# Fields
+
+  - `alpha`: The shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues. Must be in the range `[0, 1]`, where `0` means no shrinkage and `1` means full shrinkage.
+
 # Constructor
 
     ShrunkDenoise(; alpha::Real = 0.0)
@@ -137,19 +141,19 @@ A flexible container type for configuring and applying denoising algorithms to c
 
 # Fields
 
-  - `alg::AbstractDenoiseAlgorithm`: Denoising algorithm ([`SpectralDenoise`](@ref), [`FixedDenoise`](@ref), [`ShrunkDenoise`](@ref)).
-  - `args::Tuple`: Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
-  - `kwargs::NamedTuple`: Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
-  - `kernel::Any`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
-  - `m::Integer`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
-  - `n::Integer`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
+  - `alg`: Denoising algorithm ([`SpectralDenoise`](@ref), [`FixedDenoise`](@ref), [`ShrunkDenoise`](@ref)).
+  - `args`: Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+  - `kwargs`: Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+  - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+  - `m`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+  - `n`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
 
 # Constructor
 
     Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
              m::Integer = 10,
              n::Integer = 1000,
-             kernel = AverageShiftedHistograms.Kernels.gaussian,
+             kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
              args::Tuple = (),
              kwargs::NamedTuple = (;))
 
@@ -173,10 +177,10 @@ struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
     n::T6
 end
 """
-    Denoise(; kernel = AverageShiftedHistograms.Kernels.gaussian,
+    Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
               args::Tuple = (),
-              kwargs::NamedTuple = (;),
-              alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
+              kwargs::NamedTuple = (;),              
+              kernel = AverageShiftedHistograms.Kernels.gaussian,
               m::Integer = 10,
               n::Integer = 1000)
 
@@ -184,17 +188,12 @@ Construct a [`Denoise`](@ref) object, configuring all parameters for matrix deno
 
 # Arguments
 
-  - `alg::AbstractDenoiseAlgorithm`: Denoising algorithm to use (e.g., [`SpectralDenoise`](@ref), [`FixedDenoise`](@ref), [`ShrunkDenoise`](@ref)).
-  - `args::Tuple`: Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
-  - `kwargs::NamedTuple`: Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+  - `alg`: Denoising algorithm to use (e.g., [`SpectralDenoise`](@ref), [`FixedDenoise`](@ref), [`ShrunkDenoise`](@ref)).
+  - `args`: Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+  - `kwargs`: Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
   - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
-  - `m::Integer`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
-  - `n::Integer`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
-
-# Validation
-
-  - Types are inferred from provided arguments.
-  - All keyword arguments correspond to fields in [`Denoise`](@ref).
+  - `m`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+  - `n`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
 
 # Examples
 
@@ -250,19 +249,14 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
   - `alg::SpectralDenoise`: Sets the smallest `num_factors` eigenvalues to zero.
   - `alg::FixedDenoise`: Replaces the smallest `num_factors` eigenvalues with their average.
   - `alg::ShrunkDenoise`: Shrinks the smallest `num_factors` eigenvalues towards the diagonal, controlled by `alg.alpha`.
-  - `X::AbstractMatrix`: The matrix to be denoised (modified in-place).
-  - `vals::AbstractVector`: Eigenvalues of `X`, sorted in ascending order.
-  - `vecs::AbstractMatrix`: Corresponding eigenvectors of `X`.
-  - `num_factors::Integer`: Number of eigenvalues to treat as noise.
+  - `X`: The matrix to be denoised (modified in-place).
+  - `vals`: Eigenvalues of `X`, sorted in ascending order.
+  - `vecs`: Corresponding eigenvectors of `X`.
+  - `num_factors`: Number of eigenvalues to treat as noise.
 
-# ReturnsResult
+# Returns
 
   - `nothing`. The input matrix `X` is modified in-place.
-
-# Validation
-
-  - Assumes `vals` and `vecs` are from the eigendecomposition of a correlation matrix.
-  - The denoised matrix is projected back to correlation space.
 
 # Related
 
@@ -304,7 +298,9 @@ function _denoise!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
 end
 
 """
-    errPDF(x, vals; kernel = AverageShiftedHistograms.Kernels.gaussian, m = 10, n = 1000, q = 1000)
+    errPDF(x::Real, vals::AbstractVector, q::Real;
+           kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
+           n::Integer = 1000)
 
 Compute the sum of squared errors (SSE) between the theoretical Marčenko–Pastur (MP) eigenvalue density and the empirical eigenvalue density estimated from observed eigenvalues.
 
@@ -313,28 +309,24 @@ This function is used internally to fit the MP distribution to the observed spec
 # Arguments
 
   - `x`: Scale parameter for the MP distribution `[0, 1]`.
-  - `vals::AbstractVector`: Observed eigenvalues.
+  - `vals`: Observed eigenvalues.
+  - `q`: Effective sample ratio (e.g., `n_obs / n_assets`).
   - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
-  - `m::Integer`: Number of adjacent histograms to smooth over.
-  - `n::Integer`: Number of points in the range of eigenvalues for density estimation.
-  - `q::Real`: Effective sample ratio (e.g., `n_obs / n_assets`).
+  - `m`: Number of adjacent histograms to smooth over.
+  - `n`: Number of points in the range of eigenvalues for density estimation.
 
-# ReturnsResult
+# Returns
 
   - `sse::Real`: The sum of squared errors between the empirical and theoretical densities.
-
-# Validation
-
-  - Assumes `vals` are eigenvalues of a correlation or covariance matrix.
-  - The empirical density is estimated using average shifted histograms.
 
 # Related
 
   - [`find_max_eval`](@ref)
   - [`Denoise`](@ref)
 """
-function errPDF(x, vals; kernel = AverageShiftedHistograms.Kernels.gaussian, m = 10,
-                n = 1000, q = 1000)
+function errPDF(x::Real, vals::AbstractVector, q::Real;
+                kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
+                n::Integer = 1000)
     e_min, e_max = x * (1 - sqrt(1.0 / q))^2, x * (1 + sqrt(1.0 / q))^2
     rg = range(e_min, e_max; length = n)
     pdf1 = q ⊘ (2 * pi * x * rg) ⊙
@@ -348,7 +340,10 @@ function errPDF(x, vals; kernel = AverageShiftedHistograms.Kernels.gaussian, m =
 end
 
 """
-    find_max_eval(vals, q; kernel = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10, n::Integer = 1000, args = (), kwargs = (;))
+    find_max_eval(vals::AbstractVector, q::Real;
+                  kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
+                  m::Integer = 10, n::Integer = 1000, args::Tuple = (),
+                  kwargs::NamedTuple = (;))
 
 Estimate the upper edge of the Marčenko–Pastur (MP) distribution for a set of eigenvalues, used to separate signal from noise in random matrix denoising.
 
@@ -356,32 +351,29 @@ This function fits the MP distribution to the observed spectrum by minimizing th
 
 # Arguments
 
-  - `vals::AbstractVector`: Observed eigenvalues (typically sorted in ascending order).
-  - `q::Real`: Effective sample ratio (e.g., `n_obs / n_assets`).
+  - `vals`: Observed eigenvalues (typically sorted in ascending order).
+  - `q`: Effective sample ratio (e.g., `n_obs / n_assets`).
   - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
-  - `m::Integer`: Number of adjacent histograms to smooth over.
-  - `n::Integer`: Number of points in the range of eigenvalues for density estimation.
+  - `m`: Number of adjacent histograms to smooth over.
+  - `n`: Number of points in the range of eigenvalues for density estimation.
   - `args`: Additional positional arguments for [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
   - `kwargs`: Additional keyword arguments for [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
 
-# ReturnsResult
+# Returns
 
-  - `(e_max, x)`: Tuple containing the estimated upper edge of the noise eigenvalue spectrum (`e_max`) and the fitted scale parameter (`x`).
-
-# Validation
-
-  - Uses [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl) to fit the MP distribution.
-  - Assumes `vals` are eigenvalues of a correlation or covariance matrix.
+  - `(e_max::Real, x::Real)`: Tuple containing the estimated upper edge of the noise eigenvalue spectrum (`e_max`) and the fitted scale parameter (`x`).
 
 # Related
 
   - [`errPDF`](@ref)
   - [`Denoise`](@ref)
 """
-function find_max_eval(vals, q; kernel = AverageShiftedHistograms.Kernels.gaussian,
-                       m::Integer = 10, n::Integer = 1000, args = (), kwargs = (;))
-    res = Optim.optimize(x -> errPDF(x, vals; kernel = kernel, m = m, n = n, q = q), 0.0,
-                         1.0, args...; kwargs...)
+function find_max_eval(vals::AbstractVector, q::Real;
+                       kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
+                       m::Integer = 10, n::Integer = 1000, args::Tuple = (),
+                       kwargs::NamedTuple = (;))
+    res = Optim.optimize(x -> errPDF(x, vals, q; kernel = kernel, m = m, n = n), 0.0, 1.0,
+                         args...; kwargs...)
     x = Optim.converged(res) ? Optim.minimizer(res) : 1.0
     e_max = x * (1.0 + sqrt(1.0 / q))^2
     return e_max, x
@@ -398,12 +390,12 @@ In-place denoising of a covariance or correlation matrix using a [`Denoise`](@re
 
 # Arguments
 
-  - `de::Denoise`: The denoising estimator specifying the algorithm and kernel parameters.
-  - `pdm::Union{Nothing, <:Posdef}`: Optional positive definite matrix estimator. If provided, ensures the output is positive definite.
-  - `X::AbstractMatrix`: The covariance or correlation matrix to be denoised (modified in-place).
-  - `q::Real`: The effective sample ratio (e.g., `n_obs / n_assets`), used for spectral thresholding.
+  - `de`: The denoising estimator specifying the algorithm and kernel parameters.
+  - `X`: The covariance or correlation matrix to be denoised (modified in-place).
+  - `q`: The effective sample ratio (e.g., `n_obs / n_assets`), used for spectral thresholding.
+  - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
 
-# ReturnsResult
+# Returns
 
   - `nothing`. The input matrix `X` is modified in-place.
 

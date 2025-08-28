@@ -65,6 +65,26 @@ All concrete types representing the result of a clustering estimation should sub
   - [`AbstractClusteringAlgorithm`](@ref)
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
+
+"""
+    HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
+
+Result type for hierarchical clustering in PortfolioOptimisers.jl.
+
+`HierarchicalClustering` stores the output of a hierarchical clustering algorithm, including the clustering object, similarity and distance matrices, and the number of clusters.
+
+# Fields
+
+  - `clustering`: The hierarchical clustering object (e.g., `Clustering.Hclust`).
+  - `S`: Similarity matrix used for clustering.
+  - `D`: Distance matrix used for clustering.
+  - `k`: Number of clusters.
+
+# Related
+
+  - [`AbstractClusteringResult`](@ref)
+  - [`ClusteringEstimator`](@ref)
+"""
 struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     clustering::T1
     S::T2

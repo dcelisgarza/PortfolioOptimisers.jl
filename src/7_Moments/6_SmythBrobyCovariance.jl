@@ -259,16 +259,16 @@ A flexible container type for configuring and applying Smyth-Broby covariance es
 
 # Fields
 
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator.
-  - `ve::StatsBase.CovarianceEstimator`: Variance estimator.
-  - `pdm::Posdef`: Positive definite matrix estimator (see [`Posdef`](@ref)).
-  - `threshold::Real`: Threshold parameter for Smyth-Broby covariance computation (typically in (0, 1)).
-  - `c1::Real`: Zone of confusion parameter (typically in (0, 1]).
-  - `c2::Real`: Zone of indecision lower bound (typically in (0, 1]).
-  - `c3::Real`: Zone of indecision upper bound (must satisfy `c3 > c2`).
-  - `n::Real`: Exponent parameter for the Smyth-Broby kernel.
-  - `alg::SmythBrobyCovarianceAlgorithm`: Smyth-Broby covariance algorithm variant.
-  - `threads::FLoops.Transducers.Executor`: Parallel execution strategy.
+  - `me`: Expected returns estimator.
+  - `ve`: Variance estimator.
+  - `pdm`: Positive definite matrix estimator (see [`Posdef`](@ref)).
+  - `threshold`: Threshold parameter for Smyth-Broby covariance computation (typically in (0, 1)).
+  - `c1`: Zone of confusion parameter (typically in (0, 1]).
+  - `c2`: Zone of indecision lower bound (typically in (0, 1]).
+  - `c3`: Zone of indecision upper bound (must satisfy `c3 > c2`).
+  - `n`: Exponent parameter for the Smyth-Broby kernel.
+  - `alg`: Smyth-Broby covariance algorithm variant.
+  - `threads`: Parallel execution strategy.
 
 # Constructor
 
@@ -338,18 +338,18 @@ This constructor creates a `SmythBrobyCovariance` object using the specified Smy
 
 # Arguments
 
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator.
-  - `ve::StatsBase.CovarianceEstimator`: Variance estimator.
-  - `pdm::Union{Nothing, <:Posdef}`: Positive definite matrix estimator.
-  - `threshold::Real`: Threshold parameter for Smyth-Broby covariance computation (must satisfy `0 < threshold < 1`).
-  - `c1::Real`: Zone of confusion parameter (must satisfy `0 < c1 ≤ 1`).
-  - `c2::Real`: Zone of indecision lower bound (must satisfy `0 < c2 ≤ 1`).
-  - `c3::Real`: Zone of indecision upper bound (must satisfy `c3 > c2`).
-  - `n::Real`: Exponent parameter for the Smyth-Broby kernel.
-  - `alg::SmythBrobyCovarianceAlgorithm`: Smyth-Broby covariance algorithm variant.
-  - `threads::FLoops.Transducers.Executor`: Parallel execution strategy.
+  - `me`: Expected returns estimator.
+  - `ve`: Variance estimator.
+  - `pdm`: Positive definite matrix estimator.
+  - `threshold`: Threshold parameter for Smyth-Broby covariance computation (must satisfy `0 < threshold < 1`).
+  - `c1`: Zone of confusion parameter (must satisfy `0 < c1 ≤ 1`).
+  - `c2`: Zone of indecision lower bound (must satisfy `0 < c2 ≤ 1`).
+  - `c3`: Zone of indecision upper bound (must satisfy `c3 > c2`).
+  - `n`: Exponent parameter for the Smyth-Broby kernel.
+  - `alg`: Smyth-Broby covariance algorithm variant.
+  - `threads`: Parallel execution strategy.
 
-# ReturnsResult
+# Returns
 
   - `SmythBrobyCovariance`: A configured Smyth-Broby covariance estimator.
 
@@ -442,20 +442,20 @@ This function computes the kernel value for a pair of asset returns, applying th
 
 # Arguments
 
-  - `xi::Real`: Return for asset `i`.
-  - `xj::Real`: Return for asset `j`.
-  - `mui::Real`: Mean for asset `i`.
-  - `muj::Real`: Mean for asset `j`.
-  - `sigmai::Real`: Standard deviation for asset `i`.
-  - `sigmaj::Real`: Standard deviation for asset `j`.
-  - `c1::Real`: Zone of confusion parameter (typically in (0, 1]).
-  - `c2::Real`: Zone of indecision lower bound (typically in (0, 1]).
-  - `c3::Real`: Zone of indecision upper bound (must satisfy `c3 > c2`).
-  - `n::Real`: Exponent parameter for the kernel.
+  - `xi`: Return for asset `i`.
+  - `xj`: Return for asset `j`.
+  - `mui`: Mean for asset `i`.
+  - `muj`: Mean for asset `j`.
+  - `sigmai`: Standard deviation for asset `i`.
+  - `sigmaj`: Standard deviation for asset `j`.
+  - `c1`: Zone of confusion parameter (typically in (0, 1]).
+  - `c2`: Zone of indecision lower bound (typically in (0, 1]).
+  - `c3`: Zone of indecision upper bound (must satisfy `c3 > c2`).
+  - `n`: Exponent parameter for the kernel.
 
-# ReturnsResult
+# Returns
 
-  - `kernel::Real`: The computed kernel value for the pair `(xi, xj)`.
+  - `score::Real`: The computed score for the pair `(xi, xj)`.
 
 # Details
 
@@ -502,12 +502,12 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby0, <:Any}`: Smyth-Broby covariance estimator configured with the `SmythBroby0` algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `mean_vec::AbstractArray`: Vector of means for each asset, used for centering.
-  - `std_vec::AbstractArray`: Vector of standard deviations for each asset, used for scaling and thresholding.
+  - `ce`: Smyth-Broby covariance estimator configured with the `SmythBroby0` algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `mean_vec`: Vector of means for each asset, used for centering.
+  - `std_vec`: Vector of standard deviations for each asset, used for scaling and thresholding.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -580,10 +580,10 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby0, <:Any}`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby0` algorithm.
-  - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
+  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby0` algorithm.
+  - `X`: Z-transformed data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -654,10 +654,10 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby0, <:Any}`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby0` algorithm.
-  - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
+  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby0` algorithm.
+  - `X`: Z-transformed data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -733,10 +733,10 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby1, <:Any}`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby1` algorithm.
-  - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
+  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby1` algorithm.
+  - `X`: Z-transformed data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -811,12 +811,12 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby2, <:Any}`: Smyth-Broby covariance estimator configured with the `SmythBroby2` algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `mean_vec::AbstractArray`: Vector of means for each asset, used for centering.
-  - `std_vec::AbstractArray`: Vector of standard deviations for each asset, used for scaling and thresholding.
+  - `ce`: Smyth-Broby covariance estimator configured with the `SmythBroby2` algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `mean_vec`: Vector of means for each asset, used for centering.
+  - `std_vec`: Vector of standard deviations for each asset, used for scaling and thresholding.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
 
@@ -887,10 +887,10 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby2, <:Any}`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby2` algorithm.
-  - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
+  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBroby2` algorithm.
+  - `X`: Z-transformed data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
 
@@ -959,12 +959,12 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber0, <:Any}`: Smyth-Broby covariance estimator configured with the `SmythBrobyGerber0` algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `mean_vec::AbstractArray`: Vector of means for each asset, used for centering.
-  - `std_vec::AbstractArray`: Vector of standard deviations for each asset, used for scaling and thresholding.
+  - `ce`: Smyth-Broby covariance estimator configured with the `SmythBrobyGerber0` algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `mean_vec`: Vector of means for each asset, used for centering.
+  - `std_vec`: Vector of standard deviations for each asset, used for scaling and thresholding.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -1043,10 +1043,10 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber0, <:Any}`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBrobyGerber0` algorithm.
-  - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
+  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBrobyGerber0` algorithm.
+  - `X`: Z-transformed data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -1123,12 +1123,12 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber1, <:Any}`: Smyth-Broby covariance estimator configured with the `SmythBrobyGerber1` algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `mean_vec::AbstractArray`: Vector of means for each asset, used for centering.
-  - `std_vec::AbstractArray`: Vector of standard deviations for each asset, used for scaling and thresholding.
+  - `ce`: Smyth-Broby covariance estimator configured with the `SmythBrobyGerber1` algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `mean_vec`: Vector of means for each asset, used for centering.
+  - `std_vec`: Vector of standard deviations for each asset, used for scaling and thresholding.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -1213,10 +1213,10 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber1, <:Any}`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBrobyGerber1` algorithm.
-  - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
+  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBrobyGerber1` algorithm.
+  - `X`: Z-transformed data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
@@ -1300,12 +1300,12 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{..., SmythBrobyGerber2, ...}`: Smyth-Broby covariance estimator configured with the `SmythBrobyGerber2` algorithm.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `mean_vec::AbstractArray`: Vector of means for each asset, used for centering.
-  - `std_vec::AbstractArray`: Vector of standard deviations for each asset, used for scaling and thresholding.
+  - `ce`: Smyth-Broby covariance estimator configured with the `SmythBrobyGerber2` algorithm.
+  - `X`: Data matrix (observations × assets).
+  - `mean_vec`: Vector of means for each asset, used for centering.
+  - `std_vec`: Vector of standard deviations for each asset, used for scaling and thresholding.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
 
@@ -1380,10 +1380,10 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{..., NormalisedSmythBrobyGerber2, ...}`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBrobyGerber2` algorithm.
-  - `X::AbstractMatrix`: Z-transformed data matrix (observations × assets).
+  - `ce`: Smyth-Broby covariance estimator configured with the `NormalisedSmythBrobyGerber2` algorithm.
+  - `X`: Z-transformed data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
 
@@ -1459,13 +1459,13 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnNormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Smyth-Broby covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `ce`: Smyth-Broby covariance estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix.
 
@@ -1514,13 +1514,13 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnNormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Smyth-Broby covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance.
+  - `ce`: Smyth-Broby covariance estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the covariance.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
-# ReturnsResult
+# Returns
 
   - `sigma::Matrix{Float64}`: The Smyth-Broby covariance matrix.
 
@@ -1568,13 +1568,13 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Smyth-Broby covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `ce`: Smyth-Broby covariance estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix.
 
@@ -1627,13 +1627,13 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 
 # Arguments
 
-  - `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Smyth-Broby covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance.
+  - `ce`: Smyth-Broby covariance estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the covariance.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
-# ReturnsResult
+# Returns
 
   - `sigma::Matrix{Float64}`: The Smyth-Broby covariance matrix.
 

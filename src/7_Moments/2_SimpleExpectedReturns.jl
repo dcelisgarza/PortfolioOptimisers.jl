@@ -9,7 +9,7 @@ A simple expected returns estimator for PortfolioOptimisers.jl, representing the
 
 # Fields
 
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional weights for each observation. If `nothing`, the unweighted mean is computed.
+  - `w`: Optional weights for each observation. If `nothing`, the unweighted mean is computed.
 
 # Constructor
 
@@ -19,7 +19,7 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator with optional observation 
 
 # Fields
 
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional weights for each observation.
+  - `w`: Optional weights for each observation.
 
 # Related
 
@@ -37,9 +37,9 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator for computing expected ret
 
 # Arguments
 
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional observation weights. If `nothing`, the unweighted mean is computed.
+  - `w`: Optional observation weights. If `nothing`, the unweighted mean is computed.
 
-# ReturnsResult
+# Returns
 
   - `SimpleExpectedReturns`: A simple expected returns estimator configured with optional weights.
 
@@ -47,7 +47,7 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator for computing expected ret
 
   - If `w` is provided, it must not be empty.
 
-# ReturnsResult
+# Returns
 
   - `SimpleExpectedReturns`: A simple expected returns estimator.
 
@@ -90,12 +90,12 @@ This method computes the expected returns as the sample mean of the input data `
 
 # Arguments
 
-  - `me::SimpleExpectedReturns`: The expected returns estimator.
-  - `X::AbstractArray`: Data array of asset returns (observations × assets).
+  - `me`: The expected returns estimator.
+  - `X`: Data array of asset returns (observations × assets).
   - `dims`: Dimension along which to compute the mean.
   - `kwargs...`: Additional keyword arguments passed to [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean).
 
-# ReturnsResult
+# Returns
 
   - The mean of `X` along the specified dimension using the [`SimpleExpectedReturns`](@ref) estimator.
 

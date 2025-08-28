@@ -100,7 +100,7 @@ Regression target type for standard linear models in PortfolioOptimisers.jl.
 
 # Fields
 
-  - `kwargs::NamedTuple`: Keyword arguments to be passed to the linear model fitting routine (e.g., options for the solver or regularisation).
+  - `kwargs`: Keyword arguments to be passed to the linear model fitting routine (e.g., options for the solver or regularisation).
 
 # Constructor
 
@@ -126,7 +126,7 @@ This constructor creates a `LinearModel` object, optionally accepting keyword ar
 
 # Arguments
 
-  - `kwargs::NamedTuple`: Keyword arguments for the linear model fitting routine.
+  - `kwargs`: Keyword arguments for the linear model fitting routine.
 
 # Returns
 
@@ -186,8 +186,8 @@ Regression target type for generalised linear models (GLMs) in PortfolioOptimise
 
 # Fields
 
-  - `args::Tuple`: Positional arguments to be passed to the GLM fitting routine (e.g., distribution and link).
-  - `kwargs::NamedTuple`: Keyword arguments for the GLM fitting routine (e.g., solver options, regularisation).
+  - `args`: Positional arguments to be passed to the GLM fitting routine (e.g., distribution and link).
+  - `kwargs`: Keyword arguments for the GLM fitting routine (e.g., solver options, regularisation).
 
 # Constructor
 
@@ -214,8 +214,8 @@ This constructor creates a `GeneralisedLinearModel` object, optionally accepting
 
 # Arguments
 
-  - `args::Tuple`: Positional arguments for the GLM fitting routine.
-  - `kwargs::NamedTuple`: Keyword arguments for the GLM fitting routine.
+  - `args`: Positional arguments for the GLM fitting routine.
+  - `kwargs`: Keyword arguments for the GLM fitting routine.
 
 # Returns
 

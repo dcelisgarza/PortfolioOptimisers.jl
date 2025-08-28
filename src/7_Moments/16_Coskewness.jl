@@ -62,7 +62,7 @@ Construct a [`Coskewness`](@ref) estimator for coskewness computation.
   - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator.
   - `alg::AbstractMomentAlgorithm`: Moment algorithm.
 
-# ReturnsResult
+# Returns
 
   - `Coskewness`: Configured coskewness estimator.
 
@@ -109,7 +109,7 @@ Internal helper for coskewness matrix processing.
   - `X::AbstractMatrix`: Data matrix (observations × assets).
   - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator.
 
-# ReturnsResult
+# Returns
 
   - `V::Matrix`: Processed coskewness matrix.
 
@@ -150,7 +150,7 @@ Internal helper for coskewness computation.
   - `X::AbstractMatrix`: Data matrix (observations × assets).
   - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator.
 
-# ReturnsResult
+# Returns
 
   - `cskew::Matrix`: Coskewness tensor.
   - `V::Matrix`: Processed coskewness matrix.
@@ -187,7 +187,7 @@ Compute the full coskewness tensor and processed matrix for a dataset. For `Full
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
-# ReturnsResult
+# Returns
 
   - `cskew::Matrix`: Coskewness tensor (observations × assets^2).
   - `V::Matrix`: Processed coskewness matrix (assets × assets).

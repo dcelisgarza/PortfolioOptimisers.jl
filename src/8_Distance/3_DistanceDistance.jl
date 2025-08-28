@@ -12,9 +12,9 @@ A distance-of-distances estimator for portfolio optimization.
 
 # Fields
 
-  - `dist::Distances.Metric`: The metric to use for the second-level distance from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl).
-  - `args::Tuple`: Positional arguments to pass to the metric.
-  - `kwargs::NamedTuple`: Keyword arguments to pass to the metric.
+  - `dist`: The metric to use for the second-level distance from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl).
+  - `args`: Positional arguments to pass to the metric.
+  - `kwargs`: Keyword arguments to pass to the metric.
   - `alg::AbstractDistanceAlgorithm`: The base distance algorithm to use.
 
 # Constructor
@@ -44,9 +44,9 @@ Construct a [`DistanceDistance`](@ref) estimator with the specified metric and b
 
 # Arguments
 
-  - `dist::Distances.Metric`: The metric to use for the second-level distance from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl).
-  - `args::Tuple`: Positional arguments to pass to the metric.
-  - `kwargs::NamedTuple`: Keyword arguments to pass to the metric.
+  - `dist`: The metric to use for the second-level distance from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl).
+  - `args`: Positional arguments to pass to the metric.
+  - `kwargs`: Keyword arguments to pass to the metric.
   - `alg::AbstractDistanceAlgorithm`: The base distance algorithm to use.
 
 # Returns

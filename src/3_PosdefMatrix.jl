@@ -47,7 +47,7 @@ Constructor for [`Posdef`](@ref). Defaults to the [`NearestCorrelationMatrix.New
 
 # Arguments
 
-  - `alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm}`: The algorithm used for the nearest correlation matrix projection.
+  - `alg`: The algorithm used for the nearest correlation matrix projection.
 
 # Examples
 
@@ -82,10 +82,10 @@ For covariance matrices, the function internally converts to a correlation matri
 
 # Arguments
 
-  - `method::Posdef`: The estimator specifying the projection algorithm.
-  - `X::AbstractMatrix`: The matrix to be projected in-place.
+  - `method`: The estimator specifying the projection algorithm.
+  - `X`: The matrix to be projected in-place.
 
-# ReturnsResult
+# Returns
 
   - `nothing`. The input matrix `X` is modified in-place.
 

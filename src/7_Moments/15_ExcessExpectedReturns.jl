@@ -40,7 +40,7 @@ Construct an [`ExcessExpectedReturns`](@ref) estimator for excess expected retur
   - `me::AbstractExpectedReturnsEstimator`: Mean estimator for expected returns.
   - `rf::Real`: Risk-free rate to subtract.
 
-# ReturnsResult
+# Returns
 
   - `ExcessExpectedReturns`: Configured excess expected returns estimator.
 
@@ -79,7 +79,7 @@ This method applies the mean estimator to the data and subtracts the risk-free r
   - `dims::Int`: Dimension along which to compute the mean.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
-# ReturnsResult
+# Returns
 
   - `mu::AbstractArray`: Excess expected returns vector.
 

@@ -26,15 +26,15 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
 
 # Fields
 
-  - `name::Union{Symbol, <:AbstractString}`: Symbol or string identifier for the solver.
-  - `solver::Any`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
-  - `settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}}`: Solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).
-  - `check_sol::NamedTuple`: Named tuple of solution for keyword arguments in [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible).
-  - `add_bridges::Bool`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
+  - `name`: Symbol or string identifier for the solver.
+  - `solver`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
+  - `settings`: Solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).
+  - `check_sol`: Named tuple of solution for keyword arguments in [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible).
+  - `add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
 
 # Constructor
 
-    Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
+    Solver(; name::Union{Symbol, <:AbstractString} = "", solver = nothing,
              settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}} = nothing,
              check_sol::NamedTuple = (;), add_bridges::Bool = true)
 
@@ -60,11 +60,11 @@ This constructor validates and packages the solver backend, settings, and option
 
 # Arguments
 
-  - `name::Union{Symbol, <:AbstractString}`: Symbol or string identifier for the solver.
-  - `solver::Any`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
-  - `settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}}`: Solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).
-  - `check_sol::NamedTuple`: Named tuple of solution for keyword arguments in [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible).
-  - `add_bridges::Bool`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
+  - `name`: Symbol or string identifier for the solver.
+  - `solver`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
+  - `settings`: Solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).
+  - `check_sol`: Named tuple of solution for keyword arguments in [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible).
+  - `add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
 
 # Returns
 

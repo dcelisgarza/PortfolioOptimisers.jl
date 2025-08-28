@@ -13,11 +13,11 @@ A flexible container type for configuring and applying distance-based covariance
 
 # Fields
 
-  - `dist::Distances.Metric`: Distance metric used for pairwise computations.
-  - `args::Tuple`: Additional positional arguments for the distance metric.
-  - `kwargs::NamedTuple`: Additional keyword arguments for the distance metric.
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional weights for observations.
-  - `threads::FLoops.Transducers.Executor`: Parallel execution strategy.
+  - `dist`: Distance metric used for pairwise computations.
+  - `args`: Additional positional arguments for the distance metric.
+  - `kwargs`: Additional keyword arguments for the distance metric.
+  - `w`: Optional weights for observations.
+  - `threads`: Parallel execution strategy.
 
 # Constructor
 
@@ -54,13 +54,13 @@ This constructor creates a `DistanceCovariance` object using the specified dista
 
 # Arguments
 
-  - `dist::Distances.Metric`: Distance metric used for pairwise computations.
-  - `args::Tuple`: Additional positional arguments for the distance metric.
-  - `kwargs::NamedTuple`: Additional keyword arguments for the distance metric.
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional weights for observations.
-  - `threads::FLoops.Transducers.Executor`: Parallel execution strategy.
+  - `dist`: Distance metric used for pairwise computations.
+  - `args`: Additional positional arguments for the distance metric.
+  - `kwargs`: Additional keyword arguments for the distance metric.
+  - `w`: Optional weights for observations.
+  - `threads`: Parallel execution strategy.
 
-# ReturnsResult
+# Returns
 
   - `DistanceCovariance`: A configured distance covariance estimator.
 
@@ -103,11 +103,11 @@ This function calculates the distance correlation between `v1` and `v2` using th
 
 # Arguments
 
-  - `ce::DistanceCovariance`: Distance covariance estimator.
-  - `v1::AbstractVector`: First data vector.
-  - `v2::AbstractVector`: Second data vector.
+  - `ce`: Distance covariance estimator.
+  - `v1`: First data vector.
+  - `v2`: Second data vector.
 
-# ReturnsResult
+# Returns
 
   - `ρ::Float64`: The computed distance correlation between `v1` and `v2`.
 
@@ -156,10 +156,10 @@ This function calculates the distance correlation between each pair of columns i
 
 # Arguments
 
-  - `ce::DistanceCovariance`: Distance covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
+  - `ce`: Distance covariance estimator.
+  - `X`: Data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: Distance correlation matrix.
 
@@ -192,12 +192,12 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 
 # Arguments
 
-  - `ce::DistanceCovariance`: Distance covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute correlations.
+  - `ce`: Distance covariance estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute correlations.
   - `kwargs...`: Additional keyword arguments (currently unused).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: Symmetric matrix of pairwise distance correlations.
 
@@ -247,11 +247,11 @@ This function calculates the distance covariance between `v1` and `v2` using the
 
 # Arguments
 
-  - `ce::DistanceCovariance`: Distance covariance estimator.
-  - `v1::AbstractVector`: First data vector.
-  - `v2::AbstractVector`: Second data vector.
+  - `ce`: Distance covariance estimator.
+  - `v1`: First data vector.
+  - `v2`: Second data vector.
 
-# ReturnsResult
+# Returns
 
   - `σ::Float64`: The computed distance covariance between `v1` and `v2`.
 
@@ -298,10 +298,10 @@ This function calculates the distance covariance between each pair of columns in
 
 # Arguments
 
-  - `ce::DistanceCovariance`: Distance covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
+  - `ce`: Distance covariance estimator.
+  - `X`: Data matrix (observations × assets).
 
-# ReturnsResult
+# Returns
 
   - `sigma::Matrix{Float64}`: Symmetric matrix of pairwise distance covariances.
 
@@ -334,12 +334,12 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 
 # Arguments
 
-  - `ce::DistanceCovariance`: Distance covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
+  - `ce`: Distance covariance estimator.
+  - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute covariances.
   - `kwargs...`: Additional keyword arguments (currently unused).
 
-# ReturnsResult
+# Returns
 
   - `sigma::Matrix{Float64}`: Symmetric matrix of pairwise distance covariances.
 

@@ -112,7 +112,7 @@ This utility dispatches on the binning algorithm type and returns the correspond
   - `bins::Scott`: Use Scott's rule (`astropy.stats.scott_bin_width`).
   - `bins::Union{<:HacineGharbiRavier, <:Integer}`: No bin width function (returns `nothing`).
 
-# ReturnsResult
+# Returns
 
   - `bin_width_func`: The corresponding bin width function (callable), or `nothing` if not applicable.
 
@@ -185,7 +185,7 @@ This function determines the number of bins to use for histogram-based calculati
   - `bin_width_func`: Bin width selection function (from `get_bin_width_func`), or `nothing`.
   - `T::Integer`: Number of observations (used by some algorithms).
 
-# ReturnsResult
+# Returns
 
   - `nbins::Int`: The computed number of bins for the variable pair.
 
@@ -238,7 +238,7 @@ This function computes the normalised histograms (probability mass functions) fo
   - `xi::AbstractVector`: Data vector for variable `i`.
   - `bins::Integer`: Number of bins to use for the histograms.
 
-# ReturnsResult
+# Returns
 
   - `ex::Float64`: Entropy of `xj`.
   - `ey::Float64`: Entropy of `xi`.
@@ -291,7 +291,7 @@ This function calculates the mutual information between two variables given thei
 
   - `X::AbstractMatrix`: Joint histogram matrix (typically from `calc_hist_data`).
 
-# ReturnsResult
+# Returns
 
   - `mi::Float64`: The intrinsic mutual information between the two variables.
 
@@ -346,7 +346,7 @@ This function calculates the pairwise variation of information between all colum
   - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins.
   - `normalise::Bool`: Whether to normalise the VI by the joint entropy.
 
-# ReturnsResult
+# Returns
 
   - `var_mtx::Matrix{Float64}`: Symmetric matrix of pairwise variation of information values.
 
@@ -447,7 +447,7 @@ This function calculates the pairwise mutual information between all columns of 
   - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins.
   - `normalise::Bool`: Whether to normalise the MI by the minimum marginal entropy.
 
-# ReturnsResult
+# Returns
 
   - `mut_mtx::Matrix{Float64}`: Symmetric matrix of pairwise mutual information values.
 

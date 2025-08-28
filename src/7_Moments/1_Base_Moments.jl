@@ -73,14 +73,14 @@ This function attempts to compute the weighted covariance matrix using the provi
 
 # Arguments
 
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use.
-  - `X::AbstractMatrix`: Data matrix.
-  - `w::AbstractWeights`: Optional weights for each observation.
+  - `ce`: Covariance estimator to use.
+  - `X`: Data matrix.
+  - `w`: Optional weights for each observation.
   - `dims`: Dimension along which to compute the covariance.
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cov`.
 
-# ReturnsResult
+# Returns
 
   - Covariance matrix as computed by the estimator and optional weights.
 
@@ -115,14 +115,14 @@ This function attempts to compute the weighted correlation matrix using the prov
 
 # Arguments
 
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use.
-  - `X::AbstractMatrix`: Data matrix.
-  - `w::AbstractWeights`: Optional weights for each observation.
+  - `ce`: Covariance estimator to use.
+  - `X`: Data matrix.
+  - `w`: Optional weights for each observation.
   - `dims`: Dimension along which to compute the correlation.
   - `mean`: Optional mean array to use for centering.
   - `kwargs...`: Additional keyword arguments passed to `cor`.
 
-# ReturnsResult
+# Returns
 
   - Correlation matrix as computed by the estimator and optional weights.
 

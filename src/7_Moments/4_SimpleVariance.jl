@@ -8,9 +8,9 @@ A flexible variance estimator for PortfolioOptimisers.jl supporting optional exp
 
 # Fields
 
-  - `me::Union{Nothing, <:AbstractExpectedReturnsEstimator}`: Optional expected returns estimator. If `nothing`, the mean is not estimated.
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional observation weights. If `nothing`, the estimator is unweighted.
-  - `corrected::Bool`: Whether to apply Bessel's correction (unbiased variance).
+  - `me`: Optional expected returns estimator. If `nothing`, the mean is not estimated.
+  - `w`: Optional observation weights. If `nothing`, the estimator is unweighted.
+  - `corrected`: Whether to apply Bessel's correction (unbiased variance).
 
 # Constructor
 
@@ -47,11 +47,11 @@ This constructor creates a `SimpleVariance` object using the specified expected 
 
 # Arguments
 
-  - `me::Union{Nothing, <:AbstractExpectedReturnsEstimator}`: Expected returns estimator. Necessary when estimating the variance or standard deviation along the dimension of a matrix. Not used when computed on a vector.
-  - `w::Union{Nothing, <:AbstractWeights}`: Optional observation weights. If `nothing`, the estimator is unweighted.
-  - `corrected::Bool`: Whether to apply Bessel's correction.
+  - `me`: Expected returns estimator. Necessary when estimating the variance or standard deviation along the dimension of a matrix. Not used when computed on a vector.
+  - `w`: Optional observation weights. If `nothing`, the estimator is unweighted.
+  - `corrected`: Whether to apply Bessel's correction.
 
-# ReturnsResult
+# Returns
 
   - `SimpleVariance`: A variance estimator configured with the specified mean estimator, weights, and bias correction flag.
 
@@ -112,13 +112,13 @@ This method computes the standard deviation of the input array `X` using the con
 
 # Arguments
 
-  - `ve::SimpleVariance`: Variance estimator specifying the mean estimator, weights, and bias correction.
-  - `X::AbstractArray`: Data array (vector or matrix) for which to compute the standard deviation.
-  - `dims::Int`: Dimension along which to compute the standard deviation (for matrices).
+  - `ve`: Variance estimator specifying the mean estimator, weights, and bias correction.
+  - `X`: Data array (vector or matrix) for which to compute the standard deviation.
+  - `dims`: Dimension along which to compute the standard deviation (for matrices).
   - `mean`: Optional mean value or vector for centering. If not provided, estimated using `ve.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
-# ReturnsResult
+# Returns
 
   - Standard deviation of `X`, computed according to the estimator configuration.
 
@@ -167,11 +167,11 @@ This method computes the standard deviation of the input vector `X` using the co
 
 # Arguments
 
-  - `ve::SimpleVariance`: Variance estimator specifying weights and bias correction.
-  - `X::AbstractVector`: Data vector for which to compute the standard deviation.
-  - `mean`: Optional mean value for centering. If not provided, the default mean is used.
+  - `ve`: Variance estimator specifying weights and bias correction.
+  - `X`: Data vector for which to compute the standard deviation.
+  - `mean`: Optional Mean value for centering. If not provided, the default mean is used.
 
-# ReturnsResult
+# Returns
 
   - Standard deviation of `X`, computed according to the estimator configuration.
 
@@ -230,13 +230,13 @@ This method computes the variance of the input array `X` using the configuration
 
 # Arguments
 
-  - `ve::SimpleVariance`: Variance estimator specifying the mean estimator, weights, and bias correction.
-  - `X::AbstractArray`: Data array (vector or matrix) for which to compute the variance.
-  - `dims::Int`: Dimension along which to compute the variance (for matrices).
+  - `ve`: Variance estimator specifying the mean estimator, weights, and bias correction.
+  - `X`: Data array (vector or matrix) for which to compute the variance.
+  - `dims`: Dimension along which to compute the variance (for matrices).
   - `mean`: Optional mean value or vector for centering. If not provided, estimated using `ve.me`.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
-# ReturnsResult
+# Returns
 
   - Variance of `X`, computed according to the estimator configuration.
 
@@ -283,11 +283,11 @@ This method computes the variance of the input vector `X` using the configuratio
 
 # Arguments
 
-  - `ve::SimpleVariance`: Variance estimator specifying weights and bias correction.
-  - `X::AbstractVector`: Data vector for which to compute the variance.
+  - `ve`: Variance estimator specifying weights and bias correction.
+  - `X`: Data vector for which to compute the variance.
   - `mean`: Optional mean value for centering. If not provided, the default mean is used.
 
-# ReturnsResult
+# Returns
 
   - Variance of `X`, computed according to the estimator configuration.
 

@@ -12,7 +12,7 @@ Container type for equilibrium expected returns estimators.
 # Fields
 
   - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
-  - `w::Union{Nothing, <:AbstractWeights}`: Equilibrium portfolio weights. If `nothing`, uses equal weights.
+  - `w`: Equilibrium portfolio weights. If `nothing`, uses equal weights.
   - `l::Real`: Risk aversion parameter.
 
 # Constructor
@@ -45,10 +45,10 @@ Construct an [`EquilibriumExpectedReturns`](@ref) estimator for equilibrium-base
 
   - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
 
-  - `w::Union{Nothing, <:AbstractWeights}`: Equilibrium portfolio weights. If `nothing`, uses equal weights.
+  - `w`: Equilibrium portfolio weights. If `nothing`, uses equal weights.
   - `l::Real`: Risk aversion parameter.
 
-# ReturnsResult
+# Returns
 
   - `EquilibriumExpectedReturns`: Configured equilibrium expected returns estimator.
 
@@ -105,7 +105,7 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
   - `dims::Int`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
 
-# ReturnsResult
+# Returns
 
   - `mu::AbstractArray`: Equilibrium expected returns vector.
 

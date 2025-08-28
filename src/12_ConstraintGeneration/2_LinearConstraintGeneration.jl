@@ -158,6 +158,14 @@ function nothing_asset_sets_view(sets::AssetSets, i::AbstractVector)
     dict[sets.key] = view(sets.dict[sets.key], i)
     return AssetSets(; key = sets.key, dict = dict)
 end
+"""
+    nothing_asset_sets_view(::Nothing, ::Any)
+
+No-op fallback for indexing `nothing` asset sets.
+"""
+function nothing_asset_sets_view(::Nothing, ::Any)
+    return nothing
+end
 function group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::Real,
                        dict::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
                                    <:AbstractVector{<:Pair{<:Any, <:Real}}},

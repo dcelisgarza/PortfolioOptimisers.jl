@@ -22,7 +22,11 @@ A concrete detoning estimator for removing the top `n` principal components (mar
 
 # Fields
 
-  - `n::Integer`: Number of leading principal components to remove.
+  - `n`: Number of leading principal components to remove.
+
+# Constructor
+
+    Detone(; n = 1)
 
 # Related
 
@@ -41,9 +45,9 @@ Construct a [`Detone`](@ref) estimator for removing the top `n` principal compon
 
 # Arguments
 
-  - `n::Integer`: Number of leading principal components to remove. Must satisfy `n ≥ 0`.
+  - `n`: Number of leading principal components to remove. Must satisfy `n ≥ 0`.
 
-# ReturnsResult
+# Returns
 
   - `Detone`: A detoning estimator.
 
@@ -76,11 +80,11 @@ In-place removal of the top `n` principal components (market modes) from a covar
 
 # Arguments
 
-  - `dt::Detone`: The detoning estimator specifying the number of components to remove.
-  - `X::AbstractMatrix`: The covariance or correlation matrix to be detoned (modified in-place).
-  - `pdm::Union{Nothing, <:Posdef}`: Optional positive definite matrix estimator.
+  - `dt`: The detoning estimator specifying the number of components to remove.
+  - `X`: The covariance or correlation matrix to be detoned (modified in-place).
+  - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
 
-# ReturnsResult
+# Returns
 
   - `nothing`. The input matrix `X` is modified in-place.
 

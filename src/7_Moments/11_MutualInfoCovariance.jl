@@ -48,7 +48,7 @@ This constructor creates a `MutualInfoCovariance` object using the specified var
   - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins for MI estimation.
   - `normalise::Bool`: Whether to normalise the MI matrix.
 
-# ReturnsResult
+# Returns
 
   - `MutualInfoCovariance`: A configured mutual information-based covariance estimator.
 
@@ -103,7 +103,7 @@ This method computes the pairwise mutual information correlation matrix for the 
   - `dims::Int`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments (currently unused).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: Symmetric matrix of mutual information-based correlation coefficients.
 
@@ -140,7 +140,7 @@ This method computes the pairwise mutual information covariance matrix for the i
   - `dims::Int`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
-# ReturnsResult
+# Returns
 
   - `sigma::Matrix{Float64}`: Symmetric matrix of mutual information-based covariances.
 

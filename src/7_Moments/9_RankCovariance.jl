@@ -51,7 +51,7 @@ This constructor creates a `KendallCovariance` object using the specified varian
 
   - `ve::AbstractVarianceEstimator`: Variance estimator.
 
-# ReturnsResult
+# Returns
 
   - `KendallCovariance`: A configured Kendall's tau-based covariance estimator.
 
@@ -92,7 +92,7 @@ This method computes the pairwise Kendall's tau rank correlation matrix for the 
   - `dims::Int`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments (currently unused).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: Symmetric matrix of Kendall's tau rank correlation coefficients.
 
@@ -127,7 +127,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
   - `dims::Int`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
-# ReturnsResult
+# Returns
 
   - `sigma::Matrix{Float64}`: Symmetric matrix of Kendall's tau rank covariances.
 
@@ -190,7 +190,7 @@ This constructor creates a `SpearmanCovariance` object using the specified varia
 
   - `ve::AbstractVarianceEstimator`: Variance estimator.
 
-# ReturnsResult
+# Returns
 
   - `SpearmanCovariance`: A configured Spearman's rho-based covariance estimator.
 
@@ -230,7 +230,7 @@ This method computes the pairwise Spearman's rho rank correlation matrix for the
   - `dims::Int`: Dimension along which to compute the correlation (1 = columns/assets, 2 = rows). Default is `1`.
   - `kwargs...`: Additional keyword arguments (currently unused).
 
-# ReturnsResult
+# Returns
 
   - `rho::Matrix{Float64}`: Symmetric matrix of Spearman's rho rank correlation coefficients.
 
@@ -265,7 +265,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
   - `dims::Int`: Dimension along which to compute the covariance (1 = columns/assets, 2 = rows). Default is `1`.
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
-# ReturnsResult
+# Returns
 
   - `sigma::Matrix{Float64}`: Symmetric matrix of Spearman's rho rank covariances.
 
