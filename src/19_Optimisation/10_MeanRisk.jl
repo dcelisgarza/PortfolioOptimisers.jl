@@ -230,8 +230,8 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_risk_constraints!(model, mr.r, mr, pr, nplg, cplg; rd = rd)
     scalarise_risk_expression!(model, mr.opt.sce)
     set_return_constraints!(model, ret, mr.obj, pr; rd = rd)
-    set_sdp_philogeny_constraints!(model, nplg, :sdp_nplg)
-    set_sdp_philogeny_constraints!(model, cplg, :sdp_cplg)
+    set_sdp_phylogeny_constraints!(model, nplg, :sdp_nplg)
+    set_sdp_phylogeny_constraints!(model, cplg, :sdp_cplg)
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     retcode, sol = solve_mean_risk!(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), fees)

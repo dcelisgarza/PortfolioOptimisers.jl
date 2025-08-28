@@ -52,15 +52,15 @@ include("./9_JuMPModelOptimisation.jl")
 
 include("./10_OWA.jl")
 
-include("./11_Philogeny/1_Base_Philogeny.jl")
-include("./11_Philogeny/2_Clustering.jl")
-include("./11_Philogeny/3_Hierarchical.jl")
-include("./11_Philogeny/4_DBHT.jl")
-include("./11_Philogeny/5_Philogeny.jl")
+include("./11_Phylogeny/1_Base_Phylogeny.jl")
+include("./11_Phylogeny/2_Clustering.jl")
+include("./11_Phylogeny/3_Hierarchical.jl")
+include("./11_Phylogeny/4_DBHT.jl")
+include("./11_Phylogeny/5_Phylogeny.jl")
 
 include("./12_ConstraintGeneration/1_Base_ConstraintGeneration.jl")
 include("./12_ConstraintGeneration/2_LinearConstraintGeneration.jl")
-include("./12_ConstraintGeneration/3_PhilogenyConstraintGeneration.jl")
+include("./12_ConstraintGeneration/3_PhylogenyConstraintGeneration.jl")
 include("./12_ConstraintGeneration/4_WeightBoundsConstraintGeneration.jl")
 include("./12_ConstraintGeneration/5_ThresholdConstraintGeneration.jl")
 

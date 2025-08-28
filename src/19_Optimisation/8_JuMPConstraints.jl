@@ -545,15 +545,15 @@ end
 function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds,
                               card::Union{Nothing, <:Integer},
                               gcard::Union{Nothing, <:LinearConstraint},
-                              nplg::Union{Nothing, <:PhilogenyResult},
-                              cplg::Union{Nothing, <:PhilogenyResult},
+                              nplg::Union{Nothing, <:PhylogenyResult},
+                              cplg::Union{Nothing, <:PhylogenyResult},
                               lt::Union{Nothing, <:BuyInThreshold},
                               st::Union{Nothing, <:BuyInThreshold},
                               fees::Union{Nothing, <:Fees}, ss::Union{Nothing, <:Real})
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
-    n_flag = isa(nplg, IntegerPhilogeny)
-    c_flag = isa(cplg, IntegerPhilogeny)
+    n_flag = isa(nplg, IntegerPhylogeny)
+    c_flag = isa(cplg, IntegerPhylogeny)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
     ffl_flag, ffs_flag, ffl, ffs = if !isnothing(fees)
@@ -1050,10 +1050,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         cplg::Union{Nothing, <:SemiDefinitePhilogeny,
-                                                     <:IntegerPhilogeny},
-                                         nplg::Union{Nothing, <:SemiDefinitePhilogeny,
-                                                     <:IntegerPhilogeny}, args...)
+                                         cplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                     <:IntegerPhylogeny},
+                                         nplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                     <:IntegerPhylogeny}, args...)
     r = te.r
     wb = te.tracking.w
     err = te.err
@@ -1071,10 +1071,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:DependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         cplg::Union{Nothing, <:SemiDefinitePhilogeny,
-                                                     <:IntegerPhilogeny},
-                                         nplg::Union{Nothing, <:SemiDefinitePhilogeny,
-                                                     <:IntegerPhilogeny},
+                                         cplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                     <:IntegerPhylogeny},
+                                         nplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                     <:IntegerPhylogeny},
                                          fees::Union{Nothing, <:Fees}, args...)
     r = te.r
     wb = te.tracking.w
@@ -1203,10 +1203,10 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
     @constraint(model, M_PSD, sc * M in PSDCone())
     return W
 end
-function set_sdp_philogeny_constraints!(args...)
+function set_sdp_phylogeny_constraints!(args...)
     return nothing
 end
-function set_sdp_philogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhilogeny,
+function set_sdp_phylogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhylogeny,
                                         key::Symbol)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
@@ -1220,10 +1220,10 @@ function set_sdp_philogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhil
     end
     return nothing
 end
-function set_sdp_frc_philogeny_constraints!(args...)
+function set_sdp_frc_phylogeny_constraints!(args...)
     return nothing
 end
-function set_sdp_frc_philogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhilogeny,
+function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhylogeny,
                                             key::Symbol)
     sc = model[:sc]
     set_sdp_frc_constraints!(model)

@@ -29,9 +29,9 @@ end
 function clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...)
     return clusterise(cle, pr.X; kwargs...)
 end
-function philogeny_matrix(necle::Union{<:Network, <:ClusteringEstimator},
+function phylogeny_matrix(necle::Union{<:Network, <:ClusteringEstimator},
                           pr::AbstractPriorResult; kwargs...)
-    return philogeny_matrix(necle, pr.X; kwargs...)
+    return phylogeny_matrix(necle, pr.X; kwargs...)
 end
 function centrality_vector(necte::Union{<:Network, <:Centrality},
                            cent::AbstractCentralityAlgorithm, pr::AbstractPriorResult;

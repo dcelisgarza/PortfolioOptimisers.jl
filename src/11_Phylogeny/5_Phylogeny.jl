@@ -1,4 +1,4 @@
-abstract type AbstractCentralityAlgorithm <: AbstractPhilogenyAlgorithm end
+abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
@@ -70,7 +70,7 @@ end
 function calc_centrality(cent::StressCentrality, g::AbstractGraph)
     return Graphs.stress_centrality(g, cent.args...; cent.kwargs...)
 end
-abstract type AbstractTreeType <: AbstractPhilogenyAlgorithm end
+abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
 struct KruskalTree{T1, T2} <: AbstractTreeType
     args::T1
     kwargs::T2
@@ -101,7 +101,7 @@ end
 function calc_mst(cent::PrimTree, g::AbstractGraph)
     return Graphs.prim_mst(g, cent.args...; cent.kwargs...)
 end
-abstract type AbstractNetworkEstimator <: AbstractPhilogenyEstimator end
+abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
 struct Network{T1, T2, T3, T4} <: AbstractNetworkEstimator
     ce::T1
     de::T2
@@ -114,7 +114,7 @@ function Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovari
                  n::Integer = 1)
     return Network(ce, de, alg, n)
 end
-abstract type AbstractCentralityEstimator <: AbstractPhilogenyEstimator end
+abstract type AbstractCentralityEstimator <: AbstractPhylogenyEstimator end
 struct Centrality{T1, T2} <: AbstractCentralityEstimator
     ne::T1
     cent::T2
@@ -141,7 +141,7 @@ function calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractSimilarityMatrixAlgo
     Rpm = PMFG_T2s(S)[1]
     return adjacency_matrix(SimpleGraph(Rpm))
 end
-function philogeny_matrix(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function phylogeny_matrix(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs...)
     A = calc_adjacency(ne, X; dims = dims, kwargs...)
     P = zeros(Int, size(Matrix(A)))
     for i in 0:(ne.n)
@@ -150,7 +150,7 @@ function philogeny_matrix(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs.
     P .= clamp!(P, 0, 1) - I
     return P
 end
-function philogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
+function phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
                           X::AbstractMatrix; branchorder::Symbol = :optimal, dims::Int = 1,
                           kwargs...)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
@@ -164,7 +164,7 @@ function philogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClustering
 end
 function centrality_vector(ne::Network, cent::AbstractCentralityAlgorithm,
                            X::AbstractMatrix; dims::Int = 1, kwargs...)
-    P = philogeny_matrix(ne, X; dims = dims, kwargs...)
+    P = phylogeny_matrix(ne, X; dims = dims, kwargs...)
     G = SimpleGraph(P)
     return calc_centrality(cent, G)
 end
@@ -179,18 +179,18 @@ function average_centrality(cte::Centrality, w::AbstractVector, X::AbstractMatri
                             dims::Int = 1, kwargs...)
     return average_centrality(cte.ne, cte.cent, w, X; dims = dims, kwargs...)
 end
-function asset_philogeny(w::AbstractVector, X::AbstractMatrix)
+function asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
     aw = abs.(w * transpose(w))
     c = dot(X, aw)
     c /= sum(aw)
     return c
 end
-function asset_philogeny(cle::Union{<:Network, <:ClusteringEstimator}, w::AbstractVector,
+function asset_phylogeny(cle::Union{<:Network, <:ClusteringEstimator}, w::AbstractVector,
                          X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return asset_philogeny(w, philogeny_matrix(cle, X; dims = dims, kwargs...))
+    return asset_phylogeny(w, phylogeny_matrix(cle, X; dims = dims, kwargs...))
 end
 
 export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
        KatzCentrality, Pagerank, RadialityCentrality, StressCentrality, KruskalTree,
-       BoruvkaTree, PrimTree, Network, philogeny_matrix, average_centrality,
-       asset_philogeny, AbstractCentralityAlgorithm, Centrality, centrality_vector
+       BoruvkaTree, PrimTree, Network, phylogeny_matrix, average_centrality,
+       asset_phylogeny, AbstractCentralityAlgorithm, Centrality, centrality_vector

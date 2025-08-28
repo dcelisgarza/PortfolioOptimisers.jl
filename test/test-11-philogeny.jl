@@ -1,4 +1,4 @@
-@safetestset "Philogeny tests" begin
+@safetestset "Phylogeny tests" begin
     using PortfolioOptimisers, Test, Clustering, CSV, DataFrames, TimeSeries
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
         for rtol in
@@ -177,10 +177,10 @@
             @test res
         end
     end
-    @testset "Philogeny matrix" begin
-        df = CSV.read(joinpath(@__DIR__, "./assets/PhilogenyMatrix1.csv.gz"), DataFrame)
+    @testset "Phylogeny matrix" begin
+        df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix1.csv.gz"), DataFrame)
         for i in 1:8
-            A = philogeny_matrix(Network(; n = i), pr.X)
+            A = phylogeny_matrix(Network(; n = i), pr.X)
             res = isapprox(vec(A), df[!, i])
             if !res
                 println("Iteration $i failed on detault network estimator.")
@@ -189,9 +189,9 @@
             @test res
         end
 
-        df = CSV.read(joinpath(@__DIR__, "./assets/PhilogenyMatrix2.csv.gz"), DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix2.csv.gz"), DataFrame)
         for i in 1:5
-            A = philogeny_matrix(Network(; n = i, alg = MaximumDistanceSimilarity()), pr.X)
+            A = phylogeny_matrix(Network(; n = i, alg = MaximumDistanceSimilarity()), pr.X)
             res = isapprox(vec(A), df[!, i])
             if !res
                 println("Iteration $i failed on MaximumDistanceSimilarity.")
@@ -200,13 +200,13 @@
             @test res
         end
 
-        df = CSV.read(joinpath(@__DIR__, "./assets/PhilogenyMatrix3.csv.gz"), DataFrame)
-        A = philogeny_matrix(ClusteringEstimator(), pr.X)
+        df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix3.csv.gz"), DataFrame)
+        A = phylogeny_matrix(ClusteringEstimator(), pr.X)
         @test isapprox(vec(A), df[!, 1])
 
         w = fill(inv(20), 20)
-        @test isapprox(asset_philogeny(Network(), w, pr.X), 0.09500000000000008)
-        @test isapprox(asset_philogeny(ClusteringEstimator(), w, pr.X), 0.3350000000000003)
+        @test isapprox(asset_phylogeny(Network(), w, pr.X), 0.09500000000000008)
+        @test isapprox(asset_phylogeny(ClusteringEstimator(), w, pr.X), 0.3350000000000003)
 
         A1 = PortfolioOptimisers.calc_adjacency(Network(; alg = KruskalTree()), pr.X)
         A2 = PortfolioOptimisers.calc_adjacency(Network(; alg = BoruvkaTree()), pr.X)

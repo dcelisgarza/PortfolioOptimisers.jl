@@ -1,76 +1,76 @@
-abstract type PhilogenyEstimator <: AbstractConstraintEstimator end
-abstract type PhilogenyResult <: AbstractConstraintResult end
-struct SemiDefinitePhilogenyEstimator{T1, T2} <: PhilogenyEstimator
+abstract type PhylogenyEstimator <: AbstractConstraintEstimator end
+abstract type PhylogenyResult <: AbstractConstraintResult end
+struct SemiDefinitePhylogenyEstimator{T1, T2} <: PhylogenyEstimator
     pe::T1
     p::T2
 end
-function SemiDefinitePhilogenyEstimator(;
-                                        pe::Union{<:AbstractPhilogenyEstimator,
+function SemiDefinitePhylogenyEstimator(;
+                                        pe::Union{<:AbstractPhylogenyEstimator,
                                                   <:AbstractClusteringResult} = Network(),
                                         p::Real = 0.05)
     @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
-    return SemiDefinitePhilogenyEstimator(pe, p)
+    return SemiDefinitePhylogenyEstimator(pe, p)
 end
-struct SemiDefinitePhilogeny{T1, T2} <: PhilogenyResult
+struct SemiDefinitePhylogeny{T1, T2} <: PhylogenyResult
     A::T1
     p::T2
 end
-function SemiDefinitePhilogeny(; A::AbstractMatrix{<:Real}, p::Real = 0.05)
+function SemiDefinitePhylogeny(; A::AbstractMatrix{<:Real}, p::Real = 0.05)
     @argcheck(!isempty(A))
     @argcheck(p >= zero(p))
-    return SemiDefinitePhilogeny(A, p)
+    return SemiDefinitePhylogeny(A, p)
 end
-function philogeny_constraints(plc::SemiDefinitePhilogenyEstimator, X::AbstractMatrix;
+function phylogeny_constraints(plc::SemiDefinitePhylogenyEstimator, X::AbstractMatrix;
                                dims::Int = 1, kwargs...)
-    return SemiDefinitePhilogeny(; A = philogeny_matrix(plc.pe, X; dims = dims, kwargs...),
+    return SemiDefinitePhylogeny(; A = phylogeny_matrix(plc.pe, X; dims = dims, kwargs...),
                                  p = plc.p)
 end
-struct IntegerPhilogenyEstimator{T1, T2, T3} <: PhilogenyEstimator
+struct IntegerPhylogenyEstimator{T1, T2, T3} <: PhylogenyEstimator
     pe::T1
     B::T2
     scale::T3
 end
-function _validate_length_integer_philogeny_constraint_B(alg::PredefinedNumberClusters,
+function _validate_length_integer_phylogeny_constraint_B(alg::PredefinedNumberClusters,
                                                          B::AbstractVector)
     @argcheck(length(B) <= alg.k,
               DomainError("`length(B) <= alg.k`:\nlength(B) => $(length(B))\nalg.k => $(alg.k)"))
     return nothing
 end
-function _validate_length_integer_philogeny_constraint_B(args...)
+function _validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
-function validate_length_integer_philogeny_constraint_B(pe::ClusteringEstimator,
+function validate_length_integer_phylogeny_constraint_B(pe::ClusteringEstimator,
                                                         B::AbstractVector)
     if !isnothing(pe.onc.max_k)
         @argcheck(length(B) <= pe.onc.max_k,
                   DomainError("`length(B) <= pe.onc.max_k`:\nlength(B) => $(length(B))\npe.onc.max_k => $(pe.onc.max_k)"))
     end
-    _validate_length_integer_philogeny_constraint_B(pe.onc.alg, B)
+    _validate_length_integer_phylogeny_constraint_B(pe.onc.alg, B)
     return nothing
 end
-function validate_length_integer_philogeny_constraint_B(args...)
+function validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
-function IntegerPhilogenyEstimator(;
-                                   pe::Union{<:AbstractPhilogenyEstimator,
+function IntegerPhylogenyEstimator(;
+                                   pe::Union{<:AbstractPhylogenyEstimator,
                                              <:AbstractClusteringResult} = Network(),
                                    B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                                    scale::Real = 100_000.0)
     if isa(B, AbstractVector)
         @argcheck(!isempty(B))
         @argcheck(all(x -> x >= zero(x), B))
-        validate_length_integer_philogeny_constraint_B(pe, B)
+        validate_length_integer_phylogeny_constraint_B(pe, B)
     else
         @argcheck(B >= zero(B))
     end
-    return IntegerPhilogenyEstimator(pe, B, scale)
+    return IntegerPhylogenyEstimator(pe, B, scale)
 end
-struct IntegerPhilogeny{T1, T2, T3} <: PhilogenyResult
+struct IntegerPhylogeny{T1, T2, T3} <: PhylogenyResult
     A::T1
     B::T2
     scale::T3
 end
-function IntegerPhilogeny(; A::AbstractMatrix{<:Real},
+function IntegerPhylogeny(; A::AbstractMatrix{<:Real},
                           B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                           scale::Real = 100_000.0)
     @argcheck(!isempty(A))
@@ -82,18 +82,18 @@ function IntegerPhilogeny(; A::AbstractMatrix{<:Real},
     else
         @argcheck(B >= zero(B))
     end
-    return IntegerPhilogeny(A, B, scale)
+    return IntegerPhylogeny(A, B, scale)
 end
-function philogeny_constraints(plc::IntegerPhilogenyEstimator, X::AbstractMatrix;
+function phylogeny_constraints(plc::IntegerPhylogenyEstimator, X::AbstractMatrix;
                                dims::Int = 1, kwargs...)
-    return IntegerPhilogeny(; A = philogeny_matrix(plc.pe, X; dims = dims, kwargs...),
+    return IntegerPhylogeny(; A = phylogeny_matrix(plc.pe, X; dims = dims, kwargs...),
                             B = plc.B, scale = plc.scale)
 end
-function philogeny_constraints(plc::Union{<:SemiDefinitePhilogeny, <:IntegerPhilogeny},
+function phylogeny_constraints(plc::Union{<:SemiDefinitePhylogeny, <:IntegerPhylogeny},
                                args...; kwargs...)
     return plc
 end
-function philogeny_constraints(::Nothing, args...; kwargs...)
+function phylogeny_constraints(::Nothing, args...; kwargs...)
     return nothing
 end
 abstract type VectorToRealMeasure <: AbstractAlgorithm end
@@ -116,7 +116,7 @@ end
 function vec_to_real_measure(val::Real, ::AbstractVector)
     return val
 end
-struct CentralityEstimator{T1, T2, T3} <: PhilogenyEstimator
+struct CentralityEstimator{T1, T2, T3} <: PhylogenyEstimator
     A::T1
     B::T2
     comp::T3
@@ -185,6 +185,6 @@ function centrality_constraints(::Nothing, args...; kwargs...)
     return nothing
 end
 
-export SemiDefinitePhilogenyEstimator, SemiDefinitePhilogeny, IntegerPhilogenyEstimator,
-       IntegerPhilogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityEstimator,
-       philogeny_constraints, centrality_constraints
+export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
+       IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityEstimator,
+       phylogeny_constraints, centrality_constraints

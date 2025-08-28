@@ -170,8 +170,8 @@ function JuMPOptimiser(;
                                    <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
                                                             <:BuyInThresholdEstimator}}} = nothing,
                        sets::Union{Nothing, <:AssetSets} = nothing,
-                       nplg::Union{Nothing, <:PhilogenyEstimator, <:PhilogenyResult} = nothing,
-                       cplg::Union{Nothing, <:PhilogenyEstimator, <:PhilogenyResult} = nothing,
+                       nplg::Union{Nothing, <:PhylogenyEstimator, <:PhylogenyResult} = nothing,
+                       cplg::Union{Nothing, <:PhylogenyEstimator, <:PhylogenyResult} = nothing,
                        tn::Union{Nothing, <:TurnoverEstimator, <:Turnover,
                                  <:AbstractVector{<:Union{<:TurnoverEstimator, <:Turnover}}} = nothing,
                        te::Union{Nothing, <:AbstractTracking,
@@ -386,8 +386,8 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
         sgst = threshold_constraints(opt.sgst, opt.sets; datatype = datatype,
                                      strict = opt.strict)
     end
-    nplg = philogeny_constraints(opt.nplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
-    cplg = philogeny_constraints(opt.cplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
+    nplg = phylogeny_constraints(opt.nplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
+    cplg = phylogeny_constraints(opt.cplg, pr.X; iv = rd.iv, ivpa = rd.ivpa)
     tn = turnover_constraints(opt.tn, opt.sets; strict = opt.strict)
     fees = fees_constraints(opt.fees, opt.sets; datatype = datatype, strict = opt.strict)
     ret = jump_returns_factory(opt.ret, pr)

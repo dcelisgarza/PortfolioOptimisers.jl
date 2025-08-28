@@ -1,8 +1,70 @@
-abstract type AbstractClusteringEstimator <: AbstractPhilogenyEstimator end
-abstract type AbstractClusteringAlgorithm <: AbstractPhilogenyAlgorithm end
+"""
+    AbstractClusteringEstimator <: AbstractPhylogenyEstimator
+
+Abstract supertype for all clustering estimator types in PortfolioOptimisers.jl.
+
+All concrete types implementing clustering-based estimation algorithms should subtype `AbstractClusteringEstimator`. This enables a consistent interface for clustering estimators throughout the package.
+
+# Related
+
+  - [`AbstractClusteringAlgorithm`](@ref)
+  - [`AbstractClusteringResult`](@ref)
+"""
+abstract type AbstractClusteringEstimator <: AbstractPhylogenyEstimator end
+
+"""
+    AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm
+
+Abstract supertype for all clustering algorithm types in PortfolioOptimisers.jl.
+
+All concrete types implementing specific clustering algorithms should subtype `AbstractClusteringAlgorithm`. This enables flexible extension and dispatch of clustering routines.
+
+# Related
+
+  - [`AbstractClusteringEstimator`](@ref)
+  - [`AbstractClusteringResult`](@ref)
+"""
+abstract type AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm end
+
+"""
+    AbstractOptimalNumberClustersEstimator <: AbstractEstimator
+
+Abstract supertype for all optimal number of clusters estimator types in PortfolioOptimisers.jl.
+
+All concrete types implementing algorithms to estimate the optimal number of clusters should subtype `AbstractOptimalNumberClustersEstimator`. This enables a consistent interface for cluster number estimation.
+
+# Related
+
+  - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
+"""
 abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
+
+"""
+    AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm
+
+Abstract supertype for all optimal number of clusters algorithm types in PortfolioOptimisers.jl.
+
+All concrete types implementing specific algorithms for determining the optimal number of clusters should subtype `AbstractOptimalNumberClustersAlgorithm`. This enables flexible extension and dispatch of cluster number selection routines.
+
+# Related
+
+  - [`AbstractOptimalNumberClustersEstimator`](@ref)
+"""
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
-abstract type AbstractClusteringResult <: AbstractPhilogenyResult end
+
+"""
+    AbstractClusteringResult <: AbstractPhylogenyResult
+
+Abstract supertype for all clustering result types in PortfolioOptimisers.jl.
+
+All concrete types representing the result of a clustering estimation should subtype `AbstractClusteringResult`. This enables a consistent interface for clustering results throughout the package.
+
+# Related
+
+  - [`AbstractClusteringEstimator`](@ref)
+  - [`AbstractClusteringAlgorithm`](@ref)
+"""
+abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     clustering::T1
     S::T2
