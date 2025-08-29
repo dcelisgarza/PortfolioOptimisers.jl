@@ -25,9 +25,9 @@ Container type for cokurtosis estimators.
 
 # Fields
 
-  - `me::AbstractExpectedReturnsEstimator`: Mean estimator for expected returns.
-  - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator for cokurtosis tensors.
-  - `alg::AbstractMomentAlgorithm`: Moment algorithm.
+  - `me`: Mean estimator for expected returns.
+  - `mp`: Matrix processing estimator for cokurtosis tensors.
+  - `alg`: Moment algorithm.
 
 # Constructor
 
@@ -58,9 +58,9 @@ Construct a [`Cokurtosis`](@ref) estimator for cokurtosis computation.
 
 # Arguments
 
-  - `me::AbstractExpectedReturnsEstimator`: Mean estimator for expected returns.
-  - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator.
-  - `alg::AbstractMomentAlgorithm`: Moment algorithm.
+  - `me`: Mean estimator for expected returns.
+  - `mp`: Matrix processing estimator.
+  - `alg`: Moment algorithm.
 
 # Returns
 
@@ -106,12 +106,12 @@ Internal helper for cokurtosis computation.
 
 # Arguments
 
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator.
+  - `X`: Data matrix (observations × assets).
+  - `mp`: Matrix processing estimator.
 
 # Returns
 
-  - `ckurt::Matrix`: Cokurtosis tensor after matrix processing.
+  - `ckurt::Matrix{<:Real}`: Cokurtosis tensor after matrix processing.
 
 # Related
 
@@ -129,9 +129,7 @@ function _cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
 end
 
 """
-    cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
-    cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
-    cokurtosis(::Nothing, args...; kwargs...)
+    cokurtosis(ke::Union{Nothing, <:Cokurtosis}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the cokurtosis tensor for a dataset.
 
@@ -142,14 +140,14 @@ This method computes the cokurtosis tensor using the estimator's mean and matrix
   - `ke::Cokurtosis{<:Any, <:Any, <:Full}`: Cokurtosis estimator with `Full` moment algorithm.
   - `ke::Cokurtosis{<:Any, <:Any, <:Semi}`: Cokurtosis estimator with `Semi` moment algorithm.
   - `ke::Nothing`: No-op cokurtosis computation, returns `nothing`.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the mean.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the mean.
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 # Returns
 
-  - `ckurt::Matrix`: Cokurtosis tensor (assets^2 × assets^2).
+  - `ckurt::Matrix{<:Real}`: Cokurtosis tensor (assets^2 × assets^2).
 
 # Examples
 

@@ -157,9 +157,9 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
 
 # Arguments
 
-  - `target::LinearModel`: A [`LinearModel`](@ref) regression target specifying model options.
-  - `X::AbstractMatrix`: The design matrix (observations × features).
-  - `y::AbstractVector`: The response vector.
+  - `target`: A [`LinearModel`](@ref) regression target specifying model options.
+  - `X`: The design matrix (observations × features).
+  - `y`: The response vector.
 
 # Returns
 
@@ -247,9 +247,9 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
 
 # Arguments
 
-  - `target::GeneralisedLinearModel`: A [`GeneralisedLinearModel`](@ref) regression target specifying model options.
-  - `X::AbstractMatrix`: The design matrix (observations × features).
-  - `y::AbstractVector`: The response vector.
+  - `target`: A [`GeneralisedLinearModel`](@ref) regression target specifying model options.
+  - `X`: The design matrix (observations × features).
+  - `y`: The response vector.
 
 # Returns
 
@@ -433,9 +433,9 @@ Container type for regression results in PortfolioOptimisers.jl.
 
 # Fields
 
-  - `M::AbstractMatrix`: Main coefficient matrix (e.g., regression weights or loadings).
-  - `L::Union{Nothing, AbstractMatrix}`: Optional auxiliary matrix for recovering lost dimensions in dimensionality reduction regressions.
-  - `b::AbstractVector`: Optional intercept vector.
+  - `M`: Main coefficient matrix (e.g., regression weights or loadings).
+  - `L`: Optional auxiliary matrix for recovering lost dimensions in dimensionality reduction regressions.
+  - `b`: Optional intercept vector.
 
 # Constructor
 
@@ -463,9 +463,9 @@ This constructor creates a `Regression` object from the given coefficient matrix
 
 # Arguments
 
-  - `M::AbstractMatrix`: Main coefficient matrix.
-  - `L::Union{Nothing, <:AbstractMatrix}`: Optional auxiliary matrix for recovering lost dimensions in dimensionality reduction regressions.
-  - `b::Union{Nothing, <:AbstractVector}`: Optional intercept vector.
+  - `M`: Main coefficient matrix.
+  - `L`: Optional auxiliary matrix for recovering lost dimensions in dimensionality reduction regressions.
+  - `b`: Optional intercept vector.
 
 # Returns
 
@@ -527,8 +527,8 @@ This function constructs a new `Regression` result, where the coefficient matrix
 
 # Arguments
 
-  - `re::Regression`: A regression result object.
-  - `i::AbstractVector`: Indices of the rows to select.
+  - `re`: A regression result object.
+  - `i`: Indices of the rows to select.
 
 # Returns
 
@@ -567,7 +567,7 @@ This method returns the input `re` unchanged. It is used internally to allow gen
 
 # Arguments
 
-  - `re::Union{Nothing, <:AbstractRegressionEstimator}`: Either `nothing` or a regression estimator type.
+  - `re`: Either `nothing` or a regression estimator type.
   - `args...`: Additional arguments (ignored).
 
 # Returns
@@ -591,7 +591,7 @@ This method is a pass-through for [`Regression`](@ref) result objects, allowing 
 
 # Arguments
 
-  - `re::Regression`: A regression result object.
+  - `re`: A regression result object.
   - `args...`: Additional arguments (ignored).
 
 # Returns
@@ -615,8 +615,8 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 
 # Arguments
 
-  - `re::AbstractRegressionEstimator`: A regression estimator or result object.
-  - `rd::ReturnsResult`: A returns result object containing data matrices `X` and `F`.
+  - `re`: A regression estimator or result object.
+  - `rd`: A returns result object containing data matrices `X` and `F`.
 
 # Returns
 

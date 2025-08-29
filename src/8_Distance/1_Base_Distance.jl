@@ -127,8 +127,8 @@ Variation of Information (VI) distance algorithm for portfolio optimization.
 
 # Fields
 
-  - `bins::Union{<:AbstractBins, <:Integer}`: Binning strategy or number of bins. If an integer, must be strictly positive.
-  - `normalise::Bool`: Whether to normalise the VI distance to the range [0, 1].
+  - `bins`: Binning strategy or number of bins. If an integer, must be strictly positive.
+  - `normalise`: Whether to normalise the VI distance to the range [0, 1].
 
 # Related
 
@@ -150,8 +150,8 @@ This constructor creates a `VariationInfoDistance` object with the specified bin
 
 # Arguments
 
-  - `bins::Union{<:AbstractBins, <:Integer}`: Binning strategy or number of bins. If an integer, must be strictly positive.
-  - `normalise::Bool`: Whether to normalise the VI distance to the range [0, 1].
+  - `bins`: Binning strategy or number of bins. If an integer, must be strictly positive.
+  - `normalise`: Whether to normalise the VI distance to the range [0, 1].
 
 # Returns
 

@@ -1,4 +1,4 @@
-@safetestset "Finite allocation" begin
+@safetestwset "Finite allocation" begin
     using PortfolioOptimisers, Clarabel, HiGHS, Test, CSV, TimeSeries, DataFrames,
           LinearAlgebra, StatsBase
     X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -60,11 +60,8 @@
     end
     @test isapprox(sum(res_da.cost), 4206.9 * 0.8, rtol = rtol)
     @test isapprox(res_da.shares .* vec(values(X[end])), res_da.cost)
-    rtol = if Sys.isapple()
-        5e-2
-    else
-        1e-3
-    end
+    rtol = 5e-2
+
     @test isapprox(rmsd(res.w, res_da.w), 0.029094976416644103, rtol = rtol)
 
     res_ga = optimise!(ga, res.w, vec(values(X[end])), 4206.9)

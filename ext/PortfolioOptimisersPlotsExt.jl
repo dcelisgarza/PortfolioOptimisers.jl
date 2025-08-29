@@ -3,7 +3,8 @@ module PortfolioOptimisersPlotsExt
 using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra, Statistics, StatsBase,
       Clustering
 
-function PortfolioOptimisers.plot_ptf_cumulative_returns(w::AbstractArray, X::AbstractArray,
+function PortfolioOptimisers.plot_ptf_cumulative_returns(w::AbstractArray,
+                                                         X::AbstractMatrix,
                                                          fees::Union{Nothing, <:Fees} = nothing;
                                                          ts::AbstractVector = 1:size(X, 1),
                                                          compound::Bool = false,
@@ -30,10 +31,12 @@ function compute_relevant_assets(w::AbstractVector, M::Real, N::Real)
     return N, idx
 end
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::AbstractVector,
-                                                           X::AbstractArray,
+                                                           X::AbstractMatrix,
                                                            fees::Union{Nothing, <:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X, 1),
-                                                           nx::AbstractVector = 1:size(X, 2),
+                                                           ts::AbstractVector = 1:size(X,
+                                                                                       1),
+                                                           nx::AbstractVector = 1:size(X,
+                                                                                       2),
                                                            N::Union{Nothing, <:Real} = nothing,
                                                            compound::Bool = false,
                                                            f_kwargs::NamedTuple = (;
@@ -128,7 +131,8 @@ function PortfolioOptimisers.plot_stacked_bar_composition(w::Union{<:AbstractVec
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::Union{<:AbstractVector{<:Real},
                                                                     <:AbstractVector{<:AbstractVector}},
-                                                           nx::AbstractVector = 1:size(w, 1);
+                                                           nx::AbstractVector = 1:size(w,
+                                                                                       1);
                                                            kwargs::NamedTuple = (;
                                                                                  xlabel = "Portfolios",
                                                                                  ylabel = "Weight",
@@ -235,7 +239,7 @@ function PortfolioOptimisers.plot_clusters(clr::PortfolioOptimisers.AbstractClus
     return plot(dend1, plot(; ticks = nothing, border = :none, background_color = nothing),
                 hmap, dend2; layout = l, fig_kwargs..., ekwargs...)
 end
-function PortfolioOptimisers.plot_drawdowns(w::AbstractArray, X::AbstractArray,
+function PortfolioOptimisers.plot_drawdowns(w::AbstractArray, X::AbstractMatrix,
                                             slv::Union{<:Solver,
                                                        <:AbstractVector{<:Solver}},
                                             fees::Union{Nothing, <:Fees} = nothing;

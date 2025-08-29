@@ -96,7 +96,7 @@ Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
 # Fields
 
-  - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target type.
+  - `target`: The shrinkage target type.
 
 # Constructor
 
@@ -121,7 +121,7 @@ Construct a [`JamesStein`](@ref) shrinkage algorithm for expected returns estima
 
 # Arguments
 
-  - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target.
+  - `target`: The shrinkage target.
 
 # Returns
 
@@ -157,7 +157,7 @@ Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
 # Fields
 
-  - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target type.
+  - `target`: The shrinkage target type.
 
 # Constructor
 
@@ -182,7 +182,7 @@ Construct a [`BayesStein`](@ref) shrinkage algorithm for expected returns estima
 
 # Arguments
 
-  - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target.
+  - `target`: The shrinkage target.
 
 # Returns
 
@@ -218,7 +218,7 @@ Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expecte
 
 # Fields
 
-  - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target type.
+  - `target`: The shrinkage target type.
 
 # Constructor
 
@@ -243,7 +243,7 @@ Construct a [`BodnarOkhrinParolya`](@ref) shrinkage algorithm for expected retur
 
 # Arguments
 
-  - `target::AbstractShrunkExpectedReturnsTarget`: The shrinkage target.
+  - `target`: The shrinkage target.
 
 # Returns
 
@@ -281,9 +281,9 @@ Container type for shrinkage-based expected returns estimators.
 
 # Fields
 
-  - `me::AbstractExpectedReturnsEstimator`: Mean estimator for expected returns.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
-  - `alg::AbstractShrunkExpectedReturnsAlgorithm`: Shrinkage algorithm (e.g., James-Stein, Bayes-Stein).
+  - `me`: Mean estimator for expected returns.
+  - `ce`: Covariance estimator.
+  - `alg`: Shrinkage algorithm (e.g., James-Stein, Bayes-Stein).
 
 # Constructor
 
@@ -314,9 +314,9 @@ Construct a [`ShrunkExpectedReturns`](@ref) estimator for shrinkage-based expect
 
 # Arguments
 
-  - `me::AbstractExpectedReturnsEstimator`: Mean estimator for expected returns.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
-  - `alg::AbstractShrunkExpectedReturnsAlgorithm`: Shrinkage algorithm.
+  - `me`: Mean estimator for expected returns.
+  - `ce`: Covariance estimator.
+  - `alg`: Shrinkage algorithm.
 
 # Returns
 
@@ -362,9 +362,7 @@ function ShrunkExpectedReturns(;
 end
 
 """
-    target_mean(::GrandMean, mu, sigma; kwargs...)
-    target_mean(::VolatilityWeighted, mu, sigma; isigma = nothing, kwargs...)
-    target_mean(::MeanSquareError, mu, sigma; T, kwargs...)
+    target_mean(::AbstractShrunkExpectedReturnsTarget, mu::AbstractArray, sigma::AbstractMatrix; kwargs...)
 
 Compute the shrinkage target vector for expected returns estimation.
 
@@ -375,19 +373,13 @@ Compute the shrinkage target vector for expected returns estimation.
   - `target::GrandMean`: ReturnsResult a vector filled with the mean of `mu`.
   - `target::VolatilityWeighted`: ReturnsResult a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
   - `target::MeanSquareError`: ReturnsResult a vector filled with the trace of `sigma` divided by `T`.
-  - `mu::AbstractArray`: Vector of expected returns.
-  - `sigma::AbstractMatrix`: Covariance matrix of asset returns.
+  - `mu`: 1D array of expected returns.
+  - `sigma`: Covariance matrix of asset returns.
   - `kwargs...`: Additional keyword arguments, such as `T` (number of observations) or `isigma` (inverse covariance matrix).
 
 # Returns
 
   - `b::AbstractArray`: Target vector for shrinkage estimation.
-
-# Methods
-
-  - `target_mean(::GrandMean, mu, sigma; kwargs...)`: ReturnsResult a vector filled with the grand mean of `mu`.
-  - `target_mean(::VolatilityWeighted, mu, sigma; isigma = nothing, kwargs...)`: ReturnsResult a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
-  - `target_mean(::MeanSquareError, mu, sigma; T, kwargs...)`: ReturnsResult a vector filled with the trace of `sigma` divided by `T`.
 
 # Related
 
@@ -415,9 +407,7 @@ function target_mean(::MeanSquareError, mu::AbstractArray, sigma::AbstractMatrix
 end
 
 """
-    mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::AbstractArray; dims::Int = 1, kwargs...)
-    mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::AbstractArray; dims::Int = 1, kwargs...)
-    mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}, X::AbstractArray; dims::Int = 1, kwargs...)
+    mean(me::ShrunkExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute shrunk expected returns using the specified estimator.
 
@@ -428,8 +418,8 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
   - `me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}`: Use the James-Stein algorithm.
   - `me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}`: Use the Bayes-Stein algorithm.
   - `me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}`: Use the Bodnar-Okhrin-Parolya algorithm.
-  - `X::AbstractArray`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the mean.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the mean.
   - `kwargs...`: Additional keyword arguments passed to the mean and covariance estimators.
 
 # Returns
@@ -457,7 +447,7 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
   - [`target_mean`](@ref)
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein},
-                         X::AbstractArray; dims::Int = 1, kwargs...)
+                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -472,7 +462,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein},
     return (one(alpha) - alpha) * mu + alpha * b
 end
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein},
-                         X::AbstractArray; dims::Int = 1, kwargs...)
+                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -487,7 +477,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein},
     return (one(alpha) - alpha) * mu + alpha * b
 end
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
-                         X::AbstractArray; dims::Int = 1, kwargs...)
+                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)

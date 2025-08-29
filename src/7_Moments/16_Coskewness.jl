@@ -25,9 +25,9 @@ Container type for coskewness estimators.
 
 # Fields
 
-  - `me::AbstractExpectedReturnsEstimator`: Mean estimator for expected returns.
-  - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator for coskewness tensors.
-  - `alg::AbstractMomentAlgorithm`: Moment algorithm (e.g., `Full`, `Semi`).
+  - `me`: Mean estimator for expected returns.
+  - `mp`: Matrix processing estimator for coskewness tensors.
+  - `alg`: Moment algorithm (e.g., `Full`, `Semi`).
 
 # Constructor
 
@@ -58,9 +58,9 @@ Construct a [`Coskewness`](@ref) estimator for coskewness computation.
 
 # Arguments
 
-  - `me::AbstractExpectedReturnsEstimator`: Mean estimator for expected returns.
-  - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator.
-  - `alg::AbstractMomentAlgorithm`: Moment algorithm.
+  - `me`: Mean estimator for expected returns.
+  - `mp`: Matrix processing estimator.
+  - `alg`: Moment algorithm.
 
 # Returns
 
@@ -105,13 +105,13 @@ Internal helper for coskewness matrix processing.
 
 # Arguments
 
-  - `cskew::AbstractMatrix`: Coskewness tensor (flattened or block matrix).
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator.
+  - `cskew`: Coskewness tensor (flattened or block matrix).
+  - `X`: Data matrix (observations × assets).
+  - `mp`: Matrix processing estimator.
 
 # Returns
 
-  - `V::Matrix`: Processed coskewness matrix.
+  - `V::Matrix{<:Real}`: Processed coskewness matrix.
 
 # Related
 
@@ -146,14 +146,14 @@ Internal helper for coskewness computation.
 
 # Arguments
 
-  - `y::AbstractMatrix`: Centered data vector (e.g., `X .- mean`).
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator.
+  - `y`: Centered data vector (e.g., `X .- mean`).
+  - `X`: Data matrix (observations × assets).
+  - `mp`: Matrix processing estimator.
 
 # Returns
 
-  - `cskew::Matrix`: Coskewness tensor.
-  - `V::Matrix`: Processed coskewness matrix.
+  - `cskew::Matrix{<:Real}`: Coskewness tensor.
+  - `V::Matrix{<:Real}`: Processed coskewness matrix.
 
 # Related
 
@@ -171,9 +171,7 @@ function _coskewness(y::AbstractMatrix, X::AbstractMatrix,
     return cskew, V
 end
 """
-    coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
-    coskewness(ske::Coskewness{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
-    coskewness(::Nothing, args...; kwargs...)
+    coskewness(ske::Union{Nothing, <:Coskewness}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the full coskewness tensor and processed matrix for a dataset. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.
 
@@ -182,15 +180,15 @@ Compute the full coskewness tensor and processed matrix for a dataset. For `Full
   - `ske::Coskewness{<:Any, <:Any, <:Full}`: Coskewness estimator with `Full` moment algorithm.
   - `ske::Coskewness{<:Any, <:Any, <:Semi}`: Coskewness estimator with `Semi` moment algorithm.
   - `ske::Nothing`: No-op coskewness computation, returns `(nothing, nothing)`.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the mean.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the mean.
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 # Returns
 
-  - `cskew::Matrix`: Coskewness tensor (observations × assets^2).
-  - `V::Matrix`: Processed coskewness matrix (assets × assets).
+  - `cskew::Matrix{<:Real}`: Coskewness tensor (observations × assets^2).
+  - `V::Matrix{<:Real}`: Processed coskewness matrix (assets × assets).
 
 # Examples
 

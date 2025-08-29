@@ -10,8 +10,8 @@ A flexible distance estimator that generalizes distance transformations for port
 
 # Fields
 
-  - `power::Integer`: The integer power to which the base correlation or distance matrix is raised.
-  - `alg::AbstractDistanceAlgorithm`: The base distance algorithm to use (e.g., `SimpleDistance()`).
+  - `power`: The integer power to which the base correlation or distance matrix is raised.
+  - `alg`: The base distance algorithm to use (e.g., `SimpleDistance()`).
 
 # Constructor
 
@@ -42,8 +42,8 @@ This constructor creates a `GeneralDistance` object that will raise the base cor
 
 # Arguments
 
-  - `power::Integer`: The integer power to which the base correlation or distance matrix is raised.
-  - `alg::AbstractDistanceAlgorithm`: The base distance algorithm to use.
+  - `power`: The integer power to which the base correlation or distance matrix is raised.
+  - `alg`: The base distance algorithm to use.
 
 # Returns
 
@@ -85,15 +85,15 @@ This method computes the correlation matrix from the data matrix `X` using the p
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:SimpleDistance}`: General distance estimator with a power and `SimpleDistance` algorithm.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use for correlation computation.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `de`: General distance estimator with a power and `SimpleDistance` algorithm.
+  - `ce`: Covariance estimator to use for correlation computation.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the correlation estimator.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise distances.
 
 # Details
 
@@ -123,14 +123,14 @@ This method takes a correlation or covariance matrix `rho`, raises it to the pow
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:SimpleDistance}`: General distance estimator with a power and `SimpleDistance` algorithm.
-  - `rho::AbstractMatrix`: Correlation or covariance matrix.
+  - `de`: General distance estimator with a power and `SimpleDistance` algorithm.
+  - `rho`: Correlation or covariance matrix.
   - `args...`: Ignored.
   - `kwargs...`: Ignored.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise distances.
 
 # Details
 
@@ -166,15 +166,15 @@ This method computes the correlation matrix from the data matrix `X` using the p
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:SimpleDistance}`: General distance estimator with a power and `SimpleDistance` algorithm.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use for correlation computation.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `de`: General distance estimator with a power and `SimpleDistance` algorithm.
+  - `ce`: Covariance estimator to use for correlation computation.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the correlation estimator.
 
 # Returns
 
-  - `(rho, dist)`: Tuple of powered correlation matrix and distance matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of powered correlation matrix and distance matrix.
 
 # Details
 
@@ -206,15 +206,15 @@ This method computes the correlation matrix from the data matrix `X` using the p
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance}`: General distance estimator with a power and `SimpleAbsoluteDistance` algorithm.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use for correlation computation.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `de`: General distance estimator with a power and `SimpleAbsoluteDistance` algorithm.
+  - `ce`: Covariance estimator to use for correlation computation.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the correlation estimator.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise distances.
 
 # Details
 
@@ -243,14 +243,14 @@ This method takes a correlation or covariance matrix `rho`, takes the absolute v
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance}`: General distance estimator with a power and `SimpleAbsoluteDistance` algorithm.
-  - `rho::AbstractMatrix`: Correlation or covariance matrix.
+  - `de`: General distance estimator with a power and `SimpleAbsoluteDistance` algorithm.
+  - `rho`: Correlation or covariance matrix.
   - `args...`: Ignored.
   - `kwargs...`: Ignored.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise distances.
 
 # Details
 
@@ -285,15 +285,15 @@ This method computes the correlation matrix from the data matrix `X` using the p
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance}`: General distance estimator with a power and `SimpleAbsoluteDistance` algorithm.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use for correlation computation.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `de`: General distance estimator with a power and `SimpleAbsoluteDistance` algorithm.
+  - `ce`: Covariance estimator to use for correlation computation.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the correlation estimator.
 
 # Returns
 
-  - `(rho, dist)`: Tuple of powered absolute correlation matrix and distance matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of powered absolute correlation matrix and distance matrix.
 
 # Details
 
@@ -323,15 +323,15 @@ This method computes the correlation matrix from the data matrix `X` using the p
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:LogDistance}`: General distance estimator with a power and `LogDistance` algorithm.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use for correlation computation.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `de`: General distance estimator with a power and `LogDistance` algorithm.
+  - `ce`: Covariance estimator to use for correlation computation.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the correlation estimator.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise log-distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise log-distances.
 
 # Details
 
@@ -360,15 +360,15 @@ This method computes the correlation matrix from the data matrix `X` using the p
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:LogDistance}`: General distance estimator with a power and `LogDistance` algorithm.
-  - `ce::Union{<:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}}`: LTD covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `de`: General distance estimator with a power and `LogDistance` algorithm.
+  - `ce`: LTD covariance estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the correlation estimator.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise log-distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise log-distances.
 
 # Details
 
@@ -397,14 +397,14 @@ This method takes a correlation or covariance matrix `rho`, converts to a correl
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:LogDistance}`: General distance estimator with a power and `LogDistance` algorithm.
-  - `rho::AbstractMatrix`: Correlation or covariance matrix.
+  - `de`: General distance estimator with a power and `LogDistance` algorithm.
+  - `rho`: Correlation or covariance matrix.
   - `args...`: Ignored.
   - `kwargs...`: Ignored.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise log-distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise log-distances.
 
 # Details
 
@@ -438,15 +438,15 @@ This method computes the correlation matrix from the data matrix `X` using the p
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:LogDistance}`: General distance estimator with a power and `LogDistance` algorithm.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use for correlation computation.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `de`: General distance estimator with a power and `LogDistance` algorithm.
+  - `ce`: Covariance estimator to use for correlation computation.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the correlation estimator.
 
 # Returns
 
-  - `(rho, dist)`: Tuple of powered absolute correlation matrix and log-distance matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of powered absolute correlation matrix and log-distance matrix.
 
 # Details
 
@@ -475,15 +475,15 @@ This method computes the correlation matrix from the data matrix `X` using the p
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:LogDistance}`: General distance estimator with a power and `LogDistance` algorithm.
-  - `ce::Union{<:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}}`: LTD covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `de`: General distance estimator with a power and `LogDistance` algorithm.
+  - `ce`: LTD covariance estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the correlation estimator.
 
 # Returns
 
-  - `(rho, dist)`: Tuple of powered correlation matrix and log-distance matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of powered correlation matrix and log-distance matrix.
 
 # Details
 
@@ -513,15 +513,15 @@ This method computes the VI distance matrix for the input data matrix `X` using 
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:VariationInfoDistance}`: General distance estimator with a power and `VariationInfoDistance` algorithm.
+  - `de`: General distance estimator with a power and `VariationInfoDistance` algorithm.
   - `::Any`: Placeholder for compatibility; ignored.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the distance. If `2`, the data is transposed.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance. If `2`, the data is transposed.
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Returns
 
-  - `dist::Matrix`: Matrix of powered pairwise variation of information distances.
+  - `dist::Matrix{<:Real}`: Matrix of powered pairwise variation of information distances.
 
 # Details
 
@@ -553,15 +553,15 @@ This method computes the correlation matrix from the data matrix `X` using the p
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:VariationInfoDistance}`: General distance estimator with a power and `VariationInfoDistance` algorithm.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator (used to compute the correlation matrix).
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the correlation. If `2`, the data is transposed.
+  - `de`: General distance estimator with a power and `VariationInfoDistance` algorithm.
+  - `ce`: Covariance estimator (used to compute the correlation matrix).
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the correlation. If `2`, the data is transposed.
   - `kwargs...`: Additional keyword arguments passed to the correlation computation.
 
 # Returns
 
-  - `(rho, dist)`: Tuple of powered correlation matrix and powered VI distance matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of powered correlation matrix and powered VI distance matrix.
 
 # Details
 
@@ -597,15 +597,15 @@ This method computes the correlation matrix from the data matrix `X` using the p
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CorrelationDistance}`: General distance estimator with a power and `CorrelationDistance` algorithm.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use for correlation computation.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `de`: General distance estimator with a power and `CorrelationDistance` algorithm.
+  - `ce`: Covariance estimator to use for correlation computation.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the correlation estimator.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise correlation distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise correlation distances.
 
 # Details
 
@@ -634,14 +634,14 @@ This method takes a correlation or covariance matrix `rho`, raises it to the pow
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CorrelationDistance}`: General distance estimator with a power and `CorrelationDistance` algorithm.
-  - `rho::AbstractMatrix`: Correlation or covariance matrix.
+  - `de`: General distance estimator with a power and `CorrelationDistance` algorithm.
+  - `rho`: Correlation or covariance matrix.
   - `args...`: Ignored.
   - `kwargs...`: Ignored.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise correlation distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise correlation distances.
 
 # Details
 
@@ -677,15 +677,15 @@ This method computes the correlation matrix from the data matrix `X` using the p
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CorrelationDistance}`: General distance estimator with a power and `CorrelationDistance` algorithm.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator to use for correlation computation.
-  - `X::AbstractMatrix`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `de`: General distance estimator with a power and `CorrelationDistance` algorithm.
+  - `ce`: Covariance estimator to use for correlation computation.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the correlation estimator.
 
 # Returns
 
-  - `(rho, dist)`: Tuple of powered correlation matrix and correlation distance matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of powered correlation matrix and correlation distance matrix.
 
 # Details
 
@@ -714,15 +714,15 @@ This method dispatches to the [`VariationInfoDistance`](@ref) algorithm, using t
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CanonicalDistance}`: General distance estimator with a power and `CanonicalDistance` algorithm.
-  - `ce::MutualInfoCovariance`: Mutual information covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the distance.
+  - `de`: General distance estimator with a power and `CanonicalDistance` algorithm.
+  - `ce`: Mutual information covariance estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise canonical distances.
+  - `dist::Matri{<Real}`: Matrix of pairwise canonical distances.
 
 # Related
 
@@ -748,15 +748,15 @@ This method dispatches to the [`VariationInfoDistance`](@ref) algorithm, using t
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CanonicalDistance}`: General distance estimator with a power and `CanonicalDistance` algorithm.
-  - `ce::PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any}`: Wrapped mutual information covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the distance.
+  - `de`: General distance estimator with a power and `CanonicalDistance` algorithm.
+  - `ce`: Wrapped mutual information covariance estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise canonical distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise canonical distances.
 
 # Related
 
@@ -784,15 +784,15 @@ This method dispatches to the [`LogDistance`](@ref) algorithm.
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CanonicalDistance}`: General distance estimator with a power and `CanonicalDistance` algorithm.
-  - `ce::Union{<:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}}`: LTD covariance estimator or a wrapped LTD estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the distance.
+  - `de`: General distance estimator with a power and `CanonicalDistance` algorithm.
+  - `ce`: LTD covariance estimator or a wrapped LTD estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise canonical distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise canonical distances.
 
 # Related
 
@@ -819,15 +819,15 @@ This method dispatches to the [`CorrelationDistance`](@ref) algorithm.
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CanonicalDistance}`: General distance estimator with a power and `CanonicalDistance` algorithm.
-  - `ce::Union{<:DistanceCovariance, <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}}`: Distance covariance estimator or a wrapped distance covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the distance.
+  - `de`: General distance estimator with a power and `CanonicalDistance` algorithm.
+  - `ce`: Distance covariance estimator or a wrapped distance covariance estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise canonical distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise canonical distances.
 
 # Related
 
@@ -853,15 +853,15 @@ This method dispatches to the [`SimpleDistance`](@ref) algorithm.
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CanonicalDistance}`: General distance estimator with a power and `CanonicalDistance` algorithm.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the distance.
+  - `de`: General distance estimator with a power and `CanonicalDistance` algorithm.
+  - `ce`: Covariance estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise canonical distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise canonical distances.
 
 # Related
 
@@ -884,14 +884,14 @@ This method dispatches to the [`SimpleDistance`](@ref) algorithm.
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CanonicalDistance}`: General distance estimator with a power and `CanonicalDistance` algorithm.
-  - `rho::AbstractMatrix`: Correlation or covariance matrix.
+  - `de`: General distance estimator with a power and `CanonicalDistance` algorithm.
+  - `rho`: Correlation or covariance matrix.
   - `args...`: Additional arguments (ignored).
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `dist::Matrix`: Matrix of pairwise canonical distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise canonical distances.
 
 # Related
 
@@ -913,15 +913,15 @@ This method dispatches to the [`VariationInfoDistance`](@ref) algorithm, using t
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CanonicalDistance}`: General distance estimator with a power and `CanonicalDistance` algorithm.
-  - `ce::MutualInfoCovariance`: Mutual information covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the distance.
+  - `de`: General distance estimator with a power and `CanonicalDistance` algorithm.
+  - `ce`: Mutual information covariance estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `(rho, dist)`: Tuple of correlation matrix and canonical distance matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of correlation matrix and canonical distance matrix.
 
 # Related
 
@@ -947,15 +947,15 @@ This method dispatches to the [`VariationInfoDistance`](@ref) algorithm, using t
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CanonicalDistance}`: General distance estimator with a power and `CanonicalDistance` algorithm.
-  - `ce::PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any}`: Wrapped mutual information covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the distance.
+  - `de`: General distance estimator with a power and `CanonicalDistance` algorithm.
+  - `ce`: Wrapped mutual information covariance estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `(rho, dist)`: Tuple of correlation matrix and canonical distance matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of correlation matrix and canonical distance matrix.
 
 # Related
 
@@ -983,15 +983,15 @@ This method dispatches to the [`LogDistance`](@ref) algorithm.
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CanonicalDistance}`: General distance estimator with a power and `CanonicalDistance` algorithm.
-  - `ce::Union{<:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}}`: LTD covariance estimator or a wrapped LTD estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the distance.
+  - `de`: General distance estimator with a power and `CanonicalDistance` algorithm.
+  - `ce`: LTD covariance estimator or a wrapped LTD estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `(rho, dist)`: Tuple of correlation matrix and canonical distance matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of correlation matrix and canonical distance matrix.
 
 # Related
 
@@ -1018,15 +1018,15 @@ This method dispatches to the [`CorrelationDistance`](@ref) algorithm.
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CanonicalDistance}`: General distance estimator with a power and `CanonicalDistance` algorithm.
-  - `ce::Union{<:DistanceCovariance, <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}}`: Distance covariance estimator or a wrapped distance covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the distance.
+  - `de`: General distance estimator with a power and `CanonicalDistance` algorithm.
+  - `ce`: Distance covariance estimator or a wrapped distance covariance estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `(rho, dist)`: Tuple of correlation matrix and canonical distance matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of correlation matrix and canonical distance matrix.
 
 # Related
 
@@ -1053,15 +1053,15 @@ This method dispatches to the [`SimpleDistance`](@ref) algorithm.
 
 # Arguments
 
-  - `de::GeneralDistance{<:Any, <:CanonicalDistance}`: General distance estimator with a power and `CanonicalDistance` algorithm.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the distance.
+  - `de`: General distance estimator with a power and `CanonicalDistance` algorithm.
+  - `ce`: Covariance estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the distance.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `(rho, dist)`: Tuple of correlation matrix and canonical distance matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of correlation matrix and canonical distance matrix.
 
 # Related
 

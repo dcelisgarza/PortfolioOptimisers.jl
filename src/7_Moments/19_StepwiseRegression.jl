@@ -9,7 +9,7 @@ Stepwise regression criterion based on p-value thresholding.
 
 # Fields
 
-  - `threshold::Real`: The p-value threshold for variable inclusion.
+  - `threshold`: The p-value threshold for variable inclusion.
 
 # Related
 
@@ -28,7 +28,7 @@ This constructor creates a `PValue` object with the specified p-value threshold.
 
 # Arguments
 
-  - `threshold::Real`: The p-value threshold for variable inclusion.
+  - `threshold`: The p-value threshold for variable inclusion.
 
 # Returns
 
@@ -99,9 +99,9 @@ Estimator for stepwise regression-based moment estimation.
 
 # Fields
 
-  - `crit::AbstractStepwiseRegressionCriterion`: Criterion for variable selection.
-  - `alg::AbstractStepwiseRegressionAlgorithm`: Stepwise algorithm.
-  - `target::AbstractRegressionTarget`: Regression target type.
+  - `crit`: Criterion for variable selection.
+  - `alg`: Stepwise algorithm.
+  - `target`: Regression target type.
 
 # Constructor
 
@@ -131,9 +131,9 @@ This constructor creates a `StepwiseRegression` object with the specified criter
 
 # Arguments
 
-  - `crit::AbstractStepwiseRegressionCriterion`: Criterion for variable selection.
-  - `alg::AbstractStepwiseRegressionAlgorithm`: Stepwise algorithm.
-  - `target::AbstractRegressionTarget`: Regression target type.
+  - `crit`: Criterion for variable selection.
+  - `alg`: Stepwise algorithm.
+  - `target`: Regression target type.
 
 # Returns
 
@@ -175,10 +175,10 @@ This function is used in stepwise regression routines when no variables meet the
 
 # Arguments
 
-  - `target::AbstractRegressionTarget`: Regression target type (e.g., `LinearModel()`).
-  - `included::AbstractVector`: Indices of currently included variables (modified in-place).
-  - `F::AbstractMatrix`: Factor matrix (features × observations).
-  - `x::AbstractVector`: Response vector.
+  - `target`: Regression target type (e.g., `LinearModel()`).
+  - `included`: Indices of currently included variables (modified in-place).
+  - `F`: Factor matrix (features × observations).
+  - `x`: Response vector.
 
 # Returns
 
@@ -231,9 +231,9 @@ This method implements forward selection for stepwise regression, where variable
 
 # Arguments
 
-  - `re::StepwiseRegression{<:PValue, <:Forward}`: Stepwise regression estimator with a `PValue` criterion and `Forward` algorithm.
-  - `x::AbstractVector`: Response vector.
-  - `F::AbstractMatrix`: Feature matrix (observations × variables).
+  - `re`: Stepwise regression estimator with a `PValue` criterion and `Forward` algorithm.
+  - `x`: Response vector.
+  - `F`: Feature matrix (observations × variables).
 
 # Returns
 
@@ -299,10 +299,10 @@ This function updates the `included` and `excluded` variable sets in forward ste
 # Arguments
 
   - `::AbstractMinValStepwiseRegressionCriterion`: Stepwise regression criterion type where lower values are better.
-  - `value::AbstractVector`: Vector of criterion values for each variable.
-  - `excluded::AbstractVector`: Indices of currently excluded variables (modified in-place).
-  - `included::AbstractVector`: Indices of currently included variables (modified in-place).
-  - `threshold::Real`: Current threshold value for inclusion.
+  - `value`: Vector of criterion values for each variable.
+  - `excluded`: Indices of currently excluded variables (modified in-place).
+  - `included`: Indices of currently included variables (modified in-place).
+  - `threshold`: Current threshold value for inclusion.
 
 # Returns
 
@@ -346,10 +346,10 @@ This function updates the `included` and `excluded` variable sets in forward ste
 # Arguments
 
   - `::AbstractMaxValStepwiseRegressionCriteria`: Stepwise regression criterion type where higher values are better.
-  - `value::AbstractVector`: Vector of criterion values for each variable.
-  - `excluded::AbstractVector`: Indices of currently excluded variables (modified in-place).
-  - `included::AbstractVector`: Indices of currently included variables (modified in-place).
-  - `threshold::Real`: Current threshold value for inclusion.
+  - `value`: Vector of criterion values for each variable.
+  - `excluded`: Indices of currently excluded variables (modified in-place).
+  - `included`: Indices of currently included variables (modified in-place).
+  - `threshold`: Current threshold value for inclusion.
 
 # Returns
 
@@ -391,9 +391,9 @@ This method implements forward selection for stepwise regression, where variable
 
 # Arguments
 
-  - `re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion, <:AbstractMaxValStepwiseRegressionCriteria}, <:Forward}`: Stepwise regression estimator with a minimization or maximization criterion and `Forward` algorithm.
-  - `x::AbstractVector`: Response vector.
-  - `F::AbstractMatrix`: Feature matrix (observations × variables).
+  - `re`: Stepwise regression estimator with a minimization or maximization criterion and `Forward` algorithm.
+  - `x`: Response vector.
+  - `F`: Feature matrix (observations × variables).
 
 # Returns
 
@@ -455,9 +455,9 @@ This method implements backward elimination for stepwise regression, where all v
 
 # Arguments
 
-  - `re::StepwiseRegression{<:PValue, <:Backward}`: Stepwise regression estimator with a `PValue` criterion and `Backward` algorithm.
-  - `x::AbstractVector`: Response vector.
-  - `F::AbstractMatrix`: Feature matrix (observations × variables).
+  - `re`: Stepwise regression estimator with a `PValue` criterion and `Backward` algorithm.
+  - `x`: Response vector.
+  - `F`: Feature matrix (observations × variables).
 
 # Returns
 
@@ -516,9 +516,9 @@ This function updates the `included` variable set in backward stepwise regressio
 # Arguments
 
   - `::AbstractMinValStepwiseRegressionCriterion`: Stepwise regression criterion type where lower values are better.
-  - `value::AbstractVector`: Vector of criterion values for each variable.
-  - `included::AbstractVector`: Indices of currently included variables (modified in-place).
-  - `threshold::Real`: Current threshold value for exclusion.
+  - `value`: Vector of criterion values for each variable.
+  - `included`: Indices of currently included variables (modified in-place).
+  - `threshold`: Current threshold value for exclusion.
 
 # Returns
 
@@ -560,9 +560,9 @@ This function updates the `included` variable set in backward stepwise regressio
 # Arguments
 
   - `::AbstractMaxValStepwiseRegressionCriteria`: Stepwise regression criterion type where higher values are better.
-  - `value::AbstractVector`: Vector of criterion values for each variable.
-  - `included::AbstractVector`: Indices of currently included variables (modified in-place).
-  - `threshold::Real`: Current threshold value for exclusion.
+  - `value`: Vector of criterion values for each variable.
+  - `included`: Indices of currently included variables (modified in-place).
+  - `threshold`: Current threshold value for exclusion.
 
 # Returns
 
@@ -603,9 +603,9 @@ This method implements backward elimination for stepwise regression, where all v
 
 # Arguments
 
-  - `re::StepwiseRegression{<:Union{<:AbstractMinValStepwiseRegressionCriterion, <:AbstractMaxValStepwiseRegressionCriteria}, <:Backward}`: Stepwise regression estimator with a minimization or maximization criterion and `Backward` algorithm.
-  - `x::AbstractVector`: Response vector.
-  - `F::AbstractMatrix`: Feature matrix (observations × variables).
+  - `re`: Stepwise regression estimator with a minimization or maximization criterion and `Backward` algorithm.
+  - `x`: Response vector.
+  - `F`: Feature matrix (observations × variables).
 
 # Returns
 
@@ -671,9 +671,9 @@ This method fits a stepwise regression model (as specified by `re`) to each colu
 
 # Arguments
 
-  - `re::StepwiseRegression`: Stepwise regression estimator specifying the criterion, algorithm, and regression target.
-  - `X::AbstractMatrix`: Asset returns matrix (observations × assets).
-  - `F::AbstractMatrix`: Factor returns matrix (observations × factors or features).
+  - `re`: Stepwise regression estimator specifying the criterion, algorithm, and regression target.
+  - `X`: Asset returns matrix (observations × assets).
+  - `F`: Factor returns matrix (observations × factors or features).
 
 # Returns
 

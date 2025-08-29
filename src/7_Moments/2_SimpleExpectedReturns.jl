@@ -25,7 +25,7 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator with optional observation 
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)`](@ref)
+  - [`mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
 struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
     w::T1
@@ -39,17 +39,13 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator for computing expected ret
 
   - `w`: Optional observation weights. If `nothing`, the unweighted mean is computed.
 
+# Validation
+
+    - If `w` is provided, it must not be empty.
+
 # Returns
 
   - `SimpleExpectedReturns`: A simple expected returns estimator configured with optional weights.
-
-# Validation
-
-  - If `w` is provided, it must not be empty.
-
-# Returns
-
-  - `SimpleExpectedReturns`: A simple expected returns estimator.
 
 # Examples
 
@@ -72,7 +68,7 @@ SimpleExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`SimpleExpectedReturns`](@ref)
-  - [`mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)`](@ref)
+  - [`mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
 function SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(w, AbstractWeights)
@@ -82,7 +78,7 @@ function SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
 end
 
 """
-    mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)
+    mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estimator.
 
@@ -130,7 +126,7 @@ julia> mean(serw, X)
   - [`SimpleExpectedReturns`](@ref)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
-function Statistics.mean(me::SimpleExpectedReturns, X::AbstractArray; dims::Int = 1,
+function Statistics.mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1,
                          kwargs...)
     return isnothing(me.w) ? mean(X; dims = dims) : mean(X, me.w; dims = dims)
 end

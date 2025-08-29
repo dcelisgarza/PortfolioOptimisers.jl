@@ -3,5 +3,5 @@
 ```@docs
 ExcessExpectedReturns
 ExcessExpectedReturns()
-mean(me::ExcessExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)
+mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```

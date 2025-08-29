@@ -84,8 +84,8 @@ This method applies PCA as a dimension reduction technique for regression-based 
 
 # Arguments
 
-  - `drtgt::PCA`: A [`PCA`](@ref) dimension reduction target, specifying keyword arguments for PCA.
-  - `X::AbstractMatrix`: Data matrix (observations × features) to which PCA will be fitted.
+  - `drtgt`: A [`PCA`](@ref) dimension reduction target, specifying keyword arguments for PCA.
+  - `X`: Data matrix (observations × features) to which PCA will be fitted.
 
 # Returns
 
@@ -169,8 +169,8 @@ This method applies PPCA as a dimension reduction technique for regression-based
 
 # Arguments
 
-  - `drtgt::PPCA`: A [`PPCA`](@ref) dimension reduction target, specifying keyword arguments for PPCA.
-  - `X::AbstractMatrix`: Data matrix (observations × features) to which PPCA will be fitted.
+  - `drtgt`: A [`PPCA`](@ref) dimension reduction target, specifying keyword arguments for PPCA.
+  - `X`: Data matrix (observations × features) to which PPCA will be fitted.
 
 # Returns
 
@@ -239,10 +239,10 @@ This constructor creates a `DimensionReductionRegression` object with the specif
 
 # Arguments
 
-  - `me::AbstractExpectedReturnsEstimator`: Expected returns estimator.
-  - `ve::AbstractVarianceEstimator`: Variance estimator.
-  - `drtgt::DimensionReductionTarget`: Dimension reduction target.
-  - `retgt::AbstractRegressionTarget`: Regression target type.
+  - `me`: Expected returns estimator.
+  - `ve`: Variance estimator.
+  - `drtgt`: Dimension reduction target.
+  - `retgt`: Regression target type.
 
 # Returns
 
@@ -291,13 +291,13 @@ This helper function standardizes the feature matrix `X` (using Z-score normaliz
 
 # Arguments
 
-  - `drtgt::DimensionReductionTarget`: Dimension reduction target (e.g., `PCA()`, `PPCA()`).
-  - `X::AbstractMatrix`: Feature matrix (observations × features) to be reduced.
+  - `drtgt`: Dimension reduction target (e.g., `PCA()`, `PPCA()`).
+  - `X`: Feature matrix (observations × features) to be reduced.
 
 # Returns
 
-  - `x1::AbstractMatrix`: Projected feature matrix with an intercept column prepended.
-  - `Vp::AbstractMatrix`: Projection matrix from the fitted dimension reduction model.
+  - `x1::AbstractMatrix{<:Real}`: Projected feature matrix with an intercept column prepended.
+  - `Vp::AbstractMatrix{<:Real}`: Projection matrix from the fitted dimension reduction model.
 
 # Details
 
@@ -332,16 +332,16 @@ This function fits a regression model (as specified by `retgt`) to the response 
 
 # Arguments
 
-  - `retgt::AbstractRegressionTarget`: Regression target type (e.g., `LinearModel()`).
-  - `y::AbstractVector`: Response vector.
-  - `mu::AbstractVector`: Mean vector of the original features.
-  - `sigma::AbstractVector`: Standard deviation vector of the original features.
-  - `x1::AbstractMatrix`: Projected feature matrix with intercept column (from dimension reduction).
-  - `Vp::AbstractMatrix`: Projection matrix from the fitted dimension reduction model.
+  - `retgt`: Regression target type (e.g., `LinearModel()`).
+  - `y`: Response vector.
+  - `mu`: Mean vector of the original features.
+  - `sigma`: Standard deviation vector of the original features.
+  - `x1`: Projected feature matrix with intercept column (from dimension reduction).
+  - `Vp`: Projection matrix from the fitted dimension reduction model.
 
 # Returns
 
-  - `beta::Vector`: Vector of regression coefficients in the original feature space, with the intercept as the first element.
+  - `beta::Vector{<:Real}`: Vector of regression coefficients in the original feature space, with the intercept as the first element.
 
 # Details
 
@@ -375,9 +375,9 @@ This method fits a regression model with dimension reduction (e.g., PCA or PPCA)
 
 # Arguments
 
-  - `re::DimensionReductionRegression`: Dimension reduction regression estimator specifying the expected returns estimator, variance estimator, dimension reduction target, and regression target.
-  - `X::AbstractMatrix`: Response matrix (observations × targets/assets).
-  - `F::AbstractMatrix`: Feature matrix (observations × features).
+  - `re`: Dimension reduction regression estimator specifying the expected returns estimator, variance estimator, dimension reduction target, and regression target.
+  - `X`: Response matrix (observations × targets/assets).
+  - `F`: Feature matrix (observations × features).
 
 # Returns
 

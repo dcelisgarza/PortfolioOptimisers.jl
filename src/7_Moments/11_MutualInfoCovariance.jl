@@ -11,9 +11,9 @@ Covariance estimator based on mutual information.
 
 # Fields
 
-  - `ve::AbstractVarianceEstimator`: Variance estimator used to compute marginal standard deviations.
-  - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins for histogram-based MI estimation.
-  - `normalise::Bool`: Whether to normalise the MI matrix.
+  - `ve`: Variance estimator used to compute marginal standard deviations.
+  - `bins`: Binning algorithm or fixed number of bins for histogram-based MI estimation.
+  - `normalise`: Whether to normalise the MI matrix.
 
 # Constructor
 
@@ -44,9 +44,9 @@ This constructor creates a `MutualInfoCovariance` object using the specified var
 
 # Arguments
 
-  - `ve::AbstractVarianceEstimator`: Variance estimator.
-  - `bins::Union{<:AbstractBins, <:Integer}`: Binning algorithm or fixed number of bins for MI estimation.
-  - `normalise::Bool`: Whether to normalise the MI matrix.
+  - `ve`: Variance estimator.
+  - `bins`: Binning algorithm or fixed number of bins for MI estimation.
+  - `normalise`: Whether to normalise the MI matrix.
 
 # Returns
 
@@ -98,14 +98,14 @@ This method computes the pairwise mutual information correlation matrix for the 
 
 # Arguments
 
-  - `ce::MutualInfoCovariance`: Mutual information-based covariance estimator.
-  - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `ce`: Mutual information-based covariance estimator.
+  - `X`: Data matrix of asset returns (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments (currently unused).
 
 # Returns
 
-  - `rho::Matrix{Float64}`: Symmetric matrix of mutual information-based correlation coefficients.
+  - `rho::Matrix{<:Real}`: Symmetric matrix of mutual information-based correlation coefficients.
 
 # Validation
 
@@ -135,14 +135,14 @@ This method computes the pairwise mutual information covariance matrix for the i
 
 # Arguments
 
-  - `ce::MutualInfoCovariance`: Mutual information-based covariance estimator.
-  - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance.
+  - `ce`: Mutual information-based covariance estimator.
+  - `X`: Data matrix of asset returns (observations × assets).
+  - `dims`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
 # Returns
 
-  - `sigma::Matrix{Float64}`: Symmetric matrix of mutual information-based covariances.
+  - `sigma::Matrix{<:Real}`: Symmetric matrix of mutual information-based covariances.
 
 # Validation
 

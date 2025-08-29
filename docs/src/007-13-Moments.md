@@ -16,5 +16,5 @@ BodnarOkhrinParolya()
 ShrunkExpectedReturns
 ShrunkExpectedReturns()
 PortfolioOptimisers.target_mean
-mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::AbstractArray; dims::Int = 1, kwargs...)
+mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```

@@ -3,5 +3,5 @@
 ```@docs
 EquilibriumExpectedReturns
 EquilibriumExpectedReturns()
-mean(me::EquilibriumExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)
+mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```

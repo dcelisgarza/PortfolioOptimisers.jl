@@ -10,8 +10,8 @@ Container type for excess expected returns estimators.
 
 # Fields
 
-  - `me::AbstractExpectedReturnsEstimator`: Mean estimator for expected returns.
-  - `rf::Real`: Risk-free rate to subtract from expected returns.
+  - `me`: Mean estimator for expected returns.
+  - `rf`: Risk-free rate to subtract from expected returns.
 
 # Constructor
 
@@ -37,8 +37,8 @@ Construct an [`ExcessExpectedReturns`](@ref) estimator for excess expected retur
 
 # Arguments
 
-  - `me::AbstractExpectedReturnsEstimator`: Mean estimator for expected returns.
-  - `rf::Real`: Risk-free rate to subtract.
+  - `me`: Mean estimator for expected returns.
+  - `rf`: Risk-free rate to subtract.
 
 # Returns
 
@@ -66,7 +66,7 @@ function ExcessExpectedReturns(;
 end
 
 """
-    mean(me::ExcessExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)
+    mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute excess expected returns by subtracting the risk-free rate.
 
@@ -74,9 +74,9 @@ This method applies the mean estimator to the data and subtracts the risk-free r
 
 # Arguments
 
-  - `me::ExcessExpectedReturns`: Excess expected returns estimator.
-  - `X::AbstractArray`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the mean.
+  - `me`: Excess expected returns estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the mean.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 # Returns
@@ -87,7 +87,7 @@ This method applies the mean estimator to the data and subtracts the risk-free r
 
   - [`ExcessExpectedReturns`](@ref)
 """
-function Statistics.mean(me::ExcessExpectedReturns, X::AbstractArray; dims::Int = 1,
+function Statistics.mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1,
                          kwargs...)
     return mean(me.me, X; dims = dims, kwargs...) .- me.rf
 end

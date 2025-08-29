@@ -427,7 +427,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Gerber correlation, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Gerber correlation, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -479,7 +479,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -531,7 +531,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -579,7 +579,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -633,7 +633,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Gerber correlation or correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Gerber correlation or correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -687,7 +687,7 @@ This method computes the Gerber correlation or correlation matrix for the input 
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Gerber correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -744,7 +744,7 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Gerber correlation matrix.
+  - `rho::Matrix{<:Real}`: The Gerber correlation matrix.
 
 # Validation
 
@@ -786,7 +786,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 
 # Returns
 
-  - `sigma::Matrix{Float64}`: The Gerber covariance matrix.
+  - `sigma::Matrix{<:Real}`: The Gerber covariance matrix.
 
 # Validation
 
@@ -828,7 +828,7 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Gerber correlation matrix.
+  - `rho::Matrix{<:Real}`: The Gerber correlation matrix.
 
 # Validation
 
@@ -874,7 +874,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 
 # Returns
 
-  - `sigma::Matrix{Float64}`: The Gerber covariance matrix.
+  - `sigma::Matrix{<:Real}`: The Gerber covariance matrix.
 
 # Validation
 

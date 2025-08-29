@@ -11,8 +11,8 @@ Lower tail dependence covariance estimator.
 
 # Fields
 
-  - `ve::AbstractVarianceEstimator`: Variance estimator used to compute marginal standard deviations.
-  - `alpha::Real`: Quantile level for the 5% lower tail.
+  - `ve`: Variance estimator used to compute marginal standard deviations.
+  - `alpha`: Quantile level for the 5% lower tail.
   - `threads`: Parallel execution strategy.
 
 # Constructor
@@ -45,8 +45,8 @@ This constructor creates a `LTDCovariance` object using the specified variance e
 
 # Arguments
 
-  - `ve::AbstractVarianceEstimator`: Variance estimator.
-  - `alpha::Real`: Quantile level for the lower tail.
+  - `ve`: Variance estimator.
+  - `alpha`: Quantile level for the lower tail.
   - `threads`: Parallel execution strategy.
 
 # Returns
@@ -98,13 +98,13 @@ The lower tail dependence (LTD) between two assets quantifies the probability th
 
 # Arguments
 
-  - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
-  - `alpha::Real`: Quantile level for the lower tail.
+  - `X`: Data matrix of asset returns (observations × assets).
+  - `alpha`: Quantile level for the lower tail.
   - `threads`: Parallel execution strategy.
 
 # Returns
 
-  - `rho::Matrix{Float64}`: Symmetric matrix of lower tail dependence coefficients, where `rho[i, j]` is the estimated LTD between assets `i` and `j`.
+  - `rho::Matrix{<:Real}`: Symmetric matrix of lower tail dependence coefficients, where `rho[i, j]` is the estimated LTD between assets `i` and `j`.
 
 # Details
 
@@ -149,14 +149,14 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
 
 # Arguments
 
-  - `ce::LTDCovariance`: Lower tail dependence covariance estimator.
-  - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `ce`: Lower tail dependence covariance estimator.
+  - `X`: Data matrix of asset returns (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `rho::Matrix{Float64}`: Symmetric matrix of lower tail dependence correlation coefficients.
+  - `rho::Matrix{<:Real}`: Symmetric matrix of lower tail dependence correlation coefficients.
 
 # Validation
 
@@ -183,14 +183,14 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
 
 # Arguments
 
-  - `ce::LTDCovariance`: Lower tail dependence covariance estimator.
-  - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance.
+  - `ce`: Lower tail dependence covariance estimator.
+  - `X`: Data matrix of asset returns (observations × assets).
+  - `dims`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
 # Returns
 
-  - `sigma::Matrix{Float64}`: Symmetric matrix of lower tail dependence covariances.
+  - `sigma::Matrix{<:Real}`: Symmetric matrix of lower tail dependence covariances.
 
 # Validation
 

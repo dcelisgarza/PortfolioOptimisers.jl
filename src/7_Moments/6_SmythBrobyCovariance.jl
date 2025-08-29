@@ -509,7 +509,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -585,7 +585,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -659,7 +659,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -738,7 +738,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -818,7 +818,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -892,7 +892,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -966,7 +966,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -1048,7 +1048,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -1130,7 +1130,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -1218,7 +1218,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -1307,7 +1307,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -1385,7 +1385,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix, normalised and projected to be positive definite using the estimator's `pdm` field.
 
 # Details
 
@@ -1467,7 +1467,7 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix.
 
 # Validation
 
@@ -1522,7 +1522,7 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 
 # Returns
 
-  - `sigma::Matrix{Float64}`: The Smyth-Broby covariance matrix.
+  - `sigma::Matrix{<:Real}`: The Smyth-Broby covariance matrix.
 
 # Validation
 
@@ -1576,7 +1576,7 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The Smyth-Broby correlation matrix.
+  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix.
 
 # Validation
 
@@ -1635,7 +1635,7 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 
 # Returns
 
-  - `sigma::Matrix{Float64}`: The Smyth-Broby covariance matrix.
+  - `sigma::Matrix{<:Real}`: The Smyth-Broby covariance matrix.
 
 # Validation
 

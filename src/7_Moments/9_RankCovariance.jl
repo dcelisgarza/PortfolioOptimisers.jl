@@ -22,7 +22,7 @@ Robust covariance estimator based on Kendall's tau rank correlation.
 
 # Fields
 
-  - `ve::AbstractVarianceEstimator`: Variance estimator used to compute marginal standard deviations.
+  - `ve`: Variance estimator used to compute marginal standard deviations.
 
 # Constructor
 
@@ -49,7 +49,7 @@ This constructor creates a `KendallCovariance` object using the specified varian
 
 # Arguments
 
-  - `ve::AbstractVarianceEstimator`: Variance estimator.
+  - `ve`: Variance estimator.
 
 # Returns
 
@@ -87,14 +87,14 @@ This method computes the pairwise Kendall's tau rank correlation matrix for the 
 
 # Arguments
 
-  - `ce::KendallCovariance`: Kendall's tau-based covariance estimator.
-  - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation.
+  - `ce`: Kendall's tau-based covariance estimator.
+  - `X`: Data matrix of asset returns (observations × assets).
+  - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments (currently unused).
 
 # Returns
 
-  - `rho::Matrix{Float64}`: Symmetric matrix of Kendall's tau rank correlation coefficients.
+  - `rho::Matrix{<:Real}`: Symmetric matrix of Kendall's tau rank correlation coefficients.
 
 # Validation
 
@@ -122,14 +122,14 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 
 # Arguments
 
-  - `ce::KendallCovariance`: Kendall's tau-based covariance estimator.
-  - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance.
+  - `ce`: Kendall's tau-based covariance estimator.
+  - `X`: Data matrix of asset returns (observations × assets).
+  - `dims`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
 # Returns
 
-  - `sigma::Matrix{Float64}`: Symmetric matrix of Kendall's tau rank covariances.
+  - `sigma::Matrix{<:Real}`: Symmetric matrix of Kendall's tau rank covariances.
 
 # Validation
 
@@ -161,7 +161,7 @@ Robust covariance estimator based on Spearman's rho rank correlation.
 
 # Fields
 
-  - `ve::AbstractVarianceEstimator`: Variance estimator used to compute marginal standard deviations.
+  - `ve`: Variance estimator used to compute marginal standard deviations.
 
 # Constructor
 
@@ -188,7 +188,7 @@ This constructor creates a `SpearmanCovariance` object using the specified varia
 
 # Arguments
 
-  - `ve::AbstractVarianceEstimator`: Variance estimator.
+  - `ve`: Variance estimator.
 
 # Returns
 
@@ -225,14 +225,14 @@ This method computes the pairwise Spearman's rho rank correlation matrix for the
 
 # Arguments
 
-  - `ce::SpearmanCovariance`: Spearman's rho-based covariance estimator.
-  - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
-  - `dims::Int`: Dimension along which to compute the correlation (1 = columns/assets, 2 = rows). Default is `1`.
+  - `ce`: Spearman's rho-based covariance estimator.
+  - `X`: Data matrix of asset returns (observations × assets).
+  - `dims`: Dimension along which to compute the correlation (1 = columns/assets, 2 = rows). Default is `1`.
   - `kwargs...`: Additional keyword arguments (currently unused).
 
 # Returns
 
-  - `rho::Matrix{Float64}`: Symmetric matrix of Spearman's rho rank correlation coefficients.
+  - `rho::Matrix{<:Real}`: Symmetric matrix of Spearman's rho rank correlation coefficients.
 
 # Validation
 
@@ -260,14 +260,14 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 
 # Arguments
 
-  - `ce::SpearmanCovariance`: Spearman's rho-based covariance estimator.
-  - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance (1 = columns/assets, 2 = rows). Default is `1`.
+  - `ce`: Spearman's rho-based covariance estimator.
+  - `X`: Data matrix of asset returns (observations × assets).
+  - `dims`: Dimension along which to compute the covariance (1 = columns/assets, 2 = rows). Default is `1`.
   - `kwargs...`: Additional keyword arguments passed to the variance estimator.
 
 # Returns
 
-  - `sigma::Matrix{Float64}`: Symmetric matrix of Spearman's rho rank covariances.
+  - `sigma::Matrix{<:Real}`: Symmetric matrix of Spearman's rho rank covariances.
 
 # Validation
 

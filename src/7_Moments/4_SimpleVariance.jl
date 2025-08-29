@@ -26,9 +26,9 @@ Construct a `SimpleVariance` estimator with the specified expected returns estim
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`std(ve::SimpleVariance, X::AbstractVector; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
 """
 struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
@@ -88,9 +88,9 @@ SimpleVariance
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`std(ve::SimpleVariance, X::AbstractVector; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
 """
 function SimpleVariance(;
@@ -104,7 +104,7 @@ function SimpleVariance(;
 end
 
 """
-    std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)
+    std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for an array.
 
@@ -143,13 +143,13 @@ julia> std(sv, Xmat; dims = 1)
 
   - [`SimpleVariance`](@ref)
   - [`Statistics.std`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.std)
-  - [`std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`std(ve::SimpleVariance, X::AbstractVector; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
 """
-function Statistics.std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing,
-                        kwargs...)
+function Statistics.std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1,
+                        mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
         std(X; dims = dims, corrected = ve.corrected, mean = mu)
@@ -209,8 +209,8 @@ julia> std(svw, X)
 
   - [`SimpleVariance`](@ref)
   - [`Statistics.std`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.std)
-  - [`std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
 """
 function Statistics.std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
@@ -222,7 +222,7 @@ function Statistics.std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
 end
 
 """
-    var(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)
+    var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for an array.
 
@@ -261,12 +261,12 @@ julia> var(sv, Xmat; dims = 1)
 
   - [`SimpleVariance`](@ref)
   - [`Statistics.var`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.var)
-  - [`std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`std(ve::SimpleVariance, X::AbstractVector; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
 """
-function Statistics.var(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing,
-                        kwargs...)
+function Statistics.var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1,
+                        mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
         var(X; dims = dims, corrected = ve.corrected, mean = mu)
@@ -325,9 +325,9 @@ julia> var(svw, X)
 
   - [`SimpleVariance`](@ref)
   - [`Statistics.var`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.var)
-  - [`std(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`std(ve::SimpleVariance, X::AbstractVector; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::AbstractArray; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ve::SimpleVariance, X::AbstractVector; mean = nothing)
     return if isnothing(ve.w)

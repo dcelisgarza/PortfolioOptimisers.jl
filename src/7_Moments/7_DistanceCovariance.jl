@@ -161,7 +161,7 @@ This function calculates the distance correlation between each pair of columns i
 
 # Returns
 
-  - `rho::Matrix{Float64}`: Distance correlation matrix.
+  - `rho::Matrix{<:Real}`: Distance correlation matrix.
 
 # Details
 
@@ -199,7 +199,7 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 
 # Returns
 
-  - `rho::Matrix{Float64}`: Symmetric matrix of pairwise distance correlations.
+  - `rho::Matrix{<:Real}`: Symmetric matrix of pairwise distance correlations.
 
 # Validation
 
@@ -253,7 +253,7 @@ This function calculates the distance covariance between `v1` and `v2` using the
 
 # Returns
 
-  - `σ::Float64`: The computed distance covariance between `v1` and `v2`.
+  - `rho::Real`: The computed distance covariance between `v1` and `v2`.
 
 # Details
 
@@ -303,7 +303,7 @@ This function calculates the distance covariance between each pair of columns in
 
 # Returns
 
-  - `sigma::Matrix{Float64}`: Symmetric matrix of pairwise distance covariances.
+  - `sigma::Matrix{<:Real}`: Symmetric matrix of pairwise distance covariances.
 
 # Details
 
@@ -341,7 +341,7 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 
 # Returns
 
-  - `sigma::Matrix{Float64}`: Symmetric matrix of pairwise distance covariances.
+  - `sigma::Matrix{<:Real}`: Symmetric matrix of pairwise distance covariances.
 
 # Validation
 

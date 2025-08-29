@@ -10,8 +10,8 @@ Composite covariance estimator with post-processing.
 
 # Fields
 
-  - `ce::AbstractCovarianceEstimator`: The underlying covariance estimator.
-  - `mp::AbstractMatrixProcessingEstimator`: Matrix post-processing estimator.
+  - `ce`: The underlying covariance estimator.
+  - `mp`: Matrix post-processing estimator.
 
 # Constructor
 
@@ -39,8 +39,8 @@ This constructor creates a `PortfolioOptimisersCovariance` object using the spec
 
 # Arguments
 
-  - `ce::AbstractCovarianceEstimator`: Covariance estimator to use.
-  - `mp::AbstractMatrixProcessingEstimator`: Matrix post-processing estimator.
+  - `ce`: Covariance estimator to use.
+  - `mp`: Matrix post-processing estimator.
 
 # Returns
 
@@ -92,14 +92,14 @@ This method computes the covariance matrix for the input data matrix `X` using t
 
 # Arguments
 
-  - `ce::PortfolioOptimisersCovariance`: Composite covariance estimator with post-processing.
-  - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
+  - `ce`: Composite covariance estimator with post-processing.
+  - `X`: Data matrix of asset returns (observations × assets).
   - `dims`: Dimension along which to compute the covariance (1 = columns/assets, 2 = rows). Default is `1`.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
 # Returns
 
-  - `sigma::Matrix{Float64}`: The processed covariance matrix.
+  - `sigma::Matrix{<:Real}`: The processed covariance matrix.
 
 # Validation
 
@@ -134,14 +134,14 @@ This method computes the correlation matrix for the input data matrix `X` using 
 
 # Arguments
 
-  - `ce::PortfolioOptimisersCovariance`: Composite covariance estimator with post-processing.
-  - `X::AbstractMatrix`: Data matrix of asset returns (observations × assets).
+  - `ce`: Composite covariance estimator with post-processing.
+  - `X`: Data matrix of asset returns (observations × assets).
   - `dims`: Dimension along which to compute the correlation (1 = columns/assets, 2 = rows). Default is `1`.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator and matrix processing step.
 
 # Returns
 
-  - `rho::Matrix{Float64}`: The processed correlation matrix.
+  - `rho::Matrix{<:Real}`: The processed correlation matrix.
 
 # Validation
 

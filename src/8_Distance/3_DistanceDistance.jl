@@ -47,7 +47,7 @@ Construct a [`DistanceDistance`](@ref) estimator with the specified metric and b
   - `dist`: The metric to use for the second-level distance from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl).
   - `args`: Positional arguments to pass to the metric.
   - `kwargs`: Keyword arguments to pass to the metric.
-  - `alg::AbstractDistanceAlgorithm`: The base distance algorithm to use.
+  - `alg`: The base distance algorithm to use.
 
 # Returns
 
@@ -87,15 +87,15 @@ This method first computes a base distance matrix using the specified base dista
 
 # Arguments
 
-  - `de::DistanceDistance`: Distance-of-distances estimator.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the base distance.
+  - `de`: Distance-of-distances estimator.
+  - `ce`: Covariance estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the base distance.
   - `kwargs...`: Additional keyword arguments passed to the base distance computation.
 
 # Returns
 
-  - `D::Matrix`: Matrix of pairwise distances of distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise distances of distances.
 
 # Related
 
@@ -116,14 +116,14 @@ This method first computes a base distance matrix using the specified base dista
 
 # Arguments
 
-  - `de::DistanceDistance`: Distance-of-distances estimator.
-  - `rho::AbstractMatrix`: Correlation or covariance matrix.
+  - `de`: Distance-of-distances estimator.
+  - `rho`: Correlation or covariance matrix.
   - `args...`: Additional arguments (ignored).
   - `kwargs...`: Additional keyword arguments passed to the base distance computation.
 
 # Returns
 
-  - `D::Matrix`: Matrix of pairwise distances of distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise distances of distances.
 
 # Related
 
@@ -144,15 +144,15 @@ This method first computes the correlation and base distance matrices, then appl
 
 # Arguments
 
-  - `de::DistanceDistance`: Distance-of-distances estimator.
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
-  - `X::AbstractMatrix`: Data matrix (observations × features).
-  - `dims::Int`: Dimension along which to compute the base distance.
+  - `de`: Distance-of-distances estimator.
+  - `ce`: Covariance estimator.
+  - `X`: Data matrix (observations × features).
+  - `dims`: Dimension along which to compute the base distance.
   - `kwargs...`: Additional keyword arguments passed to the base distance computation.
 
 # Returns
 
-  - `(ρ, D)`: Tuple of correlation matrix and distance-of-distances matrix.
+  - `(rho::Matrix{<:Real}, dist::Matrix{<:Real})`: Tuple of correlation matrix and distance-of-distances matrix.
 
 # Related
 

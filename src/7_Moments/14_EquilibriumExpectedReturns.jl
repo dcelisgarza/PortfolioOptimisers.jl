@@ -11,9 +11,9 @@ Container type for equilibrium expected returns estimators.
 
 # Fields
 
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
+  - `ce`: Covariance estimator.
   - `w`: Equilibrium portfolio weights. If `nothing`, uses equal weights.
-  - `l::Real`: Risk aversion parameter.
+  - `l`: Risk aversion parameter.
 
 # Constructor
 
@@ -43,10 +43,9 @@ Construct an [`EquilibriumExpectedReturns`](@ref) estimator for equilibrium-base
 
 # Arguments
 
-  - `ce::StatsBase.CovarianceEstimator`: Covariance estimator.
-
+  - `ce`: Covariance estimator.
   - `w`: Equilibrium portfolio weights. If `nothing`, uses equal weights.
-  - `l::Real`: Risk aversion parameter.
+  - `l`: Risk aversion parameter.
 
 # Returns
 
@@ -92,7 +91,7 @@ function EquilibriumExpectedReturns(;
 end
 
 """
-    mean(me::EquilibriumExpectedReturns, X::AbstractArray; dims::Int = 1, kwargs...)
+    mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute equilibrium expected returns from a covariance estimator, weights, and risk aversion.
 
@@ -100,9 +99,9 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
 
 # Arguments
 
-  - `me::EquilibriumExpectedReturns`: Equilibrium expected returns estimator.
-  - `X::AbstractArray`: Data matrix (observations × assets).
-  - `dims::Int`: Dimension along which to compute the covariance.
+  - `me`: Equilibrium expected returns estimator.
+  - `X`: Data matrix (observations × assets).
+  - `dims`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
 
 # Returns
@@ -113,7 +112,7 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
 
   - [`EquilibriumExpectedReturns`](@ref)
 """
-function Statistics.mean(me::EquilibriumExpectedReturns, X::AbstractArray; dims::Int = 1,
+function Statistics.mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1,
                          kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     w = !isnothing(me.w) ? me.w : fill(inv(size(sigma, 1)), size(sigma, 1))
