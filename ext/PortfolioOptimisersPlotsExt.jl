@@ -1,7 +1,7 @@
 module PortfolioOptimisersPlotsExt
 
 using PortfolioOptimisers, GraphRecipes, StatsPlots, LinearAlgebra, Statistics, StatsBase,
-      Clustering
+      Clustering, Distributions
 
 function PortfolioOptimisers.plot_ptf_cumulative_returns(w::AbstractArray,
                                                          X::AbstractMatrix,
@@ -340,6 +340,65 @@ function PortfolioOptimisers.plot_measures(w::Union{<:AbstractVector{<:Real},
     else
         scatter(xr, yr, zr; zcolor = cr, kwargs..., ekwargs...)
     end
+end
+function PortfolioOptimisers.plot_histogram(w::AbstractArray, X::AbstractMatrix,
+                                            slv::Union{<:Solver,
+                                                       <:AbstractVector{<:Solver}},
+                                            fees::Union{Nothing, <:Fees} = nothing;
+                                            flag = true, alpha::Real = 0.05,
+                                            kappa::Real = 0.3,
+                                            points::Integer = ceil(Int,
+                                                                   4 * sqrt(size(X, 1))),
+                                            rw::Union{Nothing, <:AbstractWeights} = nothing,
+                                            theme::Symbol = :Paired_10,
+                                            h_kwargs::NamedTuple = (;
+                                                                    ylabel = "Probability Density",
+                                                                    xlabel = "Percentage Returns",
+                                                                    alpha = 0.5),
+                                            l_kwargs::NamedTuple = (; linewidth = 2),
+                                            pdf_kwargs::NamedTuple = (; linewidth = 2),
+                                            e_kwargs...)
+    ret = calc_net_returns(w, X, fees)
+    mu = mean(ret)
+    sigma = std(ret)
+    mir, mar = extrema(ret)
+    x = range(mir; stop = mar, length = points)
+    mad = LowOrderMoment(; w = rw, alg = MeanAbsoluteDeviation())(w, X, fees)
+    gmd = OrderedWeightsArray()(copy(ret))
+    risks = (mu, mu - sigma, mu - mad, mu - gmd,
+             -ValueatRisk(; w = rw, alpha = alpha)(copy(ret)),
+             -ConditionalValueatRisk(; w = rw, alpha = alpha)(copy(ret)),
+             -OrderedWeightsArray(; w = owa_tg(length(ret)))(copy(ret)),
+             -EntropicValueatRisk(; w = rw, slv = slv, alpha = alpha)(copy(ret)),
+             -RelativisticValueatRisk(; w = rw, slv = slv, alpha = alpha, kappa = kappa)(copy(ret)),
+             mir)
+    conf = round((1 - alpha) * 100; digits = 2)
+    risk_labels = ("Mean: $(round(risks[1], digits=2))%",
+                   "Mean - Std. Dev. ($(round(sigma, digits=2))%): $(round(risks[2], digits=2))%",
+                   "Mean - MAD ($(round(mad,digits=2))%): $(round(risks[3], digits=2))%",
+                   "Mean - GMD ($(round(gmd,digits=2))%): $(round(risks[4], digits=2))%",
+                   "$(conf)% Confidence VaR: $(round(risks[5], digits=2))%",
+                   "$(conf)% Confidence CVaR: $(round(risks[6], digits=2))%",
+                   "$(conf)% Confidence Tail Gini: $(round(risks[7], digits=2))%",
+                   "$(conf)% Confidence EVaR: $(round(risks[8], digits=2))%",
+                   "$(conf)% Confidence RLVaR ($(round(kappa, digits=2))): $(round(risks[9], digits=2))%",
+                   "Worst Realisation: $(round(risks[10], digits=2))%")
+    colours = palette(theme, length(risk_labels) + 2)
+    plt = histogram(ret; normalize = :pdf, label = "", color = colours[1], h_kwargs...)
+    for (i, (risk, label)) in enumerate(zip(risks, risk_labels)) #! Do not change this enumerate to pairs.
+        vline!([risk]; label = label, color = colours[i + 1], l_kwargs...)
+    end
+    D = fit(Normal, ret)
+    if flag
+        density!(ret;
+                 label = "Normal: μ = $(round(mean(D), digits=2))%, σ = $(round(std(D), digits=2))%",
+                 color = colours[end], pdf_kwargs..., e_kwargs...)
+    else
+        plot!(x, pdf.(D, x);
+              label = "Normal: μ = $(round(mean(D), digits=2))%, σ = $(round(std(D), digits=2))%",
+              color = colours[end], pdf_kwargs..., e_kwargs...)
+    end
+    return plt
 end
 
 end

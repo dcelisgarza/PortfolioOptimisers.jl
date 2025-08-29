@@ -1,4 +1,4 @@
-@safetestwset "Finite allocation" begin
+@safetestset "Finite allocation" begin
     using PortfolioOptimisers, Clarabel, HiGHS, Test, CSV, TimeSeries, DataFrames,
           LinearAlgebra, StatsBase
     X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]

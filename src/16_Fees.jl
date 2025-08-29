@@ -272,14 +272,14 @@ end
 function calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees)
     return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
-function cumulative_returns(X::AbstractMatrix; compound::Bool = false, dims::Int = 1)
+function cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
     return if compound
         cumprod(one(eltype(X)) .+ X; dims = dims)
     else
         cumsum(X; dims = dims)
     end
 end
-function drawdowns(X::AbstractMatrix; cX::Bool = false, compound::Bool = false,
+function drawdowns(X::AbstractArray; cX::Bool = false, compound::Bool = false,
                    dims::Int = 1)
     cX = !cX ? cumulative_returns(X; compound = compound, dims = dims) : X
     if compound
