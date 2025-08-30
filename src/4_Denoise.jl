@@ -179,7 +179,7 @@ end
 """
     Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
               args::Tuple = (),
-              kwargs::NamedTuple = (;),              
+              kwargs::NamedTuple = (;),
               kernel = AverageShiftedHistograms.Kernels.gaussian,
               m::Integer = 10,
               n::Integer = 1000)

@@ -40,7 +40,8 @@ function SchurParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
 end
 function schur_params_view(sp::SchurParams, i::AbstractVector, X::AbstractMatrix)
     r = risk_measure_view(sp.r, i, X)
-    return SchurParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg, flag = sp.flag)
+    return SchurParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
+                       flag = sp.flag)
 end
 struct SchurHierarchicalRiskParity{T1, T2} <: ClusteringOptimisationEstimator
     opt::T1
@@ -123,20 +124,21 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::Weigh
             A = view(sigma, lc, lc)
             C = view(sigma, rc, rc)
             if length(lc) <= 1
-                A_aug, C_aug = A, C
+                A_aug = A
+                C_aug = C
             else
                 B = view(sigma, lc, rc)
-                sigma[lc, lc] = schur_augmentation(A, B, C, gamma),
+                sigma[lc, lc] = schur_augmentation(A, B, C, gamma)
                 sigma[rc, rc] = schur_augmentation(C, transpose(B), A, gamma)
                 A_aug = view(sigma, lc, lc)
                 C_aug = view(sigma, rc, rc)
             end
             if flag
-                try   
+                try
                     posdef!(pdm, A_aug)
                     posdef!(pdm, C_aug)
                 catch e
-                    rethrow(ArgumentError("Use MonotonicSchur() or reduce gamma: $gamma."))
+                    throw(ArgumentError("Augmented matrix could not be made positive definite. Use `MonotonicSchur()` or reduce gamma: $gamma."))
                 end
             else
                 if !isposdef(A_aug) || !isposdef(C_aug)
@@ -165,22 +167,10 @@ function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lr
     for _ in 1:iter
         mgamma = (lgamma + hgamma) * 0.5
         w, risk, hrisk = objective(mgamma)..., objective(mgamma - tol)[2]
-        #=
-        try
-            objective(mgamma)..., objective(mgamma - tol)[2]
-        catch e
-            if isa(e, SingularException)
-                nothing, typemax(lrisk), typemax(lrisk)
-            else
-                rethrow(e)
-            end
-        end
-        =#
         if risk <= lrisk && risk <= hrisk
             # If risk at midpoint is lower than at the lower bound and lower than the risk just below the midpoint, we can update the lower bound to the midpoint.
             lgamma = mgamma
             lrisk = risk
-            # println("$hgamma\t$lgamma\t$((hgamma - lgamma))")
             if (hgamma - lgamma) <= tol
                 # Return if the difference between upper and lower bounds is within the tolerance.
                 return w, lgamma
@@ -204,7 +194,7 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::Weigh
     r = factory(params.r, pr)
     if iszero(max_gamma)
         nm_params = SchurParams(; r = r, gamma = max_gamma, pdm = params.pdm,
-                            alg = NonMonotonicSchur(), flag = params.flag)
+                                alg = NonMonotonicSchur(), flag = params.flag)
         return schur_weights(pr, items, wb, nm_params)
     end
     nm_params = SchurParams(; r = r, gamma = max_gamma, pdm = params.pdm,
