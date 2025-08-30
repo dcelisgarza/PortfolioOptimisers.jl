@@ -25,21 +25,22 @@ function MonotonicSchur(; N::Integer = 10, tol::Real = 1e-4,
     end
     return MonotonicSchur(N, tol, iter, strict)
 end
-struct SchurParams{T1, T2, T3, T4} <: AbstractAlgorithm
+struct SchurParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     r::T1
     gamma::T2
-    alg::T3
-    flag::T4
+    pdm::T3
+    alg::T4
+    flag:T5
 end
 function SchurParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
-                     gamma::Real = 0.5, alg::SchurAlgorithm = MonotonicSchur(),
-                     flag::Bool = true)
+                     gamma::Real = 0.5, pdm::Union{Nothing, <:Posdef},
+                     alg::SchurAlgorithm = MonotonicSchur(), flag::Bool = true)
     @argcheck(one(gamma) >= gamma >= zero(gamma))
-    return SchurParams(r, gamma, alg, flag)
+    return SchurParams(r, gamma, pdm, alg, flag)
 end
 function schur_params_view(sp::SchurParams, i::AbstractVector, X::AbstractMatrix)
     r = risk_measure_view(sp.r, i, X)
-    return SchurParams(; r = r, gamma = sp.gamma, alg = sp.alg, flag = sp.flag)
+    return SchurParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg, flag = sp.flag)
 end
 struct SchurHierarchicalRiskParity{T1, T2} <: ClusteringOptimisationEstimator
     opt::T1
@@ -104,12 +105,13 @@ function naive_portfolio_risk(::StandardDeviation, sigma::AbstractMatrix)
     return sqrt(dot(w, sigma, w))
 end
 function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::WeightBounds,
-                       params::SchurParams{<:Any, <:Any, <:NonMonotonicSchur, <:Any},
+                       params::SchurParams{<:Any, <:Any, <:Any, <:NonMonotonicSchur, <:Any},
                        gamma::Union{Nothing, <:Real} = nothing)
     r = factory(params.r, pr)
     sigma = ismutable(r.sigma) ? copy(r.sigma) : Matrix(r.sigma)
     gamma = isnothing(gamma) ? params.gamma : gamma
     w = ones(eltype(pr.X), size(pr.X, 2))
+    pdm = params.pdm
     flag = params.flag
     @inbounds while length(items) > 0
         items = [i[j:k] for i in items
@@ -120,18 +122,27 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::Weigh
             rc = items[i + 1]
             A = view(sigma, lc, lc)
             C = view(sigma, rc, rc)
-            A_aug, C_aug = if length(lc) <= 1
-                A, C
+            if length(lc) <= 1
+                A_aug, C_aug = A, C
             else
                 B = view(sigma, lc, rc)
-                schur_augmentation(A, B, C, gamma),
-                schur_augmentation(C, transpose(B), A, gamma)
+                sigma[lc, lc] = schur_augmentation(A, B, C, gamma),
+                sigma[rc, rc] = schur_augmentation(C, transpose(B), A, gamma)
+                A_aug = view(sigma, lc, lc)
+                C_aug = view(sigma, rc, rc)
             end
-            if flag && (!isposdef(A_aug) || !isposdef(C_aug))
-                return nothing, nothing
+            if flag
+                try   
+                    posdef!(pdm, A_aug)
+                    posdef!(pdm, C_aug)
+                catch e
+                    rethrow(ArgumentError("Use MonotonicSchur() or reduce gamma: $gamma."))
+                end
+            else
+                if !isposdef(A_aug) || !isposdef(C_aug)
+                    return nothing, nothing
+                end
             end
-            sigma[lc, lc] .= A_aug
-            sigma[rc, rc] .= C_aug
             lrisk = naive_portfolio_risk(r, A_aug)
             rrisk = naive_portfolio_risk(r, C_aug)
             # Allocate weight to clusters.
@@ -153,7 +164,9 @@ function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lr
     end
     for _ in 1:iter
         mgamma = (lgamma + hgamma) * 0.5
-        w, risk, hrisk = try
+        w, risk, hrisk = objective(mgamma)..., objective(mgamma - tol)[2]
+        #=
+        try
             objective(mgamma)..., objective(mgamma - tol)[2]
         catch e
             if isa(e, SingularException)
@@ -162,6 +175,7 @@ function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lr
                 rethrow(e)
             end
         end
+        =#
         if risk <= lrisk && risk <= hrisk
             # If risk at midpoint is lower than at the lower bound and lower than the risk just below the midpoint, we can update the lower bound to the midpoint.
             lgamma = mgamma
@@ -188,11 +202,13 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::Weigh
                        params::SchurParams{<:Any, <:Any, <:MonotonicSchur, <:Any})
     max_gamma = params.gamma
     r = factory(params.r, pr)
-    nm_params = SchurParams(; r = r, gamma = max_gamma, alg = NonMonotonicSchur(),
-                            flag = params.flag)
     if iszero(max_gamma)
+        nm_params = SchurParams(; r = r, gamma = max_gamma, pdm = params.pdm,
+                            alg = NonMonotonicSchur(), flag = params.flag)
         return schur_weights(pr, items, wb, nm_params)
     end
+    nm_params = SchurParams(; r = r, gamma = max_gamma, pdm = params.pdm,
+                            alg = NonMonotonicSchur(), flag = false)
     function objective(x::Real)
         w = schur_weights(pr, items, wb, nm_params, x)[1]
         risk = isnothing(w) ? typemax(eltype(pr.X)) : dot(w, r.sigma, w)
