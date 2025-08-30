@@ -33,7 +33,7 @@ struct SchurParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     flag::T5
 end
 function SchurParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
-                     gamma::Real = 0.5, pdm::Union{Nothing, <:Posdef},
+                     gamma::Real = 0.5, pdm::Union{Nothing, <:Posdef} = Posdef(),
                      alg::SchurAlgorithm = MonotonicSchur(), flag::Bool = true)
     @argcheck(one(gamma) >= gamma >= zero(gamma))
     return SchurParams(r, gamma, pdm, alg, flag)
