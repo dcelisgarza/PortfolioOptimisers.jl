@@ -199,7 +199,7 @@ function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lr
     end
 end
 function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::WeightBounds,
-                       params::SchurParams{<:Any, <:Any, <:MonotonicSchur, <:Any})
+                       params::SchurParams{<:Any, <:Any, <:Any, <:MonotonicSchur, <:Any})
     max_gamma = params.gamma
     r = factory(params.r, pr)
     if iszero(max_gamma)
