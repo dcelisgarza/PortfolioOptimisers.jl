@@ -30,7 +30,7 @@ struct SchurParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     gamma::T2
     pdm::T3
     alg::T4
-    flag:T5
+    flag::T5
 end
 function SchurParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
                      gamma::Real = 0.5, pdm::Union{Nothing, <:Posdef},
