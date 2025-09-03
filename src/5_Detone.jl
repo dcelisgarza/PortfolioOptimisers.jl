@@ -130,10 +130,12 @@ julia> X
 function detone!(::Nothing, args...)
     return nothing
 end
-function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
+function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing,<:Posdef} = Posdef())
     n = ce.n
-    @argcheck(one(n) <= n <= size(X, 2),
-              DomainError(n, range_msg("`n`", one(n), size(X, 2), n, true, true) * "."))
+    @argcheck(
+        one(n) <= n <= size(X, 2),
+        DomainError(n, range_msg("`n`", one(n), size(X, 2), n, true, true) * ".")
+    )
     n -= 1
     s = diag(X)
     iscov = any(!isone, s)
@@ -142,8 +144,8 @@ function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = 
         StatsBase.cov2cor!(X, s)
     end
     vals, vecs = eigen(X)
-    _vals = Diagonal(vals)[(end - n):end, (end - n):end]
-    _vecs = vecs[:, (end - n):end]
+    _vals = Diagonal(vals)[(end-n):end, (end-n):end]
+    _vecs = vecs[:, (end-n):end]
     X .-= _vecs * _vals * transpose(_vecs)
     X .= cov2cor(X)
     posdef!(pdm, X)
@@ -195,7 +197,7 @@ julia> Xd = detone(Detone(), X)
 function detone(::Nothing, args...)
     return nothing
 end
-function detone(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
+function detone(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing,<:Posdef} = Posdef())
     X = copy(X)
     detone!(ce, X, pdm)
     return X

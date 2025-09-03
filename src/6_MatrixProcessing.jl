@@ -101,7 +101,7 @@ Keyword arguments correspond to the fields above. The constructor infers types a
   - [`matrix_processing`](@ref)
   - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
-struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
+struct DefaultMatrixProcessing{T1,T2,T3,T4} <: AbstractMatrixProcessingEstimator
     pdm::T1
     denoise::T2
     detone::T3
@@ -160,10 +160,12 @@ DefaultMatrixProcessing
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
 """
-function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
-                                 denoise::Union{Nothing, <:Denoise} = nothing,
-                                 detone::Union{Nothing, <:Detone} = nothing,
-                                 alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
+function DefaultMatrixProcessing(;
+    pdm::Union{Nothing,<:Posdef} = Posdef(),
+    denoise::Union{Nothing,<:Denoise} = nothing,
+    detone::Union{Nothing,<:Detone} = nothing,
+    alg::Union{Nothing,<:AbstractMatrixProcessingAlgorithm} = nothing,
+)
     return DefaultMatrixProcessing(pdm, denoise, detone, alg)
 end
 
@@ -197,7 +199,7 @@ Keyword arguments correspond to the fields above. The constructor infers types a
   - [`matrix_processing`](@ref)
   - [`DefaultMatrixProcessing`](@ref)
 """
-struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
+struct NonPositiveDefiniteMatrixProcessing{T1,T2,T3} <: AbstractMatrixProcessingEstimator
     denoise::T1
     detone::T2
     alg::T3
@@ -250,10 +252,11 @@ NonPositiveDefiniteMatrixProcessing
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
 """
-function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
-                                             detone::Union{Nothing, <:Detone} = nothing,
-                                             alg::Union{Nothing,
-                                                        <:AbstractMatrixProcessingAlgorithm} = nothing)
+function NonPositiveDefiniteMatrixProcessing(;
+    denoise::Union{Nothing,<:Denoise} = nothing,
+    detone::Union{Nothing,<:Detone} = nothing,
+    alg::Union{Nothing,<:AbstractMatrixProcessingAlgorithm} = nothing,
+)
     return NonPositiveDefiniteMatrixProcessing(denoise, detone, alg)
 end
 
@@ -345,8 +348,13 @@ julia> sigma
 function matrix_processing!(::Nothing, args...; kwargs...)
     return nothing
 end
-function matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
-                            X::AbstractMatrix, args...; kwargs...)
+function matrix_processing!(
+    mp::DefaultMatrixProcessing,
+    sigma::AbstractMatrix,
+    X::AbstractMatrix,
+    args...;
+    kwargs...,
+)
     T, N = size(X)
     posdef!(mp.pdm, sigma)
     denoise!(mp.denoise, sigma, T / N, mp.pdm)
@@ -354,8 +362,13 @@ function matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
     matrix_processing_algorithm!(mp.alg, mp.pdm, sigma, X; kwargs...)
     return nothing
 end
-function matrix_processing!(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
-                            X::AbstractMatrix, args...; kwargs...)
+function matrix_processing!(
+    mp::NonPositiveDefiniteMatrixProcessing,
+    sigma::AbstractMatrix,
+    X::AbstractMatrix,
+    args...;
+    kwargs...,
+)
     T, N = size(X)
     posdef!(nothing, sigma)
     denoise!(mp.denoise, sigma, T / N, nothing)
@@ -426,18 +439,28 @@ julia> sigma_dt = matrix_processing(DefaultMatrixProcessing(; detone = Detone())
 function matrix_processing(::Nothing, args...; kwargs...)
     return nothing
 end
-function matrix_processing(mp::DefaultMatrixProcessing, sigma::AbstractMatrix,
-                           X::AbstractMatrix, args...; kwargs...)
+function matrix_processing(
+    mp::DefaultMatrixProcessing,
+    sigma::AbstractMatrix,
+    X::AbstractMatrix,
+    args...;
+    kwargs...,
+)
     sigma = copy(sigma)
     matrix_processing!(mp, sigma, X, args...; kwargs...)
     return sigma
 end
-function matrix_processing(mp::NonPositiveDefiniteMatrixProcessing, sigma::AbstractMatrix,
-                           X::AbstractMatrix, args...; kwargs...)
+function matrix_processing(
+    mp::NonPositiveDefiniteMatrixProcessing,
+    sigma::AbstractMatrix,
+    X::AbstractMatrix,
+    args...;
+    kwargs...,
+)
     sigma = copy(sigma)
     matrix_processing!(mp, sigma, X, args...; kwargs...)
     return sigma
 end
 
-export DefaultMatrixProcessing, NonPositiveDefiniteMatrixProcessing, matrix_processing,
-       matrix_processing!
+export DefaultMatrixProcessing,
+    NonPositiveDefiniteMatrixProcessing, matrix_processing, matrix_processing!

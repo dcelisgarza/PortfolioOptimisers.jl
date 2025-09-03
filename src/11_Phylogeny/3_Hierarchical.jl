@@ -38,21 +38,27 @@ ClusterNode
   - [`is_leaf`](@ref)
   - [`pre_order`](@ref)
 """
-struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
+struct ClusterNode{tid,tl,tr,td,tcnt} <: AbstractResult
     id::tid
     left::tl
     right::tr
     height::td
     level::tcnt
-    function ClusterNode(id, left::Union{Nothing, <:ClusterNode} = nothing,
-                         right::Union{Nothing, <:ClusterNode} = nothing, height::Real = 0.0,
-                         level::Int = 1)
+    function ClusterNode(
+        id,
+        left::Union{Nothing,<:ClusterNode} = nothing,
+        right::Union{Nothing,<:ClusterNode} = nothing,
+        height::Real = 0.0,
+        level::Int = 1,
+    )
         ilevel = isnothing(left) ? level : (left.level + right.level)
-        return new{typeof(id), typeof(left), typeof(right), typeof(height), typeof(level)}(id,
-                                                                                           left,
-                                                                                           right,
-                                                                                           height,
-                                                                                           ilevel)
+        return new{typeof(id),typeof(left),typeof(right),typeof(height),typeof(level)}(
+            id,
+            left,
+            right,
+            height,
+            ilevel,
+        )
     end
 end
 
@@ -229,7 +235,7 @@ function to_tree(a::Hclust)
         fi = ifelse(fi < zero(eltype(merges)), -fi, fi + N)
         fj = ifelse(fj < zero(eltype(merges)), -fj, fj + N)
         nd = ClusterNode(i + N, d[fi], d[fj], height)
-        d[N + i] = nd
+        d[N+i] = nd
     end
     return nd, d
 end
@@ -260,9 +266,13 @@ This function applies the specified clustering estimator to the input data matri
   - [`HierarchicalClustering`](@ref)
   - [`ClusteringEstimator`](@ref)
 """
-function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
-                    X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
-                    dims::Int = 1, kwargs...)
+function clusterise(
+    cle::ClusteringEstimator{<:Any,<:Any,<:HClustAlgorithm,<:Any},
+    X::AbstractMatrix{<:Real};
+    branchorder::Symbol = :optimal,
+    dims::Int = 1,
+    kwargs...,
+)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     clustering = hclust(D; linkage = cle.alg.linkage, branchorder = branchorder)
     k = optimal_number_clusters(cle.onc, clustering, D)
@@ -292,14 +302,17 @@ This function checks if the clustering assignment for `k` clusters is compatible
   - [`optimal_number_clusters`](@ref)
   - [`ClusterNode`](@ref)
 """
-function validate_k_value(clustering::Hclust, nodes::AbstractVector{<:ClusterNode},
-                          k::Integer)
+function validate_k_value(
+    clustering::Hclust,
+    nodes::AbstractVector{<:ClusterNode},
+    k::Integer,
+)
     idx = cutree(clustering; k = k)
     clusters = Vector{Vector{Int}}(undef, length(minimum(idx):maximum(idx)))
     for i in eachindex(clusters)
         clusters[i] = findall(idx .== i)
     end
-    for i in nodes[1:(k - 1)]
+    for i in nodes[1:(k-1)]
         if is_leaf(i)
             continue
         end
@@ -381,9 +394,11 @@ This function applies the specified optimal number of clusters estimator (`onc`)
   - [`valid_k_clusters`](@ref)
   - [`validate_k_value`](@ref)
 """
-function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
-                                                            <:PredefinedNumberClusters},
-                                 clustering::Hclust, args...)
+function optimal_number_clusters(
+    onc::OptimalNumberClusters{<:Any,<:PredefinedNumberClusters},
+    clustering::Hclust,
+    args...,
+)
     k = onc.alg.k
     max_k = onc.max_k
     N = length(clustering.order)
@@ -403,7 +418,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
         flagu = false
         du = 0
         ku = k
-        for i in (k + 1):max_k
+        for i = (k+1):max_k
             flagu = validate_k_value(clustering, nodes, i)
             if flagu
                 ku = i
@@ -417,7 +432,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
         flagl = false
         dl = 0
         kl = k
-        for i in (k - 1):-1:1
+        for i = (k-1):-1:1
             flagl = validate_k_value(clustering, nodes, i)
             if flagl
                 kl = i
@@ -439,22 +454,25 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
     end
     return k
 end
-function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
-                                 clustering::Hclust, dist::AbstractMatrix)
+function optimal_number_clusters(
+    onc::OptimalNumberClusters{<:Any,<:SecondOrderDifference},
+    clustering::Hclust,
+    dist::AbstractMatrix,
+)
     max_k = onc.max_k
     N = size(dist, 1)
     if isnothing(max_k)
         max_k = ceil(Int, sqrt(N))
     end
     c1 = min(ceil(Int, sqrt(N)), max_k)
-    cluster_lvls = [cutree(clustering; k = i) for i in 1:c1]
+    cluster_lvls = [cutree(clustering; k = i) for i = 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
-    for i in 2:c1
+    for i = 2:c1
         lvl = cluster_lvls[i]
         c2 = maximum(unique(lvl))
         D_list = Vector{eltype(dist)}(undef, c2)
-        for j in 1:c2
+        for j = 1:c2
             cluster = findall(lvl .== j)
             cluster_dist = dist[cluster, cluster]
             if isempty(cluster_dist)
@@ -463,8 +481,8 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
             M = size(cluster_dist, 1)
             C_list = Vector{eltype(dist)}(undef, Int(M * (M - 1) / 2))
             k = 1
-            for col in 1:M
-                for row in (col + 1):M
+            for col = 1:M
+                for row = (col+1):M
                     C_list[k] = cluster_dist[row, col]
                     k += 1
                 end
@@ -475,23 +493,25 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
     end
     gaps = fill(typemin(eltype(dist)), c1)
     if c1 > 2
-        gaps[1:(end - 2)] .= W_list[1:(end - 2)] + W_list[3:end] - 2 * W_list[2:(end - 1)]
+        gaps[1:(end-2)] .= W_list[1:(end-2)] + W_list[3:end] - 2 * W_list[2:(end-1)]
     end
     return valid_k_clusters(clustering, gaps)
 end
-function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
-                                                            <:StandardisedSilhouetteScore},
-                                 clustering::Hclust, dist::AbstractMatrix)
+function optimal_number_clusters(
+    onc::OptimalNumberClusters{<:Any,<:StandardisedSilhouetteScore},
+    clustering::Hclust,
+    dist::AbstractMatrix,
+)
     max_k = onc.max_k
     N = size(dist, 1)
     if isnothing(max_k)
         max_k = ceil(Int, sqrt(N))
     end
     c1 = min(ceil(Int, sqrt(N)), max_k)
-    cluster_lvls = [cutree(clustering; k = i) for i in 1:c1]
+    cluster_lvls = [cutree(clustering; k = i) for i = 1:c1]
     W_list = Vector{eltype(dist)}(undef, c1)
     W_list[1] = typemin(eltype(dist))
-    for i in 2:c1
+    for i = 2:c1
         lvl = cluster_lvls[i]
         sl = silhouettes(lvl, dist; metric = onc.alg.metric)
         msl = mean(sl)

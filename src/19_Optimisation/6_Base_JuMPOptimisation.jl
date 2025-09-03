@@ -11,20 +11,47 @@ function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     end
     return model[:G]
 end
-function get_chol_or_sigma_pm(model::JuMP.Model,
-                              pr::Union{<:LowOrderPrior{<:Any, <:Any, <:Any,
-                                                        <:AbstractMatrix, <:Any, <:Any,
-                                                        <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                        <:Any},
-                                        <:HighOrderPrior{<:LowOrderPrior{<:Any, <:Any,
-                                                                         <:Any,
-                                                                         <:AbstractMatrix,
-                                                                         <:Any, <:Any,
-                                                                         <:Any, <:Any,
-                                                                         <:Any, <:Any,
-                                                                         <:Any, <:Any},
-                                                         <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:Any}})
+function get_chol_or_sigma_pm(
+    model::JuMP.Model,
+    pr::Union{
+        <:LowOrderPrior{
+            <:Any,
+            <:Any,
+            <:Any,
+            <:AbstractMatrix,
+            <:Any,
+            <:Any,
+            <:Any,
+            <:Any,
+            <:Any,
+            <:Any,
+            <:Any,
+            <:Any,
+        },
+        <:HighOrderPrior{
+            <:LowOrderPrior{
+                <:Any,
+                <:Any,
+                <:Any,
+                <:AbstractMatrix,
+                <:Any,
+                <:Any,
+                <:Any,
+                <:Any,
+                <:Any,
+                <:Any,
+                <:Any,
+                <:Any,
+            },
+            <:Any,
+            <:Any,
+            <:Any,
+            <:Any,
+            <:Any,
+            <:Any,
+        },
+    },
+)
     if !haskey(model, :G)
         G = pr.chol
         @expression(model, G, G)
@@ -75,9 +102,9 @@ function add_to_objective_penalty!(model::JuMP.Model, expr)
 end
 function set_model_scales!(model::JuMP.Model, so::Real, sc::Real)
     @expressions(model, begin
-                     so, so
-                     sc, sc
-                 end)
+        so, so
+        sc, sc
+    end)
     return nothing
 end
 function set_initial_w!(args...)
@@ -88,7 +115,7 @@ function set_initial_w!(w::AbstractVector, wi::AbstractVector{<:Real})
     set_start_value.(w, wi)
     return nothing
 end
-function set_w!(model::JuMP.Model, X::AbstractMatrix, wi::Union{Nothing, <:AbstractVector})
+function set_w!(model::JuMP.Model, X::AbstractMatrix, wi::Union{Nothing,<:AbstractVector})
     @variable(model, w[1:size(X, 2)])
     set_initial_w!(w, wi)
     return nothing
@@ -117,16 +144,18 @@ function scalarise_risk_expression!(model::JuMP.Model, sce::LogSumExpScalariser)
     N = length(risk_vec)
     gamma = sce.gamma
     @variables(model, begin
-                   risk
-                   u_risk[1:N]
-               end)
-    @constraints(model,
-                 begin
-                     u_risk_lse, sc * (sum(u_risk) - 1) <= 0
-                     risk_lse[i = 1:N],
-                     [sc * gamma * (risk_vec[i] - risk), sc, sc * u_risk[i]] in
-                     MOI.ExponentialCone()
-                 end)
+        risk
+        u_risk[1:N]
+    end)
+    @constraints(
+        model,
+        begin
+            u_risk_lse, sc * (sum(u_risk) - 1) <= 0
+            risk_lse[i=1:N],
+            [sc * gamma * (risk_vec[i] - risk), sc, sc * u_risk[i]] in
+            MOI.ExponentialCone()
+        end
+    )
     return nothing
 end
 function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
@@ -141,21 +170,29 @@ end
 function set_risk_constraints!(args...; kwargs...)
     return nothing
 end
-function set_risk_constraints!(model::JuMP.Model, r::RiskMeasure,
-                               opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny},
-                               nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny}, args...; kwargs...)
+function set_risk_constraints!(
+    model::JuMP.Model,
+    r::RiskMeasure,
+    opt::JuMPOptimisationEstimator,
+    pr::AbstractPriorResult,
+    cplg::Union{Nothing,<:SemiDefinitePhylogeny,<:IntegerPhylogeny},
+    nplg::Union{Nothing,<:SemiDefinitePhylogeny,<:IntegerPhylogeny},
+    args...;
+    kwargs...,
+)
     set_risk_constraints!(model, 1, r, opt, pr, cplg, nplg, args...; kwargs...)
     return nothing
 end
-function set_risk_constraints!(model::JuMP.Model, rs::AbstractVector{<:RiskMeasure},
-                               opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny},
-                               nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny}, args...; kwargs...)
+function set_risk_constraints!(
+    model::JuMP.Model,
+    rs::AbstractVector{<:RiskMeasure},
+    opt::JuMPOptimisationEstimator,
+    pr::AbstractPriorResult,
+    cplg::Union{Nothing,<:SemiDefinitePhylogeny,<:IntegerPhylogeny},
+    nplg::Union{Nothing,<:SemiDefinitePhylogeny,<:IntegerPhylogeny},
+    args...;
+    kwargs...,
+)
     for (i, r) in enumerate(rs)
         set_risk_constraints!(model, i, r, opt, pr, cplg, nplg, args...; kwargs...)
     end
@@ -170,8 +207,11 @@ function process_model(model::JuMP.Model, ::JuMPOptimisationEstimator)
     w = value.(model[:w]) * ik
     return JuMPOptimisationSolution(; w = w)
 end
-function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
-                              datatype::DataType = Float64)
+function optimise_JuMP_model!(
+    model::JuMP.Model,
+    opt::JuMPOptimisationEstimator,
+    datatype::DataType = Float64,
+)
     trials = Dict()
     success = false
     for solver in opt.opt.slv
@@ -189,8 +229,8 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
             continue
         end
         all_finite_weights = all(isfinite, value.(model[:w]))
-        all_non_zero_weights = !all(x -> isapprox(x, zero(datatype)),
-                                    abs.(value.(model[:w])))
+        all_non_zero_weights =
+            !all(x -> isapprox(x, zero(datatype)), abs.(value.(model[:w])))
         try
             assert_is_solved_and_feasible(model; solver.check_sol...)
             if all_finite_weights && all_non_zero_weights
@@ -198,11 +238,11 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                 break
             end
         catch err
-            trials[solver.name] = Dict(:assert_is_solved_and_feasible => err,
-                                       :settings => solver.settings)
+            trials[solver.name] =
+                Dict(:assert_is_solved_and_feasible => err, :settings => solver.settings)
         end
-        trials[solver.name] = Dict(:err => solution_summary(model),
-                                   :settings => solver.settings)
+        trials[solver.name] =
+            Dict(:err => solution_summary(model), :settings => solver.settings)
     end
     retcode = if success
         OptimisationSuccess(; res = trials)

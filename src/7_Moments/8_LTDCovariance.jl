@@ -29,7 +29,7 @@ Creates a `LTDCovariance` object with the specified variance estimator, quantile
   - [`AbstractCovarianceEstimator`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
-struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+struct LTDCovariance{T1,T2,T3} <: AbstractCovarianceEstimator
     ve::T1
     alpha::T2
     threads::T3
@@ -77,14 +77,16 @@ LTDCovariance
   - [`SimpleVariance`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
-function LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                       alpha::Real = 0.05,
-                       threads::FLoops.Transducers.Executor = ThreadedEx())
+function LTDCovariance(;
+    ve::AbstractVarianceEstimator = SimpleVariance(),
+    alpha::Real = 0.05,
+    threads::FLoops.Transducers.Executor = ThreadedEx(),
+)
     @argcheck(zero(alpha) < alpha < one(alpha))
     return LTDCovariance(ve, alpha, threads)
 end
 
-function factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::LTDCovariance, w::Union{Nothing,<:AbstractWeights} = nothing)
     return LTDCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha, threads = ce.threads)
 end
 
@@ -117,8 +119,11 @@ The resulting matrix is symmetric and all values are clamped to `[0, 1]`.
   - [`LTDCovariance`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
-function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05,
-                               threads::FLoops.Transducers.Executor = SequentialEx())
+function lower_tail_dependence(
+    X::AbstractMatrix,
+    alpha::Real = 0.05,
+    threads::FLoops.Transducers.Executor = SequentialEx(),
+)
     T, N = size(X)
     k = ceil(Int, T * alpha)
     rho = Matrix{eltype(X)}(undef, N, N)
@@ -128,7 +133,7 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05,
                 xj = view(X, :, j)
                 v = sort(xj)[k]
                 maskj = xj .<= v
-                for i in 1:j
+                for i = 1:j
                     xi = view(X, :, i)
                     u = sort(xi)[k]
                     ltd = sum(xi .<= u .&& maskj) / k

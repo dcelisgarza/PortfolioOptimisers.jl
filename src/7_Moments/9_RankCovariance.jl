@@ -148,7 +148,7 @@ function Statistics.cov(ce::KendallCovariance, X::AbstractMatrix; dims::Int = 1,
     std_vec = std(ce.ve, X; dims = 1, kwargs...)
     return corkendall(X) ⊙ (std_vec ⊗ std_vec)
 end
-function factory(ce::KendallCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::KendallCovariance, w::Union{Nothing,<:AbstractWeights} = nothing)
     return KendallCovariance(; ve = factory(ce.ve, w))
 end
 
@@ -286,7 +286,7 @@ function Statistics.cov(ce::SpearmanCovariance, X::AbstractMatrix; dims::Int = 1
     std_vec = std(ce.ve, X; dims = 1, kwargs...)
     return corspearman(X) ⊙ (std_vec ⊗ std_vec)
 end
-function factory(ce::SpearmanCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::SpearmanCovariance, w::Union{Nothing,<:AbstractWeights} = nothing)
     return SpearmanCovariance(; ve = factory(ce.ve, w))
 end
 

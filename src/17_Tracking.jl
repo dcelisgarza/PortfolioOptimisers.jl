@@ -24,12 +24,11 @@ struct DependentVariableTracking <: VariableTracking end
 function tracking_view(::Nothing, ::Any)
     return nothing
 end
-struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
+struct WeightsTracking{T1,T2} <: AbstractTrackingAlgorithm
     fees::T1
     w::T2
 end
-function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing,
-                         w::AbstractVector{<:Real})
+function WeightsTracking(; fees::Union{Nothing,<:Fees} = nothing, w::AbstractVector{<:Real})
     @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
     return WeightsTracking(fees, w)
 end
@@ -60,27 +59,38 @@ end
 function factory(tracking::ReturnsTracking, ::Any)
     return tracking
 end
-struct TrackingError{T1, T2, T3} <: AbstractTracking
+struct TrackingError{T1,T2,T3} <: AbstractTracking
     tracking::T1
     err::T2
     alg::T3
 end
-function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
-                       alg::NormTracking = SOCTracking())
-    @argcheck(isfinite(err) && err >= zero(err),
-              DomainError("`err` must be finite and non-negative:\nerr => $err"))
+function TrackingError(;
+    tracking::AbstractTrackingAlgorithm,
+    err::Real = 0.0,
+    alg::NormTracking = SOCTracking(),
+)
+    @argcheck(
+        isfinite(err) && err >= zero(err),
+        DomainError("`err` must be finite and non-negative:\nerr => $err")
+    )
     return TrackingError(tracking, err, alg)
 end
 function tracking_view(tracking::TrackingError, i::AbstractVector, args...)
-    return TrackingError(; tracking = tracking_view(tracking.tracking, i),
-                         err = tracking.err, alg = tracking.alg)
+    return TrackingError(;
+        tracking = tracking_view(tracking.tracking, i),
+        err = tracking.err,
+        alg = tracking.alg,
+    )
 end
 function tracking_view(tracking::AbstractVector{<:AbstractTracking}, args...)
     return [tracking_view(t, args...) for t in tracking]
 end
 function factory(tracking::TrackingError, w::AbstractVector)
-    return TrackingError(; tracking = factory(tracking.tracking, w), err = tracking.err,
-                         alg = tracking.alg)
+    return TrackingError(;
+        tracking = factory(tracking.tracking, w),
+        err = tracking.err,
+        alg = tracking.alg,
+    )
 end
 Base.iterate(S::AbstractTracking, state = 1) = state > 1 ? nothing : (S, state + 1)
 

@@ -1,160 +1,319 @@
 @safetestset "Phylogeny tests" begin
     using PortfolioOptimisers, Test, Clustering, CSV, DataFrames, TimeSeries
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
-        for rtol in
-            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
-             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
-             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
+        for rtol in [
+            1e-10,
+            5e-10,
+            1e-9,
+            5e-9,
+            1e-8,
+            5e-8,
+            1e-7,
+            5e-7,
+            1e-6,
+            5e-6,
+            1e-5,
+            5e-5,
+            1e-4,
+            5e-4,
+            1e-3,
+            5e-3,
+            1e-2,
+            5e-2,
+            1e-1,
+            2.5e-1,
+            5e-1,
+            1e0,
+            1.1e0,
+            1.2e0,
+            1.3e0,
+            1.4e0,
+            1.5e0,
+            1.6e0,
+            1.7e0,
+            1.8e0,
+            1.9e0,
+            2e0,
+            2.5e0,
+        ]
             if isapprox(a1, a2; rtol = rtol)
                 println("isapprox($name1, $name2, rtol = $(rtol))")
                 break
             end
         end
-        for atol in
-            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
-             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
-             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
+        for atol in [
+            1e-10,
+            5e-10,
+            1e-9,
+            5e-9,
+            1e-8,
+            5e-8,
+            1e-7,
+            5e-7,
+            1e-6,
+            5e-6,
+            1e-5,
+            5e-5,
+            1e-4,
+            5e-4,
+            1e-3,
+            5e-3,
+            1e-2,
+            5e-2,
+            1e-1,
+            2.5e-1,
+            5e-1,
+            1e0,
+            1.1e0,
+            1.2e0,
+            1.3e0,
+            1.4e0,
+            1.5e0,
+            1.6e0,
+            1.7e0,
+            1.8e0,
+            1.9e0,
+            2e0,
+            2.5e0,
+        ]
             if isapprox(a1, a2; atol = atol)
                 println("isapprox($name1, $name2, atol = $(atol))")
                 break
             end
         end
     end
-    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
-                                     timestamp = :Date)[(end - 252):end])
+    rd = prices_to_returns(
+        TimeArray(
+            CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+            timestamp = :Date,
+        )[(end-252):end],
+    )
     pr = prior(EmpiricalPrior(), rd)
     @testset "Clustering tests" begin
-        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
-                                             de = Distance(; alg = CanonicalDistance()),
-                                             alg = HClustAlgorithm(),
-                                             onc = OptimalNumberClusters(;
-                                                                         alg = SecondOrderDifference())),
-                         pr.X)
+        clr = clusterise(
+            ClusteringEstimator(;
+                ce = PortfolioOptimisersCovariance(),
+                de = Distance(; alg = CanonicalDistance()),
+                alg = HClustAlgorithm(),
+                onc = OptimalNumberClusters(; alg = SecondOrderDifference()),
+            ),
+            pr.X,
+        )
         clr2 = clusterise(clr)
         @test clr === clr2
-        clr_t = Hclust{Float64}([-1 -13; -2 1; -7 -4; -3 -9; 4 -6; -14 -10; 6 -16; 2 3;
-                                 -8 -12;
-                                 -11 9; 10 -15; -18 11; -19 7; -5 -20; 14 -17; 5 8; 13 12;
-                                 15 16;
-                                 18 17],
-                                [0.2992796916890263, 0.3905612031361099, 0.4116454947407609,
-                                 0.22529867864314176, 0.48924055164900887,
-                                 0.28518628966607656, 0.38008631653392483, 0.58425801808901,
-                                 0.4209146698909511, 0.4605479608276049, 0.491265779899127,
-                                 0.5080236207888611, 0.6028393326616824,
-                                 0.24670816017739164, 0.5174631833197462,
-                                 0.6821605083740293, 0.739945604975504, 0.9602133336085281,
-                                 1.0707389175241802],
-                                [5, 20, 17, 3, 9, 6, 2, 1, 13, 7, 4, 19, 14, 10, 16, 18, 11,
-                                 8, 12, 15], :ward)
+        clr_t = Hclust{Float64}(
+            [
+                -1 -13;
+                -2 1;
+                -7 -4;
+                -3 -9;
+                4 -6;
+                -14 -10;
+                6 -16;
+                2 3;
+                -8 -12;
+                -11 9;
+                10 -15;
+                -18 11;
+                -19 7;
+                -5 -20;
+                14 -17;
+                5 8;
+                13 12;
+                15 16;
+                18 17
+            ],
+            [
+                0.2992796916890263,
+                0.3905612031361099,
+                0.4116454947407609,
+                0.22529867864314176,
+                0.48924055164900887,
+                0.28518628966607656,
+                0.38008631653392483,
+                0.58425801808901,
+                0.4209146698909511,
+                0.4605479608276049,
+                0.491265779899127,
+                0.5080236207888611,
+                0.6028393326616824,
+                0.24670816017739164,
+                0.5174631833197462,
+                0.6821605083740293,
+                0.739945604975504,
+                0.9602133336085281,
+                1.0707389175241802,
+            ],
+            [5, 20, 17, 3, 9, 6, 2, 1, 13, 7, 4, 19, 14, 10, 16, 18, 11, 8, 12, 15],
+            :ward,
+        )
         @test clr.clustering.merges == clr_t.merges
         @test isapprox(clr.clustering.heights, clr_t.heights)
         @test clr.clustering.labels == clr_t.labels
         @test clr.clustering.linkage == clr_t.linkage
-        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
-                                             de = Distance(; alg = CanonicalDistance()),
-                                             alg = DBHT(),
-                                             onc = OptimalNumberClusters(;
-                                                                         alg = SecondOrderDifference())),
-                         pr.X)
-        clr_t = Hclust{Float64}([-1 -13; -7 -4; -3 -9; -5 -20; 4 -17; -2 1; 3 -6; 7 6; 8 2;
-                                 5 9;
-                                 -14 -10; -19 11; -11 -8; -12 -15; -18 13; -16 15; 16 14;
-                                 12 17;
-                                 10 18],
-                                [0.1, 0.1111111111111111, 0.125, 0.14285714285714285,
-                                 0.16666666666666666, 0.2, 0.25, 0.3333333333333333, 0.5,
-                                 1.0, 0.125, 0.14285714285714285, 0.16666666666666666, 0.2,
-                                 0.25, 0.3333333333333333, 0.5, 1.0, 2.0],
-                                [5, 20, 17, 3, 9, 6, 2, 1, 13, 7, 4, 19, 14, 10, 16, 18, 11,
-                                 8, 12, 15], :DBHT)
+        clr = clusterise(
+            ClusteringEstimator(;
+                ce = PortfolioOptimisersCovariance(),
+                de = Distance(; alg = CanonicalDistance()),
+                alg = DBHT(),
+                onc = OptimalNumberClusters(; alg = SecondOrderDifference()),
+            ),
+            pr.X,
+        )
+        clr_t = Hclust{Float64}(
+            [
+                -1 -13;
+                -7 -4;
+                -3 -9;
+                -5 -20;
+                4 -17;
+                -2 1;
+                3 -6;
+                7 6;
+                8 2;
+                5 9;
+                -14 -10;
+                -19 11;
+                -11 -8;
+                -12 -15;
+                -18 13;
+                -16 15;
+                16 14;
+                12 17;
+                10 18
+            ],
+            [
+                0.1,
+                0.1111111111111111,
+                0.125,
+                0.14285714285714285,
+                0.16666666666666666,
+                0.2,
+                0.25,
+                0.3333333333333333,
+                0.5,
+                1.0,
+                0.125,
+                0.14285714285714285,
+                0.16666666666666666,
+                0.2,
+                0.25,
+                0.3333333333333333,
+                0.5,
+                1.0,
+                2.0,
+            ],
+            [5, 20, 17, 3, 9, 6, 2, 1, 13, 7, 4, 19, 14, 10, 16, 18, 11, 8, 12, 15],
+            :DBHT,
+        )
         @test clr.clustering.merges == clr_t.merges
         @test isapprox(clr.clustering.heights, clr_t.heights)
         @test clr.clustering.labels == clr_t.labels
         @test clr.clustering.linkage == clr_t.linkage
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SecondOrderDifference(),
-                                                                                     max_k = nothing),
-                                                               clr.clustering, clr.D)
-        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SecondOrderDifference(),
-                                                                                     max_k = 1),
-                                                               clr.clustering, clr.D)
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SecondOrderDifference(),
-                                                                                     max_k = 100),
-                                                               clr.clustering, clr.D)
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = SecondOrderDifference(), max_k = nothing),
+            clr.clustering,
+            clr.D,
+        )
+        @test 1 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = SecondOrderDifference(), max_k = 1),
+            clr.clustering,
+            clr.D,
+        )
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = SecondOrderDifference(), max_k = 100),
+            clr.clustering,
+            clr.D,
+        )
 
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = StandardisedSilhouetteScore(),
-                                                                                     max_k = nothing),
-                                                               clr.clustering, clr.D)
-        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = StandardisedSilhouetteScore(),
-                                                                                     max_k = 1),
-                                                               clr.clustering, clr.D)
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = StandardisedSilhouetteScore(),
-                                                                                     max_k = 100),
-                                                               clr.clustering, clr.D)
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = StandardisedSilhouetteScore(), max_k = nothing),
+            clr.clustering,
+            clr.D,
+        )
+        @test 1 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = StandardisedSilhouetteScore(), max_k = 1),
+            clr.clustering,
+            clr.D,
+        )
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = StandardisedSilhouetteScore(), max_k = 100),
+            clr.clustering,
+            clr.D,
+        )
 
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = StandardisedSilhouetteScore(),
-                                                                                     max_k = nothing),
-                                                               clr.clustering, clr.D)
-        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = StandardisedSilhouetteScore(),
-                                                                                     max_k = 1),
-                                                               clr.clustering, clr.D)
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = StandardisedSilhouetteScore(),
-                                                                                     max_k = 100),
-                                                               clr.clustering, clr.D)
-        @test 4 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = PredefinedNumberClusters(;
-                                                                                                                    k = 10),
-                                                                                     max_k = nothing),
-                                                               clr.clustering, clr.D)
-        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = PredefinedNumberClusters(;
-                                                                                                                    k = 1),
-                                                                                     max_k = 5),
-                                                               clr.clustering, clr.D)
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = PredefinedNumberClusters(;
-                                                                                                                    k = 2),
-                                                                                     max_k = 5),
-                                                               clr.clustering, clr.D)
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = PredefinedNumberClusters(;
-                                                                                                                    k = 3),
-                                                                                     max_k = 2),
-                                                               clr.clustering, clr.D)
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = StandardisedSilhouetteScore(), max_k = nothing),
+            clr.clustering,
+            clr.D,
+        )
+        @test 1 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = StandardisedSilhouetteScore(), max_k = 1),
+            clr.clustering,
+            clr.D,
+        )
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = StandardisedSilhouetteScore(), max_k = 100),
+            clr.clustering,
+            clr.D,
+        )
+        @test 4 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(;
+                alg = PredefinedNumberClusters(; k = 10),
+                max_k = nothing,
+            ),
+            clr.clustering,
+            clr.D,
+        )
+        @test 1 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = PredefinedNumberClusters(; k = 1), max_k = 5),
+            clr.clustering,
+            clr.D,
+        )
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = PredefinedNumberClusters(; k = 2), max_k = 5),
+            clr.clustering,
+            clr.D,
+        )
+        @test 2 == PortfolioOptimisers.optimal_number_clusters(
+            OptimalNumberClusters(; alg = PredefinedNumberClusters(; k = 3), max_k = 2),
+            clr.clustering,
+            clr.D,
+        )
 
-        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
-                                             de = DistanceDistance(;
-                                                                   alg = CanonicalDistance()),
-                                             alg = HClustAlgorithm(),
-                                             onc = OptimalNumberClusters(;
-                                                                         alg = StandardisedSilhouetteScore())),
-                         pr.X)
+        clr = clusterise(
+            ClusteringEstimator(;
+                ce = PortfolioOptimisersCovariance(),
+                de = DistanceDistance(; alg = CanonicalDistance()),
+                alg = HClustAlgorithm(),
+                onc = OptimalNumberClusters(; alg = StandardisedSilhouetteScore()),
+            ),
+            pr.X,
+        )
         @test clr.k == 2
 
-        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
-                                             de = DistanceDistance(;
-                                                                   alg = CanonicalDistance()),
-                                             alg = DBHT(; sim = MaximumDistanceSimilarity(),
-                                                        root = UniqueRoot()),
-                                             onc = OptimalNumberClusters(;
-                                                                         alg = PredefinedNumberClusters(;
-                                                                                                        k = 5))),
-                         pr.X)
+        clr = clusterise(
+            ClusteringEstimator(;
+                ce = PortfolioOptimisersCovariance(),
+                de = DistanceDistance(; alg = CanonicalDistance()),
+                alg = DBHT(; sim = MaximumDistanceSimilarity(), root = UniqueRoot()),
+                onc = OptimalNumberClusters(; alg = PredefinedNumberClusters(; k = 5)),
+            ),
+            pr.X,
+        )
         @test clr.k == 4
     end
     @testset "Centrality tests" begin
-        ces = [BetweennessCentrality(), ClosenessCentrality(), DegreeCentrality(),
-               EigenvectorCentrality(), KatzCentrality(), Pagerank(), RadialityCentrality(),
-               StressCentrality()]
+        ces = [
+            BetweennessCentrality(),
+            ClosenessCentrality(),
+            DegreeCentrality(),
+            EigenvectorCentrality(),
+            KatzCentrality(),
+            Pagerank(),
+            RadialityCentrality(),
+            StressCentrality(),
+        ]
         df1 = CSV.read(joinpath(@__DIR__, "./assets/Centrality1.csv.gz"), DataFrame)
         df2 = CSV.read(joinpath(@__DIR__, "./assets/AverageCentrality1.csv.gz"), DataFrame)
         w = fill(inv(20), 20)
@@ -179,7 +338,7 @@
     end
     @testset "Phylogeny matrix" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix1.csv.gz"), DataFrame)
-        for i in 1:8
+        for i = 1:8
             A = phylogeny_matrix(Network(; n = i), pr.X)
             res = isapprox(vec(A), df[!, i])
             if !res
@@ -190,7 +349,7 @@
         end
 
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix2.csv.gz"), DataFrame)
-        for i in 1:5
+        for i = 1:5
             A = phylogeny_matrix(Network(; n = i, alg = MaximumDistanceSimilarity()), pr.X)
             res = isapprox(vec(A), df[!, i])
             if !res

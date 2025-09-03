@@ -221,7 +221,7 @@ Estimator for dimension reduction regression-based moment estimation.
   - [`DimensionReductionTarget`](@ref)
   - [`AbstractRegressionTarget`](@ref)
 """
-struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimator
+struct DimensionReductionRegression{T1,T2,T3,T4} <: AbstractRegressionEstimator
     me::T1
     ve::T2
     drtgt::T3
@@ -275,10 +275,11 @@ DimensionReductionRegression
   - [`AbstractRegressionTarget`](@ref)
 """
 function DimensionReductionRegression(;
-                                      me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                                      ve::AbstractVarianceEstimator = SimpleVariance(),
-                                      drtgt::DimensionReductionTarget = PCA(),
-                                      retgt::AbstractRegressionTarget = LinearModel())
+    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+    ve::AbstractVarianceEstimator = SimpleVariance(),
+    drtgt::DimensionReductionTarget = PCA(),
+    retgt::AbstractRegressionTarget = LinearModel(),
+)
     return DimensionReductionRegression(me, ve, drtgt, retgt)
 end
 
@@ -356,8 +357,14 @@ This function fits a regression model (as specified by `retgt`) to the response 
   - [`AbstractRegressionTarget`](@ref)
   - [`prep_dim_red_reg`](@ref)
 """
-function regression(retgt::AbstractRegressionTarget, y::AbstractVector, mu::AbstractVector,
-                    sigma::AbstractVector, x1::AbstractMatrix, Vp::AbstractMatrix)
+function regression(
+    retgt::AbstractRegressionTarget,
+    y::AbstractVector,
+    mu::AbstractVector,
+    sigma::AbstractVector,
+    x1::AbstractMatrix,
+    Vp::AbstractMatrix,
+)
     fit_result = fit(retgt, x1, y)
     beta_pc = coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma

@@ -1,8 +1,7 @@
 abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
 struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
 struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
-struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <:
-       AbstractLowOrderPriorEstimator_1o2_1o2
+struct OpinionPoolingPrior{T1,T2,T3,T4,T5,T6,T7} <: AbstractLowOrderPriorEstimator_1o2_1o2
     pes::T1
     pe1::T2
     pe2::T3
@@ -12,24 +11,27 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <:
     threads::T7
 end
 function OpinionPoolingPrior(;
-                             pes::AbstractVector{<:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
-                             pe1::Union{Nothing,
-                                        <:AbstractLowOrderPriorEstimatorMap_1o2_1o2} = nothing,
-                             pe2::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
-                             p::Union{Nothing, <:Real} = nothing,
-                             w::Union{Nothing, <:AbstractVector} = nothing,
-                             alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
-                             threads::FLoops.Transducers.Executor = ThreadedEx())
+    pes::AbstractVector{<:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
+    pe1::Union{Nothing,<:AbstractLowOrderPriorEstimatorMap_1o2_1o2} = nothing,
+    pe2::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
+    p::Union{Nothing,<:Real} = nothing,
+    w::Union{Nothing,<:AbstractVector} = nothing,
+    alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
+    threads::FLoops.Transducers.Executor = ThreadedEx(),
+)
     @argcheck(!isempty(pes))
     if !isnothing(p)
         @argcheck(p >= zero(p))
     end
     if isa(w, AbstractVector)
         @argcheck(!isempty(w) && length(w) == length(pes))
-        @argcheck(all(x -> zero(x) <= x <= one(x), w),
-                  DomainError(w,
-                              range_msg("all entries of `w`", zero(w), one(w), nothing,
-                                        true, true) * "."))
+        @argcheck(
+            all(x -> zero(x) <= x <= one(x), w),
+            DomainError(
+                w,
+                range_msg("all entries of `w`", zero(w), one(w), nothing, true, true) * ".",
+            )
+        )
         @argcheck(sum(w) <= one(eltype(w)))
     end
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)
@@ -47,15 +49,23 @@ end
 function compute_pooling(::LinearOpinionPooling, ow::AbstractVector, pw::AbstractMatrix)
     return pweights(pw * ow)
 end
-function compute_pooling(::LogarithmicOpinionPooling, ow::AbstractVector,
-                         pw::AbstractMatrix)
+function compute_pooling(
+    ::LogarithmicOpinionPooling,
+    ow::AbstractVector,
+    pw::AbstractMatrix,
+)
     u = log.(pw) * ow
     lse = logsumexp(u)
     return pweights(vec(exp.(u .- lse)))
 end
-function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1,
-               strict::Bool = false, kwargs...)
+function prior(
+    pe::OpinionPoolingPrior,
+    X::AbstractMatrix,
+    F::Union{Nothing,<:AbstractMatrix} = nothing;
+    dims::Int = 1,
+    strict::Bool = false,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -88,9 +98,20 @@ function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
     (; X, mu, sigma, chol, rr, f_mu, f_sigma) = prior(pe2, X, F; strict = strict, kwargs...)
     ens = exp(entropy(w))
     kld = [kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
-    return LowOrderPrior(; X = X, mu = mu, sigma = sigma, chol = chol, w = w, ens = ens,
-                         kld = kld, ow = ow, rr = rr, f_mu = f_mu, f_sigma = f_sigma,
-                         f_w = ifelse(!isnothing(rr), w, nothing))
+    return LowOrderPrior(;
+        X = X,
+        mu = mu,
+        sigma = sigma,
+        chol = chol,
+        w = w,
+        ens = ens,
+        kld = kld,
+        ow = ow,
+        rr = rr,
+        f_mu = f_mu,
+        f_sigma = f_sigma,
+        f_w = ifelse(!isnothing(rr), w, nothing),
+    )
 end
 
 export LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior

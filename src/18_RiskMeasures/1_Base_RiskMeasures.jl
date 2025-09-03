@@ -22,7 +22,7 @@ abstract type AbstractMomentHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure
 abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
 Base.length(::AbstractBaseRiskMeasure) = 1
 Base.iterate(rs::AbstractBaseRiskMeasure, state = 1) = state > 1 ? nothing : (rs, state + 1)
-struct Frontier{T1, T2, T3} <: AbstractAlgorithm
+struct Frontier{T1,T2,T3} <: AbstractAlgorithm
     N::T1
     factor::T2
     flag::T3
@@ -38,14 +38,16 @@ function _Frontier(; N::Integer = 20, factor::Real, flag::Bool)
     @argcheck(isfinite(factor) && factor > zero(factor))
     return Frontier(N, factor, flag)
 end
-struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
+struct RiskMeasureSettings{T1,T2,T3} <: AbstractRiskMeasureSettings
     scale::T1
     ub::T2
     rke::T3
 end
-function RiskMeasureSettings(; scale::Real = 1.0,
-                             ub::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing,
-                             rke::Bool = true)
+function RiskMeasureSettings(;
+    scale::Real = 1.0,
+    ub::Union{Nothing,<:Real,<:AbstractVector,<:Frontier} = nothing,
+    rke::Bool = true,
+)
     if isa(ub, Real)
         @argcheck(isfinite(ub) && ub > zero(ub))
     elseif isa(ub, AbstractVector)
@@ -60,13 +62,19 @@ end
 function HierarchicalRiskMeasureSettings(; scale::Real = 1.0)
     return HierarchicalRiskMeasureSettings(scale)
 end
-const MuRiskMeasures = Union{MuRiskMeasure, MuHierarchicalRiskMeasure,
-                             MuNoOptimisationRiskMeasure, SquareRootKurtosisRiskMeasure}
-const MomentRiskMeasures = Union{AbstractMomentRiskMeasure,
-                                 AbstractMomentHierarchicalRiskMeasure,
-                                 AbstractMomentNoOptimisationRiskMeasure}
+const MuRiskMeasures = Union{
+    MuRiskMeasure,
+    MuHierarchicalRiskMeasure,
+    MuNoOptimisationRiskMeasure,
+    SquareRootKurtosisRiskMeasure,
+}
+const MomentRiskMeasures = Union{
+    AbstractMomentRiskMeasure,
+    AbstractMomentHierarchicalRiskMeasure,
+    AbstractMomentNoOptimisationRiskMeasure,
+}
 
-const SolverRiskMeasures = Union{SolverRiskMeasure, SolverHierarchicalRiskMeasure}
+const SolverRiskMeasures = Union{SolverRiskMeasure,SolverHierarchicalRiskMeasure}
 function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
     return rs
 end
@@ -76,8 +84,11 @@ end
 function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
     return rs
 end
-function risk_measure_view(rs::AbstractVector{<:AbstractBaseRiskMeasure}, i::AbstractVector,
-                           X::AbstractMatrix)
+function risk_measure_view(
+    rs::AbstractVector{<:AbstractBaseRiskMeasure},
+    i::AbstractVector,
+    X::AbstractMatrix,
+)
     return risk_measure_view.(rs, Ref(i), Ref(X))
 end
 abstract type Scalariser end
@@ -94,5 +105,10 @@ function expected_risk end
 function no_bounds_risk_measure end
 function no_bounds_no_risk_expr_risk_measure end
 
-export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
-       MaxScalariser, LogSumExpScalariser, expected_risk
+export Frontier,
+    RiskMeasureSettings,
+    HierarchicalRiskMeasureSettings,
+    SumScalariser,
+    MaxScalariser,
+    LogSumExpScalariser,
+    expected_risk

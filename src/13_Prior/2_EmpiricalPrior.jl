@@ -1,5 +1,4 @@
-struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
-       AbstractPriorResult
+struct LowOrderPrior{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12} <: AbstractPriorResult
     X::T1
     mu::T2
     sigma::T3
@@ -13,16 +12,20 @@ struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
     f_sigma::T11
     f_w::T12
 end
-function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                       chol::Union{Nothing, <:AbstractMatrix} = nothing,
-                       w::Union{Nothing, <:AbstractWeights} = nothing,
-                       ens::Union{Nothing, <:Real} = nothing,
-                       kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                       ow::Union{Nothing, <:AbstractVector} = nothing,
-                       rr::Union{Nothing, <:Regression} = nothing,
-                       f_mu::Union{Nothing, <:AbstractVector} = nothing,
-                       f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
-                       f_w::Union{Nothing, <:AbstractVector} = nothing)
+function LowOrderPrior(;
+    X::AbstractMatrix,
+    mu::AbstractVector,
+    sigma::AbstractMatrix,
+    chol::Union{Nothing,<:AbstractMatrix} = nothing,
+    w::Union{Nothing,<:AbstractWeights} = nothing,
+    ens::Union{Nothing,<:Real} = nothing,
+    kld::Union{Nothing,<:Real,<:AbstractVector{<:Real}} = nothing,
+    ow::Union{Nothing,<:AbstractVector} = nothing,
+    rr::Union{Nothing,<:Regression} = nothing,
+    f_mu::Union{Nothing,<:AbstractVector} = nothing,
+    f_sigma::Union{Nothing,<:AbstractMatrix} = nothing,
+    f_w::Union{Nothing,<:AbstractVector} = nothing,
+)
     @argcheck(!isempty(X) && !isempty(mu) && !isempty(sigma))
     @argcheck(size(X, 2) == length(mu))
     assert_matrix_issquare(sigma)
@@ -58,28 +61,47 @@ function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractM
 end
 function prior_view(pr::LowOrderPrior, i::AbstractVector)
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
-    return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
-                         sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
-                         kld = pr.kld, ow = pr.ow, rr = regression_view(pr.rr, i),
-                         f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w)
+    return LowOrderPrior(;
+        X = view(pr.X, :, i),
+        mu = view(pr.mu, i),
+        sigma = view(pr.sigma, i, i),
+        chol = chol,
+        w = pr.w,
+        ens = pr.ens,
+        kld = pr.kld,
+        ow = pr.ow,
+        rr = regression_view(pr.rr, i),
+        f_mu = pr.f_mu,
+        f_sigma = pr.f_sigma,
+        f_w = pr.f_w,
+    )
 end
-struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_1_0
+struct EmpiricalPrior{T1,T2,T3} <: AbstractLowOrderPriorEstimator_1_0
     ce::T1
     me::T2
     horizon::T3
 end
 function EmpiricalPrior(;
-                        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                        horizon::Union{Nothing, <:Real} = nothing)
+    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+    horizon::Union{Nothing,<:Real} = nothing,
+)
     return EmpiricalPrior(ce, me, horizon)
 end
-function factory(pe::EmpiricalPrior, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
-                          horizon = pe.horizon)
+function factory(pe::EmpiricalPrior, w::Union{Nothing,<:AbstractWeights} = nothing)
+    return EmpiricalPrior(;
+        me = factory(pe.me, w),
+        ce = factory(pe.ce, w),
+        horizon = pe.horizon,
+    )
 end
-function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, args...;
-               dims::Int = 1, kwargs...)
+function prior(
+    pe::EmpiricalPrior{<:Any,<:Any,Nothing},
+    X::AbstractMatrix,
+    args...;
+    dims::Int = 1,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -88,8 +110,13 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, arg
     sigma = cov(pe.ce, X; kwargs...)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
 end
-function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Real}, X::AbstractMatrix, args...;
-               dims::Int = 1, kwargs...)
+function prior(
+    pe::EmpiricalPrior{<:Any,<:Any,<:Real},
+    X::AbstractMatrix,
+    args...;
+    dims::Int = 1,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

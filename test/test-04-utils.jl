@@ -1,6 +1,14 @@
 @safetestset "Tools tests" begin
-    using Test, PortfolioOptimisers, DataFrames, TimeSeries, Dates, Random, StableRNGs, CSV,
-          Statistics, LinearAlgebra
+    using Test,
+        PortfolioOptimisers,
+        DataFrames,
+        TimeSeries,
+        Dates,
+        Random,
+        StableRNGs,
+        CSV,
+        Statistics,
+        LinearAlgebra
 
     @testset "prices_to_returns" begin
         rng = StableRNG(987654321)
@@ -9,20 +17,24 @@
 
         dfx = DataFrame(Px, :auto)
         dfx.all_missing = fill(NaN, nrow(dfx))
-        dfx[!, :date] = (today() - Day(100)):Day(1):today()
+        dfx[!, :date] = (today()-Day(100)):Day(1):today()
         Px = TimeArray(dfx; timestamp = :date)
 
         dfy = DataFrame(Fx, [:fx1, :fx2, :fx3, :fx4, :fx5])
         dfy.all_missing = fill(NaN, nrow(dfy))
-        dfy[!, :date] = (today() - Day(100)):Day(1):today()
+        dfy[!, :date] = (today()-Day(100)):Day(1):today()
         Py = TimeArray(dfy; timestamp = :date)
 
         rd = prices_to_returns(Px, Py; missing_col_percent = 0.1, missing_row_percent = 0.5)
         ts1 = rd.ts
         X1 = rd.X
         F1 = rd.F
-        rd = prices_to_returns(Px, Py; missing_col_percent = 0.1,
-                               missing_row_percent = nothing)
+        rd = prices_to_returns(
+            Px,
+            Py;
+            missing_col_percent = 0.1,
+            missing_row_percent = nothing,
+        )
         ts2 = rd.ts
         X2 = rd.X
         F2 = rd.F

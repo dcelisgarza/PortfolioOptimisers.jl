@@ -2,20 +2,24 @@ function block_vec_pq(A, p, q)
     mp, nq = size(A)
 
     if !(mod(mp, p) == 0 && mod(nq, q) == 0)
-        throw(DimensionMismatch("size(A) = $(size(A)), must be integer multiples of (p, q) = ($p, $q)"))
+        throw(
+            DimensionMismatch(
+                "size(A) = $(size(A)), must be integer multiples of (p, q) = ($p, $q)",
+            ),
+        )
     end
 
     m = Int(mp / p)
     n = Int(nq / q)
 
     A_vec = Matrix{eltype(A)}(undef, m * n, p * q)
-    for j in 0:(n - 1)
+    for j = 0:(n-1)
         Aj = Matrix{eltype(A)}(undef, m, p * q)
-        for i in 0:(m - 1)
-            Aij = vec(A[(1 + (i * p)):((i + 1) * p), (1 + (j * q)):((j + 1) * q)])
-            Aj[i + 1, :] .= Aij
+        for i = 0:(m-1)
+            Aij = vec(A[(1+(i*p)):((i+1)*p), (1+(j*q)):((j+1)*q)])
+            Aj[i+1, :] .= Aij
         end
-        A_vec[(1 + (j * m)):((j + 1) * m), :] .= Aj
+        A_vec[(1+(j*m)):((j+1)*m), :] .= Aj
     end
 
     return A_vec
@@ -26,15 +30,15 @@ function duplication_matrix(n::Int, diag::Bool = true)
     v = zeros(Int, nsq)
     r = 1
     a = 1
-    for i in 1:n
+    for i = 1:n
         b = i
-        for j in 0:(i - 2)
+        for j = 0:(i-2)
             v[r] = b
             b += n - j - 1
             r += 1
         end
 
-        for j in 0:(n - i)
+        for j = 0:(n-i)
             v[r] = a + j
             r += 1
         end
@@ -48,7 +52,7 @@ function duplication_matrix(n::Int, diag::Bool = true)
         filtered_rows = Vector{Int}(undef, 0)
         m = div(n * (n - 1), 2)
         rows = 1:nsq
-        counts = Dict{Int, Int}()
+        counts = Dict{Int,Int}()
         for i in v
             !haskey(counts, i) ? counts[i] = 1 : counts[i] += 1
         end
@@ -60,14 +64,14 @@ function duplication_matrix(n::Int, diag::Bool = true)
         end
         repeated_elem = sort!(collect(repeated_elem))
 
-        cols = Dict{Int, Int}()
+        cols = Dict{Int,Int}()
         cntr = 0
         for col in repeated_elem
             cntr += 1
             cols[col] = cntr
         end
 
-        for i in 1:nsq
+        for i = 1:nsq
             if !iszero(count(x -> x == v[i], repeated_elem))
                 push!(filtered_rows, rows[i])
                 push!(filtered_cols, cols[v[i]])
@@ -94,7 +98,7 @@ function elimination_matrix(n::Int, diag::Bool = true)
 
     v = zeros(Int, m)
     for i in rg
-        for j in 0:(n - i)
+        for j = 0:(n-i)
             v[r] = a + j + b
             r += 1
         end
@@ -124,12 +128,12 @@ function summation_matrix(n::Int, diag::Bool = true)
 
     for i in rg
         r += i - 1
-        for j in 0:(n - i)
-            v1[r + j + 1] = a + j + b
+        for j = 0:(n-i)
+            v1[r+j+1] = a + j + b
         end
-        for j in 1:(n - i)
-            v2[r + j + 1] = a + j + b
-            rows2[r + j + 1] = a + j
+        for j = 1:(n-i)
+            v2[r+j+1] = a + j + b
+            rows2[r+j+1] = a + j
         end
         r += n - i + 1
         a += n - i + 1
@@ -157,15 +161,15 @@ function dup_elim_sum_matrices(n::Int)
     r2 = 1
     a = 1
     b2 = 0
-    for i in 1:n
+    for i = 1:n
         b1 = i
-        for j in 0:(i - 2)
+        for j = 0:(i-2)
             v1[r1] = b1
             b1 += n - j - 1
             r1 += 1
         end
 
-        for j in 0:(n - i)
+        for j = 0:(n-i)
             v1[r1] = a + j
             v2[r2] = a + j + b2
             r1 += 1
@@ -181,7 +185,7 @@ function dup_elim_sum_matrices(n::Int)
 
     return d, l, s
 end
-struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
+struct HighOrderPrior{T1,T2,T3,T4,T5,T6,T7} <: AbstractPriorResult
     pr::T1
     kt::T2
     L2::T3
@@ -190,12 +194,15 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
     V::T6
     skmp::T7
 end
-function HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix},
-                        L2::Union{Nothing, <:AbstractMatrix},
-                        S2::Union{Nothing, <:AbstractMatrix},
-                        sk::Union{Nothing, <:AbstractMatrix},
-                        V::Union{Nothing, <:AbstractMatrix},
-                        skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
+function HighOrderPrior(;
+    pr::AbstractPriorResult,
+    kt::Union{Nothing,<:AbstractMatrix},
+    L2::Union{Nothing,<:AbstractMatrix},
+    S2::Union{Nothing,<:AbstractMatrix},
+    sk::Union{Nothing,<:AbstractMatrix},
+    V::Union{Nothing,<:AbstractMatrix},
+    skmp::Union{Nothing,<:AbstractMatrixProcessingEstimator},
+)
     kt_flag = isa(kt, AbstractMatrix)
     L2_flag = isa(L2, AbstractMatrix)
     S2_flag = isa(S2, AbstractMatrix)
@@ -236,9 +243,15 @@ function prior_view(pr::HighOrderPrior, i::AbstractVector)
     skmp = pr.skmp
     sk = nothing_scalar_array_view_odd_order(sk, i, idx)
     V = __coskewness(sk, view(pr.X, :, i), skmp)
-    return HighOrderPrior(; pr = prior_view(pr.pr, i),
-                          kt = nothing_scalar_array_view(kt, idx), L2 = L2, S2 = S2,
-                          sk = sk, V = V, skmp = skmp)
+    return HighOrderPrior(;
+        pr = prior_view(pr.pr, i),
+        kt = nothing_scalar_array_view(kt, idx),
+        L2 = L2,
+        S2 = S2,
+        sk = sk,
+        V = V,
+        skmp = skmp,
+    )
 end
 function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
     return if sym == :X
@@ -263,22 +276,23 @@ function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
-struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
+struct HighOrderPriorEstimator{T1,T2,T3} <: AbstractHighOrderPriorEstimator
     pe::T1
     kte::T2
     ske::T3
 end
-function factory(pe::HighOrderPriorEstimator,
-                 w::Union{Nothing, <:AbstractWeights} = nothing)
-    return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
-                                   ske = factory(pe.ske, w))
+function factory(pe::HighOrderPriorEstimator, w::Union{Nothing,<:AbstractWeights} = nothing)
+    return HighOrderPriorEstimator(;
+        pe = factory(pe.pe, w),
+        kte = factory(pe.kte, w),
+        ske = factory(pe.ske, w),
+    )
 end
 function HighOrderPriorEstimator(;
-                                 pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
-                                 kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
-                                                                                         alg = Full()),
-                                 ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
-                                                                                         alg = Full()))
+    pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
+    kte::Union{Nothing,<:CokurtosisEstimator} = Cokurtosis(; alg = Full()),
+    ske::Union{Nothing,<:CoskewnessEstimator} = Coskewness(; alg = Full()),
+)
     return HighOrderPriorEstimator(pe, kte, ske)
 end
 function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
@@ -290,8 +304,13 @@ function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
-               F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+function prior(
+    pe::HighOrderPriorEstimator,
+    X::AbstractMatrix,
+    F::Union{Nothing,<:AbstractMatrix} = nothing;
+    dims::Int = 1,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -304,8 +323,15 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
     kt = cokurtosis(pe.kte, X; mean = transpose(mu), kwargs...)
     L2, S2 = !isnothing(kt) ? dup_elim_sum_matrices(length(mu))[2:3] : (nothing, nothing)
     sk, V = coskewness(pe.ske, X; mean = transpose(mu), kwargs...)
-    return HighOrderPrior(; pr = pr, kt = kt, L2 = L2, S2 = S2, sk = sk, V = V,
-                          skmp = isnothing(sk) ? nothing : pe.ske.mp)
+    return HighOrderPrior(;
+        pr = pr,
+        kt = kt,
+        L2 = L2,
+        S2 = S2,
+        sk = sk,
+        V = V,
+        skmp = isnothing(sk) ? nothing : pe.ske.mp,
+    )
 end
 
 export HighOrderPrior, HighOrderPriorEstimator

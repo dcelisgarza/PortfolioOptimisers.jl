@@ -11,8 +11,11 @@ end
 function sigma_ucs(::Nothing, args...; kwargs...)
     return nothing
 end
-function ucs(uc::Tuple{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetResult},
-             args...; kwargs...)
+function ucs(
+    uc::Tuple{<:AbstractUncertaintySetResult,<:AbstractUncertaintySetResult},
+    args...;
+    kwargs...,
+)
     return uc
 end
 function mu_ucs(uc::AbstractUncertaintySetResult, args...; kwargs...)
@@ -31,7 +34,7 @@ function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwarg
     return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
 struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
-struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
+struct BoxUncertaintySet{T1,T2} <: AbstractUncertaintySetResult
     lb::T1
     ub::T2
 end
@@ -48,8 +51,12 @@ function NormalKUncertaintyAlgorithm(; kwargs::NamedTuple = (;))
 end
 struct GeneralKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
-function k_ucs(km::NormalKUncertaintyAlgorithm, q::Real, X::AbstractMatrix,
-               sigma_X::AbstractMatrix)
+function k_ucs(
+    km::NormalKUncertaintyAlgorithm,
+    q::Real,
+    X::AbstractMatrix,
+    sigma_X::AbstractMatrix,
+)
     k_mus = diag(X * (sigma_X \ I) * transpose(X))
     return sqrt(quantile(k_mus, one(q) - q; km.kwargs...))
 end
@@ -62,32 +69,42 @@ end
 function k_ucs(type::Real, args...)
     return type
 end
-struct EllipseUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
+struct EllipseUncertaintySetAlgorithm{T1,T2} <: AbstractUncertaintySetAlgorithm
     method::T1
     diagonal::T2
 end
 function EllipseUncertaintySetAlgorithm(;
-                                        method::Union{<:AbstractUncertaintyKAlgorithm,
-                                                      <:Real} = ChiSqKUncertaintyAlgorithm(),
-                                        diagonal::Bool = true)
+    method::Union{<:AbstractUncertaintyKAlgorithm,<:Real} = ChiSqKUncertaintyAlgorithm(),
+    diagonal::Bool = true,
+)
     return EllipseUncertaintySetAlgorithm(method, diagonal)
 end
 abstract type AbstractEllipseUncertaintySetResultClass <: AbstractUncertaintySetResult end
 struct MuEllipseUncertaintySet <: AbstractEllipseUncertaintySetResultClass end
 struct SigmaEllipseUncertaintySet <: AbstractEllipseUncertaintySetResultClass end
-struct EllipseUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
+struct EllipseUncertaintySet{T1,T2,T3} <: AbstractUncertaintySetResult
     sigma::T1
     k::T2
     class::T3
 end
-function EllipseUncertaintySet(; sigma::AbstractMatrix, k::Real,
-                               class::AbstractEllipseUncertaintySetResultClass)
+function EllipseUncertaintySet(;
+    sigma::AbstractMatrix,
+    k::Real,
+    class::AbstractEllipseUncertaintySetResultClass,
+)
     @argcheck(!isempty(sigma))
     assert_matrix_issquare(sigma)
     @argcheck(zero(k) < k)
     return EllipseUncertaintySet(sigma, k, class)
 end
 
-export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
-       NormalKUncertaintyAlgorithm, GeneralKUncertaintyAlgorithm,
-       ChiSqKUncertaintyAlgorithm, EllipseUncertaintySetAlgorithm, EllipseUncertaintySet
+export ucs,
+    mu_ucs,
+    sigma_ucs,
+    BoxUncertaintySetAlgorithm,
+    BoxUncertaintySet,
+    NormalKUncertaintyAlgorithm,
+    GeneralKUncertaintyAlgorithm,
+    ChiSqKUncertaintyAlgorithm,
+    EllipseUncertaintySetAlgorithm,
+    EllipseUncertaintySet

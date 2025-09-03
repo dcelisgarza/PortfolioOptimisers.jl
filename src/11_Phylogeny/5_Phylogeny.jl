@@ -38,7 +38,7 @@ Centrality algorithm type for betweenness centrality in PortfolioOptimisers.jl.
 
   - [`AbstractCentralityAlgorithm`](@ref)
 """
-struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
+struct BetweennessCentrality{T1,T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
 end
@@ -89,7 +89,7 @@ Centrality algorithm type for closeness centrality in PortfolioOptimisers.jl.
 
   - [`AbstractCentralityAlgorithm`](@ref)
 """
-struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
+struct ClosenessCentrality{T1,T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
 end
@@ -144,7 +144,7 @@ Centrality algorithm type for degree centrality in PortfolioOptimisers.jl.
 
   - [`AbstractCentralityAlgorithm`](@ref)
 """
-struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
+struct DegreeCentrality{T1,T2} <: AbstractCentralityAlgorithm
     kind::T1
     kwargs::T2
 end
@@ -261,7 +261,7 @@ Centrality algorithm type for PageRank in PortfolioOptimisers.jl.
 
   - [`AbstractCentralityAlgorithm`](@ref)
 """
-struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
+struct Pagerank{T1,T2,T3} <: AbstractCentralityAlgorithm
     n::T1
     alpha::T2
     epsilon::T3
@@ -296,8 +296,12 @@ Pagerank
 ```
 """
 function Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
-    @argcheck(n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
-              DomainError("The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon"))
+    @argcheck(
+        n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
+        DomainError(
+            "The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon",
+        )
+    )
     return Pagerank(n, alpha, epsilon)
 end
 
@@ -334,7 +338,7 @@ Centrality algorithm type for stress centrality in PortfolioOptimisers.jl.
 
   - [`AbstractCentralityAlgorithm`](@ref)
 """
-struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
+struct StressCentrality{T1,T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
 end
@@ -466,7 +470,7 @@ Algorithm type for Kruskal's minimum spanning tree (MST) in PortfolioOptimisers.
 
   - [`AbstractTreeType`](@ref)
 """
-struct KruskalTree{T1, T2} <: AbstractTreeType
+struct KruskalTree{T1,T2} <: AbstractTreeType
     args::T1
     kwargs::T2
 end
@@ -517,7 +521,7 @@ Algorithm type for Boruvka's minimum spanning tree (MST) in PortfolioOptimisers.
 
   - [`AbstractTreeType`](@ref)
 """
-struct BoruvkaTree{T1, T2} <: AbstractTreeType
+struct BoruvkaTree{T1,T2} <: AbstractTreeType
     args::T1
     kwargs::T2
 end
@@ -568,7 +572,7 @@ Algorithm type for Prim's minimum spanning tree (MST) in PortfolioOptimisers.jl.
 
   - [`AbstractTreeType`](@ref)
 """
-struct PrimTree{T1, T2} <: AbstractTreeType
+struct PrimTree{T1,T2} <: AbstractTreeType
     args::T1
     kwargs::T2
 end
@@ -676,7 +680,7 @@ Estimator type for network-based phylogeny analysis in PortfolioOptimisers.jl.
   - [`AbstractTreeType`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
 """
-struct Network{T1, T2, T3, T4} <: AbstractNetworkEstimator
+struct Network{T1,T2,T3,T4} <: AbstractNetworkEstimator
     ce::T1
     de::T2
     alg::T3
@@ -734,10 +738,12 @@ Network
 
   - [`Network`](@ref)
 """
-function Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                 de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-                 alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
-                 n::Integer = 1)
+function Network(;
+    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+    de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+    alg::Union{<:AbstractSimilarityMatrixAlgorithm,<:AbstractTreeType} = KruskalTree(),
+    n::Integer = 1,
+)
     return Network(ce, de, alg, n)
 end
 
@@ -777,7 +783,7 @@ Estimator type for centrality-based analysis in PortfolioOptimisers.jl.
   - [`AbstractCentralityEstimator`](@ref)
   - [`AbstractCentralityAlgorithm`](@ref)
 """
-struct Centrality{T1, T2} <: AbstractCentralityEstimator
+struct Centrality{T1,T2} <: AbstractCentralityEstimator
     ne::T1
     cent::T2
 end
@@ -833,8 +839,10 @@ Centrality
 
   - [`Centrality`](@ref)
 """
-function Centrality(; ne::AbstractNetworkEstimator = Network(),
-                    cent::AbstractCentralityAlgorithm = DegreeCentrality())
+function Centrality(;
+    ne::AbstractNetworkEstimator = Network(),
+    cent::AbstractCentralityAlgorithm = DegreeCentrality(),
+)
     return Centrality(ne, cent)
 end
 
@@ -862,15 +870,23 @@ Compute the adjacency matrix for a network estimator.
   - [`calc_mst`](@ref)
   - [`PMFG_T2s`](@ref)
 """
-function calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractTreeType, <:Any},
-                        X::AbstractMatrix; dims::Int = 1, kwargs...)
+function calc_adjacency(
+    ne::Network{<:Any,<:Any,<:AbstractTreeType,<:Any},
+    X::AbstractMatrix;
+    dims::Int = 1,
+    kwargs...,
+)
     D = distance(ne.de, ne.ce, X; dims = dims, kwargs...)
     G = SimpleWeightedGraph(D)
     tree = calc_mst(ne.alg, G)
     return adjacency_matrix(SimpleGraph(G[tree]))
 end
-function calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm,
-                                    <:Any}, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function calc_adjacency(
+    ne::Network{<:Any,<:Any,<:AbstractSimilarityMatrixAlgorithm,<:Any},
+    X::AbstractMatrix;
+    dims::Int = 1,
+    kwargs...,
+)
     S, D = cor_and_dist(ne.de, ne.ce, X; dims = dims, kwargs...)
     S = dbht_similarity(ne.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
@@ -903,7 +919,7 @@ This function constructs the adjacency matrix for the network, then computes the
 function phylogeny_matrix(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs...)
     A = calc_adjacency(ne, X; dims = dims, kwargs...)
     P = zeros(Int, size(Matrix(A)))
-    for i in 0:(ne.n)
+    for i = 0:(ne.n)
         P .+= A^i
     end
     P .= clamp!(P, 0, 1) - I
@@ -934,9 +950,13 @@ This function applies clustering to the data, assigns assets to clusters, and co
   - [`ClusteringEstimator`](@ref)
   - [`phylogeny_matrix`](@ref)
 """
-function phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
-                          X::AbstractMatrix; branchorder::Symbol = :optimal, dims::Int = 1,
-                          kwargs...)
+function phylogeny_matrix(
+    cle::Union{<:ClusteringEstimator,<:AbstractClusteringResult},
+    X::AbstractMatrix;
+    branchorder::Symbol = :optimal,
+    dims::Int = 1,
+    kwargs...,
+)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
     clusters = cutree(res.clustering; k = res.k)
     P = zeros(Int, size(X, 2), res.k)
@@ -973,8 +993,13 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
   - [`Centrality`](@ref)
   - [`calc_centrality`](@ref)
 """
-function centrality_vector(ne::Network, cent::AbstractCentralityAlgorithm,
-                           X::AbstractMatrix; dims::Int = 1, kwargs...)
+function centrality_vector(
+    ne::Network,
+    cent::AbstractCentralityAlgorithm,
+    X::AbstractMatrix;
+    dims::Int = 1,
+    kwargs...,
+)
     P = phylogeny_matrix(ne, X; dims = dims, kwargs...)
     G = SimpleGraph(P)
     return calc_centrality(cent, G)
@@ -1034,8 +1059,14 @@ This function computes the centrality vector and returns the weighted average us
   - [`Centrality`](@ref)
   - [`centrality_vector`](@ref)
 """
-function average_centrality(ne::Network, cent::AbstractCentralityAlgorithm,
-                            w::AbstractVector, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function average_centrality(
+    ne::Network,
+    cent::AbstractCentralityAlgorithm,
+    w::AbstractVector,
+    X::AbstractMatrix;
+    dims::Int = 1,
+    kwargs...,
+)
     return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...), w)
 end
 """
@@ -1063,8 +1094,13 @@ This function applies the centrality algorithm in the estimator to the network a
   - [`Centrality`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(cte::Centrality, w::AbstractVector, X::AbstractMatrix;
-                            dims::Int = 1, kwargs...)
+function average_centrality(
+    cte::Centrality,
+    w::AbstractVector,
+    X::AbstractMatrix;
+    dims::Int = 1,
+    kwargs...,
+)
     return average_centrality(cte.ne, cte.cent, w, X; dims = dims, kwargs...)
 end
 
@@ -1120,12 +1156,31 @@ This function computes the phylogeny matrix using the estimator and data, then c
   - [`phylogeny_matrix`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(cle::Union{<:Network, <:ClusteringEstimator}, w::AbstractVector,
-                         X::AbstractMatrix; dims::Int = 1, kwargs...)
+function asset_phylogeny(
+    cle::Union{<:Network,<:ClusteringEstimator},
+    w::AbstractVector,
+    X::AbstractMatrix;
+    dims::Int = 1,
+    kwargs...,
+)
     return asset_phylogeny(w, phylogeny_matrix(cle, X; dims = dims, kwargs...))
 end
 
-export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
-       KatzCentrality, Pagerank, RadialityCentrality, StressCentrality, KruskalTree,
-       BoruvkaTree, PrimTree, Network, phylogeny_matrix, average_centrality,
-       asset_phylogeny, AbstractCentralityAlgorithm, Centrality, centrality_vector
+export BetweennessCentrality,
+    ClosenessCentrality,
+    DegreeCentrality,
+    EigenvectorCentrality,
+    KatzCentrality,
+    Pagerank,
+    RadialityCentrality,
+    StressCentrality,
+    KruskalTree,
+    BoruvkaTree,
+    PrimTree,
+    Network,
+    phylogeny_matrix,
+    average_centrality,
+    asset_phylogeny,
+    AbstractCentralityAlgorithm,
+    Centrality,
+    centrality_vector

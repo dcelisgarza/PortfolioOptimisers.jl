@@ -13,15 +13,18 @@ struct RelativeErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
 struct SquareRelativeErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
 struct AbsoluteErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
 struct SquareAbsoluteErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
-struct JuMPWeightFiniliser{T1, T2, T3, T4} <: WeightFinaliser
+struct JuMPWeightFiniliser{T1,T2,T3,T4} <: WeightFinaliser
     slv::T1
     sc::T2
     so::T3
     alg::T4
 end
-function JuMPWeightFiniliser(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                             sc::Real = 1.0, so::Real = 1.0,
-                             alg::JuMPWeightFiniliserFormulation = RelativeErrorWeightFiniliser())
+function JuMPWeightFiniliser(;
+    slv::Union{<:Solver,<:AbstractVector{<:Solver}},
+    sc::Real = 1.0,
+    so::Real = 1.0,
+    alg::JuMPWeightFiniliserFormulation = RelativeErrorWeightFiniliser(),
+)
     if isa(slv, AbstractVector)
         @argcheck(!isempty(slv))
     end
@@ -29,23 +32,31 @@ function JuMPWeightFiniliser(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
     @argcheck(so > zero(so))
     return JuMPWeightFiniliser(slv, sc, so, alg)
 end
-function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::RelativeErrorWeightFiniliser,
-                                              wi::AbstractVector)
+function set_clustering_weight_finaliser_alg!(
+    model::JuMP.Model,
+    ::RelativeErrorWeightFiniliser,
+    wi::AbstractVector,
+)
     wi[iszero.(wi)] .= eps(eltype(wi))
     w = model[:w]
     sc = model[:sc]
     so = model[:so]
     @variable(model, t)
-    @constraint(model,
-                [sc * t;
-                 sc * (w ⊘ wi .- one(eltype(wi)))] in MOI.NormOneCone(length(w) + 1))
+    @constraint(
+        model,
+        [
+            sc * t;
+            sc * (w ⊘ wi .- one(eltype(wi)))
+        ] in MOI.NormOneCone(length(w) + 1)
+    )
     @objective(model, Min, so * t)
     return nothing
 end
-function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::SquareRelativeErrorWeightFiniliser,
-                                              wi::AbstractVector)
+function set_clustering_weight_finaliser_alg!(
+    model::JuMP.Model,
+    ::SquareRelativeErrorWeightFiniliser,
+    wi::AbstractVector,
+)
     wi[iszero.(wi)] .= eps(eltype(wi))
     w = model[:w]
     sc = model[:sc]
@@ -55,9 +66,11 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     @objective(model, Min, so * t)
     return nothing
 end
-function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::AbsoluteErrorWeightFiniliser,
-                                              wi::AbstractVector)
+function set_clustering_weight_finaliser_alg!(
+    model::JuMP.Model,
+    ::AbsoluteErrorWeightFiniliser,
+    wi::AbstractVector,
+)
     w = model[:w]
     sc = model[:sc]
     so = model[:so]
@@ -66,9 +79,11 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     @objective(model, Min, so * t)
     return nothing
 end
-function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
-                                              ::SquareAbsoluteErrorWeightFiniliser,
-                                              wi::AbstractVector)
+function set_clustering_weight_finaliser_alg!(
+    model::JuMP.Model,
+    ::SquareAbsoluteErrorWeightFiniliser,
+    wi::AbstractVector,
+)
     w = model[:w]
     sc = model[:sc]
     so = model[:so]
@@ -102,8 +117,11 @@ function opt_weight_bounds(cwf::JuMPWeightFiniliser, wb::WeightBounds, wi::Abstr
         opt_weight_bounds(IterativeWeightFiniliser(), wb, wi)
     end
 end
-function opt_weight_bounds(cwf::IterativeWeightFiniliser, wb::WeightBounds,
-                           w::AbstractVector)
+function opt_weight_bounds(
+    cwf::IterativeWeightFiniliser,
+    wb::WeightBounds,
+    w::AbstractVector,
+)
     lb = wb.lb
     ub = wb.ub
     if !(any(map((x, y) -> x < y, ub, w)) || any(map((x, y) -> x > y, lb, w)))
@@ -111,7 +129,7 @@ function opt_weight_bounds(cwf::IterativeWeightFiniliser, wb::WeightBounds,
     end
     iter = cwf.iter
     s1 = sum(w)
-    for _ in 1:iter
+    for _ = 1:iter
         if !(any(map((x, y) -> x < y, ub, w)) || any(map((x, y) -> x > y, lb, w)))
             break
         end
@@ -128,8 +146,11 @@ function opt_weight_bounds(cwf::IterativeWeightFiniliser, wb::WeightBounds,
     end
     return w
 end
-function clustering_optimisation_result(cwf::WeightFinaliser, wb::WeightBounds,
-                                        w::AbstractVector)
+function clustering_optimisation_result(
+    cwf::WeightFinaliser,
+    wb::WeightBounds,
+    w::AbstractVector,
+)
     w = opt_weight_bounds(cwf, wb, w)
     retcode = if !any(!isfinite, w)
         OptimisationSuccess()
@@ -139,6 +160,9 @@ function clustering_optimisation_result(cwf::WeightFinaliser, wb::WeightBounds,
     return retcode, w
 end
 
-export IterativeWeightFiniliser, RelativeErrorWeightFiniliser,
-       SquareRelativeErrorWeightFiniliser, AbsoluteErrorWeightFiniliser,
-       SquareAbsoluteErrorWeightFiniliser, JuMPWeightFiniliser
+export IterativeWeightFiniliser,
+    RelativeErrorWeightFiniliser,
+    SquareRelativeErrorWeightFiniliser,
+    AbsoluteErrorWeightFiniliser,
+    SquareAbsoluteErrorWeightFiniliser,
+    JuMPWeightFiniliser

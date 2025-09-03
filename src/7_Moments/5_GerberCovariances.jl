@@ -289,17 +289,17 @@ function NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpect
 end
 for alg in (Gerber0, Gerber1, Gerber2)
     eval(quote
-             function factory(alg::$(alg), ::Any)
-                 return alg
-             end
-         end)
+        function factory(alg::$(alg), ::Any)
+            return alg
+        end
+    end)
 end
 for alg in (NormalisedGerber0, NormalisedGerber1, NormalisedGerber2)
     eval(quote
-             function factory(alg::$(alg), w::Union{Nothing, <:AbstractWeights})
-                 return $(alg)(; me = factory(alg.me, w))
-             end
-         end)
+        function factory(alg::$(alg), w::Union{Nothing,<:AbstractWeights})
+            return $(alg)(; me = factory(alg.me, w))
+        end
+    end)
 end
 
 """
@@ -344,7 +344,7 @@ Construct a `GerberCovariance` estimator with the specified algorithm, variance 
   - [`NormalisedGerber1`](@ref)
   - [`NormalisedGerber2`](@ref)
 """
-struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
+struct GerberCovariance{T1,T2,T3,T4} <: BaseGerberCovariance
     ve::T1
     pdm::T2
     threshold::T3
@@ -405,9 +405,12 @@ GerberCovariance
   - [`NormalisedGerber1`](@ref)
   - [`NormalisedGerber2`](@ref)
 """
-function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                          pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
-                          alg::GerberCovarianceAlgorithm = Gerber1())
+function GerberCovariance(;
+    ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+    pdm::Union{Nothing,<:Posdef} = Posdef(),
+    threshold::Real = 0.5,
+    alg::GerberCovarianceAlgorithm = Gerber1(),
+)
     @argcheck(zero(threshold) < threshold < one(threshold))
     return GerberCovariance(ve, pdm, threshold, alg)
 end
@@ -448,8 +451,11 @@ The algorithm proceeds as follows:
   - [`Gerber0`](@ref)
   - [`posdef!`](@ref)
 """
-function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix,
-                std_vec::AbstractArray)
+function gerber(
+    ce::GerberCovariance{<:Any,<:Any,<:Any,<:Gerber0},
+    X::AbstractMatrix,
+    std_vec::AbstractArray,
+)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
@@ -500,8 +506,10 @@ The algorithm proceeds as follows:
   - [`NormalisedGerber0`](@ref)
   - [`posdef!`](@ref)
 """
-function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0},
-                X::AbstractMatrix)
+function gerber(
+    ce::GerberCovariance{<:Any,<:Any,<:Any,<:NormalisedGerber0},
+    X::AbstractMatrix,
+)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
@@ -547,8 +555,11 @@ The algorithm proceeds as follows:
  3. The Gerber1 correlation is given by `(UmD' * UmD) ⊘ (T .- (N' * N))`, where `T` is the number of observations.
  4. The result is projected to the nearest positive definite matrix using `posdef!`.
 """
-function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::AbstractMatrix,
-                std_vec::AbstractArray)
+function gerber(
+    ce::GerberCovariance{<:Any,<:Any,<:Any,<:Gerber1},
+    X::AbstractMatrix,
+    std_vec::AbstractArray,
+)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
@@ -601,8 +612,10 @@ The algorithm proceeds as follows:
   - [`NormalisedGerber1`](@ref)
   - [`posdef!`](@ref)
 """
-function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1},
-                X::AbstractMatrix)
+function gerber(
+    ce::GerberCovariance{<:Any,<:Any,<:Any,<:NormalisedGerber1},
+    X::AbstractMatrix,
+)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
@@ -655,8 +668,11 @@ The algorithm proceeds as follows:
   - [`Gerber2`](@ref)
   - [`posdef!`](@ref)
 """
-function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix,
-                std_vec::AbstractArray)
+function gerber(
+    ce::GerberCovariance{<:Any,<:Any,<:Any,<:Gerber2},
+    X::AbstractMatrix,
+    std_vec::AbstractArray,
+)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
@@ -709,8 +725,10 @@ The algorithm proceeds as follows:
   - [`NormalisedGerber2`](@ref)
   - [`posdef!`](@ref)
 """
-function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2},
-                X::AbstractMatrix)
+function gerber(
+    ce::GerberCovariance{<:Any,<:Any,<:Any,<:NormalisedGerber2},
+    X::AbstractMatrix,
+)
     T, N = size(X)
     U = Matrix{Bool}(undef, T, N)
     D = Matrix{Bool}(undef, T, N)
@@ -758,9 +776,12 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix, std_vec::AbstractArray)`](@ref)
   - [`cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                                             <:UnNormalisedGerberCovarianceAlgorithm},
-                        X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.cor(
+    ce::GerberCovariance{<:Any,<:Any,<:Any,<:UnNormalisedGerberCovarianceAlgorithm},
+    X::AbstractMatrix;
+    dims::Int = 1,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -800,9 +821,12 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix, std_vec::AbstractArray)`](@ref)
   - [`cor(ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                                             <:UnNormalisedGerberCovarianceAlgorithm},
-                        X::AbstractMatrix; dims::Int = 1, kwargs...)
+function Statistics.cov(
+    ce::GerberCovariance{<:Any,<:Any,<:Any,<:UnNormalisedGerberCovarianceAlgorithm},
+    X::AbstractMatrix;
+    dims::Int = 1,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -842,9 +866,13 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}, X::AbstractMatrix)`](@ref)
   - [`cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                                             <:NormalisedGerberCovarianceAlgorithm},
-                        X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+function Statistics.cor(
+    ce::GerberCovariance{<:Any,<:Any,<:Any,<:NormalisedGerberCovarianceAlgorithm},
+    X::AbstractMatrix;
+    dims::Int = 1,
+    mean = nothing,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -888,9 +916,13 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}, X::AbstractMatrix)`](@ref)
   - [`cor(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                                             <:NormalisedGerberCovarianceAlgorithm},
-                        X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+function Statistics.cov(
+    ce::GerberCovariance{<:Any,<:Any,<:Any,<:NormalisedGerberCovarianceAlgorithm},
+    X::AbstractMatrix;
+    dims::Int = 1,
+    mean = nothing,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -902,10 +934,14 @@ function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
     X = (X .- mean_vec) ⊘ std_vec
     return gerber(ce, X) ⊙ (std_vec ⊗ std_vec)
 end
-function factory(ce::GerberCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return GerberCovariance(; alg = factory(ce.alg, w), ve = factory(ce.ve, w),
-                            pdm = ce.pdm, threshold = ce.threshold)
+function factory(ce::GerberCovariance, w::Union{Nothing,<:AbstractWeights} = nothing)
+    return GerberCovariance(;
+        alg = factory(ce.alg, w),
+        ve = factory(ce.ve, w),
+        pdm = ce.pdm,
+        threshold = ce.threshold,
+    )
 end
 
-export GerberCovariance, Gerber0, Gerber1, Gerber2, NormalisedGerber0, NormalisedGerber1,
-       NormalisedGerber2
+export GerberCovariance,
+    Gerber0, Gerber1, Gerber2, NormalisedGerber0, NormalisedGerber1, NormalisedGerber2

@@ -25,7 +25,7 @@ Creates a `PortfolioOptimisersCovariance` object with the specified covariance e
   - [`AbstractCovarianceEstimator`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
 """
-struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
+struct PortfolioOptimisersCovariance{T1,T2} <: AbstractCovarianceEstimator
     ce::T1
     mp::T2
 end
@@ -74,12 +74,16 @@ PortfolioOptimisersCovariance
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`DefaultMatrixProcessing`](@ref)
 """
-function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                                       mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
+function PortfolioOptimisersCovariance(;
+    ce::AbstractCovarianceEstimator = Covariance(),
+    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+)
     return PortfolioOptimisersCovariance(ce, mp)
 end
-function factory(ce::PortfolioOptimisersCovariance,
-                 w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(
+    ce::PortfolioOptimisersCovariance,
+    w::Union{Nothing,<:AbstractWeights} = nothing,
+)
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 
@@ -111,8 +115,12 @@ This method computes the covariance matrix for the input data matrix `X` using t
   - [`matrix_processing!`](@ref)
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/#Statistics.cov-Tuple%7BCovarianceEstimator,%20AbstractMatrix%7D)
 """
-function Statistics.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
-                        kwargs...)
+function Statistics.cov(
+    ce::PortfolioOptimisersCovariance,
+    X::AbstractMatrix;
+    dims = 1,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -153,8 +161,12 @@ This method computes the correlation matrix for the input data matrix `X` using 
   - [`matrix_processing!`](@ref)
   - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/#Statistics.cor)
 """
-function Statistics.cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1,
-                        kwargs...)
+function Statistics.cor(
+    ce::PortfolioOptimisersCovariance,
+    X::AbstractMatrix;
+    dims = 1,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

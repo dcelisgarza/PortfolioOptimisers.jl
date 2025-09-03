@@ -44,7 +44,7 @@ Construct a `Cokurtosis` estimator with the specified mean estimator, matrix pro
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
-struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
+struct Cokurtosis{T1,T2,T3} <: CokurtosisEstimator
     me::T1
     mp::T2
     alg::T3
@@ -88,12 +88,14 @@ Cokurtosis
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
-function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                    alg::AbstractMomentAlgorithm = Full())
+function Cokurtosis(;
+    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+    alg::AbstractMomentAlgorithm = Full(),
+)
     return Cokurtosis(me, mp, alg)
 end
-function factory(ce::Cokurtosis, w::Union{Nothing, <:AbstractWeights} = nothing)
+function factory(ce::Cokurtosis, w::Union{Nothing,<:AbstractWeights} = nothing)
     return Cokurtosis(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 
@@ -171,8 +173,13 @@ julia> cokurtosis(Cokurtosis(), X)
   - [`Cokurtosis`](@ref)
   - [`_cokurtosis`](@ref)
 """
-function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1,
-                    mean = nothing, kwargs...)
+function cokurtosis(
+    ke::Cokurtosis{<:Any,<:Any,<:Full},
+    X::AbstractMatrix;
+    dims::Int = 1,
+    mean = nothing,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -181,8 +188,13 @@ function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Full}, X::AbstractMatrix; dim
     X = X .- mu
     return _cokurtosis(X, ke.mp)
 end
-function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1,
-                    mean = nothing, kwargs...)
+function cokurtosis(
+    ke::Cokurtosis{<:Any,<:Any,<:Semi},
+    X::AbstractMatrix;
+    dims::Int = 1,
+    mean = nothing,
+    kwargs...,
+)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
