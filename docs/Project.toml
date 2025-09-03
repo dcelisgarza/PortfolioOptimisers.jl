@@ -1,0 +1,11 @@
+# Don't forget to run
+#
+#     pkg> dev ..
+#
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
+PortfolioOptimisers = "e0036ec9-05e5-505d-a6a9-07af41c94861"
+
+[compat]
+Documenter = "1"
