@@ -19,7 +19,8 @@ If the solution to the issue is clear, you can immediately create a pull request
 Otherwise, say what your proposed solution is and wait for a discussion around it.
 
 !!! tip
+
     Feel free to ping us after a few days if there are no responses.
 
-If your solution involves code (or something that requires running the package locally), check the [developer documentation](91-developer.md).
+If your solution involves code (or something that requires running the package locally), check the [developer documentation](091-developer.md).
 Otherwise, you can use the GitHub interface directly to create your pull request.

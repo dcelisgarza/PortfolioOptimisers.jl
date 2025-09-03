@@ -1,0 +1,16 @@
+# Histogram
+
+```@docs
+PortfolioOptimisers.AbstractBins
+PortfolioOptimisers.AstroPyBins
+Knuth
+FreedmanDiaconis
+Scott
+HacineGharbiRavier
+PortfolioOptimisers.get_bin_width_func
+PortfolioOptimisers.calc_num_bins
+PortfolioOptimisers.calc_hist_data
+PortfolioOptimisers.intrinsic_mutual_info
+PortfolioOptimisers.variation_info
+PortfolioOptimisers.mutual_info
+```

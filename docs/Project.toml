@@ -1,11 +1,14 @@
-# Don't forget to run
-#
-#     pkg> dev ..
-#
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterCitations = "daee34ce-89f3-4625-b898-19384cb65244"
+DocumenterTools = "35a29f4d-8980-5a13-9543-d66fff28ecb8"
+GraphRecipes = "bd48cda9-67a9-57be-86fa-5b3c104eda73"
+Handcalcs = "e8a07092-c156-4455-ab8e-ed8bc81edefb"
+Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
 PortfolioOptimisers = "e0036ec9-05e5-505d-a6a9-07af41c94861"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
 [compat]
 Documenter = "1"

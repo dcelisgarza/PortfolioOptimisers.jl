@@ -10,3 +10,7 @@ coverage
 docs/build/
 env
 node_modules
+*NOTRACK*
+*.CondaPkg/*
+/docs/.CondaPkg/*
+/test/.CondaPkg/*
