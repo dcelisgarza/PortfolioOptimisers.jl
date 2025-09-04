@@ -1,4 +1,4 @@
-struct GreedyAllocationOptimisation{T1,T2,T3,T4,T5,T6} <: OptimisationResult
+struct GreedyAllocationOptimisation{T1, T2, T3, T4, T5, T6} <: OptimisationResult
     oe::T1
     shares::T2
     cost::T3
@@ -6,7 +6,7 @@ struct GreedyAllocationOptimisation{T1,T2,T3,T4,T5,T6} <: OptimisationResult
     retcode::T5
     cash::T6
 end
-struct GreedyAllocation{T1,T2,T3} <: BaseFiniteAllocationOptimisationEstimator
+struct GreedyAllocation{T1, T2, T3} <: BaseFiniteAllocationOptimisationEstimator
     unit::T1
     args::T2
     kwargs::T3
@@ -17,18 +17,11 @@ end
 function roundmult(val::Real, prec::Real, args...; kwargs...)
     return round(div(val, prec) * prec, args...; kwargs...)
 end
-function greedy_sub_allocation!(
-    w::AbstractVector,
-    p::AbstractVector,
-    cash::Real,
-    bgt::Real,
-    ga::GreedyAllocation,
-)
+function greedy_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real, bgt::Real,
+                                ga::GreedyAllocation)
     if isempty(w)
-        return Vector{eltype(w)}(undef, 0),
-        Vector{eltype(w)}(undef, 0),
-        Vector{eltype(w)}(undef, 0),
-        cash
+        return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
+               Vector{eltype(w)}(undef, 0), cash
     end
 
     idx = sortperm(w; rev = true)
@@ -89,26 +82,20 @@ function greedy_sub_allocation!(
     idx = invperm(idx)
     return view(shares, idx), view(cost, idx), view(aw, idx), acash
 end
-function optimise!(
-    ga::GreedyAllocation,
-    w::AbstractVector,
-    p::AbstractVector,
-    cash::Real = 1e6,
-    T::Union{Nothing,<:Real} = nothing,
-    fees::Union{Nothing,<:Fees} = nothing;
-    kwargs...,
-)
+function optimise!(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
+                   cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
+                   fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     @argcheck(!isempty(w) && !isempty(p) && length(w) == length(p))
     @argcheck(cash > zero(cash))
     if !isnothing(fees)
         @argcheck(!isnothing(T))
     end
     cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, cash, T, fees)
-    sshares, scost, sw, scash =
-        greedy_sub_allocation!(-view(w, sidx), view(p, sidx), scash, sbgt, ga)
+    sshares, scost, sw, scash = greedy_sub_allocation!(-view(w, sidx), view(p, sidx), scash,
+                                                       sbgt, ga)
     lcash = adjust_long_cash(bgt, lcash, scash)
-    lshares, lcost, lw, lcash =
-        greedy_sub_allocation!(view(w, lidx), view(p, lidx), lcash, lbgt, ga)
+    lshares, lcost, lw, lcash = greedy_sub_allocation!(view(w, lidx), view(p, lidx), lcash,
+                                                       lbgt, ga)
     res = Matrix{eltype(w)}(undef, length(w), 3)
     res[lidx, 1] = lshares
     res[sidx, 1] = -sshares
@@ -116,14 +103,9 @@ function optimise!(
     res[sidx, 2] = -scost
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
-    return GreedyAllocationOptimisation(
-        typeof(ga),
-        view(res, :, 1),
-        view(res, :, 2),
-        view(res, :, 3),
-        OptimisationSuccess(nothing),
-        lcash,
-    )
+    return GreedyAllocationOptimisation(typeof(ga), view(res, :, 1), view(res, :, 2),
+                                        view(res, :, 3), OptimisationSuccess(nothing),
+                                        lcash)
 end
 
 export GreedyAllocationOptimisation, GreedyAllocation

@@ -1,131 +1,47 @@
 @safetestset "Fees" begin
     using PortfolioOptimisers, Test, DataFrames, TimeSeries, CSV, Clarabel
     function find_tol(a1, a2; name1 = :a1, name2 = :a2)
-        for rtol in [
-            1e-10,
-            5e-10,
-            1e-9,
-            5e-9,
-            1e-8,
-            5e-8,
-            1e-7,
-            5e-7,
-            1e-6,
-            5e-6,
-            1e-5,
-            5e-5,
-            1e-4,
-            5e-4,
-            1e-3,
-            5e-3,
-            1e-2,
-            5e-2,
-            1e-1,
-            2.5e-1,
-            5e-1,
-            1e0,
-            1.1e0,
-            1.2e0,
-            1.3e0,
-            1.4e0,
-            1.5e0,
-            1.6e0,
-            1.7e0,
-            1.8e0,
-            1.9e0,
-            2e0,
-            2.5e0,
-        ]
+        for rtol in
+            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
+             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
+             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
             if isapprox(a1, a2; rtol = rtol)
                 println("isapprox($name1, $name2, rtol = $(rtol))")
                 break
             end
         end
-        for atol in [
-            1e-10,
-            5e-10,
-            1e-9,
-            5e-9,
-            1e-8,
-            5e-8,
-            1e-7,
-            5e-7,
-            1e-6,
-            5e-6,
-            1e-5,
-            5e-5,
-            1e-4,
-            5e-4,
-            1e-3,
-            5e-3,
-            1e-2,
-            5e-2,
-            1e-1,
-            2.5e-1,
-            5e-1,
-            1e0,
-            1.1e0,
-            1.2e0,
-            1.3e0,
-            1.4e0,
-            1.5e0,
-            1.6e0,
-            1.7e0,
-            1.8e0,
-            1.9e0,
-            2e0,
-            2.5e0,
-        ]
+        for atol in
+            [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
+             5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1e0, 1.1e0, 1.2e0, 1.3e0,
+             1.4e0, 1.5e0, 1.6e0, 1.7e0, 1.8e0, 1.9e0, 2e0, 2.5e0]
             if isapprox(a1, a2; atol = atol)
                 println("isapprox($name1, $name2, atol = $(atol))")
                 break
             end
         end
     end
-    X =
-        TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz")); timestamp = :Date)[(end-252):end]
+    X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
     rd = prices_to_returns(X)
     pr = prior(EmpiricalPrior(), rd)
     rf = 4.2 / 100 / 252
     w = fill(inv(size(pr.X, 2)), size(pr.X, 2))
-    slv = Solver(;
-        name = :clarabel1,
-        solver = Clarabel.Optimizer,
-        check_sol = (; allow_local = true, allow_almost = true),
-        settings = Dict("verbose" => false),
-    )
+    slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = Dict("verbose" => false))
     sets = AssetSets(;
-        dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end], "group2" => rd.nx[2:2:end]),
-    )
-    fest = FeesEstimator(;
-        tn = TurnoverEstimator(; w = w, val = Dict("BAC" => 0.001)),
-        l = Dict("group2" => 0.002),
-        s = Dict("group1" => 0.003),
-        fl = Dict("XOM" => 0.005, "WMT" => 0.005, "LLY" => 0.005),
-        fs = Dict("BBY" => 0.007, "CVX" => 0.007, "group3" => 0.011),
-    )
-    fes = [
-        fees_constraints(fest, sets),
-        Fees(;
-            tn = Turnover(; val = 0.001, w = w),
-            l = 0.002,
-            s = 0.003,
-            fl = 0.005,
-            fs = 0.007,
-        ),
-    ]
+                     dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
+                                 "group2" => rd.nx[2:2:end]))
+    fest = FeesEstimator(; tn = TurnoverEstimator(; w = w, val = Dict("BAC" => 0.001)),
+                         l = Dict("group2" => 0.002), s = Dict("group1" => 0.003),
+                         fl = Dict("XOM" => 0.005, "WMT" => 0.005, "LLY" => 0.005),
+                         fs = Dict("BBY" => 0.007, "CVX" => 0.007, "group3" => 0.011))
+    fes = [fees_constraints(fest, sets),
+           Fees(; tn = Turnover(; val = 0.001, w = w), l = 0.002, s = 0.003, fl = 0.005,
+                fs = 0.007)]
     T, N = size(pr.X)
-    res = optimise!(
-        MeanRisk(;
-            opt = JuMPOptimiser(;
-                wb = WeightBounds(; lb = -1, ub = 1),
-                sbgt = 1,
-                bgt = 1,
-                pe = pr,
-                slv = slv,
-            ),
-        ),
-    )
+    res = optimise!(MeanRisk(;
+                             opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),
+                                                 sbgt = 1, bgt = 1, pe = pr, slv = slv)))
     @testset "Fees" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/Fees.csv.gz"), DataFrame)
         f1s = [0.02002313426946848, 0.12149580659357644]
@@ -158,17 +74,9 @@
     end
     @testset "Finite allocation fees" begin
         p = vec(values(X[end]))
-        res = optimise!(
-            MeanRisk(;
-                opt = JuMPOptimiser(;
-                    wb = WeightBounds(; lb = -1, ub = 1),
-                    sbgt = 1,
-                    bgt = 1,
-                    pe = pr,
-                    slv = slv,
-                ),
-            ),
-        )
+        res = optimise!(MeanRisk(;
+                                 opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),
+                                                     sbgt = 1, bgt = 1, pe = pr, slv = slv)))
         resa = optimise!(DiscreteAllocation(; slv = slv), res.w, p, 1000, T, fes[1])
         @test isapprox(sum(resa.cost) + calc_fees(res.w, p, fes[1]) * T + resa.cash, 1000)
 

@@ -70,7 +70,7 @@ SimpleExpectedReturns
   - [`SimpleExpectedReturns`](@ref)
   - [`mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
-function SimpleExpectedReturns(; w::Union{Nothing,<:AbstractWeights} = nothing)
+function SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(w, AbstractWeights)
         @argcheck(!isempty(w))
     end
@@ -126,16 +126,12 @@ julia> mean(serw, X)
   - [`SimpleExpectedReturns`](@ref)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
-function Statistics.mean(
-    me::SimpleExpectedReturns,
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function Statistics.mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1,
+                         kwargs...)
     return isnothing(me.w) ? mean(X; dims = dims) : mean(X, me.w; dims = dims)
 end
 
-function factory(me::SimpleExpectedReturns, w::Union{Nothing,<:AbstractWeights} = nothing)
+function factory(me::SimpleExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
     return SimpleExpectedReturns(; w = isnothing(w) ? me.w : w)
 end
 

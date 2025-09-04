@@ -1,12 +1,8 @@
 abstract type BaseFiniteAllocationOptimisationEstimator <: BaseOptimisationEstimator end
 abstract type FiniteAllocationOptimisationAlgorithm <: OptimisationAlgorithm end
-function setup_alloc_optim(
-    w::AbstractVector,
-    p::AbstractVector,
-    cash::Real,
-    T::Union{Nothing,<:Real} = nothing,
-    fees::Union{Nothing,<:Fees} = nothing,
-)
+function setup_alloc_optim(w::AbstractVector, p::AbstractVector, cash::Real,
+                           T::Union{Nothing, <:Real} = nothing,
+                           fees::Union{Nothing, <:Fees} = nothing)
     if !isnothing(T) && !isnothing(fees)
         cash -= calc_fees(w, p, fees) * T
     end

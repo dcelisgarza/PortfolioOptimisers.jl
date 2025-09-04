@@ -25,8 +25,7 @@ struct RelativeUlcerIndex{T1} <: HierarchicalRiskMeasure
     settings::T1
 end
 function RelativeUlcerIndex(;
-    settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-)
+                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
     return RelativeUlcerIndex(settings)
 end
 function (::RelativeUlcerIndex)(x::AbstractVector)

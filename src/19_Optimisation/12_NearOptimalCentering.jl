@@ -1,7 +1,8 @@
 abstract type NearOptimalCenteringAlgorithm <: OptimisationAlgorithm end
 struct ConstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
 struct UnconstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
-struct NearOptimalCenteringOptimisation{T1,T2,T3,T4,T5,T6,T7,T8,T9} <: OptimisationResult
+struct NearOptimalCenteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
+       OptimisationResult
     oe::T1
     pa::T2
     w_min_retcode::T3
@@ -19,7 +20,7 @@ function Base.getproperty(r::NearOptimalCenteringOptimisation, sym::Symbol)
         getfield(r, sym)
     end
 end
-struct NearOptimalCentering{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12} <:
+struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
        JuMPOptimisationEstimator
     opt::T1
     r::T2
@@ -34,20 +35,18 @@ struct NearOptimalCentering{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12} <:
     ucs_flag::T11
     alg::T12
 end
-function NearOptimalCentering(;
-    opt::JuMPOptimiser = JuMPOptimiser(),
-    r::Union{<:RiskMeasure,<:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
-    obj::Union{Nothing,<:ObjectiveFunction} = MinimumRisk(),
-    bins::Union{Nothing,<:Real} = nothing,
-    w_min::Union{Nothing,<:AbstractVector{<:Real}} = nothing,
-    w_min_ini::Union{Nothing,<:AbstractVector{<:Real}} = nothing,
-    w_opt::Union{Nothing,<:AbstractVector} = nothing,
-    w_opt_ini::Union{Nothing,<:AbstractVector} = nothing,
-    w_max::Union{Nothing,<:AbstractVector{<:Real}} = nothing,
-    w_max_ini::Union{Nothing,<:AbstractVector{<:Real}} = nothing,
-    ucs_flag::Bool = true,
-    alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
-)
+function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
+                              r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
+                              obj::Union{Nothing, <:ObjectiveFunction} = MinimumRisk(),
+                              bins::Union{Nothing, <:Real} = nothing,
+                              w_min::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                              w_min_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                              w_opt::Union{Nothing, <:AbstractVector} = nothing,
+                              w_opt_ini::Union{Nothing, <:AbstractVector} = nothing,
+                              w_max::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                              w_max_ini::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                              ucs_flag::Bool = true,
+                              alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering())
     if isa(r, AbstractVector)
         @argcheck(!isempty(r))
         @argcheck(!any(x -> isa(x, QuadExpressionRiskMeasures), r))
@@ -75,20 +74,8 @@ function NearOptimalCentering(;
     if isa(bins, Real)
         @argcheck(isfinite(bins) && bins > 0)
     end
-    return NearOptimalCentering(
-        opt,
-        r,
-        obj,
-        bins,
-        w_min,
-        w_min_ini,
-        w_opt,
-        w_opt_ini,
-        w_max,
-        w_max_ini,
-        ucs_flag,
-        alg,
-    )
+    return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
+                                w_max, w_max_ini, ucs_flag, alg)
 end
 function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatrix)
     X = isa(noc.opt.pe, AbstractPriorResult) ? noc.opt.pe.X : X
@@ -100,31 +87,16 @@ function opt_view(noc::NearOptimalCentering, i::AbstractVector, X::AbstractMatri
     w_opt_ini = nothing_scalar_array_view(noc.w_opt_ini, i)
     w_max = nothing_scalar_array_view(noc.w_max, i)
     w_max_ini = nothing_scalar_array_view(noc.w_max_ini, i)
-    return NearOptimalCentering(;
-        alg = noc.alg,
-        ucs_flag = noc.ucs_flag,
-        r = r,
-        obj = noc.obj,
-        opt = opt,
-        bins = noc.bins,
-        w_min = w_min,
-        w_min_ini = w_min_ini,
-        w_opt = w_opt,
-        w_opt_ini = w_opt_ini,
-        w_max = w_max,
-        w_max_ini = w_max_ini,
-    )
+    return NearOptimalCentering(; alg = noc.alg, ucs_flag = noc.ucs_flag, r = r,
+                                obj = noc.obj, opt = opt, bins = noc.bins, w_min = w_min,
+                                w_min_ini = w_min_ini, w_opt = w_opt, w_opt_ini = w_opt_ini,
+                                w_max = w_max, w_max_ini = w_max_ini)
 end
-function near_optimal_centering_risks(
-    ::Any,
-    r::RiskMeasure,
-    pr::AbstractPriorResult,
-    fees::Union{Nothing,<:Fees},
-    slv::Union{<:Solver,<:AbstractVector{<:Solver}},
-    w_min::AbstractVector,
-    w_opt::AbstractVector,
-    w_max::AbstractVector,
-)
+function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
+                                      fees::Union{Nothing, <:Fees},
+                                      slv::Union{<:Solver, <:AbstractVector{<:Solver}},
+                                      w_min::AbstractVector, w_opt::AbstractVector,
+                                      w_max::AbstractVector)
     X = pr.X
     r = factory(r, pr, slv)
     scale = r.settings.scale
@@ -133,16 +105,11 @@ function near_optimal_centering_risks(
     risk_max = expected_risk(r, w_max, X, fees) * scale
     return risk_min, risk_opt, risk_max
 end
-function near_optimal_centering_risks(
-    ::SumScalariser,
-    rs::AbstractVector{<:RiskMeasure},
-    pr::AbstractPriorResult,
-    fees::Union{Nothing,<:Fees},
-    slv::Union{<:Solver,<:AbstractVector{<:Solver}},
-    w_min::AbstractVector,
-    w_opt::AbstractVector,
-    w_max::AbstractVector,
-)
+function near_optimal_centering_risks(::SumScalariser, rs::AbstractVector{<:RiskMeasure},
+                                      pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                                      slv::Union{<:Solver, <:AbstractVector{<:Solver}},
+                                      w_min::AbstractVector, w_opt::AbstractVector,
+                                      w_max::AbstractVector)
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
@@ -158,16 +125,12 @@ function near_optimal_centering_risks(
     end
     return risk_min, risk_opt, risk_max
 end
-function near_optimal_centering_risks(
-    scalarisation::LogSumExpScalariser,
-    rs::AbstractVector{<:RiskMeasure},
-    pr::AbstractPriorResult,
-    fees::Union{Nothing,<:Fees},
-    slv::Union{<:Solver,<:AbstractVector{<:Solver}},
-    w_min::AbstractVector,
-    w_opt::AbstractVector,
-    w_max::AbstractVector,
-)
+function near_optimal_centering_risks(scalarisation::LogSumExpScalariser,
+                                      rs::AbstractVector{<:RiskMeasure},
+                                      pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                                      slv::Union{<:Solver, <:AbstractVector{<:Solver}},
+                                      w_min::AbstractVector, w_opt::AbstractVector,
+                                      w_max::AbstractVector)
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
@@ -189,16 +152,12 @@ function near_optimal_centering_risks(
     risk_max = log(risk_max) * igamma
     return risk_min, risk_opt, risk_max
 end
-function near_optimal_centering_risks(
-    ::MaxScalariser,
-    rs::AbstractVector{<:RiskMeasure},
-    pr::AbstractPriorResult,
-    fees::Union{Nothing,<:Fees},
-    slv::Union{Nothing,<:Solver,<:AbstractVector{<:Solver}},
-    w_min::AbstractVector,
-    w_opt::AbstractVector,
-    w_max::AbstractVector,
-)
+function near_optimal_centering_risks(::MaxScalariser, rs::AbstractVector{<:RiskMeasure},
+                                      pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                                      slv::Union{Nothing, <:Solver,
+                                                 <:AbstractVector{<:Solver}},
+                                      w_min::AbstractVector, w_opt::AbstractVector,
+                                      w_max::AbstractVector)
     X = pr.X
     rs = factory(rs, pr, slv)
     datatype = eltype(X)
@@ -228,7 +187,7 @@ function near_optimal_centering_risks(
     end
     return risk_min, risk_opt, risk_max
 end
-struct NearOptimalSetup{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12}
+struct NearOptimalSetup{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12}
     w_opt::T1
     rk_opt::T2
     rt_opt::T3
@@ -242,11 +201,8 @@ struct NearOptimalSetup{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12}
     w_opt_retcode::T11
     w_max_retcode::T12
 end
-function near_optimal_centering_setup(
-    noc::NearOptimalCentering,
-    rd::ReturnsResult;
-    dims::Int = 1,
-)
+function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult;
+                                      dims::Int = 1)
     w_min = noc.w_min
     w_opt = noc.w_opt
     w_max = noc.w_max
@@ -264,37 +220,28 @@ function near_optimal_centering_setup(
         nb_opt = no_bounds_optimiser(opt, noc.ucs_flag)
     end
     if w_min_flag
-        res_min = optimise!(
-            MeanRisk(; r = nb_r, obj = MinimumRisk(), opt = nb_opt, wi = noc.w_min_ini),
-            rd;
-            save = false,
-        )
+        res_min = optimise!(MeanRisk(; r = nb_r, obj = MinimumRisk(), opt = nb_opt,
+                                     wi = noc.w_min_ini), rd; save = false)
         w_min_retcode = res_min.retcode
         w_min = res_min.w
     end
     if w_opt_flag
-        res_opt = optimise!(
-            MeanRisk(; r = r, obj = noc.obj, opt = opt, wi = noc.w_opt_ini),
-            rd;
-            save = false,
-        )
+        res_opt = optimise!(MeanRisk(; r = r, obj = noc.obj, opt = opt, wi = noc.w_opt_ini),
+                            rd; save = false)
         w_opt_retcode = res_opt.retcode
         w_opt = res_opt.w
     end
     if w_max_flag
-        res_max = optimise!(
-            MeanRisk(; r = nb_r, obj = MaximumReturn(), opt = nb_opt, wi = noc.w_max_ini),
-            rd;
-            save = false,
-        )
+        res_max = optimise!(MeanRisk(; r = nb_r, obj = MaximumReturn(), opt = nb_opt,
+                                     wi = noc.w_max_ini), rd; save = false)
         w_max_retcode = res_max.retcode
         w_max = res_max.w
     end
     pr = opt.pe
     fees = opt.fees
     ret = opt.ret
-    rk_min, rk_opt, rk_max =
-        near_optimal_centering_risks(opt.sce, r, pr, fees, opt.slv, w_min, w_opt, w_max)
+    rk_min, rk_opt, rk_max = near_optimal_centering_risks(opt.sce, r, pr, fees, opt.slv,
+                                                          w_min, w_opt, w_max)
     rt_min = expected_return(ret, w_min, pr, fees)
     rt_opt = expected_return(ret, w_opt, pr, fees)
     rt_max = expected_return(ret, w_max, pr, fees)
@@ -311,27 +258,11 @@ function near_optimal_centering_setup(
     if unconstrained
         r, opt = nb_r, nb_opt
     end
-    return NearOptimalSetup(
-        w_opt,
-        rk_opt,
-        rt_opt,
-        rt_min,
-        rt_max,
-        w_min,
-        w_max,
-        r,
-        opt,
-        w_min_retcode,
-        w_opt_retcode,
-        w_max_retcode,
-    )
+    return NearOptimalSetup(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min, w_max, r, opt,
+                            w_min_retcode, w_opt_retcode, w_max_retcode)
 end
-function set_near_optimal_centering_constraints!(
-    model::JuMP.Model,
-    rk::Real,
-    rt::Real,
-    wb::WeightBounds,
-)
+function set_near_optimal_centering_constraints!(model::JuMP.Model, rk::Real, rt::Real,
+                                                 wb::WeightBounds)
     w = model[:w]
     sc = model[:sc]
     w_ub = wb.ub
@@ -339,43 +270,36 @@ function set_near_optimal_centering_constraints!(
     ret = model[:ret]
     N = length(w)
     @variables(model, begin
-        log_ret
-        log_risk
-        log_w[1:N]
-        log_delta_w[1:N]
-    end)
-    @constraints(
-        model,
-        begin
-            clog_risk, [sc * log_risk, sc, sc * (rk - risk)] in MOI.ExponentialCone()
-            clog_ret, [sc * log_ret, sc, sc * (ret - rt)] in MOI.ExponentialCone()
-            clog_w[i=1:N], [sc * log_w[i], sc, sc * w[i]] in MOI.ExponentialCone()
-            clog_delta_w[i=1:N],
-            [sc * log_delta_w[i], sc, sc * (w_ub[i] - w[i])] in MOI.ExponentialCone()
-        end
-    )
+                   log_ret
+                   log_risk
+                   log_w[1:N]
+                   log_delta_w[1:N]
+               end)
+    @constraints(model,
+                 begin
+                     clog_risk,
+                     [sc * log_risk, sc, sc * (rk - risk)] in MOI.ExponentialCone()
+                     clog_ret, [sc * log_ret, sc, sc * (ret - rt)] in MOI.ExponentialCone()
+                     clog_w[i = 1:N],
+                     [sc * log_w[i], sc, sc * w[i]] in MOI.ExponentialCone()
+                     clog_delta_w[i = 1:N],
+                     [sc * log_delta_w[i], sc, sc * (w_ub[i] - w[i])] in
+                     MOI.ExponentialCone()
+                 end)
     @expression(model, obj_expr, -(log_ret + log_risk + sum(log_w + log_delta_w)))
     return obj_expr
 end
-function set_near_optimal_objective_function!(
-    ::UnconstrainedNearOptimalCentering,
-    model::JuMP.Model,
-    rk::Real,
-    rt::Real,
-    opt::BaseJuMPOptimisationEstimator,
-)
+function set_near_optimal_objective_function!(::UnconstrainedNearOptimalCentering,
+                                              model::JuMP.Model, rk::Real, rt::Real,
+                                              opt::BaseJuMPOptimisationEstimator)
     so = model[:so]
     obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, opt.wb)
     @objective(model, Min, so * obj_expr)
     return nothing
 end
-function set_near_optimal_objective_function!(
-    ::ConstrainedNearOptimalCentering,
-    model::JuMP.Model,
-    rk::Real,
-    rt::Real,
-    opt::BaseJuMPOptimisationEstimator,
-)
+function set_near_optimal_objective_function!(::ConstrainedNearOptimalCentering,
+                                              model::JuMP.Model, rk::Real, rt::Real,
+                                              opt::BaseJuMPOptimisationEstimator)
     so = model[:so]
     obj_expr = set_near_optimal_centering_constraints!(model, rk, rt, opt.wb)
     add_penalty_to_objective!(model, 1, obj_expr)
@@ -406,37 +330,16 @@ function unregister_noc_variables!(model::JuMP.Model)
     unregister(model, :obj_expr)
     return nothing
 end
-function solve_noc!(
-    noc::NearOptimalCentering,
-    model::JuMP.Model,
-    rk_opt::Real,
-    rt_opt::Real,
-    opt::BaseJuMPOptimisationEstimator,
-    args...,
-)
+function solve_noc!(noc::NearOptimalCentering, model::JuMP.Model, rk_opt::Real,
+                    rt_opt::Real, opt::BaseJuMPOptimisationEstimator, args...)
     set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
     return optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
 end
-function solve_noc!(
-    noc::NearOptimalCentering{
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:UnconstrainedNearOptimalCentering,
-    },
-    model::JuMP.Model,
-    rk_opts::AbstractVector{<:Real},
-    rt_opts::AbstractVector{<:Real},
-    opt::BaseJuMPOptimisationEstimator,
-)
+function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:UnconstrainedNearOptimalCentering},
+                    model::JuMP.Model, rk_opts::AbstractVector{<:Real},
+                    rt_opts::AbstractVector{<:Real}, opt::BaseJuMPOptimisationEstimator)
     retcodes = sizehint!(Vector{OptimisationReturnCode}(undef, 0), length(rk_opts))
     sols = sizehint!(Vector{JuMPOptimisationSolution}(undef, 0), length(rk_opts))
     for (rk_opt, rt_opt) in zip(rk_opts, rt_opts)
@@ -451,32 +354,12 @@ end
 function compute_ret_lbs(lbs::Frontier, rt_min::Real, rt_max::Real)
     return range(; start = rt_min, stop = rt_max, length = lbs.N)
 end
-function solve_noc!(
-    noc::NearOptimalCentering{
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:ConstrainedNearOptimalCentering,
-    },
-    model::JuMP.Model,
-    rk_opts::AbstractVector{<:Real},
-    rt_opts::AbstractVector{<:Real},
-    opt::BaseJuMPOptimisationEstimator,
-    rt_min::Real,
-    rt_max::Real,
-    ::Any,
-    ::Any,
-    ::Val{true},
-    ::Val{false},
-)
+function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:ConstrainedNearOptimalCentering},
+                    model::JuMP.Model, rk_opts::AbstractVector{<:Real},
+                    rt_opts::AbstractVector{<:Real}, opt::BaseJuMPOptimisationEstimator,
+                    rt_min::Real, rt_max::Real, ::Any, ::Any, ::Val{true}, ::Val{false})
     lbs = compute_ret_lbs(model[:ret_frontier], rt_min, rt_max)
     sc = model[:sc]
     ret_expr = model[:ret]
@@ -497,83 +380,39 @@ function solve_noc!(
     end
     return retcodes, sols
 end
-function rebuild_risk_frontier(
-    noc::NearOptimalCentering{
-        <:Any,
-        <:AbstractVector,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:ConstrainedNearOptimalCentering,
-    },
-    pr::AbstractPriorResult,
-    fees::Union{Nothing,<:Fees},
-    risk_frontier::AbstractVector,
-    w_min::AbstractVector,
-    w_max::AbstractVector,
-    idx::AbstractVector,
-)
+function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:AbstractVector, <:Any,
+                                                         <:Any, <:Any, <:Any, <:Any, <:Any,
+                                                         <:Any, <:Any, <:Any,
+                                                         <:ConstrainedNearOptimalCentering},
+                               pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                               risk_frontier::AbstractVector, w_min::AbstractVector,
+                               w_max::AbstractVector, idx::AbstractVector)
     risk_frontier = copy(risk_frontier)
     r = factory(view(noc.r, idx), pr, noc.opt.slv)
     for (i, ri) in zip(idx, r)
-        risk_frontier[i] =
-            _rebuild_risk_frontier(pr, fees, ri, risk_frontier, w_min, w_max, i)
+        risk_frontier[i] = _rebuild_risk_frontier(pr, fees, ri, risk_frontier, w_min, w_max,
+                                                  i)
     end
     return risk_frontier
 end
-function rebuild_risk_frontier(
-    noc::NearOptimalCentering{
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:ConstrainedNearOptimalCentering,
-    },
-    pr::AbstractPriorResult,
-    fees::Union{Nothing,<:Fees},
-    risk_frontier::AbstractVector,
-    w_min::AbstractVector,
-    w_max::AbstractVector,
-    args...,
-)
+function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                         <:Any, <:Any, <:Any, <:Any, <:Any,
+                                                         <:Any,
+                                                         <:ConstrainedNearOptimalCentering},
+                               pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                               risk_frontier::AbstractVector, w_min::AbstractVector,
+                               w_max::AbstractVector, args...)
     risk_frontier = copy(risk_frontier)
     r = factory(noc.r, pr, noc.opt.slv)
     return [_rebuild_risk_frontier(pr, fees, r, risk_frontier, w_min, w_max)]
 end
-function compute_risk_ubs(
-    model::JuMP.Model,
-    noc::NearOptimalCentering{
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:ConstrainedNearOptimalCentering,
-    },
-    pr::AbstractPriorResult,
-    fees::Union{Nothing,<:Fees},
-    w_min::AbstractVector,
-    w_max::AbstractVector,
-)
+function compute_risk_ubs(model::JuMP.Model,
+                          noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                    <:Any, <:Any, <:Any, <:Any, <:Any,
+                                                    <:Any,
+                                                    <:ConstrainedNearOptimalCentering},
+                          pr::AbstractPriorResult, fees::Union{Nothing, <:Fees},
+                          w_min::AbstractVector, w_max::AbstractVector)
     risk_frontier = model[:risk_frontier]
     idx = Vector{Int}(undef, 0)
     for (i, rkf) in enumerate(risk_frontier)
@@ -586,40 +425,17 @@ function compute_risk_ubs(
     end
     return rebuild_risk_frontier(noc, pr, fees, risk_frontier, w_min, w_max, idx)
 end
-function solve_noc!(
-    noc::NearOptimalCentering{
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:ConstrainedNearOptimalCentering,
-    },
-    model::JuMP.Model,
-    rk_opts::AbstractVector{<:Real},
-    rt_opts::AbstractVector{<:Real},
-    opt::BaseJuMPOptimisationEstimator,
-    ::Any,
-    ::Any,
-    w_min::AbstractVector,
-    w_max::AbstractVector,
-    ::Val{false},
-    ::Val{true},
-)
+function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:ConstrainedNearOptimalCentering},
+                    model::JuMP.Model, rk_opts::AbstractVector{<:Real},
+                    rt_opts::AbstractVector{<:Real}, opt::BaseJuMPOptimisationEstimator,
+                    ::Any, ::Any, w_min::AbstractVector, w_max::AbstractVector,
+                    ::Val{false}, ::Val{true})
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max)
-    itrs = [
-        (
-            Iterators.repeated(rkf[1], length(rkf[2][2])),
-            Iterators.repeated(rkf[2][1], length(rkf[2][2])),
-            rkf[2][2],
-        ) for rkf in risk_frontier
-    ]
+    itrs = [(Iterators.repeated(rkf[1], length(rkf[2][2])),
+             Iterators.repeated(rkf[2][1], length(rkf[2][2])), rkf[2][2])
+            for rkf in risk_frontier]
     pitrs = Iterators.product.(itrs...)
     retcodes = sizehint!(Vector{OptimisationReturnCode}(undef, 0), length(rk_opts))
     sols = sizehint!(Vector{JuMPOptimisationSolution}(undef, 0), length(rk_opts))
@@ -666,29 +482,14 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
         OptimisationFailure(msg)
     end
 end
-function optimise!(
-    noc::NearOptimalCentering{
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:UnconstrainedNearOptimalCentering,
-    },
-    rd::ReturnsResult = ReturnsResult();
-    dims::Int = 1,
-    str_names::Bool = false,
-    save::Bool = true,
-    kwargs...,
-)
-    (; w_opt, rk_opt, rt_opt, r, opt, w_min_retcode, w_opt_retcode, w_max_retcode) =
-        near_optimal_centering_setup(noc, rd; dims = dims)
+function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                             <:Any, <:Any, <:Any, <:Any, <:Any,
+                                             <:UnconstrainedNearOptimalCentering},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
+    (; w_opt, rk_opt, rt_opt, r, opt, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
+                                                                                                                  rd;
+                                                                                                                  dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
@@ -702,73 +503,36 @@ function optimise!(
     # retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
-    return NearOptimalCenteringOptimisation(
-        typeof(noc),
-        ProcessedJuMPOptimiserAttributes(
-            opt.pe,
-            opt.wb,
-            opt.lt,
-            opt.st,
-            opt.lcs,
-            opt.cent,
-            opt.gcard,
-            opt.sgcard,
-            opt.smtx,
-            opt.sgmtx,
-            opt.slt,
-            opt.sst,
-            opt.sglt,
-            opt.sgst,
-            opt.nplg,
-            opt.cplg,
-            opt.tn,
-            opt.fees,
-            opt.ret,
-        ),
-        w_min_retcode,
-        w_opt_retcode,
-        w_max_retcode,
-        noc_retcode,
-        retcode,
-        sol,
-        ifelse(save, model, nothing),
-    )
+    return NearOptimalCenteringOptimisation(typeof(noc),
+                                            ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
+                                                                             opt.lt, opt.st,
+                                                                             opt.lcs,
+                                                                             opt.cent,
+                                                                             opt.gcard,
+                                                                             opt.sgcard,
+                                                                             opt.smtx,
+                                                                             opt.sgmtx,
+                                                                             opt.slt,
+                                                                             opt.sst,
+                                                                             opt.sglt,
+                                                                             opt.sgst,
+                                                                             opt.nplg,
+                                                                             opt.cplg,
+                                                                             opt.tn,
+                                                                             opt.fees,
+                                                                             opt.ret),
+                                            w_min_retcode, w_opt_retcode, w_max_retcode,
+                                            noc_retcode, retcode, sol,
+                                            ifelse(save, model, nothing))
 end
-function optimise!(
-    noc::NearOptimalCentering{
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:Any,
-        <:ConstrainedNearOptimalCentering,
-    },
-    rd::ReturnsResult = ReturnsResult();
-    dims::Int = 1,
-    str_names::Bool = false,
-    save::Bool = true,
-    kwargs...,
-)
-    (;
-        w_opt,
-        rk_opt,
-        rt_opt,
-        r,
-        opt,
-        rt_min,
-        rt_max,
-        w_min,
-        w_max,
-        w_min_retcode,
-        w_opt_retcode,
-        w_max_retcode,
-    ) = near_optimal_centering_setup(noc, rd; dims = dims)
+function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                             <:Any, <:Any, <:Any, <:Any, <:Any,
+                                             <:ConstrainedNearOptimalCentering},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
+    (; w_opt, rk_opt, rt_opt, r, opt, rt_min, rt_max, w_min, w_max, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
+                                                                                                                                                rd;
+                                                                                                                                                dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
@@ -778,41 +542,13 @@ function optimise!(
     set_linear_weight_constraints!(model, opt.lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, opt.cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, opt.lcm, :lcm_ineq, :lcm_eq)
-    set_mip_constraints!(
-        model,
-        opt.wb,
-        opt.card,
-        opt.gcard,
-        opt.nplg,
-        opt.cplg,
-        opt.lt,
-        opt.st,
-        opt.fees,
-        opt.ss,
-    )
-    set_smip_constraints!(
-        model,
-        opt.wb,
-        opt.scard,
-        opt.sgcard,
-        opt.smtx,
-        opt.sgmtx,
-        opt.slt,
-        opt.sst,
-        opt.sglt,
-        nothing,
-        opt.ss,
-    )
+    set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.nplg, opt.cplg, opt.lt,
+                         opt.st, opt.fees, opt.ss)
+    set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx, opt.sgmtx,
+                          opt.slt, opt.sst, opt.sglt, nothing, opt.ss)
     set_turnover_constraints!(model, opt.tn)
-    set_tracking_error_constraints!(
-        model,
-        opt.pe,
-        opt.te,
-        noc,
-        opt.nplg,
-        opt.cplg,
-        opt.fees,
-    )
+    set_tracking_error_constraints!(model, opt.pe, opt.te, noc, opt.nplg, opt.cplg,
+                                    opt.fees)
     set_number_effective_assets!(model, opt.nea)
     set_l1_regularisation!(model, opt.l1)
     set_l2_regularisation!(model, opt.l2)
@@ -825,54 +561,32 @@ function optimise!(
     add_custom_constraint!(model, opt.ccnt, opt, opt.pe)
     # set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
     # retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
-    noc_retcode, sol = solve_noc!(
-        noc,
-        model,
-        rk_opt,
-        rt_opt,
-        opt,
-        rt_min,
-        rt_max,
-        w_min,
-        w_max,
-        Val(haskey(model, :ret_frontier)),
-        Val(haskey(model, :risk_frontier)),
-    )
+    noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, rt_min, rt_max, w_min,
+                                  w_max, Val(haskey(model, :ret_frontier)),
+                                  Val(haskey(model, :risk_frontier)))
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
-    return NearOptimalCenteringOptimisation(
-        typeof(noc),
-        ProcessedJuMPOptimiserAttributes(
-            opt.pe,
-            opt.wb,
-            opt.lt,
-            opt.st,
-            opt.lcs,
-            opt.cent,
-            opt.gcard,
-            opt.sgcard,
-            opt.smtx,
-            opt.sgmtx,
-            opt.slt,
-            opt.sst,
-            opt.sglt,
-            opt.sgst,
-            opt.nplg,
-            opt.cplg,
-            opt.tn,
-            opt.fees,
-            opt.ret,
-        ),
-        w_min_retcode,
-        w_opt_retcode,
-        w_max_retcode,
-        noc_retcode,
-        retcode,
-        sol,
-        ifelse(save, model, nothing),
-    )
+    return NearOptimalCenteringOptimisation(typeof(noc),
+                                            ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
+                                                                             opt.lt, opt.st,
+                                                                             opt.lcs,
+                                                                             opt.cent,
+                                                                             opt.gcard,
+                                                                             opt.sgcard,
+                                                                             opt.smtx,
+                                                                             opt.sgmtx,
+                                                                             opt.slt,
+                                                                             opt.sst,
+                                                                             opt.sglt,
+                                                                             opt.sgst,
+                                                                             opt.nplg,
+                                                                             opt.cplg,
+                                                                             opt.tn,
+                                                                             opt.fees,
+                                                                             opt.ret),
+                                            w_min_retcode, w_opt_retcode, w_max_retcode,
+                                            noc_retcode, retcode, sol,
+                                            ifelse(save, model, nothing))
 end
 
-export NearOptimalCentering,
-    UnconstrainedNearOptimalCentering,
-    ConstrainedNearOptimalCentering,
-    NearOptimalCenteringOptimisation
+export NearOptimalCentering, UnconstrainedNearOptimalCentering,
+       ConstrainedNearOptimalCentering, NearOptimalCenteringOptimisation

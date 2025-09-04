@@ -42,7 +42,7 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
 
   - [`optimise_JuMP_model!`](@ref)
 """
-struct Solver{T1,T2,T3,T4,T5} <: AbstractEstimator
+struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
     name::T1
     solver::T2
     settings::T3
@@ -86,14 +86,10 @@ Solver
   add_bridges | Bool: true
 ```
 """
-function Solver(;
-    name::Union{Symbol,<:AbstractString} = "",
-    solver::Any = nothing,
-    settings::Union{Nothing,<:AbstractDict,<:Pair,<:AbstractVector{<:Pair}} = nothing,
-    check_sol::NamedTuple = (;),
-    add_bridges::Bool = true,
-)
-    if isa(settings, Union{<:AbstractDict,<:AbstractVector})
+function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
+                settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}} = nothing,
+                check_sol::NamedTuple = (;), add_bridges::Bool = true)
+    if isa(settings, Union{<:AbstractDict, <:AbstractVector})
         @argcheck(!isempty(settings), IsEmptyError(non_empty_msg("`settings`") * "."))
     end
     return Solver(name, solver, settings, check_sol, add_bridges)
@@ -123,7 +119,7 @@ The `JuMPResult` struct records the outcome of a JuMP optimisation, including tr
 
   - [`optimise_JuMP_model!`](@ref)
 """
-struct JuMPResult{T1,T2} <: AbstractJuMPResult
+struct JuMPResult{T1, T2} <: AbstractJuMPResult
     trials::T1
     success::T2
 end
@@ -194,10 +190,8 @@ Iterates over the provided settings and applies each as a solver attribute.
 
   - `nothing`
 """
-function set_solver_attributes(
-    model::JuMP.Model,
-    settings::Union{<:AbstractDict,<:AbstractVector{<:Pair}},
-)
+function set_solver_attributes(model::JuMP.Model,
+                               settings::Union{<:AbstractDict, <:AbstractVector{<:Pair}})
     for (k, v) in settings
         set_attribute(model, k, v)
     end
@@ -245,10 +239,8 @@ Tries each solver in order, applying settings and checking for solution feasibil
   - If a solver fails, records the error and tries the next.
   - Stops at the first successful solution.
 """
-function optimise_JuMP_model!(
-    model::JuMP.Model,
-    slv::Union{<:Solver,<:AbstractVector{<:Solver}},
-)
+function optimise_JuMP_model!(model::JuMP.Model,
+                              slv::Union{<:Solver, <:AbstractVector{<:Solver}})
     trials = Dict()
     success = false
     for solver in slv
@@ -270,8 +262,8 @@ function optimise_JuMP_model!(
             success = true
             break
         catch err
-            trials[solver.name] =
-                Dict(:assert_is_solved_and_feasible => err, :settings => solver.settings)
+            trials[solver.name] = Dict(:assert_is_solved_and_feasible => err,
+                                       :settings => solver.settings)
         end
     end
     return JuMPResult(; trials = trials, success = success)

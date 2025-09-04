@@ -16,17 +16,13 @@ struct EqualRoot <: DBHTRootMethod end
 abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
 struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
 struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
-struct GeneralExponentialSimilarity{T1,T2} <: AbstractSimilarityMatrixAlgorithm
+struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
     coef::T1
     power::T2
 end
 function GeneralExponentialSimilarity(; coef::Real = 1.0, power::Real = 1.0)
-    @argcheck(
-        coef >= zero(coef) && power >= zero(power),
-        AssertionError(
-            "The following conditions must hold:\n`coef` must be non-negative: coef => $coef\n`power` must be non-negative: power => $power",
-        )
-    )
+    @argcheck(coef >= zero(coef) && power >= zero(power),
+              AssertionError("The following conditions must hold:\n`coef` must be non-negative: coef => $coef\n`power` must be non-negative: power => $power"))
     return GeneralExponentialSimilarity(coef, power)
 end
 function dbht_similarity(::MaximumDistanceSimilarity; D::AbstractMatrix, kwargs...)
@@ -40,14 +36,12 @@ function dbht_similarity(se::GeneralExponentialSimilarity; D::AbstractMatrix, kw
     coef = se.coef
     return exp.(-coef * D .^ power)
 end
-struct DBHT{T1,T2} <: AbstractClusteringAlgorithm
+struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
     sim::T1
     root::T2
 end
-function DBHT(;
-    sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-    root::DBHTRootMethod = UniqueRoot(),
-)
+function DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+              root::DBHTRootMethod = UniqueRoot())
     return DBHT(sim, root)
 end
 
@@ -73,12 +67,8 @@ Constructs a Triangulated Maximally Filtered Graph (TMFG) starting from a tetrah
 """
 function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
     N = size(W, 1)
-    @argcheck(
-        N >= 9 && all(x -> x >= zero(x), W),
-        AssertionError(
-            "The following conditions must hold:\nN >= 9 => N = $N\nAll entries in `W` must be non-negative",
-        )
-    )
+    @argcheck(N >= 9 && all(x -> x >= zero(x), W),
+              AssertionError("The following conditions must hold:\nN >= 9 => N = $N\nAll entries in `W` must be non-negative"))
     A = spzeros(N, N)  # Initialize adjacency matrix
     in_v = zeros(Int, N)    # Initialize list of inserted vertices
     tri = zeros(Int, 2 * N - 4, 3)  # Initialize list of triangles
@@ -111,7 +101,7 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
     gain[ou_v, 4] .= sum(W[ou_v, tri[4, :]]; dims = 2)
 
     kk = 4  # Number of triangles
-    for k = 5:N
+    for k in 5:N
         # Find best vertex to add in a triangle
         if length(ou_v) == 1  # Special case for the last vertex
             ve = ou_v[1]
@@ -134,18 +124,18 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
         A[ve, tri[agm, :]] .= 1
 
         # Update 3-clique list
-        clique3[k-4, :] .= tri[agm, :]
+        clique3[k - 4, :] .= tri[agm, :]
 
         # Update triangle list replacing 1 and adding 2 triangles
-        tri[kk+1, :] .= vcat(tri[agm, [1, 3]], ve) # add
-        tri[kk+2, :] .= vcat(tri[agm, [2, 3]], ve) # add
+        tri[kk + 1, :] .= vcat(tri[agm, [1, 3]], ve) # add
+        tri[kk + 2, :] .= vcat(tri[agm, [2, 3]], ve) # add
         tri[agm, :] .= vcat(tri[agm, [1, 2]], ve)     # replace
 
         # # Update gain table
         gain[ve, :] .= 0
         gain[ou_v, agm] .= sum(W[ou_v, tri[agm, :]]; dims = 2)
-        gain[ou_v, kk+1] .= sum(W[ou_v, tri[kk+1, :]]; dims = 2)
-        gain[ou_v, kk+2] .= sum(W[ou_v, tri[kk+2, :]]; dims = 2)
+        gain[ou_v, kk + 1] .= sum(W[ou_v, tri[kk + 1, :]]; dims = 2)
+        gain[ou_v, kk + 2] .= sum(W[ou_v, tri[kk + 2, :]]; dims = 2)
 
         # # Update number of triangles
         kk += 2
@@ -165,7 +155,7 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
         ss = zeros(Int, M)
         for i in axes(cliques, 1)
             ss .= 0
-            for j = 1:3
+            for j in 1:3
                 ss .+= vec(sum(cliques .== cliques[i, j]; dims = 2))
             end
             cliqueTree[i, ss .== 2] .= 1
@@ -226,10 +216,8 @@ function distance_wei(L::AbstractMatrix{<:Real})
             dropzeros!(L1)
             for v in V
                 T = findnz(L1[v, :])[1] # neighbours of shortest nodes
-                d, wi = findmin(
-                    vcat(vcat(transpose(D[u, T]), transpose(D[u, v] .+ L1[v, T])));
-                    dims = 1,
-                )
+                d, wi = findmin(vcat(vcat(transpose(D[u, T]),
+                                          transpose(D[u, v] .+ L1[v, T]))); dims = 1)
                 wi = vec(getindex.(wi, 2))
                 D[u, T] .= vec(d)   # Smallest of old/new path lengths
                 ind = T[wi .== 3]   # Indices of lengthened paths
@@ -404,8 +392,9 @@ function FindDisjoint(Adj::AbstractMatrix{<:Real}, Cliq::AbstractVector{<:Real})
     Temp = copy(Adj)
     T = zeros(Int, N)
     IndxTotal = 1:N
-    IndxNot =
-        findall(IndxTotal .!= Cliq[1] .&& IndxTotal .!= Cliq[2] .&& IndxTotal .!= Cliq[3])
+    IndxNot = findall(IndxTotal .!= Cliq[1] .&&
+                      IndxTotal .!= Cliq[2] .&&
+                      IndxTotal .!= Cliq[3])
     Temp[Cliq, :] .= 0
     Temp[:, Cliq] .= 0
     dropzeros!(Temp)
@@ -473,22 +462,16 @@ Find adjacent clique to the root candidates.
 
   - `Adj`: `Nc×Nc` adjacency matrix of the cliques with the root cliques.
 """
-function AdjCliq(
-    A::AbstractMatrix{<:Real},
-    CliqList::AbstractMatrix{<:Real},
-    CliqRoot::AbstractVector{<:Real},
-)
+function AdjCliq(A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real},
+                 CliqRoot::AbstractVector{<:Real})
     Nc = size(CliqList, 1)
     N = size(A, 1)
     Adj = spzeros(Nc, Nc)
     Indicator = zeros(Int, N)
     for n in eachindex(CliqRoot)
         Indicator[CliqList[CliqRoot[n], :]] .= 1
-        Indi = hcat(
-            Indicator[CliqList[CliqRoot, 1]],
-            Indicator[CliqList[CliqRoot, 2]],
-            Indicator[CliqList[CliqRoot, 3]],
-        )
+        Indi = hcat(Indicator[CliqList[CliqRoot, 1]], Indicator[CliqList[CliqRoot, 2]],
+                    Indicator[CliqList[CliqRoot, 3]])
 
         adjacent = CliqRoot[vec(sum(Indi; dims = 2)) .== 2]
         Adj[adjacent, n] .= 1
@@ -625,10 +608,8 @@ Looks for 3-cliques of a Maximal Planar Graph (MPG), then construct a hierarchy 
   - `CliqList`: `Nc×3` matrix. Each row vector lists the three vertices consisting of a 3-clique in the MPG.
   - `Sb`: `Nc×1` vector. `Sb[n] = 1` indicates 3-clique `n` is separating.
 """
-function CliqHierarchyTree2s(
-    Apm::AbstractMatrix{<:Real},
-    root::DBHTRootMethod = UniqueRoot(),
-)
+function CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real},
+                             root::DBHTRootMethod = UniqueRoot())
     N = size(Apm, 1)
     A = Apm .!= 0
     K3, E, clique = clique3(A)
@@ -690,13 +671,9 @@ Computes the directions on each separating 3-clique of a Maximal Planar Graph (M
 
   - `Hc`: `Nb×Nb` unweighted directed adjacency matrix of the DBHT. `Hc[i, j]=1` indicates a directed edge from bubble `i` to bubble `j`.
 """
-function DirectHb(
-    Rpm::AbstractMatrix{<:Real},
-    Hb::AbstractMatrix{<:Real},
-    Mb::AbstractMatrix{<:Real},
-    Mv::AbstractMatrix{<:Real},
-    CliqList::AbstractMatrix{<:Real},
-)
+function DirectHb(Rpm::AbstractMatrix{<:Real}, Hb::AbstractMatrix{<:Real},
+                  Mb::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
+                  CliqList::AbstractMatrix{<:Real})
     Hb = Hb .!= 0
     r, c, _ = findnz(sparse(UpperTriangular(Hb) .!= 0))
     CliqEdge = Matrix{Int}(undef, 0, 3)
@@ -738,7 +715,7 @@ function DirectHb(
     end
 
     Sep = vec(Int.(sum(Hc; dims = 2) .== 0))
-    Sep[vec(sum(Hc; dims = 1) .== 0).&&kb .> 1] .= 2
+    Sep[vec(sum(Hc; dims = 1) .== 0) .&& kb .> 1] .= 2
 
     return Hc, Sep
 end
@@ -766,14 +743,9 @@ Obtains non-discrete and discrete clusterings from the bubble topology of the Pl
   - `Adjv`: `N×Nk` cluster membership matrix for vertices for non-discrete clustering via the bubble topology. `Adjv[n, k] = 1` indicates cluster membership of vertex `n` to the `k`'th non-discrete cluster.
   - `Tc`: `N×1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`'th discrete cluster.
 """
-function BubbleCluster8s(
-    Rpm::AbstractMatrix{<:Real},
-    Dpm::AbstractMatrix{<:Real},
-    Hb::AbstractMatrix{<:Real},
-    Mb::AbstractMatrix{<:Real},
-    Mv::AbstractMatrix{<:Real},
-    CliqList::AbstractMatrix{<:Real},
-)
+function BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real},
+                         Hb::AbstractMatrix{<:Real}, Mb::AbstractMatrix{<:Real},
+                         Mv::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real})
     Hc, Sep = DirectHb(Rpm, Hb, Mb, Mv, CliqList)   # Assign directions on the bubble tree
 
     N = size(Rpm, 1)    # Number of vertices in the PMFG
@@ -844,11 +816,8 @@ Assigns each vertex in the to a specific bubble.
 
   - `Mvv`: Matrix of the vertices belonging to the bubble.
 """
-function BubbleMember(
-    Rpm::AbstractMatrix{<:Real},
-    Mv::AbstractMatrix{<:Real},
-    Mc::AbstractMatrix{<:Real},
-)
+function BubbleMember(Rpm::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
+                      Mc::AbstractMatrix{<:Real})
     Mvv = zeros(Int, size(Mv, 1), size(Mv, 2))
 
     vu = findall(vec(sum(Mc; dims = 2) .> 1))
@@ -887,12 +856,9 @@ Construct the linkage matrix by continuially adding rows to the matrix.
 
   - `Z`: Linkage matrix at iteration `i + 1` in the same format as the output from Matlab.
 """
-function DendroConstruct(
-    Zi::AbstractMatrix{<:Real},
-    LabelVec1::AbstractVector{<:Real},
-    LabelVec2::AbstractVector{<:Real},
-    LinkageDist::Union{<:Real,<:AbstractVector{<:Real}},
-)
+function DendroConstruct(Zi::AbstractMatrix{<:Real}, LabelVec1::AbstractVector{<:Real},
+                         LabelVec2::AbstractVector{<:Real},
+                         LinkageDist::Union{<:Real, <:AbstractVector{<:Real}})
     indx = LabelVec1 .!= LabelVec2
     Z = vcat(Zi, hcat(transpose(sort!(unique(LabelVec1[indx]))), LinkageDist))
     return Z
@@ -918,9 +884,9 @@ Looks for the pair of clusters with the best linkage.
 function LinkageFunction(d::AbstractMatrix{<:Real}, labelvec::AbstractVector{<:Real})
     lvec = sort!(unique(labelvec))
     Links = Matrix{Int}(undef, 0, 3)
-    for r = 1:(length(lvec)-1)
+    for r in 1:(length(lvec) - 1)
         vecr = labelvec .== lvec[r]
-        for c = (r+1):length(lvec)
+        for c in (r + 1):length(lvec)
             vecc = labelvec .== lvec[c]
             x1 = vecr .|| vecc
             dd = d[x1, x1]
@@ -964,20 +930,15 @@ Computes iterates over the vertices to construct the linkage matrix iteration by
   - `nc`: updated inverse of the linkage distance.
   - `LabelVec1`: updated `LabelVec1` for the next iteration.
 """
-function build_link_and_dendro(
-    rg::AbstractRange,
-    dpm::AbstractMatrix{<:Real},
-    LabelVec::AbstractVector{<:Real},
-    LabelVec1::AbstractVector{<:Real},
-    LabelVec2::AbstractVector{<:Real},
-    V::AbstractVector{<:Real},
-    nc::Real,
-    Z::AbstractMatrix{<:Real},
-)
+function build_link_and_dendro(rg::AbstractRange, dpm::AbstractMatrix{<:Real},
+                               LabelVec::AbstractVector{<:Real},
+                               LabelVec1::AbstractVector{<:Real},
+                               LabelVec2::AbstractVector{<:Real}, V::AbstractVector{<:Real},
+                               nc::Real, Z::AbstractMatrix{<:Real})
     for _ in rg
         PairLink, dvu = LinkageFunction(dpm, LabelVec)  # Look for the pair of clusters which produces the best linkage
-        LabelVec[LabelVec .== PairLink[1].||LabelVec .== PairLink[2]] .=
-            maximum(LabelVec1) + 1  # Merge the cluster pair by updating the label vector with a same label.
+        LabelVec[LabelVec .== PairLink[1] .|| LabelVec .== PairLink[2]] .= maximum(LabelVec1) +
+                                                                           1  # Merge the cluster pair by updating the label vector with a same label.
         LabelVec2[V] = LabelVec
         Z = DendroConstruct(Z, LabelVec1, LabelVec2, 1 / nc)
         nc -= 1
@@ -1005,12 +966,8 @@ Constructs the intra- and inter-cluster hierarchy by utilizing Bubble Hierarchy 
 
   - `Z`: `(N-1)×3` linkage matrix in the same format as the output from Matlab.
 """
-function HierarchyConstruct4s(
-    Rpm::AbstractMatrix{<:Real},
-    Dpm::AbstractMatrix{<:Real},
-    Tc::AbstractVector{<:Real},
-    Mv::AbstractMatrix{<:Real},
-)
+function HierarchyConstruct4s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real},
+                              Tc::AbstractVector{<:Real}, Mv::AbstractMatrix{<:Real})
     N = size(Dpm, 1)
     kvec = sort!(unique(Tc))
     LabelVec1 = collect(1:N)
@@ -1031,16 +988,8 @@ function HierarchyConstruct4s(
                 dpm = Dpm[V, V] # Retrieve the distance matrix for the vertices in V
                 LabelVec = LabelVec1[V] # Initiate the label vector which labels for the clusters
                 LabelVec2 = copy(LabelVec1)
-                Z, nc, LabelVec1 = build_link_and_dendro(
-                    1:(length(V)-1),
-                    dpm,
-                    LabelVec,
-                    LabelVec1,
-                    LabelVec2,
-                    V,
-                    nc,
-                    Z,
-                )
+                Z, nc, LabelVec1 = build_link_and_dendro(1:(length(V) - 1), dpm, LabelVec,
+                                                         LabelVec1, LabelVec2, V, nc, Z)
             end
         end
 
@@ -1050,28 +999,20 @@ function HierarchyConstruct4s(
         # Perform linkage merging between the bubbles
         LabelVec = LabelVec1[V] # Initiate the label vector which labels for the clusters.
         LabelVec2 = copy(LabelVec1)
-        Z, nc, LabelVec1 = build_link_and_dendro(
-            1:(length(Bub)-1),
-            dpm,
-            LabelVec,
-            LabelVec1,
-            LabelVec2,
-            V,
-            nc,
-            Z,
-        )
+        Z, nc, LabelVec1 = build_link_and_dendro(1:(length(Bub) - 1), dpm, LabelVec,
+                                                 LabelVec1, LabelVec2, V, nc, Z)
     end
 
     # Inter-cluster hierarchy construction
     LabelVec2 = copy(LabelVec1)
     dcl = ones(Int, length(LabelVec1))
-    for _ = 1:(length(kvec)-1)
+    for _ in 1:(length(kvec) - 1)
         PairLink, dvu = LinkageFunction(Dpm, LabelVec1)
-        LabelVec2[LabelVec1 .== PairLink[1].||LabelVec1 .== PairLink[2]] .=
-            maximum(LabelVec1) + 1
-        dvu =
-            unique(dcl[LabelVec1 .== PairLink[1]]) + unique(dcl[LabelVec1 .== PairLink[2]])
-        dcl[LabelVec1 .== PairLink[1].||LabelVec1 .== PairLink[2]] .= dvu
+        LabelVec2[LabelVec1 .== PairLink[1] .|| LabelVec1 .== PairLink[2]] .= maximum(LabelVec1) +
+                                                                              1
+        dvu = unique(dcl[LabelVec1 .== PairLink[1]]) +
+              unique(dcl[LabelVec1 .== PairLink[2]])
+        dcl[LabelVec1 .== PairLink[1] .|| LabelVec1 .== PairLink[2]] .= dvu
         Z = DendroConstruct(Z, LabelVec1, LabelVec2, dvu)
         LabelVec1 = copy(LabelVec2)
     end
@@ -1168,18 +1109,10 @@ Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering a
   - `Z`: `(N-1)×3` linkage matrix in the same format as the output from Matlab.
   - `Z_hclust`: Z matrix in [Clustering.Hclust](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format.
 """
-function DBHTs(
-    D::AbstractMatrix{<:Real},
-    S::AbstractMatrix{<:Real};
-    branchorder::Symbol = :optimal,
-    root::DBHTRootMethod = UniqueRoot(),
-)
-    @argcheck(
-        !isempty(S) && !isempty(D) && size(S) == size(D),
-        DimensionMismatch(
-            "The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))",
-        )
-    )
+function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
+               branchorder::Symbol = :optimal, root::DBHTRootMethod = UniqueRoot())
+    @argcheck(!isempty(S) && !isempty(D) && size(S) == size(D),
+              DimensionMismatch("The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))"))
     Rpm = PMFG_T2s(S)[1]
     Apm = copy(Rpm)
     Apm[Apm .!= 0] .= D[Apm .!= 0]
@@ -1274,33 +1207,21 @@ function J_LoGo(sigma, separators, cliques)
     jlogo!(jlogo, sigma, separators, -1)
     return jlogo
 end
-struct DBHTClustering{T1,T2,T3,T4} <: AbstractClusteringResult
+struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     clustering::T1
     S::T2
     D::T3
     k::T4
 end
-function DBHTClustering(;
-    clustering::Clustering.Hclust,
-    S::AbstractMatrix,
-    D::AbstractMatrix,
-    k::Integer,
-)
-    @argcheck(
-        !isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
-        AssertionError(
-            "The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))\nk >= 1 => k = $k",
-        )
-    )
+function DBHTClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
+                        D::AbstractMatrix, k::Integer)
+    @argcheck(!isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
+              AssertionError("The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))\nk >= 1 => k = $k"))
     return DBHTClustering(clustering, S, D, k)
 end
-function clusterise(
-    cle::ClusteringEstimator{<:Any,<:Any,<:DBHT,<:Any},
-    X::AbstractMatrix{<:Real};
-    branchorder::Symbol = :optimal,
-    dims::Int = 1,
-    kwargs...,
-)
+function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
+                    X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
+                    dims::Int = 1, kwargs...)
     # S = cor(cle.ce, X; dims = dims, kwargs...)
     # D = distance(cle.de, S, X; dims = dims, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
@@ -1313,45 +1234,30 @@ function logo!(::Nothing, args...; kwargs...)
     return nothing
 end
 abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
-struct LoGo{T1,T2} <: InverseMatrixSparsificationAlgorithm
+struct LoGo{T1, T2} <: InverseMatrixSparsificationAlgorithm
     dist::T1
     sim::T2
 end
-function LoGo(;
-    dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-    sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-)
+function LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+              sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
     return LoGo(dist, sim)
 end
-function LoGo_dist_assert(
-    ::Union{
-        Distance{<:VariationInfoDistance},
-        GeneralDistance{<:VariationInfoDistance,<:Any},
-        DistanceDistance{<:VariationInfoDistance,<:Any,<:Any,<:Any},
-        GeneralDistanceDistance{<:VariationInfoDistance,<:Any,<:Any,<:Any,<:Any},
-    },
-    sigma::AbstractMatrix,
-    X::AbstractMatrix,
-)
-    @argcheck(
-        size(sigma, 1) == size(X, 2),
-        DimensionMismatch(
-            "Number of columns of `sigma` must be equal to the number of rows of `X`:\nsize(sigma, 1) == size(X, 2) => $(size(sigma,1)) != $(size(X,2))",
-        )
-    )
+function LoGo_dist_assert(::Union{Distance{<:VariationInfoDistance},
+                                  GeneralDistance{<:VariationInfoDistance, <:Any},
+                                  DistanceDistance{<:VariationInfoDistance, <:Any, <:Any,
+                                                   <:Any},
+                                  GeneralDistanceDistance{<:VariationInfoDistance, <:Any,
+                                                          <:Any, <:Any, <:Any}},
+                          sigma::AbstractMatrix, X::AbstractMatrix)
+    @argcheck(size(sigma, 1) == size(X, 2),
+              DimensionMismatch("Number of columns of `sigma` must be equal to the number of rows of `X`:\nsize(sigma, 1) == size(X, 2) => $(size(sigma,1)) != $(size(X,2))"))
     return nothing
 end
 function LoGo_dist_assert(args...)
     return nothing
 end
-function logo!(
-    je::LoGo,
-    pdm::Union{Nothing,<:Posdef},
-    sigma::AbstractMatrix,
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix,
+               X::AbstractMatrix; dims::Int = 1, kwargs...)
     assert_matrix_issquare(sigma)
     LoGo_dist_assert(je.dist, sigma, X)
     s = diag(sigma)
@@ -1369,21 +1275,11 @@ function logo!(
     posdef!(pdm, sigma)
     return nothing
 end
-function matrix_processing_algorithm!(
-    je::LoGo,
-    pdm::Union{Nothing,<:Posdef},
-    sigma::AbstractMatrix,
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef},
+                                      sigma::AbstractMatrix, X::AbstractMatrix;
+                                      dims::Int = 1, kwargs...)
     return logo!(je, pdm, sigma, X; dims = dims, kwargs...)
 end
 
-export ExponentialSimilarity,
-    GeneralExponentialSimilarity,
-    MaximumDistanceSimilarity,
-    UniqueRoot,
-    EqualRoot,
-    DBHT,
-    LoGo
+export ExponentialSimilarity, GeneralExponentialSimilarity, MaximumDistanceSimilarity,
+       UniqueRoot, EqualRoot, DBHT, LoGo

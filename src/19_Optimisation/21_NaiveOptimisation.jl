@@ -5,7 +5,7 @@ end
 function assert_external_optimiser(::NaiveOptimisationEstimator)
     return nothing
 end
-struct NaiveOptimisation{T1,T2,T3,T4} <: OptimisationResult
+struct NaiveOptimisation{T1, T2, T3, T4} <: OptimisationResult
     oe::T1
     pr::T2
     w::T3
@@ -15,8 +15,7 @@ struct InverseVolatility{T1} <: NaiveOptimisationEstimator
     pe::T1
 end
 function InverseVolatility(;
-    pe::Union{<:AbstractPriorEstimator,<:AbstractPriorResult} = EmpiricalPrior(),
-)
+                           pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior())
     return InverseVolatility(pe)
 end
 function opt_view(opt::InverseVolatility, i::AbstractVector, args...)
@@ -29,12 +28,8 @@ function assert_external_optimiser(opt::InverseVolatility)
     assert_internal_optimiser(opt)
     return nothing
 end
-function optimise!(
-    iv::InverseVolatility,
-    rd::ReturnsResult = ReturnsResult();
-    dims::Int = 1,
-    kwargs...,
-)
+function optimise!(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
+                   dims::Int = 1, kwargs...)
     pr = prior(iv.pe, rd; dims = dims)
     w = inv.(sqrt.(diag(pr.sigma)))
     return NaiveOptimisation(typeof(iv), pr, w / sum(w), OptimisationSuccess(nothing))
@@ -45,17 +40,14 @@ function optimise!(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     @argcheck(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
     N = size(rd.X, dims)
-    return NaiveOptimisation(
-        typeof(ew),
-        nothing,
-        range(; start = inv(N), stop = inv(N), length = N),
-        OptimisationSuccess(nothing),
-    )
+    return NaiveOptimisation(typeof(ew), nothing,
+                             range(; start = inv(N), stop = inv(N), length = N),
+                             OptimisationSuccess(nothing))
 end
 struct RandomWeights{T1} <: NaiveOptimisationEstimator
     rng::T1
 end
-function RandomWeights(; rng::Union{Nothing,<:AbstractRNG} = nothing)
+function RandomWeights(; rng::Union{Nothing, <:AbstractRNG} = nothing)
     return RandomWeights(rng)
 end
 function optimise!(rw::RandomWeights, rd::ReturnsResult; dims::Int = 1, kwargs...)

@@ -1,4 +1,5 @@
-struct SchurHierarchicalRiskParityOptimisation{T1,T2,T3,T4,T5,T6,T7} <: OptimisationResult
+struct SchurHierarchicalRiskParityOptimisation{T1, T2, T3, T4, T5, T6, T7} <:
+       OptimisationResult
     oe::T1
     pr::T2
     wb::T3
@@ -9,18 +10,14 @@ struct SchurHierarchicalRiskParityOptimisation{T1,T2,T3,T4,T5,T6,T7} <: Optimisa
 end
 abstract type SchurAlgorithm <: AbstractAlgorithm end
 struct NonMonotonicSchur <: SchurAlgorithm end
-struct MonotonicSchur{T1,T2,T3,T4} <: SchurAlgorithm
+struct MonotonicSchur{T1, T2, T3, T4} <: SchurAlgorithm
     N::T1
     tol::T2
     iter::T3
     strict::T4
 end
-function MonotonicSchur(;
-    N::Integer = 10,
-    tol::Real = 1e-4,
-    iter::Union{Nothing,Integer} = nothing,
-    strict::Bool = false,
-)
+function MonotonicSchur(; N::Integer = 10, tol::Real = 1e-4,
+                        iter::Union{Nothing, Integer} = nothing, strict::Bool = false)
     @argcheck(N > 0)
     @argcheck(tol > 0)
     if !isnothing(iter)
@@ -28,41 +25,31 @@ function MonotonicSchur(;
     end
     return MonotonicSchur(N, tol, iter, strict)
 end
-struct SchurParams{T1,T2,T3,T4,T5} <: AbstractAlgorithm
+struct SchurParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     r::T1
     gamma::T2
     pdm::T3
     alg::T4
     flag::T5
 end
-function SchurParams(;
-    r::Union{<:StandardDeviation,<:Variance} = Variance(),
-    gamma::Real = 0.5,
-    pdm::Union{Nothing,<:Posdef} = Posdef(),
-    alg::SchurAlgorithm = MonotonicSchur(),
-    flag::Bool = true,
-)
+function SchurParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
+                     gamma::Real = 0.5, pdm::Union{Nothing, <:Posdef} = Posdef(),
+                     alg::SchurAlgorithm = MonotonicSchur(), flag::Bool = true)
     @argcheck(one(gamma) >= gamma >= zero(gamma))
     return SchurParams(r, gamma, pdm, alg, flag)
 end
 function schur_params_view(sp::SchurParams, i::AbstractVector, X::AbstractMatrix)
     r = risk_measure_view(sp.r, i, X)
-    return SchurParams(;
-        r = r,
-        gamma = sp.gamma,
-        pdm = sp.pdm,
-        alg = sp.alg,
-        flag = sp.flag,
-    )
+    return SchurParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
+                       flag = sp.flag)
 end
-struct SchurHierarchicalRiskParity{T1,T2} <: ClusteringOptimisationEstimator
+struct SchurHierarchicalRiskParity{T1, T2} <: ClusteringOptimisationEstimator
     opt::T1
     params::T2
 end
-function SchurHierarchicalRiskParity(;
-    opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-    params::Union{<:SchurParams,<:AbstractVector{<:SchurParams}} = SchurParams(),
-)
+function SchurHierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+                                     params::Union{<:SchurParams,
+                                                   <:AbstractVector{<:SchurParams}} = SchurParams())
     if isa(params, AbstractVector)
         @argcheck(!isempty(params))
     end
@@ -85,19 +72,15 @@ function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     m = zeros(n1, n2)
     e = vcat(ones(1, n2) / n2, I(n2))
     m .+= e
-    for i = 1:(n1-1)
+    for i in 1:(n1 - 1)
         e[i, :] .= view(e, i + 1, :)
-        e[i+1, :] .= view(e, i, :)
+        e[i + 1, :] .= view(e, i, :)
         m .+= e
     end
     return m / n1
 end
-function schur_augmentation(
-    A::AbstractMatrix,
-    B::AbstractMatrix,
-    C::AbstractMatrix,
-    gamma::Real,
-)
+function schur_augmentation(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix,
+                            gamma::Real)
     Na = size(A, 1)
     Nd = size(C, 1)
     if iszero(gamma) || isone(Na) || isone(Nd)
@@ -122,13 +105,9 @@ function naive_portfolio_risk(::StandardDeviation, sigma::AbstractMatrix)
     w ./= sum(w)
     return sqrt(dot(w, sigma, w))
 end
-function schur_weights(
-    pr::AbstractPriorResult,
-    items::AbstractVector,
-    wb::WeightBounds,
-    params::SchurParams{<:Any,<:Any,<:Any,<:NonMonotonicSchur,<:Any},
-    gamma::Union{Nothing,<:Real} = nothing,
-)
+function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::WeightBounds,
+                       params::SchurParams{<:Any, <:Any, <:Any, <:NonMonotonicSchur, <:Any},
+                       gamma::Union{Nothing, <:Real} = nothing)
     r = factory(params.r, pr)
     sigma = ismutable(r.sigma) ? copy(r.sigma) : Matrix(r.sigma)
     gamma = isnothing(gamma) ? params.gamma : gamma
@@ -136,14 +115,12 @@ function schur_weights(
     pdm = params.pdm
     flag = params.flag
     @inbounds while length(items) > 0
-        items = [
-            i[j:k] for i in items for
-            (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i))) if
-            length(i) > 1
-        ]
-        for i = 1:2:length(items)
+        items = [i[j:k] for i in items
+                 for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
+                 if length(i) > 1]
+        for i in 1:2:length(items)
             lc = items[i]
-            rc = items[i+1]
+            rc = items[i + 1]
             A = view(sigma, lc, lc)
             C = view(sigma, rc, rc)
             if length(lc) <= 1
@@ -161,11 +138,7 @@ function schur_weights(
                     posdef!(pdm, A_aug)
                     posdef!(pdm, C_aug)
                 catch e
-                    throw(
-                        ArgumentError(
-                            "Augmented matrix could not be made positive definite. Use `MonotonicSchur()` or reduce gamma: $gamma.",
-                        ),
-                    )
+                    throw(ArgumentError("Augmented matrix could not be made positive definite. Use `MonotonicSchur()` or reduce gamma: $gamma."))
                 end
             else
                 if !isposdef(A_aug) || !isposdef(C_aug)
@@ -184,20 +157,14 @@ function schur_weights(
     end
     return w, gamma
 end
-function schur_binary_search(
-    objective::Function,
-    lgamma::Real,
-    hgamma::Real,
-    lrisk::Real,
-    tol::Real = 1e-4,
-    iter::Union{Nothing,<:Integer} = nothing,
-    strict::Bool = false,
-)
+function schur_binary_search(objective::Function, lgamma::Real, hgamma::Real, lrisk::Real,
+                             tol::Real = 1e-4, iter::Union{Nothing, <:Integer} = nothing,
+                             strict::Bool = false)
     w = nothing
     if isnothing(iter)
         iter = ceil(Int, log2((hgamma - lgamma) / tol) * 4 + 10)
     end
-    for _ = 1:iter
+    for _ in 1:iter
         mgamma = (lgamma + hgamma) * 0.5
         w, risk, hrisk = objective(mgamma)..., objective(mgamma - tol)[2]
         if risk <= lrisk && risk <= hrisk
@@ -221,31 +188,17 @@ function schur_binary_search(
         return w, lgamma
     end
 end
-function schur_weights(
-    pr::AbstractPriorResult,
-    items::AbstractVector,
-    wb::WeightBounds,
-    params::SchurParams{<:Any,<:Any,<:Any,<:MonotonicSchur,<:Any},
-)
+function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::WeightBounds,
+                       params::SchurParams{<:Any, <:Any, <:Any, <:MonotonicSchur, <:Any})
     max_gamma = params.gamma
     r = factory(params.r, pr)
     if iszero(max_gamma)
-        nm_params = SchurParams(;
-            r = r,
-            gamma = max_gamma,
-            pdm = params.pdm,
-            alg = NonMonotonicSchur(),
-            flag = params.flag,
-        )
+        nm_params = SchurParams(; r = r, gamma = max_gamma, pdm = params.pdm,
+                                alg = NonMonotonicSchur(), flag = params.flag)
         return schur_weights(pr, items, wb, nm_params)
     end
-    nm_params = SchurParams(;
-        r = r,
-        gamma = max_gamma,
-        pdm = params.pdm,
-        alg = NonMonotonicSchur(),
-        flag = false,
-    )
+    nm_params = SchurParams(; r = r, gamma = max_gamma, pdm = params.pdm,
+                            alg = NonMonotonicSchur(), flag = false)
     function objective(x::Real)
         w = schur_weights(pr, items, wb, nm_params, x)[1]
         risk = isnothing(w) ? typemax(eltype(pr.X)) : dot(w, r.sigma, w)
@@ -256,21 +209,14 @@ function schur_weights(
     w, risk = objective(gammas[1])
     risks[1] = risk
     # First binary search, finds the point at which the risk starts to increase with gamma, if it exists.
-    for i = 2:length(gammas)
+    for i in 2:length(gammas)
         w, risk = objective(gammas[i])
         risks[i] = risk
-        if risk >= risks[i-1]
+        if risk >= risks[i - 1]
             # Turning point is strictly between [gammas[i-2], gammas[i]].
             lidx = max(1, i - 2)
-            return schur_binary_search(
-                objective,
-                gammas[lidx],
-                gammas[i],
-                risks[lidx],
-                params.alg.tol,
-                params.alg.iter,
-                params.alg.strict,
-            )
+            return schur_binary_search(objective, gammas[lidx], gammas[i], risks[lidx],
+                                       params.alg.tol, params.alg.iter, params.alg.strict)
         end
     end
     # If there's no turning point in the range of gammas, check the derivative at the last gamma.
@@ -278,60 +224,28 @@ function schur_weights(
         return w, max_gamma
     end
     # If the turning point exists and was not found within the range, or the last gamma, it is between the last two gammas.
-    return schur_binary_search(
-        objective,
-        gammas[end-1],
-        gammas[end],
-        risks[end-1],
-        params.alg.tol,
-        params.alg.iter,
-        params.alg.strict,
-    )
+    return schur_binary_search(objective, gammas[end - 1], gammas[end], risks[end - 1],
+                               params.alg.tol, params.alg.iter, params.alg.strict)
 end
-function optimise!(
-    sh::SchurHierarchicalRiskParity{<:Any,<:Any},
-    rd::ReturnsResult = ReturnsResult();
-    dims::Int = 1,
-    kwargs...,
-)
+function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(sh.opt.pe, rd; dims = dims)
     clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.clustering.order]
-    wb = weight_bounds_constraints(
-        sh.opt.wb,
-        sh.opt.sets;
-        N = size(pr.X, 2),
-        strict = sh.opt.strict,
-        datatype = eltype(pr.X),
-    )
+    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
+                                   strict = sh.opt.strict, datatype = eltype(pr.X))
     w, gamma = schur_weights(pr, items, wb, sh.params)
     retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w)
-    return SchurHierarchicalRiskParityOptimisation(
-        typeof(sh),
-        pr,
-        wb,
-        clr,
-        gamma,
-        retcode,
-        w,
-    )
+    return SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gamma, retcode,
+                                                   w)
 end
-function optimise!(
-    sh::SchurHierarchicalRiskParity{<:Any,<:AbstractVector},
-    rd::ReturnsResult = ReturnsResult();
-    dims::Int = 1,
-    kwargs...,
-)
+function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(sh.opt.pe, rd; dims = dims)
     clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.clustering.order]
-    wb = weight_bounds_constraints(
-        sh.opt.wb,
-        sh.opt.sets;
-        N = size(pr.X, 2),
-        strict = sh.opt.strict,
-        datatype = eltype(pr.X),
-    )
+    wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(pr.X, 2),
+                                   strict = sh.opt.strict, datatype = eltype(pr.X))
     params = sh.params
     gammas = Vector{eltype(pr.X)}(undef, length(params))
     w = zeros(eltype(pr.X), size(pr.X, 2))
@@ -341,16 +255,9 @@ function optimise!(
         gammas[i] = gamma
     end
     retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w / sum(w))
-    return SchurHierarchicalRiskParityOptimisation(
-        typeof(sh),
-        pr,
-        wb,
-        clr,
-        gammas,
-        retcode,
-        w,
-    )
+    return SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gammas, retcode,
+                                                   w)
 end
 
-export SchurHierarchicalRiskParityOptimisation,
-    SchurParams, SchurHierarchicalRiskParity, NonMonotonicSchur, MonotonicSchur
+export SchurHierarchicalRiskParityOptimisation, SchurParams, SchurHierarchicalRiskParity,
+       NonMonotonicSchur, MonotonicSchur

@@ -44,7 +44,7 @@ Construct a `Coskewness` estimator with the specified mean estimator, matrix pro
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
-struct Coskewness{T1,T2,T3} <: CoskewnessEstimator
+struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
     me::T1
     mp::T2
     alg::T3
@@ -87,14 +87,12 @@ Coskewness
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
-function Coskewness(;
-    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-    mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
-    alg::AbstractMomentAlgorithm = Full(),
-)
+function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                    mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
+                    alg::AbstractMomentAlgorithm = Full())
     return Coskewness(me, mp, alg)
 end
-function factory(ce::Coskewness, w::Union{Nothing,<:AbstractWeights} = nothing)
+function factory(ce::Coskewness, w::Union{Nothing, <:AbstractWeights} = nothing)
     return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
 end
 
@@ -122,22 +120,18 @@ Internal helper for coskewness matrix processing.
   - [`matrix_processing!`](@ref)
   - [`coskewness`](@ref)
 """
-function __coskewness(
-    cskew::AbstractMatrix,
-    X::AbstractMatrix,
-    mp::AbstractMatrixProcessingEstimator,
-)
+function __coskewness(cskew::AbstractMatrix, X::AbstractMatrix,
+                      mp::AbstractMatrixProcessingEstimator)
     N = size(cskew, 1)
     V = zeros(eltype(cskew), N, N)
-    for i = 1:N
+    for i in 1:N
         j = (i - 1) * N + 1
         k = i * N
         coskew_jk = view(cskew, :, j:k)
         matrix_processing!(mp, coskew_jk, X)
         vals, vecs = eigen(coskew_jk)
-        vals .=
-            clamp.(real.(vals), typemin(eltype(cskew)), zero(eltype(cskew))) +
-            clamp.(imag.(vals), typemin(eltype(cskew)), zero(eltype(cskew)))im
+        vals .= clamp.(real.(vals), typemin(eltype(cskew)), zero(eltype(cskew))) +
+                clamp.(imag.(vals), typemin(eltype(cskew)), zero(eltype(cskew)))im
         V .-= real(vecs * Diagonal(vals) * transpose(vecs))
     end
     return V
@@ -167,14 +161,10 @@ Internal helper for coskewness computation.
   - [`__coskewness`](@ref)
   - [`coskewness`](@ref)
 """
-function _coskewness(
-    y::AbstractMatrix,
-    X::AbstractMatrix,
-    mp::AbstractMatrixProcessingEstimator,
-)
-    o = transpose(
-        range(; start = one(eltype(y)), stop = one(eltype(y)), length = size(X, 2)),
-    )
+function _coskewness(y::AbstractMatrix, X::AbstractMatrix,
+                     mp::AbstractMatrixProcessingEstimator)
+    o = transpose(range(; start = one(eltype(y)), stop = one(eltype(y)),
+                        length = size(X, 2)))
     z = kron(o, y) ⊙ kron(y, o)
     cskew = transpose(X) * z / size(X, 1)
     V = __coskewness(cskew, X, mp)
@@ -230,13 +220,8 @@ julia> V
   - [`_coskewness`](@ref)
   - [`__coskewness`](@ref)
 """
-function coskewness(
-    ske::Coskewness{<:Any,<:Any,<:Full},
-    X::AbstractMatrix;
-    dims::Int = 1,
-    mean = nothing,
-    kwargs...,
-)
+function coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1,
+                    mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -245,13 +230,8 @@ function coskewness(
     y = X .- mu
     return _coskewness(y, X, ske.mp)
 end
-function coskewness(
-    ske::Coskewness{<:Any,<:Any,<:Semi},
-    X::AbstractMatrix;
-    dims::Int = 1,
-    mean = nothing,
-    kwargs...,
-)
+function coskewness(ske::Coskewness{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1,
+                    mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

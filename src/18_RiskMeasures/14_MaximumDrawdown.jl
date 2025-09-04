@@ -25,8 +25,7 @@ struct RelativeMaximumDrawdown{T1} <: HierarchicalRiskMeasure
     settings::T1
 end
 function RelativeMaximumDrawdown(;
-    settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-)
+                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
     return RelativeMaximumDrawdown(settings)
 end
 function (::RelativeMaximumDrawdown)(x::AbstractVector)

@@ -4,11 +4,11 @@ abstract type BudgetCostEstimator <: BudgetConstraintEstimator end
 function set_budget_costs!(args...)
     return nothing
 end
-struct BudgetRange{T1,T2} <: BudgetEstimator
+struct BudgetRange{T1, T2} <: BudgetEstimator
     lb::T1
     ub::T2
 end
-function BudgetRange(; lb::Union{Nothing,<:Real} = 1.0, ub::Union{Nothing,<:Real} = 1.0)
+function BudgetRange(; lb::Union{Nothing, <:Real} = 1.0, ub::Union{Nothing, <:Real} = 1.0)
     lb_flag = isnothing(lb)
     ub_flag = isnothing(ub)
     @argcheck(lb_flag ⊼ ub_flag)
@@ -23,13 +23,13 @@ function BudgetRange(; lb::Union{Nothing,<:Real} = 1.0, ub::Union{Nothing,<:Real
     end
     return BudgetRange(lb, ub)
 end
-function budget_view(bgt::Union{<:Real,<:BudgetRange}, ::Any)
+function budget_view(bgt::Union{<:Real, <:BudgetRange}, ::Any)
     return bgt
 end
 function set_budget_constraints!(args...)
     return nothing
 end
-struct BudgetCosts{T1,T2,T3,T4,T5,T6} <: BudgetCostEstimator
+struct BudgetCosts{T1, T2, T3, T4, T5, T6} <: BudgetCostEstimator
     bgt::T1
     w::T2
     vp::T3
@@ -37,14 +37,11 @@ struct BudgetCosts{T1,T2,T3,T4,T5,T6} <: BudgetCostEstimator
     up::T5
     un::T6
 end
-function BudgetCosts(;
-    bgt::Union{<:Real,<:BudgetRange} = 1.0,
-    w::AbstractVector{<:Real},
-    vp::Union{<:Real,<:AbstractVector{<:Real}} = 1.0,
-    vn::Union{<:Real,<:AbstractVector{<:Real}} = 1.0,
-    up::Union{<:Real,<:AbstractVector{<:Real}} = 1.0,
-    un::Union{<:Real,<:AbstractVector{<:Real}} = 1.0,
-)
+function BudgetCosts(; bgt::Union{<:Real, <:BudgetRange} = 1.0, w::AbstractVector{<:Real},
+                     vp::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                     vn::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                     up::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                     un::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
     @argcheck(!isempty(w))
     if isa(vp, AbstractVector)
         @argcheck(!isempty(vp) && all(x -> x >= zero(x), vp))
@@ -76,7 +73,7 @@ function budget_view(bgt::BudgetCosts, i::AbstractVector)
     un = nothing_scalar_array_view(bgt.un, i)
     return BudgetCosts(; bgt = bgt.bgt, w = w, vp = vp, vn = vn, up = up, un = un)
 end
-struct BudgetMarketImpact{T1,T2,T3,T4,T5,T6,T7} <: BudgetCostEstimator
+struct BudgetMarketImpact{T1, T2, T3, T4, T5, T6, T7} <: BudgetCostEstimator
     bgt::T1
     w::T2
     vp::T3
@@ -85,15 +82,13 @@ struct BudgetMarketImpact{T1,T2,T3,T4,T5,T6,T7} <: BudgetCostEstimator
     un::T6
     beta::T7
 end
-function BudgetMarketImpact(;
-    bgt::Union{<:Real,<:BudgetRange} = 1.0,
-    w::AbstractVector{<:Real},
-    vp::Union{<:Real,<:AbstractVector{<:Real}} = 1.0,
-    vn::Union{<:Real,<:AbstractVector{<:Real}} = 1.0,
-    up::Union{<:Real,<:AbstractVector{<:Real}} = 1.0,
-    un::Union{<:Real,<:AbstractVector{<:Real}} = 1.0,
-    beta::Real = 2 / 3,
-)
+function BudgetMarketImpact(; bgt::Union{<:Real, <:BudgetRange} = 1.0,
+                            w::AbstractVector{<:Real},
+                            vp::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                            vn::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                            up::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                            un::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
+                            beta::Real = 2 / 3)
     @argcheck(!isempty(w))
     if isa(vp, AbstractVector)
         @argcheck(!isempty(vp) && all(x -> x >= zero(x), vp))
@@ -115,13 +110,10 @@ function BudgetMarketImpact(;
     else
         @argcheck(un >= zero(un))
     end
-    @argcheck(
-        zero(beta) <= beta <= one(beta),
-        DomainError(
-            beta,
-            range_msg("`beta`", zero(beta), one(beta), nothing, true, true) * ".",
-        )
-    )
+    @argcheck(zero(beta) <= beta <= one(beta),
+              DomainError(beta,
+                          range_msg("`beta`", zero(beta), one(beta), nothing, true, true) *
+                          "."))
     return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
 end
 function budget_view(bgt::BudgetMarketImpact, i::AbstractVector)
@@ -130,15 +122,8 @@ function budget_view(bgt::BudgetMarketImpact, i::AbstractVector)
     vn = nothing_scalar_array_view(bgt.vn, i)
     up = nothing_scalar_array_view(bgt.up, i)
     un = nothing_scalar_array_view(bgt.un, i)
-    return BudgetMarketImpact(;
-        bgt = bgt.bgt,
-        w = w,
-        vp = vp,
-        vn = vn,
-        up = up,
-        un = un,
-        beta = bgt.beta,
-    )
+    return BudgetMarketImpact(; bgt = bgt.bgt, w = w, vp = vp, vn = vn, up = up, un = un,
+                              beta = bgt.beta)
 end
 function set_budget_constraints!(model::JuMP.Model, val::Real, w::AbstractVector)
     k = model[:k]
@@ -182,9 +167,9 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Real, sbgt::
     k = model[:k]
     sc = model[:sc]
     @constraints(model, begin
-        lbgt, sc * (sum(lw) - k * (bgt + sbgt)) == 0
-        sbgt, sc * (sum(sw) - k * sbgt) == 0
-    end)
+                     lbgt, sc * (sum(lw) - k * (bgt + sbgt)) == 0
+                     sbgt, sc * (sum(sw) - k * sbgt) == 0
+                 end)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, ::Nothing)
@@ -239,24 +224,21 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Real, sbgt::
     lb = sbgt.lb
     if !isnothing(lb)
         @constraints(model, begin
-            lbgt_lb, sc * (sum(lw) - k * (lb + bgt)) >= 0
-            sbgt_lb, sc * (sum(sw) - k * lb) >= 0
-        end)
+                         lbgt_lb, sc * (sum(lw) - k * (lb + bgt)) >= 0
+                         sbgt_lb, sc * (sum(sw) - k * lb) >= 0
+                     end)
     end
     ub = sbgt.ub
     if !isnothing(ub)
         @constraints(model, begin
-            lbgt_ub, sc * (sum(lw) - k * (ub + bgt)) <= 0
-            sbgt_ub, sc * (sum(sw) - k * ub) <= 0
-        end)
+                         lbgt_ub, sc * (sum(lw) - k * (ub + bgt)) <= 0
+                         sbgt_ub, sc * (sum(sw) - k * ub) <= 0
+                     end)
     end
     return nothing
 end
-function set_long_short_budget_constraints!(
-    model::JuMP.Model,
-    bgt::BudgetRange,
-    sbgt::BudgetRange,
-)
+function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
+                                            sbgt::BudgetRange)
     lw = model[:lw]
     sw = model[:sw]
     k = model[:k]
@@ -267,9 +249,9 @@ function set_long_short_budget_constraints!(
     slb_flag = isnothing(slb)
     if !lb_flag && !slb_flag
         @constraints(model, begin
-            lbgt_lb, sc * (sum(lw) - k * (lb + slb)) >= 0
-            sbgt_lb, sc * (sum(sw) - k * slb) >= 0
-        end)
+                         lbgt_lb, sc * (sum(lw) - k * (lb + slb)) >= 0
+                         sbgt_lb, sc * (sum(sw) - k * slb) >= 0
+                     end)
     elseif !lb_flag && slb_flag
         @constraint(model, lbgt_lb, sc * (sum(lw) - k * lb) >= 0)
     elseif lb_flag && !slb_flag
@@ -281,9 +263,9 @@ function set_long_short_budget_constraints!(
     sub_flag = isnothing(sub)
     if !ub_flag && !sub_flag
         @constraints(model, begin
-            lbgt_ub, sc * (sum(lw) - k * (ub + sub)) <= 0
-            sbgt_ub, sc * (sum(sw) - k * sub) <= 0
-        end)
+                         lbgt_ub, sc * (sum(lw) - k * (ub + sub)) <= 0
+                         sbgt_ub, sc * (sum(sw) - k * sub) <= 0
+                     end)
     elseif !ub_flag && sub_flag
         @constraint(model, lbgt_ub, sc * (sum(lw) - k * ub) <= 0)
     elseif ub_flag && !sub_flag
@@ -291,13 +273,10 @@ function set_long_short_budget_constraints!(
     end
     return nothing
 end
-function set_cost_budget_constraints!(
-    model::JuMP.Model,
-    vp::Union{<:Real,<:AbstractVector{<:Real}},
-    vn::Union{<:Real,<:AbstractVector{<:Real}},
-    val::Real,
-    w::AbstractVector,
-)
+function set_cost_budget_constraints!(model::JuMP.Model,
+                                      vp::Union{<:Real, <:AbstractVector{<:Real}},
+                                      vn::Union{<:Real, <:AbstractVector{<:Real}},
+                                      val::Real, w::AbstractVector)
     k = model[:k]
     sc = model[:sc]
     wp = model[:wp]
@@ -306,13 +285,10 @@ function set_cost_budget_constraints!(
     @constraint(model, cost_bgt, sc * (sum(w) + cost_bgt_expr - k * val) == 0)
     return nothing
 end
-function set_cost_budget_constraints!(
-    model::JuMP.Model,
-    vp::Union{<:Real,<:AbstractVector{<:Real}},
-    vn::Union{<:Real,<:AbstractVector{<:Real}},
-    bgt::BudgetRange,
-    w::AbstractVector,
-)
+function set_cost_budget_constraints!(model::JuMP.Model,
+                                      vp::Union{<:Real, <:AbstractVector{<:Real}},
+                                      vn::Union{<:Real, <:AbstractVector{<:Real}},
+                                      bgt::BudgetRange, w::AbstractVector)
     k = model[:k]
     sc = model[:sc]
     wp = model[:wp]
@@ -335,22 +311,19 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::Abstrac
     sc = model[:sc]
     N = length(w)
     @variables(model, begin
-        wp[1:N], (lower_bound = 0)
-        wn[1:N], (lower_bound = 0)
-    end)
+                   wp[1:N], (lower_bound = 0)
+                   wn[1:N], (lower_bound = 0)
+               end)
     @constraints(model, begin
-        sc * (wp ⊖ up) <= 0
-        sc * (wn ⊖ un) <= 0
-        sc * (w - wb - wp + wn) == 0
-    end)
+                     sc * (wp ⊖ up) <= 0
+                     sc * (wn ⊖ un) <= 0
+                     sc * (w - wb - wp + wn) == 0
+                 end)
     set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w)
     return nothing
 end
-function set_budget_constraints!(
-    model::JuMP.Model,
-    bgt::BudgetMarketImpact,
-    w::AbstractVector,
-)
+function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact,
+                                 w::AbstractVector)
     wb = bgt.w
     up = bgt.up
     un = bgt.un
@@ -358,18 +331,18 @@ function set_budget_constraints!(
     sc = model[:sc]
     N = length(w)
     @variables(model, begin
-        wp[1:N], (lower_bound = 0)
-        wn[1:N], (lower_bound = 0)
-        wip[1:N]
-        win[1:N]
-    end)
+                   wp[1:N], (lower_bound = 0)
+                   wn[1:N], (lower_bound = 0)
+                   wip[1:N]
+                   win[1:N]
+               end)
     @constraints(model, begin
-        sc * (wp ⊖ up) <= 0
-        sc * (wn ⊖ un) <= 0
-        sc * (w - wb - wp + wn) == 0
-        [i = 1:N], [sc * wip[i], sc, sc * wp[i]] in MOI.PowerCone(beta)
-        [i = 1:N], [sc * win[i], sc, sc * wn[i]] in MOI.PowerCone(beta)
-    end)
+                     sc * (wp ⊖ up) <= 0
+                     sc * (wn ⊖ un) <= 0
+                     sc * (w - wb - wp + wn) == 0
+                     [i = 1:N], [sc * wip[i], sc, sc * wp[i]] in MOI.PowerCone(beta)
+                     [i = 1:N], [sc * win[i], sc, sc * wn[i]] in MOI.PowerCone(beta)
+                 end)
     set_cost_budget_constraints!(model, wip, win, bgt.bgt, w)
     return nothing
 end
@@ -388,13 +361,10 @@ end
 function set_weight_constraints!(args...)
     return nothing
 end
-function set_weight_constraints!(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    bgt::Union{Nothing,<:Real,<:BudgetRange},
-    sbgt::Union{Nothing,<:Real,<:BudgetRange},
-    long::Bool = false,
-)
+function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
+                                 bgt::Union{Nothing, <:Real, <:BudgetRange},
+                                 sbgt::Union{Nothing, <:Real, <:BudgetRange},
+                                 long::Bool = false)
     lb = wb.lb
     ub = wb.ub
     flag = w_neg_flag(lb) || w_neg_flag(ub)
@@ -412,13 +382,13 @@ function set_weight_constraints!(
     set_budget_constraints!(model, bgt, w)
     if flag
         @variables(model, begin
-            lw[1:N] >= 0
-            sw[1:N] >= 0
-        end)
+                       lw[1:N] >= 0
+                       sw[1:N] >= 0
+                   end)
         @constraints(model, begin
-            w_lw, sc * (w - lw) <= 0
-            w_sw, sc * (w + sw) >= 0
-        end)
+                         w_lw, sc * (w - lw) <= 0
+                         w_sw, sc * (w + sw) >= 0
+                     end)
         set_long_short_budget_constraints!(model, bgt, sbgt)
     else
         @expression(model, lw, w)
@@ -437,12 +407,8 @@ end
 function set_linear_weight_constraints!(::JuMP.Model, ::Nothing, ::Symbol, ::Symbol)
     return nothing
 end
-function set_linear_weight_constraints!(
-    model::JuMP.Model,
-    lcm::LinearConstraint,
-    key_ineq::Symbol,
-    key_eq::Symbol,
-)
+function set_linear_weight_constraints!(model::JuMP.Model, lcm::LinearConstraint,
+                                        key_ineq::Symbol, key_eq::Symbol)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -483,19 +449,13 @@ function mip_wb(model::JuMP.Model, wb::WeightBounds, il::AbstractVector, is::Abs
     end
     return nothing
 end
-function short_mip_threshold_constraints(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    lt::Union{Nothing,<:BuyInThreshold},
-    st::Union{Nothing,<:BuyInThreshold},
-    ffl::Union{Nothing,<:Real,<:AbstractVector},
-    ffs::Union{Nothing,<:Real,<:AbstractVector},
-    ss::Union{Nothing,<:Real},
-    lt_flag::Bool,
-    st_flag::Bool,
-    ffl_flag::Bool,
-    ffs_flag::Bool,
-)
+function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
+                                         lt::Union{Nothing, <:BuyInThreshold},
+                                         st::Union{Nothing, <:BuyInThreshold},
+                                         ffl::Union{Nothing, <:Real, <:AbstractVector},
+                                         ffs::Union{Nothing, <:Real, <:AbstractVector},
+                                         ss::Union{Nothing, <:Real}, lt_flag::Bool,
+                                         st_flag::Bool, ffl_flag::Bool, ffs_flag::Bool)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -504,32 +464,32 @@ function short_mip_threshold_constraints(
     end
     N = length(w)
     @variables(model, begin
-        ilb[1:N], (binary = true)
-        isb[1:N], (binary = true)
-    end)
+                   ilb[1:N], (binary = true)
+                   isb[1:N], (binary = true)
+               end)
     @expression(model, i_mip, ilb + isb)
     if isa(k, Real)
         @expressions(model, begin
-            il, ilb
-            is, isb
-        end)
+                         il, ilb
+                         is, isb
+                     end)
     else
         @variables(model, begin
-            ilf[1:N] >= 0
-            isf[1:N] >= 0
-        end)
+                       ilf[1:N] >= 0
+                       isf[1:N] >= 0
+                   end)
         @constraints(model, begin
-            ilf_ub, ilf .- k <= 0
-            isf_ub, isf .- k <= 0
-            ilfd_ub, ilf - ss * ilb <= 0
-            isfd_ub, isf - ss * isb <= 0
-            ilfd_lb, (ilf + ss * (1 .- ilb)) .- k >= 0
-            isfd_lb, (isf + ss * (1 .- isb)) .- k >= 0
-        end)
+                         ilf_ub, ilf .- k <= 0
+                         isf_ub, isf .- k <= 0
+                         ilfd_ub, ilf - ss * ilb <= 0
+                         isfd_ub, isf - ss * isb <= 0
+                         ilfd_lb, (ilf + ss * (1 .- ilb)) .- k >= 0
+                         isfd_lb, (isf + ss * (1 .- isb)) .- k >= 0
+                     end)
         @expressions(model, begin
-            il, ilf
-            is, isf
-        end)
+                         il, ilf
+                         is, isf
+                     end)
     end
     @constraint(model, i_mip_ub, i_mip .- 1 <= 0)
     mip_wb(model, wb, il, is)
@@ -549,15 +509,10 @@ function short_mip_threshold_constraints(
     end
     return i_mip
 end
-function mip_constraints(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    ffl::Union{Nothing,<:Real,<:AbstractVector},
-    lt::Union{Nothing,<:BuyInThreshold},
-    ss::Union{Nothing,<:Real},
-    lt_flag::Bool,
-    ffl_flag::Bool,
-)
+function mip_constraints(model::JuMP.Model, wb::WeightBounds,
+                         ffl::Union{Nothing, <:Real, <:AbstractVector},
+                         lt::Union{Nothing, <:BuyInThreshold}, ss::Union{Nothing, <:Real},
+                         lt_flag::Bool, ffl_flag::Bool)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -571,10 +526,10 @@ function mip_constraints(
         end
         @variable(model, ibf[1:N] >= 0)
         @constraints(model, begin
-            ibf_ub, ibf .- k <= 0
-            ibfd_ub, ibf - ss * ib <= 0
-            ibfd_lb, (ibf + ss * (1 .- ib)) .- k >= 0
-        end)
+                         ibf_ub, ibf .- k <= 0
+                         ibfd_ub, ibf - ss * ib <= 0
+                         ibfd_lb, (ibf + ss * (1 .- ib)) .- k >= 0
+                     end)
         @expression(model, i_mip, ibf)
     end
     mip_wb(model, wb, i_mip, i_mip)
@@ -587,18 +542,14 @@ function mip_constraints(
     end
     return ib
 end
-function set_mip_constraints!(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    card::Union{Nothing,<:Integer},
-    gcard::Union{Nothing,<:LinearConstraint},
-    nplg::Union{Nothing,<:PhylogenyResult},
-    cplg::Union{Nothing,<:PhylogenyResult},
-    lt::Union{Nothing,<:BuyInThreshold},
-    st::Union{Nothing,<:BuyInThreshold},
-    fees::Union{Nothing,<:Fees},
-    ss::Union{Nothing,<:Real},
-)
+function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                              card::Union{Nothing, <:Integer},
+                              gcard::Union{Nothing, <:LinearConstraint},
+                              nplg::Union{Nothing, <:PhylogenyResult},
+                              cplg::Union{Nothing, <:PhylogenyResult},
+                              lt::Union{Nothing, <:BuyInThreshold},
+                              st::Union{Nothing, <:BuyInThreshold},
+                              fees::Union{Nothing, <:Fees}, ss::Union{Nothing, <:Real})
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     n_flag = isa(nplg, IntegerPhylogeny)
@@ -610,32 +561,19 @@ function set_mip_constraints!(
     else
         false, false, nothing, nothing
     end
-    if !(
-        card_flag ||
-        gcard_flag ||
-        n_flag ||
-        c_flag ||
-        lt_flag ||
-        st_flag ||
-        ffl_flag ||
-        ffs_flag
-    )
+    if !(card_flag ||
+         gcard_flag ||
+         n_flag ||
+         c_flag ||
+         lt_flag ||
+         st_flag ||
+         ffl_flag ||
+         ffs_flag)
         return nothing
     end
     ib = if (st_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
-        short_mip_threshold_constraints(
-            model,
-            wb,
-            lt,
-            st,
-            ffl,
-            ffs,
-            ss,
-            lt_flag,
-            st_flag,
-            ffl_flag,
-            ffs_flag,
-        )
+        short_mip_threshold_constraints(model, wb, lt, st, ffl, ffs, ss, lt_flag, st_flag,
+                                        ffl_flag, ffs_flag)
     else
         mip_constraints(model, wb, ffl, lt, ss, lt_flag, ffl_flag)
     end
@@ -670,16 +608,9 @@ end
 function smip_wb(::Any, ::Nothing, args...)
     return nothing
 end
-function smip_wb(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    smtx::AbstractMatrix,
-    smtx_expr::AbstractVector{<:AbstractJuMPScalar},
-    il::AbstractVector,
-    is::AbstractVector,
-    key::Symbol = :set_w_mip_,
-    i::Integer = 1,
-)
+function smip_wb(model::JuMP.Model, wb::WeightBounds, smtx::AbstractMatrix,
+                 smtx_expr::AbstractVector{<:AbstractJuMPScalar}, il::AbstractVector,
+                 is::AbstractVector, key::Symbol = :set_w_mip_, i::Integer = 1)
     sc = model[:sc]
     lb = wb.lb
     if !isnothing(lb) && w_finite_flag(lb)
@@ -693,20 +624,14 @@ function smip_wb(
     end
     return nothing
 end
-function short_smip_threshold_constraints(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    smtx::Union{Nothing,<:AbstractMatrix},
-    lt::Union{Nothing,<:BuyInThreshold},
-    st::Union{Nothing,<:BuyInThreshold},
-    ss::Union{Nothing,<:Real},
-    lt_flag::Bool,
-    st_flag::Bool,
-    key1::Symbol = :si,
-    key7::Symbol = :smtx_expr_,
-    key8::Symbol = :set_w_mip_,
-    i::Integer = 1,
-)
+function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
+                                          smtx::Union{Nothing, <:AbstractMatrix},
+                                          lt::Union{Nothing, <:BuyInThreshold},
+                                          st::Union{Nothing, <:BuyInThreshold},
+                                          ss::Union{Nothing, <:Real}, lt_flag::Bool,
+                                          st_flag::Bool, key1::Symbol = :si,
+                                          key7::Symbol = :smtx_expr_,
+                                          key8::Symbol = :set_w_mip_, i::Integer = 1)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -714,76 +639,90 @@ function short_smip_threshold_constraints(
         ss = 1_000
     end
     N = size(smtx, 1)
-    ilb, isb =
-        model[Symbol(key1, :lb_, i)], model[Symbol(key1, :ub_, i)] = @variables(model, begin
-            [1:N], (binary = true)
-            [1:N], (binary = true)
-        end)
+    ilb, isb = model[Symbol(key1, :lb_, i)], model[Symbol(key1, :ub_, i)] = @variables(model,
+                                                                                       begin
+                                                                                           [1:N],
+                                                                                           (binary = true)
+                                                                                           [1:N],
+                                                                                           (binary = true)
+                                                                                       end)
     key2 = Symbol(key1, :_mip_)
     i_mip = model[Symbol(key2, i)] = @expression(model, ilb + isb)
     il, is = if isa(k, Real)
-        model[Symbol(key1, :l_, i)], model[Symbol(key1, :s_, i)] =
-            @expressions(model, begin
-                ilb
-                isb
-            end)
+        model[Symbol(key1, :l_, i)], model[Symbol(key1, :s_, i)] = @expressions(model,
+                                                                                begin
+                                                                                    ilb
+                                                                                    isb
+                                                                                end)
     else
         key3 = Symbol(key1, :lf_)
         key4 = Symbol(key1, :sf_)
-        ilf, isf =
-            model[Symbol(key3, i)], model[Symbol(key4, i)] = @variables(model, begin
-                [1:N], (lower_bound = 0)
-                [1:N], (lower_bound = 0)
-            end)
+        ilf, isf = model[Symbol(key3, i)], model[Symbol(key4, i)] = @variables(model,
+                                                                               begin
+                                                                                   [1:N],
+                                                                                   (lower_bound = 0)
+                                                                                   [1:N],
+                                                                                   (lower_bound = 0)
+                                                                               end)
         key5 = Symbol(key1, :lfd_)
         key6 = Symbol(key1, :sfd_)
-        model[Symbol(key3, :ub_, i)],
-        model[Symbol(key4, :ub_, i)],
-        model[Symbol(key5, :ub_, i)],
-        model[Symbol(key6, :ub_, i)],
-        model[Symbol(key5, :lb_, i)],
-        model[Symbol(key6, :lb_, i)] = @constraints(model, begin
-            ilf .- k <= 0
-            isf .- k <= 0
-            ilf - ss * ilb <= 0
-            isf - ss * isb <= 0
-            (ilf + ss * (1 .- ilb)) .- k >= 0
-            (isf + ss * (1 .- isb)) .- k >= 0
-        end)
-        model[Symbol(key1, :l_, i)], model[Symbol(key1, :s_, i)] =
-            @expressions(model, begin
-                ilf
-                isf
-            end)
+        model[Symbol(key3, :ub_, i)], model[Symbol(key4, :ub_, i)], model[Symbol(key5, :ub_, i)], model[Symbol(key6, :ub_, i)], model[Symbol(key5, :lb_, i)], model[Symbol(key6, :lb_, i)] = @constraints(model,
+                                                                                                                                                                                                          begin
+                                                                                                                                                                                                              ilf .-
+                                                                                                                                                                                                              k <=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              isf .-
+                                                                                                                                                                                                              k <=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              ilf -
+                                                                                                                                                                                                              ss *
+                                                                                                                                                                                                              ilb <=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              isf -
+                                                                                                                                                                                                              ss *
+                                                                                                                                                                                                              isb <=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              (ilf +
+                                                                                                                                                                                                               ss *
+                                                                                                                                                                                                               (1 .-
+                                                                                                                                                                                                                ilb)) .-
+                                                                                                                                                                                                              k >=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                              (isf +
+                                                                                                                                                                                                               ss *
+                                                                                                                                                                                                               (1 .-
+                                                                                                                                                                                                                isb)) .-
+                                                                                                                                                                                                              k >=
+                                                                                                                                                                                                              0
+                                                                                                                                                                                                          end)
+        model[Symbol(key1, :l_, i)], model[Symbol(key1, :s_, i)] = @expressions(model,
+                                                                                begin
+                                                                                    ilf
+                                                                                    isf
+                                                                                end)
     end
     model[Symbol(key2, :ub, i)] = @constraint(model, i_mip .- 1 <= 0)
     smtx_expr = model[Symbol(key7, i)] = @expression(model, smtx * w)
     smip_wb(model, wb, smtx, smtx_expr, il, is, key8, i)
     if lt_flag
-        model[Symbol(key8, :lt, i)] =
-            @constraint(model, sc * (smtx_expr - il ⊙ lt.val + ss * (1 .- ilb)) >= 0)
+        model[Symbol(key8, :lt, i)] = @constraint(model,
+                                                  sc * (smtx_expr - il ⊙ lt.val +
+                                                        ss * (1 .- ilb)) >= 0)
     end
     if st_flag
-        model[Symbol(key8, :st, i)] =
-            @constraint(model, sc * (smtx_expr + is ⊙ st.val - ss * (1 .- isb)) <= 0)
+        model[Symbol(key8, :st, i)] = @constraint(model,
+                                                  sc * (smtx_expr + is ⊙ st.val -
+                                                        ss * (1 .- isb)) <= 0)
     end
     return i_mip
 end
-function smip_constraints(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    smtx::Union{Nothing,<:AbstractMatrix},
-    lt::Union{Nothing,<:BuyInThreshold},
-    ss::Union{Nothing,<:Real},
-    lt_flag::Bool,
-    key1::Symbol = :sib_,
-    key2::Symbol = :i_smip_,
-    key3::Symbol = :isbf_,
-    key4::Symbol = :smtx_expr_,
-    key5::Symbol = :set_w_mip_,
-    key6::Symbol = :w_smip_lt_,
-    i::Integer = 1,
-)
+function smip_constraints(model::JuMP.Model, wb::WeightBounds,
+                          smtx::Union{Nothing, <:AbstractMatrix},
+                          lt::Union{Nothing, <:BuyInThreshold}, ss::Union{Nothing, <:Real},
+                          lt_flag::Bool, key1::Symbol = :sib_, key2::Symbol = :i_smip_,
+                          key3::Symbol = :isbf_, key4::Symbol = :smtx_expr_,
+                          key5::Symbol = :set_w_mip_, key6::Symbol = :w_smip_lt_,
+                          i::Integer = 1)
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
@@ -796,13 +735,22 @@ function smip_constraints(
             ss = 100_000.0
         end
         isbf = model[Symbol(key3, i)] = @variable(model, [1:N], lower_bound = 0)
-        model[Symbol(key3, :_ub_, i)],
-        model[Symbol(key3, :d_ub_, i)],
-        model[Symbol(key3, :d_lb_, i)] = @constraints(model, begin
-            isbf .- k <= 0
-            isbf - ss * sib <= 0
-            (isbf + ss * (1 .- sib)) .- k >= 0
-        end)
+        model[Symbol(key3, :_ub_, i)], model[Symbol(key3, :d_ub_, i)], model[Symbol(key3, :d_lb_, i)] = @constraints(model,
+                                                                                                                     begin
+                                                                                                                         isbf .-
+                                                                                                                         k <=
+                                                                                                                         0
+                                                                                                                         isbf -
+                                                                                                                         ss *
+                                                                                                                         sib <=
+                                                                                                                         0
+                                                                                                                         (isbf +
+                                                                                                                          ss *
+                                                                                                                          (1 .-
+                                                                                                                           sib)) .-
+                                                                                                                         k >=
+                                                                                                                         0
+                                                                                                                     end)
         model[Symbol(key2, i)] = @expression(model, isbf)
     end
     smtx_expr = model[Symbol(key4, i)] = @expression(model, smtx * w)
@@ -812,17 +760,13 @@ function smip_constraints(
     end
     return sib
 end
-function set_all_smip_constraints!(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    card::Union{Nothing,<:Integer},
-    gcard::Union{Nothing,<:LinearConstraint},
-    smtx::Union{Nothing,<:AbstractMatrix},
-    lt::Union{Nothing,<:BuyInThreshold},
-    st::Union{Nothing,<:BuyInThreshold},
-    ss::Union{Nothing,<:Real},
-    i::Integer = 1,
-)
+function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                                   card::Union{Nothing, <:Integer},
+                                   gcard::Union{Nothing, <:LinearConstraint},
+                                   smtx::Union{Nothing, <:AbstractMatrix},
+                                   lt::Union{Nothing, <:BuyInThreshold},
+                                   st::Union{Nothing, <:BuyInThreshold},
+                                   ss::Union{Nothing, <:Real}, i::Integer = 1)
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     lt_flag = !isnothing(lt)
@@ -832,36 +776,11 @@ function set_all_smip_constraints!(
     end
     sc = model[:sc]
     sib = if st_flag && haskey(model, :sw)
-        short_smip_threshold_constraints(
-            model,
-            wb,
-            smtx,
-            lt,
-            st,
-            ss,
-            lt_flag,
-            st_flag,
-            :si,
-            :smtx_expr_,
-            :set_w_mip_,
-            i,
-        )
+        short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
+                                         :smtx_expr_, :set_w_mip_, i)
     else
-        smip_constraints(
-            model,
-            wb,
-            smtx,
-            lt,
-            ss,
-            lt_flag,
-            :sib_,
-            :i_smip_,
-            :isbf_,
-            :smtx_expr_,
-            :set_w_mip_,
-            :w_smip_lt_,
-            i,
-        )
+        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sib_, :i_smip_, :isbf_,
+                         :smtx_expr_, :set_w_mip_, :w_smip_lt_, i)
     end
     if card_flag
         model[Symbol(:scard_, i)] = @constraint(model, sc * (sum(sib) - card) <= 0)
@@ -870,55 +789,48 @@ function set_all_smip_constraints!(
         if !isnothing(gcard.ineq)
             A = gcard.ineq.A
             B = gcard.ineq.B
-            model[Symbol(:sgcard_ineq_, i)] =
-                @constraint(model, sc * (A * transpose(smtx) * sib ⊖ B) <= 0)
+            model[Symbol(:sgcard_ineq_, i)] = @constraint(model,
+                                                          sc *
+                                                          (A * transpose(smtx) * sib ⊖ B) <=
+                                                          0)
         end
         if !isnothing(gcard.eq)
             A = gcard.eq.A
             B = gcard.eq.B
-            model[Symbol(:sgcard_eq_, i)] =
-                @constraint(model, sc * (A * transpose(smtx) * sib ⊖ B) == 0)
+            model[Symbol(:sgcard_eq_, i)] = @constraint(model,
+                                                        sc *
+                                                        (A * transpose(smtx) * sib ⊖ B) ==
+                                                        0)
         end
     end
     return nothing
 end
-function set_all_smip_constraints!(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    card::AbstractVector{<:Integer},
-    gcard::AbstractVector{<:LinearConstraint},
-    smtx::AbstractVector{<:AbstractMatrix},
-    lt::Union{
-        Nothing,
-        <:BuyInThreshold,
-        <:AbstractVector{<:BuyInThreshold},
-        <:AbstractVector{<:Union{Nothing,<:BuyInThreshold}},
-    },
-    st::Union{
-        Nothing,
-        <:BuyInThreshold,
-        <:AbstractVector{<:BuyInThreshold},
-        <:AbstractVector{<:Union{Nothing,<:BuyInThreshold}},
-    },
-    ss::Union{Nothing,<:Real},
-)
+function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                                   card::AbstractVector{<:Integer},
+                                   gcard::AbstractVector{<:LinearConstraint},
+                                   smtx::AbstractVector{<:AbstractMatrix},
+                                   lt::Union{Nothing, <:BuyInThreshold,
+                                             <:AbstractVector{<:BuyInThreshold},
+                                             <:AbstractVector{<:Union{Nothing,
+                                                                      <:BuyInThreshold}}},
+                                   st::Union{Nothing, <:BuyInThreshold,
+                                             <:AbstractVector{<:BuyInThreshold},
+                                             <:AbstractVector{<:Union{Nothing,
+                                                                      <:BuyInThreshold}}},
+                                   ss::Union{Nothing, <:Real})
     for (i, (c, g, s)) in enumerate(zip(card, gcard, smtx))
-        lti = isa(lt, Union{Nothing,<:BuyInThreshold}) ? lt : lt[i]
-        sti = isa(st, Union{Nothing,<:BuyInThreshold}) ? st : st[i]
+        lti = isa(lt, Union{Nothing, <:BuyInThreshold}) ? lt : lt[i]
+        sti = isa(st, Union{Nothing, <:BuyInThreshold}) ? st : st[i]
         set_all_smip_constraints!(model, wb, c, g, s, lti, sti, ss, i)
     end
     return nothing
 end
-function set_scardmip_constraints!(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    card::Union{Nothing,<:Integer},
-    smtx::Union{Nothing,<:AbstractMatrix},
-    lt::Union{Nothing,<:BuyInThreshold},
-    st::Union{Nothing,<:BuyInThreshold},
-    ss::Union{Nothing,<:Real},
-    i::Integer = 1,
-)
+function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                                   card::Union{Nothing, <:Integer},
+                                   smtx::Union{Nothing, <:AbstractMatrix},
+                                   lt::Union{Nothing, <:BuyInThreshold},
+                                   st::Union{Nothing, <:BuyInThreshold},
+                                   ss::Union{Nothing, <:Real}, i::Integer = 1)
     card_flag = !isnothing(card)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
@@ -927,76 +839,40 @@ function set_scardmip_constraints!(
     end
     sc = model[:sc]
     sib = if st_flag && haskey(model, :sw)
-        short_smip_threshold_constraints(
-            model,
-            wb,
-            smtx,
-            lt,
-            st,
-            ss,
-            lt_flag,
-            st_flag,
-            :si,
-            :smtx_expr_,
-            :set_w_mip_,
-            i,
-        )
+        short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
+                                         :smtx_expr_, :set_w_mip_, i)
     else
-        smip_constraints(
-            model,
-            wb,
-            smtx,
-            lt,
-            ss,
-            lt_flag,
-            :sib_,
-            :i_smip_,
-            :isbf_,
-            :smtx_expr_,
-            :set_w_mip_,
-            :w_smip_lt_,
-            i,
-        )
+        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sib_, :i_smip_, :isbf_,
+                         :smtx_expr_, :set_w_mip_, :w_smip_lt_, i)
     end
     model[Symbol(:scard_, i)] = @constraint(model, sc * (sum(sib) - card) <= 0)
     return nothing
 end
-function set_scardmip_constraints!(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    card::AbstractVector{<:Integer},
-    smtx::AbstractVector{<:AbstractMatrix},
-    lt::Union{
-        Nothing,
-        <:BuyInThreshold,
-        <:AbstractVector{<:BuyInThreshold},
-        <:AbstractVector{<:Union{Nothing,<:BuyInThreshold}},
-    },
-    st::Union{
-        Nothing,
-        <:BuyInThreshold,
-        <:AbstractVector{<:BuyInThreshold},
-        <:AbstractVector{<:Union{Nothing,<:BuyInThreshold}},
-    },
-    ss::Union{Nothing,<:Real},
-)
+function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                                   card::AbstractVector{<:Integer},
+                                   smtx::AbstractVector{<:AbstractMatrix},
+                                   lt::Union{Nothing, <:BuyInThreshold,
+                                             <:AbstractVector{<:BuyInThreshold},
+                                             <:AbstractVector{<:Union{Nothing,
+                                                                      <:BuyInThreshold}}},
+                                   st::Union{Nothing, <:BuyInThreshold,
+                                             <:AbstractVector{<:BuyInThreshold},
+                                             <:AbstractVector{<:Union{Nothing,
+                                                                      <:BuyInThreshold}}},
+                                   ss::Union{Nothing, <:Real})
     for (i, (c, s)) in enumerate(zip(card, smtx))
-        lti = isa(lt, Union{Nothing,<:BuyInThreshold}) ? lt : lt[i]
-        sti = isa(st, Union{Nothing,<:BuyInThreshold}) ? st : st[i]
+        lti = isa(lt, Union{Nothing, <:BuyInThreshold}) ? lt : lt[i]
+        sti = isa(st, Union{Nothing, <:BuyInThreshold}) ? st : st[i]
         set_scardmip_constraints!(model, wb, c, s, lti, sti, ss, i)
     end
     return nothing
 end
-function set_sgcardmip_constraints!(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    gcard::Union{Nothing,<:LinearConstraint},
-    smtx::Union{Nothing,<:AbstractMatrix},
-    lt::Union{Nothing,<:BuyInThreshold},
-    st::Union{Nothing,<:BuyInThreshold},
-    ss::Union{Nothing,<:Real},
-    i::Integer = 1,
-)
+function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                                    gcard::Union{Nothing, <:LinearConstraint},
+                                    smtx::Union{Nothing, <:AbstractMatrix},
+                                    lt::Union{Nothing, <:BuyInThreshold},
+                                    st::Union{Nothing, <:BuyInThreshold},
+                                    ss::Union{Nothing, <:Real}, i::Integer = 1)
     gcard_flag = !isnothing(gcard)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
@@ -1005,90 +881,60 @@ function set_sgcardmip_constraints!(
     end
     sc = model[:sc]
     sib = if st_flag && haskey(model, :sw)
-        short_smip_threshold_constraints(
-            model,
-            wb,
-            smtx,
-            lt,
-            st,
-            ss,
-            lt_flag,
-            st_flag,
-            :sgi,
-            :sgmtx_expr_,
-            :setg_w_mip_,
-            i,
-        )
+        short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag,
+                                         :sgi, :sgmtx_expr_, :setg_w_mip_, i)
     else
-        smip_constraints(
-            model,
-            wb,
-            smtx,
-            lt,
-            ss,
-            lt_flag,
-            :sgib_,
-            :i_sgmip_,
-            :isgbf_,
-            :sgmtx_expr_,
-            :setg_w_mip_,
-            :w_sgmip_lt_,
-            i,
-        )
+        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sgib_, :i_sgmip_, :isgbf_,
+                         :sgmtx_expr_, :setg_w_mip_, :w_sgmip_lt_, i)
     end
     if !isnothing(gcard.ineq)
         A = gcard.ineq.A
         B = gcard.ineq.B
-        model[Symbol(:sgcard_ineq_, i)] =
-            @constraint(model, sc * (A * transpose(smtx) * sib ⊖ B) <= 0)
+        model[Symbol(:sgcard_ineq_, i)] = @constraint(model,
+                                                      sc *
+                                                      (A * transpose(smtx) * sib ⊖ B) <= 0)
     end
     if !isnothing(gcard.eq)
         A = gcard.eq.A
         B = gcard.eq.B
-        model[Symbol(:sgcard_eq_, i)] =
-            @constraint(model, sc * (A * transpose(smtx) * sib ⊖ B) == 0)
+        model[Symbol(:sgcard_eq_, i)] = @constraint(model,
+                                                    sc * (A * transpose(smtx) * sib ⊖ B) ==
+                                                    0)
     end
     return nothing
 end
-function set_sgcardmip_constraints!(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    gcard::AbstractVector{<:LinearConstraint},
-    smtx::AbstractVector{<:AbstractMatrix},
-    lt::Union{
-        Nothing,
-        <:BuyInThreshold,
-        <:AbstractVector{<:BuyInThreshold},
-        <:AbstractVector{<:Union{Nothing,<:BuyInThreshold}},
-    },
-    st::Union{
-        Nothing,
-        <:BuyInThreshold,
-        <:AbstractVector{<:BuyInThreshold},
-        <:AbstractVector{<:Union{Nothing,<:BuyInThreshold}},
-    },
-    ss::Union{Nothing,<:Real},
-)
+function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                                    gcard::AbstractVector{<:LinearConstraint},
+                                    smtx::AbstractVector{<:AbstractMatrix},
+                                    lt::Union{Nothing, <:BuyInThreshold,
+                                              <:AbstractVector{<:BuyInThreshold},
+                                              <:AbstractVector{<:Union{Nothing,
+                                                                       <:BuyInThreshold}}},
+                                    st::Union{Nothing, <:BuyInThreshold,
+                                              <:AbstractVector{<:BuyInThreshold},
+                                              <:AbstractVector{<:Union{Nothing,
+                                                                       <:BuyInThreshold}}},
+                                    ss::Union{Nothing, <:Real})
     for (i, (gc, s)) in enumerate(zip(gcard, smtx))
-        lti = isa(lt, Union{Nothing,<:BuyInThreshold}) ? lt : lt[i]
-        sti = isa(st, Union{Nothing,<:BuyInThreshold}) ? st : st[i]
+        lti = isa(lt, Union{Nothing, <:BuyInThreshold}) ? lt : lt[i]
+        sti = isa(st, Union{Nothing, <:BuyInThreshold}) ? st : st[i]
         set_sgcardmip_constraints!(model, wb, gc, s, lti, sti, ss, i)
     end
     return nothing
 end
-function set_smip_constraints!(
-    model::JuMP.Model,
-    wb::WeightBounds,
-    card::Union{Nothing,<:Integer,<:AbstractVector{<:Integer}},
-    gcard::Union{Nothing,<:LinearConstraint,<:AbstractVector{<:LinearConstraint}},
-    smtx::Union{Nothing,<:AbstractMatrix,<:AbstractVector{<:AbstractMatrix}},
-    sgmtx::Union{Nothing,<:AbstractMatrix,<:AbstractVector{<:AbstractMatrix}},
-    lt::Union{Nothing,<:BuyInThreshold},
-    st::Union{Nothing,<:BuyInThreshold},
-    glt::Union{Nothing,<:BuyInThreshold},
-    gst::Union{Nothing,<:BuyInThreshold},
-    ss::Union{Nothing,<:Real},
-)
+function set_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                               card::Union{Nothing, <:Integer, <:AbstractVector{<:Integer}},
+                               gcard::Union{Nothing, <:LinearConstraint,
+                                            <:AbstractVector{<:LinearConstraint}},
+                               smtx::Union{Nothing, <:AbstractMatrix,
+                                           <:AbstractVector{<:AbstractMatrix}},
+                               sgmtx::Union{Nothing, <:AbstractMatrix,
+                                            <:AbstractVector{<:AbstractMatrix}},
+                               lt::Union{Nothing, <:BuyInThreshold},
+                               st::Union{Nothing, <:BuyInThreshold},
+                               glt::Union{Nothing, <:BuyInThreshold},
+                               gst::Union{Nothing, <:BuyInThreshold},
+                               ss::Union{Nothing, <:Real})
     if smtx === sgmtx
         set_all_smip_constraints!(model, wb, card, gcard, smtx, lt, st, ss)
     else
@@ -1109,10 +955,10 @@ function set_turnover_fees!(model::JuMP.Model, tn::Turnover)
     val = tn.val
     @variable(model, t_ftn[1:N])
     @expressions(model, begin
-        x_ftn, w - wt * k
-        ftn, dot_scalar(val, t_ftn)
-    end)
-    @constraint(model, cftn[i=1:N], [sc * t_ftn[i]; sc * x_ftn[i]] in MOI.NormOneCone(2))
+                     x_ftn, w - wt * k
+                     ftn, dot_scalar(val, t_ftn)
+                 end)
+    @constraint(model, cftn[i = 1:N], [sc * t_ftn[i]; sc * x_ftn[i]] in MOI.NormOneCone(2))
     add_to_fees!(model, ftn)
     return nothing
 end
@@ -1125,13 +971,13 @@ end
 function set_short_non_fixed_fees!(args...)
     return nothing
 end
-function set_long_non_fixed_fees!(model::JuMP.Model, fl::Union{<:Real,<:AbstractVector})
+function set_long_non_fixed_fees!(model::JuMP.Model, fl::Union{<:Real, <:AbstractVector})
     lw = model[:lw]
     @expression(model, fl, dot_scalar(fl, lw))
     add_to_fees!(model, fl)
     return nothing
 end
-function set_short_non_fixed_fees!(model::JuMP.Model, fs::Union{<:Real,<:AbstractVector})
+function set_short_non_fixed_fees!(model::JuMP.Model, fs::Union{<:Real, <:AbstractVector})
     if !haskey(model, :sw)
         return nothing
     end
@@ -1149,13 +995,10 @@ end
 function set_tracking_error_constraints!(args...)
     return nothing
 end
-function set_tracking_error_constraints!(
-    model::JuMP.Model,
-    i::Integer,
-    pr::AbstractPriorResult,
-    te::TrackingError{<:Any,<:Any,<:NOCTracking},
-    args...,
-)
+function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
+                                         pr::AbstractPriorResult,
+                                         te::TrackingError{<:Any, <:Any, <:NOCTracking},
+                                         args...)
     X = pr.X
     k = model[:k]
     sc = model[:sc]
@@ -1166,22 +1009,22 @@ function set_tracking_error_constraints!(
     f = err * T
     t_te = model[Symbol(:t_te_, i)] = @variable(model)
     te = model[Symbol(:te_, i)] = @expression(model, net_X - wb * k)
-    model[Symbol(:cte_noc_, i)], model[Symbol(:cte_, i)] = @constraints(model, begin
-        [
-            sc * t_te;
-            sc * te
-        ] in MOI.NormOneCone(1 + T)
-        sc * (t_te - f * k) <= 0
-    end)
+    model[Symbol(:cte_noc_, i)], model[Symbol(:cte_, i)] = @constraints(model,
+                                                                        begin
+                                                                            [sc * t_te;
+                                                                             sc * te] in
+                                                                            MOI.NormOneCone(1 +
+                                                                                            T)
+                                                                            sc *
+                                                                            (t_te - f * k) <=
+                                                                            0
+                                                                        end)
     return nothing
 end
-function set_tracking_error_constraints!(
-    model::JuMP.Model,
-    i::Integer,
-    pr::AbstractPriorResult,
-    te::TrackingError{<:Any,<:Any,<:SOCTracking},
-    args...,
-)
+function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
+                                         pr::AbstractPriorResult,
+                                         te::TrackingError{<:Any, <:Any, <:SOCTracking},
+                                         args...)
     X = pr.X
     k = model[:k]
     sc = model[:sc]
@@ -1191,25 +1034,26 @@ function set_tracking_error_constraints!(
     f = err * sqrt(size(X, 1) - te.alg.ddof)
     t_te = model[Symbol(:t_te_, i)] = @variable(model)
     te = model[Symbol(:te_, i)] = @expression(model, net_X - wb * k)
-    model[Symbol(:cte_soc_, i)], model[Symbol(:cte_, i)] = @constraints(model, begin
-        [
-            sc * t_te;
-            sc * te
-        ] in SecondOrderCone()
-        sc * (t_te - f * k) <= 0
-    end)
+    model[Symbol(:cte_soc_, i)], model[Symbol(:cte_, i)] = @constraints(model,
+                                                                        begin
+                                                                            [sc * t_te;
+                                                                             sc * te] in
+                                                                            SecondOrderCone()
+                                                                            sc *
+                                                                            (t_te - f * k) <=
+                                                                            0
+                                                                        end)
     return nothing
 end
-function set_tracking_error_constraints!(
-    model::JuMP.Model,
-    i::Integer,
-    pr::AbstractPriorResult,
-    te::RiskTrackingError{<:Any,<:Any,<:Any,<:IndependentVariableTracking},
-    opt::JuMPOptimisationEstimator,
-    cplg::Union{Nothing,<:SemiDefinitePhylogeny,<:IntegerPhylogeny},
-    nplg::Union{Nothing,<:SemiDefinitePhylogeny,<:IntegerPhylogeny},
-    args...,
-)
+function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
+                                         pr::AbstractPriorResult,
+                                         te::RiskTrackingError{<:Any, <:Any, <:Any,
+                                                               <:IndependentVariableTracking},
+                                         opt::JuMPOptimisationEstimator,
+                                         cplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                     <:IntegerPhylogeny},
+                                         nplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                     <:IntegerPhylogeny}, args...)
     r = te.r
     wb = te.tracking.w
     err = te.err
@@ -1222,17 +1066,16 @@ function set_tracking_error_constraints!(
     model[Symbol(:cter_, i)] = @constraint(model, sc * (risk_expr - err * k) <= 0)
     return nothing
 end
-function set_tracking_error_constraints!(
-    model::JuMP.Model,
-    i::Integer,
-    pr::AbstractPriorResult,
-    te::RiskTrackingError{<:Any,<:Any,<:Any,<:DependentVariableTracking},
-    opt::JuMPOptimisationEstimator,
-    cplg::Union{Nothing,<:SemiDefinitePhylogeny,<:IntegerPhylogeny},
-    nplg::Union{Nothing,<:SemiDefinitePhylogeny,<:IntegerPhylogeny},
-    fees::Union{Nothing,<:Fees},
-    args...,
-)
+function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
+                                         pr::AbstractPriorResult,
+                                         te::RiskTrackingError{<:Any, <:Any, <:Any,
+                                                               <:DependentVariableTracking},
+                                         opt::JuMPOptimisationEstimator,
+                                         cplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                     <:IntegerPhylogeny},
+                                         nplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                     <:IntegerPhylogeny},
+                                         fees::Union{Nothing, <:Fees}, args...)
     r = te.r
     wb = te.tracking.w
     err = te.err
@@ -1243,21 +1086,22 @@ function set_tracking_error_constraints!(
     t_dr = model[Symbol(:t_dr_, i)] = @variable(model)
     risk_expr = set_risk!(model, te_dw, r, opt, pr, cplg, nplg, args...)[1]
     dr = model[Symbol(:dr_, i)] = @expression(model, risk_expr - rb * k)
-    model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = @constraints(model, begin
-        [
-            sc * t_dr;
-            sc * dr
-        ] in MOI.NormOneCone(2)
-        sc * (t_dr - err * k) <= 0
-    end)
+    model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = @constraints(model,
+                                                                          begin
+                                                                              [sc * t_dr;
+                                                                               sc * dr] in
+                                                                              MOI.NormOneCone(2)
+                                                                              sc *
+                                                                              (t_dr -
+                                                                               err * k) <=
+                                                                              0
+                                                                          end)
     return nothing
 end
-function set_tracking_error_constraints!(
-    model::JuMP.Model,
-    pr::AbstractPriorResult,
-    tres::Union{<:AbstractTracking,<:AbstractVector{<:AbstractTracking}},
-    args...,
-)
+function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
+                                         tres::Union{<:AbstractTracking,
+                                                     <:AbstractVector{<:AbstractTracking}},
+                                         args...)
     for (i, te) in enumerate(tres)
         set_tracking_error_constraints!(model, i, pr, te, args...)
     end
@@ -1275,19 +1119,20 @@ function _set_turnover_constraints!(model::JuMP.Model, tn::Turnover, i::Integer 
     val = tn.val
     t_tn = model[Symbol(:t_tn_, i)] = @variable(model, [1:N])
     tn = model[Symbol(:tn_, i)] = @expression(model, w - wb * k)
-    model[Symbol(:ctn_noc_, i)], model[Symbol(:ctn_, i)] = @constraints(model, begin
-        [i = 1:N], [
-            sc * t_tn[i];
-            sc * tn[i]
-        ] in MOI.NormOneCone(2)
-        sc * (t_tn ⊖ val * k) <= 0
-    end)
+    model[Symbol(:ctn_noc_, i)], model[Symbol(:ctn_, i)] = @constraints(model,
+                                                                        begin
+                                                                            [i = 1:N],
+                                                                            [sc * t_tn[i];
+                                                                             sc * tn[i]] in
+                                                                            MOI.NormOneCone(2)
+                                                                            sc *
+                                                                            (t_tn ⊖ val * k) <=
+                                                                            0
+                                                                        end)
     return nothing
 end
-function set_turnover_constraints!(
-    model::JuMP.Model,
-    tns::Union{<:Turnover,<:AbstractVector{<:Turnover}},
-)
+function set_turnover_constraints!(model::JuMP.Model,
+                                   tns::Union{<:Turnover, <:AbstractVector{<:Turnover}})
     for (i, tn) in enumerate(tns)
         _set_turnover_constraints!(model, tn, i)
     end
@@ -1302,9 +1147,9 @@ function set_number_effective_assets!(model::JuMP.Model, val::Real)
     sc = model[:sc]
     @variable(model, nea)
     @constraints(model, begin
-        cnea_soc, [sc * nea; sc * w] in SecondOrderCone()
-        cnea, sc * (nea * sqrt(val) - k) <= 0
-    end)
+                     cnea_soc, [sc * nea; sc * w] in SecondOrderCone()
+                     cnea, sc * (nea * sqrt(val) - k) <= 0
+                 end)
     return nothing
 end
 function set_l1_regularisation!(args...)
@@ -1340,9 +1185,8 @@ function set_sdp_constraints!(model::JuMP.Model, w_key::Symbol = :w, W_key::Symb
     sc = model[:sc]
     N = length(w)
     W = model[W_key] = @variable(model, [1:N, 1:N], Symmetric)
-    M =
-        model[Symbol(W_key, :_M)] =
-            @expression(model, hcat(vcat(W, transpose(w)), vcat(w, k)))
+    M = model[Symbol(W_key, :_M)] = @expression(model,
+                                                hcat(vcat(W, transpose(w)), vcat(w, k)))
     model[Symbol(:M, :_PSD)] = @constraint(model, sc * M in PSDCone())
     return W
 end
@@ -1362,11 +1206,8 @@ end
 function set_sdp_phylogeny_constraints!(args...)
     return nothing
 end
-function set_sdp_phylogeny_constraints!(
-    model::JuMP.Model,
-    adj::SemiDefinitePhylogeny,
-    key::Symbol,
-)
+function set_sdp_phylogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhylogeny,
+                                        key::Symbol)
     sc = model[:sc]
     W = set_sdp_constraints!(model)
     A = adj.A
@@ -1382,11 +1223,8 @@ end
 function set_sdp_frc_phylogeny_constraints!(args...)
     return nothing
 end
-function set_sdp_frc_phylogeny_constraints!(
-    model::JuMP.Model,
-    adj::SemiDefinitePhylogeny,
-    key::Symbol,
-)
+function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhylogeny,
+                                            key::Symbol)
     sc = model[:sc]
     set_sdp_frc_constraints!(model)
     W = model[:W]

@@ -2,8 +2,7 @@ struct EqualRiskMeasure{T1} <: HierarchicalRiskMeasure
     settings::T1
 end
 function EqualRiskMeasure(;
-    settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-)
+                          settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
     return EqualRiskMeasure(settings)
 end
 function (::EqualRiskMeasure)(w::AbstractVector)

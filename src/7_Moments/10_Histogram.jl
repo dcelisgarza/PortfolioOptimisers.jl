@@ -147,7 +147,7 @@ end
 function get_bin_width_func(::Scott)
     return pyimport("astropy.stats").scott_bin_width
 end
-function get_bin_width_func(::Union{<:HacineGharbiRavier,<:Integer})
+function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})
     return nothing
 end
 
@@ -186,44 +186,29 @@ This function determines the number of bins to use for histogram-based calculati
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
 """
-function calc_num_bins(
-    ::AstroPyBins,
-    xj::AbstractVector,
-    xi::AbstractVector,
-    j::Integer,
-    i::Integer,
-    bin_width_func,
-    ::Any,
-)
+function calc_num_bins(::AstroPyBins, xj::AbstractVector, xi::AbstractVector, j::Integer,
+                       i::Integer, bin_width_func, ::Any)
     xjl, xju = extrema(xj)
     k1 = (xju - xjl) / pyconvert(eltype(xj), bin_width_func(Py(xj).to_numpy()))
-    return round(
-        Int,
-        if j != i
-            xil, xiu = extrema(xi)
-            k2 = (xiu - xil) / pyconvert(eltype(xi), bin_width_func(Py(xi).to_numpy()))
-            max(k1, k2)
-        else
-            k1
-        end,
-    )
+    return round(Int,
+                 if j != i
+                     xil, xiu = extrema(xi)
+                     k2 = (xiu - xil) /
+                          pyconvert(eltype(xi), bin_width_func(Py(xi).to_numpy()))
+                     max(k1, k2)
+                 else
+                     k1
+                 end)
 end
-function calc_num_bins(
-    ::HacineGharbiRavier,
-    xj::AbstractVector,
-    xi::AbstractVector,
-    j::Integer,
-    i::Integer,
-    ::Any,
-    T::Integer,
-)
+function calc_num_bins(::HacineGharbiRavier, xj::AbstractVector, xi::AbstractVector,
+                       j::Integer, i::Integer, ::Any, T::Integer)
     corr = cor(xj, xi)
     return round(Int, if isone(corr)
-        z = cbrt(8 + 324 * T + 12 * sqrt(36 * T + 729 * T^2))
-        z / 6 + 2 / (3 * z) + 1 / 3
-    else
-        sqrt(1 + sqrt(1 + 24 * T / (1 - corr^2))) / sqrt(2)
-    end)
+                     z = cbrt(8 + 324 * T + 12 * sqrt(36 * T + 729 * T^2))
+                     z / 6 + 2 / (3 * z) + 1 / 3
+                 else
+                     sqrt(1 + sqrt(1 + 24 * T / (1 - corr^2))) / sqrt(2)
+                 end)
 end
 function calc_num_bins(bins::Integer, args...)
     return bins
@@ -277,11 +262,9 @@ function calc_hist_data(xj::AbstractVector, xi::AbstractVector, bins::Integer)
     ex = entropy(hx)
     ey = entropy(hy)
 
-    hxy = StatsBase.fit(
-        Histogram,
-        (xj, xi),
-        (range(xjl; stop = xjh, length = bp1), range(xil; stop = xih, length = bp1)),
-    ).weights
+    hxy = StatsBase.fit(Histogram, (xj, xi),
+                        (range(xjl; stop = xjh, length = bp1),
+                         range(xil; stop = xih, length = bp1))).weights
 
     return ex, ey, hxy
 end
@@ -369,17 +352,15 @@ This function calculates the pairwise variation of information between all colum
   - [`calc_hist_data`](@ref)
   - [`intrinsic_mutual_info`](@ref)
 """
-function variation_info(
-    X::AbstractMatrix,
-    bins::Union{<:AbstractBins,<:Integer} = HacineGharbiRavier(),
-    normalise::Bool = true,
-)
+function variation_info(X::AbstractMatrix,
+                        bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                        normalise::Bool = true)
     T, N = size(X)
     var_mtx = Matrix{eltype(X)}(undef, N, N)
     bin_width_func = get_bin_width_func(bins)
     for j in axes(X, 2)
         xj = view(X, :, j)
-        for i = 1:j
+        for i in 1:j
             xi = view(X, :, i)
             nbins = calc_num_bins(bins, xj, xi, j, i, bin_width_func, T)
             ex, ey, hxy = calc_hist_data(xj, xi, nbins)
@@ -472,17 +453,15 @@ This function calculates the pairwise mutual information between all columns of 
   - [`calc_hist_data`](@ref)
   - [`intrinsic_mutual_info`](@ref)
 """
-function mutual_info(
-    X::AbstractMatrix,
-    bins::Union{<:AbstractBins,<:Integer} = HacineGharbiRavier(),
-    normalise::Bool = true,
-)
+function mutual_info(X::AbstractMatrix,
+                     bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                     normalise::Bool = true)
     T, N = size(X)
     mut_mtx = Matrix{eltype(X)}(undef, N, N)
     bin_width_func = get_bin_width_func(bins)
     for j in axes(X, 2)
         xj = view(X, :, j)
-        for i = 1:j
+        for i in 1:j
             xi = view(X, :, i)
             nbins = calc_num_bins(bins, xj, xi, j, i, bin_width_func, T)
             ex, ey, hxy = calc_hist_data(xj, xi, nbins)

@@ -8,16 +8,14 @@ function ApproxOrderedWeightsArray(; p::AbstractVector{<:Real} = Float64[2, 3, 4
     @argcheck(all(x -> x > zero(x), p))
     return ApproxOrderedWeightsArray(p)
 end
-struct OrderedWeightsArray{T1,T2,T3} <: OrderedWeightsArrayRiskMeasure
+struct OrderedWeightsArray{T1, T2, T3} <: OrderedWeightsArrayRiskMeasure
     settings::T1
     w::T2
     alg::T3
 end
-function OrderedWeightsArray(;
-    settings::RiskMeasureSettings = RiskMeasureSettings(),
-    w::Union{Nothing,<:AbstractVector} = nothing,
-    alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
-)
+function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                             w::Union{Nothing, <:AbstractVector} = nothing,
+                             alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
     if isa(w, AbstractVector)
         @argcheck(!isempty(w))
     end
@@ -27,19 +25,17 @@ function (r::OrderedWeightsArray)(x::AbstractVector)
     w = isnothing(r.w) ? owa_gmd(length(x)) : r.w
     return dot(w, sort!(x))
 end
-struct OrderedWeightsArrayRange{T1,T2,T3,T4} <: OrderedWeightsArrayRiskMeasure
+struct OrderedWeightsArrayRange{T1, T2, T3, T4} <: OrderedWeightsArrayRiskMeasure
     settings::T1
     w1::T2
     w2::T3
     alg::T4
 end
-function OrderedWeightsArrayRange(;
-    settings::RiskMeasureSettings = RiskMeasureSettings(),
-    w1::Union{Nothing,<:AbstractVector} = nothing,
-    w2::Union{Nothing,<:AbstractVector} = nothing,
-    alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
-    rev::Bool = false,
-)
+function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                                  w1::Union{Nothing, <:AbstractVector} = nothing,
+                                  w2::Union{Nothing, <:AbstractVector} = nothing,
+                                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
+                                  rev::Bool = false)
     w1_flag = !isnothing(w1)
     w2_flag = !isnothing(w2)
     if w1_flag
@@ -63,5 +59,5 @@ function (r::OrderedWeightsArrayRange)(x::AbstractVector)
     return dot(w, sort!(x))
 end
 
-export ExactOrderedWeightsArray,
-    ApproxOrderedWeightsArray, OrderedWeightsArray, OrderedWeightsArrayRange
+export ExactOrderedWeightsArray, ApproxOrderedWeightsArray, OrderedWeightsArray,
+       OrderedWeightsArrayRange

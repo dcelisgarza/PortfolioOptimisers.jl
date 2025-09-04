@@ -136,7 +136,7 @@ Variation of Information (VI) distance algorithm for portfolio optimization.
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
 """
-struct VariationInfoDistance{T1,T2} <: AbstractDistanceAlgorithm
+struct VariationInfoDistance{T1, T2} <: AbstractDistanceAlgorithm
     bins::T1
     normalise::T2
 end
@@ -178,9 +178,8 @@ VariationInfoDistance
   - [`cor_and_dist`](@ref)
 """
 function VariationInfoDistance(;
-    bins::Union{<:AbstractBins,<:Integer} = HacineGharbiRavier(),
-    normalise::Bool = true,
-)
+                               bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                               normalise::Bool = true)
     if isa(bins, Integer)
         @argcheck(bins > zero(bins))
     end
@@ -189,11 +188,5 @@ end
 function distance end
 function cor_and_dist end
 
-export SimpleDistance,
-    SimpleAbsoluteDistance,
-    LogDistance,
-    CorrelationDistance,
-    CanonicalDistance,
-    VariationInfoDistance,
-    distance,
-    cor_and_dist
+export SimpleDistance, SimpleAbsoluteDistance, LogDistance, CorrelationDistance,
+       CanonicalDistance, VariationInfoDistance, distance, cor_and_dist

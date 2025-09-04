@@ -300,7 +300,7 @@ Construct a `ShrunkExpectedReturns` estimator with the specified mean estimator,
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
 """
-struct ShrunkExpectedReturns{T1,T2,T3} <: AbstractShrunkExpectedReturnsEstimator
+struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
     me::T1
     ce::T2
     alg::T3
@@ -355,10 +355,9 @@ ShrunkExpectedReturns
   - [`ShrunkExpectedReturns`](@ref)
 """
 function ShrunkExpectedReturns(;
-    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-    alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein(),
-)
+                               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                               ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                               alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
     return ShrunkExpectedReturns(me, ce, alg)
 end
 
@@ -393,26 +392,16 @@ function target_mean(::GrandMean, mu::AbstractArray, sigma::AbstractMatrix; kwar
     val = mean(mu)
     return range(; start = val, stop = val, length = length(mu))
 end
-function target_mean(
-    ::VolatilityWeighted,
-    mu::AbstractArray,
-    sigma::AbstractMatrix;
-    isigma = nothing,
-    kwargs...,
-)
+function target_mean(::VolatilityWeighted, mu::AbstractArray, sigma::AbstractMatrix;
+                     isigma = nothing, kwargs...)
     if isnothing(isigma)
         isigma = sigma \ I
     end
     val = sum(isigma * mu) / sum(isigma)
     return range(; start = val, stop = val, length = length(mu))
 end
-function target_mean(
-    ::MeanSquareError,
-    mu::AbstractArray,
-    sigma::AbstractMatrix;
-    T::Integer,
-    kwargs...,
-)
+function target_mean(::MeanSquareError, mu::AbstractArray, sigma::AbstractMatrix;
+                     T::Integer, kwargs...)
     val = tr(sigma) / T
     return range(; start = val, stop = val, length = length(mu))
 end
@@ -457,12 +446,8 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
   - [`ShrunkExpectedReturns`](@ref)
   - [`target_mean`](@ref)
 """
-function Statistics.mean(
-    me::ShrunkExpectedReturns{<:Any,<:Any,<:JamesStein},
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein},
+                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -476,12 +461,8 @@ function Statistics.mean(
     alpha = (N * mean(evals) - 2 * maximum(evals)) / dot(mb, mb) / T
     return (one(alpha) - alpha) * mu + alpha * b
 end
-function Statistics.mean(
-    me::ShrunkExpectedReturns{<:Any,<:Any,<:BayesStein},
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein},
+                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -495,12 +476,8 @@ function Statistics.mean(
     alpha = (N + 2) / ((N + 2) + T * dot(mb, isigma, mb))
     return (one(alpha) - alpha) * mu + alpha * b
 end
-function Statistics.mean(
-    me::ShrunkExpectedReturns{<:Any,<:Any,<:BodnarOkhrinParolya},
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
+                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     mu = mean(me.me, X; dims = dims, kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     T, N = size(X)
@@ -518,18 +495,10 @@ function Statistics.mean(
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
 end
-function factory(ce::ShrunkExpectedReturns, w::Union{Nothing,<:AbstractWeights} = nothing)
-    return ShrunkExpectedReturns(;
-        me = factory(ce.me, w),
-        ce = factory(ce.ce, w),
-        alg = ce.alg,
-    )
+function factory(ce::ShrunkExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return ShrunkExpectedReturns(; me = factory(ce.me, w), ce = factory(ce.ce, w),
+                                 alg = ce.alg)
 end
 
-export GrandMean,
-    VolatilityWeighted,
-    MeanSquareError,
-    JamesStein,
-    BayesStein,
-    BodnarOkhrinParolya,
-    ShrunkExpectedReturns
+export GrandMean, VolatilityWeighted, MeanSquareError, JamesStein, BayesStein,
+       BodnarOkhrinParolya, ShrunkExpectedReturns

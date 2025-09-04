@@ -11,16 +11,16 @@ Documentation for [PortfolioOptimisers](https://github.com/dcelisgarza/Portfolio
 There are three overarching design choices in `PortfolioOptimisers.jl`:
 
  1. Well-defined type hierarchies:
-
+    
      1. lets us define interfaces and leverage multiple dispatch to easily and quickly add new features.
 
  2. Strongly typed immutable structs:
-
+    
      1. reduces runtime dispatch;
      2. allows the compiler to perform aggressive optimisations via specialisation and constant propagation;
      3. there is always a single source of truth for every process, minimising bugs and ensuring valid structures throughout program execution.
  3. Compositional design:
-
+    
      1. there are many interactions within `PortfolioOptimisers.jl`, by using composition we can decouple and compartmentalise processes into self-contained units;
      2. complexity arises by combining these logical subunits, their immutability means that performing assertions at variable instantiation ensures their correctness throughout the program lifetime;
      3. makes development and testing easier and fearless, as each component can be tested in isolation;

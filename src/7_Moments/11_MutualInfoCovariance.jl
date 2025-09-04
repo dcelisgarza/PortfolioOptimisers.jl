@@ -28,7 +28,7 @@ Creates a `MutualInfoCovariance` object with the specified variance estimator, b
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractBins`](@ref)
 """
-struct MutualInfoCovariance{T1,T2,T3} <: AbstractCovarianceEstimator
+struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ve::T1
     bins::T2
     normalise::T3
@@ -76,22 +76,17 @@ MutualInfoCovariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractBins`](@ref)
 """
-function MutualInfoCovariance(;
-    ve::AbstractVarianceEstimator = SimpleVariance(),
-    bins::Union{<:AbstractBins,<:Integer} = HacineGharbiRavier(),
-    normalise::Bool = true,
-)
+function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+                              bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                              normalise::Bool = true)
     if isa(bins, Integer)
         @argcheck(bins > zero(bins))
     end
     return MutualInfoCovariance(ve, bins, normalise)
 end
-function factory(ce::MutualInfoCovariance, w::Union{Nothing,<:AbstractWeights} = nothing)
-    return MutualInfoCovariance(;
-        ve = factory(ce.ve, w),
-        bins = ce.bins,
-        normalise = ce.normalise,
-    )
+function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,
+                                normalise = ce.normalise)
 end
 
 """
@@ -122,12 +117,8 @@ This method computes the pairwise mutual information correlation matrix for the 
   - [`mutual_info`](@ref)
   - [`cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cor(
-    ce::MutualInfoCovariance,
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function Statistics.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
+                        kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -165,12 +156,8 @@ This method computes the pairwise mutual information covariance matrix for the i
   - [`mutual_info`](@ref)
   - [`cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cov(
-    ce::MutualInfoCovariance,
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function Statistics.cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1,
+                        kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

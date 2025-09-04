@@ -118,13 +118,10 @@ ShrunkDenoise
 ```
 """
 function ShrunkDenoise(; alpha::Real = 0.0)
-    @argcheck(
-        zero(alpha) <= alpha <= one(alpha),
-        DomainError(
-            alpha,
-            range_msg("`alpha`", zero(alpha), one(alpha), nothing, true, true) * ".",
-        )
-    )
+    @argcheck(zero(alpha) <= alpha <= one(alpha),
+              DomainError(alpha,
+                          range_msg("`alpha`", zero(alpha), one(alpha), nothing, true,
+                                    true) * "."))
     return ShrunkDenoise(alpha)
 end
 
@@ -171,7 +168,7 @@ Keyword arguments correspond to the fields above. The constructor infers types a
   - [`denoise!`](@ref)
   - [`denoise`](@ref)
 """
-struct Denoise{T1,T2,T3,T4,T5,T6} <: AbstractDenoiseEstimator
+struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
     alg::T1
     args::T2
     kwargs::T3
@@ -231,14 +228,10 @@ Denoise
   - [`denoise!`](@ref)
   - [`denoise`](@ref)
 """
-function Denoise(;
-    alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
-    args::Tuple = (),
-    kwargs::NamedTuple = (;),
-    kernel = AverageShiftedHistograms.Kernels.gaussian,
-    m::Integer = 10,
-    n::Integer = 1000,
-)
+function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple = (),
+                 kwargs::NamedTuple = (;),
+                 kernel = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
+                 n::Integer = 1000)
     return Denoise(alg, args, kwargs, kernel, m, n)
 end
 
@@ -273,44 +266,29 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
   - [`FixedDenoise`](@ref)
   - [`ShrunkDenoise`](@ref)
 """
-function _denoise!(
-    ::SpectralDenoise,
-    X::AbstractMatrix,
-    vals::AbstractVector,
-    vecs::AbstractMatrix,
-    num_factors::Integer,
-)
+function _denoise!(::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector,
+                   vecs::AbstractMatrix, num_factors::Integer)
     _vals = copy(vals)
     _vals[1:num_factors] .= zero(eltype(X))
     X .= cov2cor(vecs * Diagonal(_vals) * transpose(vecs))
     return nothing
 end
-function _denoise!(
-    ::FixedDenoise,
-    X::AbstractMatrix,
-    vals::AbstractVector,
-    vecs::AbstractMatrix,
-    num_factors::Integer,
-)
+function _denoise!(::FixedDenoise, X::AbstractMatrix, vals::AbstractVector,
+                   vecs::AbstractMatrix, num_factors::Integer)
     _vals = copy(vals)
     _vals[1:num_factors] .= sum(_vals[1:num_factors]) / num_factors
     X .= cov2cor(vecs * Diagonal(_vals) * transpose(vecs))
     return nothing
 end
-function _denoise!(
-    de::ShrunkDenoise,
-    X::AbstractMatrix,
-    vals::AbstractVector,
-    vecs::AbstractMatrix,
-    num_factors::Integer,
-)
+function _denoise!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
+                   vecs::AbstractMatrix, num_factors::Integer)
     # Small
     vals_l = vals[1:num_factors]
     vecs_l = vecs[:, 1:num_factors]
 
     # Large
-    vals_r = vals[(num_factors+1):end]
-    vecs_r = vecs[:, (num_factors+1):end]
+    vals_r = vals[(num_factors + 1):end]
+    vecs_r = vecs[:, (num_factors + 1):end]
 
     corr0 = vecs_r * Diagonal(vals_r) * transpose(vecs_r)
     corr1 = vecs_l * Diagonal(vals_l) * transpose(vecs_l)
@@ -346,19 +324,13 @@ This function is used internally to fit the MP distribution to the observed spec
   - [`find_max_eval`](@ref)
   - [`Denoise`](@ref)
 """
-function errPDF(
-    x::Real,
-    vals::AbstractVector,
-    q::Real;
-    kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
-    m::Integer = 10,
-    n::Integer = 1000,
-)
+function errPDF(x::Real, vals::AbstractVector, q::Real;
+                kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
+                n::Integer = 1000)
     e_min, e_max = x * (1 - sqrt(1.0 / q))^2, x * (1 + sqrt(1.0 / q))^2
     rg = range(e_min, e_max; length = n)
-    pdf1 =
-        q ⊘ (2 * pi * x * rg) ⊙
-        sqrt.(clamp.((e_max .- rg) ⊙ (rg .- e_min), zero(x), typemax(x)))
+    pdf1 = q ⊘ (2 * pi * x * rg) ⊙
+           sqrt.(clamp.((e_max .- rg) ⊙ (rg .- e_min), zero(x), typemax(x)))
     e_min, e_max = x * (1 - sqrt(1.0 / q))^2, x * (1 + sqrt(1.0 / q))^2
     res = ash(vals; rng = range(e_min, e_max; length = n), kernel = kernel, m = m)
     pdf2 = [AverageShiftedHistograms.pdf(res, i) for i in pdf1]
@@ -396,22 +368,12 @@ This function fits the MP distribution to the observed spectrum by minimizing th
   - [`errPDF`](@ref)
   - [`Denoise`](@ref)
 """
-function find_max_eval(
-    vals::AbstractVector,
-    q::Real;
-    kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
-    m::Integer = 10,
-    n::Integer = 1000,
-    args::Tuple = (),
-    kwargs::NamedTuple = (;),
-)
-    res = Optim.optimize(
-        x -> errPDF(x, vals, q; kernel = kernel, m = m, n = n),
-        0.0,
-        1.0,
-        args...;
-        kwargs...,
-    )
+function find_max_eval(vals::AbstractVector, q::Real;
+                       kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
+                       m::Integer = 10, n::Integer = 1000, args::Tuple = (),
+                       kwargs::NamedTuple = (;))
+    res = Optim.optimize(x -> errPDF(x, vals, q; kernel = kernel, m = m, n = n), 0.0, 1.0,
+                         args...; kwargs...)
     x = Optim.converged(res) ? Optim.minimizer(res) : 1.0
     e_max = x * (1.0 + sqrt(1.0 / q))^2
     return e_max, x
@@ -483,12 +445,8 @@ julia> X
 function denoise!(::Nothing, args...)
     return nothing
 end
-function denoise!(
-    de::Denoise,
-    X::AbstractMatrix,
-    q::Real,
-    pdm::Union{Nothing,<:Posdef} = Posdef(),
-)
+function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
+                  pdm::Union{Nothing, <:Posdef} = Posdef())
     assert_matrix_issquare(X)
     s = diag(X)
     iscov = any(!isone, s)
@@ -497,15 +455,8 @@ function denoise!(
         StatsBase.cov2cor!(X, s)
     end
     vals, vecs = eigen(X)
-    max_val = find_max_eval(
-        vals,
-        q;
-        kernel = de.kernel,
-        m = de.m,
-        n = de.n,
-        args = de.args,
-        kwargs = de.kwargs,
-    )[1]
+    max_val = find_max_eval(vals, q; kernel = de.kernel, m = de.m, n = de.n, args = de.args,
+                            kwargs = de.kwargs)[1]
     num_factors = findlast(vals .< max_val)
     _denoise!(de.alg, X, vals, vecs, num_factors)
     posdef!(pdm, X)
@@ -561,12 +512,8 @@ julia> Xd = denoise(Denoise(), X, 10 / 5)
 function denoise(::Nothing, args...)
     return nothing
 end
-function denoise(
-    de::Denoise,
-    X::AbstractMatrix,
-    q::Real,
-    pdm::Union{Nothing,<:Posdef} = Posdef(),
-)
+function denoise(de::Denoise, X::AbstractMatrix, q::Real,
+                 pdm::Union{Nothing, <:Posdef} = Posdef())
     X = copy(X)
     denoise!(de, X, q, pdm)
     return X

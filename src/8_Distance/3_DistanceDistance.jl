@@ -29,7 +29,7 @@ A distance-of-distances estimator for portfolio optimization.
   - [`distance`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
-struct DistanceDistance{T1,T2,T3,T4} <: AbstractDistanceEstimator
+struct DistanceDistance{T1, T2, T3, T4} <: AbstractDistanceEstimator
     dist::T1
     args::T2
     kwargs::T3
@@ -71,12 +71,9 @@ DistanceDistance
   - [`distance`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
-function DistanceDistance(;
-    dist::Distances.Metric = Distances.Euclidean(),
-    args::Tuple = (),
-    kwargs::NamedTuple = (;),
-    alg::AbstractDistanceAlgorithm = SimpleDistance(),
-)
+function DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
+                          args::Tuple = (), kwargs::NamedTuple = (;),
+                          alg::AbstractDistanceAlgorithm = SimpleDistance())
     return DistanceDistance(dist, args, kwargs, alg)
 end
 
@@ -105,13 +102,8 @@ This method first computes a base distance matrix using the specified base dista
   - [`DistanceDistance`](@ref)
   - [`distance`](@ref)
 """
-function distance(
-    de::DistanceDistance,
-    ce::StatsBase.CovarianceEstimator,
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
     dist = distance(Distance(; alg = de.alg), ce, X; dims = dims, kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
@@ -167,13 +159,8 @@ This method first computes the correlation and base distance matrices, then appl
   - [`DistanceDistance`](@ref)
   - [`cor_and_dist`](@ref)
 """
-function cor_and_dist(
-    de::DistanceDistance,
-    ce::StatsBase.CovarianceEstimator,
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
+                      X::AbstractMatrix; dims::Int = 1, kwargs...)
     rho, dist = cor_and_dist(Distance(; alg = de.alg), ce, X; dims = dims, kwargs...)
     return rho, Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end

@@ -29,7 +29,7 @@ Construct an `EquilibriumExpectedReturns` estimator with the specified covarianc
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
-struct EquilibriumExpectedReturns{T1,T2,T3} <: AbstractShrunkExpectedReturnsEstimator
+struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
     ce::T1
     w::T2
     l::T3
@@ -81,10 +81,9 @@ EquilibriumExpectedReturns
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
 function EquilibriumExpectedReturns(;
-    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-    w::Union{Nothing,<:AbstractWeights} = nothing,
-    l::Real = 1.0,
-)
+                                    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                                    w::Union{Nothing, <:AbstractWeights} = nothing,
+                                    l::Real = 1.0)
     if isa(w, AbstractWeights)
         @argcheck(!isempty(w))
     end
@@ -113,12 +112,8 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
 
   - [`EquilibriumExpectedReturns`](@ref)
 """
-function Statistics.mean(
-    me::EquilibriumExpectedReturns,
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function Statistics.mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1,
+                         kwargs...)
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     w = !isnothing(me.w) ? me.w : fill(inv(size(sigma, 1)), size(sigma, 1))
     return me.l * sigma * w

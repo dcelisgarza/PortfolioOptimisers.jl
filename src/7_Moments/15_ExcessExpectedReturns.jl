@@ -25,7 +25,7 @@ Construct an `ExcessExpectedReturns` estimator with the specified mean estimator
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
-struct ExcessExpectedReturns{T1,T2} <: AbstractShrunkExpectedReturnsEstimator
+struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
     me::T1
     rf::T2
 end
@@ -60,9 +60,8 @@ ExcessExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
 function ExcessExpectedReturns(;
-    me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-    rf::Real = 0.0,
-)
+                               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                               rf::Real = 0.0)
     return ExcessExpectedReturns(me, rf)
 end
 
@@ -88,15 +87,11 @@ This method applies the mean estimator to the data and subtracts the risk-free r
 
   - [`ExcessExpectedReturns`](@ref)
 """
-function Statistics.mean(
-    me::ExcessExpectedReturns,
-    X::AbstractMatrix;
-    dims::Int = 1,
-    kwargs...,
-)
+function Statistics.mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1,
+                         kwargs...)
     return mean(me.me, X; dims = dims, kwargs...) .- me.rf
 end
-function factory(me::ExcessExpectedReturns, w::Union{Nothing,<:AbstractWeights} = nothing)
+function factory(me::ExcessExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
     return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
 

@@ -1,4 +1,4 @@
-struct FactorBlackLittermanPrior{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13} <:
+struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
        AbstractLowOrderPriorEstimator_2_1
     pe::T1
     f_mp::T2
@@ -15,20 +15,18 @@ struct FactorBlackLittermanPrior{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13} <:
     rsd::T13
 end
 function FactorBlackLittermanPrior(;
-    pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPrior(),
-    f_mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-    re::AbstractRegressionEstimator = StepwiseRegression(),
-    ve::AbstractVarianceEstimator = SimpleVariance(),
-    views::Union{<:LinearConstraintEstimator,<:BlackLittermanViews},
-    sets::Union{Nothing,<:AssetSets} = nothing,
-    views_conf::Union{Nothing,<:AbstractVector} = nothing,
-    w::Union{Nothing,<:AbstractWeights} = nothing,
-    rf::Real = 0.0,
-    l::Union{Nothing,<:Real} = nothing,
-    tau::Union{Nothing,<:Real} = nothing,
-    rsd::Bool = true,
-)
+                                   pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPrior(),
+                                   f_mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                                   mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                                   re::AbstractRegressionEstimator = StepwiseRegression(),
+                                   ve::AbstractVarianceEstimator = SimpleVariance(),
+                                   views::Union{<:LinearConstraintEstimator,
+                                                <:BlackLittermanViews},
+                                   sets::Union{Nothing, <:AssetSets} = nothing,
+                                   views_conf::Union{Nothing, <:AbstractVector} = nothing,
+                                   w::Union{Nothing, <:AbstractWeights} = nothing,
+                                   rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
+                                   tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)
     if isa(views, LinearConstraintEstimator)
         @argcheck(!isnothing(sets))
     end
@@ -36,41 +34,15 @@ function FactorBlackLittermanPrior(;
     if !isnothing(tau)
         @argcheck(tau > zero(tau))
     end
-    return FactorBlackLittermanPrior(
-        pe,
-        f_mp,
-        mp,
-        re,
-        ve,
-        views,
-        sets,
-        views_conf,
-        w,
-        rf,
-        l,
-        tau,
-        rsd,
-    )
+    return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
+                                     l, tau, rsd)
 end
-function factory(
-    pe::FactorBlackLittermanPrior,
-    w::Union{Nothing,<:AbstractWeights} = nothing,
-)
-    return FactorBlackLittermanPrior(;
-        pe = factory(pe.pe, w),
-        f_mp = pe.f_mp,
-        mp = pe.mp,
-        re = pe.re,
-        ve = factory(pe.ve, w),
-        views = pe.views,
-        sets = pe.sets,
-        views_conf = pe.views_conf,
-        w = pe.w,
-        rf = pe.rf,
-        l = pe.l,
-        tau = pe.tau,
-        rsd = pe.rsd,
-    )
+function factory(pe::FactorBlackLittermanPrior,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
+                                     re = pe.re, ve = factory(pe.ve, w), views = pe.views,
+                                     sets = pe.sets, views_conf = pe.views_conf, w = pe.w,
+                                     rf = pe.rf, l = pe.l, tau = pe.tau, rsd = pe.rsd)
 end
 function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
     return if sym == :me
@@ -81,14 +53,8 @@ function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function prior(
-    pe::FactorBlackLittermanPrior,
-    X::AbstractMatrix,
-    F::AbstractMatrix;
-    dims::Int = 1,
-    strict::Bool = false,
-    kwargs...,
-)
+function prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix;
+               dims::Int = 1, strict::Bool = false, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -102,12 +68,8 @@ function prior(
     rr = regression(pe.re, X, F)
     (; b, M) = rr
     posterior_X = F * transpose(M) .+ transpose(b)
-    (; P, Q) = black_litterman_views(
-        pe.views,
-        pe.sets;
-        datatype = eltype(posterior_X),
-        strict = strict,
-    )
+    (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
+                                     strict = strict)
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
     omega = tau * calc_omega(pe.views_conf, P, prior_sigma)
     prior_mu = if !isnothing(pe.l)
@@ -122,8 +84,8 @@ function prior(
     else
         prior_mu .- pe.rf
     end
-    f_posterior_mu, f_posterior_sigma =
-        vanilla_posteriors(tau, pe.rf, prior_mu, prior_sigma, omega, P, Q)
+    f_posterior_mu, f_posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu,
+                                                           prior_sigma, omega, P, Q)
     matrix_processing!(pe.f_mp, f_posterior_sigma, F)
     # Reconstruct the posteriors using the black litterman adjusted factor statistics.
     posterior_mu = M * f_posterior_mu + b
@@ -136,17 +98,11 @@ function prior(
         posterior_sigma .+= err_sigma
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
-    return LowOrderPrior(;
-        X = posterior_X,
-        mu = posterior_mu,
-        sigma = posterior_sigma,
-        chol = transpose(reshape(posterior_csigma, length(posterior_mu), :)),
-        w = f_prior.w,
-        rr = rr,
-        f_mu = f_posterior_mu,
-        f_sigma = f_posterior_sigma,
-        f_w = f_prior.w,
-    )
+    return LowOrderPrior(; X = posterior_X, mu = posterior_mu, sigma = posterior_sigma,
+                         chol = transpose(reshape(posterior_csigma, length(posterior_mu),
+                                                  :)), w = f_prior.w, rr = rr,
+                         f_mu = f_posterior_mu, f_sigma = f_posterior_sigma,
+                         f_w = f_prior.w)
 end
 
 export FactorBlackLittermanPrior

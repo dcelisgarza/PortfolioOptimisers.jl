@@ -128,10 +128,8 @@ NormalisedConstantRelativeRiskAversion
   - [`owa_l_moment_crm`](@ref)
 """
 function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
-    @argcheck(
-        zero(g) < g < one(g),
-        DomainError(g, range_msg("`g`", zero(g), one(g), g, false, false) * ".")
-    )
+    @argcheck(zero(g) < g < one(g),
+              DomainError(g, range_msg("`g`", zero(g), one(g), g, false, false) * "."))
     return NormalisedConstantRelativeRiskAversion(g)
 end
 
@@ -169,7 +167,7 @@ Estimator type for OWA weights using JuMP-based optimization.
   - [`owa_l_moment_crm`](@ref)
   - [`Solver`](@ref)
 """
-struct OWAJuMP{T1,T2,T3,T4,T5} <: AbstractOrderedWeightsArrayEstimator
+struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
     slv::T1
     max_phi::T2
     sc::T3
@@ -226,41 +224,23 @@ OWAJuMP
   - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
   - [`owa_l_moment_crm`](@ref)
 """
-function OWAJuMP(;
-    slv::Union{<:Solver,<:AbstractVector{<:Solver}} = Solver(),
-    max_phi::Real = 0.5,
-    sc::Real = 1.0,
-    so::Real = 1.0,
-    alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy(),
-)
+function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
+                 max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
+                 alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
     if isa(slv, AbstractVector)
         @argcheck(!isempty(slv), IsEmptyError(non_empty_msg("`slv`") * "."))
     end
-    @argcheck(
-        zero(max_phi) < max_phi < one(max_phi),
-        DomainError(
-            max_phi,
-            range_msg("`max_phi`", zero(max_phi), one(max_phi), max_phi, false, false) *
-            ".",
-        )
-    )
-    @argcheck(
-        isfinite(sc) && sc > zero(sc),
-        AssertionError(
-            uppercasefirst(
-                mul_cond_msg([non_finite_msg("`sc`"), comp_msg("`sc`", "0", :gt, sc)]),
-            ),
-        )
-    )
+    @argcheck(zero(max_phi) < max_phi < one(max_phi),
+              DomainError(max_phi,
+                          range_msg("`max_phi`", zero(max_phi), one(max_phi), max_phi,
+                                    false, false) * "."))
+    @argcheck(isfinite(sc) && sc > zero(sc),
+              AssertionError(uppercasefirst(mul_cond_msg([non_finite_msg("`sc`"),
+                                                          comp_msg("`sc`", "0", :gt, sc)]))))
 
-    @argcheck(
-        isfinite(so) && so > zero(so),
-        AssertionError(
-            uppercasefirst(
-                mul_cond_msg([non_finite_msg("`so`"), comp_msg("`so`", "0", :gt, so)]),
-            ),
-        )
-    )
+    @argcheck(isfinite(so) && so > zero(so),
+              AssertionError(uppercasefirst(mul_cond_msg([non_finite_msg("`so`"),
+                                                          comp_msg("`so`", "0", :gt, so)]))))
     return OWAJuMP(slv, max_phi, sc, so, alg)
 end
 
@@ -326,7 +306,7 @@ function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real = 0.5)
     a = weights * phis
     w = similar(a)
     w[1] = a[1]
-    for i = 2:length(a)
+    for i in 2:length(a)
         w[i] = maximum(a[1:i])
     end
     return w
@@ -366,17 +346,17 @@ function owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
     max_phi = method.max_phi
     sc = method.sc
     @variables(model, begin
-        theta[1:T]
-        phi[1:N]
-    end)
+                   theta[1:T]
+                   phi[1:N]
+               end)
     @constraints(model, begin
-        sc * phi >= 0
-        sc * (phi .- max_phi) <= 0
-        sc * (sum(phi) - 1) == 0
-        sc * (theta - weights * phi) == 0
-        sc * (phi[2:end] - phi[1:(end-1)]) <= 0
-        sc * (theta[2:end] - theta[1:(end-1)]) >= 0
-    end)
+                     sc * phi >= 0
+                     sc * (phi .- max_phi) <= 0
+                     sc * (sum(phi) - 1) == 0
+                     sc * (theta - weights * phi) == 0
+                     sc * (phi[2:end] - phi[1:(end - 1)]) <= 0
+                     sc * (theta[2:end] - theta[1:(end - 1)]) >= 0
+                 end)
     return model
 end
 
@@ -449,16 +429,12 @@ This function dispatches on the estimator `method` to compute OWA weights from a
   - [`MinimumSumSquares`](@ref)
   - [`ncrra_weights`](@ref)
 """
-function owa_l_moment_crm(
-    method::NormalisedConstantRelativeRiskAversion,
-    weights::AbstractMatrix{<:Real},
-)
+function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion,
+                          weights::AbstractMatrix{<:Real})
     return ncrra_weights(weights, method.g)
 end
-function owa_l_moment_crm(
-    method::OWAJuMP{<:Any,<:Any,<:Any,<:Any,<:MaximumEntropy},
-    weights::AbstractMatrix{<:Real},
-)
+function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumEntropy},
+                          weights::AbstractMatrix{<:Real})
     T = size(weights, 1)
     sc = method.sc
     so = method.so
@@ -466,37 +442,32 @@ function owa_l_moment_crm(
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     @variables(model, begin
-        t
-        x[1:T]
-    end)
+                   t
+                   x[1:T]
+               end)
     @constraints(model, begin
-        sc * (sum(x) - 1) == 0
-        [sc * t; ovec; sc * x] in MOI.RelativeEntropyCone(2 * T + 1)
-        [i = 1:T], [sc * x[i]; sc * theta[i]] in MOI.NormOneCone(2)
-    end)
+                     sc * (sum(x) - 1) == 0
+                     [sc * t; ovec; sc * x] in MOI.RelativeEntropyCone(2 * T + 1)
+                     [i = 1:T], [sc * x[i]; sc * theta[i]] in MOI.NormOneCone(2)
+                 end)
     @objective(model, Max, -so * t)
     return owa_model_solve(model, method, weights)
 end
-function owa_l_moment_crm(
-    method::OWAJuMP{<:Any,<:Any,<:Any,<:Any,<:MinimumSquareDistance},
-    weights::AbstractMatrix{<:Real},
-)
+function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
+                                          <:MinimumSquareDistance},
+                          weights::AbstractMatrix{<:Real})
     sc = method.sc
     so = method.so
     model = owa_model_setup(method, weights)
     theta = model[:theta]
     @variable(model, t)
-    @constraint(
-        model,
-        [sc * t; sc * (theta[2:end] - theta[1:(end-1)])] in SecondOrderCone()
-    )
+    @constraint(model,
+                [sc * t; sc * (theta[2:end] - theta[1:(end - 1)])] in SecondOrderCone())
     @objective(model, Min, so * t)
     return owa_model_solve(model, method, weights)
 end
-function owa_l_moment_crm(
-    method::OWAJuMP{<:Any,<:Any,<:Any,<:Any,<:MinimumSumSquares},
-    weights::AbstractMatrix{<:Real},
-)
+function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumSumSquares},
+                          weights::AbstractMatrix{<:Real})
     sc = method.sc
     so = method.so
     model = owa_model_setup(method, weights)
@@ -516,24 +487,18 @@ function owa_gmd(T::Integer)
     return (4 * range(1; stop = T) .- 2 * (T + 1)) / (T * (T - 1))
 end
 function owa_cvar(T::Integer, alpha::Real = 0.05)
-    @argcheck(
-        zero(alpha) < alpha < one(alpha),
-        DomainError(
-            alpha,
-            range_msg("`alpha`", zero(alpha), one(alpha), alpha, false, false) * ".",
-        )
-    )
+    @argcheck(zero(alpha) < alpha < one(alpha),
+              DomainError(alpha,
+                          range_msg("`alpha`", zero(alpha), one(alpha), alpha, false,
+                                    false) * "."))
     k = floor(Int, T * alpha)
     w = zeros(typeof(alpha), T)
     w[1:k] .= -1 / (T * alpha)
-    w[k+1] = -1 - sum(w[1:k])
+    w[k + 1] = -1 - sum(w[1:k])
     return w
 end
-function owa_wcvar(
-    T::Integer,
-    alphas::AbstractVector{<:Real},
-    weights::AbstractVector{<:Real},
-)
+function owa_wcvar(T::Integer, alphas::AbstractVector{<:Real},
+                   weights::AbstractVector{<:Real})
     w = zeros(promote_type(eltype(alphas), eltype(weights)), T)
     for (i, j) in zip(alphas, weights)
         w .+= owa_cvar(T, i) * j
@@ -541,20 +506,16 @@ function owa_wcvar(
     return w
 end
 function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
-    @argcheck(
-        zero(alpha) < alpha_i < alpha < one(alpha) && a_sim > zero(a_sim),
-        AssertionError(
-            "The following conditions must hold:\n`alpha_i` in (0, `alpha`) => $alpha_i\n`alpha` in (0, 1) => $alpha\n`a_sim` > 0 => $a_sim",
-        )
-    )
+    @argcheck(zero(alpha) < alpha_i < alpha < one(alpha) && a_sim > zero(a_sim),
+              AssertionError("The following conditions must hold:\n`alpha_i` in (0, `alpha`) => $alpha_i\n`alpha` in (0, 1) => $alpha\n`a_sim` > 0 => $a_sim"))
     alphas = range(; start = alpha_i, stop = alpha, length = a_sim)
     n = length(alphas)
     w = Vector{typeof(alpha)}(undef, n)
     w[1] = alphas[2] * alphas[1] / alphas[n]^2
-    for i = 2:(n-1)
-        w[i] = (alphas[i+1] - alphas[i-1]) * alphas[i] / alphas[n]^2
+    for i in 2:(n - 1)
+        w[i] = (alphas[i + 1] - alphas[i - 1]) * alphas[i] / alphas[n]^2
     end
-    w[n] = (alphas[n] - alphas[n-1]) / alphas[n]
+    w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]
     return owa_wcvar(T, alphas, w)
 end
 function owa_wr(T::Integer)
@@ -571,27 +532,17 @@ end
 function owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
     return owa_cvar(T, alpha) - reverse(owa_cvar(T, beta))
 end
-function owa_wcvarrg(
-    T::Integer,
-    alphas::AbstractVector{<:Real},
-    weights_a::AbstractVector{<:Real},
-    betas::AbstractVector{<:Real} = alphas,
-    weights_b::AbstractVector{<:Real} = weights_a,
-)
+function owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
+                     weights_a::AbstractVector{<:Real},
+                     betas::AbstractVector{<:Real} = alphas,
+                     weights_b::AbstractVector{<:Real} = weights_a)
     w = owa_wcvar(T, alphas, weights_a) - reverse(owa_wcvar(T, betas, weights_b))
     return w
 end
-function owa_tgrg(
-    T::Integer;
-    alpha_i::Real = 0.0001,
-    alpha::Real = 0.05,
-    a_sim::Integer = 100,
-    beta_i::Real = alpha_i,
-    beta::Real = alpha,
-    b_sim::Integer = a_sim,
-)
-    w =
-        owa_tg(T; alpha_i = alpha_i, alpha = alpha, a_sim = a_sim) -
+function owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,
+                  a_sim::Integer = 100, beta_i::Real = alpha_i, beta::Real = alpha,
+                  b_sim::Integer = a_sim)
+    w = owa_tg(T; alpha_i = alpha_i, alpha = alpha, a_sim = a_sim) -
         reverse(owa_tg(T; alpha_i = beta_i, alpha = beta, a_sim = b_sim))
 
     return w
@@ -622,12 +573,11 @@ function owa_l_moment(T::Integer, k::Integer = 2)
     w = Vector{typeof(inv(T * k))}(undef, T)
     for i in eachindex(w)
         a = zero(k)
-        for j = 0:(k-1)
-            a +=
-                (-1)^j *
-                binomial(k - 1, j) *
-                binomial(i - 1, k - 1 - j) *
-                binomial(T - i, j)
+        for j in 0:(k - 1)
+            a += (-1)^j *
+                 binomial(k - 1, j) *
+                 binomial(i - 1, k - 1 - j) *
+                 binomial(T - i, j)
         end
         a *= 1 / (k * binomial(T, k))
         w[i] = a
@@ -668,34 +618,19 @@ This function constructs the OWA linear moment CRM weights matrix for order stat
   - [`NormalisedConstantRelativeRiskAversion`](@ref)
   - [`OWAJuMP`](@ref)
 """
-function owa_l_moment_crm(
-    T::Integer;
-    k::Integer = 2,
-    method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion(),
-)
+function owa_l_moment_crm(T::Integer; k::Integer = 2,
+                          method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
     @argcheck(k >= 2, DomainError("`k` must be at least 2:\nk => $k"))
     rg = 2:k
     weights = Matrix{typeof(inv(T * k))}(undef, T, length(rg))
     for i in rg
         wi = (-1)^i * owa_l_moment(T, i)
-        weights[:, i-1] .= wi
+        weights[:, i - 1] .= wi
     end
     return owa_l_moment_crm(method, weights)
 end
 
-export MaximumEntropy,
-    MinimumSquareDistance,
-    MinimumSumSquares,
-    NormalisedConstantRelativeRiskAversion,
-    OWAJuMP,
-    owa_gmd,
-    owa_cvar,
-    owa_wcvar,
-    owa_tg,
-    owa_wr,
-    owa_rg,
-    owa_cvarrg,
-    owa_wcvarrg,
-    owa_tgrg,
-    owa_l_moment,
-    owa_l_moment_crm
+export MaximumEntropy, MinimumSquareDistance, MinimumSumSquares,
+       NormalisedConstantRelativeRiskAversion, OWAJuMP, owa_gmd, owa_cvar, owa_wcvar,
+       owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_wcvarrg, owa_tgrg, owa_l_moment,
+       owa_l_moment_crm

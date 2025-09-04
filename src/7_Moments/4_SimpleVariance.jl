@@ -31,7 +31,7 @@ Construct a `SimpleVariance` estimator with the specified expected returns estim
   - [`var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
 """
-struct SimpleVariance{T1,T2,T3} <: AbstractVarianceEstimator
+struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
     me::T1
     w::T2
     corrected::T3
@@ -94,10 +94,9 @@ SimpleVariance
   - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
 """
 function SimpleVariance(;
-    me::Union{Nothing,<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-    w::Union{Nothing,<:AbstractWeights} = nothing,
-    corrected::Bool = true,
-)
+                        me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
+                        w::Union{Nothing, <:AbstractWeights} = nothing,
+                        corrected::Bool = true)
     if isa(me, AbstractWeights)
         @argcheck(!isempty(w))
     end
@@ -149,13 +148,8 @@ julia> std(sv, Xmat; dims = 1)
   - [`var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
 """
-function Statistics.std(
-    ve::SimpleVariance,
-    X::AbstractMatrix;
-    dims::Int = 1,
-    mean = nothing,
-    kwargs...,
-)
+function Statistics.std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1,
+                        mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
         std(X; dims = dims, corrected = ve.corrected, mean = mu)
@@ -271,13 +265,8 @@ julia> var(sv, Xmat; dims = 1)
   - [`std(ve::SimpleVariance, X::AbstractVector; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
 """
-function Statistics.var(
-    ve::SimpleVariance,
-    X::AbstractMatrix;
-    dims::Int = 1,
-    mean = nothing,
-    kwargs...,
-)
+function Statistics.var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1,
+                        mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ve.me, X; dims = dims, kwargs...) : mean
     return if isnothing(ve.w)
         var(X; dims = dims, corrected = ve.corrected, mean = mu)
@@ -347,12 +336,9 @@ function Statistics.var(ve::SimpleVariance, X::AbstractVector; mean = nothing)
         var(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
-function factory(ve::SimpleVariance, w::Union{Nothing,<:AbstractWeights} = nothing)
-    return SimpleVariance(;
-        me = factory(ve.me, w),
-        w = isnothing(w) ? ve.w : w,
-        corrected = ve.corrected,
-    )
+function factory(ve::SimpleVariance, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return SimpleVariance(; me = factory(ve.me, w), w = isnothing(w) ? ve.w : w,
+                          corrected = ve.corrected)
 end
 
 export SimpleVariance

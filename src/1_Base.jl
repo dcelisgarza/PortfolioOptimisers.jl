@@ -69,21 +69,15 @@ All concrete types that implement variance estimation (e.g., sample variance, ro
   - [`AbstractCovarianceEstimator`](@ref)
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
-function Base.show(
-    io::IO,
-    ear::Union{
-        <:AbstractEstimator,
-        <:AbstractAlgorithm,
-        <:AbstractResult,
-        <:AbstractCovarianceEstimator,
-    },
-)
+function Base.show(io::IO,
+                   ear::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
+                              <:AbstractCovarianceEstimator})
     name = string(typeof(ear))
     fields = propertynames(ear)
     if isempty(fields)
         return println(io, string(typeof(ear), "()"))
     end
-    name = name[1:(findfirst(x->(x=='{'||x=='('), name)-1)]
+    name = name[1:(findfirst(x -> (x == '{' || x == '('), name) - 1)]
     println(io, name)
     padding = maximum(map(length, map(string, fields))) + 2
     for field in fields
@@ -99,17 +93,9 @@ function Base.show(
             println(io, "| $(size(val,1))×$(size(val,2)) $(typeof(val))")
         elseif isa(val, AbstractVector) && length(val) > 6
             println(io, "| $(length(val))-element $(typeof(val))")
-        elseif isa(
-            val,
-            Union{
-                <:AbstractEstimator,
-                <:AbstractAlgorithm,
-                <:AbstractResult,
-                <:AbstractCovarianceEstimator,
-                <:JuMP.Model,
-                <:Clustering.Hclust,
-            },
-        )
+        elseif isa(val,
+                   Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult,
+                         <:AbstractCovarianceEstimator, <:JuMP.Model, <:Clustering.Hclust})
             ioalg = IOBuffer()
             show(ioalg, val)
             algstr = String(take!(ioalg))
@@ -125,7 +111,7 @@ function Base.show(
             tval = typeof(val)
             val = repr(val)
             if !isnothing(match(r"[\(\{]", val))
-                val = val[1:(findfirst(x->(x=='{'||x=='('), val)-1)]
+                val = val[1:(findfirst(x -> (x == '{' || x == '('), val) - 1)]
             end
             println(io, "| $(tval): ", val)
         else
@@ -158,7 +144,7 @@ struct IsNonFiniteError{T1} <: PortfolioOptimisersError
 end
 function Base.showerror(io::IO, err::PortfolioOptimisersError)
     name = string(typeof(err))
-    name = name[1:(findfirst(x->(x=='{'||x=='('), name)-1)]
+    name = name[1:(findfirst(x -> (x == '{' || x == '('), name) - 1)]
     return print(io, "$name: $(err.msg)")
 end
 function non_finite_msg(a)
@@ -186,13 +172,9 @@ function range_msg(a, b, c, va = nothing, bi::Bool = false, ci::Bool = false)
     return "$a$(!isnothing(va) ? " ($va)" : "") must be in $(bi ? '[' : '(')$b, $c$(ci ? ']' : ')')"
 end
 function comp_msg(a, b, c = :eq, va = nothing, vb = nothing)
-    msg = (;
-        :eq => "must be equal to",
-        :gt => "must be greater than",
-        :lt => "must be smaller than",
-        :geq => "must be greater than or equal to",
-        :leq => "must be smaller than or equal to",
-    )
+    msg = (; :eq => "must be equal to", :gt => "must be greater than",
+           :lt => "must be smaller than", :geq => "must be greater than or equal to",
+           :leq => "must be smaller than or equal to")
     return "$a$(!isnothing(va) ? " ($va)" : "") $(msg[c]) $b$(!isnothing(vb) ? " ($vb)" : "")"
 end
 

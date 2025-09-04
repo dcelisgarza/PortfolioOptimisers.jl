@@ -1,11 +1,9 @@
-struct TurnoverRiskMeasure{T1,T2} <: RiskMeasure
+struct TurnoverRiskMeasure{T1, T2} <: RiskMeasure
     settings::T1
     w::T2
 end
-function TurnoverRiskMeasure(;
-    settings::RiskMeasureSettings = RiskMeasureSettings(),
-    w::AbstractVector{<:Real},
-)
+function TurnoverRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                             w::AbstractVector{<:Real})
     @argcheck(!isempty(w))
     return TurnoverRiskMeasure(settings, w)
 end

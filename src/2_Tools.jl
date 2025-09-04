@@ -20,10 +20,8 @@ abstract type AbstractReturnsResult <: AbstractResult end
 Assert that `A` is a square matrix.
 """
 function assert_matrix_issquare(A::AbstractMatrix)
-    @argcheck(
-        size(A, 1) == size(A, 2),
-        DimensionMismatch("matrix is not square: dimensions are $(size(A))")
-    )
+    @argcheck(size(A, 1) == size(A, 2),
+              DimensionMismatch("matrix is not square: dimensions are $(size(A))"))
 end
 function drop_correlated(X::AbstractMatrix; threshold::Real = 0.95, absolute::Bool = false)
     N = size(X, 2)
@@ -56,7 +54,8 @@ function drop_incomplete(X::AbstractMatrix, any_missing::Bool = true)
         end
         setdiff(1:N, to_remove)
     else
-        (1:N)[(.!isnan.(X[1, :]).||ismissing.(X[1, :])) .& (.!isnan.(X[end, :]).||ismissing.(X[end, :]))]
+        (1:N)[(.!isnan.(X[1, :]) .|| ismissing.(X[1, :])) .& (.!isnan.(X[end, :]) .|| ismissing.(X[end,
+                                                                                                   :]))]
     end
 end
 function select_kextremes(X::AbstractMatrix) end
@@ -98,7 +97,7 @@ Keyword arguments correspond to the fields above. The constructor performs inter
   - [`AbstractReturnsResult`](@ref)
   - [`prices_to_returns`](@ref)
 """
-struct ReturnsResult{T1,T2,T3,T4,T5,T6,T7} <: AbstractReturnsResult
+struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     nx::T1
     X::T2
     nf::T3
@@ -155,178 +154,91 @@ ReturnsResult
   - [`ReturnsResult`](@ref)
   - [`prices_to_returns`](@ref)
 """
-function ReturnsResult(;
-    nx::Union{Nothing,<:AbstractVector} = nothing,
-    X::Union{Nothing,<:AbstractMatrix} = nothing,
-    nf::Union{Nothing,<:AbstractVector} = nothing,
-    F::Union{Nothing,<:AbstractMatrix} = nothing,
-    ts::Union{Nothing,<:AbstractVector} = nothing,
-    iv::Union{Nothing,<:AbstractMatrix} = nothing,
-    ivpa::Union{Nothing,<:Real,<:AbstractVector} = nothing,
-)
+function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
+                       X::Union{Nothing, <:AbstractMatrix} = nothing,
+                       nf::Union{Nothing, <:AbstractVector} = nothing,
+                       F::Union{Nothing, <:AbstractMatrix} = nothing,
+                       ts::Union{Nothing, <:AbstractVector} = nothing,
+                       iv::Union{Nothing, <:AbstractMatrix} = nothing,
+                       ivpa::Union{Nothing, <:Real, <:AbstractVector} = nothing)
     nxs_flag = !isnothing(nx)
     X_flag = !isnothing(X)
     if nxs_flag || X_flag
-        @argcheck(
-            (nxs_flag && X_flag),
-            IsNothingError(
-                uppercasefirst(mul_cond_msg(some_msg("`nx`", nx), some_msg("`X`", X))),
-            )
-        )
-        @argcheck(
-            !isempty(nx) && !isempty(X),
-            IsEmptyError(
-                uppercasefirst(
-                    mul_cond_msg(non_empty_msg(`nx`, nx), non_empty_msg("`X`", X)),
-                ),
-            )
-        )
-        @argcheck(
-            length(nx) == size(X, 2),
-            DimensionMismatch(
-                comp_msg(
-                    "length of `nx`",
-                    "number of columns of `X`",
-                    :eq,
-                    length(nx),
-                    size(X, 2),
-                ) * ".",
-            )
-        )
+        @argcheck((nxs_flag && X_flag),
+                  IsNothingError(uppercasefirst(mul_cond_msg(some_msg("`nx`", nx),
+                                                             some_msg("`X`", X)))))
+        @argcheck(!isempty(nx) && !isempty(X),
+                  IsEmptyError(uppercasefirst(mul_cond_msg(non_empty_msg(`nx`, nx),
+                                                           non_empty_msg("`X`", X)))))
+        @argcheck(length(nx) == size(X, 2),
+                  DimensionMismatch(comp_msg("length of `nx`", "number of columns of `X`",
+                                             :eq, length(nx), size(X, 2)) * "."))
     end
     nfs_flag = !isnothing(nf)
     F_flag = !isnothing(F)
     if nfs_flag || F_flag
-        @argcheck(
-            nfs_flag && F_flag,
-            IsNothingError(
-                uppercasefirst(mul_cond_msg(some_msg("`nf`", nf), some_msg("`F`", F))),
-            )
-        )
-        @argcheck(
-            !isempty(nf) && !isempty(F),
-            IsEmptyError(
-                uppercasefirst(
-                    mul_cond_msg(non_empty_msg(`nf`, nf), non_empty_msg("`F`", F)),
-                ),
-            )
-        )
-        @argcheck(
-            length(nf) == size(F, 2),
-            DimensionMismatch(
-                comp_msg(
-                    "length of `nf`",
-                    "number of columns of `F`",
-                    :eq,
-                    length(nf),
-                    size(F, 2),
-                ) * ".",
-            )
-        )
+        @argcheck(nfs_flag && F_flag,
+                  IsNothingError(uppercasefirst(mul_cond_msg(some_msg("`nf`", nf),
+                                                             some_msg("`F`", F)))))
+        @argcheck(!isempty(nf) && !isempty(F),
+                  IsEmptyError(uppercasefirst(mul_cond_msg(non_empty_msg(`nf`, nf),
+                                                           non_empty_msg("`F`", F)))))
+        @argcheck(length(nf) == size(F, 2),
+                  DimensionMismatch(comp_msg("length of `nf`", "number of columns of `F`",
+                                             :eq, length(nf), size(F, 2)) * "."))
     end
     if X_flag && F_flag
-        @argcheck(
-            size(X, 1) == size(F, 1),
-            DimensionMismatch(
-                comp_msg(
-                    "number of rows of `X`",
-                    "number of rows of `F`",
-                    :eq,
-                    size(X, 1),
-                    size(F, 1),
-                ) * ".",
-            )
-        )
+        @argcheck(size(X, 1) == size(F, 1),
+                  DimensionMismatch(comp_msg("number of rows of `X`",
+                                             "number of rows of `F`", :eq, size(X, 1),
+                                             size(F, 1)) * "."))
     end
     if !isnothing(ts)
         @argcheck(!isempty(ts), IsEmptyError(non_empty_msg("`ts`") * "."))
         if X_flag
-            @argcheck(
-                length(ts) == size(X, 1),
-                DimensionMismatch(
-                    uppercasefirst(
-                        comp_msg(
-                            "length of `ts`",
-                            "number of rows of `X`",
-                            :eq,
-                            length(ts),
-                            size(X, 1),
-                        ),
-                    ) * ".",
-                )
-            )
+            @argcheck(length(ts) == size(X, 1),
+                      DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
+                                                                "number of rows of `X`",
+                                                                :eq, length(ts),
+                                                                size(X, 1))) * "."))
         elseif F_flag
-            @argcheck(
-                length(ts) == size(F, 1),
-                DimensionMismatch(
-                    uppercasefirst(
-                        comp_msg(
-                            "length of `ts`",
-                            "number of rows of `F`",
-                            :eq,
-                            length(ts),
-                            size(F, 1),
-                        ),
-                    ) * ".",
-                )
-            )
+            @argcheck(length(ts) == size(F, 1),
+                      DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
+                                                                "number of rows of `F`",
+                                                                :eq, length(ts),
+                                                                size(F, 1))) * "."))
         else
-            throw(
-                IsNothingEmptyError(
-                    uppercasefirst(
-                        "at least one of " * mul_cond_msg(
-                            nothing_non_empty_msg("`X`", X),
-                            nothing_non_empty_msg("`F`", F),
-                        ),
-                    ) * ".",
-                ),
-            )
+            throw(IsNothingEmptyError(uppercasefirst("at least one of " *
+                                                     mul_cond_msg(nothing_non_empty_msg("`X`",
+                                                                                        X),
+                                                                  nothing_non_empty_msg("`F`",
+                                                                                        F))) *
+                                      "."))
         end
     end
     if !isnothing(iv)
         @argcheck(!isempty(iv), IsEmptyError(non_empty_msg("`iv`") * "."))
-        @argcheck(
-            size(iv) == size(X),
-            DimensionMismatch(
-                uppercasefirst(
-                    comp_msg("size of `iv`", "size of `X`", :eq, size(iv), size(X)),
-                ) * ".",
-            )
-        )
-        @argcheck(
-            all(x -> x >= zero(eltype(iv)), iv),
-            DomainError(iv, "all entries of " * non_neg_msg("`iv`") * ".")
-        )
+        @argcheck(size(iv) == size(X),
+                  DimensionMismatch(uppercasefirst(comp_msg("size of `iv`", "size of `X`",
+                                                            :eq, size(iv), size(X))) * "."))
+        @argcheck(all(x -> x >= zero(eltype(iv)), iv),
+                  DomainError(iv, "all entries of " * non_neg_msg("`iv`") * "."))
         if isa(ivpa, Real)
             @argcheck(isfinite(ivpa), DomainError(ivpa, non_finite_msg("`ivpa`") * "."))
-            @argcheck(
-                ivpa > zero(ivpa),
-                DomainError(ivpa, comp_msg("`ivpa`", zero(ivpa), :gt) * ".")
-            )
+            @argcheck(ivpa > zero(ivpa),
+                      DomainError(ivpa, comp_msg("`ivpa`", zero(ivpa), :gt) * "."))
         elseif isa(ivpa, AbstractVector)
             @argcheck(!isempty(ivpa), IsEmptyError(non_empty_msg("`ivpa`") * "."))
-            @argcheck(
-                length(ivpa) == size(iv, 2),
-                DimensionMismatch(
-                    uppercasefirst(
-                        comp_msg(
-                            "length of `ivpa`",
-                            "number of columns of `iv`",
-                            :eq,
-                            length(ivpa),
-                            size(iv, 2),
-                        ),
-                    ) * ".",
-                )
-            )
-            @argcheck(
-                all(x -> isfinite(x), ivpa),
-                DomainError(ivpa, "all entries of " * non_finite_msg("`ivpa`") * ".")
-            )
-            @argcheck(
-                all(x -> x > zero(eltype(ivpa)), ivpa),
-                DomainError(ivpa, "all entries of " * comp_msg("`ivpa`", "0", :geq) * ".")
-            )
+            @argcheck(length(ivpa) == size(iv, 2),
+                      DimensionMismatch(uppercasefirst(comp_msg("length of `ivpa`",
+                                                                "number of columns of `iv`",
+                                                                :eq, length(ivpa),
+                                                                size(iv, 2))) * "."))
+            @argcheck(all(x -> isfinite(x), ivpa),
+                      DomainError(ivpa, "all entries of " * non_finite_msg("`ivpa`") * "."))
+            @argcheck(all(x -> x > zero(eltype(ivpa)), ivpa),
+                      DomainError(ivpa,
+                                  "all entries of " * comp_msg("`ivpa`", "0", :geq) * "."))
         end
     end
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
@@ -336,15 +248,8 @@ function returns_result_view(rd::ReturnsResult, i::AbstractVector)
     X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
     iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)
     ivpa = nothing_scalar_array_view(rd.ivpa, i)
-    return ReturnsResult(;
-        nx = nx,
-        X = X,
-        nf = rd.nf,
-        F = rd.F,
-        ts = rd.ts,
-        iv = iv,
-        ivpa = ivpa,
-    )
+    return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts, iv = iv,
+                         ivpa = ivpa)
 end
 """
     prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
@@ -418,49 +323,28 @@ ReturnsResult
 
   - [`ReturnsResult`](@ref)
 """
-function prices_to_returns(
-    X::TimeArray,
-    F::TimeArray = TimeArray(TimeType[], []);
-    iv::Union{Nothing,<:TimeArray} = nothing,
-    ivpa::Union{Nothing,<:Real,<:AbstractVector{<:Real}} = nothing,
-    ret_method::Symbol = :simple,
-    padding::Bool = false,
-    missing_col_percent::Real = 1.0,
-    missing_row_percent::Union{Nothing,<:Real} = 1.0,
-    collapse_args::Tuple = (),
-    map_func::Union{Nothing,Function} = nothing,
-    join_method::Symbol = :outer,
-    impute_method::Union{Nothing,<:Impute.Imputor} = nothing,
-)
-    @argcheck(
-        zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
-        DomainError(
-            missing_col_percent,
-            range_msg(
-                "`missing_col_percent`",
-                zero(missing_col_percent),
-                one(missing_col_percent),
-                nothing,
-                false,
-                true,
-            ) * ".",
-        )
-    )
+function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
+                           iv::Union{Nothing, <:TimeArray} = nothing,
+                           ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                           ret_method::Symbol = :simple, padding::Bool = false,
+                           missing_col_percent::Real = 1.0,
+                           missing_row_percent::Union{Nothing, <:Real} = 1.0,
+                           collapse_args::Tuple = (),
+                           map_func::Union{Nothing, Function} = nothing,
+                           join_method::Symbol = :outer,
+                           impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
+    @argcheck(zero(missing_col_percent) < missing_col_percent <= one(missing_col_percent),
+              DomainError(missing_col_percent,
+                          range_msg("`missing_col_percent`", zero(missing_col_percent),
+                                    one(missing_col_percent), nothing, false, true) * "."))
     if !isnothing(missing_row_percent)
-        @argcheck(
-            zero(missing_row_percent) < missing_row_percent <= one(missing_row_percent),
-            DomainError(
-                missing_row_percent,
-                range_msg(
-                    "`missing_row_percent`",
-                    nothing,
-                    zero(missing_row_percent),
-                    one(missing_row_percent),
-                    false,
-                    true,
-                ) * ".",
-            )
-        )
+        @argcheck(zero(missing_row_percent) <
+                  missing_row_percent <=
+                  one(missing_row_percent),
+                  DomainError(missing_row_percent,
+                              range_msg("`missing_row_percent`", nothing,
+                                        zero(missing_row_percent), one(missing_row_percent),
+                                        false, true) * "."))
     end
     if !isempty(F)
         asset_names = string.(colnames(X))
@@ -497,9 +381,8 @@ function prices_to_returns(
     X = X[!, [true; keep_cols]]
     select!(X, Not(names(X, Missing)))
     dropmissing!(X)
-    X = DataFrame(
-        percentchange(TimeArray(X; timestamp = :timestamp), ret_method; padding = padding),
-    )
+    X = DataFrame(percentchange(TimeArray(X; timestamp = :timestamp), ret_method;
+                                padding = padding))
     col_names = names(X)
     nx = intersect(col_names, asset_names)
     nf = intersect(col_names, factor_names)
@@ -520,30 +403,17 @@ function prices_to_returns(
     else
         X = Matrix(X[!, nx])
     end
-    return ReturnsResult(;
-        ts = ts,
-        nx = nx,
-        X = X,
-        nf = nf,
-        F = F,
-        iv = values(iv),
-        ivpa = ivpa,
-    )
+    return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = values(iv),
+                         ivpa = ivpa)
 end
 """
     brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
                         asset_classes::DataFrame, col, date0 = nothing,
                         date1 = nothing)
 """
-function brinson_attribution(
-    X::TimeArray,
-    w::AbstractVector,
-    wb::AbstractVector,
-    asset_classes::DataFrame,
-    col,
-    date0 = nothing,
-    date1 = nothing,
-)
+function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
+                             asset_classes::DataFrame, col, date0 = nothing,
+                             date1 = nothing)
     # Efficient filtering of date range
     idx1, idx2 = if !isnothing(date0) && !isnothing(date1)
         timestamps = timestamp(X)
@@ -560,13 +430,8 @@ function brinson_attribution(
     unique_classes = unique(classes)
 
     df = DataFrame(;
-        index = [
-            "Asset Allocation",
-            "Security Selection",
-            "Interaction",
-            "Total Excess Return",
-        ],
-    )
+                   index = ["Asset Allocation", "Security Selection", "Interaction",
+                            "Total Excess Return"])
 
     # Precompute class membership matrix for efficiency
     sets_mat = [class_j == class_i for class_j in classes, class_i in unique_classes]
@@ -957,7 +822,7 @@ julia> PortfolioOptimisers.fourth_moment_index_factory(3, [1, 2])
 function fourth_moment_index_factory(N::Integer, i)
     idx = sizehint!(Int[], length(i)^2)
     for c in i
-        append!(idx, (((c-1)*N+1):(c*N))[i])
+        append!(idx, (((c - 1) * N + 1):(c * N))[i])
     end
     return idx
 end
@@ -991,7 +856,7 @@ julia> traverse_concrete_subtypes(MyAbstract)
  MyConcrete2
 ```
 """
-function traverse_concrete_subtypes(t, ctarr::Union{Nothing,<:AbstractVector} = nothing)
+function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} = nothing)
     if isnothing(ctarr)
         ctarr = []
     end
@@ -1040,10 +905,5 @@ function factory(::Nothing, args...; kwargs...)
     return nothing
 end
 
-export drop_correlated,
-    drop_incomplete,
-    ReturnsResult,
-    prices_to_returns,
-    brinson_attribution,
-    factory,
-    traverse_concrete_subtypes
+export drop_correlated, drop_incomplete, ReturnsResult, prices_to_returns,
+       brinson_attribution, factory, traverse_concrete_subtypes
