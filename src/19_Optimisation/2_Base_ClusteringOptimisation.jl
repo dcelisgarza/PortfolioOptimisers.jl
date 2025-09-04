@@ -1,12 +1,12 @@
 abstract type BaseClusteringOptimisationEstimator <: BaseOptimisationEstimator end
 abstract type ClusteringOptimisationEstimator <: OptimisationEstimator end
 abstract type WeightFinaliser <: AbstractAlgorithm end
-struct IterativeWeightFiniliser{T1} <: WeightFinaliser
+struct IterativeWeightFinaliser{T1} <: WeightFinaliser
     iter::T1
 end
-function IterativeWeightFiniliser(; iter::Integer = 100)
+function IterativeWeightFinaliser(; iter::Integer = 100)
     @argcheck(iter > 0)
-    return IterativeWeightFiniliser(iter)
+    return IterativeWeightFinaliser(iter)
 end
 abstract type JuMPWeightFiniliserFormulation <: AbstractAlgorithm end
 struct RelativeErrorWeightFiniliser <: JuMPWeightFiniliserFormulation end
@@ -45,7 +45,7 @@ function set_clustering_weight_finaliser_alg!(
     @constraint(
         model,
         [
-            sc * t;
+            sc * t
             sc * (w ⊘ wi .- one(eltype(wi)))
         ] in MOI.NormOneCone(length(w) + 1)
     )
@@ -114,11 +114,11 @@ function opt_weight_bounds(cwf::JuMPWeightFiniliser, wb::WeightBounds, wi::Abstr
         value.(model[:w])
     else
         @warn("Version: $(cwf.alg)\nReverting to Heuristic type.")
-        opt_weight_bounds(IterativeWeightFiniliser(), wb, wi)
+        opt_weight_bounds(IterativeWeightFinaliser(), wb, wi)
     end
 end
 function opt_weight_bounds(
-    cwf::IterativeWeightFiniliser,
+    cwf::IterativeWeightFinaliser,
     wb::WeightBounds,
     w::AbstractVector,
 )
@@ -160,7 +160,7 @@ function clustering_optimisation_result(
     return retcode, w
 end
 
-export IterativeWeightFiniliser,
+export IterativeWeightFinaliser,
     RelativeErrorWeightFiniliser,
     SquareRelativeErrorWeightFiniliser,
     AbsoluteErrorWeightFiniliser,

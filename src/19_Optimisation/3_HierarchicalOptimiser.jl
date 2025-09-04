@@ -24,7 +24,7 @@ function HierarchicalOptimiser(;
     fees::Union{Nothing,<:FeesEstimator,<:Fees} = nothing,
     wb::Union{Nothing,<:WeightBoundsEstimator,<:WeightBounds} = WeightBounds(),
     sets::Union{Nothing,<:AssetSets} = nothing,
-    cwf::WeightFinaliser = IterativeWeightFiniliser(),
+    cwf::WeightFinaliser = IterativeWeightFinaliser(),
     strict::Bool = false,
 )
     if isa(wb, WeightBoundsEstimator)

@@ -105,7 +105,7 @@ function NestedClustering(;
     sets::Union{Nothing,<:AssetSets} = nothing,
     opti::OptimisationEstimator,
     opto::OptimisationEstimator,
-    cwf::WeightFinaliser = IterativeWeightFiniliser(),
+    cwf::WeightFinaliser = IterativeWeightFinaliser(),
     strict::Bool = false,
     threads::FLoops.Transducers.Executor = ThreadedEx(),
 )

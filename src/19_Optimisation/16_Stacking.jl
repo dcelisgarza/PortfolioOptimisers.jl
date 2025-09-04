@@ -40,7 +40,7 @@ function Stacking(;
     sets::Union{Nothing,<:AssetSets} = nothing,
     opti::AbstractVector{<:Union{<:OptimisationEstimator,<:OptimisationResult}},
     opto::OptimisationEstimator,
-    cwf::WeightFinaliser = IterativeWeightFiniliser(),
+    cwf::WeightFinaliser = IterativeWeightFinaliser(),
     strict::Bool = false,
     threads::FLoops.Transducers.Executor = ThreadedEx(),
 )
