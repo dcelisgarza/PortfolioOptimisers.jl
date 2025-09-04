@@ -70,7 +70,7 @@ function finite_sub_allocation(w::AbstractVector, p::AbstractVector, cash::Real,
     else
         res = finite_sub_allocation!(w, p, cash, bgt, da.fallback, str_names)
         if length(res) == 4
-            res = (res..., OptimisationFailure(; res = res.trials), nothing)
+            res = (res..., OptimisationFailure(nothing), nothing)
         end
         res
     end
