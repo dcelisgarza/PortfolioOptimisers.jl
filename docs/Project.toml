@@ -10,6 +10,7 @@ PortfolioOptimisers = "e0036ec9-05e5-505d-a6a9-07af41c94861"
 StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
+TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
 
 [compat]
 Documenter = "1"
