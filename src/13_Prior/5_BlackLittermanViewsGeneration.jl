@@ -1,4 +1,4 @@
-struct BlackLittermanViews{T1,T2} <: AbstractResult
+struct BlackLittermanViews{T1, T2} <: AbstractResult
     P::T1
     Q::T2
 end
@@ -13,12 +13,10 @@ end
 function black_litterman_views(blves::LinearConstraintEstimator, args...; kwargs...)
     return blves
 end
-function get_black_litterman_views(
-    lcs::Union{<:ParsingResult,<:AbstractVector{<:ParsingResult}},
-    sets::AssetSets;
-    datatype::DataType = Float64,
-    strict::Bool = false,
-)
+function get_black_litterman_views(lcs::Union{<:ParsingResult,
+                                              <:AbstractVector{<:ParsingResult}},
+                                   sets::AssetSets; datatype::DataType = Float64,
+                                   strict::Bool = false)
     if isa(lcs, AbstractVector)
         @argcheck(!isempty(lcs))
     end
@@ -47,22 +45,16 @@ function get_black_litterman_views(
         nothing
     end
 end
-function black_litterman_views(
-    eqn::Union{<:AbstractString,Expr,<:AbstractVector{<:Union{<:AbstractString,Expr}}},
-    sets::AssetSets;
-    datatype::DataType = Float64,
-    strict::Bool = false,
-)
+function black_litterman_views(eqn::Union{<:AbstractString, Expr,
+                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                               sets::AssetSets; datatype::DataType = Float64,
+                               strict::Bool = false)
     lcs = parse_equation(eqn; ops1 = ("==",), ops2 = (:call, :(==)), datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, true)
     return get_black_litterman_views(lcs, sets; datatype = datatype, strict = strict)
 end
-function black_litterman_views(
-    lcs::LinearConstraintEstimator,
-    sets::AssetSets;
-    datatype::DataType = Float64,
-    strict::Bool = false,
-)
+function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
+                               datatype::DataType = Float64, strict::Bool = false)
     return black_litterman_views(lcs.val, sets; datatype = datatype, strict = strict)
 end
 function black_litterman_views(views::BlackLittermanViews, args...; kwargs...)
@@ -71,34 +63,28 @@ end
 function assert_bl_views_conf(::Nothing, args...)
     return nothing
 end
-function assert_bl_views_conf(
-    views_conf::Real,
-    val::Union{<:AbstractString,Expr,<:AbstractVector{<:Union{<:AbstractString,Expr}}},
-)
+function assert_bl_views_conf(views_conf::Real,
+                              val::Union{<:AbstractString, Expr,
+                                         <:AbstractVector{<:Union{<:AbstractString, Expr}}})
     @argcheck(!isa(val, AbstractVector))
     @argcheck(zero(views_conf) < views_conf < one(views_conf))
     return nothing
 end
-function assert_bl_views_conf(
-    views_conf::AbstractVector{<:Real},
-    val::Union{<:AbstractString,Expr,<:AbstractVector{<:Union{<:AbstractString,Expr}}},
-)
+function assert_bl_views_conf(views_conf::AbstractVector{<:Real},
+                              val::Union{<:AbstractString, Expr,
+                                         <:AbstractVector{<:Union{<:AbstractString, Expr}}})
     @argcheck(isa(val, AbstractVector))
     @argcheck(!isempty(views_conf))
     @argcheck(length(val) == length(views_conf))
     @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end
-function assert_bl_views_conf(
-    views_conf::Union{<:Real,<:AbstractVector{<:Real}},
-    views::LinearConstraintEstimator,
-)
+function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
+                              views::LinearConstraintEstimator)
     return assert_bl_views_conf(views_conf, views.val)
 end
-function assert_bl_views_conf(
-    views_conf::Union{<:Real,<:AbstractVector{<:Real}},
-    views::BlackLittermanViews,
-)
+function assert_bl_views_conf(views_conf::Union{<:Real, <:AbstractVector{<:Real}},
+                              views::BlackLittermanViews)
     return @argcheck(length(views_conf) == length(views.Q))
 end
 

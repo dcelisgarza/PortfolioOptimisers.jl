@@ -201,7 +201,7 @@ Construct a `GeneralisedLinearModel` regression target with optional arguments f
   - [`LinearModel`](@ref)
   - [`StatsAPI.fit(::GeneralisedLinearModel, ::AbstractMatrix, ::AbstractVector)`](@ref)
 """
-struct GeneralisedLinearModel{T1,T2} <: AbstractRegressionTarget
+struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
     args::T1
     kwargs::T2
 end
@@ -399,13 +399,13 @@ This utility dispatches on the concrete criterion subtype of [`AbstractStepwiseR
   - [`AdjustedRSquared`](@ref)
 """
 function regression_criterion_func(::AIC)
-    return GLM.aic
+    return StatsAPI.aic
 end
 function regression_criterion_func(::AICC)
-    return GLM.aicc
+    return StatsAPI.aicc
 end
 function regression_criterion_func(::BIC)
-    return GLM.bic
+    return StatsAPI.bic
 end
 function regression_criterion_func(::RSquared)
     return GLM.r2
@@ -448,7 +448,7 @@ Construct a `Regression` result object with the specified coefficient matrix, op
 
   - [`AbstractRegressionResult`](@ref)
 """
-struct Regression{T1,T2,T3} <: AbstractRegressionResult
+struct Regression{T1, T2, T3} <: AbstractRegressionResult
     M::T1
     L::T2
     b::T3
@@ -491,11 +491,8 @@ Regression
 
   - [`Regression`](@ref)
 """
-function Regression(;
-    M::AbstractMatrix,
-    L::Union{Nothing,<:AbstractMatrix} = nothing,
-    b::Union{Nothing,<:AbstractVector} = nothing,
-)
+function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
+                    b::Union{Nothing, <:AbstractVector} = nothing)
     @argcheck(!isempty(M))
     if isa(b, AbstractVector)
         @argcheck(!isempty(b))
@@ -506,14 +503,14 @@ function Regression(;
     end
     return Regression(M, L, b)
 end
-function Base.getproperty(re::Regression{<:Any,Nothing,<:Any}, sym::Symbol)
+function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
     return if sym == :L
         getfield(re, :M)
     else
         getfield(re, sym)
     end
 end
-function Base.getproperty(re::Regression{<:Any,<:AbstractMatrix,<:Any}, sym::Symbol)
+function Base.getproperty(re::Regression{<:Any, <:AbstractMatrix, <:Any}, sym::Symbol)
     return if sym == :L
         getfield(re, :L)
     else
@@ -558,11 +555,8 @@ Regression
   - [`Regression`](@ref)
 """
 function regression_view(re::Regression, i::AbstractVector)
-    return Regression(;
-        M = view(re.M, i, :),
-        L = isnothing(re.L) ? nothing : view(re.L, i, :),
-        b = view(re.b, i),
-    )
+    return Regression(; M = view(re.M, i, :),
+                      L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
 """
     regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
@@ -584,7 +578,7 @@ This method returns the input `re` unchanged. It is used internally to allow gen
 
   - [`regression_view(::Regression, ::AbstractVector)`](@ref)
 """
-function regression_view(re::Union{Nothing,<:AbstractRegressionEstimator}, args...)
+function regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
     return re
 end
 
@@ -637,12 +631,5 @@ function regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
     return regression(re, rd.X, rd.F)
 end
 
-export regression,
-    Regression,
-    LinearModel,
-    GeneralisedLinearModel,
-    AIC,
-    AICC,
-    BIC,
-    RSquared,
-    AdjustedRSquared
+export regression, Regression, LinearModel, GeneralisedLinearModel, AIC, AICC, BIC,
+       RSquared, AdjustedRSquared
