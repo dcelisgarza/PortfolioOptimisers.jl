@@ -1,4 +1,4 @@
-struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6} <:
+struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
        ClusteringOptimisationEstimator
     opt::T1
     ri::T2
@@ -6,6 +6,7 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6} <:
     scei::T4
     sceo::T5
     threads::T6
+    fallback::T7
 end
 function HierarchicalEqualRiskContribution(;
                                            opt::HierarchicalOptimiser = HierarchicalOptimiser(),
@@ -15,14 +16,16 @@ function HierarchicalEqualRiskContribution(;
                                                      <:AbstractVector{<:OptimisationRiskMeasure}} = ri,
                                            scei::Scalariser = SumScalariser(),
                                            sceo::Scalariser = scei,
-                                           threads::FLoops.Transducers.Executor = ThreadedEx())
+                                           threads::FLoops.Transducers.Executor = ThreadedEx(),
+                                           fallback::Union{Nothing,
+                                                           <:OptimisationEstimator} = nothing)
     if isa(ri, AbstractVector)
         @argcheck(!isempty(ri))
     end
     if isa(ro, AbstractVector)
         @argcheck(!isempty(ro))
     end
-    return HierarchicalEqualRiskContribution(opt, ri, ro, scei, sceo, threads)
+    return HierarchicalEqualRiskContribution(opt, ri, ro, scei, sceo, threads, fallback)
 end
 function opt_view(hec::HierarchicalEqualRiskContribution, i::AbstractVector,
                   X::AbstractMatrix)
@@ -37,7 +40,8 @@ function opt_view(hec::HierarchicalEqualRiskContribution, i::AbstractVector,
     end
     opt = opt_view(hec.opt, i)
     return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scei = hec.scei,
-                                             sceo = hec.sceo, threads = hec.threads)
+                                             sceo = hec.sceo, threads = hec.threads,
+                                             fallback = hec.fallback)
 end
 function herc_scalarised_risk_o!(::SumScalariser, wk::AbstractVector, roku::AbstractVector,
                                  rkbo::AbstractVector, cl::AbstractVector,
@@ -474,7 +478,11 @@ function optimise!(hec::HierarchicalEqualRiskContribution,
     wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; N = length(w),
                                    strict = hec.opt.strict, datatype = eltype(pr.X))
     retcode, w = clustering_optimisation_result(hec.opt.cwf, wb, w / sum(w))
-    return HierarchicalOptimisation(typeof(hec), pr, fees, wb, clr, retcode, w)
+    return if isa(retcode, OptimisationSuccess) || isnothing(hec.fallback)
+        HierarchicalOptimisation(typeof(hec), pr, fees, wb, clr, retcode, w)
+    else
+        optimise!(hec.fallback, rd; dims = dims, kwargs...)
+    end
 end
 
 export HierarchicalEqualRiskContribution

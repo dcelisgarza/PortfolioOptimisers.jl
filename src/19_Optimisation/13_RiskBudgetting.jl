@@ -24,16 +24,18 @@ function risk_budgetting_algorithm_view(r::FactorRiskBudgetting, i::AbstractVect
     re = regression_view(r.re, i)
     return FactorRiskBudgetting(; re = re, rkb = r.rkb, flag = r.flag)
 end
-struct RiskBudgetting{T1, T2, T3, T4} <: JuMPOptimisationEstimator
+struct RiskBudgetting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     opt::T1
     r::T2
     alg::T3
     wi::T4
+    fallback::T5
 end
 function RiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
                         r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                         alg::RiskBudgettingAlgorithm = AssetRiskBudgetting(),
-                        wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+                        wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                        fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
     if isa(r, AbstractVector)
         @argcheck(!isempty(r))
     end
@@ -43,7 +45,7 @@ function RiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
     if isa(alg.rkb, RiskBudgetEstimator)
         @argcheck(!isnothing(opt.sets))
     end
-    return RiskBudgetting(opt, r, alg, wi)
+    return RiskBudgetting(opt, r, alg, wi, fallback)
 end
 function opt_view(rb::RiskBudgetting, i::AbstractVector, X::AbstractMatrix)
     X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
@@ -51,7 +53,7 @@ function opt_view(rb::RiskBudgetting, i::AbstractVector, X::AbstractMatrix)
     r = risk_measure_view(rb.r, i, X)
     alg = risk_budgetting_algorithm_view(rb.alg, i)
     wi = nothing_scalar_array_view(rb.wi, i)
-    return RiskBudgetting(; opt = opt, r = r, alg = alg, wi = wi)
+    return RiskBudgetting(; opt = opt, r = r, alg = alg, wi = wi, fallback = rb.fallback)
 end
 function _set_risk_budgetting_constraints!(model::JuMP.Model, rb::RiskBudgetting,
                                            w::AbstractVector{<:AbstractJuMPScalar},
@@ -131,15 +133,19 @@ function optimise!(rb::RiskBudgetting, rd::ReturnsResult = ReturnsResult(); dims
     add_custom_constraint!(model, rb.opt.ccnt, rb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
-    return JuMPOptimisationRiskBudgetting(typeof(rb),
-                                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st,
-                                                                           lcs, cent, gcard,
-                                                                           sgcard, smtx,
-                                                                           sgmtx, slt, sst,
-                                                                           sglt, sgst, nplg,
-                                                                           cplg, tn, fees,
-                                                                           ret), prb,
-                                          retcode, sol, ifelse(save, model, nothing))
+    return if isa(retcode, OptimisationSuccess) || isnothing(rb.fallback)
+        JuMPOptimisationRiskBudgetting(typeof(rb),
+                                       ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs,
+                                                                        cent, gcard, sgcard,
+                                                                        smtx, sgmtx, slt,
+                                                                        sst, sglt, sgst,
+                                                                        nplg, cplg, tn,
+                                                                        fees, ret), prb,
+                                       retcode, sol, ifelse(save, model, nothing))
+    else
+        optimise!(rb.fallback, rd; dims = dims, str_names = str_names, save = save,
+                  kwargs...)
+    end
 end
 
 export AssetRiskBudgetting, FactorRiskBudgetting, RiskBudgetting

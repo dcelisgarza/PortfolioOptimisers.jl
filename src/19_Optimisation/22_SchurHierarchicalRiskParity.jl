@@ -43,23 +43,25 @@ function schur_params_view(sp::SchurParams, i::AbstractVector, X::AbstractMatrix
     return SchurParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
                        flag = sp.flag)
 end
-struct SchurHierarchicalRiskParity{T1, T2} <: ClusteringOptimisationEstimator
+struct SchurHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisationEstimator
     opt::T1
     params::T2
+    fallback::T3
 end
 function SchurHierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                      params::Union{<:SchurParams,
-                                                   <:AbstractVector{<:SchurParams}} = SchurParams())
+                                                   <:AbstractVector{<:SchurParams}} = SchurParams(),
+                                     fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
     if isa(params, AbstractVector)
         @argcheck(!isempty(params))
     end
-    return SchurHierarchicalRiskParity(opt, params)
+    return SchurHierarchicalRiskParity(opt, params, fallback)
 end
 function opt_view(sh::SchurHierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
     opt = opt_view(sh.opt, i)
     params = schur_params_view(sh.params, i, X)
-    return SchurHierarchicalRiskParity(; opt = opt, params = params)
+    return SchurHierarchicalRiskParity(; opt = opt, params = params, fallback = sh.fallback)
 end
 function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     @argcheck(abs(n1 - n2) <= 1)
@@ -236,8 +238,11 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
                                    strict = sh.opt.strict, datatype = eltype(pr.X))
     w, gamma = schur_weights(pr, items, wb, sh.params)
     retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w)
-    return SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gamma, retcode,
-                                                   w)
+    return if isa(retcode, OptimisationSuccess) || isnothing(sh.fallback)
+        SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gamma, retcode, w)
+    else
+        optimise!(sh.fallback, rd; dims = dims, kwargs...)
+    end
 end
 function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
@@ -255,8 +260,11 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
         gammas[i] = gamma
     end
     retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w / sum(w))
-    return SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gammas, retcode,
-                                                   w)
+    return if isa(retcode, OptimisationSuccess) || isnothing(sh.fallback)
+        SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gammas, retcode, w)
+    else
+        optimise!(sh.fallback, rd; dims = dims, kwargs...)
+    end
 end
 
 export SchurHierarchicalRiskParityOptimisation, SchurParams, SchurHierarchicalRiskParity,

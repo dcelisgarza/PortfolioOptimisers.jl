@@ -8,7 +8,7 @@ struct StackingOptimisation{T1, T2, T3, T4, T5, T6, T7} <: OptimisationResult
     retcode::T6
     w::T7
 end
-struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8} <: BaseStackingOptimisationEstimator
+struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9} <: BaseStackingOptimisationEstimator
     pe::T1
     wb::T2
     sets::T3
@@ -17,6 +17,7 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8} <: BaseStackingOptimisationEstim
     cwf::T6
     strict::T7
     threads::T8
+    fallback::T9
 end
 function assert_external_optimiser(opt::Stacking)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
@@ -42,12 +43,13 @@ function Stacking(;
                                                <:OptimisationResult}},
                   opto::OptimisationEstimator,
                   cwf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
-                  threads::FLoops.Transducers.Executor = ThreadedEx())
+                  threads::FLoops.Transducers.Executor = ThreadedEx(),
+                  fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
     assert_external_optimiser(opto)
     if isa(wb, WeightBoundsEstimator)
         @argcheck(!isnothing(sets))
     end
-    return Stacking(pe, wb, sets, opti, opto, cwf, strict, threads)
+    return Stacking(pe, wb, sets, opti, opto, cwf, strict, threads, fallback)
 end
 function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
@@ -57,7 +59,7 @@ function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
     wb = weight_bounds_view(st.wb, i)
     sets = nothing_asset_sets_view(st.sets, i)
     return Stacking(; pe = pe, opti = opti, opto = opto, wb = wb, cwf = st.cwf, sets = sets,
-                    strict = st.strict, threads = st.threads)
+                    strict = st.strict, threads = st.threads, fallback = st.fallback)
 end
 function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
@@ -80,7 +82,12 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
                      str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.cwf, st.strict, resi,
                                                  reso, wi * reso.w; datatype = eltype(pr.X))
-    return StackingOptimisation(typeof(st), pr, wb, resi, reso, retcode, w)
+    return if isa(retcode, OptimisationSuccess) || isnothing(st.fallback)
+        StackingOptimisation(typeof(st), pr, wb, resi, reso, retcode, w)
+    else
+        optimise!(st.fallback, rd; dims = dims, branchorder = branchorder,
+                  str_names = str_names, save = save, kwargs...)
+    end
 end
 
 export StackingOptimisation, Stacking

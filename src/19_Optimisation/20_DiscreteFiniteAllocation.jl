@@ -11,23 +11,24 @@ struct DiscreteAllocationOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <
     l_model::T9
     cash::T10
 end
-struct DiscreteAllocation{T1, T2, T3} <: BaseFiniteAllocationOptimisationEstimator
+struct DiscreteAllocation{T1, T2, T3, T4} <: BaseFiniteAllocationOptimisationEstimator
     slv::T1
     sc::T2
     so::T3
+    fallback::T4
 end
 function DiscreteAllocation(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
-                            sc::Real = 1, so::Real = 1)
+                            sc::Real = 1, so::Real = 1,
+                            fallback::BaseFiniteAllocationOptimisationEstimator = GreedyAllocation())
     if isa(slv, AbstractVector)
         @argcheck(!isempty(slv))
     end
     @argcheck(sc > zero(sc))
     @argcheck(so > zero(so))
-    return DiscreteAllocation(slv, sc, so)
+    return DiscreteAllocation(slv, sc, so, fallback)
 end
-function discrete_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real,
-                                  bgt::Real, da::DiscreteAllocation,
-                                  str_names::Bool = false)
+function finite_sub_allocation(w::AbstractVector, p::AbstractVector, cash::Real, bgt::Real,
+                               da::DiscreteAllocation, str_names::Bool = false)
     if isempty(w)
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
                Vector{eltype(w)}(undef, 0), cash, nothing, nothing
@@ -67,9 +68,11 @@ function discrete_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Re
         acash = value(r)
         shares, cost, aw, acash, OptimisationSuccess(; res = res.trials), model
     else
-        @warn("Discrete allocation failed. Reverting to greedy allocation.")
-        greedy_sub_allocation!(w, p, cash, bgt, GreedyAllocation())...,
-        OptimisationFailure(; res = res.trials), nothing
+        res = finite_sub_allocation!(w, p, cash, bgt, da.fallback, str_names)
+        if length(res) == 4
+            res = (res..., OptimisationFailure(; res = res.trials), nothing)
+        end
+        res
     end
 end
 function optimise!(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
@@ -82,15 +85,15 @@ function optimise!(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
         @argcheck(!isnothing(T))
     end
     cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, cash, T, fees)
-    sshares, scost, sw, scash, sretcode, smodel = discrete_sub_allocation!(-view(w, sidx),
-                                                                           view(p, sidx),
-                                                                           scash, sbgt, da,
-                                                                           str_names)
+    sshares, scost, sw, scash, sretcode, smodel = finite_sub_allocation(-view(w, sidx),
+                                                                        view(p, sidx),
+                                                                        scash, sbgt, da,
+                                                                        str_names)
     lcash = adjust_long_cash(bgt, lcash, scash)
-    lshares, lcost, lw, lcash, lretcode, lmodel = discrete_sub_allocation!(view(w, lidx),
-                                                                           view(p, lidx),
-                                                                           lcash, lbgt, da,
-                                                                           str_names)
+    lshares, lcost, lw, lcash, lretcode, lmodel = finite_sub_allocation(view(w, lidx),
+                                                                        view(p, lidx),
+                                                                        lcash, lbgt, da,
+                                                                        str_names)
 
     res = Matrix{eltype(w)}(undef, length(w), 3)
     res[lidx, 1] = lshares
@@ -99,9 +102,7 @@ function optimise!(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
     res[sidx, 2] = -scost
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
-    retcode = if isa(sretcode, OptimisationFailure) ||
-                 isa(lretcode, OptimisationFailure) ||
-                 (isnothing(sretcode) && isnothing(lretcode))
+    retcode = if isa(sretcode, OptimisationFailure) || isa(lretcode, OptimisationFailure)
         OptimisationFailure(nothing)
     else
         OptimisationSuccess(nothing)

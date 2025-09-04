@@ -1,27 +1,29 @@
-struct MeanRisk{T1, T2, T3, T4} <: JuMPOptimisationEstimator
+struct MeanRisk{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     opt::T1
     r::T2
     obj::T3
     wi::T4
+    fallback::T5
 end
 function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(),
                   r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(),
-                  wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing)
+                  wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
+                  fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
     if isa(r, AbstractVector)
         @argcheck(!isempty(r))
     end
     if isa(wi, AbstractVector)
         @argcheck(!isempty(wi))
     end
-    return MeanRisk(opt, r, obj, wi)
+    return MeanRisk(opt, r, obj, wi, fallback)
 end
 function opt_view(mr::MeanRisk, i::AbstractVector, X::AbstractMatrix)
     X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
     opt = opt_view(mr.opt, i, X)
     r = risk_measure_view(mr.r, i, X)
     wi = nothing_scalar_array_view(mr.wi, i)
-    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi)
+    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi, fallback = mr.fallback)
 end
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
                           pr::AbstractPriorResult, ::Val{false}, ::Val{false}, args...)
@@ -235,12 +237,17 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     retcode, sol = solve_mean_risk!(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), fees)
-    return JuMPOptimisation(typeof(mr),
-                            ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent,
-                                                             gcard, sgcard, smtx, sgmtx,
-                                                             slt, sst, sglt, sgst, nplg,
-                                                             cplg, tn, fees, ret), retcode,
-                            sol, ifelse(save, model, nothing))
+    return if isa(retcode, OptimisationSuccess) || isnothing(mr.fallback)
+        JuMPOptimisation(typeof(mr),
+                         ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent, gcard,
+                                                          sgcard, smtx, sgmtx, slt, sst,
+                                                          sglt, sgst, nplg, cplg, tn, fees,
+                                                          ret), retcode, sol,
+                         ifelse(save, model, nothing))
+    else
+        optimise!(mr.fallback, rd; dims = dims, str_names = str_names, save = save,
+                  kwargs...)
+    end
 end
 
 export MeanRisk

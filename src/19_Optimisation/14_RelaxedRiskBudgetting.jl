@@ -8,28 +8,31 @@ function RegularisedPenalisedRelaxedRiskBudgetting(; p::Real = 1.0)
     @argcheck(isfinite(p) && p > zero(p))
     return RegularisedPenalisedRelaxedRiskBudgetting(p)
 end
-struct RelaxedRiskBudgetting{T1, T2, T3, T4} <: JuMPOptimisationEstimator
+struct RelaxedRiskBudgetting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     opt::T1
     rkb::T2
     wi::T3
     alg::T4
+    fallback::T5
 end
 function RelaxedRiskBudgetting(; opt::JuMPOptimiser = JuMPOptimiser(),
                                rkb::Union{Nothing, <:RiskBudgetEstimator,
                                           <:RiskBudgetResult} = nothing,
                                wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                               alg::RelaxedRiskBudgettingAlgorithm = BasicRelaxedRiskBudgetting())
+                               alg::RelaxedRiskBudgettingAlgorithm = BasicRelaxedRiskBudgetting(),
+                               fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
     if isa(wi, AbstractVector)
         @argcheck(!isempty(wi))
     end
-    return RelaxedRiskBudgetting(opt, rkb, wi, alg)
+    return RelaxedRiskBudgetting(opt, rkb, wi, alg, fallback)
 end
 function opt_view(rrb::RelaxedRiskBudgetting, i::AbstractVector, X::AbstractMatrix)
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
     rkb = risk_budget_view(rrb.rkb, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
-    return RelaxedRiskBudgetting(; opt = opt, rkb = rkb, wi = wi, alg = rrb.alg)
+    return RelaxedRiskBudgetting(; opt = opt, rkb = rkb, wi = wi, alg = rrb.alg,
+                                 fallback = rrb.fallback)
 end
 function set_relaxed_risk_budgetting_alg_constraints!(::BasicRelaxedRiskBudgetting,
                                                       model::JuMP.Model,
@@ -139,15 +142,19 @@ function optimise!(rrb::RelaxedRiskBudgetting, rd::ReturnsResult = ReturnsResult
     add_custom_constraint!(model, rrb.opt.ccnt, rrb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rrb.opt.cobj, rrb, pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(pr.X))
-    return JuMPOptimisationRiskBudgetting(typeof(rrb),
-                                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st,
-                                                                           lcs, cent, gcard,
-                                                                           sgcard, smtx,
-                                                                           sgmtx, slt, sst,
-                                                                           sglt, sgst, nplg,
-                                                                           cplg, tn, fees,
-                                                                           ret), prb,
-                                          retcode, sol, ifelse(save, model, nothing))
+    return if isa(retcode, OptimisationSuccess) || isnothing(rrb.fallback)
+        JuMPOptimisationRiskBudgetting(typeof(rrb),
+                                       ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs,
+                                                                        cent, gcard, sgcard,
+                                                                        smtx, sgmtx, slt,
+                                                                        sst, sglt, sgst,
+                                                                        nplg, cplg, tn,
+                                                                        fees, ret), prb,
+                                       retcode, sol, ifelse(save, model, nothing))
+    else
+        optimise!(rrb.fallback, rd; dims = dims, str_names = str_names, save = save,
+                  kwargs...)
+    end
 end
 
 export BasicRelaxedRiskBudgetting, RegularisedRelaxedRiskBudgetting,

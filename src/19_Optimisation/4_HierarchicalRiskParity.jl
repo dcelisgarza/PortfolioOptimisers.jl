@@ -1,22 +1,25 @@
-struct HierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisationEstimator
+struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
     opt::T1
     r::T2
     sce::T3
+    fallback::T4
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::Union{<:OptimisationRiskMeasure,
                                          <:AbstractVector{<:OptimisationRiskMeasure}} = Variance(),
-                                sce::Scalariser = SumScalariser())
+                                sce::Scalariser = SumScalariser(),
+                                fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
     if isa(r, AbstractVector)
         @argcheck(!isempty(r))
     end
-    return HierarchicalRiskParity(opt, r, sce)
+    return HierarchicalRiskParity(opt, r, sce, fallback)
 end
 function opt_view(hrp::HierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = risk_measure_view(hrp.r, i, X)
     opt = opt_view(hrp.opt, i)
-    return HierarchicalRiskParity(; r = r, opt = opt, sce = hrp.sce)
+    return HierarchicalRiskParity(; r = r, opt = opt, sce = hrp.sce,
+                                  fallback = hrp.fallback)
 end
 function split_factor_weight_constraints(alpha::Real, wb::WeightBounds, w::AbstractVector,
                                          lc::AbstractVector, rc::AbstractVector)
@@ -70,7 +73,11 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
         end
     end
     retcode, w = clustering_optimisation_result(hrp.opt.cwf, wb, w / sum(w))
-    return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
+    return if isa(retcode, OptimisationSuccess) || isnothing(hrp.fallback)
+        HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
+    else
+        optimise!(hrp.fallback, rd; dims = dims, kwargs...)
+    end
 end
 function hrp_scalarised_risk(::SumScalariser, wu::AbstractMatrix, wk::AbstractVector,
                              rku::AbstractVector, lc::AbstractVector, rc::AbstractVector,
@@ -167,7 +174,11 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any,
         end
     end
     retcode, w = clustering_optimisation_result(hrp.opt.cwf, wb, w / sum(w))
-    return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
+    return if isa(retcode, OptimisationSuccess) || isnothing(hrp.fallback)
+        HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
+    else
+        optimise!(hrp.fallback, rd; dims = dims, kwargs...)
+    end
 end
 
 export HierarchicalRiskParity

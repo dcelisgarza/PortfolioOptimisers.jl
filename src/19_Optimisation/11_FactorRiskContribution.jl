@@ -1,4 +1,4 @@
-struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
+struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
        JuMPOptimisationEstimator
     opt::T1
     re::T2
@@ -9,6 +9,7 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     sets::T7
     wi::T8
     flag::T9
+    fallback::T10
 end
 function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 re::Union{<:Regression, <:AbstractRegressionEstimator} = StepwiseRegression(),
@@ -20,7 +21,8 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                             <:SemiDefinitePhylogeny} = nothing,
                                 sets::Union{Nothing, <:AssetSets} = nothing,
                                 wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
-                                flag::Bool = true)
+                                flag::Bool = true,
+                                fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
     if isa(r, AbstractVector)
         @argcheck(!isempty(r))
     end
@@ -31,7 +33,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                    Union{<:SemiDefinitePhylogenyEstimator, <:SemiDefinitePhylogeny}))
     @argcheck(!isa(opt.cplg,
                    Union{<:SemiDefinitePhylogenyEstimator, <:SemiDefinitePhylogeny}))
-    return FactorRiskContribution(opt, re, r, obj, nplg, cplg, sets, wi, flag)
+    return FactorRiskContribution(opt, re, r, obj, nplg, cplg, sets, wi, flag, fallback)
 end
 function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMatrix)
     X = isa(frc.opt.pe, AbstractPriorResult) ? frc.opt.pe.X : X
@@ -40,7 +42,7 @@ function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMat
     r = risk_measure_view(frc.r, i, X)
     return FactorRiskContribution(; opt = opt, re = re, r = r, obj = frc.obj,
                                   nplg = frc.nplg, cplg = frc.cplg, sets = frc.sets,
-                                  wi = frc.wi, flag = frc.flag)
+                                  wi = frc.wi, flag = frc.flag, fallback = frc.fallback)
 end
 function set_factor_risk_contribution_constraints!(model::JuMP.Model,
                                                    re::Union{<:Regression,
@@ -100,24 +102,24 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     add_custom_constraint!(model, frc.opt.ccnt, frc, pr)
     set_portfolio_objective_function!(model, frc.obj, ret, frc.opt.cobj, frc, pr)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(pr.X))
-    return JuMPOptimisationFactorRiskContribution(typeof(frc),
-                                                  ProcessedJuMPOptimiserAttributes(pr, wb,
-                                                                                   lt, st,
-                                                                                   lcs,
-                                                                                   cent,
-                                                                                   gcard,
-                                                                                   sgcard,
-                                                                                   smtx,
-                                                                                   sgmtx,
-                                                                                   slt, sst,
-                                                                                   sglt,
-                                                                                   sgst,
-                                                                                   nplg,
-                                                                                   cplg, tn,
-                                                                                   fees,
-                                                                                   ret), rr,
-                                                  frc_nplg, frc_cplg, retcode, sol,
-                                                  ifelse(save, model, nothing))
+    return if isa(retcode, OptimisationSuccess) || isnothing(frc.fallback)
+        JuMPOptimisationFactorRiskContribution(typeof(frc),
+                                               ProcessedJuMPOptimiserAttributes(pr, wb, lt,
+                                                                                st, lcs,
+                                                                                cent, gcard,
+                                                                                sgcard,
+                                                                                smtx, sgmtx,
+                                                                                slt, sst,
+                                                                                sglt, sgst,
+                                                                                nplg, cplg,
+                                                                                tn, fees,
+                                                                                ret), rr,
+                                               frc_nplg, frc_cplg, retcode, sol,
+                                               ifelse(save, model, nothing))
+    else
+        optimise!(frc.fallback, rd; dims = dims, str_names = str_names, save = save,
+                  kwargs...)
+    end
 end
 
 export FactorRiskContribution

@@ -94,7 +94,7 @@ function risk_measure_view(r::SquareRootKurtosis, i::AbstractVector, args...)
     j = if isa(mu, AbstractVector)
         length(mu)
     elseif isa(kt, AbstractMatrix)
-        round(Int, sqrt(size(kt, 1)))
+        isqrt(size(kt, 1))
     else
         nothing
     end

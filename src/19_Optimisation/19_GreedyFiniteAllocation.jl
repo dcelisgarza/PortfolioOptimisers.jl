@@ -17,8 +17,8 @@ end
 function roundmult(val::Real, prec::Real, args...; kwargs...)
     return round(div(val, prec) * prec, args...; kwargs...)
 end
-function greedy_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real, bgt::Real,
-                                ga::GreedyAllocation)
+function finite_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real, bgt::Real,
+                                ga::GreedyAllocation, args...)
     if isempty(w)
         return Vector{eltype(w)}(undef, 0), Vector{eltype(w)}(undef, 0),
                Vector{eltype(w)}(undef, 0), cash
@@ -91,10 +91,10 @@ function optimise!(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
         @argcheck(!isnothing(T))
     end
     cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, cash, T, fees)
-    sshares, scost, sw, scash = greedy_sub_allocation!(-view(w, sidx), view(p, sidx), scash,
+    sshares, scost, sw, scash = finite_sub_allocation!(-view(w, sidx), view(p, sidx), scash,
                                                        sbgt, ga)
     lcash = adjust_long_cash(bgt, lcash, scash)
-    lshares, lcost, lw, lcash = greedy_sub_allocation!(view(w, lidx), view(p, lidx), lcash,
+    lshares, lcost, lw, lcash = finite_sub_allocation!(view(w, lidx), view(p, lidx), lcash,
                                                        lbgt, ga)
     res = Matrix{eltype(w)}(undef, length(w), 3)
     res[lidx, 1] = lshares
