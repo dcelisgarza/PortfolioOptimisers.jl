@@ -1,5 +1,5 @@
 using PortfolioOptimisers
-using Test
+using Test, SafeTestsets
 
 #=
 Don't add your tests to runtests.jl. Instead, create files named
