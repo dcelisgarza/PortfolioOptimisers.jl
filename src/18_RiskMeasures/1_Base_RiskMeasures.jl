@@ -20,8 +20,6 @@ abstract type MuHierarchicalRiskMeasure <: HierarchicalRiskMeasure end
 abstract type AbstractMomentHierarchicalRiskMeasure <: MuHierarchicalRiskMeasure end
 
 abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
-Base.length(::AbstractBaseRiskMeasure) = 1
-Base.iterate(rs::AbstractBaseRiskMeasure, state = 1) = state > 1 ? nothing : (rs, state + 1)
 struct Frontier{T1, T2, T3} <: AbstractAlgorithm
     N::T1
     factor::T2

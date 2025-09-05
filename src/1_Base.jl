@@ -177,5 +177,10 @@ function comp_msg(a, b, c = :eq, va = nothing, vb = nothing)
            :leq => "must be smaller than or equal to")
     return "$a$(!isnothing(va) ? " ($va)" : "") $(msg[c]) $b$(!isnothing(vb) ? " ($vb)" : "")"
 end
+function Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                 <:AbstractResult}, state = 1)
+    return state > 1 ? nothing : (obj, state + 1)
+end
+Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}) = 1
 
 export IsEmptyError, IsNothingError, IsNothingEmptyError

@@ -82,6 +82,5 @@ function factory(tracking::TrackingError, w::AbstractVector)
     return TrackingError(; tracking = factory(tracking.tracking, w), err = tracking.err,
                          alg = tracking.alg)
 end
-Base.iterate(S::AbstractTracking, state = 1) = state > 1 ? nothing : (S, state + 1)
 
 export WeightsTracking, ReturnsTracking, TrackingError

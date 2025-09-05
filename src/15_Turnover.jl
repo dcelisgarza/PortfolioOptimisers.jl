@@ -65,6 +65,5 @@ end
 function factory(tn::Turnover, w::AbstractVector)
     return Turnover(; w = w, val = tn.val)
 end
-Base.iterate(S::Turnover, state = 1) = state > 1 ? nothing : (S, state + 1)
 
 export TurnoverEstimator, Turnover, turnover_constraints

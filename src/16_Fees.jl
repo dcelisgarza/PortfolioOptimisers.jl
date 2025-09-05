@@ -83,8 +83,6 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
     end
     return Fees(tn, l, s, fl, fs, kwargs)
 end
-Base.length(::Fees) = 1
-Base.iterate(::Fees, i = 1) = i <= 1 ? (i, nothing) : nothing
 function fees_constraints(fees::Union{Nothing, <:Fees}, args...; kwargs...)
     return fees
 end

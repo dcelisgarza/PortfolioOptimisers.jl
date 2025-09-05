@@ -126,9 +126,6 @@ function CentralityEstimator(; A::Centrality = Centrality(),
                              comp::ComparisonOperators = LEQ())
     return CentralityEstimator(A, B, comp)
 end
-function Base.iterate(S::CentralityEstimator, state = 1)
-    return state > 1 ? nothing : (S, state + 1)
-end
 function centrality_constraints(ccs::Union{<:CentralityEstimator,
                                            <:AbstractVector{<:CentralityEstimator}},
                                 X::AbstractMatrix; dims::Int = 1, kwargs...)

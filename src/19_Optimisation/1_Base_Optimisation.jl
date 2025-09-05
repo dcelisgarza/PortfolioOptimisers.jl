@@ -23,10 +23,6 @@ function SingletonOptimisation(; retcode::OptimisationReturnCode)
     return SingletonOptimisation(retcode)
 end
 abstract type OptimisationModelResult <: AbstractResult end
-Base.length(opt::AbstractOptimisationEstimator) = 1
-function Base.iterate(S::AbstractOptimisationEstimator, state = 1)
-    return state > 1 ? nothing : (S, state + 1)
-end
 function opt_view(opt::AbstractOptimisationEstimator, args...)
     return opt
 end

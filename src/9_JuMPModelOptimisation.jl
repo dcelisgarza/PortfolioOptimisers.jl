@@ -94,7 +94,6 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
     end
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
-Base.iterate(S::Solver, state = 1) = state > 1 ? nothing : (S, state + 1)
 
 """
     struct JuMPResult{T1, T2} <: AbstractJuMPResult

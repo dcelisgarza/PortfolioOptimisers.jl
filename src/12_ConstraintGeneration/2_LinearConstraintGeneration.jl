@@ -138,8 +138,6 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
     eqn::T5
     ij::T6
 end
-Base.length(res::AbstractParsingResult) = 1
-Base.iterate(res::AbstractParsingResult, state = 1) = state > 1 ? nothing : (res, state + 1)
 Base.getindex(res::AbstractParsingResult, i) = i == 1 ? res : throw(BoundsError(res, i))
 struct AssetSets{T1, T2} <: AbstractEstimator
     key::T1
@@ -151,8 +149,6 @@ function AssetSets(; key::Union{Symbol, <:AbstractString} = "nx",
               AssertionError("The following conditions must be met:\n`dict` must be non-empty => !isempty(dict) = $(!isempty(dict))\n`dict` must contain `key` = $key, typeof(key) = $(typeof(key)) => haskey(dict, key) = $(haskey(dict, key))"))
     return AssetSets(key, dict)
 end
-Base.length(res::AssetSets) = 1
-Base.iterate(res::AssetSets, state = 1) = state > 1 ? nothing : (res, state + 1)
 function nothing_asset_sets_view(sets::AssetSets, i::AbstractVector)
     dict = Dict(k => v for (k, v) in sets.dict if k != sets.key)
     dict[sets.key] = view(sets.dict[sets.key], i)
