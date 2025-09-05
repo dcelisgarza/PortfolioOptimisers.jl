@@ -99,12 +99,21 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 
 ## References
 
-  - Main entry: `src/PortfolioOptimisers.jl`
-  - Developer guide: `docs/src/91-developer.md`
-  - Contributing: `docs/src/90-contributing.md`
-  - Tests: `test/`
-  - Docs: `docs/`
+  - Main entry: [src/PortfolioOptimisers.jl](../src/PortfolioOptimisers.jl)
+  - Developer guide: [docs/src/091-developer.md](../docs/src/091-developer.md)
+  - Contributing: [contributing](../docs/src/090-contributing.md)
+  - Tests: [test](../test/)
+  - Docs: [docs](../docs/)
+
+## Code Review & Maintenance
+
+  - Ensure tests cover new functionality and edge cases.
+  - Keep documentation up to date with code changes.
+  - Follow semantic versioning for releases.
+  - Check spelling and grammar in code, docstrings and docs.
+  - Ensure new code follows established patterns and conventions.
+  - Ensure new documentation adheres to established patterns and conventions.
 
 * * *
 
-For further details, see the [README.md](../README.md), [91-developer.md](../docs/src/091-developer.md) and in-code documentation.
+For further details, see the [README.md](../README.md), [`091-developer.md`](../docs/src/091-developer.md) and in-code documentation.
