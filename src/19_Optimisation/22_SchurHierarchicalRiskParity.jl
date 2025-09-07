@@ -65,6 +65,7 @@ function opt_view(sh::SchurHierarchicalRiskParity, i::AbstractVector, X::Abstrac
 end
 function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     @argcheck(abs(n1 - n2) <= 1)
+
     if n1 == n2
         return I(n1)
     elseif n1 < n2
@@ -72,30 +73,26 @@ function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     end
 
     m = zeros(n1, n2)
-    e = vcat(ones(1, n2) / n2, I(n2))
-    m .+= e
-    for i in 1:(n1 - 1)
-        e[i, :] .= view(e, i + 1, :)
-        e[i + 1, :] .= view(e, i, :)
-        m .+= e
+    row = fill(inv(n2), n2)
+    e = I(n2)
+    for i in axes(m, 1)
+        mj = vcat(e[1:(i - 1), :], row', e[i:end, :])
+        m .+= mj / n1
     end
-    return m / n1
+    return m
 end
 function schur_augmentation(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix,
                             gamma::Real)
     Na = size(A, 1)
-    Nd = size(C, 1)
-    if iszero(gamma) || isone(Na) || isone(Nd)
+    Nc = size(C, 1)
+    if iszero(gamma) || isone(Na) || isone(Nc)
         return A
     end
-
     A_aug = A - gamma * B * (C \ transpose(B))
-    m = symmetric_step_up_matrix(Na, Nd)
-    r = I - gamma * (transpose(B) \ transpose(C)) * transpose(m)
+    m = symmetric_step_up_matrix(Na, Nc)
+    r = I - gamma * transpose(transpose(C) \ transpose(B)) * transpose(m)
     A_aug = r \ A_aug
-    A_aug = (A_aug + transpose(A_aug)) / 2
-
-    return A_aug
+    return (A_aug + transpose(A_aug)) / 2
 end
 function naive_portfolio_risk(::Variance, sigma::AbstractMatrix)
     w = inv.(diag(sigma))
@@ -130,10 +127,10 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::Weigh
                 C_aug = C
             else
                 B = view(sigma, lc, rc)
-                sigma[lc, lc] = schur_augmentation(A, B, C, gamma)
-                sigma[rc, rc] = schur_augmentation(C, transpose(B), A, gamma)
-                A_aug = view(sigma, lc, lc)
-                C_aug = view(sigma, rc, rc)
+                A_aug = schur_augmentation(A, B, C, gamma)
+                C_aug = schur_augmentation(C, transpose(B), A, gamma)
+                sigma[lc, lc] = A_aug
+                sigma[rc, rc] = C_aug
             end
             if flag
                 try
