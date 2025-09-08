@@ -11,7 +11,7 @@ body:
 
         - You have checked the [documentation](https://dcelisgarza.github.io/PortfolioOptimisers.jl) and haven't found enough information
         - There is not an [existing issue](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues) with the same question
-        - You have read the [contributing guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/dev/90-contributing/)
+        - You have read the [contributing guide](https://dcelisgarza.github.io/PortfolioOptimisers.jl/dev/090-contributing/)
         - You are following the [code of conduct](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/CODE_OF_CONDUCT.md)
         The form below should help you in filling out this issue.
   - type: textarea
