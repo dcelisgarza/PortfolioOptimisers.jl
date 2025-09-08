@@ -286,9 +286,12 @@ Compute the shrinkage target vector for expected returns estimation.
 
 # Arguments
 
-  - `target::GrandMean`: ReturnsResult a vector filled with the mean of `mu`.
-  - `target::VolatilityWeighted`: ReturnsResult a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
-  - `target::MeanSquareError`: ReturnsResult a vector filled with the trace of `sigma` divided by `T`.
+  - `target`: The shrinkage target type.
+
+      + `target::GrandMean`: Returns a vector filled with the mean of `mu`.
+      + `target::VolatilityWeighted`: Returns a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
+      + `target::MeanSquareError`: Returns a vector filled with the trace of `sigma` divided by `T`.
+
   - `mu`: 1D array of expected returns.
   - `sigma`: Covariance matrix of asset returns.
   - `kwargs...`: Additional keyword arguments, such as `T` (number of observations) or `isigma` (inverse covariance matrix).
@@ -331,9 +334,12 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
 
 # Arguments
 
-  - `me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}`: Use the James-Stein algorithm.
-  - `me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}`: Use the Bayes-Stein algorithm.
-  - `me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}`: Use the Bodnar-Okhrin-Parolya algorithm.
+  - `me`: Shrunk expected returns estimator.
+
+      + `me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}`: Use the James-Stein algorithm.
+      + `me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}`: Use the Bayes-Stein algorithm.
+      + `me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}`: Use the Bodnar-Okhrin-Parolya algorithm.
+
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the mean.
   - `kwargs...`: Additional keyword arguments passed to the mean and covariance estimators.

@@ -18,38 +18,14 @@ Container type for equilibrium expected returns estimators.
 # Constructor
 
     EquilibriumExpectedReturns(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                               w::Union{Nothing, <:AbstractWeights} = nothing,
-                               l::Real = 1.0)
+                                 w::Union{Nothing, <:AbstractVector} = nothing,
+                                 l::Real = 1)
 
-Construct an `EquilibriumExpectedReturns` estimator with the specified covariance estimator, weights, and risk aversion.
+Keyword arguments correspond to the fields above.
 
-# Related
+## Validation
 
-  - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
-  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-"""
-struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
-    ce::T1
-    w::T2
-    l::T3
-end
-"""
-    EquilibriumExpectedReturns(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                               w::Union{Nothing, <:AbstractWeights} = nothing,
-                               l::Real = 1.0)
-
-Construct an [`EquilibriumExpectedReturns`](@ref) estimator for equilibrium-based expected returns.
-
-# Arguments
-
-  - `ce`: Covariance estimator.
-  - `w`: Equilibrium portfolio weights. If `nothing`, uses equal weights.
-  - `l`: Risk aversion parameter.
-
-# Returns
-
-  - `EquilibriumExpectedReturns`: Configured equilibrium expected returns estimator.
+  - If `w` is provided, it must not be empty.
 
 # Examples
 
@@ -76,18 +52,26 @@ EquilibriumExpectedReturns
 
 # Related
 
-  - [`EquilibriumExpectedReturns`](@ref)
+  - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
+struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
+    ce::T1
+    w::T2
+    l::T3
+end
 function EquilibriumExpectedReturns(;
                                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                    w::Union{Nothing, <:AbstractWeights} = nothing,
-                                    l::Real = 1.0)
-    if isa(w, AbstractWeights)
+                                    w::Union{Nothing, <:AbstractVector} = nothing,
+                                    l::Real = 1)
+    if isa(w, AbstractVector)
         @argcheck(!isempty(w))
     end
     return EquilibriumExpectedReturns(ce, w, l)
+end
+function factory(ce::EquilibriumExpectedReturns, args...)
+    return ce
 end
 
 """
@@ -95,7 +79,7 @@ end
 
 Compute equilibrium expected returns from a covariance estimator, weights, and risk aversion.
 
-This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` is the risk aversion parameter, `Σ` is the covariance matrix, and `w` are the equilibrium weights. If `w` is not provided, equal weights are used.
+This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` is the risk aversion parameter, `Σ` is the covariance matrix, and `w` are the equilibrium weights. If `w` is not provided in the estimator, equal weights are used.
 
 # Arguments
 
@@ -117,9 +101,6 @@ function Statistics.mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims
     sigma = cov(me.ce, X; dims = dims, kwargs...)
     w = !isnothing(me.w) ? me.w : fill(inv(size(sigma, 1)), size(sigma, 1))
     return me.l * sigma * w
-end
-function factory(ce::EquilibriumExpectedReturns, args...)
-    return ce
 end
 
 export EquilibriumExpectedReturns

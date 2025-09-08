@@ -11,32 +11,15 @@ Stepwise regression criterion based on p-value thresholding.
 
   - `threshold`: The p-value threshold for variable inclusion.
 
-# Related
+# Constructor
 
-  - [`AbstractStepwiseRegressionCriterion`](@ref)
-  - [`StepwiseRegression`](@ref)
-"""
-struct PValue{T1} <: AbstractStepwiseRegressionCriterion
-    threshold::T1
-end
-"""
     PValue(; threshold::Real = 0.05)
 
-Construct a [`PValue`](@ref) stepwise regression criterion.
+Keyword arguments correspond to the fields above.
 
-This constructor creates a `PValue` object with the specified p-value threshold.
+## Validation
 
-# Arguments
-
-  - `threshold`: The p-value threshold for variable inclusion.
-
-# Returns
-
-  - `PValue`: A p-value-based stepwise regression criterion.
-
-# Validation
-
-  - Asserts that `0 < threshold < 1`.
+  - Asserts that `threshold` is in `(0, 1)`.
 
 # Examples
 
@@ -48,9 +31,12 @@ PValue
 
 # Related
 
-  - [`PValue`](@ref)
+  - [`AbstractStepwiseRegressionCriterion`](@ref)
   - [`StepwiseRegression`](@ref)
 """
+struct PValue{T1} <: AbstractStepwiseRegressionCriterion
+    threshold::T1
+end
 function PValue(; threshold::Real = 0.05)
     @argcheck(zero(threshold) < threshold < one(threshold))
     return PValue(threshold)
@@ -106,38 +92,10 @@ Estimator for stepwise regression-based moment estimation.
 # Constructor
 
     StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
-                        alg::AbstractStepwiseRegressionAlgorithm = Forward(),
-                        target::AbstractRegressionTarget = LinearModel())
+                         alg::AbstractStepwiseRegressionAlgorithm = Forward(),
+                         target::AbstractRegressionTarget = LinearModel())
 
-# Related
-
-  - [`AbstractStepwiseRegressionCriterion`](@ref)
-  - [`AbstractStepwiseRegressionAlgorithm`](@ref)
-  - [`AbstractRegressionTarget`](@ref)
-"""
-struct StepwiseRegression{T1, T2, T3} <: AbstractRegressionEstimator
-    crit::T1
-    alg::T2
-    target::T3
-end
-"""
-    StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
-                        alg::AbstractStepwiseRegressionAlgorithm = Forward(),
-                        target::AbstractRegressionTarget = LinearModel())
-
-Construct a [`StepwiseRegression`](@ref) estimator for stepwise regression-based moment estimation.
-
-This constructor creates a `StepwiseRegression` object with the specified criterion, algorithm, and regression target.
-
-# Arguments
-
-  - `crit`: Criterion for variable selection.
-  - `alg`: Stepwise algorithm.
-  - `target`: Regression target type.
-
-# Returns
-
-  - `StepwiseRegression`: A configured stepwise regression estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -157,6 +115,11 @@ StepwiseRegression
   - [`AbstractStepwiseRegressionAlgorithm`](@ref)
   - [`AbstractRegressionTarget`](@ref)
 """
+struct StepwiseRegression{T1, T2, T3} <: AbstractRegressionEstimator
+    crit::T1
+    alg::T2
+    target::T3
+end
 function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = Forward(),
                             target::AbstractRegressionTarget = LinearModel())

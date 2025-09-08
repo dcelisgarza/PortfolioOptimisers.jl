@@ -1,10 +1,9 @@
 # Coskewness
 
 ```@docs
-PortfolioOptimisers.CoskewnessEstimator
 Coskewness
-Coskewness()
+coskewness
+PortfolioOptimisers.CoskewnessEstimator
 PortfolioOptimisers.__coskewness
 PortfolioOptimisers._coskewness
-coskewness
 ```
