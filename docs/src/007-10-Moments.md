@@ -1,12 +1,12 @@
 # Histogram
 
 ```@docs
-PortfolioOptimisers.AbstractBins
-PortfolioOptimisers.AstroPyBins
 Knuth
 FreedmanDiaconis
 Scott
 HacineGharbiRavier
+PortfolioOptimisers.AbstractBins
+PortfolioOptimisers.AstroPyBins
 PortfolioOptimisers.get_bin_width_func
 PortfolioOptimisers.calc_num_bins
 PortfolioOptimisers.calc_hist_data

@@ -89,7 +89,7 @@ This method computes the standard deviation of the input array `X` using the con
 
 # Returns
 
-  - Standard deviation of `X`, computed according to the estimator configuration.
+  - `sd::Vector{<:Real}`: Standard deviation vector of `X`.
 
 # Examples
 
@@ -141,7 +141,7 @@ This method computes the standard deviation of the input vector `X` using the co
 
 # Returns
 
-  - Standard deviation of `X`, computed according to the estimator configuration.
+  - `sd::Real`: Standard deviation of `X`.
 
 # Examples
 
@@ -205,7 +205,7 @@ This method computes the variance of the input array `X` using the configuration
 
 # Returns
 
-  - Variance of `X`, computed according to the estimator configuration.
+  - `v::Vector{<:Real}`: Variance vector of `X`.
 
 # Examples
 
@@ -256,7 +256,7 @@ This method computes the variance of the input vector `X` using the configuratio
 
 # Returns
 
-  - Variance of `X`, computed according to the estimator configuration.
+  - `v::Real`: Variance of `X`.
 
 # Examples
 

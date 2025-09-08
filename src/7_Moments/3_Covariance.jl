@@ -78,7 +78,7 @@ This method dispatches to [`robust_cov`](@ref), using the specified covariance e
 
 # Returns
 
-  - Covariance matrix as computed by the estimator and optional weights.
+  - `sigma::AbstractMatrix{<:Real}`: Covariance matrix.
 
 # Related
 
@@ -111,7 +111,7 @@ This method dispatches to [`robust_cor`](@ref), using the specified covariance e
 
 # Returns
 
-  - Correlation matrix as computed by the estimator and optional weights.
+  - `rho::AbstractMatrix{<:Real}`: Correlation matrix.
 
 # Related
 
@@ -192,13 +192,17 @@ function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
 end
 
 """
-    cov(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+    cov(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 
-Compute the full covariance matrix using a [`Covariance`](@ref) estimator.
+Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 
 # Arguments
 
-  - `ce`: Covariance estimator with `Full` moment algorithm.
+  - `ce`: Covariance estimator.
+
+      + `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with [`Full`](@ref) moment algorithm.
+      + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
+
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the covariance.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
@@ -206,7 +210,7 @@ Compute the full covariance matrix using a [`Covariance`](@ref) estimator.
 
 # Returns
 
-  - Covariance matrix as computed by the estimator and moment algorithm.
+  - `sigma::AbstractMatrix{<:Real}`: Covariance matrix.
 
 # Related
 
@@ -215,43 +219,13 @@ Compute the full covariance matrix using a [`Covariance`](@ref) estimator.
   - [`GeneralWeightedCovariance`](@ref)
   - [`Full`](@ref)
   - [`Semi`](@ref)
-  - [`cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cor(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
                         dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     return cov(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
-"""
-    cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
-
-Compute the semi covariance matrix using a [`Covariance`](@ref) estimator.
-
-# Arguments
-
-  - `ce`: Covariance estimator with `Semi` moment algorithm.
-  - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
-  - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
-
-# Returns
-
-  - Covariance matrix as computed by the estimator and moment algorithm.
-
-# Related
-
-  - [`Covariance`](@ref)
-  - [`AbstractCovarianceEstimator`](@ref)
-  - [`GeneralWeightedCovariance`](@ref)
-  - [`Full`](@ref)
-  - [`Semi`](@ref)
-  - [`cov(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-"""
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
                         dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
@@ -260,13 +234,17 @@ function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
 end
 
 """
-    cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+    cor(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 
-Compute the full correlation matrix using a [`Covariance`](@ref) estimator.
+Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 
 # Arguments
 
-  - `ce`: Covariance estimator with `Full` moment algorithm.
+  - `ce`: Covariance estimator.
+
+      + `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with [`Full`](@ref) moment algorithm.
+      + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
+
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the correlation.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
@@ -274,7 +252,7 @@ Compute the full correlation matrix using a [`Covariance`](@ref) estimator.
 
 # Returns
 
-  - Correlation matrix as computed by the estimator and moment algorithm.
+  - `rho::AbstractMatrix{<:Real}`: Correlation matrix.
 
 # Related
 
@@ -283,43 +261,13 @@ Compute the full correlation matrix using a [`Covariance`](@ref) estimator.
   - [`GeneralWeightedCovariance`](@ref)
   - [`Full`](@ref)
   - [`Semi`](@ref)
-  - [`cov(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cov(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix;
                         dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     return cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
-"""
-    cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
-
-Compute the semi correlation matrix using a [`Covariance`](@ref) estimator.
-
-# Arguments
-
-  - `ce`: Covariance estimator with `Semi` moment algorithm.
-  - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the correlation.
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
-  - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
-
-# Returns
-
-  - Correlation matrix as computed by the estimator and moment algorithm.
-
-# Related
-
-  - [`Covariance`](@ref)
-  - [`AbstractCovarianceEstimator`](@ref)
-  - [`GeneralWeightedCovariance`](@ref)
-  - [`Full`](@ref)
-  - [`Semi`](@ref)
-  - [`cov(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cor(ce::Covariance{<:Any, <:Any, <:Full}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-"""
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
                         dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean

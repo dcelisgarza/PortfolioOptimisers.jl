@@ -78,13 +78,13 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Fields
 
-  - `nx`: Names or identifiers of asset columns.
+  - `nx`: Names or identifiers of asset columns (assets × 1).
   - `X`: Asset returns matrix (observations × assets).
-  - `nf`: Names or identifiers of factor columns.
+  - `nf`: Names or identifiers of factor columns (factors × 1).
   - `F`: Factor returns matrix (observations × factors).
-  - `ts`: Optional timestamps for each observation.
-  - `iv`: Implied volatilities matrix.
-  - `ivpa`: Implied volatility risk premium adjustment.
+  - `ts`: Optional timestamps for each observation (observations × 1).
+  - `iv`: Implied volatilities matrix (observations × assets).
+  - `ivpa`: Implied volatility risk premium adjustment, if a vector (assets × 1).
 
 # Constructor
 

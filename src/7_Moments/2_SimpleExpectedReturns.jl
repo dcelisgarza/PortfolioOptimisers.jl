@@ -53,7 +53,7 @@ This method computes the expected returns as the sample mean of the input data `
 
 # Returns
 
-  - The mean of `X` along the specified dimension using the [`SimpleExpectedReturns`](@ref) estimator.
+  - `mu::Vector{<:Real}`: The expected returns vector.
 
 # Examples
 
