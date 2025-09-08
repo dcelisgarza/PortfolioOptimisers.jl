@@ -85,27 +85,9 @@ A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a c
 
     ShrunkDenoise(; alpha::Real = 0.0)
 
-Creates a new `ShrunkDenoise` with the specified shrinkage parameter `alpha`.
+Keyword arguments correspond to the fields above.
 
-# Related
-
-  - [`AbstractDenoiseAlgorithm`](@ref)
-  - [`denoise!`](@ref)
-  - [`Denoise`](@ref)
-"""
-struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
-    alpha::T1
-end
-"""
-    ShrunkDenoise(; alpha::Real = 0.0)
-
-Constructor for [`ShrunkDenoise`](@ref).
-
-# Arguments
-
-  - `alpha`: The shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues. Must be in the range `[0, 1]`, where `0` means no shrinkage and `1` means full shrinkage.
-
-# Validation
+## Validation
 
   - Throws an error if `alpha` is not in `[0, 1]`.
 
@@ -116,7 +98,16 @@ julia> alg = ShrunkDenoise(; alpha = 0.5)
 ShrunkDenoise
   alpha | Float64: 0.5
 ```
+
+# Related
+
+  - [`AbstractDenoiseAlgorithm`](@ref)
+  - [`denoise!`](@ref)
+  - [`Denoise`](@ref)
 """
+struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
+    alpha::T1
+end
 function ShrunkDenoise(; alpha::Real = 0.0)
     @argcheck(zero(alpha) <= alpha <= one(alpha),
               DomainError(alpha,
@@ -157,43 +148,7 @@ A flexible container type for configuring and applying denoising algorithms to c
              args::Tuple = (),
              kwargs::NamedTuple = (;))
 
-Keyword arguments correspond to the fields above. The constructor infers types and sets defaults for robust denoising.
-
-# Related
-
-  - [`AbstractDenoiseEstimator`](@ref)
-  - [`SpectralDenoise`](@ref)
-  - [`FixedDenoise`](@ref)
-  - [`ShrunkDenoise`](@ref)
-  - [`denoise!`](@ref)
-  - [`denoise`](@ref)
-"""
-struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
-    alg::T1
-    args::T2
-    kwargs::T3
-    kernel::T4
-    m::T5
-    n::T6
-end
-"""
-    Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
-              args::Tuple = (),
-              kwargs::NamedTuple = (;),
-              kernel = AverageShiftedHistograms.Kernels.gaussian,
-              m::Integer = 10,
-              n::Integer = 1000)
-
-Construct a [`Denoise`](@ref) object, configuring all parameters for matrix denoising in PortfolioOptimisers.jl.
-
-# Arguments
-
-  - `alg`: Denoising algorithm to use (e.g., [`SpectralDenoise`](@ref), [`FixedDenoise`](@ref), [`ShrunkDenoise`](@ref)).
-  - `args`: Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
-  - `kwargs`: Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
-  - `kernel`: Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
-  - `m`: Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
-  - `n`: Number of points in the range of eigenvalues used in the average shifted histogram density estimation.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -220,7 +175,6 @@ Denoise
 
 # Related
 
-  - [`Denoise`](@ref)
   - [`AbstractDenoiseEstimator`](@ref)
   - [`SpectralDenoise`](@ref)
   - [`FixedDenoise`](@ref)
@@ -228,6 +182,14 @@ Denoise
   - [`denoise!`](@ref)
   - [`denoise`](@ref)
 """
+struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
+    alg::T1
+    args::T2
+    kwargs::T3
+    kernel::T4
+    m::T5
+    n::T6
+end
 function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple = (),
                  kwargs::NamedTuple = (;),
                  kernel = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,

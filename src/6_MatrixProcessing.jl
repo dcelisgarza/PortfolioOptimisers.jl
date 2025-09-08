@@ -90,41 +90,12 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Constructor
 
-    DefaultMatrixProcessing(; pdm = Posdef(), denoise = nothing, detone = nothing, alg = nothing)
-
-Keyword arguments correspond to the fields above. The constructor infers types and sets defaults for robust matrix processing.
-
-# Related
-
-  - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`matrix_processing!`](@ref)
-  - [`matrix_processing`](@ref)
-  - [`NonPositiveDefiniteMatrixProcessing`](@ref)
-"""
-struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
-    pdm::T1
-    denoise::T2
-    detone::T3
-    alg::T4
-end
-"""
     DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
                               denoise::Union{Nothing, <:Denoise} = nothing,
                               detone::Union{Nothing, <:Detone} = nothing,
                               alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
 
-Construct a [`DefaultMatrixProcessing`](@ref) object, configuring all steps for matrix processing in PortfolioOptimisers.jl.
-
-# Arguments
-
-  - `pdm`: Positive definite matrix estimator.
-  - `denoise`: Denoising estimator.
-  - `detone`: Detoning estimator.
-  - `alg`: Optional custom matrix processing algorithm.
-
-# Returns
-
-  - `DefaultMatrixProcessing`: A configured matrix processing estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -156,10 +127,17 @@ DefaultMatrixProcessing
 
 # Related
 
-  - [`DefaultMatrixProcessing`](@ref)
+  - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
+  - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
+struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
+    pdm::T1
+    denoise::T2
+    detone::T3
+    alg::T4
+end
 function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
                                  denoise::Union{Nothing, <:Denoise} = nothing,
                                  detone::Union{Nothing, <:Detone} = nothing,
@@ -186,39 +164,12 @@ A container type for matrix processing pipelines that do **not** enforce positiv
 
 # Constructor
 
-    NonPositiveDefiniteMatrixProcessing(; denoise = nothing, detone = nothing, alg = nothing)
-
-Keyword arguments correspond to the fields above. The constructor infers types and sets defaults for robust matrix processing without positive definite enforcement.
-
-# Related
-
-  - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`matrix_processing!`](@ref)
-  - [`matrix_processing`](@ref)
-  - [`DefaultMatrixProcessing`](@ref)
-"""
-struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
-    denoise::T1
-    detone::T2
-    alg::T3
-end
-"""
     NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
                                           detone::Union{Nothing, <:Detone} = nothing,
                                           alg::Union{Nothing,
-                                                    <:AbstractMatrixProcessingAlgorithm} = nothing)
+                                                     <:AbstractMatrixProcessingAlgorithm} = nothing)
 
-Construct a [`NonPositiveDefiniteMatrixProcessing`](@ref) object, configuring matrix processing steps without positive definite enforcement.
-
-# Arguments
-
-  - `denoise`: Denoising estimator.
-  - `detone`: Detoning estimator.
-  - `alg`: Optional custom matrix processing algorithm.
-
-# Returns
-
-  - `NonPositiveDefiniteMatrixProcessing`: A configured matrix processing estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -246,10 +197,16 @@ NonPositiveDefiniteMatrixProcessing
 
 # Related
 
-  - [`NonPositiveDefiniteMatrixProcessing`](@ref)
+  - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
+  - [`DefaultMatrixProcessing`](@ref)
 """
+struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
+    denoise::T1
+    detone::T2
+    alg::T3
+end
 function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
                                              detone::Union{Nothing, <:Detone} = nothing,
                                              alg::Union{Nothing,

@@ -15,47 +15,12 @@ A flexible variance estimator for PortfolioOptimisers.jl supporting optional exp
 # Constructor
 
     SimpleVariance(; me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                    w::Union{Nothing, <:AbstractWeights} = nothing,
-                    corrected::Bool = true)
+                     w::Union{Nothing, <:AbstractWeights} = nothing,
+                     corrected::Bool = true)
 
-Construct a `SimpleVariance` estimator with the specified expected returns estimator, optional weights, and bias correction flag.
+Keyword arguments correspond to the fields above.
 
-# Related
-
-  - [`AbstractVarianceEstimator`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`std(ve::SimpleVariance, X::AbstractVector; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
-"""
-struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
-    me::T1
-    w::T2
-    corrected::T3
-end
-"""
-    SimpleVariance(; me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                    w::Union{Nothing, <:AbstractWeights} = nothing,
-                    corrected::Bool = true)
-
-Construct a [`SimpleVariance`](@ref) estimator for flexible variance estimation with optional mean-centering, observation weights, and bias correction.
-
-This constructor creates a `SimpleVariance` object using the specified expected returns estimator for mean-centering, optional observation weights, and a flag for Bessel's correction (bias correction). If no weights are provided, the estimator defaults to unweighted variance estimation. If weights are provided, they must not be empty.
-
-# Arguments
-
-  - `me`: Expected returns estimator. Necessary when estimating the variance or standard deviation along the dimension of a matrix. Not used when computed on a vector.
-  - `w`: Optional observation weights. If `nothing`, the estimator is unweighted.
-  - `corrected`: Whether to apply Bessel's correction.
-
-# Returns
-
-  - `SimpleVariance`: A variance estimator configured with the specified mean estimator, weights, and bias correction flag.
-
-# Validation
+## Validation
 
   - If `w` is provided, it must not be empty.
 
@@ -83,7 +48,6 @@ SimpleVariance
 
 # Related
 
-  - [`SimpleVariance`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
@@ -93,6 +57,11 @@ SimpleVariance
   - [`var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::AbstractVector; mean = nothing)`](@ref)
 """
+struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
+    me::T1
+    w::T2
+    corrected::T3
+end
 function SimpleVariance(;
                         me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
                         w::Union{Nothing, <:AbstractWeights} = nothing,
@@ -157,7 +126,6 @@ function Statistics.std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1,
         std(X, ve.w, dims; corrected = ve.corrected, mean = mu)
     end
 end
-
 """
     std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
 
@@ -220,7 +188,6 @@ function Statistics.std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
         std(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
-
 """
     var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 

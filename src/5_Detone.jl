@@ -26,30 +26,13 @@ A concrete detoning estimator for removing the top `n` principal components (mar
 
 # Constructor
 
-    Detone(; n = 1)
-
-# Related
-
-  - [`Detone`](@ref)
-  - [`detone!`](@ref)
-  - [`detone`](@ref)
-"""
-struct Detone{T1} <: AbstractDetoneEstimator
-    n::T1
-end
-
-"""
     Detone(; n::Integer = 1)
 
-Construct a [`Detone`](@ref) estimator for removing the top `n` principal components (market modes) from a covariance or correlation matrix.
+Keyword arguments correspond to the fields above.
 
-# Arguments
+## Validation
 
-  - `n`: Number of leading principal components to remove. Must satisfy `n ≥ 0`.
-
-# Returns
-
-  - `Detone`: A detoning estimator.
+  - `n` must satisfy `n ≥ 0`.
 
 # Examples
 
@@ -64,6 +47,9 @@ Detone
   - [`detone!`](@ref)
   - [`detone`](@ref)
 """
+struct Detone{T1} <: AbstractDetoneEstimator
+    n::T1
+end
 function Detone(; n::Integer = 1)
     @argcheck(n > zero(n), DomainError(n, comp_msg("`n`", 1, :gt, n) * "."))
     return Detone(n)

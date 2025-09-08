@@ -18,7 +18,6 @@ PortfolioOptimisers.NormalisedSmythBrobyGerber0
 PortfolioOptimisers.NormalisedSmythBrobyGerber1
 PortfolioOptimisers.NormalisedSmythBrobyGerber2
 SmythBrobyCovariance
-SmythBrobyCovariance()
 PortfolioOptimisers.sb_delta
 PortfolioOptimisers.smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:SmythBroby0, <:Any},

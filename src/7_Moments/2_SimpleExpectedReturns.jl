@@ -15,11 +15,11 @@ A simple expected returns estimator for PortfolioOptimisers.jl, representing the
 
     SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
 
-Construct a [`SimpleExpectedReturns`](@ref) estimator with optional observation weights.
+Keyword arguments correspond to the fields above.
 
-# Fields
+## Validation
 
-  - `w`: Optional weights for each observation.
+    - If `w` is provided, it must not be empty.
 
 # Related
 
@@ -30,46 +30,6 @@ Construct a [`SimpleExpectedReturns`](@ref) estimator with optional observation 
 struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
     w::T1
 end
-"""
-    SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
-
-Construct a [`SimpleExpectedReturns`](@ref) estimator for computing expected returns as the (optionally weighted) sample mean.
-
-# Arguments
-
-  - `w`: Optional observation weights. If `nothing`, the unweighted mean is computed.
-
-# Validation
-
-    - If `w` is provided, it must not be empty.
-
-# Returns
-
-  - `SimpleExpectedReturns`: A simple expected returns estimator configured with optional weights.
-
-# Examples
-
-```jldoctest
-julia> using StatsBase
-
-julia> ser = SimpleExpectedReturns()
-SimpleExpectedReturns
-  w | nothing
-
-julia> w = Weights([0.2, 0.3, 0.5]);
-
-julia> ser = SimpleExpectedReturns(; w = w)
-SimpleExpectedReturns
-  w | StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-```
-
-# Related
-
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`SimpleExpectedReturns`](@ref)
-  - [`mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
-"""
 function SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
     if isa(w, AbstractWeights)
         @argcheck(!isempty(w))
@@ -130,7 +90,6 @@ function Statistics.mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int
                          kwargs...)
     return isnothing(me.w) ? mean(X; dims = dims) : mean(X, me.w; dims = dims)
 end
-
 function factory(me::SimpleExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
     return SimpleExpectedReturns(; w = isnothing(w) ? me.w : w)
 end

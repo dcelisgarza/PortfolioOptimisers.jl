@@ -9,13 +9,9 @@ Gerber0
 Gerber1
 Gerber2
 NormalisedGerber0
-NormalisedGerber0()
 NormalisedGerber1
-NormalisedGerber1()
 NormalisedGerber2
-NormalisedGerber2()
 GerberCovariance
-GerberCovariance()
 cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:PortfolioOptimisers.UnNormalisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:PortfolioOptimisers.NormalisedGerberCovarianceAlgorithm},

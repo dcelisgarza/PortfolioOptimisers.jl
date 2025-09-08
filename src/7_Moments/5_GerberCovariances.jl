@@ -119,7 +119,18 @@ Implements the original Gerber covariance algorithm on Z-transformed data.
 
 # Constructor
 
-  - `NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())`: Construct the original normalised Gerber covariance algorithm.
+    NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> ng0 = NormalisedGerber0()
+NormalisedGerber0
+  me | SimpleExpectedReturns
+     |   w | nothing
+```
 
 # Related
 
@@ -133,35 +144,6 @@ Implements the original Gerber covariance algorithm on Z-transformed data.
 struct NormalisedGerber0{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
 end
-"""
-    NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-
-Creates a [`NormalisedGerber0`](@ref) object using the specified expected returns estimator for mean-centering prior to normalisation.
-
-# Arguments
-
-  - `me`: Expected returns estimator used for mean-centering before normalisation.
-
-# Returns
-
-  - `NormalisedGerber0`: An instance of the original normalised Gerber covariance algorithm.
-
-# Examples
-
-```jldoctest
-julia> ng0 = NormalisedGerber0()
-NormalisedGerber0
-  me | SimpleExpectedReturns
-     |   w | nothing
-```
-
-# Related
-
-  - [`NormalisedGerber0`](@ref)
-  - [`GerberCovariance`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`SimpleExpectedReturns`](@ref)
-"""
 function NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber0(me)
 end
@@ -179,7 +161,18 @@ Implements the first variant of the Gerber covariance algorithm on Z-transformed
 
 # Constructor
 
-  - `NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())`: Construct the first variant of the normalised Gerber covariance algorithm.
+    NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> ng0 = NormalisedGerber1()
+NormalisedGerber1
+  me | SimpleExpectedReturns
+     |   w | nothing
+```
 
 # Related
 
@@ -193,35 +186,6 @@ Implements the first variant of the Gerber covariance algorithm on Z-transformed
 struct NormalisedGerber1{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
 end
-"""
-    NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-
-Creates a [`NormalisedGerber1`](@ref) object using the specified expected returns estimator for mean-centering prior to normalisation.
-
-# Arguments
-
-  - `me`: Expected returns estimator used for mean-centering before normalisation.
-
-# Returns
-
-  - `NormalisedGerber1`: An instance of the original normalised Gerber covariance algorithm.
-
-# Examples
-
-```jldoctest
-julia> ng0 = NormalisedGerber1()
-NormalisedGerber1
-  me | SimpleExpectedReturns
-     |   w | nothing
-```
-
-# Related
-
-  - [`NormalisedGerber1`](@ref)
-  - [`GerberCovariance`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`SimpleExpectedReturns`](@ref)
-"""
 function NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber1(me)
 end
@@ -239,9 +203,18 @@ Implements the second variant of the Gerber covariance algorithm on Z-transforme
 
 # Constructors
 
-  - `NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())`: Construct the second variant of the normalised Gerber covariance algorithm.
+    NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
 
-These types are used to specify the algorithm when constructing a [`GerberCovariance`](@ref) estimator with normalisation.
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> ng0 = NormalisedGerber2()
+NormalisedGerber2
+  me | SimpleExpectedReturns
+     |   w | nothing
+```
 
 # Related
 
@@ -255,35 +228,6 @@ These types are used to specify the algorithm when constructing a [`GerberCovari
 struct NormalisedGerber2{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
 end
-"""
-    NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-
-Creates a [`NormalisedGerber2`](@ref) object using the specified expected returns estimator for mean-centering prior to normalisation.
-
-# Arguments
-
-  - `me`: Expected returns estimator used for mean-centering before normalisation.
-
-# Returns
-
-  - `NormalisedGerber2`: An instance of the original normalised Gerber covariance algorithm.
-
-# Examples
-
-```jldoctest
-julia> ng0 = NormalisedGerber2()
-NormalisedGerber2
-  me | SimpleExpectedReturns
-     |   w | nothing
-```
-
-# Related
-
-  - [`NormalisedGerber2`](@ref)
-  - [`GerberCovariance`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`SimpleExpectedReturns`](@ref)
-"""
 function NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber2(me)
 end
@@ -318,17 +262,20 @@ A flexible container type for configuring and applying Gerber covariance estimat
 
   - `ve`: Variance estimator.
   - `pdm`: Positive definite matrix estimator (see [`Posdef`](@ref)).
-  - `threshold`: Threshold parameter for Gerber covariance computation (typically in (0, 1)).
+  - `threshold`: Threshold parameter for Gerber covariance computation.
   - `alg`: Gerber covariance algorithm variant.
 
 # Constructor
 
-    GerberCovariance(; alg::GerberCovarianceAlgorithm = Gerber1(),
-                      ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                      pdm::Union{Nothing, <:Posdef} = Posdef(),
-                      threshold::Real = 0.5)
+    GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+                       pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
+                       alg::GerberCovarianceAlgorithm = Gerber1())
 
-Construct a `GerberCovariance` estimator with the specified algorithm, variance estimator, positive definite estimator, and threshold.
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - Asserts that `threshold` is in the interval (0, 1).
 
 # Related
 
@@ -350,61 +297,6 @@ struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
     threshold::T3
     alg::T4
 end
-"""
-    GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                     pdm::Union{Nothing, <:Posdef} = Posdef(),
-                     threshold::Real = 0.5,
-                     alg::GerberCovarianceAlgorithm = Gerber1())
-
-Construct a [`GerberCovariance`](@ref) estimator for robust Gerber-based covariance or correlation estimation.
-
-This constructor creates a `GerberCovariance` object using the specified Gerber algorithm, variance estimator, positive definite matrix estimator, and threshold parameter. The estimator is highly modular, allowing users to select from different Gerber algorithm variants, and positive definite projections.
-
-# Arguments
-
-  - `ve`: Variance estimator.
-  - `pdm`: Positive definite matrix estimator.
-  - `threshold`: Threshold parameter for Gerber covariance computation.
-  - `alg`: Gerber covariance algorithm variant.
-
-# Returns
-
-  - `GerberCovariance`: A configured Gerber covariance estimator.
-
-# Validation
-
-  - Asserts that `threshold` is strictly in `(0, 1)`.
-
-# Examples
-
-```jldoctest
-julia> gc = GerberCovariance()
-GerberCovariance
-         ve | SimpleVariance
-            |          me | SimpleExpectedReturns
-            |             |   w | nothing
-            |           w | nothing
-            |   corrected | Bool: true
-        pdm | Posdef
-            |   alg | UnionAll: NearestCorrelationMatrix.Newton
-  threshold | Float64: 0.5
-        alg | Gerber1()
-```
-
-# Related
-
-  - [`GerberCovariance`](@ref)
-  - [`GerberCovarianceAlgorithm`](@ref)
-  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`SimpleVariance`](@ref)
-  - [`Posdef`](@ref)
-  - [`Gerber0`](@ref)
-  - [`Gerber1`](@ref)
-  - [`Gerber2`](@ref)
-  - [`NormalisedGerber0`](@ref)
-  - [`NormalisedGerber1`](@ref)
-  - [`NormalisedGerber2`](@ref)
-"""
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                           pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
                           alg::GerberCovarianceAlgorithm = Gerber1())

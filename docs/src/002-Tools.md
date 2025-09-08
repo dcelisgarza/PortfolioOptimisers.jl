@@ -2,7 +2,6 @@
 
 ```@docs
 ReturnsResult
-ReturnsResult()
 prices_to_returns
 brinson_attribution
 PortfolioOptimisers.AbstractReturnsResult

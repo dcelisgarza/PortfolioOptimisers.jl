@@ -273,14 +273,43 @@ A flexible container type for configuring and applying Smyth-Broby covariance es
 # Constructor
 
     SmythBrobyCovariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                          ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                          pdm::Union{Nothing, <:Posdef} = Posdef(),
-                          threshold::Real = 0.5, c1::Real = 0.5, c2::Real = 0.5,
-                          c3::Real = 4.0, n::Real = 2.0,
-                          alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-                          threads::FLoops.Transducers.Executor = ThreadedEx())
+                           ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+                           pdm::Union{Nothing, <:Posdef} = Posdef(),
+                           threshold::Real = 0.5, c1::Real = 0.5, c2::Real = 0.5,
+                           c3::Real = 4.0, n::Real = 2.0,
+                           alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
+                           threads::FLoops.Transducers.Executor = ThreadedEx())
 
-Construct a `SmythBrobyCovariance` estimator with the specified algorithm, estimators, parameters, and threading strategy.
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - Asserts that `threshold` is strictly in `(0, 1)`.
+  - Asserts that `c1` is in `(0, 1]`.
+  - Asserts that `c2` is in `(0, 1]` and `c3 > c2`.
+
+# Examples
+
+```jldoctest
+julia> ce = SmythBrobyCovariance()
+SmythBrobyCovariance
+         me | SimpleExpectedReturns
+            |   w | nothing
+         ve | SimpleVariance
+            |          me | SimpleExpectedReturns
+            |             |   w | nothing
+            |           w | nothing
+            |   corrected | Bool: true
+        pdm | Posdef
+            |   alg | UnionAll: NearestCorrelationMatrix.Newton
+  threshold | Float64: 0.5
+         c1 | Float64: 0.5
+         c2 | Float64: 0.5
+         c3 | Float64: 4.0
+          n | Float64: 2.0
+        alg | SmythBrobyGerber1()
+    threads | Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+```
 
 # Related
 
@@ -318,94 +347,6 @@ struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     alg::T9
     threads::T10
 end
-"""
-    SmythBrobyCovariance(;
-        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-        pdm::Union{Nothing, <:Posdef} = Posdef(),
-        threshold::Real = 0.5,
-        c1::Real = 0.5,
-        c2::Real = 0.5,
-        c3::Real = 4.0,
-        n::Real = 2.0,
-        alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-        threads::FLoops.Transducers.Executor = ThreadedEx()
-    )
-
-Construct a [`SmythBrobyCovariance`](@ref) estimator for robust Smyth-Broby-based covariance or correlation estimation.
-
-This constructor creates a `SmythBrobyCovariance` object using the specified Smyth-Broby algorithm, expected returns estimator, variance estimator, positive definite matrix estimator, algorithm parameters, and threading strategy. The estimator is highly modular, allowing users to select from different Smyth-Broby algorithm variants, as well as custom estimators and parallel execution strategies.
-
-# Arguments
-
-  - `me`: Expected returns estimator.
-  - `ve`: Variance estimator.
-  - `pdm`: Positive definite matrix estimator.
-  - `threshold`: Threshold parameter for Smyth-Broby covariance computation (must satisfy `0 < threshold < 1`).
-  - `c1`: Zone of confusion parameter (must satisfy `0 < c1 ≤ 1`).
-  - `c2`: Zone of indecision lower bound (must satisfy `0 < c2 ≤ 1`).
-  - `c3`: Zone of indecision upper bound (must satisfy `c3 > c2`).
-  - `n`: Exponent parameter for the Smyth-Broby kernel.
-  - `alg`: Smyth-Broby covariance algorithm variant.
-  - `threads`: Parallel execution strategy.
-
-# Returns
-
-  - `SmythBrobyCovariance`: A configured Smyth-Broby covariance estimator.
-
-# Validation
-
-  - Asserts that `threshold` is strictly in `(0, 1)`.
-  - Asserts that `c1` is in `(0, 1]`.
-  - Asserts that `c2` is in `(0, 1]` and `c3 > c2`.
-
-# Examples
-
-```jldoctest
-julia> ce = SmythBrobyCovariance()
-SmythBrobyCovariance
-         me | SimpleExpectedReturns
-            |   w | nothing
-         ve | SimpleVariance
-            |          me | SimpleExpectedReturns
-            |             |   w | nothing
-            |           w | nothing
-            |   corrected | Bool: true
-        pdm | Posdef
-            |   alg | UnionAll: NearestCorrelationMatrix.Newton
-  threshold | Float64: 0.5
-         c1 | Float64: 0.5
-         c2 | Float64: 0.5
-         c3 | Float64: 4.0
-          n | Float64: 2.0
-        alg | SmythBrobyGerber1()
-    threads | Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-```
-
-# Related
-
-  - [`SmythBrobyCovariance`](@ref)
-  - [`BaseSmythBrobyCovariance`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`SimpleVariance`](@ref)
-  - [`Posdef`](@ref)
-  - [`SmythBrobyCovarianceAlgorithm`](@ref)
-  - [`SmythBroby0`](@ref)
-  - [`SmythBroby1`](@ref)
-  - [`SmythBroby2`](@ref)
-  - [`NormalisedSmythBroby0`](@ref)
-  - [`NormalisedSmythBroby1`](@ref)
-  - [`NormalisedSmythBroby2`](@ref)
-  - [`SmythBrobyGerber0`](@ref)
-  - [`SmythBrobyGerber1`](@ref)
-  - [`SmythBrobyGerber2`](@ref)
-  - [`NormalisedSmythBrobyGerber0`](@ref)
-  - [`NormalisedSmythBrobyGerber1`](@ref)
-  - [`NormalisedSmythBrobyGerber2`](@ref)
-  - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
-"""
 function SmythBrobyCovariance(;
                               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                               ve::StatsBase.CovarianceEstimator = SimpleVariance(),
@@ -424,7 +365,6 @@ function SmythBrobyCovariance(;
     @argcheck(c3 > c2)
     return SmythBrobyCovariance(me, ve, pdm, threshold, c1, c2, c3, n, alg, threads)
 end
-
 function factory(ce::SmythBrobyCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return SmythBrobyCovariance(; me = factory(ce.me, w), ve = factory(ce.ve, w),
                                 pdm = ce.pdm, threshold = ce.threshold, c1 = ce.c1,

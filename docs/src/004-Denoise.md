@@ -4,9 +4,7 @@
 SpectralDenoise
 FixedDenoise
 ShrunkDenoise
-ShrunkDenoise()
 Denoise
-Denoise()
 denoise!
 denoise
 PortfolioOptimisers.AbstractDenoiseEstimator

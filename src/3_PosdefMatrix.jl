@@ -27,27 +27,9 @@ A concrete estimator type for projecting a matrix to the nearest positive defini
 
 # Constructor
 
-    Posdef(; alg = NearestCorrelationMatrix.Newton)
+    Posdef(; alg::Any = NearestCorrelationMatrix.Newton)
 
-Creates a new `Posdef` with the specified algorithm.
-
-# Related
-
-  - [`AbstractPosdefEstimator`](@ref)
-  - [`posdef!`](@ref)
-  - [`posdef`](@ref)
-"""
-struct Posdef{T1} <: AbstractPosdefEstimator
-    alg::T1
-end
-"""
-    Posdef(; alg = NearestCorrelationMatrix.Newton)
-
-Constructor for [`Posdef`](@ref). Defaults to the [`NearestCorrelationMatrix.Newton`](https://github.com/adknudson/NearestCorrelationMatrix.jl) algorithm.
-
-# Arguments
-
-  - `alg`: The algorithm used for the nearest correlation matrix projection.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -65,7 +47,10 @@ Posdef
   - [`posdef!`](@ref)
   - [`posdef`](@ref)
 """
-function Posdef(; alg = NearestCorrelationMatrix.Newton)
+struct Posdef{T1} <: AbstractPosdefEstimator
+    alg::T1
+end
+function Posdef(; alg::Any = NearestCorrelationMatrix.Newton)
     return Posdef(alg)
 end
 
