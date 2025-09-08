@@ -16,35 +16,9 @@ Composite covariance estimator with post-processing.
 # Constructor
 
     PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                                   mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
+                                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
 
-Creates a `PortfolioOptimisersCovariance` object with the specified covariance estimator and matrix processing step.
-
-# Related
-
-  - [`AbstractCovarianceEstimator`](@ref)
-  - [`AbstractMatrixProcessingEstimator`](@ref)
-"""
-struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
-    ce::T1
-    mp::T2
-end
-"""
-    PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                                   mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
-
-Construct a [`PortfolioOptimisersCovariance`](@ref) estimator that applies a matrix post-processing step to the output of any covariance estimator.
-
-This constructor creates a `PortfolioOptimisersCovariance` object using the specified covariance estimator and matrix processing estimator. The resulting object can be used as a drop-in replacement for any covariance estimator, with the added benefit of post-processing (such as shrinkage, regularisation, or projection to positive definite).
-
-# Arguments
-
-  - `ce`: Covariance estimator to use.
-  - `mp`: Matrix post-processing estimator.
-
-# Returns
-
-  - `PortfolioOptimisersCovariance`: A composite covariance estimator with post-processing.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -68,12 +42,13 @@ PortfolioOptimisersCovariance
 
 # Related
 
-  - [`PortfolioOptimisersCovariance`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
-  - [`Covariance`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`DefaultMatrixProcessing`](@ref)
 """
+struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
+    ce::T1
+    mp::T2
+end
 function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
                                        mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
     return PortfolioOptimisersCovariance(ce, mp)

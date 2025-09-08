@@ -61,12 +61,15 @@ end
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
 
-  - If `dt` is `nothing`, this is a no-op and returns `nothing`.
-  - If `dt` is a [`Detone`](@ref) object, the top `n` principal components are removed from `X` in-place. Optionally, a [`Posdef`](@ref) can be provided to ensure the output is positive definite.
+For covariance matrices, the function internally converts to a correlation matrix, applies the algorithm, and then rescales back to covariance.
 
 # Arguments
 
-  - `dt`: The detoning estimator specifying the number of components to remove.
+  - `dt`: The estimator specifying the detoning algorithm.
+
+      + `dt::Detone`: The top `n` principal components are removed from `X` in-place.
+      + `dt::Nothing`: No-op and returns `nothing`.
+
   - `X`: The covariance or correlation matrix to be detoned (modified in-place).
   - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
 
@@ -143,35 +146,7 @@ end
     detone(dt::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
     detone(::Nothing, args...)
 
-Same as [`detone!`](@ref), but returns a new matrix instead of modifying `X` in-place.
-
-  - If `dt` is `nothing`, this is a no-op and returns `nothing`.
-
-# Examples
-
-```jldoctest
-julia> using StableRNGs
-
-julia> rng = StableRNG(123456789);
-
-julia> X = rand(rng, 10, 5);
-
-julia> X = X' * X
-5×5 Matrix{Float64}:
- 3.29494  2.0765   1.73334  2.01524  1.77493
- 2.0765   2.46967  1.39953  1.97242  2.07886
- 1.73334  1.39953  1.90712  1.17071  1.30459
- 2.01524  1.97242  1.17071  2.24818  1.87091
- 1.77493  2.07886  1.30459  1.87091  2.44414
-
-julia> Xd = detone(Detone(), X)
-5×5 Matrix{Float64}:
-  3.29494    -1.14673     0.0868439  -0.502106   -1.71581
- -1.14673     2.46967    -0.876289   -0.0864304   0.274663
-  0.0868439  -0.876289    1.90712    -1.18851    -0.750345
- -0.502106   -0.0864304  -1.18851     2.24818    -0.0774753
- -1.71581     0.274663   -0.750345   -0.0774753   2.44414
-```
+Out-of-place version of [`detone!`](@ref).
 
 # Related
 

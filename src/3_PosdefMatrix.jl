@@ -55,19 +55,20 @@ function Posdef(; alg::Any = NearestCorrelationMatrix.Newton)
 end
 
 """
-    posdef!(method::Posdef, X::AbstractMatrix)
+    posdef!(pdm::Posdef, X::AbstractMatrix)
     posdef!(::Nothing, args...)
 
 In-place projection of a matrix to the nearest positive definite (PD) matrix using the specified estimator.
 
-  - If `method` is `nothing`, this is a no-op and returns `nothing`.
-  - If `method` is a [`Posdef`](@ref), the algorithm specified in `method.alg` is used to project `X` to the nearest PD matrix. If `X` is already positive definite, it is left unchanged.
-
-For covariance matrices, the function internally converts to a correlation matrix, applies the projection, and then rescales back to covariance.
+For covariance matrices, the function internally converts to a correlation matrix, applies the algorithm, and then rescales back to covariance.
 
 # Arguments
 
-  - `method`: The estimator specifying the projection algorithm.
+  - `pdm`: The estimator specifying the positive definite projection algorithm.
+
+      + `pdm::Posdef`: The algorithm specified in `pdm.alg` is used to project `X` to the nearest PD matrix. If `X` is already positive definite, it is left unchanged.
+      + `pdm::Nothing`: No-op.
+
   - `X`: The matrix to be projected in-place.
 
 # Returns
@@ -110,7 +111,7 @@ true
 function posdef!(::Nothing, args...)
     return nothing
 end
-function posdef!(method::Posdef, X::AbstractMatrix)
+function posdef!(pdm::Posdef, X::AbstractMatrix)
     if isposdef(X)
         return nothing
     end
@@ -121,7 +122,7 @@ function posdef!(method::Posdef, X::AbstractMatrix)
         s .= sqrt.(s)
         StatsBase.cov2cor!(X, s)
     end
-    nearest_cor!(X, method.alg)
+    nearest_cor!(X, pdm.alg)
     if !isposdef(X)
         @warn("Matrix could not be made positive definite.")
     end
@@ -132,32 +133,10 @@ function posdef!(method::Posdef, X::AbstractMatrix)
 end
 
 """
-    posdef(method::Posdef, X::AbstractMatrix)
+    posdef(pdm::Posdef, X::AbstractMatrix)
     posdef(::Nothing, args...)
 
-Same as [`posdef!`](@ref), but returns a new matrix instead of modifying `X` in-place.
-
-  - If `method` is `nothing`, this is a no-op and returns `nothing`.
-
-# Examples
-
-```jldoctest
-julia> using LinearAlgebra
-
-julia> est = Posdef();
-
-julia> X = [1.0 2.0; 0.9 1.0];  # Not PD
-
-julia> X_pd = posdef(est, X);
-
-julia> isposdef(X_pd)
-true
-
-julia> X_pd
-2×2 Matrix{Float64}:
- 1.0  1.0
- 1.0  1.0
-```
+Out-of-place version of [`posdef!`](@ref).
 
 # Related
 
@@ -167,9 +146,9 @@ julia> X_pd
 function posdef(::Nothing, args...)
     return nothing
 end
-function posdef(method::Posdef, X::AbstractMatrix)
+function posdef(pdm::Posdef, X::AbstractMatrix)
     X = copy(X)
-    posdef!(method, X)
+    posdef!(pdm, X)
     return X
 end
 

@@ -198,9 +198,7 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
 end
 
 """
-    _denoise!(alg::SpectralDenoise, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)
-    _denoise!(alg::FixedDenoise, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)
-    _denoise!(alg::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)
+    _denoise!(alg::AbstractDenoiseAlgorithm, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)
 
 In-place denoising of a covariance or correlation matrix using a specific denoising algorithm.
 
@@ -208,9 +206,12 @@ These methods are called internally by [`denoise!`](@ref) and [`denoise`](@ref) 
 
 # Arguments
 
-  - `alg::SpectralDenoise`: Sets the smallest `num_factors` eigenvalues to zero.
-  - `alg::FixedDenoise`: Replaces the smallest `num_factors` eigenvalues with their average.
-  - `alg::ShrunkDenoise`: Shrinks the smallest `num_factors` eigenvalues towards the diagonal, controlled by `alg.alpha`.
+  - `alg::AbstractDenoiseAlgorithm`: The denoising algorithm to apply.
+
+      + `alg::SpectralDenoise`: Sets the smallest `num_factors` eigenvalues to zero.
+      + `alg::FixedDenoise`: Replaces the smallest `num_factors` eigenvalues with their average.
+      + `alg::ShrunkDenoise`: Shrinks the smallest `num_factors` eigenvalues towards the diagonal, controlled by `alg.alpha`.
+
   - `X`: The matrix to be denoised (modified in-place).
   - `vals`: Eigenvalues of `X`, sorted in ascending order.
   - `vecs`: Corresponding eigenvectors of `X`.
@@ -347,12 +348,15 @@ end
 
 In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
 
-  - If `de` is `nothing`, this is a no-op and returns `nothing`.
-  - If `de` is a [`Denoise`](@ref) object, the specified denoising algorithm is applied to `X` in-place. Optionally, a [`Posdef`](@ref) can be provided to ensure the output is positive definite.
+For covariance matrices, the function internally converts to a correlation matrix, applies the algorithm, and then rescales back to covariance.
 
 # Arguments
 
-  - `de`: The denoising estimator specifying the algorithm and kernel parameters.
+  - `de`: The estimator specifying the denoising algorithm.
+
+      + `de::Denoise`: The specified denoising algorithm is applied to `X` in-place.
+      + `de::Nothing`: No-op.
+
   - `X`: The covariance or correlation matrix to be denoised (modified in-place).
   - `q`: The effective sample ratio (e.g., `n_obs / n_assets`), used for spectral thresholding.
   - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
@@ -432,35 +436,7 @@ end
     denoise(de::Denoise, X::AbstractMatrix, q::Real, pdm::Union{Nothing, <:Posdef} = Posdef())
     denoise(::Nothing, args...)
 
-Same as [`denoise!`](@ref), but returns a new matrix instead of modifying `X` in-place.
-
-  - If `de` is `nothing`, this is a no-op and returns `nothing`.
-
-# Examples
-
-```jldoctest
-julia> using StableRNGs
-
-julia> rng = StableRNG(123456789);
-
-julia> X = rand(rng, 10, 5);
-
-julia> X = X' * X
-5×5 Matrix{Float64}:
- 3.29494  2.0765   1.73334  2.01524  1.77493
- 2.0765   2.46967  1.39953  1.97242  2.07886
- 1.73334  1.39953  1.90712  1.17071  1.30459
- 2.01524  1.97242  1.17071  2.24818  1.87091
- 1.77493  2.07886  1.30459  1.87091  2.44414
-
-julia> Xd = denoise(Denoise(), X, 10 / 5)
-5×5 Matrix{Float64}:
- 3.29494  2.28883  1.70633  2.12343  2.17377
- 2.28883  2.46967  1.59575  1.98583  2.0329
- 1.70633  1.59575  1.90712  1.48044  1.51553
- 2.12343  1.98583  1.48044  2.24818  1.886
- 2.17377  2.0329   1.51553  1.886    2.44414
-```
+Out-of-place version of [`denoise!`](@ref).
 
 # Related
 
