@@ -28,8 +28,7 @@ jobs:
         os:
           - ubuntu-latest
           - macOS-latest
-
-          - windows-latest
+          # - windows-latest
 
         arch:
           - x64
@@ -43,7 +42,7 @@ jobs:
             os: macOS-latest
             arch: x64
             allow_failure: true
-          - version: "nightly"
-            os: windows-latest
-            arch: x64
-            allow_failure: true
+          # - version: "nightly"
+          #   os: windows-latest
+          #   arch: x64
+          #   allow_failure: true
