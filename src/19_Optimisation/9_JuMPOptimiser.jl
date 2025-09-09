@@ -20,12 +20,12 @@ struct ProcessedJuMPOptimiserAttributes{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10,
     fees::T18
     ret::T19
 end
-struct ProcessedFactorRiskBudgettingAttributes{T1, T2, T3} <: AbstractResult
+struct ProcessedFactorRiskBudgetingAttributes{T1, T2, T3} <: AbstractResult
     rkb::T1
     b1::T2
     rr::T3
 end
-struct ProcessedAssetRiskBudgettingAttributes{T1} <: AbstractResult
+struct ProcessedAssetRiskBudgetingAttributes{T1} <: AbstractResult
     rkb::T1
 end
 struct JuMPOptimisation{T1, T2, T3, T4, T5} <: OptimisationResult
@@ -46,7 +46,7 @@ struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8} <:
     sol::T7
     model::T8
 end
-struct JuMPOptimisationRiskBudgetting{T1, T2, T3, T4, T5, T6} <: OptimisationResult
+struct JuMPOptimisationRiskBudgeting{T1, T2, T3, T4, T5, T6} <: OptimisationResult
     oe::T1
     pa::T2
     prb::T3
@@ -72,7 +72,7 @@ function Base.getproperty(r::JuMPOptimisationFactorRiskContribution, sym::Symbol
         getfield(r.pa, sym)
     end
 end
-function Base.getproperty(r::JuMPOptimisationRiskBudgetting, sym::Symbol)
+function Base.getproperty(r::JuMPOptimisationRiskBudgeting, sym::Symbol)
     return if sym == :w
         r.sol.w
     elseif sym in (:oe, :pa, :prb, :retcode, :sol, :model)
@@ -414,5 +414,5 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
                          l1 = opt.l1, l2 = opt.l2, ss = opt.ss, strict = opt.strict)
 end
 
-export ProcessedJuMPOptimiserAttributes, JuMPOptimisation, JuMPOptimisationRiskBudgetting,
+export ProcessedJuMPOptimiserAttributes, JuMPOptimisation, JuMPOptimisationRiskBudgeting,
        JuMPOptimisationFactorRiskContribution, JuMPOptimiser

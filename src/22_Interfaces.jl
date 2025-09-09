@@ -42,13 +42,13 @@
                                                                                                                                         a.rd;
                                                                                                                                         a.kwargs...) isa
                                                                                                            NearOptimalSetup),
-                         set_risk_budgetting_constraints! = ("set risk budgetting constraints!" => a::Arguments -> set_risk_budgetting_constraints!(a.model,
-                                                                                                                                                    a.rb,
-                                                                                                                                                    a.sets,
-                                                                                                                                                    a.pr,
-                                                                                                                                                    a.wb,
-                                                                                                                                                    a.rd) isa
-                                                                                                                   ProcessedFactorRiskBudgettingAttributes),
+                         set_risk_budgeting_constraints! = ("set risk budgeting constraints!" => a::Arguments -> set_risk_budgeting_constraints!(a.model,
+                                                                                                                                                 a.rb,
+                                                                                                                                                 a.sets,
+                                                                                                                                                 a.pr,
+                                                                                                                                                 a.wb,
+                                                                                                                                                 a.rd) isa
+                                                                                                                 ProcessedFactorRiskBudgetingAttributes),
                          set_risk_constraints! = ("set risk constraints!" => a::Arguments -> set_risk_constraints!(a.args...;
                                                                                                                    rd = a.rd,
                                                                                                                    a.kwargs...) ===

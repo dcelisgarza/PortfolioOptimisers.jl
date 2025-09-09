@@ -1,4 +1,4 @@
-@safetestset "Risk Budgetting Optimisation" begin
+@safetestset "Risk Budgeting Optimisation" begin
     using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, StatsBase
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
@@ -67,12 +67,12 @@
           OrderedWeightsArray(; alg = ExactOrderedWeightsArray()), OrderedWeightsArray(),
           OrderedWeightsArrayRange(), NegativeSkewness(),
           NegativeSkewness(; alg = QuadRiskExpr())]
-    @testset "Asset Risk Budgetting" begin
-        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgetting1.csv.gz"), DataFrame)
+    @testset "Asset Risk Budgeting" begin
+        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgeting1.csv.gz"), DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
-            rb = RiskBudgetting(; r = r, opt = opt)
+            rb = RiskBudgeting(; r = r, opt = opt)
             res = optimise!(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)
@@ -127,13 +127,13 @@
             @test success
         end
 
-        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgetting2.csv.gz"), DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgeting2.csv.gz"), DataFrame)
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
-            rb = RiskBudgetting(; r = r, opt = opt,
-                                alg = AssetRiskBudgetting(;
-                                                          rkb = RiskBudgetResult(;
-                                                                                 val = 1:20)))
+            rb = RiskBudgeting(; r = r, opt = opt,
+                               alg = AssetRiskBudgeting(;
+                                                        rkb = RiskBudgetResult(;
+                                                                               val = 1:20)))
             res = optimise!(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)
@@ -188,9 +188,8 @@
             @test success
         end
     end
-    @testset "Factor Risk Budgetting" begin
-        df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgetting1.csv.gz"),
-                      DataFrame)
+    @testset "Factor Risk Budgeting" begin
+        df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgeting1.csv.gz"), DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             sbgt = BudgetRange(; lb = 0, ub = nothing), bgt = 1,
                             wb = WeightBounds(; lb = nothing, ub = nothing))
@@ -199,7 +198,7 @@
             if i == 25
                 continue
             end
-            rb = RiskBudgetting(; r = r, opt = opt, alg = FactorRiskBudgetting(; re = rr))
+            rb = RiskBudgeting(; r = r, opt = opt, alg = FactorRiskBudgeting(; re = rr))
             res = optimise!(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
@@ -252,18 +251,17 @@
             end
             @test success
         end
-        df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgetting2.csv.gz"),
-                      DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgeting2.csv.gz"), DataFrame)
         rr = regression(StepwiseRegression(; alg = Backward()), rd)
         for (i, r) in enumerate(rs)
             if i == 25
                 continue
             end
             opt = JuMPOptimiser(; pe = pr, slv = slv)
-            rb = RiskBudgetting(; r = r, opt = opt,
-                                alg = FactorRiskBudgetting(; flag = true, re = rr,
-                                                           rkb = RiskBudgetResult(;
-                                                                                  val = 1:5)))
+            rb = RiskBudgeting(; r = r, opt = opt,
+                               alg = FactorRiskBudgeting(; flag = true, re = rr,
+                                                         rkb = RiskBudgetResult(;
+                                                                                val = 1:5)))
             res = optimise!(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
