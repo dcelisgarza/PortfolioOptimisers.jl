@@ -25,20 +25,20 @@ jobs:
         version:
           - "1.11"
           - "1"
+          - "pre"
         os:
           - ubuntu-latest
           - macOS-latest
           # - windows-latest
-
         arch:
           - x64
         allow_failure: [false]
         include:
-          - version: "nightly"
+          - version: ["nightly", "pre"]
             os: ubuntu-latest
             arch: x64
             allow_failure: true
-          - version: "nightly"
+          - version: ["nightly", "pre"]
             os: macOS-latest
             arch: x64
             allow_failure: true
