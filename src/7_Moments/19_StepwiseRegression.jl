@@ -127,7 +127,7 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
 end
 
 """
-    add_best_asset_after_failure_pval!(target::AbstractRegressionTarget,
+    add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
                                       included::AbstractVector,
                                       F::AbstractMatrix,
                                       x::AbstractVector)
@@ -156,9 +156,9 @@ If `included` is not empty, the function does nothing. Otherwise, it evaluates e
   - [`StepwiseRegression`](@ref)
   - [`regression`](@ref)
 """
-function add_best_asset_after_failure_pval!(target::AbstractRegressionTarget,
-                                            included::AbstractVector, F::AbstractMatrix,
-                                            x::AbstractVector)
+function add_best_feature_after_pval_failure!(target::AbstractRegressionTarget,
+                                              included::AbstractVector, F::AbstractMatrix,
+                                              x::AbstractVector)
     if !isempty(included)
         return nothing
     end
@@ -204,16 +204,16 @@ This method implements forward selection for stepwise regression, where variable
 
 # Details
 
-  - At each iteration, the method fits a regression model for each excluded variable, computes p-values, and adds the variable with the lowest p-value if it is below the threshold.
-  - If no variable meets the threshold, the variable with the lowest p-value is included (see [`add_best_asset_after_failure_pval!`](@ref)).
-  - The process stops when no further variables can be added under the criterion.
+  - Starts with no variables included in the regression.
+  - Tries to add variables one at a time based on p-value, stopping when no further variables can be added under the threshold.
+  - If no variables are included at the end, the variable with the lowest p-value is added (see [`add_best_feature_after_pval_failure!`](@ref)).
 
 # Related
 
   - [`StepwiseRegression`](@ref)
   - [`PValue`](@ref)
   - [`Forward`](@ref)
-  - [`add_best_asset_after_failure_pval!`](@ref)
+  - [`add_best_feature_after_pval_failure!`](@ref)
 """
 function regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVector,
                     F::AbstractMatrix)
@@ -244,7 +244,7 @@ function regression(re::StepwiseRegression{<:PValue, <:Forward}, x::AbstractVect
             val = maximum(pvals)
         end
     end
-    add_best_asset_after_failure_pval!(re.target, included, F, x)
+    add_best_feature_after_pval_failure!(re.target, included, F, x)
     return included
 end
 
@@ -428,18 +428,16 @@ This method implements backward elimination for stepwise regression, where all v
 
 # Details
 
-  - Starts with all variables included.
-  - At each iteration, fits a regression model and computes p-values for all included variables.
-  - Removes the variable with the highest p-value if it exceeds the threshold.
-  - Stops when all included variables have p-values below the threshold or no variables remain.
-  - If all variables are excluded, the variable with the lowest p-value is included (see [`add_best_asset_after_failure_pval!`](@ref)).
+  - Starts with all variables included in the regression.
+  - Removes variables one at a time based on whichever has the largest p-value, stopping when the p-value falls under the threshold.
+  - If no variables are included at the end, the variable with the lowest p-value is added (see [`add_best_feature_after_pval_failure!`](@ref)).
 
 # Related
 
   - [`StepwiseRegression`](@ref)
   - [`PValue`](@ref)
   - [`Backward`](@ref)
-  - [`add_best_asset_after_failure_pval!`](@ref)
+  - [`add_best_feature_after_pval_failure!`](@ref)
 """
 function regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVector,
                     F::AbstractMatrix)
@@ -462,7 +460,7 @@ function regression(re::StepwiseRegression{<:PValue, <:Backward}, x::AbstractVec
         val, idx = findmax(pvals)
         push!(excluded, factors[idx])
     end
-    add_best_asset_after_failure_pval!(re.target, included, F, x)
+    add_best_feature_after_pval_failure!(re.target, included, F, x)
     return included
 end
 
