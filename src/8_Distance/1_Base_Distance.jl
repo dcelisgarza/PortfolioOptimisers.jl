@@ -147,7 +147,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `bins` is an integer, it must be strictly positive.
+  - If `bins` is an integer, `bins > 0`.
 
 # Examples
 

@@ -13,6 +13,8 @@ Distance estimator for portfolio optimization.
 
     Distance(; alg::AbstractDistanceAlgorithm = SimpleDistance())
 
+Keyword arguments correspond to the fields above.
+
 # Examples
 
 ```jldoctest
@@ -209,6 +211,10 @@ Compute the variation of information (VI) distance matrix from a data matrix.
   - `dims`: Dimension along which to compute the distance. If `2`, the data is transposed.
   - `kwargs...`: Additional keyword arguments, ignored.
 
+# Validation
+
+  - `dims` is either `1` or `2`.
+
 # Returns
 
   - `dist::Matrix{<:Real}`: Matrix of pairwise variation of information distances.
@@ -332,6 +338,10 @@ Compute and return the correlation and distance matrices. The distance matrix de
   - `X`: Data matrix (observations × features).
   - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the correlation computation.
+
+# Validation
+
+  - `dims` is either `1` or `2`.
 
 # Returns
 

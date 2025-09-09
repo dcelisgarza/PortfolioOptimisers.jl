@@ -27,9 +27,11 @@ where ``_{g}d`` is the generalised distance, ``d`` is the base distance computed
 
     GeneralDistance(; power::Integer = 1, alg::AbstractDistanceAlgorithm = SimpleDistance())
 
+Keyword arguments correspond to the fields above.
+
 ## Validation
 
-  - Asserts that `power >= 1`.
+  - `power >= 1`.
 
 # Examples
 

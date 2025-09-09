@@ -125,6 +125,10 @@ This method computes the cokurtosis tensor using the estimator's mean and matrix
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
+# Validation
+
+  - `dims` is either `1` or `2`.
+
 # Returns
 
   - `ckurt::Matrix{<:Real}`: Cokurtosis tensor (assets^2 × assets^2).

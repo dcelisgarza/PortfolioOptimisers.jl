@@ -32,7 +32,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `n` must satisfy `n ≥ 0`.
+  - `n > 0`.
 
 # Examples
 
@@ -79,9 +79,7 @@ For covariance matrices, the function internally converts to a correlation matri
 
 # Validation
 
-  - If `X` is a covariance matrix, it is internally converted to a correlation matrix for detoning and then rescaled.
-  - The number of components removed is validated to be within the matrix size.
-  - If `pdm` is provided, the result is projected to the nearest positive definite matrix.
+  - `1 <= dt.n <= size(X, 2)`.
 
 # Examples
 

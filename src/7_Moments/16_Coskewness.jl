@@ -164,6 +164,10 @@ Compute the full coskewness tensor and processed matrix for a dataset. For `Full
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
+# Validation
+
+  - `dims` is either `1` or `2`.
+
 # Returns
 
   - `cskew::Matrix{<:Real}`: Coskewness tensor (observations × assets^2).

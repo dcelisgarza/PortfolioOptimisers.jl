@@ -100,11 +100,11 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `nx` or `X` is provided, both must be non-empty and `length(nx) == size(X, 2)`.
-  - If `nf` or `F` is provided, both must be non-empty and `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
-  - If `ts` is provided, must be non-empty and `length(ts) == size(X, 1)`.
-  - If `iv` is provided, must be non-empty, positive, and `size(iv) == size(X)`.
-  - If `ivpa` is provided, must be positive and finite; if a vector, `length(ivpa) == size(iv, 2)`.
+  - If `nx` or `X` is provided, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
+  - If `nf` or `F` is provided, `!isempty(nf)`, `!isempty(F)`, and `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
+  - If `ts` is provided, `!isempty(ts)`, and `length(ts) == size(X, 1)`.
+  - If `iv` is provided, `!isempty(iv)`, `all(x -> x >= 0, iv)`, and `size(iv) == size(X)`.
+  - If `ivpa` is provided, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
 
 # Examples
 
@@ -255,8 +255,8 @@ ReturnsResult a [`ReturnsResult`](@ref) containing asset and factor returns, tim
   - `ivpa`: Optional Implied volatility risk premium adjustment.
   - `ret_method`: Return calculation method (`:simple` or `:log`).
   - `padding`: Whether to pad missing values in returns calculation.
-  - `missing_col_percent`: Maximum allowed fraction of missing values per column (asset/factor).
-  - `missing_row_percent`: Maximum allowed fraction of missing values per row (timestamp).
+  - `missing_col_percent`: Maximum allowed fraction `(0, 1]` of missing values per column (asset + factor).
+  - `missing_row_percent`: Maximum allowed fraction `(0, 1]` of missing values per row (timestamp).
   - `collapse_args`: Arguments for collapsing the time series (e.g., to lower frequency).
   - `map_func`: Optional function to apply to the data before returns calculation.
   - `join_method`: How to join asset and factor data (`:outer`, `:inner`, etc.).
@@ -265,12 +265,6 @@ ReturnsResult a [`ReturnsResult`](@ref) containing asset and factor returns, tim
 # Returns
 
   - [`ReturnsResult`](@ref): Struct containing asset/factor returns, names, time series, and optional implied volatility data.
-
-# Validation
-
-  - Ensures consistency of asset/factor names and dimensions.
-  - Handles missing data according to specified thresholds and imputation method.
-  - Validates implied volatility and risk premium adjustment if provided.
 
 # Examples
 

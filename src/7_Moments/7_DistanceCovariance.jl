@@ -90,7 +90,8 @@ This function calculates the distance correlation between `v1` and `v2` using th
 
 # Validation
 
-  - Asserts that `v1` and `v2` have the same length and at least two elements.
+  - `length(v1) == length(v2)`.
+  - `length(v1) > 1`.
 
 # Related
 
@@ -174,7 +175,7 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Examples
 
@@ -234,7 +235,8 @@ This function calculates the distance covariance between `v1` and `v2` using the
 
 # Validation
 
-  - Asserts that `v1` and `v2` have the same length and at least two elements.
+  - `length(v1) == length(v2)`.
+  - `length(v1) > 1`.
 
 # Related
 
@@ -316,7 +318,7 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Examples
 

@@ -78,7 +78,7 @@ This method computes the covariance matrix for the input data matrix `X` using t
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 
@@ -120,7 +120,7 @@ This method computes the correlation matrix for the input data matrix `X` using 
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 

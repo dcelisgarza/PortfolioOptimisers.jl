@@ -25,7 +25,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `bins` is an integer, asserts that `bins > 0`.
+  - If `bins` is an integer, `bins > 0`.
 
 # Examples
 
@@ -84,7 +84,7 @@ This method computes the pairwise mutual information correlation matrix for the 
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 
@@ -121,7 +121,7 @@ This method computes the pairwise mutual information covariance matrix for the i
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Examples
 

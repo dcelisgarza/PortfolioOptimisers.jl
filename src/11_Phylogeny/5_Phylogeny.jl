@@ -164,7 +164,7 @@ Construct a [`DegreeCentrality`](@ref) algorithm.
 
 # Validation
 
-  - Throws an error if `kind` is not in `[0, 2]`.
+  - `0 <= kind <= 2`.
 
 # Examples
 
@@ -283,7 +283,9 @@ Construct a [`Pagerank`](@ref) algorithm.
 
 # Validation
 
-  - Throws an error if `n <= 0`, `alpha` not in (0, 1), or `epsilon <= 0`.
+  - `n > 0`.
+  - `0 < alpha < 1`.
+  - `epsilon > 0`.
 
 # Examples
 

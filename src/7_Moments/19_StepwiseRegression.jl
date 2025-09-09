@@ -19,7 +19,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - Asserts that `threshold` is in `(0, 1)`.
+  - `0 < threshold < 1`.
 
 # Examples
 

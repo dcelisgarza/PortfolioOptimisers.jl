@@ -275,7 +275,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - Asserts that `threshold` is in the interval (0, 1).
+  - `0 < threshold < 1`.
 
 # Related
 
@@ -643,7 +643,7 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 
@@ -705,7 +705,7 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 

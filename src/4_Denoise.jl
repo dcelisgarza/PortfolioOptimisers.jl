@@ -79,7 +79,7 @@ A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a c
 
 # Fields
 
-  - `alpha`: The shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues. Must be in the range `[0, 1]`, where `0` means no shrinkage and `1` means full shrinkage.
+  - `alpha`: The shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues.
 
 # Constructor
 
@@ -89,7 +89,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - Throws an error if `alpha` is not in `[0, 1]`.
+  - `0 <= alpha <= 1`.
 
 # Examples
 
@@ -364,12 +364,6 @@ For covariance matrices, the function internally converts to a correlation matri
 # Returns
 
   - `nothing`. The input matrix `X` is modified in-place.
-
-# Validation
-
-  - If `X` is a covariance matrix, it is internally converted to a correlation matrix for denoising and then rescaled.
-  - The number of factors is determined automatically from the spectrum and kernel parameters.
-  - If `pdm` is provided, the result is projected to the nearest positive definite matrix.
 
 # Examples
 

@@ -284,9 +284,10 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - Asserts that `threshold` is strictly in `(0, 1)`.
-  - Asserts that `c1` is in `(0, 1]`.
-  - Asserts that `c2` is in `(0, 1]` and `c3 > c2`.
+  - `0 < threshold < 1`.
+  - `0 < c1 <= 1`.
+  - `0 < c2 <= 1`.
+  - `c3 > c2`.
 
 # Examples
 
@@ -388,9 +389,9 @@ This function computes the kernel value for a pair of asset returns, applying th
   - `muj`: Mean for asset `j`.
   - `sigmai`: Standard deviation for asset `i`.
   - `sigmaj`: Standard deviation for asset `j`.
-  - `c1`: Zone of confusion parameter (typically in (0, 1]).
-  - `c2`: Zone of indecision lower bound (typically in (0, 1]).
-  - `c3`: Zone of indecision upper bound (must satisfy `c3 > c2`).
+  - `c1`: Zone of confusion parameter.
+  - `c2`: Zone of indecision lower bound.
+  - `c3`: Zone of indecision upper bound.
   - `n`: Exponent parameter for the kernel.
 
 # Returns
@@ -1411,7 +1412,7 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 
@@ -1488,7 +1489,7 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 

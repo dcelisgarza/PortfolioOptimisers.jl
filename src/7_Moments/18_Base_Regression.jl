@@ -405,9 +405,9 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `M` must be a non-empty matrix.
-  - If provided, `b` must be a non-empty vector with length equal to the number of rows in `M`.
-  - If provided, `L` must have the same number of rows as `M`.
+  - `!isempty(M)`.
+  - If provided, `!isempty(b)`, and `length(b) == size(M, 1)`.
+  - If provided, `!isempty(L)`, and `size(L, 1) == size(M, 1)`.
 
 # Examples
 

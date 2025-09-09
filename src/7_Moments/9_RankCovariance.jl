@@ -76,7 +76,7 @@ This method computes the pairwise Kendall's tau rank correlation matrix for the 
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 
@@ -111,7 +111,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 
@@ -193,7 +193,7 @@ This method computes the pairwise Spearman's rho rank correlation matrix for the
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 
@@ -228,7 +228,7 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 

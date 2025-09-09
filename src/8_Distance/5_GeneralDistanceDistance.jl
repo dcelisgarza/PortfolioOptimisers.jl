@@ -34,9 +34,11 @@ where ``_{g}\\tilde{d}`` is the general distance of distances, ``_{g}\\bm{D}_{i}
                              power::Integer = 1,
                              alg::AbstractDistanceAlgorithm = SimpleDistance())
 
+Keyword arguments correspond to the fields above.
+
 ## Validation
 
-  - Asserts that `power >= 1`.
+  - `power >= 1`.
 
 # Examples
 

@@ -31,6 +31,8 @@ where ``\\tilde{d}`` is the distance of distances, ``\\bm{D}_{i}`` is the row co
                        args::Tuple = (), kwargs::NamedTuple = (;),
                        alg::AbstractDistanceAlgorithm = SimpleDistance())
 
+Keyword arguments correspond to the fields above.
+
 # Examples
 
 ```jldoctest

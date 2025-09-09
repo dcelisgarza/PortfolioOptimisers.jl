@@ -117,7 +117,10 @@ Creates a `HierarchicalClustering` object from the given clustering result, simi
 
 # Validation
 
-  - Throws an error if `S` or `D` are empty, if their sizes do not match, or if `k < 1`.
+  - `!isempty(S)`.
+  - `!isempty(D)`.
+  - `size(S) == size(D)`.
+  - `k ≥ 1`.
 
 # Related
 
@@ -204,7 +207,7 @@ Construct a [`PredefinedNumberClusters`](@ref) algorithm with a fixed number of 
 
 # Validation
 
-  - Throws an error if `k < 1`.
+  - `k >= 1`.
 
 # Examples
 
@@ -319,7 +322,7 @@ Construct an [`OptimalNumberClusters`](@ref) estimator for optimal cluster numbe
 
 # Validation
 
-  - Throws an error if `max_k` is provided and less than 1.
+  - `max_k >= 1`.
 
 # Examples
 

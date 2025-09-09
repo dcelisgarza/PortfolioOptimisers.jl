@@ -25,7 +25,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is provided, it must not be empty.
+  - If `w` is provided, `!isempty(w)`.
 
 # Examples
 

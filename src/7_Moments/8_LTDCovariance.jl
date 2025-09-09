@@ -25,7 +25,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - Asserts that `alpha` is strictly in `(0, 1)`.
+  - `0 < alpha < 1`.
 
 # Examples
 
@@ -135,7 +135,7 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 
@@ -169,7 +169,7 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 
