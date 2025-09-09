@@ -47,8 +47,6 @@ end
              ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
              kwargs...)
 
-Compute the simple distance matrix from a covariance estimator and data matrix.
-
 This method computes the correlation matrix using the provided covariance estimator `ce` and data matrix `X`, which is used to compute the distance matrix based on the specified distance algorithm in `de`.
 
 # Arguments
@@ -68,7 +66,7 @@ This method computes the correlation matrix using the provided covariance estima
 
 # Returns
 
-  - `dist::Matrix{<:Real}`: Matrix of pairwise Euclidean distances.
+  - `dist::Matrix{<:Real}`: Matrix of pairwise distances.
 
 # Related
 
@@ -115,7 +113,7 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
 
 # Arguments
 
-  - `::Distance{<:LogDistance}`: Distance estimator with `LogDistance` algorithm.
+  - `::Distance{<:LogDistance}`: Distance estimator with [`LogDistance`](@ref) algorithm.
   - `ce`: LTD covariance estimator or a PortfolioOptimisersCovariance wrapping an LTD estimator.
   - `X`: Data matrix (observations × features).
   - `dims`: Dimension along which to compute the correlation.
@@ -148,11 +146,11 @@ end
                        <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}},
              X::AbstractMatrix; dims::Int = 1, kwargs...)
 
-Compute the canonical distance matrix using the covariance estimator and data matrix.
+Compute the canonical distance matrix using the covariance estimator and data matrix. The method selects the appropriate distance algorithm based on the type of covariance estimator provided (see [`CanonicalDistance`](@ref)).
 
 # Arguments
 
-  - `::Distance{<:CanonicalDistance}`: Distance estimator with [`CanonicalDistance`](@ref) algorithm.
+  - `::Distance{<:CanonicalDistance}`: Distance estimator using the [`CanonicalDistance`](@ref) algorithm.
   - `ce::MutualInfoCovariance`: Mutual information covariance estimator.
   - `X`: Data matrix (observations × features).
   - `dims`: Dimension along which to compute the distance.
@@ -240,7 +238,7 @@ end
                                 <:CanonicalDistance}}, rho::AbstractMatrix, args...;
              kwargs...)
 
-Compute the simple distance matrix from a correlation or covariance matrix.
+Compute the distance matrix from a correlation or covariance matrix.
 
 If the input `rho` is a covariance matrix, it is converted to a correlation matrix which is used to compute the distance matrix using the specified distance algorithm in `de`.
 

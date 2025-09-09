@@ -2,32 +2,20 @@
 
 ```@docs
 GeneralDistance
-GeneralDistance()
-distance(de::GeneralDistance{<:Any, <:SimpleDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:SimpleDistance}, rho::AbstractMatrix, args...; kwargs...)
-cor_and_dist(de::GeneralDistance{<:Any, <:SimpleDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance}, rho::AbstractMatrix, args...; kwargs...)
-cor_and_dist(de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:LogDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:LogDistance}, ce::Union{<:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}}, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:LogDistance}, rho::AbstractMatrix, args...; kwargs...)
-cor_and_dist(de::GeneralDistance{<:Any, <:LogDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-cor_and_dist(de::GeneralDistance{<:Any, <:LogDistance}, ce::Union{<:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}}, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:VariationInfoDistance}, ::Any, X::AbstractMatrix; dims::Int = 1, kwargs...)
-cor_and_dist(de::GeneralDistance{<:Any, <:VariationInfoDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:CorrelationDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:CorrelationDistance}, rho::AbstractMatrix, args...; kwargs...)
-cor_and_dist(de::GeneralDistance{<:Any, <:CorrelationDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any}, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::Union{<:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}}, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::Union{<:DistanceCovariance, <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}}, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
-distance(de::GeneralDistance{<:Any, <:CanonicalDistance}, rho::AbstractMatrix, args...; kwargs...)
-cor_and_dist(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
-cor_and_dist(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::PortfolioOptimisersCovariance{<:MutualInfoCovariance, <:Any}, X::AbstractMatrix; dims::Int = 1, kwargs...)
-cor_and_dist(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::Union{<:LTDCovariance, <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}}, X::AbstractMatrix; dims::Int = 1, kwargs...)
-cor_and_dist(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::Union{<:DistanceCovariance, <:PortfolioOptimisersCovariance{<:DistanceCovariance, <:Any}}, X::AbstractMatrix; dims::Int = 1, kwargs...)
-cor_and_dist(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
+distance(de::GeneralDistance{<:Any, <:SimpleDistance},
+                  ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                  kwargs...)
+distance(de::GeneralDistance{<:Any, <:LogDistance},
+                  ce::Union{<:LTDCovariance,
+                            <:PortfolioOptimisersCovariance{<:LTDCovariance, <:Any}},
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+distance(de::GeneralDistance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance,
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+distance(de::GeneralDistance{<:Any, <:VariationInfoDistance}, ::Any,
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
+distance(de::GeneralDistance{<:Any, <:SimpleDistance}, rho::AbstractMatrix,
+                  args...; kwargs...)
+cor_and_dist(de::GeneralDistance{<:Any, <:SimpleDistance},
+                      ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
+                      kwargs...)
 ```

@@ -31,36 +31,6 @@ where ``\\tilde{d}`` is the distance of distances, ``\\bm{D}_{i}`` is the row co
                        args::Tuple = (), kwargs::NamedTuple = (;),
                        alg::AbstractDistanceAlgorithm = SimpleDistance())
 
-# Related
-
-  - [`Distance`](@ref)
-  - [`distance`](@ref)
-  - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
-"""
-struct DistanceDistance{T1, T2, T3, T4} <: AbstractDistanceEstimator
-    dist::T1
-    args::T2
-    kwargs::T3
-    alg::T4
-end
-"""
-    DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
-                      args::Tuple = (), kwargs::NamedTuple = (;),
-                      alg::AbstractDistanceAlgorithm = SimpleDistance())
-
-Construct a [`DistanceDistance`](@ref) estimator with the specified metric and base distance algorithm.
-
-# Arguments
-
-  - `dist`: The metric to use for the second-level distance from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl).
-  - `args`: Positional arguments to pass to the metric.
-  - `kwargs`: Keyword arguments to pass to the metric.
-  - `alg`: The base distance algorithm to use.
-
-# Returns
-
-  - `DistanceDistance`: A configured distance-of-distances estimator.
-
 # Examples
 
 ```jldoctest
@@ -74,11 +44,16 @@ DistanceDistance
 
 # Related
 
-  - [`DistanceDistance`](@ref)
   - [`Distance`](@ref)
   - [`distance`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
+struct DistanceDistance{T1, T2, T3, T4} <: AbstractDistanceEstimator
+    dist::T1
+    args::T2
+    kwargs::T3
+    alg::T4
+end
 function DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
                           args::Tuple = (), kwargs::NamedTuple = (;),
                           alg::AbstractDistanceAlgorithm = SimpleDistance())

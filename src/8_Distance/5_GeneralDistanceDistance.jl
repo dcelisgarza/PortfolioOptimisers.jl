@@ -9,14 +9,22 @@
 
 A general distance-of-distances estimator for portfolio optimization.
 
-`GeneralDistanceDistance` allows you to compute a "distance of distances" matrix using a customizable base distance powered by a `power` parameter and algorithm, and a second-level metric from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl). This is useful for meta-clustering or higher-order distance-based analyses.
+`GeneralDistanceDistance` wraps a distance metric from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) and a general distance algorithm, allowing you to compute a general "distance of distances" matrix.
+
+```math
+\\begin{align}
+    _{g}\\tilde{d}_{i,\\,j} &= \\lVert_{g}\\bm{D}_{i} - _{g}\\bm{D}_{j}\\rVert\\,,
+\\end{align}
+```
+
+where ``_{g}\\tilde{d}`` is the general distance of distances, ``_{g}\\bm{D}_{i}`` is the row corresponding to asset ``i`` of the general distance matrix computed using the specified distance algorithm [`AbstractDistanceAlgorithm`](@ref), ``\\lVert \\cdot \\rVert`` is the metric used to compute the distance of distances.
 
 # Fields
 
-  - `dist`: The metric to use for the second-level distance.
+  - `dist`: The metric to use for the second-level distance from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl).
   - `args`: Positional arguments to pass to the metric.
   - `kwargs`: Keyword arguments to pass to the metric.
-  - `power`: Power parameter for the base distance.
+  - `power`: The integer power to which the base correlation or distance matrix is raised.
   - `alg`: The base distance algorithm to use.
 
 # Constructor
@@ -26,9 +34,25 @@ A general distance-of-distances estimator for portfolio optimization.
                              power::Integer = 1,
                              alg::AbstractDistanceAlgorithm = SimpleDistance())
 
+## Validation
+
+  - Asserts that `power >= 1`.
+
+# Examples
+
+```jldoctest
+julia> GeneralDistanceDistance()
+GeneralDistanceDistance
+    dist | Distances.Euclidean: Distances.Euclidean(0.0)
+    args | Tuple{}: ()
+  kwargs | @NamedTuple{}: NamedTuple()
+   power | Int64: 1
+     alg | SimpleDistance()
+```
+
 # Related
 
-  - [`GeneralDistance`](@ref)
+  - [`GeneralDistanceDistance`](@ref)
   - [`distance`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
@@ -39,40 +63,13 @@ struct GeneralDistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
     power::T4
     alg::T5
 end
-"""
-    GeneralDistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
-                             args::Tuple = (), kwargs::NamedTuple = (;),
-                             power::Integer = 1,
-                             alg::AbstractDistanceAlgorithm = SimpleDistance())
-
-Construct a [`GeneralDistanceDistance`](@ref) estimator with the specified metric, power, and base distance algorithm.
-
-# Arguments
-
-  - `dist`: The metric to use for the second-level distance from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl).
-  - `args`: Positional arguments to pass to the metric.
-  - `kwargs`: Keyword arguments to pass to the metric.
-  - `power`: Power parameter for the base distance.
-  - `alg`: The base distance algorithm to use.
-
-# Returns
-
-  - `GeneralDistanceDistance`: A configured general distance-of-distances estimator.
-
-# Related
-
-  - [`GeneralDistanceDistance`](@ref)
-  - [`GeneralDistance`](@ref)
-  - [`distance`](@ref)
-  - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)]
-"""
 function GeneralDistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
                                  args::Tuple = (), kwargs::NamedTuple = (;),
                                  power::Integer = 1,
                                  alg::AbstractDistanceAlgorithm = SimpleDistance())
+    @argcheck(power >= one(power))
     return GeneralDistanceDistance(dist, args, kwargs, power, alg)
 end
-
 """
     distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator,
              X::AbstractMatrix; dims::Int = 1, kwargs...)
