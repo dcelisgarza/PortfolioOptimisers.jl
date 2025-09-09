@@ -1,9 +1,8 @@
 # Cokurtosis
 
 ```@docs
-PortfolioOptimisers.CokurtosisEstimator
 Cokurtosis
-Cokurtosis()
-PortfolioOptimisers._cokurtosis
 cokurtosis
+PortfolioOptimisers.CokurtosisEstimator
+PortfolioOptimisers._cokurtosis
 ```

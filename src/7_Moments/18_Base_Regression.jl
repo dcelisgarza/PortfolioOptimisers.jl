@@ -106,31 +106,7 @@ Regression target type for standard linear models in PortfolioOptimisers.jl.
 
     LinearModel(; kwargs::NamedTuple = (;))
 
-Construct a `LinearModel` regression target with optional keyword arguments for model fitting.
-
-# Related
-
-  - [`AbstractRegressionTarget`](@ref)
-  - [`GeneralisedLinearModel`](@ref)
-  - [`StatsAPI.fit(::LinearModel, ::AbstractMatrix, ::AbstractVector)`](@ref)
-"""
-struct LinearModel{T1} <: AbstractRegressionTarget
-    kwargs::T1
-end
-"""
-    LinearModel(; kwargs::NamedTuple = (;))
-
-Construct a [`LinearModel`](@ref) regression target for standard linear regression.
-
-This constructor creates a `LinearModel` object, optionally accepting keyword arguments as a `NamedTuple` to configure the underlying linear model fitting routine.
-
-# Arguments
-
-  - `kwargs`: Keyword arguments for the linear model fitting routine.
-
-# Returns
-
-  - `LinearModel`: A configured linear regression target.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -142,12 +118,16 @@ LinearModel
 
 # Related
 
-  - [`LinearModel`](@ref)
+  - [`AbstractRegressionTarget`](@ref)
+  - [`GeneralisedLinearModel`](@ref)
+  - [`StatsAPI.fit(::LinearModel, ::AbstractMatrix, ::AbstractVector)`](@ref)
 """
+struct LinearModel{T1} <: AbstractRegressionTarget
+    kwargs::T1
+end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
-
 """
     StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
 
@@ -157,7 +137,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
 
 # Arguments
 
-  - `target`: A [`LinearModel`](@ref) regression target specifying model options.
+  - `target`: Regression target specifying model options.
   - `X`: The design matrix (observations × features).
   - `y`: The response vector.
 
@@ -193,33 +173,7 @@ Regression target type for generalised linear models (GLMs) in PortfolioOptimise
 
     GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
 
-Construct a `GeneralisedLinearModel` regression target with optional arguments for model fitting.
-
-# Related
-
-  - [`AbstractRegressionTarget`](@ref)
-  - [`LinearModel`](@ref)
-  - [`StatsAPI.fit(::GeneralisedLinearModel, ::AbstractMatrix, ::AbstractVector)`](@ref)
-"""
-struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
-    args::T1
-    kwargs::T2
-end
-"""
-    GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
-
-Construct a [`GeneralisedLinearModel`](@ref) regression target for generalised linear regression.
-
-This constructor creates a `GeneralisedLinearModel` object, optionally accepting positional arguments (as a `Tuple`) and keyword arguments (as a `NamedTuple`) to configure the underlying GLM fitting routine.
-
-# Arguments
-
-  - `args`: Positional arguments for the GLM fitting routine.
-  - `kwargs`: Keyword arguments for the GLM fitting routine.
-
-# Returns
-
-  - `GeneralisedLinearModel`: A configured generalised linear regression target.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -232,12 +186,17 @@ GeneralisedLinearModel
 
 # Related
 
-  - [`GeneralisedLinearModel`](@ref)
+  - [`AbstractRegressionTarget`](@ref)
+  - [`LinearModel`](@ref)
+  - [`StatsAPI.fit(::GeneralisedLinearModel, ::AbstractMatrix, ::AbstractVector)`](@ref)
 """
+struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
+    args::T1
+    kwargs::T2
+end
 function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
-
 """
     StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
 
@@ -442,40 +401,13 @@ Container type for regression results in PortfolioOptimisers.jl.
     Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
                  b::Union{Nothing, <:AbstractVector} = nothing)
 
-Construct a `Regression` result object with the specified coefficient matrix, optional auxiliary matrix, and intercept vector.
+Keyword arguments correspond to the fields above.
 
-# Related
+## Validation
 
-  - [`AbstractRegressionResult`](@ref)
-"""
-struct Regression{T1, T2, T3} <: AbstractRegressionResult
-    M::T1
-    L::T2
-    b::T3
-end
-"""
-    Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
-                 b::Union{Nothing, <:AbstractVector} = nothing)
-
-Construct a [`Regression`](@ref) result object for regression-based moment estimation.
-
-This constructor creates a `Regression` object from the given coefficient matrix, optional auxiliary matrix, and intercept vector. It performs validation to ensure consistency of dimensions.
-
-# Arguments
-
-  - `M`: Main coefficient matrix.
-  - `L`: Optional auxiliary matrix for recovering lost dimensions in dimensionality reduction regressions.
-  - `b`: Optional intercept vector.
-
-# Returns
-
-  - `Regression`: A regression result object.
-
-# Validation
-
-  - Asserts that `M` is non-empty.
-  - If `b` is provided, asserts that it is non-empty and matches the row dimension of `M`.
-  - If `L` is provided, asserts that it matches the row dimension of `M`.
+  - `M` must be a non-empty matrix.
+  - If provided, `b` must be a non-empty vector with length equal to the number of rows in `M`.
+  - If provided, `L` must have the same number of rows as `M`.
 
 # Examples
 
@@ -489,8 +421,13 @@ Regression
 
 # Related
 
-  - [`Regression`](@ref)
+  - [`AbstractRegressionResult`](@ref)
 """
+struct Regression{T1, T2, T3} <: AbstractRegressionResult
+    M::T1
+    L::T2
+    b::T3
+end
 function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
                     b::Union{Nothing, <:AbstractVector} = nothing)
     @argcheck(!isempty(M))
@@ -499,7 +436,7 @@ function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = n
         @argcheck(length(b) == size(M, 1))
     end
     if !isnothing(L)
-        @argcheck(size(M, 1) == size(L, 1))
+        @argcheck(size(L, 1) == size(M, 1))
     end
     return Regression(M, L, b)
 end

@@ -119,7 +119,18 @@ Implements the original Gerber covariance algorithm on Z-transformed data.
 
 # Constructor
 
-  - `NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())`: Construct the original normalised Gerber covariance algorithm.
+    NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> ng0 = NormalisedGerber0()
+NormalisedGerber0
+  me | SimpleExpectedReturns
+     |   w | nothing
+```
 
 # Related
 
@@ -133,35 +144,6 @@ Implements the original Gerber covariance algorithm on Z-transformed data.
 struct NormalisedGerber0{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
 end
-"""
-    NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-
-Creates a [`NormalisedGerber0`](@ref) object using the specified expected returns estimator for mean-centering prior to normalisation.
-
-# Arguments
-
-  - `me`: Expected returns estimator used for mean-centering before normalisation.
-
-# Returns
-
-  - `NormalisedGerber0`: An instance of the original normalised Gerber covariance algorithm.
-
-# Examples
-
-```jldoctest
-julia> ng0 = NormalisedGerber0()
-NormalisedGerber0
-  me | SimpleExpectedReturns
-     |   w | nothing
-```
-
-# Related
-
-  - [`NormalisedGerber0`](@ref)
-  - [`GerberCovariance`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`SimpleExpectedReturns`](@ref)
-"""
 function NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber0(me)
 end
@@ -179,7 +161,18 @@ Implements the first variant of the Gerber covariance algorithm on Z-transformed
 
 # Constructor
 
-  - `NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())`: Construct the first variant of the normalised Gerber covariance algorithm.
+    NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> ng0 = NormalisedGerber1()
+NormalisedGerber1
+  me | SimpleExpectedReturns
+     |   w | nothing
+```
 
 # Related
 
@@ -193,35 +186,6 @@ Implements the first variant of the Gerber covariance algorithm on Z-transformed
 struct NormalisedGerber1{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
 end
-"""
-    NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-
-Creates a [`NormalisedGerber1`](@ref) object using the specified expected returns estimator for mean-centering prior to normalisation.
-
-# Arguments
-
-  - `me`: Expected returns estimator used for mean-centering before normalisation.
-
-# Returns
-
-  - `NormalisedGerber1`: An instance of the original normalised Gerber covariance algorithm.
-
-# Examples
-
-```jldoctest
-julia> ng0 = NormalisedGerber1()
-NormalisedGerber1
-  me | SimpleExpectedReturns
-     |   w | nothing
-```
-
-# Related
-
-  - [`NormalisedGerber1`](@ref)
-  - [`GerberCovariance`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`SimpleExpectedReturns`](@ref)
-"""
 function NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber1(me)
 end
@@ -239,9 +203,18 @@ Implements the second variant of the Gerber covariance algorithm on Z-transforme
 
 # Constructors
 
-  - `NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())`: Construct the second variant of the normalised Gerber covariance algorithm.
+    NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
 
-These types are used to specify the algorithm when constructing a [`GerberCovariance`](@ref) estimator with normalisation.
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> ng0 = NormalisedGerber2()
+NormalisedGerber2
+  me | SimpleExpectedReturns
+     |   w | nothing
+```
 
 # Related
 
@@ -255,35 +228,6 @@ These types are used to specify the algorithm when constructing a [`GerberCovari
 struct NormalisedGerber2{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
 end
-"""
-    NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
-
-Creates a [`NormalisedGerber2`](@ref) object using the specified expected returns estimator for mean-centering prior to normalisation.
-
-# Arguments
-
-  - `me`: Expected returns estimator used for mean-centering before normalisation.
-
-# Returns
-
-  - `NormalisedGerber2`: An instance of the original normalised Gerber covariance algorithm.
-
-# Examples
-
-```jldoctest
-julia> ng0 = NormalisedGerber2()
-NormalisedGerber2
-  me | SimpleExpectedReturns
-     |   w | nothing
-```
-
-# Related
-
-  - [`NormalisedGerber2`](@ref)
-  - [`GerberCovariance`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`SimpleExpectedReturns`](@ref)
-"""
 function NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber2(me)
 end
@@ -318,17 +262,20 @@ A flexible container type for configuring and applying Gerber covariance estimat
 
   - `ve`: Variance estimator.
   - `pdm`: Positive definite matrix estimator (see [`Posdef`](@ref)).
-  - `threshold`: Threshold parameter for Gerber covariance computation (typically in (0, 1)).
+  - `threshold`: Threshold parameter for Gerber covariance computation.
   - `alg`: Gerber covariance algorithm variant.
 
 # Constructor
 
-    GerberCovariance(; alg::GerberCovarianceAlgorithm = Gerber1(),
-                      ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                      pdm::Union{Nothing, <:Posdef} = Posdef(),
-                      threshold::Real = 0.5)
+    GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+                       pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
+                       alg::GerberCovarianceAlgorithm = Gerber1())
 
-Construct a `GerberCovariance` estimator with the specified algorithm, variance estimator, positive definite estimator, and threshold.
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - Asserts that `threshold` is in the interval (0, 1).
 
 # Related
 
@@ -350,61 +297,6 @@ struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
     threshold::T3
     alg::T4
 end
-"""
-    GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                     pdm::Union{Nothing, <:Posdef} = Posdef(),
-                     threshold::Real = 0.5,
-                     alg::GerberCovarianceAlgorithm = Gerber1())
-
-Construct a [`GerberCovariance`](@ref) estimator for robust Gerber-based covariance or correlation estimation.
-
-This constructor creates a `GerberCovariance` object using the specified Gerber algorithm, variance estimator, positive definite matrix estimator, and threshold parameter. The estimator is highly modular, allowing users to select from different Gerber algorithm variants, and positive definite projections.
-
-# Arguments
-
-  - `ve`: Variance estimator.
-  - `pdm`: Positive definite matrix estimator.
-  - `threshold`: Threshold parameter for Gerber covariance computation.
-  - `alg`: Gerber covariance algorithm variant.
-
-# Returns
-
-  - `GerberCovariance`: A configured Gerber covariance estimator.
-
-# Validation
-
-  - Asserts that `threshold` is strictly in `(0, 1)`.
-
-# Examples
-
-```jldoctest
-julia> gc = GerberCovariance()
-GerberCovariance
-         ve | SimpleVariance
-            |          me | SimpleExpectedReturns
-            |             |   w | nothing
-            |           w | nothing
-            |   corrected | Bool: true
-        pdm | Posdef
-            |   alg | UnionAll: NearestCorrelationMatrix.Newton
-  threshold | Float64: 0.5
-        alg | Gerber1()
-```
-
-# Related
-
-  - [`GerberCovariance`](@ref)
-  - [`GerberCovarianceAlgorithm`](@ref)
-  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`SimpleVariance`](@ref)
-  - [`Posdef`](@ref)
-  - [`Gerber0`](@ref)
-  - [`Gerber1`](@ref)
-  - [`Gerber2`](@ref)
-  - [`NormalisedGerber0`](@ref)
-  - [`NormalisedGerber1`](@ref)
-  - [`NormalisedGerber2`](@ref)
-"""
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                           pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
                           alg::GerberCovarianceAlgorithm = Gerber1())
@@ -728,8 +620,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2},
 end
 
 """
-    cor(ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm},
-        X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cor(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
 Compute the Gerber correlation matrix using an unnormalised Gerber covariance estimator.
 
@@ -737,7 +628,11 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
 
 # Arguments
 
-  - `ce`: Gerber covariance estimator.
+  - `ce::GerberCovariance`: Gerber covariance estimator.
+
+      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm}`: Compute the unnormalised Gerber correlation matrix.
+      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm}`: Compute the normalised Gerber correlation matrix.
+
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the correlation.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
@@ -756,7 +651,10 @@ This method computes the Gerber correlation matrix for the input data matrix `X`
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix, std_vec::AbstractArray)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::AbstractMatrix, std_vec::AbstractArray)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix, std_vec::AbstractArray)`](@ref)
-  - [`cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0}, X::AbstractMatrix)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1}, X::AbstractMatrix)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}, X::AbstractMatrix)`](@ref)
+  - [`cov(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:UnNormalisedGerberCovarianceAlgorithm},
@@ -768,80 +666,6 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
     std_vec = std(ce.ve, X; dims = 1, kwargs...)
     return gerber(ce, X, std_vec)
 end
-
-"""
-    cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm},
-        X::AbstractMatrix; dims::Int = 1, kwargs...)
-
-Compute the Gerber covariance matrix using an unnormalised Gerber covariance estimator.
-
-This method computes the Gerber covariance matrix for the input data matrix `X` using the specified unnormalised Gerber covariance estimator. The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is computed via [`gerber`](@ref), and the result is rescaled to a covariance matrix using the standard deviation vector.
-
-# Arguments
-
-  - `ce`: Gerber covariance estimator.
-  - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
-  - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
-
-# Returns
-
-  - `sigma::Matrix{<:Real}`: The Gerber covariance matrix.
-
-# Validation
-
-  - Asserts that `dims` is either `1` or `2`.
-
-# Related
-
-  - [`GerberCovariance`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix, std_vec::AbstractArray)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::AbstractMatrix, std_vec::AbstractArray)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix, std_vec::AbstractArray)`](@ref)
-  - [`cor(ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
-"""
-function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                                             <:UnNormalisedGerberCovarianceAlgorithm},
-                        X::AbstractMatrix; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
-    if dims == 2
-        X = transpose(X)
-    end
-    std_vec = std(ce.ve, X; dims = 1, kwargs...)
-    return gerber(ce, X, std_vec) ⊙ (std_vec ⊗ std_vec)
-end
-
-"""
-    cor(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm},
-        X::AbstractMatrix; dims::Int = 1, kwargs...)
-
-Compute the Gerber correlation matrix using a normalised Gerber covariance estimator.
-
-This method computes the Gerber correlation matrix for the input data matrix `X` using the specified normalised Gerber covariance estimator. The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is then computed via [`gerber`](@ref).
-
-# Arguments
-
-  - `ce`: Gerber covariance estimator.
-  - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the correlation.
-  - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
-
-# Returns
-
-  - `rho::Matrix{<:Real}`: The Gerber correlation matrix.
-
-# Validation
-
-  - Asserts that `dims` is either `1` or `2`.
-
-# Related
-
-  - [`GerberCovariance`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0}, X::AbstractMatrix)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1}, X::AbstractMatrix)`](@ref)
-  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}, X::AbstractMatrix)`](@ref)
-  - [`cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
-"""
 function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:NormalisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
@@ -858,16 +682,19 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
 end
 
 """
-    cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm},
-        X::AbstractMatrix; dims::Int = 1, kwargs...)
+    cov(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
 
-Compute the Gerber covariance matrix using a normalised Gerber covariance estimator.
+Compute the Gerber covariance matrix using an unnormalised Gerber covariance estimator.
 
-This method computes the Gerber covariance matrix for the input data matrix `X` using the specified normalised Gerber covariance estimator. The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is computed via [`gerber`](@ref), and the result is rescaled to a covariance matrix using the standard deviation vector.
+This method computes the Gerber covariance matrix for the input data matrix `X` using the specified unnormalised Gerber covariance estimator. The standard deviation vector is computed using the estimator's variance estimator. The Gerber correlation is computed via [`gerber`](@ref), and the result is rescaled to a covariance matrix using the standard deviation vector.
 
 # Arguments
 
-  - `ce`: Gerber covariance estimator.
+  - `ce::GerberCovariance`: Gerber covariance estimator.
+
+      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:UnNormalisedGerberCovarianceAlgorithm}`: Compute the unnormalised Gerber covariance matrix.
+      + `ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm}`: Compute the normalised Gerber covariance matrix.
+
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the covariance.
   - `kwargs...`: Additional keyword arguments passed to the standard deviation estimator.
@@ -883,11 +710,24 @@ This method computes the Gerber covariance matrix for the input data matrix `X` 
 # Related
 
   - [`GerberCovariance`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix, std_vec::AbstractArray)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::AbstractMatrix, std_vec::AbstractArray)`](@ref)
+  - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix, std_vec::AbstractArray)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0}, X::AbstractMatrix)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1}, X::AbstractMatrix)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}, X::AbstractMatrix)`](@ref)
-  - [`cor(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerberCovarianceAlgorithm}, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
+  - [`cor(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)`](@ref)
 """
+function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
+                                             <:UnNormalisedGerberCovarianceAlgorithm},
+                        X::AbstractMatrix; dims::Int = 1, kwargs...)
+    @argcheck(dims in (1, 2))
+    if dims == 2
+        X = transpose(X)
+    end
+    std_vec = std(ce.ve, X; dims = 1, kwargs...)
+    return gerber(ce, X, std_vec) ⊙ (std_vec ⊗ std_vec)
+end
 function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
                                              <:NormalisedGerberCovarianceAlgorithm},
                         X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)

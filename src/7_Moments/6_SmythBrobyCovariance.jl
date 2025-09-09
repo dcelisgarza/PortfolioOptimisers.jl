@@ -261,11 +261,11 @@ A flexible container type for configuring and applying Smyth-Broby covariance es
 
   - `me`: Expected returns estimator.
   - `ve`: Variance estimator.
-  - `pdm`: Positive definite matrix estimator (see [`Posdef`](@ref)).
-  - `threshold`: Threshold parameter for Smyth-Broby covariance computation (typically in (0, 1)).
-  - `c1`: Zone of confusion parameter (typically in (0, 1]).
-  - `c2`: Zone of indecision lower bound (typically in (0, 1]).
-  - `c3`: Zone of indecision upper bound (must satisfy `c3 > c2`).
+  - `pdm`: Positive definite matrix estimator.
+  - `threshold`: Threshold parameter for Smyth-Broby covariance computation.
+  - `c1`: Zone of confusion parameter.
+  - `c2`: Zone of indecision lower bound.
+  - `c3`: Zone of indecision upper bound.
   - `n`: Exponent parameter for the Smyth-Broby kernel.
   - `alg`: Smyth-Broby covariance algorithm variant.
   - `threads`: Parallel execution strategy.
@@ -273,14 +273,43 @@ A flexible container type for configuring and applying Smyth-Broby covariance es
 # Constructor
 
     SmythBrobyCovariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                          ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                          pdm::Union{Nothing, <:Posdef} = Posdef(),
-                          threshold::Real = 0.5, c1::Real = 0.5, c2::Real = 0.5,
-                          c3::Real = 4.0, n::Real = 2.0,
-                          alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-                          threads::FLoops.Transducers.Executor = ThreadedEx())
+                           ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+                           pdm::Union{Nothing, <:Posdef} = Posdef(),
+                           threshold::Real = 0.5, c1::Real = 0.5, c2::Real = 0.5,
+                           c3::Real = 4, n::Real = 2,
+                           alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
+                           threads::FLoops.Transducers.Executor = ThreadedEx())
 
-Construct a `SmythBrobyCovariance` estimator with the specified algorithm, estimators, parameters, and threading strategy.
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - Asserts that `threshold` is strictly in `(0, 1)`.
+  - Asserts that `c1` is in `(0, 1]`.
+  - Asserts that `c2` is in `(0, 1]` and `c3 > c2`.
+
+# Examples
+
+```jldoctest
+julia> ce = SmythBrobyCovariance()
+SmythBrobyCovariance
+         me | SimpleExpectedReturns
+            |   w | nothing
+         ve | SimpleVariance
+            |          me | SimpleExpectedReturns
+            |             |   w | nothing
+            |           w | nothing
+            |   corrected | Bool: true
+        pdm | Posdef
+            |   alg | UnionAll: NearestCorrelationMatrix.Newton
+  threshold | Float64: 0.5
+         c1 | Float64: 0.5
+         c2 | Float64: 0.5
+         c3 | Int64: 4
+          n | Int64: 2
+        alg | SmythBrobyGerber1()
+    threads | Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+```
 
 # Related
 
@@ -318,100 +347,12 @@ struct SmythBrobyCovariance{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     alg::T9
     threads::T10
 end
-"""
-    SmythBrobyCovariance(;
-        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-        ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-        pdm::Union{Nothing, <:Posdef} = Posdef(),
-        threshold::Real = 0.5,
-        c1::Real = 0.5,
-        c2::Real = 0.5,
-        c3::Real = 4.0,
-        n::Real = 2.0,
-        alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-        threads::FLoops.Transducers.Executor = ThreadedEx()
-    )
-
-Construct a [`SmythBrobyCovariance`](@ref) estimator for robust Smyth-Broby-based covariance or correlation estimation.
-
-This constructor creates a `SmythBrobyCovariance` object using the specified Smyth-Broby algorithm, expected returns estimator, variance estimator, positive definite matrix estimator, algorithm parameters, and threading strategy. The estimator is highly modular, allowing users to select from different Smyth-Broby algorithm variants, as well as custom estimators and parallel execution strategies.
-
-# Arguments
-
-  - `me`: Expected returns estimator.
-  - `ve`: Variance estimator.
-  - `pdm`: Positive definite matrix estimator.
-  - `threshold`: Threshold parameter for Smyth-Broby covariance computation (must satisfy `0 < threshold < 1`).
-  - `c1`: Zone of confusion parameter (must satisfy `0 < c1 ≤ 1`).
-  - `c2`: Zone of indecision lower bound (must satisfy `0 < c2 ≤ 1`).
-  - `c3`: Zone of indecision upper bound (must satisfy `c3 > c2`).
-  - `n`: Exponent parameter for the Smyth-Broby kernel.
-  - `alg`: Smyth-Broby covariance algorithm variant.
-  - `threads`: Parallel execution strategy.
-
-# Returns
-
-  - `SmythBrobyCovariance`: A configured Smyth-Broby covariance estimator.
-
-# Validation
-
-  - Asserts that `threshold` is strictly in `(0, 1)`.
-  - Asserts that `c1` is in `(0, 1]`.
-  - Asserts that `c2` is in `(0, 1]` and `c3 > c2`.
-
-# Examples
-
-```jldoctest
-julia> ce = SmythBrobyCovariance()
-SmythBrobyCovariance
-         me | SimpleExpectedReturns
-            |   w | nothing
-         ve | SimpleVariance
-            |          me | SimpleExpectedReturns
-            |             |   w | nothing
-            |           w | nothing
-            |   corrected | Bool: true
-        pdm | Posdef
-            |   alg | UnionAll: NearestCorrelationMatrix.Newton
-  threshold | Float64: 0.5
-         c1 | Float64: 0.5
-         c2 | Float64: 0.5
-         c3 | Float64: 4.0
-          n | Float64: 2.0
-        alg | SmythBrobyGerber1()
-    threads | Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-```
-
-# Related
-
-  - [`SmythBrobyCovariance`](@ref)
-  - [`BaseSmythBrobyCovariance`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`SimpleVariance`](@ref)
-  - [`Posdef`](@ref)
-  - [`SmythBrobyCovarianceAlgorithm`](@ref)
-  - [`SmythBroby0`](@ref)
-  - [`SmythBroby1`](@ref)
-  - [`SmythBroby2`](@ref)
-  - [`NormalisedSmythBroby0`](@ref)
-  - [`NormalisedSmythBroby1`](@ref)
-  - [`NormalisedSmythBroby2`](@ref)
-  - [`SmythBrobyGerber0`](@ref)
-  - [`SmythBrobyGerber1`](@ref)
-  - [`SmythBrobyGerber2`](@ref)
-  - [`NormalisedSmythBrobyGerber0`](@ref)
-  - [`NormalisedSmythBrobyGerber1`](@ref)
-  - [`NormalisedSmythBrobyGerber2`](@ref)
-  - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
-"""
 function SmythBrobyCovariance(;
                               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                               ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                               pdm::Union{Nothing, <:Posdef} = Posdef(),
                               threshold::Real = 0.5, c1::Real = 0.5, c2::Real = 0.5,
-                              c3::Real = 4.0, n::Real = 2.0,
+                              c3::Real = 4, n::Real = 2,
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
                               threads::FLoops.Transducers.Executor = ThreadedEx())
     @argcheck(zero(threshold) < threshold < one(threshold))
@@ -424,7 +365,6 @@ function SmythBrobyCovariance(;
     @argcheck(c3 > c2)
     return SmythBrobyCovariance(me, ve, pdm, threshold, c1, c2, c3, n, alg, threads)
 end
-
 function factory(ce::SmythBrobyCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return SmythBrobyCovariance(; me = factory(ce.me, w), ve = factory(ce.ve, w),
                                 pdm = ce.pdm, threshold = ce.threshold, c1 = ce.c1,
@@ -1447,19 +1387,19 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
 end
 
 """
-    cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                 <:Any, <:Any,
-                                 <:UnNormalisedSmythBrobyCovarianceAlgorithm,
-                                 <:Any}, X::AbstractMatrix; dims::Int = 1,
-        mean = nothing, kwargs...)
+    cor(ce::SmythBrobyCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 
-Compute the Smyth-Broby correlation matrix using an unnormalised Smyth-Broby covariance estimator.
+Compute the Smyth-Broby correlation matrix.
 
-This method computes the Smyth-Broby correlation matrix for the input data matrix `X` using the specified unnormalised Smyth-Broby covariance estimator [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref). The mean and standard deviation vectors are computed using the estimator's expected returns and variance estimators. The Smyth-Broby correlation is then computed via [`smythbroby`](@ref).
+This method computes the Smyth-Broby correlation matrix for the input data matrix `X`. The mean and standard deviation vectors are computed using the estimator's expected returns and variance estimators. The Smyth-Broby correlation is then computed via [`smythbroby`](@ref).
 
 # Arguments
 
   - `ce`: Smyth-Broby covariance estimator.
+
+      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnNormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the unnormalised Smyth-Broby correlation matrix.
+      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the normalised Smyth-Broby correlation matrix.
+
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the correlation.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
@@ -1477,13 +1417,20 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 
   - [`SmythBrobyCovariance`](@ref)
   - [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnNormalisedSmythBrobyCovarianceAlgorithm, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cov(ce::SmythBrobyCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any, <:Any,
@@ -1500,21 +1447,36 @@ function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
     std_vec[idx] .= eps(eltype(X))
     return smythbroby(ce, X, mean_vec, std_vec)
 end
-
+function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                                 <:Any, <:Any,
+                                                 <:NormalisedSmythBrobyCovarianceAlgorithm,
+                                                 <:Any}, X::AbstractMatrix; dims::Int = 1,
+                        mean = nothing, kwargs...)
+    @argcheck(dims in (1, 2))
+    if dims == 2
+        X = transpose(X)
+    end
+    mean_vec = isnothing(mean) ? Statistics.mean(ce.me, X; dims = 1, kwargs...) : mean
+    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
+    idx = iszero.(std_vec)
+    std_vec[idx] .= eps(eltype(X))
+    X = (X .- mean_vec) ⊘ std_vec
+    return smythbroby(ce, X)
+end
 """
-    cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                 <:Any, <:Any,
-                                 <:UnNormalisedSmythBrobyCovarianceAlgorithm,
-                                 <:Any}, X::AbstractMatrix; dims::Int = 1,
-        mean = nothing, kwargs...)
+    cov(ce::SmythBrobyCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
 
-Compute the Smyth-Broby covariance matrix using an unnormalised Smyth-Broby covariance estimator.
+Compute the Smyth-Broby covariance matrix.
 
-This method computes the Smyth-Broby covariance matrix for the input data matrix `X` using the specified unnormalised Smyth-Broby covariance estimator [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref). The mean and standard deviation vectors are computed using the estimator's expected returns and variance estimators. The Smyth-Broby correlation is computed via [`smythbroby`](@ref), and the result is rescaled to a covariance matrix using the standard deviation vector.
+This method computes the Smyth-Broby covariance matrix for the input data matrix `X`. The mean and standard deviation vectors are computed using the estimator's expected returns and variance estimators. The Smyth-Broby covariance is then computed via [`smythbroby`](@ref).
 
 # Arguments
 
   - `ce`: Smyth-Broby covariance estimator.
+
+      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnNormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the unnormalised Smyth-Broby covariance matrix.
+      + `ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyCovarianceAlgorithm, <:Any}`: Compute the normalised Smyth-Broby covariance matrix.
+
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the covariance.
   - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
@@ -1532,13 +1494,20 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 
   - [`SmythBrobyCovariance`](@ref)
   - [`UnNormalisedSmythBrobyCovarianceAlgorithm`](@ref)
+  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:SmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:UnNormalisedSmythBrobyCovarianceAlgorithm, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cov(ce::SmythBrobyCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any, <:Any,
@@ -1555,109 +1524,6 @@ function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
     std_vec[idx] .= eps(eltype(X))
     return smythbroby(ce, X, mean_vec, std_vec) ⊙ (std_vec ⊗ std_vec)
 end
-
-"""
-    cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                 <:Any, <:Any, <:NormalisedSmythBrobyCovarianceAlgorithm,
-                                 <:Any}, X::AbstractMatrix; dims::Int = 1,
-        mean = nothing, kwargs...)
-
-Compute the Smyth-Broby correlation matrix using a normalised Smyth-Broby covariance estimator.
-
-This method computes the Smyth-Broby correlation matrix for the input data matrix `X` using the specified normalised Smyth-Broby covariance estimator [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref). The mean and standard deviation vectors are computed using the estimator's expected returns and variance estimators, and the data is Z-transformed before applying the Smyth-Broby algorithm.
-
-# Arguments
-
-  - `ce`: Smyth-Broby covariance estimator.
-  - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the correlation.
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
-  - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
-
-# Returns
-
-  - `rho::Matrix{<:Real}`: The Smyth-Broby correlation matrix.
-
-# Validation
-
-  - Asserts that `dims` is either `1` or `2`.
-
-# Details
-
-  - The input data is Z-transformed (mean-centered and standardised) before applying the Smyth-Broby algorithm.
-
-# Related
-
-  - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyCovarianceAlgorithm, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-"""
-function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                 <:Any, <:Any,
-                                                 <:NormalisedSmythBrobyCovarianceAlgorithm,
-                                                 <:Any}, X::AbstractMatrix; dims::Int = 1,
-                        mean = nothing, kwargs...)
-    @argcheck(dims in (1, 2))
-    if dims == 2
-        X = transpose(X)
-    end
-    mean_vec = isnothing(mean) ? Statistics.mean(ce.me, X; dims = 1, kwargs...) : mean
-    std_vec = std(ce.ve, X; dims = 1, mean = mean_vec, kwargs...)
-    idx = iszero.(std_vec)
-    std_vec[idx] .= eps(eltype(X))
-    X = (X .- mean_vec) ⊘ std_vec
-    return smythbroby(ce, X)
-end
-
-"""
-    cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                 <:Any, <:Any, <:NormalisedSmythBrobyCovarianceAlgorithm,
-                                 <:Any}, X::AbstractMatrix; dims::Int = 1,
-        mean = nothing, kwargs...)
-
-Compute the Smyth-Broby covariance matrix using a normalised Smyth-Broby covariance estimator.
-
-This method computes the Smyth-Broby covariance matrix for the input data matrix `X` using the specified normalised Smyth-Broby covariance estimator [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref). The mean and standard deviation vectors are computed using the estimator's expected returns and variance estimators, and the data is Z-transformed before applying the Smyth-Broby algorithm. The resulting correlation matrix is rescaled to a covariance matrix using the standard deviation vector.
-
-# Arguments
-
-  - `ce`: Smyth-Broby covariance estimator.
-  - `X`: Data matrix (observations × assets).
-  - `dims`: Dimension along which to compute the covariance.
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
-  - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
-
-# Returns
-
-  - `sigma::Matrix{<:Real}`: The Smyth-Broby covariance matrix.
-
-# Validation
-
-  - Asserts that `dims` is either `1` or `2`.
-
-# Details
-
-  - The input data is Z-transformed (mean-centered and standardised) before applying the Smyth-Broby algorithm.
-  - The resulting correlation matrix is rescaled to a covariance matrix using the standard deviation vector.
-
-# Related
-
-  - [`SmythBrobyCovariance`](@ref)
-  - [`NormalisedSmythBrobyCovarianceAlgorithm`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby0, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby1, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBroby2, <:Any}, X::AbstractMatrix)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber0, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber1, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyGerber2, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:NormalisedSmythBrobyCovarianceAlgorithm, <:Any}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-"""
 function Statistics.cov(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                                  <:Any, <:Any,
                                                  <:NormalisedSmythBrobyCovarianceAlgorithm,

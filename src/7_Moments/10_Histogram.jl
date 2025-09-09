@@ -111,7 +111,7 @@ This utility dispatches on the binning algorithm type and returns the correspond
 
 # Returns
 
-  - `bin_width_func`: The corresponding bin width function (callable), or `nothing` if not applicable.
+  - `bin_width_func::Function`: The corresponding bin width function (callable), or `nothing` if not applicable.
 
 # Examples
 
@@ -278,7 +278,7 @@ This function calculates the mutual information between two variables given thei
 
 # Arguments
 
-  - `X`: Joint histogram matrix (typically from `calc_hist_data`).
+  - `X`: Joint histogram matrix.
 
 # Returns
 

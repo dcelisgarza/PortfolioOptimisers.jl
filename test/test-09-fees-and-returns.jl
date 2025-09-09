@@ -65,12 +65,13 @@
         sric = sr - N / (T * sr)
         srfic = srf - N / (T * srf)
 
-        @test rtf == rt - f
-        @test srf == expected_ratio(r, res.ret, res.w, pr, fes[1]; rf = rf)
-        @test sr == expected_ratio(r, res.ret, res.w, pr; rf = rf)
-        @test (rk, rtf, srf) ==
-              expected_risk_ret_ratio(r, res.ret, res.w, pr, fes[1]; rf = rf)
-        @test (rk, rt, sric) == expected_risk_ret_sric(r, res.ret, res.w, pr; rf = rf)
+        @test isapprox(rtf, rt - f)
+        @test isapprox(srf, expected_ratio(r, res.ret, res.w, pr, fes[1]; rf = rf))
+        @test isapprox(sr, expected_ratio(r, res.ret, res.w, pr; rf = rf))
+        @test all(isapprox.((rk, rtf, srf),
+                            expected_risk_ret_ratio(r, res.ret, res.w, pr, fes[1]; rf = rf)))
+        @test all(isapprox.((rk, rt, sric),
+                            expected_risk_ret_sric(r, res.ret, res.w, pr; rf = rf)))
     end
     @testset "Finite allocation fees" begin
         p = vec(values(X[end]))

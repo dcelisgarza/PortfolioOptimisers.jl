@@ -28,32 +28,7 @@ Robust covariance estimator based on Kendall's tau rank correlation.
 
     KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
 
-Construct a `KendallCovariance` object with the specified variance estimator.
-
-# Related
-
-  - [`RankCovarianceEstimator`](@ref)
-  - [`SpearmanCovariance`](@ref)
-  - [`AbstractVarianceEstimator`](@ref)
-  - [`SimpleVariance`](@ref)
-"""
-struct KendallCovariance{T1} <: RankCovarianceEstimator
-    ve::T1
-end
-"""
-    KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
-
-Construct a [`KendallCovariance`](@ref) estimator for robust rank-based covariance or correlation estimation using Kendall's tau.
-
-This constructor creates a `KendallCovariance` object using the specified variance estimator. The estimator computes the covariance matrix by combining the Kendall's tau rank correlation matrix with the marginal standard deviations.
-
-# Arguments
-
-  - `ve`: Variance estimator.
-
-# Returns
-
-  - `KendallCovariance`: A configured Kendall's tau-based covariance estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -69,11 +44,14 @@ KendallCovariance
 
 # Related
 
-  - [`KendallCovariance`](@ref)
-  - [`AbstractVarianceEstimator`](@ref)
+  - [`RankCovarianceEstimator`](@ref)
+  - [`SpearmanCovariance`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`SimpleVariance`](@ref)
 """
+struct KendallCovariance{T1} <: RankCovarianceEstimator
+    ve::T1
+end
 function KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return KendallCovariance(ve)
 end
@@ -167,32 +145,7 @@ Robust covariance estimator based on Spearman's rho rank correlation.
 
     SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
 
-Construct a `SpearmanCovariance` object with the specified variance estimator.
-
-# Related
-
-  - [`RankCovarianceEstimator`](@ref)
-  - [`KendallCovariance`](@ref)
-  - [`AbstractVarianceEstimator`](@ref)
-  - [`SimpleVariance`](@ref)
-"""
-struct SpearmanCovariance{T1} <: RankCovarianceEstimator
-    ve::T1
-end
-"""
-    SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
-
-Construct a [`SpearmanCovariance`](@ref) estimator for robust rank-based covariance or correlation estimation using Spearman's rho.
-
-This constructor creates a `SpearmanCovariance` object using the specified variance estimator. The estimator computes the covariance matrix by combining the Spearman's rho rank correlation matrix with the marginal standard deviations.
-
-# Arguments
-
-  - `ve`: Variance estimator.
-
-# Returns
-
-  - `SpearmanCovariance`: A configured Spearman's rho-based covariance estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -208,10 +161,14 @@ SpearmanCovariance
 
 # Related
 
-  - [`SpearmanCovariance`](@ref)
+  - [`RankCovarianceEstimator`](@ref)
+  - [`KendallCovariance`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`SimpleVariance`](@ref)
 """
+struct SpearmanCovariance{T1} <: RankCovarianceEstimator
+    ve::T1
+end
 function SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
     return SpearmanCovariance(ve)
 end

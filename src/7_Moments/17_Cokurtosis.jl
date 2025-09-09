@@ -32,39 +32,10 @@ Container type for cokurtosis estimators.
 # Constructor
 
     Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                alg::AbstractMomentAlgorithm = Full())
+                 mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                 alg::AbstractMomentAlgorithm = Full())
 
-Construct a `Cokurtosis` estimator with the specified mean estimator, matrix processing estimator, and moment algorithm.
-
-# Related
-
-  - [`CokurtosisEstimator`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`AbstractMomentAlgorithm`](@ref)
-"""
-struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
-    me::T1
-    mp::T2
-    alg::T3
-end
-"""
-    Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                alg::AbstractMomentAlgorithm = Full())
-
-Construct a [`Cokurtosis`](@ref) estimator for cokurtosis computation.
-
-# Arguments
-
-  - `me`: Mean estimator for expected returns.
-  - `mp`: Matrix processing estimator.
-  - `alg`: Moment algorithm.
-
-# Returns
-
-  - `Cokurtosis`: Configured cokurtosis estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -84,10 +55,16 @@ Cokurtosis
 
 # Related
 
+  - [`CokurtosisEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
+struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
+    me::T1
+    mp::T2
+    alg::T3
+end
 function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                     alg::AbstractMomentAlgorithm = Full())
@@ -137,9 +114,12 @@ This method computes the cokurtosis tensor using the estimator's mean and matrix
 
 # Arguments
 
-  - `ke::Cokurtosis{<:Any, <:Any, <:Full}`: Cokurtosis estimator with `Full` moment algorithm.
-  - `ke::Cokurtosis{<:Any, <:Any, <:Semi}`: Cokurtosis estimator with `Semi` moment algorithm.
-  - `ke::Nothing`: No-op cokurtosis computation, returns `nothing`.
+  - `ke`: Cokurtosis estimator.
+
+      + `ke::Cokurtosis{<:Any, <:Any, <:Full}`: Cokurtosis estimator with [`Full`](@ref) moment algorithm.
+      + `ke::Cokurtosis{<:Any, <:Any, <:Semi}`: Cokurtosis estimator with [`Semi`](@ref) moment algorithm.
+      + `ke::Nothing`: No-op, returns `nothing`.
+
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the mean.
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.

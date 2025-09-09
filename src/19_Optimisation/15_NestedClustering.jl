@@ -29,7 +29,7 @@ function assert_rc_variance(::Any)
     return nothing
 end
 function assert_rc_variance(opt::Union{<:MeanRisk, <:FactorRiskContribution,
-                                       <:NearOptimalCentering, <:RiskBudgetting})
+                                       <:NearOptimalCentering, <:RiskBudgeting})
     if isa(opt.r, Variance)
         @argcheck(!isa(opt.r.rc, LinearConstraint),
                   "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")

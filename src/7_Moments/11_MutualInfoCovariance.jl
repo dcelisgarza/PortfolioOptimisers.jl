@@ -21,38 +21,9 @@ Covariance estimator based on mutual information.
                           bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                           normalise::Bool = true)
 
-Creates a `MutualInfoCovariance` object with the specified variance estimator, binning strategy, and normalisation option.
+Keyword arguments correspond to the fields above.
 
-# Related
-
-  - [`AbstractVarianceEstimator`](@ref)
-  - [`AbstractBins`](@ref)
-"""
-struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-    ve::T1
-    bins::T2
-    normalise::T3
-end
-"""
-    MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                          bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
-                          normalise::Bool = true)
-
-Construct a [`MutualInfoCovariance`](@ref) estimator for robust covariance or correlation estimation using mutual information.
-
-This constructor creates a `MutualInfoCovariance` object using the specified variance estimator, binning algorithm (or fixed bin count), and normalisation flag. The estimator computes the covariance matrix by combining the mutual information matrix (optionally normalised) with the marginal standard deviations.
-
-# Arguments
-
-  - `ve`: Variance estimator.
-  - `bins`: Binning algorithm or fixed number of bins for MI estimation.
-  - `normalise`: Whether to normalise the MI matrix.
-
-# Returns
-
-  - `MutualInfoCovariance`: A configured mutual information-based covariance estimator.
-
-# Validation
+## Validation
 
   - If `bins` is an integer, asserts that `bins > 0`.
 
@@ -72,10 +43,14 @@ MutualInfoCovariance
 
 # Related
 
-  - [`MutualInfoCovariance`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractBins`](@ref)
 """
+struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+    ve::T1
+    bins::T2
+    normalise::T3
+end
 function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                               bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                               normalise::Bool = true)

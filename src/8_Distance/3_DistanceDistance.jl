@@ -8,7 +8,15 @@
 
 A distance-of-distances estimator for portfolio optimization.
 
-`DistanceDistance` wraps a distance metric from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) and a base distance algorithm, allowing you to compute a "distance of distances" matrix. This is useful for meta-clustering or higher-order distance-based analyses.
+`DistanceDistance` wraps a distance metric from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) and a base distance algorithm, allowing you to compute a "distance of distances" matrix.
+
+```math
+\\begin{align}
+    \\tilde{d}_{i,\\,j} &= \\lVert\\bm{D}_{i} - \\bm{D}_{j}\\rVert\\,,
+\\end{align}
+```
+
+where ``\\tilde{d}`` is the distance of distances, ``\\bm{D}_{i}`` is the row corresponding to asset ``i`` of the distance matrix computed using the specified distance algorithm [`AbstractDistanceAlgorithm`](@ref), ``\\lVert \\cdot \\rVert`` is the metric used to compute the distance of distances.
 
 # Fields
 
@@ -23,36 +31,6 @@ A distance-of-distances estimator for portfolio optimization.
                        args::Tuple = (), kwargs::NamedTuple = (;),
                        alg::AbstractDistanceAlgorithm = SimpleDistance())
 
-# Related
-
-  - [`Distance`](@ref)
-  - [`distance`](@ref)
-  - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
-"""
-struct DistanceDistance{T1, T2, T3, T4} <: AbstractDistanceEstimator
-    dist::T1
-    args::T2
-    kwargs::T3
-    alg::T4
-end
-"""
-    DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
-                      args::Tuple = (), kwargs::NamedTuple = (;),
-                      alg::AbstractDistanceAlgorithm = SimpleDistance())
-
-Construct a [`DistanceDistance`](@ref) estimator with the specified metric and base distance algorithm.
-
-# Arguments
-
-  - `dist`: The metric to use for the second-level distance from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl).
-  - `args`: Positional arguments to pass to the metric.
-  - `kwargs`: Keyword arguments to pass to the metric.
-  - `alg`: The base distance algorithm to use.
-
-# Returns
-
-  - `DistanceDistance`: A configured distance-of-distances estimator.
-
 # Examples
 
 ```jldoctest
@@ -66,11 +44,16 @@ DistanceDistance
 
 # Related
 
-  - [`DistanceDistance`](@ref)
   - [`Distance`](@ref)
   - [`distance`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
+struct DistanceDistance{T1, T2, T3, T4} <: AbstractDistanceEstimator
+    dist::T1
+    args::T2
+    kwargs::T3
+    alg::T4
+end
 function DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
                           args::Tuple = (), kwargs::NamedTuple = (;),
                           alg::AbstractDistanceAlgorithm = SimpleDistance())
@@ -118,7 +101,7 @@ This method first computes a base distance matrix using the specified base dista
 
   - `de`: Distance-of-distances estimator.
   - `rho`: Correlation or covariance matrix.
-  - `args...`: Additional arguments (ignored).
+  - `args...`: Additional arguments passed to the base distance computation.
   - `kwargs...`: Additional keyword arguments passed to the base distance computation.
 
 # Returns

@@ -82,7 +82,7 @@ This function attempts to compute the weighted covariance matrix using the provi
 
 # Returns
 
-  - Covariance matrix as computed by the estimator and optional weights.
+  - `sigma::AbstractMatrix{<:Real}`: Covariance matrix.
 
 # Related
 
@@ -124,7 +124,7 @@ This function attempts to compute the weighted correlation matrix using the prov
 
 # Returns
 
-  - Correlation matrix as computed by the estimator and optional weights.
+  - `rho::AbstractMatrix{<:Real}`: Correlation matrix.
 
 # Related
 

@@ -27,44 +27,15 @@ Container type for coskewness estimators.
 
   - `me`: Mean estimator for expected returns.
   - `mp`: Matrix processing estimator for coskewness tensors.
-  - `alg`: Moment algorithm (e.g., `Full`, `Semi`).
+  - `alg`: Moment algorithm.
 
 # Constructor
 
     Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
-                alg::AbstractMomentAlgorithm = Full())
+                 mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
+                 alg::AbstractMomentAlgorithm = Full())
 
-Construct a `Coskewness` estimator with the specified mean estimator, matrix processing estimator, and moment algorithm.
-
-# Related
-
-  - [`CoskewnessEstimator`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`AbstractMomentAlgorithm`](@ref)
-"""
-struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
-    me::T1
-    mp::T2
-    alg::T3
-end
-"""
-    Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
-                alg::AbstractMomentAlgorithm = Full())
-
-Construct a [`Coskewness`](@ref) estimator for coskewness computation.
-
-# Arguments
-
-  - `me`: Mean estimator for expected returns.
-  - `mp`: Matrix processing estimator.
-  - `alg`: Moment algorithm.
-
-# Returns
-
-  - `Coskewness`: Configured coskewness estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -87,6 +58,11 @@ Coskewness
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
+struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
+    me::T1
+    mp::T2
+    alg::T3
+end
 function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
                     alg::AbstractMomentAlgorithm = Full())
@@ -177,9 +153,12 @@ Compute the full coskewness tensor and processed matrix for a dataset. For `Full
 
 # Arguments
 
-  - `ske::Coskewness{<:Any, <:Any, <:Full}`: Coskewness estimator with `Full` moment algorithm.
-  - `ske::Coskewness{<:Any, <:Any, <:Semi}`: Coskewness estimator with `Semi` moment algorithm.
-  - `ske::Nothing`: No-op coskewness computation, returns `(nothing, nothing)`.
+  - `ske`: Coskewness estimator.
+
+      + `ske::Coskewness{<:Any, <:Any, <:Full}`: Coskewness estimator with [`Full`](@ref) moment algorithm.
+      + `ske::Coskewness{<:Any, <:Any, <:Semi}`: Coskewness estimator with [`Semi`](@ref) moment algorithm.
+      + `ske::Nothing`: No-op, returns `(nothing, nothing)`.
+
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the mean.
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.

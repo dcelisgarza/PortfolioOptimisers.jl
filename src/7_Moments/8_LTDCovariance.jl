@@ -18,42 +18,12 @@ Lower tail dependence covariance estimator.
 # Constructor
 
     LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                   alpha::Real = 0.05, threads::FLoops.Transducers.Executor = ThreadedEx())
+                    alpha::Real = 0.05,
+                    threads::FLoops.Transducers.Executor = ThreadedEx())
 
-Creates a `LTDCovariance` object with the specified variance estimator, quantile level, and parallel execution strategy.
+Keyword arguments correspond to the fields above.
 
-# Related
-
-  - [`AbstractVarianceEstimator`](@ref)
-  - [`SimpleVariance`](@ref)
-  - [`AbstractCovarianceEstimator`](@ref)
-  - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
-"""
-struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-    ve::T1
-    alpha::T2
-    threads::T3
-end
-"""
-    LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                   alpha::Real = 0.05,
-                   threads::FLoops.Transducers.Executor = ThreadedEx())
-
-Construct a [`LTDCovariance`](@ref) estimator for robust lower tail dependence covariance or correlation estimation.
-
-This constructor creates a `LTDCovariance` object using the specified variance estimator, quantile level, and parallel execution strategy. The estimator computes the covariance matrix by focusing on the joint lower tail events of asset returns, which is particularly relevant for risk-sensitive portfolio construction.
-
-# Arguments
-
-  - `ve`: Variance estimator.
-  - `alpha`: Quantile level for the lower tail.
-  - `threads`: Parallel execution strategy.
-
-# Returns
-
-  - `LTDCovariance`: A configured lower tail dependence covariance estimator.
-
-# Validation
+## Validation
 
   - Asserts that `alpha` is strictly in `(0, 1)`.
 
@@ -75,15 +45,20 @@ LTDCovariance
 
   - [`AbstractVarianceEstimator`](@ref)
   - [`SimpleVariance`](@ref)
+  - [`AbstractCovarianceEstimator`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
+struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+    ve::T1
+    alpha::T2
+    threads::T3
+end
 function LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                        alpha::Real = 0.05,
                        threads::FLoops.Transducers.Executor = ThreadedEx())
     @argcheck(zero(alpha) < alpha < one(alpha))
     return LTDCovariance(ve, alpha, threads)
 end
-
 function factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return LTDCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha, threads = ce.threads)
 end

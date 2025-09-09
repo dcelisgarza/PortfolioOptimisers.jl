@@ -2,9 +2,9 @@
 
 ```@docs
 ReturnsResult
-ReturnsResult()
 prices_to_returns
 brinson_attribution
+traverse_concrete_subtypes
 PortfolioOptimisers.AbstractReturnsResult
 PortfolioOptimisers.assert_matrix_issquare
 PortfolioOptimisers.:⊗
@@ -12,7 +12,6 @@ PortfolioOptimisers.:⊙
 PortfolioOptimisers.:⊘
 PortfolioOptimisers.:⊕
 PortfolioOptimisers.:⊖
-traverse_concrete_subtypes
 PortfolioOptimisers.concrete_typed_array
 PortfolioOptimisers.dot_scalar
 PortfolioOptimisers.nothing_scalar_array_view

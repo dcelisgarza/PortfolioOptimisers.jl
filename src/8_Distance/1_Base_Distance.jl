@@ -40,7 +40,13 @@ abstract type AbstractDistanceAlgorithm <: AbstractAlgorithm end
 
 Simple distance algorithm for portfolio optimization.
 
-`SimpleDistance` specifies the use of a basic distance metric (typically Euclidean or squared Euclidean distance) for distance-based estimation in PortfolioOptimisers.jl. It is used as an algorithm type for distance estimators, enabling straightforward computation of pairwise distances between assets or features.
+```math
+\\begin{align}
+    d_{i,\\,j} &= \\sqrt{\\dfrac{1 - \\rho_{i,\\,j}}{2}}\\,,
+\\end{align}
+```
+
+where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
 
 # Related
 
@@ -56,7 +62,13 @@ struct SimpleDistance <: AbstractDistanceAlgorithm end
 
 Simple absolute distance algorithm for portfolio optimization.
 
-`SimpleAbsoluteDistance` specifies the use of the absolute distance metric (L1 norm) for distance-based estimation in PortfolioOptimisers.jl. It is used as an algorithm type for distance estimators, enabling computation of pairwise absolute differences between assets or features.
+```math
+\\begin{align}
+    d_{i,\\,j} &= \\sqrt{1 - \\lvert\\rho_{i,\\,j}\\rvert}\\,,
+\\end{align}
+```
+
+where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
 
 # Related
 
@@ -70,9 +82,15 @@ struct SimpleAbsoluteDistance <: AbstractDistanceAlgorithm end
 """
     struct LogDistance <: AbstractDistanceAlgorithm end
 
-Log distance algorithm for portfolio optimization.
+Logarithmic distance algorithm for portfolio optimization.
 
-`LogDistance` specifies the use of a logarithmic distance metric for distance-based estimation in PortfolioOptimisers.jl. This algorithm is useful for measuring relative differences or ratios between asset returns or features, and can be more robust to scale differences than standard Euclidean or absolute distances.
+```math
+\\begin{align}
+    d_{i,\\,j} &= -\\log{\\lvert\\rho_{i,\\,j}\\rvert}\\,,
+\\end{align}
+```
+
+where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
 
 # Related
 
@@ -88,7 +106,13 @@ struct LogDistance <: AbstractDistanceAlgorithm end
 
 Correlation distance algorithm for portfolio optimization.
 
-`CorrelationDistance` specifies the use of a correlation-based distance metric for distance-based estimation in PortfolioOptimisers.jl. This algorithm measures the dissimilarity between assets or features based on their correlation, typically using the formula `distance = 1 - correlation`. It is useful for clustering, risk analysis, and constructing distance matrices that reflect the co-movement structure of asset returns.
+```math
+\\begin{align}
+    d_{i,\\,j} &= \\sqrt{1 - \\rho_{i,\\,j}}\\,,
+\\end{align}
+```
+
+where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
 
 # Related
 
@@ -100,22 +124,6 @@ Correlation distance algorithm for portfolio optimization.
 struct CorrelationDistance <: AbstractDistanceAlgorithm end
 
 """
-    struct CanonicalDistance <: AbstractDistanceAlgorithm end
-
-Canonical distance algorithm for portfolio optimization.
-
-`CanonicalDistance` specifies the use of a canonical (or Mahalanobis-like) distance metric for distance-based estimation in PortfolioOptimisers.jl. This algorithm measures the dissimilarity between assets or features by accounting for the covariance structure of the data, making it sensitive to correlations and scale differences. It is useful for clustering, risk analysis, and constructing distance matrices that reflect both variance and correlation among asset returns.
-
-# Related
-
-  - [`AbstractDistanceAlgorithm`](@ref)
-  - [`AbstractDistanceEstimator`](@ref)
-  - [`distance`](@ref)
-  - [`cor_and_dist`](@ref)
-"""
-struct CanonicalDistance <: AbstractDistanceAlgorithm end
-
-"""
     struct VariationInfoDistance{T1, T2} <: AbstractDistanceAlgorithm
         bins::T1
         normalise::T2
@@ -123,41 +131,21 @@ struct CanonicalDistance <: AbstractDistanceAlgorithm end
 
 Variation of Information (VI) distance algorithm for portfolio optimization.
 
-`VariationInfoDistance` specifies the use of the Variation of Information (VI) metric, an information-theoretic distance based on entropy and mutual information, for distance-based estimation in PortfolioOptimisers.jl. This algorithm is useful for quantifying the dissimilarity between distributions of asset returns or features, and can be applied to both continuous and discrete data via binning.
+`VariationInfoDistance` specifies the use of the Variation of Information (VI) metric, an information-theoretic distance based on entropy and mutual information.
 
 # Fields
 
   - `bins`: Binning strategy or number of bins. If an integer, must be strictly positive.
   - `normalise`: Whether to normalise the VI distance to the range [0, 1].
 
-# Related
+# Constructor
 
-  - [`AbstractDistanceAlgorithm`](@ref)
-  - [`distance`](@ref)
-  - [`cor_and_dist`](@ref)
-"""
-struct VariationInfoDistance{T1, T2} <: AbstractDistanceAlgorithm
-    bins::T1
-    normalise::T2
-end
-"""
     VariationInfoDistance(; bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
-                           normalise::Bool = true)
+                            normalise::Bool = true)
 
-Construct a [`VariationInfoDistance`](@ref) algorithm for information-theoretic distance estimation.
+Keyword arguments correspond to the fields above.
 
-This constructor creates a `VariationInfoDistance` object with the specified binning strategy and normalisation option. The VI distance quantifies the dissimilarity between distributions using entropy and mutual information, and can be applied to both continuous and discrete data via binning.
-
-# Arguments
-
-  - `bins`: Binning strategy or number of bins. If an integer, must be strictly positive.
-  - `normalise`: Whether to normalise the VI distance to the range [0, 1].
-
-# Returns
-
-  - `VariationInfoDistance`: A configured VI distance algorithm.
-
-# Validation
+## Validation
 
   - If `bins` is an integer, it must be strictly positive.
 
@@ -172,11 +160,14 @@ VariationInfoDistance
 
 # Related
 
-  - [`VariationInfoDistance`](@ref)
   - [`AbstractDistanceAlgorithm`](@ref)
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
 """
+struct VariationInfoDistance{T1, T2} <: AbstractDistanceAlgorithm
+    bins::T1
+    normalise::T2
+end
 function VariationInfoDistance(;
                                bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                                normalise::Bool = true)
@@ -185,8 +176,42 @@ function VariationInfoDistance(;
     end
     return VariationInfoDistance(bins, normalise)
 end
+
+"""
+    struct CanonicalDistance <: AbstractDistanceAlgorithm end
+
+Canonical distance algorithm for portfolio optimization.
+
+Defines the canonical distance metric for a given covariance estimator. The resulting distance metric is consistent with the properties of the covariance estimator (relevant when the covariance estimator is [`MutualInfoCovariance`](@ref)).
+
+| Covariance Estimator                                                               | Distance Metric                 |
+| ----------------------------------------------------------------------------------:|:------------------------------- |
+| [`MutualInfoCovariance`](@ref)                                                     | [`VariationInfoDistance`](@ref) |
+| [`LTDCovariance`](@ref)                                                            | [`LogDistance`](@ref)           |
+| [`DistanceCovariance`](@ref)                                                       | [`CorrelationDistance`](@ref)   |
+| [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/) | [`SimpleDistance`](@ref)        |
+
+The table also applies to [`PortfolioOptimisersCovariance`](@ref) where `ce` is one of the aforementioned estimators.
+
+When used with a covariance matrix directly, uses [`SimpleDistance`](@ref).
+
+# Related
+
+  - [`AbstractDistanceAlgorithm`](@ref)
+  - [`AbstractDistanceEstimator`](@ref)
+  - [`MutualInfoCovariance`](@ref)
+  - [`LTDCovariance`](@ref)
+  - [`DistanceCovariance`](@ref)
+  - [`VariationInfoDistance`](@ref)
+  - [`LogDistance`](@ref)
+  - [`CorrelationDistance`](@ref)
+  - [`SimpleDistance`](@ref)
+  - [`distance`](@ref)
+  - [`cor_and_dist`](@ref)
+"""
+struct CanonicalDistance <: AbstractDistanceAlgorithm end
 function distance end
 function cor_and_dist end
 
 export SimpleDistance, SimpleAbsoluteDistance, LogDistance, CorrelationDistance,
-       CanonicalDistance, VariationInfoDistance, distance, cor_and_dist
+       VariationInfoDistance, CanonicalDistance, distance, cor_and_dist

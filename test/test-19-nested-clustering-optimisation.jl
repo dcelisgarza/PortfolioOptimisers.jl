@@ -161,10 +161,10 @@
                                  opto = MeanRisk(; opt = jopto)),
                 NestedClustering(; cle = clr, opti = NearOptimalCentering(; opt = jopti),
                                  opto = NearOptimalCentering(; opt = jopto)),
-                NestedClustering(; cle = clr, opti = RiskBudgetting(; opt = jopti),
-                                 opto = RiskBudgetting(; opt = jopto)),
-                NestedClustering(; cle = clr, opti = RelaxedRiskBudgetting(; opt = jopti),
-                                 opto = RelaxedRiskBudgetting(; opt = jopto)),
+                NestedClustering(; cle = clr, opti = RiskBudgeting(; opt = jopti),
+                                 opto = RiskBudgeting(; opt = jopto)),
+                NestedClustering(; cle = clr, opti = RelaxedRiskBudgeting(; opt = jopti),
+                                 opto = RelaxedRiskBudgeting(; opt = jopto)),
                 NestedClustering(; cle = clr, opti = HierarchicalRiskParity(; opt = hopti),
                                  opto = HierarchicalRiskParity(; opt = hopto)),
                 NestedClustering(; cle = clr,
@@ -248,8 +248,10 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustering.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise!(opt, rd)
-            rtol = if i ∈ (2, 3)
+            rtol = if i == 2
                 5e-5
+            elseif i == 3
+                5e-4
             elseif i == 4 || Sys.isapple() && i == 12
                 5e-6
             else

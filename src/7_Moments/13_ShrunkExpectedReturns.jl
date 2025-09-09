@@ -102,30 +102,7 @@ Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
     JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
-Construct a `JamesStein` shrinkage algorithm with the specified target.
-
-# Related
-
-  - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
-  - [`AbstractShrunkExpectedReturnsTarget`](@ref)
-  - [`BayesStein`](@ref)
-  - [`BodnarOkhrinParolya`](@ref)
-"""
-struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    target::T1
-end
-"""
-    JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-
-Construct a [`JamesStein`](@ref) shrinkage algorithm for expected returns estimation.
-
-# Arguments
-
-  - `target`: The shrinkage target.
-
-# Returns
-
-  - `JamesStein`: Configured James-Stein shrinkage algorithm.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -137,11 +114,14 @@ JamesStein
 
 # Related
 
+  - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
-  - [`JamesStein`](@ref)
   - [`BayesStein`](@ref)
   - [`BodnarOkhrinParolya`](@ref)
 """
+struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
+    target::T1
+end
 function JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return JamesStein(target)
 end
@@ -163,30 +143,7 @@ Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
     BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
-Construct a `BayesStein` shrinkage algorithm with the specified target.
-
-# Related
-
-  - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
-  - [`AbstractShrunkExpectedReturnsTarget`](@ref)
-  - [`JamesStein`](@ref)
-  - [`BodnarOkhrinParolya`](@ref)
-"""
-struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    target::T1
-end
-"""
-    BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-
-Construct a [`BayesStein`](@ref) shrinkage algorithm for expected returns estimation.
-
-# Arguments
-
-  - `target`: The shrinkage target.
-
-# Returns
-
-  - `BayesStein`: Configured Bayes-Stein shrinkage algorithm.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -198,11 +155,14 @@ BayesStein
 
 # Related
 
+  - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
   - [`JamesStein`](@ref)
-  - [`BayesStein`](@ref)
   - [`BodnarOkhrinParolya`](@ref)
 """
+struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
+    target::T1
+end
 function BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return BayesStein(target)
 end
@@ -224,30 +184,7 @@ Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expecte
 
     BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
 
-Construct a `BodnarOkhrinParolya` shrinkage algorithm with the specified target.
-
-# Related
-
-  - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
-  - [`AbstractShrunkExpectedReturnsTarget`](@ref)
-  - [`JamesStein`](@ref)
-  - [`BayesStein`](@ref)
-"""
-struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-    target::T1
-end
-"""
-    BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
-
-Construct a [`BodnarOkhrinParolya`](@ref) shrinkage algorithm for expected returns estimation.
-
-# Arguments
-
-  - `target`: The shrinkage target.
-
-# Returns
-
-  - `BodnarOkhrinParolya`: Configured Bodnar-Okhrin-Parolya shrinkage algorithm.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -259,11 +196,14 @@ BodnarOkhrinParolya
 
 # Related
 
+  - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
   - [`JamesStein`](@ref)
   - [`BayesStein`](@ref)
-  - [`BodnarOkhrinParolya`](@ref)
 """
+struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
+    target::T1
+end
 function BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return BodnarOkhrinParolya(target)
 end
@@ -288,39 +228,10 @@ Container type for shrinkage-based expected returns estimators.
 # Constructor
 
     ShrunkExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                           alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
+                            ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                            alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
 
-Construct a `ShrunkExpectedReturns` estimator with the specified mean estimator, covariance estimator, and shrinkage algorithm.
-
-# Related
-
-  - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
-  - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
-"""
-struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
-    me::T1
-    ce::T2
-    alg::T3
-end
-"""
-    ShrunkExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                           alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
-
-Construct a [`ShrunkExpectedReturns`](@ref) estimator for shrinkage-based expected returns estimation.
-
-# Arguments
-
-  - `me`: Mean estimator for expected returns.
-  - `ce`: Covariance estimator.
-  - `alg`: Shrinkage algorithm.
-
-# Returns
-
-  - `ShrunkExpectedReturns`: Configured shrinkage-based expected returns estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -349,11 +260,16 @@ ShrunkExpectedReturns
 
 # Related
 
+  - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
-  - [`ShrunkExpectedReturns`](@ref)
 """
+struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
+    me::T1
+    ce::T2
+    alg::T3
+end
 function ShrunkExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
@@ -370,9 +286,12 @@ Compute the shrinkage target vector for expected returns estimation.
 
 # Arguments
 
-  - `target::GrandMean`: ReturnsResult a vector filled with the mean of `mu`.
-  - `target::VolatilityWeighted`: ReturnsResult a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
-  - `target::MeanSquareError`: ReturnsResult a vector filled with the trace of `sigma` divided by `T`.
+  - `target`: The shrinkage target type.
+
+      + `target::GrandMean`: Returns a vector filled with the mean of `mu`.
+      + `target::VolatilityWeighted`: Returns a vector filled with the volatility-weighted mean of `mu`, using the inverse covariance matrix.
+      + `target::MeanSquareError`: Returns a vector filled with the trace of `sigma` divided by `T`.
+
   - `mu`: 1D array of expected returns.
   - `sigma`: Covariance matrix of asset returns.
   - `kwargs...`: Additional keyword arguments, such as `T` (number of observations) or `isigma` (inverse covariance matrix).
@@ -415,9 +334,12 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
 
 # Arguments
 
-  - `me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}`: Use the James-Stein algorithm.
-  - `me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}`: Use the Bayes-Stein algorithm.
-  - `me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}`: Use the Bodnar-Okhrin-Parolya algorithm.
+  - `me`: Shrunk expected returns estimator.
+
+      + `me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}`: Use the James-Stein algorithm.
+      + `me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}`: Use the Bayes-Stein algorithm.
+      + `me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}`: Use the Bodnar-Okhrin-Parolya algorithm.
+
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute the mean.
   - `kwargs...`: Additional keyword arguments passed to the mean and covariance estimators.

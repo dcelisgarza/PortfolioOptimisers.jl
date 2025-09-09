@@ -90,41 +90,12 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Constructor
 
-    DefaultMatrixProcessing(; pdm = Posdef(), denoise = nothing, detone = nothing, alg = nothing)
-
-Keyword arguments correspond to the fields above. The constructor infers types and sets defaults for robust matrix processing.
-
-# Related
-
-  - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`matrix_processing!`](@ref)
-  - [`matrix_processing`](@ref)
-  - [`NonPositiveDefiniteMatrixProcessing`](@ref)
-"""
-struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
-    pdm::T1
-    denoise::T2
-    detone::T3
-    alg::T4
-end
-"""
     DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
                               denoise::Union{Nothing, <:Denoise} = nothing,
                               detone::Union{Nothing, <:Detone} = nothing,
                               alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
 
-Construct a [`DefaultMatrixProcessing`](@ref) object, configuring all steps for matrix processing in PortfolioOptimisers.jl.
-
-# Arguments
-
-  - `pdm`: Positive definite matrix estimator.
-  - `denoise`: Denoising estimator.
-  - `detone`: Detoning estimator.
-  - `alg`: Optional custom matrix processing algorithm.
-
-# Returns
-
-  - `DefaultMatrixProcessing`: A configured matrix processing estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -156,10 +127,17 @@ DefaultMatrixProcessing
 
 # Related
 
-  - [`DefaultMatrixProcessing`](@ref)
+  - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
+  - [`NonPositiveDefiniteMatrixProcessing`](@ref)
 """
+struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
+    pdm::T1
+    denoise::T2
+    detone::T3
+    alg::T4
+end
 function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
                                  denoise::Union{Nothing, <:Denoise} = nothing,
                                  detone::Union{Nothing, <:Detone} = nothing,
@@ -186,39 +164,12 @@ A container type for matrix processing pipelines that do **not** enforce positiv
 
 # Constructor
 
-    NonPositiveDefiniteMatrixProcessing(; denoise = nothing, detone = nothing, alg = nothing)
-
-Keyword arguments correspond to the fields above. The constructor infers types and sets defaults for robust matrix processing without positive definite enforcement.
-
-# Related
-
-  - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`matrix_processing!`](@ref)
-  - [`matrix_processing`](@ref)
-  - [`DefaultMatrixProcessing`](@ref)
-"""
-struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
-    denoise::T1
-    detone::T2
-    alg::T3
-end
-"""
     NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
                                           detone::Union{Nothing, <:Detone} = nothing,
                                           alg::Union{Nothing,
-                                                    <:AbstractMatrixProcessingAlgorithm} = nothing)
+                                                     <:AbstractMatrixProcessingAlgorithm} = nothing)
 
-Construct a [`NonPositiveDefiniteMatrixProcessing`](@ref) object, configuring matrix processing steps without positive definite enforcement.
-
-# Arguments
-
-  - `denoise`: Denoising estimator.
-  - `detone`: Detoning estimator.
-  - `alg`: Optional custom matrix processing algorithm.
-
-# Returns
-
-  - `NonPositiveDefiniteMatrixProcessing`: A configured matrix processing estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -246,10 +197,16 @@ NonPositiveDefiniteMatrixProcessing
 
 # Related
 
-  - [`NonPositiveDefiniteMatrixProcessing`](@ref)
+  - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
+  - [`DefaultMatrixProcessing`](@ref)
 """
+struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
+    denoise::T1
+    detone::T2
+    alg::T3
+end
 function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
                                              detone::Union{Nothing, <:Detone} = nothing,
                                              alg::Union{Nothing,
@@ -258,26 +215,26 @@ function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise
 end
 
 """
-    matrix_processing!(mp::DefaultMatrixProcessing, sigma::AbstractMatrix, X::AbstractMatrix, args...; kwargs...)
-    matrix_processing!(mp::NonPosdefMatrixProcessing, sigma::AbstractMatrix, X::AbstractMatrix, args...; kwargs...)
+    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix, X::AbstractMatrix, args...; kwargs...)
     matrix_processing!(::Nothing, args...; kwargs...)
 
 In-place processing of a covariance or correlation matrix.
 
-  - If `mp` is `nothing`, this is a no-op and returns `nothing`.
-  - If `mp` is a [`DefaultMatrixProcessing`](@ref) object, the specified matrix processing steps are applied to `sigma` in-place, using the provided data matrix `X`.
-  - If `mp` is a [`NonPositiveDefiniteMatrixProcessing`](@ref) object, the specified matrix processing steps **without enforcing positive definiteness** are applied to `sigma` in-place, using the provided data matrix `X`.
-
 The processing pipeline consists of:
 
- 1. Positive definiteness enforcement via [`posdef!`](@ref) (if `mp.pdm` is [`DefaultMatrixProcessing`](@ref)).
- 2. Denoising via [`denoise!`](@ref) (if `mp.denoise` is not `nothing`).
- 3. Detoning via [`detone!`](@ref) (if `mp.detone` is not `nothing`).
- 4. Optional custom matrix processing algorithm via [`matrix_processing_algorithm!`](@ref) (if `mp.alg` is not `nothing`).
+ 1. Positive definiteness enforcement via [`posdef!`](@ref).
+ 2. Denoising via [`denoise!`](@ref).
+ 3. Detoning via [`detone!`](@ref).
+ 4. Optional custom matrix processing algorithm via [`matrix_processing_algorithm!`](@ref).
 
 # Arguments
 
-  - `mp`: Matrix processing estimator specifying the pipeline.
+  - `mp::AbstractMatrixProcessingEstimator`: Matrix processing estimator specifying the pipeline.
+
+      + `mp::DefaultMatrixProcessing`: The specified matrix processing steps are applied to `sigma` using the provided data matrix `X`.
+      + `mp::NonPositiveDefiniteMatrixProcessing`: The specified matrix processing steps **without enforcing positive definiteness** are applied to `sigma` using the provided data matrix `X`.
+      + `mp::Nothing`: No-op.
+
   - `sigma`: Covariance or correlation matrix to be processed (modified in-place).
   - `X`: Data matrix (observations × assets) used for denoising and detoning.
   - `args...`: Additional positional arguments passed to custom algorithms.
@@ -364,55 +321,10 @@ function matrix_processing!(mp::NonPositiveDefiniteMatrixProcessing, sigma::Abst
     return nothing
 end
 """
-    matrix_processing(mp::DefaultMatrixProcessing, sigma::AbstractMatrix, X::AbstractMatrix, args...; kwargs...)
-    matrix_processing(mp::NonPosdefMatrixProcessing, sigma::AbstractMatrix, X::AbstractMatrix, args...; kwargs...)
+    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix, X::AbstractMatrix, args...; kwargs...)
     matrix_processing(::Nothing, args...; kwargs...)
 
-Same as [`matrix_processing!`](@ref), but returns a new matrix instead of modifying `sigma` in-place.
-
-  - If `mp` is `nothing`, this is a no-op and returns `nothing`.
-
-# Examples
-
-```jldoctest
-julia> using StableRNGs, Statistics
-
-julia> rng = StableRNG(123456789);
-
-julia> X = rand(rng, 10, 5);
-
-julia> sigma = cov(X)
-5×5 Matrix{Float64}:
-  0.132026     0.0022567   0.0198243    0.00359832  -0.00743829
-  0.0022567    0.0514194  -0.0131242    0.004123     0.0312379
-  0.0198243   -0.0131242   0.0843837   -0.0325342   -0.00609624
-  0.00359832   0.004123   -0.0325342    0.0424332    0.0152574
- -0.00743829   0.0312379  -0.00609624   0.0152574    0.0926441
-
-julia> sigma_ds = matrix_processing(DefaultMatrixProcessing(; denoise = Denoise()), sigma, X)
-5×5 Matrix{Float64}:
- 0.132026  0.0        0.0        0.0        0.0
- 0.0       0.0514194  0.0        0.0        0.0
- 0.0       0.0        0.0843837  0.0        0.0
- 0.0       0.0        0.0        0.0424332  0.0
- 0.0       0.0        0.0        0.0        0.0926441
-
-julia> sigma = cov(X)
-5×5 Matrix{Float64}:
-  0.132026     0.0022567   0.0198243    0.00359832  -0.00743829
-  0.0022567    0.0514194  -0.0131242    0.004123     0.0312379
-  0.0198243   -0.0131242   0.0843837   -0.0325342   -0.00609624
-  0.00359832   0.004123   -0.0325342    0.0424332    0.0152574
- -0.00743829   0.0312379  -0.00609624   0.0152574    0.0926441
-
-julia> sigma_dt = matrix_processing(DefaultMatrixProcessing(; detone = Detone()), sigma, X)
-5×5 Matrix{Float64}:
- 0.132026    0.0124802   0.0117303    0.0176194    0.0042142
- 0.0124802   0.0514194   0.0273105   -0.0290864    0.0088165
- 0.0117303   0.0273105   0.0843837   -0.00279296   0.0619156
- 0.0176194  -0.0290864  -0.00279296   0.0424332   -0.0242252
- 0.0042142   0.0088165   0.0619156   -0.0242252    0.0926441
-```
+Out-of-place version of [`matrix_processing!`](@ref).
 
 # Related
 

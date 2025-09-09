@@ -16,33 +16,9 @@ Container type for excess expected returns estimators.
 # Constructor
 
     ExcessExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                          rf::Real = 0.0)
+                            rf::Real = 0.0)
 
-Construct an `ExcessExpectedReturns` estimator with the specified mean estimator and risk-free rate.
-
-# Related
-
-  - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-"""
-struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
-    me::T1
-    rf::T2
-end
-"""
-    ExcessExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                          rf::Real = 0.0)
-
-Construct an [`ExcessExpectedReturns`](@ref) estimator for excess expected returns.
-
-# Arguments
-
-  - `me`: Mean estimator for expected returns.
-  - `rf`: Risk-free rate to subtract.
-
-# Returns
-
-  - `ExcessExpectedReturns`: Configured excess expected returns estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -56,13 +32,20 @@ ExcessExpectedReturns
 
 # Related
 
-  - [`ExcessExpectedReturns`](@ref)
+  - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
+struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
+    me::T1
+    rf::T2
+end
 function ExcessExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                rf::Real = 0.0)
     return ExcessExpectedReturns(me, rf)
+end
+function factory(me::ExcessExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
+    return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
 
 """
@@ -90,9 +73,6 @@ This method applies the mean estimator to the data and subtracts the risk-free r
 function Statistics.mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1,
                          kwargs...)
     return mean(me.me, X; dims = dims, kwargs...) .- me.rf
-end
-function factory(me::ExcessExpectedReturns, w::Union{Nothing, <:AbstractWeights} = nothing)
-    return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
 
 export ExcessExpectedReturns

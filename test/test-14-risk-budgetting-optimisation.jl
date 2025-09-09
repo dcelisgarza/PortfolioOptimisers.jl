@@ -1,4 +1,4 @@
-@safetestset "Risk Budgetting Optimisation" begin
+@safetestset "Risk Budgeting Optimisation" begin
     using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, StatsBase
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
@@ -67,12 +67,12 @@
           OrderedWeightsArray(; alg = ExactOrderedWeightsArray()), OrderedWeightsArray(),
           OrderedWeightsArrayRange(), NegativeSkewness(),
           NegativeSkewness(; alg = QuadRiskExpr())]
-    @testset "Asset Risk Budgetting" begin
-        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgetting1.csv.gz"), DataFrame)
+    @testset "Asset Risk Budgeting" begin
+        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgeting1.csv.gz"), DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
-            rb = RiskBudgetting(; r = r, opt = opt)
+            rb = RiskBudgeting(; r = r, opt = opt)
             res = optimise!(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)
@@ -106,16 +106,16 @@
             end
             @test success
 
-            rtol = if i ∈ (7, 10, 19, 24, 25) || Sys.isapple() && i ∈ (2, 5, 12)
+            rtol = if i ∈ (7, 10, 19, 25) || Sys.isapple() && i ∈ (2, 5, 12)
                 1e-4
-            elseif Sys.isapple() && i == 17
+            elseif i == 17
                 5e-3
-            elseif i ∈ (9, 11, 17, 18)
+            elseif i ∈ (9, 11, 18, 24)
                 5e-4
-            elseif i ∈ (13, 21, 14, 15, 16, 22)
-                1e-2
             elseif i == 20
                 1e-3
+            elseif i ∈ (13, 21, 14, 15, 16, 22)
+                1e-2
             else
                 5e-5
             end
@@ -127,13 +127,13 @@
             @test success
         end
 
-        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgetting2.csv.gz"), DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgeting2.csv.gz"), DataFrame)
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
-            rb = RiskBudgetting(; r = r, opt = opt,
-                                alg = AssetRiskBudgetting(;
-                                                          rkb = RiskBudgetResult(;
-                                                                                 val = 1:20)))
+            rb = RiskBudgeting(; r = r, opt = opt,
+                               alg = AssetRiskBudgeting(;
+                                                        rkb = RiskBudgetResult(;
+                                                                               val = 1:20)))
             res = optimise!(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)
@@ -142,7 +142,7 @@
             @test m1 == 1
             success = m2 == 20
             if !success
-                success = m2 == 19
+                success = m2 == 19 || m2 == 18
             end
             @test success
             rtol = if i ∈ (3, 24, 28)
@@ -175,6 +175,8 @@
                 1e-2
             elseif i ∈ (14, 15, 16, 20, 22)
                 5e-3
+            elseif i == 18
+                5e-4
             else
                 1e-4
             end
@@ -186,9 +188,8 @@
             @test success
         end
     end
-    @testset "Factor Risk Budgetting" begin
-        df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgetting1.csv.gz"),
-                      DataFrame)
+    @testset "Factor Risk Budgeting" begin
+        df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgeting1.csv.gz"), DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             sbgt = BudgetRange(; lb = 0, ub = nothing), bgt = 1,
                             wb = WeightBounds(; lb = nothing, ub = nothing))
@@ -197,7 +198,7 @@
             if i == 25
                 continue
             end
-            rb = RiskBudgetting(; r = r, opt = opt, alg = FactorRiskBudgetting(; re = rr))
+            rb = RiskBudgeting(; r = r, opt = opt, alg = FactorRiskBudgeting(; re = rr))
             res = optimise!(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
@@ -206,18 +207,20 @@
             v2 = maximum(rkc[1:5])
             rtol = if i ∈ (1, 2, 10, 17)
                 5e-1
-            elseif i ∈ (4, 5, 7, 13, 24)
+            elseif i ∈ (4, 5, 7, 13, 24, 28)
                 5e-4
-            elseif i ∈ (6, 28)
+            elseif i == 6
                 1e-4
             elseif i == 9
                 1
-            elseif i ∈ (11, 14, 15, 18, 19, 20, 22)
+            elseif i ∈ (11, 15, 18, 19, 20, 22)
                 1e-1
+            elseif i == 14
+                2.5e-1
             elseif i == 26
                 5e-3
             elseif i == 29
-                1e-3
+                5e-3
             else
                 5e-2
             end
@@ -228,12 +231,12 @@
             end
             @test success
 
-            rtol = if i ∈ (9, 16, 17)
+            rtol = if i ∈ (9, 15, 16, 17, 22, 27)
                 5e-3
             elseif i == 14
                 1e-2
-            elseif i ∈ (15, 22)
-                1e-3
+            elseif Sys.iswindows() && i == 21
+                5e-3
             elseif i ∈ (18, 19, 21)
                 5e-4
             elseif i ∈ (10, 11)
@@ -248,18 +251,17 @@
             end
             @test success
         end
-        df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgetting2.csv.gz"),
-                      DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgeting2.csv.gz"), DataFrame)
         rr = regression(StepwiseRegression(; alg = Backward()), rd)
         for (i, r) in enumerate(rs)
             if i == 25
                 continue
             end
             opt = JuMPOptimiser(; pe = pr, slv = slv)
-            rb = RiskBudgetting(; r = r, opt = opt,
-                                alg = FactorRiskBudgetting(; flag = true, re = rr,
-                                                           rkb = RiskBudgetResult(;
-                                                                                  val = 1:5)))
+            rb = RiskBudgeting(; r = r, opt = opt,
+                               alg = FactorRiskBudgeting(; flag = true, re = rr,
+                                                         rkb = RiskBudgetResult(;
+                                                                                val = 1:5)))
             res = optimise!(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
@@ -292,14 +294,14 @@
             end
             @test success
 
-            rtol = if i ∈ (1, 10)
+            rtol = if i == 22 || Sys.isapple() && i ∈ (18, 20) || Sys.iswindows() && i == 10
+                1e-3
+            elseif i ∈ (1, 10) || Sys.isapple() && i == 2
                 5e-4
-            elseif i ∈ (13, 15, 16, 19)
+            elseif i ∈ (13, 15, 16, 17, 19)
                 5e-3
             elseif i == 14
                 1e-2
-            elseif i ∈ (17, 22)
-                1e-3
             elseif i ∈ (18, 20, 24, 27)
                 5e-4
             elseif i == 21

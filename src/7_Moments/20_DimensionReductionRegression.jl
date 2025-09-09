@@ -29,33 +29,11 @@ Principal Component Analysis (PCA) dimension reduction target.
 
   - `kwargs`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
 
-# Related
-
-  - [`DimensionReductionTarget`](@ref)
-  - [`DimensionReductionRegression`](@ref)
-  - [`PPCA`](@ref)
-"""
-struct PCA{T1} <: DimensionReductionTarget
-    kwargs::T1
-end
-"""
-    PCA(; kwargs::NamedTuple = (;))
-
-Construct a [`PCA`](@ref) dimension reduction target.
-
-This constructor creates a `PCA` object with the specified keyword arguments, which are passed to [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
-
-# Arguments
-
-  - `kwargs`: Keyword arguments for configuring the PCA algorithm.
-
-# Returns
-
-  - `PCA`: A PCA dimension reduction target.
-
 # Constructor
 
-    PCA(; kwargs::NamedTuple = (;))
+    PCA(; kwargs::NamedTuple = ())
+
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -67,10 +45,13 @@ PCA
 
 # Related
 
-  - [`PCA`](@ref)
   - [`DimensionReductionTarget`](@ref)
   - [`DimensionReductionRegression`](@ref)
+  - [`PPCA`](@ref)
 """
+struct PCA{T1} <: DimensionReductionTarget
+    kwargs::T1
+end
 function PCA(; kwargs::NamedTuple = (;))
     return PCA(kwargs)
 end
@@ -118,29 +99,7 @@ Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
 
     PPCA(; kwargs::NamedTuple = ())
 
-# Related
-
-  - [`DimensionReductionTarget`](@ref)
-  - [`DimensionReductionRegression`](@ref)
-  - [`PCA`](@ref)
-"""
-struct PPCA{T1} <: DimensionReductionTarget
-    kwargs::T1
-end
-"""
-    PPCA(; kwargs::NamedTuple = (;))
-
-Construct a [`PPCA`](@ref) dimension reduction target.
-
-This constructor creates a `PPCA` object with the specified keyword arguments, which are passed to the underlying PPCA algorithm.
-
-# Arguments
-
-  - `kwargs`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
-
-# Returns
-
-  - `PPCA`: A PPCA dimension reduction target.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -152,10 +111,13 @@ PPCA
 
 # Related
 
-  - [`PPCA`](@ref)
   - [`DimensionReductionTarget`](@ref)
   - [`DimensionReductionRegression`](@ref)
+  - [`PCA`](@ref)
 """
+struct PPCA{T1} <: DimensionReductionTarget
+    kwargs::T1
+end
 function PPCA(; kwargs::NamedTuple = (;))
     return PPCA(kwargs)
 end
@@ -207,46 +169,12 @@ Estimator for dimension reduction regression-based moment estimation.
 
 # Constructor
 
-    DimensionReductionRegression(;
-                                 me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                                 ve::AbstractVarianceEstimator = SimpleVariance(),
-                                 drtgt::DimensionReductionTarget = PCA(),
-                                 retgt::AbstractRegressionTarget = LinearModel())
-
-# Related
-
-  - [`DimensionReductionRegression`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-  - [`AbstractVarianceEstimator`](@ref)
-  - [`DimensionReductionTarget`](@ref)
-  - [`AbstractRegressionTarget`](@ref)
-"""
-struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimator
-    me::T1
-    ve::T2
-    drtgt::T3
-    retgt::T4
-end
-"""
     DimensionReductionRegression(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                                  ve::AbstractVarianceEstimator = SimpleVariance(),
-                                  drtgt::DimensionReductionTarget = PCA(),
-                                  retgt::AbstractRegressionTarget = LinearModel())
+                                   ve::AbstractVarianceEstimator = SimpleVariance(),
+                                   drtgt::DimensionReductionTarget = PCA(),
+                                   retgt::AbstractRegressionTarget = LinearModel())
 
-Construct a [`DimensionReductionRegression`](@ref) estimator for regression-based moment estimation with dimension reduction.
-
-This constructor creates a `DimensionReductionRegression` object with the specified expected returns estimator, variance estimator, dimension reduction target, and regression target.
-
-# Arguments
-
-  - `me`: Expected returns estimator.
-  - `ve`: Variance estimator.
-  - `drtgt`: Dimension reduction target.
-  - `retgt`: Regression target type.
-
-# Returns
-
-  - `DimensionReductionRegression`: A configured dimension reduction regression estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -274,6 +202,12 @@ DimensionReductionRegression
   - [`DimensionReductionTarget`](@ref)
   - [`AbstractRegressionTarget`](@ref)
 """
+struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimator
+    me::T1
+    ve::T2
+    drtgt::T3
+    retgt::T4
+end
 function DimensionReductionRegression(;
                                       me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                       ve::AbstractVarianceEstimator = SimpleVariance(),

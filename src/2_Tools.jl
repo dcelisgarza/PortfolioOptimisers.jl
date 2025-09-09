@@ -78,35 +78,16 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Fields
 
-  - `nx`: Names or identifiers of asset columns.
+  - `nx`: Names or identifiers of asset columns (assets × 1).
   - `X`: Asset returns matrix (observations × assets).
-  - `nf`: Names or identifiers of factor columns.
+  - `nf`: Names or identifiers of factor columns (factors × 1).
   - `F`: Factor returns matrix (observations × factors).
-  - `ts`: Optional timestamps for each observation.
-  - `iv`: Implied volatilities matrix.
-  - `ivpa`: Implied volatility risk premium adjustment.
+  - `ts`: Optional timestamps for each observation (observations × 1).
+  - `iv`: Implied volatilities matrix (observations × assets).
+  - `ivpa`: Implied volatility risk premium adjustment, if a vector (assets × 1).
 
 # Constructor
 
-    ReturnsResult(; nx=nothing, X=nothing, nf=nothing, F=nothing, ts=nothing, iv=nothing, ivpa=nothing)
-
-Keyword arguments correspond to the fields above. The constructor performs internal consistency checks (e.g., matching dimensions, non-emptiness, positivity for variances).
-
-# Related
-
-  - [`AbstractReturnsResult`](@ref)
-  - [`prices_to_returns`](@ref)
-"""
-struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
-    nx::T1
-    X::T2
-    nf::T3
-    F::T4
-    ts::T5
-    iv::T6
-    ivpa::T7
-end
-"""
     ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                     X::Union{Nothing, <:AbstractMatrix} = nothing,
                     nf::Union{Nothing, <:AbstractVector} = nothing,
@@ -115,19 +96,9 @@ end
                     iv::Union{Nothing, <:AbstractMatrix} = nothing,
                     ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
 
-Construct a [`ReturnsResult`](@ref) object, validating dimensions and types for asset and factor returns, time series, and instrument variance data.
+Keyword arguments correspond to the fields above.
 
-# Arguments
-
-  - `nx`: Asset names or identifiers.
-  - `X`: Asset returns matrix.
-  - `nf`: Factor names or identifiers.
-  - `F`: Factor returns matrix.
-  - `ts`: Timestamps.
-  - `iv`: Implied volatility matrix.
-  - `ivpa`: Implied volatility risk premium adjustment.
-
-# Validation
+## Validation
 
   - If `nx` or `X` is provided, both must be non-empty and `length(nx) == size(X, 2)`.
   - If `nf` or `F` is provided, both must be non-empty and `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
@@ -151,9 +122,18 @@ ReturnsResult
 
 # Related
 
-  - [`ReturnsResult`](@ref)
+  - [`AbstractReturnsResult`](@ref)
   - [`prices_to_returns`](@ref)
 """
+struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
+    nx::T1
+    X::T2
+    nf::T3
+    F::T4
+    ts::T5
+    iv::T6
+    ivpa::T7
+end
 function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                        X::Union{Nothing, <:AbstractMatrix} = nothing,
                        nf::Union{Nothing, <:AbstractVector} = nothing,

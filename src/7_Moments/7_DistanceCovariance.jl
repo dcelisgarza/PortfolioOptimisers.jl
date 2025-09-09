@@ -22,47 +22,11 @@ A flexible container type for configuring and applying distance-based covariance
 # Constructor
 
     DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
-                      args::Tuple = (), kwargs::NamedTuple = (;),
-                      w::Union{Nothing, <:AbstractWeights} = nothing,
-                      threads::FLoops.Transducers.Executor = ThreadedEx())
+                         args::Tuple = (), kwargs::NamedTuple = (;),
+                         w::Union{Nothing, <:AbstractWeights} = nothing,
+                         threads::FLoops.Transducers.Executor = ThreadedEx())
 
-Construct a `DistanceCovariance` estimator with the specified metric, arguments, weights, and threading strategy.
-
-# Related
-
-  - [`AbstractCovarianceEstimator`](@ref)
-  - [`Distances.Metric`](https://github.com/JuliaStats/Distances.jl)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
-"""
-struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
-    dist::T1
-    args::T2
-    kwargs::T3
-    w::T4
-    threads::T5
-end
-"""
-    DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
-                       args::Tuple = (), kwargs::NamedTuple = (;),
-                       w::Union{Nothing, <:AbstractWeights} = nothing,
-                       threads::FLoops.Transducers.Executor = ThreadedEx())
-
-Construct a [`DistanceCovariance`](@ref) estimator for robust distance-based covariance or correlation estimation.
-
-This constructor creates a `DistanceCovariance` object using the specified distance metric, additional positional and keyword arguments, optional weights, and parallel execution strategy. The estimator is highly modular, allowing users to select from different distance metrics, provide custom arguments, and configure parallelism.
-
-# Arguments
-
-  - `dist`: Distance metric used for pairwise computations.
-  - `args`: Additional positional arguments for the distance metric.
-  - `kwargs`: Additional keyword arguments for the distance metric.
-  - `w`: Optional weights for observations.
-  - `threads`: Parallel execution strategy.
-
-# Returns
-
-  - `DistanceCovariance`: A configured distance covariance estimator.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -78,22 +42,29 @@ DistanceCovariance
 
 # Related
 
-  - [`DistanceCovariance`](@ref)
+  - [`AbstractCovarianceEstimator`](@ref)
   - [`Distances.Metric`](https://github.com/JuliaStats/Distances.jl)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-executor)
 """
+struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
+    dist::T1
+    args::T2
+    kwargs::T3
+    w::T4
+    threads::T5
+end
 function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
                             w::Union{Nothing, <:AbstractWeights} = nothing,
                             threads::FLoops.Transducers.Executor = ThreadedEx())
     return DistanceCovariance(dist, args, kwargs, w, threads)
 end
-
 function factory(ce::DistanceCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)
     return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs,
                               w = isnothing(w) ? ce.w : w, threads = ce.threads)
 end
+
 """
     cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVector)
 
@@ -109,7 +80,7 @@ This function calculates the distance correlation between `v1` and `v2` using th
 
 # Returns
 
-  - `ρ::Float64`: The computed distance correlation between `v1` and `v2`.
+  - `rho::Float64`: The computed distance correlation between `v1` and `v2`.
 
 # Details
 

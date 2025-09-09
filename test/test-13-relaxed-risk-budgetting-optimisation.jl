@@ -1,4 +1,4 @@
-@safetestset "Relaxed Risk Budgetting" begin
+@safetestset "Relaxed Risk Budgeting" begin
     using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, StatsBase,
           LinearAlgebra
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
@@ -62,14 +62,14 @@
     wp = pweights(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X, 1)),
                         length = size(pr.X, 1)))
     rf = 4.2 / 100 / 252
-    algs = [BasicRelaxedRiskBudgetting(), RegularisedRelaxedRiskBudgetting(),
-            RegularisedPenalisedRelaxedRiskBudgetting(),
-            RegularisedPenalisedRelaxedRiskBudgetting(; p = 50)]
-    df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedRiskBudgetting1.csv.gz"), DataFrame)
+    algs = [BasicRelaxedRiskBudgeting(), RegularisedRelaxedRiskBudgeting(),
+            RegularisedPenalisedRelaxedRiskBudgeting(),
+            RegularisedPenalisedRelaxedRiskBudgeting(; p = 50)]
+    df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedRiskBudgeting1.csv.gz"), DataFrame)
     r = factory(StandardDeviation(), pr, slv)
     for (i, alg) in enumerate(algs)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
-        rb = RelaxedRiskBudgetting(; opt = opt, alg = alg)
+        rb = RelaxedRiskBudgeting(; opt = opt, alg = alg)
         res = optimise!(rb)
         @test isa(res.retcode, OptimisationSuccess)
         rkc = risk_contribution(r, res.w, pr.X)
@@ -102,11 +102,11 @@
         @test success
     end
 
-    df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedRiskBudgetting2.csv.gz"), DataFrame)
+    df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedRiskBudgeting2.csv.gz"), DataFrame)
     for (i, alg) in enumerate(algs)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
-        rb = RelaxedRiskBudgetting(; opt = opt, rkb = RiskBudgetResult(; val = 20:-1:1),
-                                   alg = alg)
+        rb = RelaxedRiskBudgeting(; opt = opt, rkb = RiskBudgetResult(; val = 20:-1:1),
+                                  alg = alg)
         res = optimise!(rb)
         @test isa(res.retcode, OptimisationSuccess)
         rkc = risk_contribution(r, res.w, pr.X)
