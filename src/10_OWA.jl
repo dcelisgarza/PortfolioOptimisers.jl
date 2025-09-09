@@ -81,7 +81,7 @@ This struct represents an estimator for Ordered Weights Array (OWA) weights base
 
 # Fields
 
-  - `g`: Risk aversion parameter, must satisfy `g` in `(0, 1)`.
+  - `g`: Risk aversion parameter.
 
 # Constructor
 
@@ -91,7 +91,7 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `g` in the range `(0, 1)`.
+  - `0 < g < 1`.
 
 # Examples
 
@@ -212,7 +212,11 @@ This function generates OWA weights using a normalised CRRA scheme, parameterise
 # Arguments
 
   - `weights`: Matrix of weights (typically order statistics or moment weights).
-  - `g`: Risk aversion parameter, must satisfy `g` in `(0, 1)`.
+  - `g`: Risk aversion parameter.
+
+# Validation
+
+  - `0 < g < 1`.
 
 # Returns
 
@@ -436,14 +440,46 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumS
     return owa_model_solve(model, method, weights)
 end
 
+"""
+    owa_gmd(T::Integer)
+
+Compute the Ordered Weights Array (OWA) of the Gini Mean Difference (GMD) risk measure.
+
+# Arguments
+
+  - `T`: Number of observations.
+
+# Returns
+
+  - `w::Range`: Vector of OWA weights of length `T`.
+"""
 function owa_gmd(T::Integer)
-    # w = Vector{typeof(inv(T))}(undef, T)
-    # for i in eachindex(w)
-    #     w[i] = 2 * i - 1 - T
-    # end
-    # w = 2 / (T * (T - 1)) * w
     return (4 * range(1; stop = T) .- 2 * (T + 1)) / (T * (T - 1))
 end
+
+"""
+    owa_cvar(T::Integer, alpha::Real = 0.05)
+
+Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Risk.
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alpha`: Confidence level for CVaR.
+
+# Validation
+
+  - `0 < alpha < 1`.
+
+# Returns
+
+  - `w::Vector{<:Real}`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_wcvar`](@ref)
+  - [`owa_tg`](@ref)
+"""
 function owa_cvar(T::Integer, alpha::Real = 0.05)
     @argcheck(zero(alpha) < alpha < one(alpha),
               DomainError(alpha,
@@ -451,10 +487,31 @@ function owa_cvar(T::Integer, alpha::Real = 0.05)
                                     false) * "."))
     k = floor(Int, T * alpha)
     w = zeros(typeof(alpha), T)
-    w[1:k] .= -1 / (T * alpha)
-    w[k + 1] = -1 - sum(w[1:k])
+    w[1:k] .= -one(alpha) / (T * alpha)
+    w[k + 1] = -one(alpha) - sum(w[1:k])
     return w
 end
+
+"""
+    owa_wcvar(T::Integer, alphas::AbstractVector{<:Real}, weights::AbstractVector{<:Real})
+
+Compute the Ordered Weights Array (OWA) weights for a weighted combination of Conditional Value at Risk measures.
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alphas`: Vector of confidence levels.
+  - `weights`: Vector of weights.
+
+# Returns
+
+  - `w::Vector{<:Real}`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_cvar`](@ref)
+  - [`owa_tg`](@ref)
+"""
 function owa_wcvar(T::Integer, alphas::AbstractVector{<:Real},
                    weights::AbstractVector{<:Real})
     w = zeros(promote_type(eltype(alphas), eltype(weights)), T)
@@ -463,6 +520,35 @@ function owa_wcvar(T::Integer, alphas::AbstractVector{<:Real},
     end
     return w
 end
+
+"""
+    owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
+
+Compute the Ordered Weights Array (OWA) weights for the tail Gini risk measure.
+
+This function approximates the tail Gini risk measure by integrating over a range of CVaR levels from `alpha_i` to `alpha`, using `a_sim` points. The resulting weights are suitable for tail risk assessment.
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alpha_i`: Lower bound for CVaR integration.
+  - `alpha`: Upper bound for CVaR integration.
+  - `a_sim`: Number of integration points.
+
+# Validation
+
+  - `0 < alpha_i < alpha < 1`.
+  - `a_sim > 0`.
+
+# Returns
+
+  - `w::Vector{<:Real}`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_cvar`](@ref)
+  - [`owa_wcvar`](@ref)
+"""
 function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
     @argcheck(zero(alpha) < alpha_i < alpha < one(alpha) && a_sim > zero(a_sim),
               AssertionError("The following conditions must hold:\n`alpha_i` in (0, `alpha`) => $alpha_i\n`alpha` in (0, 1) => $alpha\n`a_sim` > 0 => $a_sim"))
@@ -476,20 +562,111 @@ function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Int
     w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]
     return owa_wcvar(T, alphas, w)
 end
+
+"""
+    owa_wr(T::Integer)
+
+Compute the Ordered Weights Array (OWA) weights for the worst realisation risk measure.
+
+This function returns a vector of OWA weights that select the minimum (worst) value among `T` observations.
+
+# Arguments
+
+  - `T`: Number of observations.
+
+# Returns
+
+  - `w::Vector{<:Real}`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_rg`](@ref)
+"""
 function owa_wr(T::Integer)
     w = zeros(typeof(inv(T)), T)
     w[1] = -1
     return w
 end
+
+"""
+    owa_rg(T::Integer)
+
+Compute the Ordered Weights Array (OWA) weights for the range risk measure.
+
+This function returns a vector of OWA weights corresponding to the range (difference between maximum and minimum) returns among `T` observations.
+
+# Arguments
+
+  - `T`: Number of observations.
+
+# Returns
+
+  - `w::Vector`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_wr`](@ref)
+"""
 function owa_rg(T::Integer)
     w = zeros(typeof(inv(T)), T)
     w[1] = -1
     w[T] = 1
     return w
 end
+
+"""
+    owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
+
+Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Risk Range risk measure.
+
+This function returns a vector of OWA weights corresponding to the difference between CVaR at level `alpha` (lower tail) and the reversed CVaR at level `beta` (upper tail).
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alpha`: CVaR confidence level for the lower tail.
+  - `beta`: CVaR confidence level for the upper tail.
+
+# Returns
+
+  - `w::Vector`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_cvar`](@ref)
+  - [`owa_rg`](@ref)
+"""
 function owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
     return owa_cvar(T, alpha) - reverse(owa_cvar(T, beta))
 end
+
+"""
+    owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
+                weights_a::AbstractVector{<:Real},
+                betas::AbstractVector{<:Real} = alphas,
+                weights_b::AbstractVector{<:Real} = weights_a)
+
+Compute the Ordered Weights Array (OWA) weights for the weighted Conditional Value at Risk Range risk measure.
+
+This function returns a vector of OWA weights corresponding to the difference between a weighted sum of CVaR measures at levels `alphas` with weights `weights_a` and the reversed weighted sum of CVaR measures at levels `betas` with weights `weights_b`.
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alphas`: Vector of lower tail CVaR confidence levels.
+  - `weights_a`: Vector of weights for lower tail CVaR.
+  - `betas`: Vector of upper tail CVaR confidence levels.
+  - `weights_b`: Vector of weights for upper tail CVaR.
+
+# Returns
+
+  - `w::Vector{<:Real}`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_wcvar`](@ref)
+  - [`owa_cvarrg`](@ref)
+"""
 function owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
                      weights_a::AbstractVector{<:Real},
                      betas::AbstractVector{<:Real} = alphas,
@@ -497,6 +674,35 @@ function owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
     w = owa_wcvar(T, alphas, weights_a) - reverse(owa_wcvar(T, betas, weights_b))
     return w
 end
+
+"""
+    owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,
+             a_sim::Integer = 100, beta_i::Real = alpha_i, beta::Real = alpha,
+             b_sim::Integer = a_sim)
+
+Compute the Ordered Weights Array (OWA) weights for the tail Gini range risk measure.
+
+This function returns a vector of OWA weights corresponding to the difference between tail Gini measures for the lower and upper tails, each approximated by integrating over a range of CVaR levels.
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alpha_i`: Lower bound for lower tail CVaR integration.
+  - `alpha`: Upper bound for lower tail CVaR integration.
+  - `a_sim`: Number of integration points for lower tail.
+  - `beta_i`: Lower bound for upper tail CVaR integration.
+  - `beta`: Upper bound for upper tail CVaR integration.
+  - `b_sim`: Number of integration points for upper tail.
+
+# Returns
+
+  - `w::Vector`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_tg`](@ref)
+  - [`owa_rg`](@ref)
+"""
 function owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,
                   a_sim::Integer = 100, beta_i::Real = alpha_i, beta::Real = alpha,
                   b_sim::Integer = a_sim)
