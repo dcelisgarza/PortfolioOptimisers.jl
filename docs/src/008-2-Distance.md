@@ -2,7 +2,6 @@
 
 ```@docs
 Distance
-Distance()
 distance(::Distance{<:SimpleDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
 distance(::Distance{<:SimpleDistance}, rho::AbstractMatrix, args...; kwargs...)
 cor_and_dist(::Distance{<:SimpleDistance}, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)

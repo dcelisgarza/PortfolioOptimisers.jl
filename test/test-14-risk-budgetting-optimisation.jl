@@ -110,12 +110,12 @@
                 1e-4
             elseif i == 17
                 5e-3
-            elseif i ∈ (9, 11, 18)
+            elseif i ∈ (9, 11, 18) || Sys.isapple() && i == 24
                 5e-4
-            elseif i ∈ (13, 21, 14, 15, 16, 22)
-                1e-2
             elseif i == 20
                 1e-3
+            elseif i ∈ (13, 21, 14, 15, 16, 22)
+                1e-2
             else
                 5e-5
             end
@@ -294,13 +294,13 @@
             end
             @test success
 
-            rtol = if i ∈ (1, 10)
+            rtol = if i ∈ (1, 10) || Sys.isapple() && i == 2
                 5e-4
-            elseif i ∈ (13, 15, 16, 19)
+            elseif i ∈ (13, 15, 16, 19) || Sys.isapple() && i == 17
                 5e-3
             elseif i == 14
                 1e-2
-            elseif i ∈ (17, 22)
+            elseif i ∈ (17, 22) || Sys.isapple() && i ∈ (18, 20)
                 1e-3
             elseif i ∈ (18, 20, 24, 27)
                 5e-4

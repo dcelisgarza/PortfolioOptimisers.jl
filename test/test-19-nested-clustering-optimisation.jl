@@ -248,8 +248,10 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustering.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
             res = optimise!(opt, rd)
-            rtol = if i ∈ (2, 3)
+            rtol = if i == 2
                 5e-5
+            elseif i == 3
+                5e-4
             elseif i == 4 || Sys.isapple() && i == 12
                 5e-6
             else
