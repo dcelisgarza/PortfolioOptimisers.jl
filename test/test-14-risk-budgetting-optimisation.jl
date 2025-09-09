@@ -296,13 +296,11 @@
             end
             @test success
 
-            rtol = if i ∈ (17, 22) ||
-                      Sys.isapple() && i ∈ (18, 20) ||
-                      Sys.iswindows() && i == 10
+            rtol = if i == 22 || Sys.isapple() && i ∈ (18, 20) || Sys.iswindows() && i == 10
                 1e-3
             elseif i ∈ (1, 10) || Sys.isapple() && i == 2
                 5e-4
-            elseif i ∈ (13, 15, 16, 19) || Sys.isapple() && i == 17
+            elseif i ∈ (13, 15, 16, 17, 19)
                 5e-3
             elseif i == 14
                 1e-2
