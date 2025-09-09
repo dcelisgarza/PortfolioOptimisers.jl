@@ -11,7 +11,8 @@ BIC
 RSquared
 AdjustedRSquared
 Regression
-regression
+regression(re::Regression, args...)
+regression(re::PortfolioOptimisers.AbstractRegressionEstimator, rd::ReturnsResult)
 PortfolioOptimisers.AbstractRegressionEstimator
 PortfolioOptimisers.AbstractRegressionResult
 PortfolioOptimisers.AbstractRegressionAlgorithm

@@ -184,19 +184,28 @@ Canonical distance algorithm for portfolio optimization.
 
 Defines the canonical distance metric for a given covariance estimator. The resulting distance metric is consistent with the properties of the covariance estimator (relevant when the covariance estimator is [`MutualInfoCovariance`](@ref)).
 
-| Covariance Estimator            | Distance Metric                 |
-| -------------------------------:|:------------------------------- |
-| [`MutualInfoCovariance`](@ref)  | [`VariationInfoDistance`](@ref) |
-| [`LTDCovariance`](@ref)         | [`LogDistance`](@ref)           |
-| [`DistanceCovariance`](@ref)    | [`CorrelationDistance`](@ref)   |
-| `StatsBase.CovarianceEstimator` | [`SimpleDistance`](@ref)        |
+| Covariance Estimator                                                               | Distance Metric                 |
+| ----------------------------------------------------------------------------------:|:------------------------------- |
+| [`MutualInfoCovariance`](@ref)                                                     | [`VariationInfoDistance`](@ref) |
+| [`LTDCovariance`](@ref)                                                            | [`LogDistance`](@ref)           |
+| [`DistanceCovariance`](@ref)                                                       | [`CorrelationDistance`](@ref)   |
+| [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/) | [`SimpleDistance`](@ref)        |
 
 The table also applies to [`PortfolioOptimisersCovariance`](@ref) where `ce` is one of the aforementioned estimators.
+
+When used with a covariance matrix directly, uses [`SimpleDistance`](@ref).
 
 # Related
 
   - [`AbstractDistanceAlgorithm`](@ref)
   - [`AbstractDistanceEstimator`](@ref)
+  - [`MutualInfoCovariance`](@ref)
+  - [`LTDCovariance`](@ref)
+  - [`DistanceCovariance`](@ref)
+  - [`VariationInfoDistance`](@ref)
+  - [`LogDistance`](@ref)
+  - [`CorrelationDistance`](@ref)
+  - [`SimpleDistance`](@ref)
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
 """

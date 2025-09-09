@@ -230,7 +230,8 @@ This method computes the correlation matrix from the data matrix `X` using the p
 function distance(de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                   kwargs...)
-    rho = abs.(cor(ce, X; dims = dims), kwargs...) .^ de.power
+    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
     return sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
 end
 """
@@ -271,8 +272,9 @@ function distance(de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance}, rho::Abs
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)
     end
-    return sqrt.(clamp!(one(eltype(rho)) .- abs.(rho) .^ de.power, zero(eltype(rho)),
-                        one(eltype(rho))))
+    return sqrt.(clamp!(one(eltype(rho)) .-
+                        (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power,
+                        zero(eltype(rho)), one(eltype(rho))))
 end
 """
     cor_and_dist(de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance},
@@ -308,7 +310,8 @@ This method computes the correlation matrix from the data matrix `X` using the p
 function cor_and_dist(de::GeneralDistance{<:Any, <:SimpleAbsoluteDistance},
                       ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                       kwargs...)
-    rho = abs.(cor(ce, X; dims = dims), kwargs...) .^ de.power
+    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
     return rho, sqrt.(clamp!((one(eltype(X)) .- rho), zero(eltype(X)), one(eltype(X))))
 end
 
@@ -346,7 +349,8 @@ This method computes the correlation matrix from the data matrix `X` using the p
 function distance(de::GeneralDistance{<:Any, <:LogDistance},
                   ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                   kwargs...)
-    rho = abs.(cor(ce, X; dims = dims, kwargs...)) .^ de.power
+    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
     return -log.(rho)
 end
 """
@@ -425,7 +429,7 @@ function distance(de::GeneralDistance{<:Any, <:LogDistance}, rho::AbstractMatrix
         s .= sqrt.(s)
         rho = StatsBase.cov2cor(rho, s)
     end
-    return -log.(abs.(rho) .^ de.power)
+    return -log.((all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power)
 end
 """
     cor_and_dist(de::GeneralDistance{<:Any, <:LogDistance},
@@ -461,7 +465,8 @@ This method computes the correlation matrix from the data matrix `X` using the p
 function cor_and_dist(de::GeneralDistance{<:Any, <:LogDistance},
                       ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                       kwargs...)
-    rho = abs.(cor(ce, X; dims = dims, kwargs...)) .^ de.power
+    rho = cor(ce, X; dims = dims, kwargs...)
+    rho = (all(x -> x >= zero(x), rho) ? rho : abs.(rho)) .^ de.power
     return rho, -log.(rho)
 end
 """
