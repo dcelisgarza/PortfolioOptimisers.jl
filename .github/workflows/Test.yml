@@ -47,6 +47,14 @@ jobs:
             os: macOS-latest
             arch: x64
             allow_failure: true
+          - version: "lts"
+            os: ubuntu-latest
+            arch: x64
+            allow_failure: true
+          - version: "lts"
+            os: macOS-latest
+            arch: x64
+            allow_failure: true
           # - version: "nightly"
           #   os: windows-latest
           #   arch: x64
