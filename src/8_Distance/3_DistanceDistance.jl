@@ -8,7 +8,15 @@
 
 A distance-of-distances estimator for portfolio optimization.
 
-`DistanceDistance` wraps a distance metric from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) and a base distance algorithm, allowing you to compute a "distance of distances" matrix. This is useful for meta-clustering or higher-order distance-based analyses.
+`DistanceDistance` wraps a distance metric from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) and a base distance algorithm, allowing you to compute a "distance of distances" matrix.
+
+```math
+\\begin{align}
+    \\tilde{d}_{i,\\,j} &= \\lVert\\bm{D}_{i} - \\bm{D}_{j}\\rVert\\,,
+\\end{align}
+```
+
+where ``\\tilde{d}`` is the distance of distances, ``\\bm{D}_{i}`` is the row corresponding to asset ``i`` of the distance matrix computed using the specified distance algorithm [`AbstractDistanceAlgorithm`](@ref), ``\\lVert \\cdot \\rVert`` is the metric used to compute the distance of distances.
 
 # Fields
 
@@ -118,7 +126,7 @@ This method first computes a base distance matrix using the specified base dista
 
   - `de`: Distance-of-distances estimator.
   - `rho`: Correlation or covariance matrix.
-  - `args...`: Additional arguments (ignored).
+  - `args...`: Additional arguments passed to the base distance computation.
   - `kwargs...`: Additional keyword arguments passed to the base distance computation.
 
 # Returns

@@ -46,7 +46,7 @@ Simple distance algorithm for portfolio optimization.
 \\end{align}
 ```
 
-where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and the subscripts denote an asset pair.
+where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
 
 # Related
 
@@ -68,7 +68,7 @@ Simple absolute distance algorithm for portfolio optimization.
 \\end{align}
 ```
 
-where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and the subscripts denote an asset pair.
+where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
 
 # Related
 
@@ -90,7 +90,7 @@ Logarithmic distance algorithm for portfolio optimization.
 \\end{align}
 ```
 
-where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and the subscripts denote an asset pair.
+where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
 
 # Related
 
@@ -112,7 +112,7 @@ Correlation distance algorithm for portfolio optimization.
 \\end{align}
 ```
 
-where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and the subscripts denote an asset pair.
+where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
 
 # Related
 
