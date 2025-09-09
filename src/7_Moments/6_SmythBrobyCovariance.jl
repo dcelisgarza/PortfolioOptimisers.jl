@@ -305,8 +305,8 @@ SmythBrobyCovariance
   threshold | Float64: 0.5
          c1 | Float64: 0.5
          c2 | Float64: 0.5
-         c3 | Float64: 4.0
-          n | Float64: 2.0
+         c3 | Int64: 4
+          n | Int64: 2
         alg | SmythBrobyGerber1()
     threads | Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```

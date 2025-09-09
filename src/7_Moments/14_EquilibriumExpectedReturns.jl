@@ -47,7 +47,7 @@ EquilibriumExpectedReturns
      |      |    detone | nothing
      |      |       alg | nothing
    w | nothing
-   l | Float64: 1.0
+   l | Int64: 1
 ```
 
 # Related

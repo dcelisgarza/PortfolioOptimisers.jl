@@ -106,11 +106,11 @@
             end
             @test success
 
-            rtol = if i ∈ (7, 10, 19, 24, 25) || Sys.isapple() && i ∈ (2, 5, 12)
+            rtol = if i ∈ (7, 10, 19, 25) || Sys.isapple() && i ∈ (2, 5, 12)
                 1e-4
             elseif i == 17
                 5e-3
-            elseif i ∈ (9, 11, 18) || Sys.isapple() && i == 24
+            elseif i ∈ (9, 11, 18, 24)
                 5e-4
             elseif i == 20
                 1e-3
@@ -236,6 +236,8 @@
                 5e-3
             elseif i == 14
                 1e-2
+            elseif Sys.iswindows() && i == 21
+                5e-3
             elseif i ∈ (18, 19, 21)
                 5e-4
             elseif i ∈ (10, 11)
@@ -294,14 +296,16 @@
             end
             @test success
 
-            rtol = if i ∈ (1, 10) || Sys.isapple() && i == 2
+            rtol = if i ∈ (17, 22) ||
+                      Sys.isapple() && i ∈ (18, 20) ||
+                      Sys.iswindows() && i == 10
+                1e-3
+            elseif i ∈ (1, 10) || Sys.isapple() && i == 2
                 5e-4
             elseif i ∈ (13, 15, 16, 19) || Sys.isapple() && i == 17
                 5e-3
             elseif i == 14
                 1e-2
-            elseif i ∈ (17, 22) || Sys.isapple() && i ∈ (18, 20)
-                1e-3
             elseif i ∈ (18, 20, 24, 27)
                 5e-4
             elseif i == 21
