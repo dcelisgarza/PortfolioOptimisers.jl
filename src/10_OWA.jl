@@ -1,5 +1,7 @@
 """
-    abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
+```julia
+abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
+```
 
 Abstract supertype for all Ordered Weights Array (OWA) estimator types in PortfolioOptimisers.jl.
 
@@ -14,7 +16,9 @@ All concrete types implementing OWA estimation algorithms should subtype `Abstra
 abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
 
 """
-    abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
+```julia
+abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
+```
 
 Abstract supertype for all Ordered Weights Array (OWA) algorithm types in PortfolioOptimisers.jl.
 
@@ -29,7 +33,9 @@ All concrete types implementing specific OWA algorithms should subtype `Abstract
 abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
 
 """
-    struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
+```julia
+struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
+```
 
 Represents the Maximum Entropy algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -43,7 +49,9 @@ The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resul
 struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
 
 """
-    struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
+```julia
+struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
+```
 
 Represents the Minimum Square Distance algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -57,7 +65,9 @@ The Minimum Square Distance algorithm finds OWA weights that minimize the square
 struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
 
 """
-    struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
+```julia
+struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
+```
 
 Represents the Minimum Sum of Squares algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -71,9 +81,11 @@ The Minimum Sum of Squares algorithm minimizes the sum of squared OWA weights, p
 struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
 
 """
-    struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
-        g::T1
-    end
+```julia
+struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
+    g::T1
+end
+```
 
 Estimator type for normalised constant relative risk aversion (CRRA) OWA weights.
 
@@ -116,13 +128,15 @@ function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
 end
 
 """
-    struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
-        slv::T1
-        max_phi::T2
-        sc::T3
-        so::T4
-        alg::T5
-    end
+```julia
+struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
+    slv::T1
+    max_phi::T2
+    sc::T3
+    so::T4
+    alg::T5
+end
+```
 
 Estimator type for OWA weights using JuMP-based optimization.
 
@@ -203,7 +217,9 @@ function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
 end
 
 """
-    ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real = 0.5)
+```julia
+ncrra_weights(weights::AbstractMatrix{<:Real}; g::Real = 0.5)
+```
 
 Compute normalised constant relative risk aversion (CRRA) Ordered Weights Array (OWA) weights.
 
@@ -275,7 +291,9 @@ function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real = 0.5)
 end
 
 """
-    owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
+```julia
+owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
+```
 
 Construct a JuMP model for Ordered Weights Array (OWA) weight estimation.
 
@@ -323,7 +341,9 @@ function owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
 end
 
 """
-    owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMatrix)
+```julia
+owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMatrix)
+```
 
 Solve a JuMP model for OWA weight estimation and extract the resulting OWA weights.
 
@@ -364,7 +384,10 @@ function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMa
 end
 
 """
-    owa_l_moment_crm(method::AbstractOrderedWeightsArrayEstimator, weights::AbstractMatrix{<:Real})
+```julia
+owa_l_moment_crm(method::AbstractOrderedWeightsArrayEstimator,
+                 weights::AbstractMatrix{<:Real})
+```
 
 Compute Ordered Weights Array (OWA) linear moment convex risk measure (CRM) weights using various estimation methods.
 
@@ -441,7 +464,9 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumS
 end
 
 """
-    owa_gmd(T::Integer)
+```julia
+owa_gmd(T::Integer)
+```
 
 Compute the Ordered Weights Array (OWA) of the Gini Mean Difference (GMD) risk measure.
 
@@ -458,7 +483,9 @@ function owa_gmd(T::Integer)
 end
 
 """
-    owa_cvar(T::Integer, alpha::Real = 0.05)
+```julia
+owa_cvar(T::Integer; alpha::Real = 0.05)
+```
 
 Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Risk.
 
@@ -493,7 +520,9 @@ function owa_cvar(T::Integer, alpha::Real = 0.05)
 end
 
 """
-    owa_wcvar(T::Integer, alphas::AbstractVector{<:Real}, weights::AbstractVector{<:Real})
+```julia
+owa_wcvar(T::Integer, alphas::AbstractVector{<:Real}, weights::AbstractVector{<:Real})
+```
 
 Compute the Ordered Weights Array (OWA) weights for a weighted combination of Conditional Value at Risk measures.
 
@@ -522,7 +551,9 @@ function owa_wcvar(T::Integer, alphas::AbstractVector{<:Real},
 end
 
 """
-    owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
+```julia
+owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
+```
 
 Compute the Ordered Weights Array (OWA) weights for the tail Gini risk measure.
 
@@ -564,7 +595,9 @@ function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Int
 end
 
 """
-    owa_wr(T::Integer)
+```julia
+owa_wr(T::Integer)
+```
 
 Compute the Ordered Weights Array (OWA) weights for the worst realisation risk measure.
 
@@ -589,7 +622,9 @@ function owa_wr(T::Integer)
 end
 
 """
-    owa_rg(T::Integer)
+```julia
+owa_rg(T::Integer)
+```
 
 Compute the Ordered Weights Array (OWA) weights for the range risk measure.
 
@@ -615,7 +650,9 @@ function owa_rg(T::Integer)
 end
 
 """
-    owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
+```julia
+owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
+```
 
 Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Risk Range risk measure.
 
@@ -641,10 +678,11 @@ function owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
 end
 
 """
-    owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
-                weights_a::AbstractVector{<:Real},
-                betas::AbstractVector{<:Real} = alphas,
-                weights_b::AbstractVector{<:Real} = weights_a)
+```julia
+owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real}, weights_a::AbstractVector{<:Real};
+            betas::AbstractVector{<:Real} = alphas,
+            weights_b::AbstractVector{<:Real} = weights_a)
+```
 
 Compute the Ordered Weights Array (OWA) weights for the weighted Conditional Value at Risk Range risk measure.
 
@@ -676,9 +714,10 @@ function owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
 end
 
 """
-    owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,
-             a_sim::Integer = 100, beta_i::Real = alpha_i, beta::Real = alpha,
-             b_sim::Integer = a_sim)
+```julia
+owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05, a_sim::Integer = 100,
+         beta_i::Real = alpha_i, beta::Real = alpha, b_sim::Integer = a_sim)
+```
 
 Compute the Ordered Weights Array (OWA) weights for the tail Gini range risk measure.
 
@@ -713,7 +752,9 @@ function owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,
 end
 
 """
-    owa_l_moment(T::Integer, k::Integer = 2)
+```julia
+owa_l_moment(T::Integer; k::Integer = 2)
+```
 
 Compute the linear moment weights for the linear moments convex risk measure (CRM).
 
@@ -750,8 +791,10 @@ function owa_l_moment(T::Integer, k::Integer = 2)
 end
 
 """
-    owa_l_moment_crm(T::Integer; k::Integer = 2,
-                     method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
+```julia
+owa_l_moment_crm(T::Integer; k::Integer = 2,
+                 method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
+```
 
 Compute the ordered weights array (OWA) linear moments convex risk measure (CRM) weights for a given number of observations and moment order.
 

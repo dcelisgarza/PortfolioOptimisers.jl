@@ -1,5 +1,7 @@
 """
-    AbstractClusteringEstimator <: AbstractPhylogenyEstimator
+```julia
+abstract type AbstractClusteringEstimator <: AbstractPhylogenyEstimator end
+```
 
 Abstract supertype for all clustering estimator types in PortfolioOptimisers.jl.
 
@@ -13,7 +15,9 @@ All concrete types implementing clustering-based estimation algorithms should su
 abstract type AbstractClusteringEstimator <: AbstractPhylogenyEstimator end
 
 """
-    AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm
+```julia
+abstract type AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm end
+```
 
 Abstract supertype for all clustering algorithm types in PortfolioOptimisers.jl.
 
@@ -27,7 +31,9 @@ All concrete types implementing specific clustering algorithms should subtype `A
 abstract type AbstractClusteringAlgorithm <: AbstractPhylogenyAlgorithm end
 
 """
-    AbstractOptimalNumberClustersEstimator <: AbstractEstimator
+```julia
+abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
+```
 
 Abstract supertype for all optimal number of clusters estimator types in PortfolioOptimisers.jl.
 
@@ -40,7 +46,9 @@ All concrete types implementing algorithms to estimate the optimal number of clu
 abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 
 """
-    AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm
+```julia
+abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
+```
 
 Abstract supertype for all optimal number of clusters algorithm types in PortfolioOptimisers.jl.
 
@@ -53,7 +61,9 @@ All concrete types implementing specific algorithms for determining the optimal 
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
 
 """
-    AbstractClusteringResult <: AbstractPhylogenyResult
+```julia
+abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
+```
 
 Abstract supertype for all clustering result types in PortfolioOptimisers.jl.
 
@@ -67,7 +77,9 @@ All concrete types representing the result of a clustering estimation should sub
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 
 """
-    HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
+```julia
+abstract type HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult end
+```
 
 Result type for hierarchical clustering in PortfolioOptimisers.jl.
 
@@ -83,7 +95,9 @@ Result type for hierarchical clustering in PortfolioOptimisers.jl.
 # Constructor
 
     HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
-                            D::AbstractMatrix, k::Integer)
+                             D::AbstractMatrix, k::Integer)
+
+Keyword arguments correspond to the fields above.
 
 # Related
 
@@ -97,8 +111,10 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     k::T4
 end
 """
-    HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
-                            D::AbstractMatrix, k::Integer)
+```julia
+HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
+                       D::AbstractMatrix, k::Integer)
+```
 
 Construct a [`HierarchicalClustering`](@ref) result for hierarchical clustering.
 
@@ -133,7 +149,9 @@ function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatr
     return HierarchicalClustering(clustering, S, D, k)
 end
 """
-    clusterise(cle::AbstractClusteringResult, args...; kwargs...)
+```julia
+clusterise(cle::AbstractClusteringResult, args...; kwargs...)
+```
 
 Return the clustering result as-is.
 
@@ -156,7 +174,9 @@ function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
     return cle
 end
 """
-    SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm
+```julia
+struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
+```
 
 Algorithm type for estimating the optimal number of clusters using the second-order difference method.
 
@@ -170,7 +190,9 @@ The `SecondOrderDifference` algorithm selects the optimal number of clusters by 
 struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
 
 """
-    PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm
+```julia
+struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm end
+```
 
 Algorithm type for specifying a fixed, user-defined number of clusters.
 
@@ -193,7 +215,9 @@ struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm
     k::T1
 end
 """
-    PredefinedNumberClusters(; k::Integer = 1)
+```julia
+PredefinedNumberClusters(; k::Integer = 1)
+```
 
 Construct a [`PredefinedNumberClusters`](@ref) algorithm with a fixed number of clusters.
 
@@ -227,7 +251,9 @@ function PredefinedNumberClusters(; k::Integer = 1)
 end
 
 """
-    StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
+```julia
+struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm end
+```
 
 Algorithm type for estimating the optimal number of clusters using the standardised silhouette score.
 
@@ -250,7 +276,9 @@ struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
     metric::T1
 end
 """
-    StandardisedSilhouetteScore(; metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
+```julia
+StandardisedSilhouetteScore(; metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
+```
 
 Construct a [`StandardisedSilhouetteScore`](@ref) algorithm for optimal cluster number selection.
 
@@ -280,7 +308,9 @@ function StandardisedSilhouetteScore(;
 end
 
 """
-    OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
+```julia
+struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator end
+```
 
 Estimator type for selecting the optimal number of clusters in PortfolioOptimisers.jl.
 
@@ -306,8 +336,10 @@ struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
     alg::T2
 end
 """
-    OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
-                          alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
+```julia
+OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
+                      alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
+```
 
 Construct an [`OptimalNumberClusters`](@ref) estimator for optimal cluster number selection.
 
@@ -347,7 +379,9 @@ function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
 end
 
 """
-    HClustAlgorithm{T1} <: AbstractClusteringAlgorithm
+```julia
+struct HClustAlgorithm{T1} <: AbstractClusteringAlgorithm end
+```
 
 Algorithm type for hierarchical clustering in PortfolioOptimisers.jl.
 
@@ -370,7 +404,9 @@ struct HClustAlgorithm{T1} <: AbstractClusteringAlgorithm
     linkage::T1
 end
 """
-    HClustAlgorithm(; linkage::Symbol = :ward)
+```julia
+HClustAlgorithm(; linkage::Symbol = :ward)
+```
 
 Construct an [`HClustAlgorithm`](@ref) for hierarchical clustering.
 
@@ -399,7 +435,9 @@ function HClustAlgorithm(; linkage::Symbol = :ward)
 end
 
 """
-    ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator
+```julia
+struct ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator end
+```
 
 Estimator type for clustering in PortfolioOptimisers.jl.
 
@@ -432,10 +470,12 @@ struct ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator
     onc::T4
 end
 """
-    ClusteringEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                         de::AbstractDistanceEstimator = Distance(alg = CanonicalDistance()),
-                         alg::AbstractClusteringAlgorithm = HClustAlgorithm(),
-                         onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
+```julia
+ClusteringEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                    de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+                    alg::AbstractClusteringAlgorithm = HClustAlgorithm(),
+                    onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
+```
 
 Construct a [`ClusteringEstimator`](@ref) for clustering.
 

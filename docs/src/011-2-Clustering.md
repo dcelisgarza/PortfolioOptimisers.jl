@@ -1,11 +1,6 @@
 # Clustering
 
 ```@docs
-PortfolioOptimisers.AbstractClusteringEstimator
-PortfolioOptimisers.AbstractClusteringAlgorithm
-PortfolioOptimisers.AbstractOptimalNumberClustersEstimator
-PortfolioOptimisers.AbstractOptimalNumberClustersAlgorithm
-PortfolioOptimisers.AbstractClusteringResult
 HierarchicalClustering
 HierarchicalClustering()
 clusterise(cle::PortfolioOptimisers.AbstractClusteringResult, args...; kwargs...)
@@ -20,4 +15,9 @@ HClustAlgorithm
 HClustAlgorithm()
 ClusteringEstimator
 ClusteringEstimator()
+PortfolioOptimisers.AbstractClusteringEstimator
+PortfolioOptimisers.AbstractClusteringAlgorithm
+PortfolioOptimisers.AbstractOptimalNumberClustersEstimator
+PortfolioOptimisers.AbstractOptimalNumberClustersAlgorithm
+PortfolioOptimisers.AbstractClusteringResult
 ```

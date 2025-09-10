@@ -1,5 +1,7 @@
 """
-    abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
+```julia
+abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
+```
 
 Abstract supertype for all Gerber covariance estimators in PortfolioOptimisers.jl.
 
@@ -13,7 +15,9 @@ All concrete types implementing Gerber covariance estimation algorithms should s
 abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
 
 """
-    abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
+```julia
+abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
+```
 
 Abstract supertype for all Gerber covariance algorithm types in PortfolioOptimisers.jl.
 
@@ -31,7 +35,9 @@ These types are used to specify the algorithm when constructing a [`GerberCovari
 abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 
 """
-    abstract type UnNormalisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+```julia
+abstract type UnNormalisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+```
 
 Abstract supertype for all unnormalised Gerber covariance algorithm types.
 
@@ -48,7 +54,9 @@ Concrete types implementing unnormalised Gerber covariance algorithms should sub
 abstract type UnNormalisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 
 """
-    abstract type NormalisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+```julia
+abstract type NormalisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
+```
 
 Abstract supertype for all normalised Gerber covariance algorithm types. These Z-transform the data before applying the Gerber covariance algorithm.
 
@@ -65,7 +73,9 @@ Concrete types implementing normalised Gerber covariance algorithms should subty
 abstract type NormalisedGerberCovarianceAlgorithm <: GerberCovarianceAlgorithm end
 
 """
-    struct Gerber0 <: UnNormalisedGerberCovarianceAlgorithm end
+```julia
+struct Gerber0 <: UnNormalisedGerberCovarianceAlgorithm end
+```
 
 Implements the original Gerber covariance algorithm.
 
@@ -79,7 +89,9 @@ Implements the original Gerber covariance algorithm.
 struct Gerber0 <: UnNormalisedGerberCovarianceAlgorithm end
 
 """
-    struct Gerber1 <: UnNormalisedGerberCovarianceAlgorithm end
+```julia
+struct Gerber1 <: UnNormalisedGerberCovarianceAlgorithm end
+```
 
 Implements the first variant of the Gerber covariance algorithm.
 
@@ -93,7 +105,9 @@ Implements the first variant of the Gerber covariance algorithm.
 struct Gerber1 <: UnNormalisedGerberCovarianceAlgorithm end
 
 """
-    struct Gerber2 <: UnNormalisedGerberCovarianceAlgorithm end
+```julia
+struct Gerber2 <: UnNormalisedGerberCovarianceAlgorithm end
+```
 
 Implements the second variant of the Gerber covariance algorithm.
 
@@ -107,9 +121,11 @@ Implements the second variant of the Gerber covariance algorithm.
 struct Gerber2 <: UnNormalisedGerberCovarianceAlgorithm end
 
 """
-    struct NormalisedGerber0{T1} <: NormalisedGerberCovarianceAlgorithm
-        me::T1
-    end
+```julia
+struct NormalisedGerber0{T1} <: NormalisedGerberCovarianceAlgorithm
+    me::T1
+end
+```
 
 Implements the original Gerber covariance algorithm on Z-transformed data.
 
@@ -149,9 +165,11 @@ function NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpect
 end
 
 """
-    struct NormalisedGerber1{T1} <: NormalisedGerberCovarianceAlgorithm
-        me::T1
-    end
+```julia
+struct NormalisedGerber1{T1} <: NormalisedGerberCovarianceAlgorithm
+    me::T1
+end
+```
 
 Implements the first variant of the Gerber covariance algorithm on Z-transformed data.
 
@@ -191,9 +209,11 @@ function NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpect
 end
 
 """
-    struct NormalisedGerber2{T1} <: NormalisedGerberCovarianceAlgorithm
-        me::T1
-    end
+```julia
+struct NormalisedGerber2{T1} <: NormalisedGerberCovarianceAlgorithm
+    me::T1
+end
+```
 
 Implements the second variant of the Gerber covariance algorithm on Z-transformed data.
 
@@ -247,12 +267,14 @@ for alg in (NormalisedGerber0, NormalisedGerber1, NormalisedGerber2)
 end
 
 """
-    struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
-        ve::T1
-        pdm::T2
-        threshold::T3
-        alg::T4
-    end
+```julia
+struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
+    ve::T1
+    pdm::T2
+    threshold::T3
+    alg::T4
+end
+```
 
 A flexible container type for configuring and applying Gerber covariance estimators in PortfolioOptimisers.jl.
 
@@ -305,7 +327,10 @@ function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance()
 end
 
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix, std_vec::AbstractArray)
+```julia
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::AbstractMatrix,
+       std_vec::AbstractArray)
+```
 
 Implements the original Gerber correlation algorithm.
 
@@ -358,7 +383,9 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::Abstrac
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0}, X::AbstractMatrix)
+```julia
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0}, X::AbstractMatrix)
+```
 
 Implements the original Gerber correlation algorithm on Z-transformed data.
 
@@ -409,7 +436,10 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0},
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::AbstractMatrix, std_vec::AbstractArray)
+```julia
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::AbstractMatrix,
+       std_vec::AbstractArray)
+```
 
 Implements the first variant of the Gerber correlation algorithm.
 
@@ -458,7 +488,9 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::Abstrac
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1}, X::AbstractMatrix)
+```julia
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1}, X::AbstractMatrix)
+```
 
 Implements the first variant of the Gerber correlation algorithm on Z-transformed data.
 
@@ -511,7 +543,10 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1},
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix, std_vec::AbstractArray)
+```julia
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix,
+       std_vec::AbstractArray)
+```
 
 Implements the second variant of the Gerber correlation algorithm.
 
@@ -566,7 +601,9 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::Abstrac
     return rho
 end
 """
-    gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}, X::AbstractMatrix)
+```julia
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}, X::AbstractMatrix)
+```
 
 Implements the second variant of the Gerber correlation algorithm on Z-transformed data.
 
@@ -620,7 +657,9 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2},
 end
 
 """
-    cor(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+cor(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the Gerber correlation matrix using an unnormalised Gerber covariance estimator.
 
@@ -682,7 +721,9 @@ function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
 end
 
 """
-    cov(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+cov(ce::GerberCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the Gerber covariance matrix using an unnormalised Gerber covariance estimator.
 

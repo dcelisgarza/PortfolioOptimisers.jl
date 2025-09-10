@@ -155,7 +155,9 @@ function nothing_asset_sets_view(sets::AssetSets, i::AbstractVector)
     return AssetSets(; key = sets.key, dict = dict)
 end
 """
-    nothing_asset_sets_view(::Nothing, ::Any)
+```julia
+nothing_asset_sets_view(::Nothing, ::Any)
+```
 
 No-op fallback for indexing `nothing` asset sets.
 """

@@ -1,9 +1,11 @@
 """
-    struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ve::T1
-        alpha::T2
-        threads::T3
-    end
+```julia
+struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+    ve::T1
+    alpha::T2
+    threads::T3
+end
+```
 
 Lower tail dependence covariance estimator.
 
@@ -64,8 +66,10 @@ function factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothi
 end
 
 """
-    lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05,
-                          threads::FLoops.Transducers.Executor = SequentialEx())
+```julia
+lower_tail_dependence(X::AbstractMatrix; alpha::Real = 0.05,
+                      threads::FLoops.Transducers.Executor = SequentialEx())
+```
 
 Compute the lower tail dependence matrix for a set of asset returns.
 
@@ -116,7 +120,9 @@ function lower_tail_dependence(X::AbstractMatrix, alpha::Real = 0.05,
 end
 
 """
-    cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the lower tail dependence correlation matrix using a [`LTDCovariance`](@ref) estimator.
 
@@ -150,7 +156,9 @@ function Statistics.cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwa
     return lower_tail_dependence(X, ce.alpha, ce.threads)
 end
 """
-    cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the lower tail dependence covariance matrix using a [`LTDCovariance`](@ref) estimator.
 

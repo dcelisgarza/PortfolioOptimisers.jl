@@ -1,11 +1,13 @@
 """
-    struct GeneralDistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
-        dist::T1
-        args::T2
-        kwargs::T3
-        power::T4
-        alg::T5
-    end
+```julia
+struct GeneralDistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
+    dist::T1
+    args::T2
+    kwargs::T3
+    power::T4
+    alg::T5
+end
+```
 
 A general distance-of-distances estimator for portfolio optimization.
 
@@ -73,8 +75,10 @@ function GeneralDistanceDistance(; dist::Distances.Metric = Distances.Euclidean(
     return GeneralDistanceDistance(dist, args, kwargs, power, alg)
 end
 """
-    distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator,
-             X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;
+         dims::Int = 1, kwargs...)
+```
 
 Compute the general distance-of-distances matrix from a covariance estimator and data matrix.
 
@@ -105,7 +109,9 @@ function distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 """
-    distance(de::GeneralDistanceDistance, rho::AbstractMatrix, args...; kwargs...)
+```julia
+distance(de::GeneralDistanceDistance, rho::AbstractMatrix, args...; kwargs...)
+```
 
 Compute the general distance-of-distances matrix from a correlation or covariance matrix.
 
@@ -134,8 +140,10 @@ function distance(de::GeneralDistanceDistance, rho::AbstractMatrix, args...; kwa
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 """
-    cor_and_dist(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator,
-                 X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+cor_and_dist(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator,
+             X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute both the correlation matrix and the general distance-of-distances matrix from a covariance estimator and data matrix.
 

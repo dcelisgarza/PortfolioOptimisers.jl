@@ -1,5 +1,7 @@
 """
-    AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm
+```julia
+abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
+```
 
 Abstract supertype for all centrality algorithm types in PortfolioOptimisers.jl from [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/).
 
@@ -19,7 +21,9 @@ All concrete types implementing specific centrality algorithms (e.g., betweennes
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 
 """
-    BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
+```julia
+struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm end
+```
 
 Centrality algorithm type for betweenness centrality in PortfolioOptimisers.jl.
 
@@ -43,7 +47,9 @@ struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
     kwargs::T2
 end
 """
-    BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+struct BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;)) end
+```
 
 Construct a [`BetweennessCentrality`](@ref) algorithm.
 
@@ -70,7 +76,9 @@ function BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
 end
 
 """
-    ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
+```julia
+struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm end
+```
 
 Centrality algorithm type for closeness centrality in PortfolioOptimisers.jl.
 
@@ -94,7 +102,9 @@ struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
     kwargs::T2
 end
 """
-    ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+struct ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;)) end
+```
 
 Construct a [`ClosenessCentrality`](@ref) algorithm.
 
@@ -125,7 +135,9 @@ function ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
 end
 
 """
-    DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
+```julia
+struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm end
+```
 
 Centrality algorithm type for degree centrality in PortfolioOptimisers.jl.
 
@@ -149,7 +161,9 @@ struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
     kwargs::T2
 end
 """
-    DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
+```julia
+struct DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;)) end
+```
 
 Construct a [`DegreeCentrality`](@ref) algorithm.
 
@@ -181,7 +195,9 @@ function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
 end
 
 """
-    EigenvectorCentrality <: AbstractCentralityAlgorithm
+```julia
+struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
+```
 
 Centrality algorithm type for eigenvector centrality in PortfolioOptimisers.jl.
 
@@ -194,7 +210,9 @@ Centrality algorithm type for eigenvector centrality in PortfolioOptimisers.jl.
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
 
 """
-    KatzCentrality{T1} <: AbstractCentralityAlgorithm
+```julia
+struct KatzCentrality{T1} <: AbstractCentralityAlgorithm end
+```
 
 Centrality algorithm type for Katz centrality in PortfolioOptimisers.jl.
 
@@ -216,7 +234,9 @@ struct KatzCentrality{T1} <: AbstractCentralityAlgorithm
     alpha::T1
 end
 """
-    KatzCentrality(; alpha::Real = 0.3)
+```julia
+KatzCentrality(; alpha::Real = 0.3)
+```
 
 Construct a [`KatzCentrality`](@ref) algorithm.
 
@@ -241,7 +261,9 @@ function KatzCentrality(; alpha::Real = 0.3)
 end
 
 """
-    Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
+```julia
+struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm end
+```
 
 Centrality algorithm type for PageRank in PortfolioOptimisers.jl.
 
@@ -267,7 +289,9 @@ struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
     epsilon::T3
 end
 """
-    Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
+```julia
+Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
+```
 
 Construct a [`Pagerank`](@ref) algorithm.
 
@@ -304,7 +328,9 @@ function Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
 end
 
 """
-    RadialityCentrality <: AbstractCentralityAlgorithm
+```julia
+struct RadialityCentrality <: AbstractCentralityAlgorithm end
+```
 
 Centrality algorithm type for radiality centrality in PortfolioOptimisers.jl.
 
@@ -317,7 +343,9 @@ Centrality algorithm type for radiality centrality in PortfolioOptimisers.jl.
 struct RadialityCentrality <: AbstractCentralityAlgorithm end
 
 """
-    StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
+```julia
+struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm end
+```
 
 Centrality algorithm type for stress centrality in PortfolioOptimisers.jl.
 
@@ -341,7 +369,9 @@ struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
     kwargs::T2
 end
 """
-    StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 Construct a [`StressCentrality`](@ref) algorithm.
 
@@ -368,14 +398,16 @@ function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
 end
 
 """
-    calc_centrality(cent::BetweennessCentrality, g::AbstractGraph)
-    calc_centrality(cent::ClosenessCentrality, g::AbstractGraph)
-    calc_centrality(cent::DegreeCentrality, g::AbstractGraph)
-    calc_centrality(::EigenvectorCentrality, g::AbstractGraph)
-    calc_centrality(cent::KatzCentrality, g::AbstractGraph)
-    calc_centrality(cent::Pagerank, g::AbstractGraph)
-    calc_centrality(::RadialityCentrality, g::AbstractGraph)
-    calc_centrality(cent::StressCentrality, g::AbstractGraph)
+```julia
+calc_centrality(cent::BetweennessCentrality, g::AbstractGraph)
+calc_centrality(cent::ClosenessCentrality, g::AbstractGraph)
+calc_centrality(cent::DegreeCentrality, g::AbstractGraph)
+calc_centrality(::EigenvectorCentrality, g::AbstractGraph)
+calc_centrality(cent::KatzCentrality, g::AbstractGraph)
+calc_centrality(cent::Pagerank, g::AbstractGraph)
+calc_centrality(::RadialityCentrality, g::AbstractGraph)
+calc_centrality(cent::StressCentrality, g::AbstractGraph)
+```
 
 Compute node centrality scores for a graph using the specified centrality algorithm.
 
@@ -434,7 +466,9 @@ function calc_centrality(cent::StressCentrality, g::AbstractGraph)
 end
 
 """
-    AbstractTreeType <: AbstractPhylogenyAlgorithm
+```julia
+abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
+```
 
 Abstract supertype for all minimum spanning tree (MST) algorithm types in PortfolioOptimisers.jl.
 
@@ -449,7 +483,9 @@ All concrete types implementing specific MST algorithms (e.g., Kruskal, Boruvka,
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
 
 """
-    KruskalTree{T1, T2} <: AbstractTreeType
+```julia
+struct KruskalTree{T1, T2} <: AbstractTreeType end
+```
 
 Algorithm type for Kruskal's minimum spanning tree (MST) in PortfolioOptimisers.jl.
 
@@ -473,7 +509,9 @@ struct KruskalTree{T1, T2} <: AbstractTreeType
     kwargs::T2
 end
 """
-    KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 Construct a [`KruskalTree`](@ref) algorithm.
 
@@ -500,7 +538,9 @@ function KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
 end
 
 """
-    BoruvkaTree{T1, T2} <: AbstractTreeType
+```julia
+struct BoruvkaTree{T1, T2} <: AbstractTreeType end
+```
 
 Algorithm type for Boruvka's minimum spanning tree (MST) in PortfolioOptimisers.jl.
 
@@ -524,7 +564,9 @@ struct BoruvkaTree{T1, T2} <: AbstractTreeType
     kwargs::T2
 end
 """
-    BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 Construct a [`BoruvkaTree`](@ref) algorithm.
 
@@ -551,7 +593,9 @@ function BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
 end
 
 """
-    PrimTree{T1, T2} <: AbstractTreeType
+```julia
+struct PrimTree{T1, T2} <: AbstractTreeType end
+```
 
 Algorithm type for Prim's minimum spanning tree (MST) in PortfolioOptimisers.jl.
 
@@ -575,7 +619,9 @@ struct PrimTree{T1, T2} <: AbstractTreeType
     kwargs::T2
 end
 """
-    PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 Construct a [`PrimTree`](@ref) algorithm.
 
@@ -602,9 +648,11 @@ function PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
 end
 
 """
-    calc_mst(alg::KruskalTree, g::AbstractGraph)
-    calc_mst(alg::BoruvkaTree, g::AbstractGraph)
-    calc_mst(alg::PrimTree, g::AbstractGraph)
+```julia
+calc_mst(alg::KruskalTree, g::AbstractGraph)
+calc_mst(alg::BoruvkaTree, g::AbstractGraph)
+calc_mst(alg::PrimTree, g::AbstractGraph)
+```
 
 Compute the minimum spanning tree (MST) of a graph using the specified algorithm.
 
@@ -638,7 +686,9 @@ function calc_mst(cent::PrimTree, g::AbstractGraph)
 end
 
 """
-    AbstractNetworkEstimator <: AbstractPhylogenyEstimator
+```julia
+abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
+```
 
 Abstract supertype for all network estimator types in PortfolioOptimisers.jl.
 
@@ -652,7 +702,9 @@ All concrete types implementing network-based estimation algorithms should subty
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
 
 """
-    Network{T1, T2, T3, T4} <: AbstractNetworkEstimator
+```julia
+struct Network{T1, T2, T3, T4} <: AbstractNetworkEstimator end
+```
 
 Estimator type for network-based phylogeny analysis in PortfolioOptimisers.jl.
 
@@ -685,10 +737,12 @@ struct Network{T1, T2, T3, T4} <: AbstractNetworkEstimator
     n::T4
 end
 """
-    Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-             de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-             alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
-             n::Integer = 1)
+```julia
+Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+        alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
+        n::Integer = 1)
+```
 
 Construct a [`Network`](@ref) estimator for network-based phylogeny analysis.
 
@@ -744,7 +798,9 @@ function Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovari
 end
 
 """
-    AbstractCentralityEstimator <: AbstractPhylogenyEstimator
+```julia
+abstract type AbstractCentralityEstimator <: AbstractPhylogenyEstimator end
+```
 
 Abstract supertype for all centrality estimator types in PortfolioOptimisers.jl.
 
@@ -758,7 +814,9 @@ All concrete types implementing centrality-based estimation algorithms should su
 abstract type AbstractCentralityEstimator <: AbstractPhylogenyEstimator end
 
 """
-    Centrality{T1, T2} <: AbstractCentralityEstimator
+```julia
+struct Centrality{T1, T2} <: AbstractCentralityEstimator end
+```
 
 Estimator type for centrality-based analysis in PortfolioOptimisers.jl.
 
@@ -784,8 +842,10 @@ struct Centrality{T1, T2} <: AbstractCentralityEstimator
     cent::T2
 end
 """
-    Centrality(; ne::AbstractNetworkEstimator = Network(),
-                cent::AbstractCentralityAlgorithm = DegreeCentrality())
+```julia
+Centrality(; ne::AbstractNetworkEstimator = Network(),
+           cent::AbstractCentralityAlgorithm = DegreeCentrality())
+```
 
 Construct a [`Centrality`](@ref) estimator for centrality-based analysis.
 
@@ -841,8 +901,12 @@ function Centrality(; ne::AbstractNetworkEstimator = Network(),
 end
 
 """
-    calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractTreeType, <:Any}, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractTreeType, <:Any}, X::AbstractMatrix;
+               dims::Int = 1, kwargs...)
+calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any},
+               X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the adjacency matrix for a network estimator.
 
@@ -880,7 +944,9 @@ function calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractSimilarityMatrixAlgo
 end
 
 """
-    phylogeny_matrix(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+phylogeny_matrix(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the phylogeny matrix for a network estimator.
 
@@ -912,8 +978,11 @@ function phylogeny_matrix(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs.
     return P
 end
 """
-    phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
-                     X::AbstractMatrix; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+```julia
+phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
+                 X::AbstractMatrix; branchorder::Symbol = :optimal, dims::Int = 1,
+                 kwargs...)
+```
 
 Compute the phylogeny matrix for a clustering estimator or result.
 
@@ -950,8 +1019,10 @@ function phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClustering
 end
 
 """
-    centrality_vector(ne::Network, cent::AbstractCentralityAlgorithm,
-                      X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+centrality_vector(ne::Network, cent::AbstractCentralityAlgorithm, X::AbstractMatrix;
+                  dims::Int = 1, kwargs...)
+```
 
 Compute the centrality vector for a network and centrality algorithm.
 
@@ -983,7 +1054,9 @@ function centrality_vector(ne::Network, cent::AbstractCentralityAlgorithm,
 end
 
 """
-    centrality_vector(cte::Centrality, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+centrality_vector(cte::Centrality, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the centrality vector for a centrality estimator.
 
@@ -1010,8 +1083,10 @@ function centrality_vector(cte::Centrality, X::AbstractMatrix; dims::Int = 1, kw
 end
 
 """
-    average_centrality(ne::Network, cent::AbstractCentralityAlgorithm,
-                       w::AbstractVector, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+average_centrality(ne::Network, cent::AbstractCentralityAlgorithm, w::AbstractVector,
+                   X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the weighted average centrality for a network and centrality algorithm.
 
@@ -1041,8 +1116,10 @@ function average_centrality(ne::Network, cent::AbstractCentralityAlgorithm,
     return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...), w)
 end
 """
-    average_centrality(cte::Centrality, w::AbstractVector, X::AbstractMatrix;
-                       dims::Int = 1, kwargs...)
+```julia
+average_centrality(cte::Centrality, w::AbstractVector, X::AbstractMatrix; dims::Int = 1,
+                   kwargs...)
+```
 
 Compute the weighted average centrality for a centrality estimator.
 
@@ -1071,7 +1148,9 @@ function average_centrality(cte::Centrality, w::AbstractVector, X::AbstractMatri
 end
 
 """
-    asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
+```julia
+asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
+```
 
 Compute the asset phylogeny score for a set of weights and a phylogeny matrix.
 
@@ -1098,8 +1177,10 @@ function asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
     return c
 end
 """
-    asset_phylogeny(cle::Union{<:Network, <:ClusteringEstimator}, w::AbstractVector,
-                    X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+asset_phylogeny(cle::Union{<:Network, <:ClusteringEstimator}, w::AbstractVector,
+                X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the asset phylogeny score for a set of weights and a network or clustering estimator.
 

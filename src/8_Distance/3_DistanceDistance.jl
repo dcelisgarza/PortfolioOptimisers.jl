@@ -1,10 +1,12 @@
 """
-    struct DistanceDistance{T1, T2, T3, T4} <: AbstractDistanceEstimator
-        dist::T1
-        args::T2
-        kwargs::T3
-        alg::T4
-    end
+```julia
+struct DistanceDistance{T1, T2, T3, T4} <: AbstractDistanceEstimator
+    dist::T1
+    args::T2
+    kwargs::T3
+    alg::T4
+end
+```
 
 A distance-of-distances estimator for portfolio optimization.
 
@@ -63,8 +65,10 @@ function DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
 end
 
 """
-    distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
-             X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;
+         dims::Int = 1, kwargs...)
+```
 
 Compute the distance-of-distances matrix from a covariance estimator and data matrix.
 
@@ -93,7 +97,9 @@ function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 """
-    distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
+```julia
+distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
+```
 
 Compute the distance-of-distances matrix from a correlation or covariance matrix.
 
@@ -120,8 +126,10 @@ function distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
 """
-    cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
-                 X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;
+             dims::Int = 1, kwargs...)
+```
 
 Compute both the correlation matrix and the distance-of-distances matrix from a covariance estimator and data matrix.
 

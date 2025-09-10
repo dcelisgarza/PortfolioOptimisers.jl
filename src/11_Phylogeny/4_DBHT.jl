@@ -1,13 +1,19 @@
 """
-    abstract type DBHTRootMethod end
+```julia
+abstract type DBHTRootMethod end
+```
 """
 abstract type DBHTRootMethod <: AbstractAlgorithm end
 """
-    struct UniqueRoot <: DBHTRootMethod end
+```julia
+struct UniqueRoot <: DBHTRootMethod end
+```
 """
 struct UniqueRoot <: DBHTRootMethod end
 """
-    struct EqualRoot <: DBHTRootMethod end
+```julia
+struct EqualRoot <: DBHTRootMethod end
+```
 """
 struct EqualRoot <: DBHTRootMethod end
 

@@ -1,9 +1,11 @@
 """
-    struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ve::T1
-        bins::T2
-        normalise::T3
-    end
+```julia
+struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+    ve::T1
+    bins::T2
+    normalise::T3
+end
+```
 
 Covariance estimator based on mutual information.
 
@@ -65,7 +67,9 @@ function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} 
 end
 
 """
-    cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the mutual information (MI) correlation matrix using a [`MutualInfoCovariance`](@ref) estimator.
 
@@ -102,7 +106,9 @@ function Statistics.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int =
 end
 
 """
-    cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the mutual information (MI) covariance matrix using a [`MutualInfoCovariance`](@ref) estimator.
 

@@ -1,5 +1,7 @@
 """
-    abstract type AbstractJuMPResult <: AbstractResult end
+```julia
+abstract type AbstractJuMPResult <: AbstractResult end
+```
 
 Abstract supertype for all JuMP-based optimisation result types in PortfolioOptimisers.jl.
 
@@ -12,13 +14,15 @@ All concrete types representing the result of a JuMP model optimisation should s
 abstract type AbstractJuMPResult <: AbstractResult end
 
 """
-    struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
-        name::T1
-        solver::T2
-        settings::T3
-        check_sol::T4
-        add_bridges::T5
-    end
+```julia
+struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
+    name::T1
+    solver::T2
+    settings::T3
+    check_sol::T4
+    add_bridges::T5
+end
+```
 
 Container for configuring a JuMP solver and its settings.
 
@@ -76,10 +80,12 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
 """
-    struct JuMPResult{T1, T2} <: AbstractJuMPResult
-        trials::T1
-        success::T2
-    end
+```julia
+struct JuMPResult{T1, T2} <: AbstractJuMPResult
+    trials::T1
+    success::T2
+end
+```
 
 Result type for JuMP model optimisation.
 
@@ -121,7 +127,9 @@ function JuMPResult(; trials::AbstractDict, success::Bool)
 end
 
 """
-    set_solver_attributes(args...)
+```julia
+set_solver_attributes(args...)
+```
 
 Set solver attributes for a JuMP model.
 
@@ -139,8 +147,10 @@ function set_solver_attributes(args...)
     return nothing
 end
 """
-    set_solver_attributes(model::JuMP.Model,
-                          settings::Union{<:AbstractDict, <:AbstractVector{<:Pair}})
+```julia
+set_solver_attributes(model::JuMP.Model,
+                      settings::Union{<:AbstractDict, <:AbstractVector{<:Pair}})
+```
 
 Set multiple solver attributes on a JuMP model.
 
@@ -163,7 +173,9 @@ function set_solver_attributes(model::JuMP.Model,
     return nothing
 end
 """
-    set_solver_attributes(model::JuMP.Model, settings::Pair)
+```julia
+set_solver_attributes(model::JuMP.Model, settings::Pair)
+```
 
 Set a single solver attribute on a JuMP model.
 
@@ -182,8 +194,9 @@ function set_solver_attributes(model::JuMP.Model, settings::Pair)
 end
 
 """
-    optimise_JuMP_model!(model::JuMP.Model,
-                         slv::Union{<:Solver, <:AbstractVector{<:Solver}})
+```julia
+optimise_JuMP_model!(model::JuMP.Model, slv::Union{<:Solver, <:AbstractVector{<:Solver}})
+```
 
 Attempt to optimise a JuMP model using one or more configured solvers.
 

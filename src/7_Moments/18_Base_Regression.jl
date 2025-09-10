@@ -1,5 +1,7 @@
 """
-    abstract type AbstractRegressionEstimator <: AbstractEstimator end
+```julia
+abstract type AbstractRegressionEstimator <: AbstractEstimator end
+```
 
 Abstract supertype for all regression estimator types in PortfolioOptimisers.jl.
 
@@ -14,7 +16,9 @@ All concrete types implementing regression estimation algorithms should subtype 
 abstract type AbstractRegressionEstimator <: AbstractEstimator end
 
 """
-    abstract type AbstractRegressionResult <: AbstractResult end
+```julia
+abstract type AbstractRegressionResult <: AbstractResult end
+```
 
 Abstract supertype for all regression result types in PortfolioOptimisers.jl.
 
@@ -29,7 +33,9 @@ All concrete types representing the output of regression-based moment estimation
 abstract type AbstractRegressionResult <: AbstractResult end
 
 """
-    abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
+```julia
+abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
+```
 
 Abstract supertype for all regression algorithm types in PortfolioOptimisers.jl.
 
@@ -48,7 +54,9 @@ These types are used to specify the algorithm when constructing a regression est
 abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
 
 """
-    abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
+```julia
+abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
+```
 
 Abstract supertype for all stepwise regression algorithm types in PortfolioOptimisers.jl.
 
@@ -63,7 +71,9 @@ All concrete types implementing stepwise regression algorithms should subtype `A
 abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
 
 """
-    abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
+```julia
+abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
+```
 
 Abstract supertype for all stepwise regression criterion types in PortfolioOptimisers.jl.
 
@@ -77,7 +87,9 @@ All concrete types representing criteria for stepwise regression algorithms shou
 abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
 
 """
-    abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
+```julia
+abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
+```
 
 Abstract supertype for all regression target types in PortfolioOptimisers.jl.
 
@@ -90,9 +102,11 @@ All concrete types representing regression targets (such as linear or generalise
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
 
 """
-    struct LinearModel{T1} <: AbstractRegressionTarget
-        kwargs::T1
-    end
+```julia
+struct LinearModel{T1} <: AbstractRegressionTarget
+    kwargs::T1
+end
+```
 
 Regression target type for standard linear models in PortfolioOptimisers.jl.
 
@@ -129,7 +143,9 @@ function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
 """
-    StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
+```julia
+StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
+```
 
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
 
@@ -155,10 +171,12 @@ function StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
 end
 
 """
-    struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
-        args::T1
-        kwargs::T2
-    end
+```julia
+struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
+    args::T1
+    kwargs::T2
+end
+```
 
 Regression target type for generalised linear models (GLMs) in PortfolioOptimisers.jl.
 
@@ -198,7 +216,9 @@ function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple 
     return GeneralisedLinearModel(args, kwargs)
 end
 """
-    StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
+```julia
+StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
+```
 
 Fit a generalised linear regression model using a [`GeneralisedLinearModel`](@ref) regression target.
 
@@ -224,7 +244,10 @@ function StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::Abst
 end
 
 """
-    abstract type AbstractMinValStepwiseRegressionCriterion <: AbstractStepwiseRegressionCriterion end
+```julia
+abstract type AbstractMinValStepwiseRegressionCriterion <:
+              AbstractStepwiseRegressionCriterion end
+```
 
 Abstract supertype for all stepwise regression criteria where lower values indicate better model fit in PortfolioOptimisers.jl.
 
@@ -241,7 +264,10 @@ abstract type AbstractMinValStepwiseRegressionCriterion <:
               AbstractStepwiseRegressionCriterion end
 
 """
-    abstract type AbstractMaxValStepwiseRegressionCriteria <: AbstractStepwiseRegressionCriterion end
+```julia
+abstract type AbstractMaxValStepwiseRegressionCriteria <:
+              AbstractStepwiseRegressionCriterion end
+```
 
 Abstract supertype for all stepwise regression criteria where higher values indicate better model fit in PortfolioOptimisers.jl.
 
@@ -257,7 +283,9 @@ abstract type AbstractMaxValStepwiseRegressionCriteria <:
               AbstractStepwiseRegressionCriterion end
 
 """
-    struct AIC <: AbstractMinValStepwiseRegressionCriterion end
+```julia
+struct AIC <: AbstractMinValStepwiseRegressionCriterion end
+```
 
 Akaike Information Criterion (AIC) for stepwise regression in PortfolioOptimisers.jl.
 
@@ -273,7 +301,9 @@ Akaike Information Criterion (AIC) for stepwise regression in PortfolioOptimiser
 struct AIC <: AbstractMinValStepwiseRegressionCriterion end
 
 """
-    struct AICC <: AbstractMinValStepwiseRegressionCriterion end
+```julia
+struct AICC <: AbstractMinValStepwiseRegressionCriterion end
+```
 
 Corrected Akaike Information Criterion (AICC) for stepwise regression in PortfolioOptimisers.jl.
 
@@ -289,7 +319,9 @@ Corrected Akaike Information Criterion (AICC) for stepwise regression in Portfol
 struct AICC <: AbstractMinValStepwiseRegressionCriterion end
 
 """
-    struct BIC <: AbstractMinValStepwiseRegressionCriterion end
+```julia
+struct BIC <: AbstractMinValStepwiseRegressionCriterion end
+```
 
 Bayesian Information Criterion (BIC) for stepwise regression in PortfolioOptimisers.jl.
 
@@ -305,7 +337,9 @@ Bayesian Information Criterion (BIC) for stepwise regression in PortfolioOptimis
 struct BIC <: AbstractMinValStepwiseRegressionCriterion end
 
 """
-    struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
+```julia
+struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
+```
 
 Coefficient of determination (R²) for stepwise regression in PortfolioOptimisers.jl.
 
@@ -320,7 +354,9 @@ Coefficient of determination (R²) for stepwise regression in PortfolioOptimiser
 struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
 
 """
-    struct AdjustedRSquared <: AbstractMaxValStepwiseRegressionCriteria end
+```julia
+struct AdjustedRSquared <: AbstractMaxValStepwiseRegressionCriteria end
+```
 
 Adjusted coefficient of determination (Adjusted R²) for stepwise regression in PortfolioOptimisers.jl.
 
@@ -335,7 +371,9 @@ Adjusted coefficient of determination (Adjusted R²) for stepwise regression in 
 struct AdjustedRSquared <: AbstractMaxValStepwiseRegressionCriteria end
 
 """
-    regression_criterion_func(::AbstractStepwiseRegressionCriterion)
+```julia
+regression_criterion_func(::AbstractStepwiseRegressionCriterion)
+```
 
 Return the function used to compute the value of a stepwise regression criterion.
 
@@ -380,11 +418,13 @@ function regression_threshold(::AbstractMaxValStepwiseRegressionCriteria)
 end
 
 """
-    struct Regression{T1, T2, T3} <: AbstractRegressionResult
-        M::T1
-        L::T2
-        b::T3
-    end
+```julia
+struct Regression{T1, T2, T3} <: AbstractRegressionResult
+    M::T1
+    L::T2
+    b::T3
+end
+```
 
 Container type for regression results in PortfolioOptimisers.jl.
 
@@ -456,7 +496,9 @@ function Base.getproperty(re::Regression{<:Any, <:AbstractMatrix, <:Any}, sym::S
 end
 
 """
-    regression_view(re::Regression, i::AbstractVector)
+```julia
+regression_view(re::Regression, i::AbstractVector)
+```
 
 Return a view of a [`Regression`](@ref) result object, selecting only the rows indexed by `i`.
 
@@ -496,7 +538,9 @@ function regression_view(re::Regression, i::AbstractVector)
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
 """
-    regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
+```julia
+regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)
+```
 
 No-op fallback for `regression_view` when the input is `nothing` or an `AbstractRegressionEstimator`.
 
@@ -520,7 +564,9 @@ function regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args
 end
 
 """
-    regression(re::Regression, args...)
+```julia
+regression(re::Regression, args...)
+```
 
 Return the regression result object unchanged.
 
@@ -544,7 +590,9 @@ function regression(re::Regression, args...)
 end
 
 """
-    regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
+```julia
+regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
+```
 
 Compute or extract a regression result from an estimator or result and a [`ReturnsResult`](@ref).
 

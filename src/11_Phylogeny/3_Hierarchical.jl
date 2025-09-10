@@ -1,5 +1,7 @@
 """
-    ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
+```julia
+struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult end
+```
 
 Node type for representing clusters in a hierarchical clustering tree.
 
@@ -57,7 +59,9 @@ struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
 end
 
 """
-    is_leaf(a::ClusterNode)
+```julia
+is_leaf(a::ClusterNode)
+```
 
 Determine if a `ClusterNode` is a leaf node.
 
@@ -87,7 +91,9 @@ function is_leaf(a::ClusterNode)
 end
 
 """
-    AbstractPreorderBy <: AbstractAlgorithm
+```julia
+abstract type AbstractPreorderBy <: AbstractAlgorithm end
+```
 
 Abstract supertype for all preorder traversal strategies in PortfolioOptimisers.jl.
 
@@ -101,7 +107,9 @@ Concrete types implementing specific preorder traversal logic should subtype `Ab
 abstract type AbstractPreorderBy <: AbstractAlgorithm end
 
 """
-    PreorderTreeByID <: AbstractPreorderBy
+```julia
+struct PreorderTreeByID <: AbstractPreorderBy end
+```
 
 Preorder traversal strategy that visits nodes by their identifier.
 
@@ -116,7 +124,9 @@ Preorder traversal strategy that visits nodes by their identifier.
 struct PreorderTreeByID <: AbstractPreorderBy end
 
 """
-    get_node_property(preorder_by::PreorderTreeByID, a::ClusterNode)
+```julia
+get_node_property(preorder_by::PreorderTreeByID, a::ClusterNode)
+```
 
 Get the property of a node used for preorder traversal.
 
@@ -139,7 +149,9 @@ For `PreorderTreeByID`, this returns the node's `id`.
 get_node_property(::PreorderTreeByID, a::ClusterNode) = a.id
 
 """
-    pre_order(a::ClusterNode, preorder_by::AbstractPreorderBy = PreorderTreeByID())
+```julia
+pre_order(a::ClusterNode; preorder_by::AbstractPreorderBy = PreorderTreeByID())
+```
 
 Perform a preorder traversal of a hierarchical clustering tree.
 
@@ -194,7 +206,9 @@ function pre_order(a::ClusterNode, preorder_by::AbstractPreorderBy = PreorderTre
 end
 
 """
-    to_tree(a::Hclust)
+```julia
+to_tree(a::Hclust)
+```
 
 Convert a hierarchical clustering result to a tree of `ClusterNode` objects.
 
@@ -235,9 +249,11 @@ function to_tree(a::Hclust)
 end
 
 """
-    clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
-               X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
-               dims::Int = 1, kwargs...)
+```julia
+clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
+           X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal, dims::Int = 1,
+           kwargs...)
+```
 
 Run hierarchical clustering and return the result as a `HierarchicalClustering` object.
 
@@ -270,8 +286,9 @@ function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:
 end
 
 """
-    validate_k_value(clustering::Hclust, nodes::AbstractVector{<:ClusterNode},
-                     k::Integer)
+```julia
+validate_k_value(clustering::Hclust, nodes::AbstractVector{<:ClusterNode}, k::Integer)
+```
 
 Validate whether a given number of clusters `k` is consistent with the hierarchical clustering tree.
 
@@ -319,7 +336,9 @@ function validate_k_value(clustering::Hclust, nodes::AbstractVector{<:ClusterNod
 end
 
 """
-    valid_k_clusters(clustering::Hclust, arr::AbstractVector)
+```julia
+valid_k_clusters(clustering::Hclust, arr::AbstractVector)
+```
 
 Find a valid number of clusters for a hierarchical clustering tree given a scoring array.
 
@@ -355,9 +374,14 @@ function valid_k_clusters(clustering::Hclust, arr::AbstractVector)
 end
 
 """
-    optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:PredefinedNumberClusters}, clustering::Hclust, args...)
-    optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference}, clustering::Hclust, dist::AbstractMatrix)
-    optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:StandardisedSilhouetteScore}, clustering::Hclust, dist::AbstractMatrix)
+```julia
+optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:PredefinedNumberClusters},
+                        clustering::Hclust, args...)
+optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
+                        clustering::Hclust, dist::AbstractMatrix)
+optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:StandardisedSilhouetteScore},
+                        clustering::Hclust, dist::AbstractMatrix)
+```
 
 Select the optimal number of clusters for a hierarchical clustering tree.
 

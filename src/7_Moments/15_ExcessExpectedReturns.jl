@@ -1,8 +1,10 @@
 """
-    struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
-        me::T1
-        rf::T2
-    end
+```julia
+struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
+    me::T1
+    rf::T2
+end
+```
 
 Container type for excess expected returns estimators.
 
@@ -49,7 +51,9 @@ function factory(me::ExcessExpectedReturns, w::Union{Nothing, <:AbstractWeights}
 end
 
 """
-    mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+mean(me::ExcessExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute excess expected returns by subtracting the risk-free rate.
 

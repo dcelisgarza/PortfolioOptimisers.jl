@@ -1,8 +1,10 @@
 """
-    struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
-        ce::T1
-        mp::T2
-    end
+```julia
+struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
+    ce::T1
+    mp::T2
+end
+```
 
 Composite covariance estimator with post-processing.
 
@@ -59,7 +61,9 @@ function factory(ce::PortfolioOptimisersCovariance,
 end
 
 """
-    cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
+```julia
+cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
+```
 
 Compute the covariance matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
@@ -101,7 +105,9 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; di
 end
 
 """
-    cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
+```julia
+cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
+```
 
 Compute the correlation matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 

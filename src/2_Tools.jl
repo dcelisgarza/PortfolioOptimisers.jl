@@ -1,5 +1,7 @@
 """
-    AbstractReturnsResult <: AbstractResult
+```julia
+abstract type AbstractReturnsResult <: AbstractResult end
+```
 
 Abstract supertype for all returns result types in PortfolioOptimisers.jl.
 
@@ -15,7 +17,9 @@ and optimization routines.
 abstract type AbstractReturnsResult <: AbstractResult end
 
 """
-    assert_matrix_issquare(A::AbstractMatrix)
+```julia
+assert_matrix_issquare(A::AbstractMatrix)
+```
 
 Assert that `A` is a square matrix.
 """
@@ -61,15 +65,17 @@ end
 function select_kextremes(X::AbstractMatrix) end
 
 """
-    struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
-        nx::T1
-        X::T2
-        nf::T3
-        F::T4
-        ts::T5
-        iv::T6
-        ivpa::T7
-    end
+```julia
+struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
+    nx::T1
+    X::T2
+    nf::T3
+    F::T4
+    ts::T5
+    iv::T6
+    ivpa::T7
+end
+```
 
 A flexible container type for storing the results of asset and factor returns calculations in PortfolioOptimisers.jl.
 
@@ -88,13 +94,15 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Constructor
 
-    ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
-                    X::Union{Nothing, <:AbstractMatrix} = nothing,
-                    nf::Union{Nothing, <:AbstractVector} = nothing,
-                    F::Union{Nothing, <:AbstractMatrix} = nothing,
-                    ts::Union{Nothing, <:AbstractVector} = nothing,
-                    iv::Union{Nothing, <:AbstractMatrix} = nothing,
-                    ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+```julia
+ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
+              X::Union{Nothing, <:AbstractMatrix} = nothing,
+              nf::Union{Nothing, <:AbstractVector} = nothing,
+              F::Union{Nothing, <:AbstractMatrix} = nothing,
+              ts::Union{Nothing, <:AbstractVector} = nothing,
+              iv::Union{Nothing, <:AbstractMatrix} = nothing,
+              ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -231,17 +239,19 @@ function returns_result_view(rd::ReturnsResult, i::AbstractVector)
     return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts, iv = iv,
                          ivpa = ivpa)
 end
+
 """
-    prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []);
-                      iv::Union{Nothing, <:TimeArray} = nothing,
-                      ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                      ret_method::Symbol = :simple, padding::Bool = false,
-                      missing_col_percent::Real = 1.0,
-                      missing_row_percent::Union{Nothing, <:Real} = 1.0,
-                      collapse_args::Tuple = (),
-                      map_func::Union{Nothing, Function} = nothing,
-                      join_method::Symbol = :outer,
-                      impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
+```julia
+prices_to_returns(X::TimeArray; F::TimeArray = TimeArray(TimeType[], []),
+                  iv::Union{Nothing, <:TimeArray} = nothing,
+                  ivpa::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                  ret_method::Symbol = :simple, padding::Bool = false,
+                  missing_col_percent::Real = 1.0,
+                  missing_row_percent::Union{Nothing, <:Real} = 1.0,
+                  collapse_args::Tuple = (), map_func::Union{Nothing, Function} = nothing,
+                  join_method::Symbol = :outer,
+                  impute_method::Union{Nothing, <:Impute.Imputor} = nothing)
+```
 
 Convert price data (and optionally factor data) in `TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
 
@@ -380,10 +390,12 @@ function prices_to_returns(X::TimeArray, F::TimeArray = TimeArray(TimeType[], []
     return ReturnsResult(; ts = ts, nx = nx, X = X, nf = nf, F = F, iv = values(iv),
                          ivpa = ivpa)
 end
+
 """
-    brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
-                        asset_classes::DataFrame, col, date0 = nothing,
-                        date1 = nothing)
+```julia
+brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
+                    asset_classes::DataFrame, col; date0 = nothing, date1 = nothing)
+```
 """
 function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector,
                              asset_classes::DataFrame, col, date0 = nothing,
@@ -436,7 +448,9 @@ function brinson_attribution(X::TimeArray, w::AbstractVector, wb::AbstractVector
 end
 
 """
-    ⊗(A::AbstractArray, B::AbstractArray)
+```julia
+⊗(A::AbstractArray, B::AbstractArray)
+```
 
 Tensor product of two arrays. ReturnsResult a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
 
@@ -452,7 +466,9 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
 ⊗(A::AbstractArray, B::AbstractArray) = reshape(kron(B, A), (length(A), length(B)))
 
 """
-    ⊙(A, B)
+```julia
+⊙(A, B)
+```
 
 Elementwise multiplication.
 
@@ -484,7 +500,9 @@ julia> PortfolioOptimisers.:⊙(2, 3)
 ⊙(A, B) = A * B
 
 """
-    ⊘(A, B)
+```julia
+⊘(A, B)
+```
 
 Elementwise division.
 
@@ -516,7 +534,9 @@ julia> PortfolioOptimisers.:⊘(8, 2)
 ⊘(A, B) = A / B
 
 """
-    ⊕(A, B)
+```julia
+⊕(A, B)
+```
 
 Elementwise addition.
 
@@ -548,7 +568,9 @@ julia> PortfolioOptimisers.:⊕(2, 3)
 ⊕(A, B) = A + B
 
 """
-    ⊖(A, B)
+```julia
+⊖(A, B)
+```
 
 Elementwise subtraction.
 
@@ -580,9 +602,11 @@ julia> PortfolioOptimisers.:⊖(8, 2)
 ⊖(A, B) = A - B
 
 """
-    dot_scalar(a::Real, b::AbstractVector)
-    dot_scalar(a::AbstractVector, b::Real)
-    dot_scalar(a::AbstractVector, b::AbstractVector)
+```julia
+dot_scalar(a::Real, b::AbstractVector)
+dot_scalar(a::AbstractVector, b::Real)
+dot_scalar(a::AbstractVector, b::AbstractVector)
+```
 
 Efficient scalar and vector dot product utility.
 
@@ -623,7 +647,9 @@ function dot_scalar(a::AbstractVector, b::AbstractVector)
 end
 
 """
-    nothing_scalar_array_view(x, i)
+```julia
+nothing_scalar_array_view(x, i)
+```
 
 Utility for safely viewing or indexing into possibly `nothing`, scalar, or array values.
 
@@ -678,7 +704,9 @@ function nothing_scalar_array_view(x::AbstractArray, i)
 end
 
 """
-    nothing_scalar_array_view_odd_order(x, i, j)
+```julia
+nothing_scalar_array_view_odd_order(x, i, j)
+```
 
 Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
 
@@ -712,8 +740,10 @@ function nothing_scalar_array_view_odd_order(x::AbstractArray, i, j)
 end
 
 """
-    nothing_scalar_array_getindex(x, i)
-    nothing_scalar_array_getindex(x, i, j)
+```julia
+nothing_scalar_array_getindex(x, i)
+nothing_scalar_array_getindex(x, i, j)
+```
 
 Utility for safely indexing into possibly `nothing`, scalar, vector, or array values.
 
@@ -769,7 +799,9 @@ function nothing_scalar_array_getindex(x::AbstractMatrix, i, j)
 end
 
 """
-    fourth_moment_index_factory(N::Integer, i::AbstractVector)
+```julia
+fourth_moment_index_factory(N::Integer, i::AbstractVector)
+```
 
 Constructs an index vector for extracting the fourth moment submatrix corresponding to indices `i` from a covariance matrix of size `N × N`.
 
@@ -802,7 +834,9 @@ function fourth_moment_index_factory(N::Integer, i)
 end
 
 """
-    traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} = nothing)
+```julia
+traverse_concrete_subtypes(t; ctarr::Union{Nothing, <:AbstractVector} = nothing)
+```
 
 Recursively traverse all subtypes of the given abstract type `t` and collect all concrete struct types into `ctarr`.
 
@@ -846,7 +880,9 @@ function traverse_concrete_subtypes(t, ctarr::Union{Nothing, <:AbstractVector} =
 end
 
 """
-    concrete_typed_array(A::AbstractArray)
+```julia
+concrete_typed_array(A::AbstractArray)
+```
 
 Convert an `AbstractArray` `A` to a concrete typed array, where each element is of the same type as the elements of `A`.
 

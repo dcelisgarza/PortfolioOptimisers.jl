@@ -1,7 +1,9 @@
 """
-    struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
-        w::T1
-    end
+```julia
+struct SimpleExpectedReturns{T1} <: AbstractExpectedReturnsEstimator
+    w::T1
+end
+```
 
 A simple expected returns estimator for PortfolioOptimisers.jl, representing the sample mean with optional observation weights.
 
@@ -38,7 +40,9 @@ function SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
 end
 
 """
-    mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+mean(me::SimpleExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estimator.
 
