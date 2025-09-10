@@ -37,7 +37,7 @@ jobs:
         arch: [x64]
         allow_failure: [false]
         include:
-          - version: ["pre", "lts", "nightly"]
-          - os: [ubuntu-latest, macOS-latest]
-          - arch: [x64]
-          - allow_failure: [true]
+          - version: "pre"
+          - os: ubuntu-latest
+          - arch: x64
+          - allow_failure: true
