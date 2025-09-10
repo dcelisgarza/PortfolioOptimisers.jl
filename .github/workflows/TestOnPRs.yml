@@ -4,10 +4,11 @@ on:
   pull_request:
     branches:
       - main
-      - dev*
     paths:
       - "src/**"
       - "test/**"
+      - "ext/**"
+      - "examples/**"
       - "*.toml"
     types: [opened, synchronize, reopened]
 
@@ -21,10 +22,50 @@ jobs:
   test:
     uses: ./.github/workflows/ReusableTest.yml
     with:
-      os: ubuntu-latest
-      version: "1"
-      arch: x64
-      allow_failure: false
-      run_codecov: true
+      os: ${{ matrix.os }}
+      version: ${{ matrix.version }}
+      arch: ${{ matrix.arch }}
+      allow_failure: ${{ matrix.allow_failure }}
+      run_codecov: ${{ matrix.version == '1' && matrix.os == 'ubuntu-latest' }}
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["1", "lts", "pre", "nightly"]
+        os:
+          - ubuntu-latest
+          - macOS-latest
+          # - windows-latest
+        arch:
+          - x64
+        allow_failure: [false]
+        include:
+          - version: "pre"
+            os: ubuntu-latest
+            arch: x64
+            allow_failure: true
+          - version: "pre"
+            os: macOS-latest
+            arch: x64
+            allow_failure: true
+          - version: "nightly"
+            os: ubuntu-latest
+            arch: x64
+            allow_failure: true
+          - version: "nightly"
+            os: macOS-latest
+            arch: x64
+            allow_failure: true
+          - version: "lts"
+            os: ubuntu-latest
+            arch: x64
+            allow_failure: true
+          - version: "lts"
+            os: macOS-latest
+            arch: x64
+            allow_failure: true
+          # - version: "nightly"
+          #   os: windows-latest
+          #   arch: x64
+          #   allow_failure: true
