@@ -23,10 +23,11 @@ A flexible container type for configuring and applying distance-based covariance
 
 # Constructor
 
-    DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
-                         args::Tuple = (), kwargs::NamedTuple = (;),
-                         w::Union{Nothing, <:AbstractWeights} = nothing,
-                         threads::FLoops.Transducers.Executor = ThreadedEx())
+```julia
+DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
+                   kwargs::NamedTuple = (;), w::Union{Nothing, <:AbstractWeights} = nothing,
+                   threads::FLoops.Transducers.Executor = ThreadedEx())
+```
 
 Keyword arguments correspond to the fields above.
 

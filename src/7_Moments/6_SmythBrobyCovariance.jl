@@ -306,13 +306,14 @@ A flexible container type for configuring and applying Smyth-Broby covariance es
 
 # Constructor
 
-    SmythBrobyCovariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                           ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                           pdm::Union{Nothing, <:Posdef} = Posdef(),
-                           threshold::Real = 0.5, c1::Real = 0.5, c2::Real = 0.5,
-                           c3::Real = 4, n::Real = 2,
-                           alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-                           threads::FLoops.Transducers.Executor = ThreadedEx())
+```julia
+SmythBrobyCovariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                     ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+                     pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
+                     c1::Real = 0.5, c2::Real = 0.5, c3::Real = 4, n::Real = 2,
+                     alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
+                     threads::FLoops.Transducers.Executor = ThreadedEx())
+```
 
 Keyword arguments correspond to the fields above.
 

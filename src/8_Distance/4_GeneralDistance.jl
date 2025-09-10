@@ -27,7 +27,9 @@ where ``_{g}d`` is the generalised distance, ``d`` is the base distance computed
 
 # Constructor
 
-    GeneralDistance(; power::Integer = 1, alg::AbstractDistanceAlgorithm = SimpleDistance())
+```julia
+GeneralDistance(; power::Integer = 1, alg::AbstractDistanceAlgorithm = SimpleDistance())
+```
 
 Keyword arguments correspond to the fields above.
 

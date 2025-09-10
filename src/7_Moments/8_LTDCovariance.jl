@@ -19,9 +19,10 @@ Lower tail dependence covariance estimator.
 
 # Constructor
 
-    LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                    alpha::Real = 0.05,
-                    threads::FLoops.Transducers.Executor = ThreadedEx())
+```julia
+LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(), alpha::Real = 0.05,
+              threads::FLoops.Transducers.Executor = ThreadedEx())
+```
 
 Keyword arguments correspond to the fields above.
 

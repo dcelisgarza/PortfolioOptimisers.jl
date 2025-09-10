@@ -17,8 +17,10 @@ Container type for excess expected returns estimators.
 
 # Constructor
 
-    ExcessExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                            rf::Real = 0.0)
+```julia
+ExcessExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                      rf::Real = 0.0)
+```
 
 Keyword arguments correspond to the fields above.
 

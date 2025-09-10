@@ -30,7 +30,9 @@ Robust covariance estimator based on Kendall's tau rank correlation.
 
 # Constructor
 
-    KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+```julia
+KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -153,7 +155,9 @@ Robust covariance estimator based on Spearman's rho rank correlation.
 
 # Constructor
 
-    SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+```julia
+SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+```
 
 Keyword arguments correspond to the fields above.
 

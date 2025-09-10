@@ -15,7 +15,9 @@ Stepwise regression criterion based on p-value thresholding.
 
 # Constructor
 
-    PValue(; threshold::Real = 0.05)
+```julia
+PValue(; threshold::Real = 0.05)
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -99,9 +101,11 @@ Estimator for stepwise regression-based moment estimation.
 
 # Constructor
 
-    StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
-                         alg::AbstractStepwiseRegressionAlgorithm = Forward(),
-                         target::AbstractRegressionTarget = LinearModel())
+```julia
+StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
+                   alg::AbstractStepwiseRegressionAlgorithm = Forward(),
+                   target::AbstractRegressionTarget = LinearModel())
+```
 
 Keyword arguments correspond to the fields above.
 

@@ -19,9 +19,11 @@ Covariance estimator based on mutual information.
 
 # Constructor
 
-    MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                          bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
-                          normalise::Bool = true)
+```julia
+MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+                     bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                     normalise::Bool = true)
+```
 
 Keyword arguments correspond to the fields above.
 

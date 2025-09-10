@@ -94,8 +94,10 @@ Result type for hierarchical clustering in PortfolioOptimisers.jl.
 
 # Constructor
 
-    HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
-                             D::AbstractMatrix, k::Integer)
+```julia
+HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
+                       D::AbstractMatrix, k::Integer)
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -204,7 +206,9 @@ Algorithm type for specifying a fixed, user-defined number of clusters.
 
 # Constructor
 
-    PredefinedNumberClusters(; k::Integer = 1)
+```julia
+PredefinedNumberClusters(; k::Integer = 1)
+```
 
 # Related
 
@@ -265,7 +269,9 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 
 # Constructor
 
-    PredefinedNumberClusters(; k::Integer = 1)
+```julia
+PredefinedNumberClusters(; k::Integer = 1)
+```
 
 # Related
 
@@ -323,8 +329,10 @@ Estimator type for selecting the optimal number of clusters in PortfolioOptimise
 
 # Constructor
 
-    OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
-                          alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
+```julia
+OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
+                      alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
+```
 
 # Related
 
@@ -393,7 +401,9 @@ Algorithm type for hierarchical clustering in PortfolioOptimisers.jl.
 
 # Constructor
 
-    HClustAlgorithm(; linkage::Symbol = :ward)
+```julia
+HClustAlgorithm(; linkage::Symbol = :ward)
+```
 
 # Related
 
@@ -452,10 +462,12 @@ Estimator type for clustering in PortfolioOptimisers.jl.
 
 # Constructor
 
-    ClusteringEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                         de::AbstractDistanceEstimator = Distance(alg = CanonicalDistance()),
-                         alg::AbstractClusteringAlgorithm = HClustAlgorithm(),
-                         onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
+```julia
+ClusteringEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                    de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+                    alg::AbstractClusteringAlgorithm = HClustAlgorithm(),
+                    onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
+```
 
 # Related
 

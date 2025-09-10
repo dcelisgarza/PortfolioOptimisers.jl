@@ -135,7 +135,9 @@ Implements the original Gerber covariance algorithm on Z-transformed data.
 
 # Constructor
 
-    NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+```julia
+NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -179,7 +181,9 @@ Implements the first variant of the Gerber covariance algorithm on Z-transformed
 
 # Constructor
 
-    NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+```julia
+NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -221,9 +225,11 @@ Implements the second variant of the Gerber covariance algorithm on Z-transforme
 
   - `me`: Expected returns estimator used for mean-centering prior to normalisation.
 
-# Constructors
+# Constructor
 
-    NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+```julia
+NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -289,9 +295,11 @@ A flexible container type for configuring and applying Gerber covariance estimat
 
 # Constructor
 
-    GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                       pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
-                       alg::GerberCovarianceAlgorithm = Gerber1())
+```julia
+GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+                 pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
+                 alg::GerberCovarianceAlgorithm = Gerber1())
+```
 
 Keyword arguments correspond to the fields above.
 

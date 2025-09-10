@@ -36,7 +36,9 @@ Centrality algorithm type for betweenness centrality in PortfolioOptimisers.jl.
 
 # Constructor
 
-    BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 # Related
 
@@ -91,7 +93,9 @@ Centrality algorithm type for closeness centrality in PortfolioOptimisers.jl.
 
 # Constructor
 
-    ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 # Related
 
@@ -115,7 +119,9 @@ Construct a [`ClosenessCentrality`](@ref) algorithm.
 
 # Constructor
 
-    ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 # Returns
 
@@ -150,7 +156,9 @@ Centrality algorithm type for degree centrality in PortfolioOptimisers.jl.
 
 # Constructor
 
-    DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
+```julia
+DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
+```
 
 # Related
 
@@ -224,7 +232,9 @@ Centrality algorithm type for Katz centrality in PortfolioOptimisers.jl.
 
 # Constructor
 
-    KatzCentrality(; alpha::Real = 0.3)
+```julia
+KatzCentrality(; alpha::Real = 0.3)
+```
 
 # Related
 
@@ -277,7 +287,9 @@ Centrality algorithm type for PageRank in PortfolioOptimisers.jl.
 
 # Constructor
 
-    Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
+```julia
+Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
+```
 
 # Related
 
@@ -358,7 +370,9 @@ Centrality algorithm type for stress centrality in PortfolioOptimisers.jl.
 
 # Constructor
 
-    StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 # Related
 
@@ -498,7 +512,9 @@ Algorithm type for Kruskal's minimum spanning tree (MST) in PortfolioOptimisers.
 
 # Constructor
 
-    KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 # Related
 
@@ -553,7 +569,9 @@ Algorithm type for Boruvka's minimum spanning tree (MST) in PortfolioOptimisers.
 
 # Constructor
 
-    BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 # Related
 
@@ -608,7 +626,9 @@ Algorithm type for Prim's minimum spanning tree (MST) in PortfolioOptimisers.jl.
 
 # Constructor
 
-    PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```julia
+PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 # Related
 
@@ -719,10 +739,12 @@ Estimator type for network-based phylogeny analysis in PortfolioOptimisers.jl.
 
 # Constructor
 
-    Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-             de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-             alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
-             n::Integer = 1)
+```julia
+Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+        alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
+        n::Integer = 1)
+```
 
 # Related
 
@@ -829,8 +851,10 @@ Estimator type for centrality-based analysis in PortfolioOptimisers.jl.
 
 # Constructor
 
-    Centrality(; ne::AbstractNetworkEstimator = Network(),
-                cent::AbstractCentralityAlgorithm = DegreeCentrality())
+```julia
+Centrality(; ne::AbstractNetworkEstimator = Network(),
+           cent::AbstractCentralityAlgorithm = DegreeCentrality())
+```
 
 # Related
 

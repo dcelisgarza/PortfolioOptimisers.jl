@@ -17,8 +17,10 @@ Composite covariance estimator with post-processing.
 
 # Constructor
 
-    PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
+```julia
+PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
+                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
+```
 
 Keyword arguments correspond to the fields above.
 

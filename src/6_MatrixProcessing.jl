@@ -100,10 +100,12 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Constructor
 
-    DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
-                              denoise::Union{Nothing, <:Denoise} = nothing,
-                              detone::Union{Nothing, <:Detone} = nothing,
-                              alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
+```julia
+DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
+                        denoise::Union{Nothing, <:Denoise} = nothing,
+                        detone::Union{Nothing, <:Detone} = nothing,
+                        alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -176,10 +178,12 @@ A container type for matrix processing pipelines that do **not** enforce positiv
 
 # Constructor
 
-    NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
-                                          detone::Union{Nothing, <:Detone} = nothing,
-                                          alg::Union{Nothing,
-                                                     <:AbstractMatrixProcessingAlgorithm} = nothing)
+```julia
+NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
+                                    detone::Union{Nothing, <:Detone} = nothing,
+                                    alg::Union{Nothing,
+                                               <:AbstractMatrixProcessingAlgorithm} = nothing)
+```
 
 Keyword arguments correspond to the fields above.
 

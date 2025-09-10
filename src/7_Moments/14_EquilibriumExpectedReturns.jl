@@ -19,9 +19,11 @@ Container type for equilibrium expected returns estimators.
 
 # Constructor
 
-    EquilibriumExpectedReturns(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                 w::Union{Nothing, <:AbstractVector} = nothing,
-                                 l::Real = 1)
+```julia
+EquilibriumExpectedReturns(;
+                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                           w::Union{Nothing, <:AbstractVector} = nothing, l::Real = 1)
+```
 
 Keyword arguments correspond to the fields above.
 

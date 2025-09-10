@@ -35,7 +35,9 @@ Principal Component Analysis (PCA) dimension reduction target.
 
 # Constructor
 
-    PCA(; kwargs::NamedTuple = ())
+```julia
+PCA(; kwargs::NamedTuple = ())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -105,7 +107,9 @@ Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
 
 # Constructor
 
-    PPCA(; kwargs::NamedTuple = ())
+```julia
+PPCA(; kwargs::NamedTuple = ())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -181,10 +185,13 @@ Estimator for dimension reduction regression-based moment estimation.
 
 # Constructor
 
-    DimensionReductionRegression(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                                   ve::AbstractVarianceEstimator = SimpleVariance(),
-                                   drtgt::DimensionReductionTarget = PCA(),
-                                   retgt::AbstractRegressionTarget = LinearModel())
+```julia
+DimensionReductionRegression(;
+                             me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                             ve::AbstractVarianceEstimator = SimpleVariance(),
+                             drtgt::DimensionReductionTarget = PCA(),
+                             retgt::AbstractRegressionTarget = LinearModel())
+```
 
 Keyword arguments correspond to the fields above.
 

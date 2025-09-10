@@ -35,9 +35,11 @@ Container type for cokurtosis estimators.
 
 # Constructor
 
-    Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                 mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                 alg::AbstractMomentAlgorithm = Full())
+```julia
+Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+           mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+           alg::AbstractMomentAlgorithm = Full())
+```
 
 Keyword arguments correspond to the fields above.
 

@@ -29,9 +29,11 @@ where ``\\tilde{d}`` is the distance of distances, ``\\bm{D}_{i}`` is the row co
 
 # Constructor
 
-    DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
-                       args::Tuple = (), kwargs::NamedTuple = (;),
-                       alg::AbstractDistanceAlgorithm = SimpleDistance())
+```julia
+DistanceDistance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
+                 kwargs::NamedTuple = (;),
+                 alg::AbstractDistanceAlgorithm = SimpleDistance())
+```
 
 Keyword arguments correspond to the fields above.
 

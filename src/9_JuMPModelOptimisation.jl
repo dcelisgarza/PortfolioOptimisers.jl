@@ -38,9 +38,11 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
 
 # Constructor
 
-    Solver(; name::Union{Symbol, <:AbstractString} = "", solver = nothing,
-             settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}} = nothing,
-             check_sol::NamedTuple = (;), add_bridges::Bool = true)
+```julia
+Solver(; name::Union{Symbol, <:AbstractString} = "", solver = nothing,
+       settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}} = nothing,
+       check_sol::NamedTuple = (;), add_bridges::Bool = true)
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -98,7 +100,9 @@ The `JuMPResult` struct records the outcome of a JuMP optimisation, including tr
 
 # Constructor
 
-    JuMPResult(; trials::AbstractDict, success::Bool)
+```julia
+JuMPResult(; trials::AbstractDict, success::Bool)
+```
 
 Keyword arguments correspond to the fields above.
 

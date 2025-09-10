@@ -118,7 +118,9 @@ Regression target type for standard linear models in PortfolioOptimisers.jl.
 
 # Constructor
 
-    LinearModel(; kwargs::NamedTuple = (;))
+```julia
+LinearModel(; kwargs::NamedTuple = (;))
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -189,7 +191,9 @@ Regression target type for generalised linear models (GLMs) in PortfolioOptimise
 
 # Constructor
 
-    GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
+```julia
+GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -438,8 +442,10 @@ Container type for regression results in PortfolioOptimisers.jl.
 
 # Constructor
 
-    Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
-                 b::Union{Nothing, <:AbstractVector} = nothing)
+```julia
+Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
+           b::Union{Nothing, <:AbstractVector} = nothing)
+```
 
 Keyword arguments correspond to the fields above.
 

@@ -31,10 +31,11 @@ where ``_{g}\\tilde{d}`` is the general distance of distances, ``_{g}\\bm{D}_{i}
 
 # Constructor
 
-    GeneralDistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
-                             args::Tuple = (), kwargs::NamedTuple = (;),
-                             power::Integer = 1,
-                             alg::AbstractDistanceAlgorithm = SimpleDistance())
+```julia
+GeneralDistanceDistance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
+                        kwargs::NamedTuple = (;), power::Integer = 1,
+                        alg::AbstractDistanceAlgorithm = SimpleDistance())
+```
 
 Keyword arguments correspond to the fields above.
 

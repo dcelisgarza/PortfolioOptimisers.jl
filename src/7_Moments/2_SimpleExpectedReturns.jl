@@ -15,7 +15,9 @@ A simple expected returns estimator for PortfolioOptimisers.jl, representing the
 
 # Constructor
 
-    SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
+```julia
+SimpleExpectedReturns(; w::Union{Nothing, <:AbstractWeights} = nothing)
+```
 
 Keyword arguments correspond to the fields above.
 

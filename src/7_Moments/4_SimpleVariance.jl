@@ -17,9 +17,11 @@ A flexible variance estimator for PortfolioOptimisers.jl supporting optional exp
 
 # Constructor
 
-    SimpleVariance(; me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                     w::Union{Nothing, <:AbstractWeights} = nothing,
-                     corrected::Bool = true)
+```julia
+SimpleVariance(;
+               me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
+               w::Union{Nothing, <:AbstractWeights} = nothing, corrected::Bool = true)
+```
 
 Keyword arguments correspond to the fields above.
 

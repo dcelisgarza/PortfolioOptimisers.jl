@@ -97,7 +97,9 @@ This struct represents an estimator for Ordered Weights Array (OWA) weights base
 
 # Constructor
 
-    NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
+```julia
+NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -152,9 +154,11 @@ Estimator type for OWA weights using JuMP-based optimization.
 
 # Constructor
 
-    OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
-             max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
-             alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+```julia
+OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(), max_phi::Real = 0.5,
+        sc::Real = 1.0, so::Real = 1.0,
+        alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+```
 
 Keyword arguments correspond to the fields above.
 

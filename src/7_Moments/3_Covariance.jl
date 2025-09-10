@@ -14,9 +14,12 @@ A flexible covariance estimator for PortfolioOptimisers.jl supporting arbitrary 
 
 # Constructor
 
-    GeneralWeightedCovariance(; ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
-                                                                                                 corrected = true),
-                                w::Union{Nothing, <:AbstractWeights} = nothing)
+```julia
+GeneralWeightedCovariance(;
+                          ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
+                                                                                         corrected = true),
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -160,9 +163,11 @@ A flexible container type for configuring and applying joint expected returns an
 
 # Constructor
 
-    Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                 ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance(),
-                 alg::AbstractMomentAlgorithm = Full())
+```julia
+Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+           ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance(),
+           alg::AbstractMomentAlgorithm = Full())
+```
 
 Keyword arguments correspond to the fields above.
 

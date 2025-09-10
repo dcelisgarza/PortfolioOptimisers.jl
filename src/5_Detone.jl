@@ -28,7 +28,9 @@ A concrete detoning estimator for removing the top `n` principal components (mar
 
 # Constructor
 
-    Detone(; n::Integer = 1)
+```julia
+Detone(; n::Integer = 1)
+```
 
 Keyword arguments correspond to the fields above.
 

@@ -17,9 +17,11 @@ Node type for representing clusters in a hierarchical clustering tree.
 
 # Constructor
 
-    ClusterNode(id, left::Union{Nothing, <:ClusterNode} = nothing,
-                right::Union{Nothing, <:ClusterNode} = nothing,
-                height::Real = 0.0, level::Int = 1)
+```julia
+ClusterNode(id; left::Union{Nothing, <:ClusterNode} = nothing,
+            right::Union{Nothing, <:ClusterNode} = nothing, height::Real = 0.0,
+            level::Int = 1)
+```
 
 Creates a new `ClusterNode` with the specified properties. If `left` is `nothing`, the node is a leaf and `level` is set to the provided value; otherwise, `level` is computed as the sum of the levels of the left and right children.
 

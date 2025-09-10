@@ -114,7 +114,9 @@ Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
 # Constructor
 
-    JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
+```julia
+JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -157,7 +159,9 @@ Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
 # Constructor
 
-    BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
+```julia
+BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -200,7 +204,9 @@ Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expecte
 
 # Constructor
 
-    BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
+```julia
+BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -247,9 +253,11 @@ Container type for shrinkage-based expected returns estimators.
 
 # Constructor
 
-    ShrunkExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                            ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                            alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
+```julia
+ShrunkExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                      ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                      alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
+```
 
 Keyword arguments correspond to the fields above.
 

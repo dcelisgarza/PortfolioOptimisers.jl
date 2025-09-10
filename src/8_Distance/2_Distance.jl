@@ -13,7 +13,9 @@ Distance estimator for portfolio optimization.
 
 # Constructor
 
-    Distance(; alg::AbstractDistanceAlgorithm = SimpleDistance())
+```julia
+Distance(; alg::AbstractDistanceAlgorithm = SimpleDistance())
+```
 
 Keyword arguments correspond to the fields above.
 
