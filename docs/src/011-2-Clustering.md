@@ -4,7 +4,6 @@
 HierarchicalClustering
 clusterise(cle::PortfolioOptimisers.AbstractClusteringResult, args...; kwargs...)
 SecondOrderDifference
-PredefinedNumberClusters
 StandardisedSilhouetteScore
 OptimalNumberClusters
 HClustAlgorithm

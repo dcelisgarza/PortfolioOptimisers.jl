@@ -971,8 +971,11 @@ Compute the adjacency matrix for a network estimator.
 
 # Arguments
 
-  - `ne::Network{<:Any, <:Any, <:AbstractTreeType, <:Any}`: Constructs a weighted graph from the distance matrix and computes the minimum spanning tree, returning the adjacency matrix of the resulting graph.
-  - `ne::Network{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: Computes the similarity and distance matrices, applies the [`PMFG_T2s`](@ref) algorithm, and returns the adjacency matrix of the resulting graph..
+  - `ne`: Network estimator.
+
+      + `ne::Network{<:Any, <:Any, <:AbstractTreeType, <:Any}`: Constructs a weighted graph from the distance matrix and computes the minimum spanning tree, returning the adjacency matrix of the resulting graph.
+      + `ne::Network{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: Computes the similarity and distance matrices, applies the [`PMFG_T2s`](@ref) algorithm, and returns the adjacency matrix of the resulting graph..
+
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute (default: `1`).
   - `kwargs...`: Additional keyword arguments.

@@ -92,7 +92,7 @@ Result type for hierarchical clustering in PortfolioOptimisers.jl.
 
 # Fields
 
-  - `clustering`: The hierarchical clustering object (e.g., `Clustering.Hclust`).
+  - `clustering`: The hierarchical clustering object.
   - `S`: Similarity matrix used for clustering.
   - `D`: Distance matrix used for clustering.
   - `k`: Number of clusters.
@@ -130,6 +130,7 @@ function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatr
               AssertionError("The following conditions must hold:\n`S` must be non-empty => $(!isempty(S))\n`D` must be non-empty => $(!isempty(D))\n`S` and `D` must have the same size => $(size(S) == size(D))\nk must be greater than or equal to 1 => $k"))
     return HierarchicalClustering(clustering, S, D, k)
 end
+
 """
 ```julia
 clusterise(cle::AbstractClusteringResult, args...; kwargs...)
@@ -142,7 +143,8 @@ This function provides a generic interface for extracting or processing clusteri
 # Arguments
 
   - `cle::AbstractClusteringResult`: The clustering result object.
-  - `args...; kwargs...`: Additional arguments (ignored by default).
+  - `args...`: Additional positional arguments, ignored.
+  - `kwargs...`: Additional keyword arguments, ignored.
 
 # Returns
 
@@ -155,6 +157,7 @@ This function provides a generic interface for extracting or processing clusteri
 function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
     return cle
 end
+
 """
 ```julia
 struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
@@ -173,54 +176,6 @@ struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
 
 """
 ```julia
-struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm
-    k::T1
-end
-```
-
-Algorithm type for specifying a fixed, user-defined number of clusters.
-
-`PredefinedNumberClusters` allows the user to set the number of clusters directly, bypassing any automatic selection algorithm. This is useful when the desired number of clusters is known in advance or dictated by external requirements.
-
-# Fields
-
-  - `k`: The fixed number of clusters.
-
-# Constructor
-
-```julia
-PredefinedNumberClusters(; k::Integer = 1)
-```
-
-Keyword arguments correspond to the fields above.
-
-## Validation
-
-  - `k >= 1`.
-
-# Examples
-
-```jldoctest
-julia> PredefinedNumberClusters(; k = 3)
-PredefinedNumberClusters
-  k | Int64: 3
-```
-
-# Related
-
-  - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
-  - [`OptimalNumberClusters`](@ref)
-"""
-struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm
-    k::T1
-end
-function PredefinedNumberClusters(; k::Integer = 1)
-    @argcheck(k >= one(k), DomainError("`k` must be greater than or equal to 1:\nk => $k"))
-    return PredefinedNumberClusters(k)
-end
-
-"""
-```julia
 struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
     metric::T1
 end
@@ -232,12 +187,12 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 
 # Fields
 
-  - `metric`: The distance metric used for silhouette calculation (e.g., from `Distances.jl`), or `nothing` for the default.
+  - `metric`: The distance metric used for silhouette calculation from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), or `nothing` for the default.
 
 # Constructor
 
 ```julia
-PredefinedNumberClusters(; k::Integer = 1)
+StandardisedSilhouetteScore(; metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
 ```
 
 Keyword arguments correspond to the fields above.
@@ -253,6 +208,7 @@ StandardisedSilhouetteScore
 
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
   - [`OptimalNumberClusters`](@ref)
+  - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 ```
 """
 struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
@@ -277,14 +233,14 @@ Estimator type for selecting the optimal number of clusters in PortfolioOptimise
 
 # Fields
 
-  - `max_k`: Maximum number of clusters to consider (can be `nothing` for no limit).
-  - `alg`: Algorithm for selecting the optimal number of clusters (e.g., [`SecondOrderDifference`](@ref), [`StandardisedSilhouetteScore`](@ref), [`PredefinedNumberClusters`](@ref)).
+  - `max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `sqrt(N)`, where `N` is the number of assets.
+  - `alg`: Algorithm for selecting the optimal number of clusters. If an integer, defines the number of clusters directly.
 
 # Constructor
 
 ```julia
 OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
-                      alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
+                      alg::Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
 ```
 
 Keyword arguments correspond to the fields above.
@@ -292,6 +248,7 @@ Keyword arguments correspond to the fields above.
 ## Validation
 
   - `max_k >= 1`.
+  - If `alg` is an integer, `alg >= 1`.
 
 # Examples
 
@@ -312,10 +269,15 @@ struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
     alg::T2
 end
 function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
-                               alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
+                               alg::Union{<:Integer,
+                                          <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
     if !isnothing(max_k)
         @argcheck(max_k >= one(max_k),
                   DomainError("`max_k` must be greater than or equal to 1:\nmax_k => $max_k"))
+    end
+    if isa(alg, Integer)
+        @argcheck(alg >= one(alg),
+                  DomainError("`alg` must be greater than or equal to 1:\nalg => $alg"))
     end
     return OptimalNumberClusters(max_k, alg)
 end
@@ -444,6 +406,6 @@ function ClusteringEstimator(;
     return ClusteringEstimator(ce, de, alg, onc)
 end
 
-export HierarchicalClustering, clusterise, SecondOrderDifference, PredefinedNumberClusters,
+export HierarchicalClustering, clusterise, SecondOrderDifference,
        StandardisedSilhouetteScore, OptimalNumberClusters, HClustAlgorithm,
        ClusteringEstimator

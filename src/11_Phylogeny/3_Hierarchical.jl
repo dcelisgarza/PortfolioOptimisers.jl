@@ -29,7 +29,7 @@ ClusterNode(id; left::Union{Nothing, <:ClusterNode} = nothing,
             level::Int = 1)
 ```
 
-Creates a new `ClusterNode` with the specified properties. If `left` is `nothing`, the node is a leaf and `level` is set to the provided value; otherwise, `level` is computed as the sum of the levels of the left and right children.
+Positional and keyword arguments correspond to the fields above. The `level` is automatically computed based on the levels of child nodes if they exist.
 
 # Examples
 
@@ -119,7 +119,7 @@ abstract type AbstractPreorderBy <: AbstractAlgorithm end
 struct PreorderTreeByID <: AbstractPreorderBy end
 ```
 
-Preorder traversal strategy that visits nodes by their identifier.
+Preorder traversal strategy that visits nodes by their ID.
 
 `PreorderTreeByID` is used to specify that preorder traversal should be performed using the node's `id` property.
 
@@ -168,7 +168,7 @@ Returns a vector of node properties (by default, node IDs) in preorder (root, le
 # Arguments
 
   - `a`: The root node of the tree.
-  - `preorder_by`: Traversal strategy (default: `PreorderTreeByID()`).
+  - `preorder_by`: Traversal strategy.
 
 # Returns
 
@@ -220,7 +220,7 @@ to_tree(a::Hclust)
 
 Convert a hierarchical clustering result to a tree of `ClusterNode` objects.
 
-This function takes a hierarchical clustering object (from `Clustering.jl`) and constructs a tree representation using `ClusterNode` nodes. It returns the root node and a vector of all nodes in the tree.
+This function takes a hierarchical clustering object from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html) and constructs a tree representation using `ClusterNode` nodes. It returns the root node and a vector of all nodes in the tree.
 
 # Arguments
 
@@ -263,7 +263,7 @@ clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
            kwargs...)
 ```
 
-Run hierarchical clustering and return the result as a `HierarchicalClustering` object.
+Run hierarchical clustering and return the result as a [`HierarchicalClustering`](@ref) object.
 
 This function applies the specified clustering estimator to the input data matrix, computes the similarity and distance matrices, performs hierarchical clustering, and selects the optimal number of clusters. The result is returned as a `HierarchicalClustering` object.
 
@@ -271,13 +271,13 @@ This function applies the specified clustering estimator to the input data matri
 
   - `cle`: Clustering estimator.
   - `X`: Data matrix (observations × assets).
-  - `branchorder`: Branch ordering strategy for hierarchical clustering (default: `:optimal`).
-  - `dims`: Dimension along which to cluster (default: `1`).
+  - `branchorder`: Branch ordering strategy for hierarchical clustering.
+  - `dims`: Dimension along which to cluster.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `HierarchicalClustering`: Result object containing clustering, similarity, distance matrices, and number of clusters.
+  - `res::HierarchicalClustering`: Result object containing clustering, similarity, distance matrices, and number of clusters.
 
 # Related
 
@@ -310,7 +310,7 @@ This function checks if the clustering assignment for `k` clusters is compatible
 
 # Returns
 
-  - `Bool`: `true` if `k` is a valid number of clusters, `false` otherwise.
+  - `flag::Bool`: `true` if `k` is a valid number of clusters, `false` otherwise.
 
 # Related
 
@@ -350,7 +350,7 @@ valid_k_clusters(clustering::Hclust, arr::AbstractVector)
 
 Find a valid number of clusters for a hierarchical clustering tree given a scoring array.
 
-This function iteratively searches for a valid `k` (number of clusters) by checking the scoring array (e.g., silhouette scores, second-order differences) and validating each candidate using [`validate_k_value`](@ref). Returns the first valid `k` found, or `1` if none are valid.
+This function iteratively searches for a valid `k` (number of clusters) by checking the scoring array and validating each candidate using [`validate_k_value`](@ref). Returns the first valid `k` found, or `1` if none are valid.
 
 # Arguments
 
@@ -359,7 +359,7 @@ This function iteratively searches for a valid `k` (number of clusters) by check
 
 # Returns
 
-  - `Integer`: Valid number of clusters.
+  - `k::Integer`: Valid number of clusters.
 
 # Related
 
@@ -383,8 +383,8 @@ end
 
 """
 ```julia
-optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:PredefinedNumberClusters},
-                        clustering::Hclust, args...)
+optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer}, clustering::Hclust,
+                        args...)
 optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
                         clustering::Hclust, dist::AbstractMatrix)
 optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:StandardisedSilhouetteScore},
@@ -393,13 +393,16 @@ optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:StandardisedSilhouet
 
 Select the optimal number of clusters for a hierarchical clustering tree.
 
-This function applies the specified optimal number of clusters estimator (`onc`) to a hierarchical clustering result and distance matrix, using the configured algorithm (e.g., [`SecondOrderDifference`](@ref), [`StandardisedSilhouetteScore`](@ref), [`PredefinedNumberClusters`](@ref)). The selection is based on cluster validity and scoring metrics.
+This function applies the specified optimal number of clusters estimator (`onc`) to a hierarchical clustering result and distance matrix, using the configured algorithm (e.g., [`SecondOrderDifference`](@ref), [`StandardisedSilhouetteScore`](@ref), or given directly). The selection is based on cluster validity and scoring metrics.
 
 # Arguments
 
-  - `onc::OptimalNumberClusters{<:Any, <:PredefinedNumberClusters}`: Uses a user-specified fixed number of clusters (`k`). If `k` is not valid, searches above and below for the nearest valid cluster count.
-  - `onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference}`: Computes the second-order difference of a clustering evaluation metric for each possible cluster count, and selects the first valid `k` that maximises the difference.
-  - `onc::OptimalNumberClusters{<:Any, <:StandardisedSilhouetteScore}`: Computes the standardised silhouette score for each possible cluster count, and selects the first valid `k` that maximises the score.
+  - `onc`: Optimal number of clusters estimator.
+
+      + `onc::OptimalNumberClusters{<:Any, <:Integer}`: Uses a user-specified fixed number of clusters `k` directly. If `k` is not valid, searches above and below for the nearest valid cluster count.
+      + `onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference}`: Computes the second-order difference of a clustering evaluation metric for each possible cluster count, and selects the first valid `k` that maximises the difference.
+      + `onc::OptimalNumberClusters{<:Any, <:StandardisedSilhouetteScore}`: Computes the standardised silhouette score for each possible cluster count, and selects the first valid `k` that maximises the score.
+
   - `clustering`: Hierarchical clustering object.
   - `dist`: Distance matrix used for clustering.
 
@@ -413,10 +416,9 @@ This function applies the specified optimal number of clusters estimator (`onc`)
   - [`valid_k_clusters`](@ref)
   - [`validate_k_value`](@ref)
 """
-function optimal_number_clusters(onc::OptimalNumberClusters{<:Any,
-                                                            <:PredefinedNumberClusters},
+function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
                                  clustering::Hclust, args...)
-    k = onc.alg.k
+    k = onc.alg
     max_k = onc.max_k
     N = length(clustering.order)
     if isnothing(max_k)

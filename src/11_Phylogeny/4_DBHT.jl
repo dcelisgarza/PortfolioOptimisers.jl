@@ -1,27 +1,165 @@
 """
 ```julia
-abstract type DBHTRootMethod end
+abstract type DBHTRootMethod <: AbstractAlgorithm end
 ```
+
+Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection methods in PortfolioOptimisers.jl.
+
+# Related
+
+  - [`UniqueRoot`](@ref)
+  - [`EqualRoot`](@ref)
+  - [`DBHT`](@ref)
 """
 abstract type DBHTRootMethod <: AbstractAlgorithm end
+
 """
 ```julia
 struct UniqueRoot <: DBHTRootMethod end
 ```
+
+A DBHT root selection method that enforces a unique root in the hierarchy.
+
+# Related
+
+  - [`DBHTRootMethod`](@ref)
+  - [`EqualRoot`](@ref)
+  - [`DBHT`](@ref)
 """
 struct UniqueRoot <: DBHTRootMethod end
+
 """
 ```julia
 struct EqualRoot <: DBHTRootMethod end
 ```
+
+A DBHT root selection method that creates a root from the adjacency tree of all root candidates. This can be used to represent multiple equally plausible roots in the DBHT hierarchy.
+
+# Related
+
+  - [`DBHTRootMethod`](@ref)
+  - [`UniqueRoot`](@ref)
+  - [`DBHT`](@ref)
 """
 struct EqualRoot <: DBHTRootMethod end
 
 """
+```julia
+abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
+```
+
+Abstract supertype for all similarity matrix algorithms used in the creation of Planar Maximally Filtered Graph (PMFG) used in [`DBHT`](@ref) and [`LoGo`](@ref) methods.
+
+# Related
+
+  - [`MaximumDistanceSimilarity`](@ref)
+  - [`ExponentialSimilarity`](@ref)
+  - [`GeneralExponentialSimilarity`](@ref)
+  - [`DBHT`](@ref)
+  - [`LoGo`](@ref)
 """
 abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
+
+"""
+```julia
 struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
+```
+
+Similarity matrix algorithm using the maximum distance transformation.
+
+```math
+\\begin{align}
+S_{i,\\,j} &= \\left\\lceil\\max(\\mathbf{D})^2\\right\\rceil - D_{i,\\,j}^2\\,,
+\\end{align}
+```
+
+where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscript denotes an asset.
+
+# Related
+
+  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`ExponentialSimilarity`](@ref)
+  - [`GeneralExponentialSimilarity`](@ref)
+  - [`dbht_similarity`](@ref)
+"""
+struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
+
+"""
+```julia
 struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
+```
+
+Similarity matrix algorithm using the exponential transformation.
+
+```math
+\\begin{align}
+S_{i,\\,j} &= e^{-D_{i,\\,j}}\\,,
+\\end{align}
+```
+
+where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscript denotes an asset.
+
+# Related
+
+  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`MaximumDistanceSimilarity`](@ref)
+  - [`GeneralExponentialSimilarity`](@ref)
+  - [`dbht_similarity`](@ref)
+"""
+struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
+
+"""
+```julia
+struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
+    coef::T1
+    power::T2
+end
+```
+
+Similarity matrix algorithm using a generalised exponential transformation.
+
+```math
+\\begin{align}
+S_{i,\\,j} &= e^{-c \\cdot D_{i,\\,j}^p}\\,,
+\\end{align}
+```
+
+where `S` is the similarity, `\\mathbf{D}` the distance matrix, ``c`` a scale factor, ``p`` an exponent, and each subscript denotes an asset.
+
+# Fields
+
+  - `coef`: Non-negative scaling coefficient.
+  - `power`: Non-negative exponent applied to the distance matrix.
+
+# Constructor
+
+```julia
+GeneralExponentialSimilarity(; coef::Real = 1.0, power::Real = 1.0)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `coef >= 0`.
+  - `power >= 0`.
+
+# Examples
+
+```jldoctest
+julia> GeneralExponentialSimilarity()
+GeneralExponentialSimilarity
+   coef | Float64: 1.0
+  power | Float64: 1.0
+```
+
+# Related
+
+  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`MaximumDistanceSimilarity`](@ref)
+  - [`ExponentialSimilarity`](@ref)
+  - [`dbht_similarity`](@ref)
+"""
 struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
     coef::T1
     power::T2
@@ -31,6 +169,38 @@ function GeneralExponentialSimilarity(; coef::Real = 1.0, power::Real = 1.0)
               AssertionError("The following conditions must hold:\n`coef` must be non-negative: coef => $coef\n`power` must be non-negative: power => $power"))
     return GeneralExponentialSimilarity(coef, power)
 end
+
+"""
+```julia
+dbht_similarity(se::AbstractSimilarityMatrixAlgorithm; D::AbstractMatrix, kwargs...)
+```
+
+Compute a similarity matrix from a distance matrix using the specified similarity algorithm.
+
+This function dispatches on the type of `se` to apply the appropriate similarity transformation to the distance matrix `D`. Used internally by DBHT and related clustering algorithms.
+
+# Arguments
+
+  - `se`: Similarity matrix algorithm.
+
+      + `se::MaximumDistanceSimilarity`: Uses the maximum distance transformation.
+      + `se::ExponentialSimilarity`: Uses the exponential transformation.
+      + `se::GeneralExponentialSimilarity`: Uses a generalised exponential transformation.
+
+  - `D`: Distance matrix.
+  - `kwargs...`: Additional keyword arguments (not used).
+
+# Returns
+
+  - `S::Matrix{<:Real}`: Similarity matrix of the same size as `D`.
+
+# Related
+
+  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`MaximumDistanceSimilarity`](@ref)
+  - [`ExponentialSimilarity`](@ref)
+  - [`GeneralExponentialSimilarity`](@ref)
+"""
 function dbht_similarity(::MaximumDistanceSimilarity; D::AbstractMatrix, kwargs...)
     return ceil(maximum(D)^2) .- D .^ 2
 end
@@ -42,6 +212,53 @@ function dbht_similarity(se::GeneralExponentialSimilarity; D::AbstractMatrix, kw
     coef = se.coef
     return exp.(-coef * D .^ power)
 end
+
+"""
+```julia
+struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
+    sim::T1
+    root::T2
+end
+```
+
+Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
+
+`DBHT` is a composable clustering algorithm type for constructing hierarchical clusterings using the Direct Bubble Hierarchical Tree (DBHT) method, as described in [DBHTs](@cite).
+
+# Fields
+
+  - `sim`: Similarity matrix algorithm.
+  - `root`: Root selection method.
+
+# Constructor
+
+```julia
+DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+     root::DBHTRootMethod = UniqueRoot())
+```
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> DBHT()
+DBHT
+   sim | MaximumDistanceSimilarity()
+  root | UniqueRoot()
+```
+
+# Related
+
+  - [`AbstractClusteringAlgorithm`](@ref)
+  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`DBHTRootMethod`](@ref)
+  - [`MaximumDistanceSimilarity`](@ref)
+  - [`ExponentialSimilarity`](@ref)
+  - [`GeneralExponentialSimilarity`](@ref)
+  - [`UniqueRoot`](@ref)
+  - [`EqualRoot`](@ref)
+"""
 struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
     sim::T1
     root::T2
@@ -52,30 +269,50 @@ function DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilari
 end
 
 """
-```
-PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
+```julia
+PMFG_T2s(W::AbstractMatrix{<:Real}; nargout::Integer = 3)
 ```
 
-Constructs a Triangulated Maximally Filtered Graph (TMFG) starting from a tetrahedron and recursively inserting vertices inside existing triangles (T2 move) in order to approximate a Maximal Planar Graph with the largest total weight, aka Planar Maximally Filtered Graph (PMFG). All weights are non-negative [PMFG](@cite).
+Constructs a Triangulated Maximally Filtered Graph (TMFG) starting from a tetrahedron and recursively inserting vertices inside existing triangles (T2 move) in order to approximate a Maximal Planar Graph with the largest total weight, also known as the Planar Maximally Filtered Graph (PMFG). All weights must be non-negative.
+
+This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and LoGo algorithms, providing the planar graph structure and clique information required for hierarchical clustering and sparse inverse covariance estimation.
 
 # Arguments
 
-  - `W`: `N×N` matrix of non-negative weights.
-  - `nargout`: number of output arguments, the same arguments are always returne, this only controls whether some arguments are empty or not.
+  - `W`: `N×N` matrix of non-negative weights (e.g., similarity or correlation matrix).
+  - `nargout`: Number of output arguments. All outputs are always computed, but if `nargout <= 3`, `cliques` and `cliqueTree` are returned as `nothing`.
 
-# Outputs
+# Validation
 
-  - `A`: adjacency matrix of the PMFG with weights.
-  - `tri`: list of triangles (triangular faces).
-  - `clique3`: list of 3-cliques taht are not triangular faces, all 3-cliques are given by `[tri; clique3]`.
-  - `cliques`: list of all 4-cliques, if `nargout <= 3`, this will be returned as an empty array.
-  - `cliqueTree`: 4-cliques tree structure (adjacency matrix), if `nargout <= 4`, it is returned as an empty array.
+  - `N >= 9` is required for a meaningful PMFG.
+  - All entries in `W` must be non-negative.
+
+# Details
+
+  - The algorithm starts by selecting the four vertices with the largest strength to form an initial tetrahedron.
+  - Vertices are recursively inserted into existing triangles to maximize the total weight, following the T2 move.
+  - The resulting graph is planar and maximally filtered, preserving the most relevant connections for hierarchical clustering.
+  - The function also identifies all 3-cliques and, optionally, all 4-cliques and their adjacency structure.
+
+# Returns
+
+  - `A::SparseMatrixCSC{<:Real, Int}`: Adjacency matrix of the PMFG with weights.
+  - `tri::Matrix{Int}`: List of triangles (triangular faces) in the PMFG.
+  - `clique3::Matrix{Int}`: List of 3-cliques that are not triangular faces; all 3-cliques are given by `[tri; clique3]`.
+  - `cliques::Union{Nothing, Matrix{Int}}`: List of all 4-cliques (tetrahedra), or `nothing` if `nargout <= 3`.
+  - `cliqueTree::Union{Nothing, SparseMatrixCSC{Int, Int}}`: 4-cliques tree structure (adjacency matrix), or `nothing` if `nargout <= 4`.
+
+# Related
+
+  - [`CliqHierarchyTree2s`](@ref)
+  - [`DBHT`](@ref)
+  - [`LoGo`](@ref)
 """
 function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
     N = size(W, 1)
     @argcheck(N >= 9 && all(x -> x >= zero(x), W),
               AssertionError("The following conditions must hold:\nN >= 9 => N = $N\nAll entries in `W` must be non-negative"))
-    A = spzeros(N, N)  # Initialize adjacency matrix
+    A = spzeros(Int, N, N)  # Initialize adjacency matrix
     in_v = zeros(Int, N)    # Initialize list of inserted vertices
     tri = zeros(Int, 2 * N - 4, 3)  # Initialize list of triangles
     clique3 = zeros(Int, N - 4, 3)   # Initialize list of 3-cliques (non-face triangles)
@@ -149,13 +386,14 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
 
     A = sparse(W ⊙ ((A + A') .== 1))
 
-    cliques = if nargout > 3
-        vcat(transpose(in_v[1:4]), hcat(clique3, in_v[5:end]))
-    else
-        Matrix{Int}(undef, 0, 0)
+    cliques = nothing
+    cliqueTree = nothing
+
+    if nargout > 3
+        cliques = vcat(transpose(in_v[1:4]), hcat(clique3, in_v[5:end]))
     end
 
-    cliqueTree = if nargout > 4
+    if nargout > 4
         M = size(cliques, 1)
         cliqueTree = spzeros(Int, M, M)
         ss = zeros(Int, M)
@@ -166,45 +404,51 @@ function PMFG_T2s(W::AbstractMatrix{<:Real}, nargout::Integer = 3)
             end
             cliqueTree[i, ss .== 2] .= 1
         end
-        cliqueTree
-    else
-        Matrix{Int}(undef, 0, 0)
     end
 
     return A, tri, clique3, cliques, cliqueTree
 end
 
 """
-```
+```julia
 distance_wei(L::AbstractMatrix{<:Real})
 ```
 
-The distance matrix contains lengths of shortest paths between all node pairs. An entry `[u, v]` represents the length of the shortest path from node `u` to node `v`. The average shortest path length is the characteristic path length of the network. The function uses Dijkstra's algorithm.
+Compute the shortest weighted path lengths between all node pairs in a network.
+
+This function computes the distance matrix containing the lengths of the shortest paths between all node pairs in a (possibly weighted) network, using Dijkstra's algorithm. An entry `[u, v]` represents the length of the shortest path from node `u` to node `v`. The average shortest path length is the characteristic path length of the network.
 
 # Inputs
 
-  - `L`: Directed/undirected connection-length matrix.
+  - `L`: Directed or undirected connection-length matrix.
 
-      + Lengths between disconnected nodes are set to `Inf`.
-      + Lengths on the main diagonal are set to `0`.
-
-!!! note
-
-    The input matrix must be a connection-length matrix typically obtained via a mapping from weight to length. For instance, in a weighted correlation network, higher correlations are more naturally interpreted as shorter distances, and the input matrix should therefore be some inverse of the connectivity matrix, i.e. a distance matrix.
-
-    The number of edges in the shortest weighted path may in general exceed the number of edges in the shortest binary paths (i.e. the shortest weighted paths computed on the binarised connectivity matrix), because the shortest weighted paths have the minimal weighted distance, not necessarily the minimal number of edges.
-
-# Outputs
-
-  - `D`: distance (shortest weighted path) matrix.
-  - `B`: number of edged in the shortest weigthed path matrix.
+      + Lengths between disconnected nodes should be set to `Inf`.
+      + Lengths on the main diagonal should be set to `0`.
 
 !!! note
 
-    Based on a Matlab implementation by:
+    The input matrix must be a connection-length matrix, typically obtained by mapping weights to lengths (e.g., inverse of a similarity or correlation matrix). In weighted networks, shortest weighted paths may traverse more edges than shortest binary paths.
 
-      - Mika Rubinov, UNSW/U Cambridge, 2007-2012.
-      - Rick Betzel and Andrea Avena, IU, 2012
+# Details
+
+  - For each node, the function computes the shortest path to all other nodes using Dijkstra's algorithm.
+  - The output `D` contains the minimal total length for each node pair, and `B` contains the number of edges in the corresponding shortest path.
+  - Used internally for PMFG and DBHT clustering to compute geodesic distances on the graph.
+
+# Returns
+
+  - `D::Matrix{<:Real}`: Distance (shortest weighted path) matrix.
+  - `B::Matrix{Int}`: Number of edges in the shortest weighted path matrix.
+
+!!! note
+
+    Based on a Matlab implementation by Mika Rubinov, Rick Betzel, and Andrea Avena.
+
+# Related
+
+  - [`PMFG_T2s`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
+  - [`DBHT`](@ref)
 """
 function distance_wei(L::AbstractMatrix{<:Real})
     N = size(L, 1)
@@ -247,21 +491,35 @@ function distance_wei(L::AbstractMatrix{<:Real})
 end
 
 """
-```
+```julia
 clique3(A::AbstractMatrix{<:Real})
 ```
 
-Computes the list of 3-cliques.
+Computes the list of 3-cliques in a Maximal Planar Graph (MPG).
+
+This function identifies all 3-cliques (triangles) in the adjacency matrix `A` of a MPG. It returns the candidate cliques, their edge indices, and a matrix listing all unique 3-cliques. Used internally in DBHT and related phylogenetic clustering algorithms.
 
 # Inputs
 
   - `A`: `N×N` adjacency matrix of a Maximal Planar Graph (MPG).
 
-# Outputs
+# Details
 
-  - `K3`: vector of vectors with the corresponding indices of candidate cliques.
-  - `E`: matrix with non-zero indices and entries of candidate cliques.
-  - `CliqList`: `Nc×3` matrix. Each row vector lists the three vertices consisting of a 3-clique in the MPG.
+  - The function searches for all triangles (3-cliques) by examining pairs of connected nodes and their shared neighbors.
+  - Duplicates are removed and the resulting list is sorted for consistency.
+  - The output `clique` matrix is used as the basis for further hierarchical and bubble structure construction in DBHT.
+
+# Returns
+
+  - `K3::Vector{Vector{Int}}`: Vector of vectors, each containing the indices of nodes forming a candidate 3-clique.
+  - `E::Matrix{Int}`: Matrix with nonzero indices and entries of candidate cliques (edge pairs).
+  - `clique::Matrix{Int}`: `Nc×3` matrix. Each row lists the three vertices of a unique 3-clique in the MPG.
+
+# Related
+
+  - [`CliqHierarchyTree2s`](@ref)
+  - [`BubbleHierarchy`](@ref)
+  - [`DBHT`](@ref)
 """
 function clique3(A::AbstractMatrix{<:Real})
     A = A - Diagonal(A)
@@ -297,11 +555,9 @@ function clique3(A::AbstractMatrix{<:Real})
             check = a ⊙ b ⊙ c
             check = sum(check)
 
-            if check == 0
+            if iszero(check)
                 clique = vcat(clique, candidate)
             end
-
-            candidate, check, a, b, c = nothing, nothing, nothing, nothing, nothing
         end
     end
 
@@ -313,28 +569,47 @@ function clique3(A::AbstractMatrix{<:Real})
 end
 
 """
-```
+```julia
 breadth(CIJ::AbstractMatrix{<:Real}, source::Integer)
 ```
 
 Breadth-first search.
 
+This function performs a breadth-first search (BFS) on a binary (directed or undirected) connection matrix, starting from a specified source vertex. It computes the shortest path distances from the source to all other vertices and records the predecessor (branch) for each node in the BFS tree.
+
 # Inputs
 
-  - `CIJ`: binary (directed/undirected) connection matrix.
-  - `source`: source vertex.
+  - `CIJ`: Binary (0/1) connection matrix representing the graph.
+  - `source`: Index of the source vertex from which to start the search.
 
-# Outputs
+# Returns
 
-  - `distance`: distance between `source` and i'th vertex (0 for source vertex).
-  - `branch`: vertex that precedes i in the breadth-first search tree (-1 for source vertex).
+  - `distance::Vector{<:Real}`: Vector of shortest path distances from the source to each vertex (`0` for the source itself, `Inf` for unreachable nodes).
+  - `branch::Vector{Int}`: Vector of predecessor indices for each vertex in the BFS tree (`-1` for the source).
 
-!!! note
+# Details
 
-    Breadth-first search tree does not contain all paths (or all shortest paths), but allows the determination of at least one path with minimum distace. The entire graph is explored, starting from source vertex `source`.    # Colours
+  - The function explores the entire graph, layer by layer, starting from the source vertex.
+  - For each node, it records the minimum number of steps required to reach it from the source.
+  - The `branch` vector allows reconstruction of the BFS tree.
+  - Used internally for component analysis and separating set identification in DBHT and related algorithms.
 
-    Original written by:
-    Olaf Sporns, Indiana University, 2002/2007/2008
+# Examples
+
+```jldoctest
+julia> distance, branch = breadth(CIJ, 1)
+using PortfolioOptimisers
+```
+
+# Notes
+
+  - The BFS tree does not contain all paths (or all shortest paths), but allows the determination of at least one path with minimum distance.
+  - Original implementation by Olaf Sporns, Indiana University, 2002/2007/2008.
+
+# Related
+
+  - [`FindDisjoint`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
 """
 function breadth(CIJ::AbstractMatrix{<:Real}, source::Integer)
     N = size(CIJ, 1)
@@ -377,21 +652,40 @@ function breadth(CIJ::AbstractMatrix{<:Real}, source::Integer)
 end
 
 """
-```
+```julia
 FindDisjoint(Adj::AbstractMatrix{<:Real}, Cliq::AbstractVector{<:Real})
 ```
 
-Finds disjointed cliques in adjacency matrix.
+Finds disjointed cliques in an adjacency matrix.
 
-# Inputs
+This function identifies nodes that are not adjacent to a given 3-clique in the adjacency matrix, and classifies all nodes into three groups: members of the clique, nodes in the same connected component as the clique, and nodes in a disjoint component.
+
+# Arguments
 
   - `Adj`: `N×N` adjacency matrix.
-  - `Cliq`: `3×1` vector of 3-cliques.
+  - `Cliq`: `3×1` vector of node indices forming a 3-clique.
 
-# Outputs
+# Details
 
-  - `T`: `N×1` vector containing the adjacency number of each node.
-  - `IndxNot`: `N×1` vector of nodes with no adjacencies.
+  - The function removes the clique nodes from the adjacency matrix and performs a breadth-first search to classify the remaining nodes.
+  - Nodes unreachable from the first non-clique node are marked as disjoint.
+  - Used internally by DBHT routines to determine separating sets and clique membership.
+
+# Returns
+
+  - `T::Vector{Int}`: `N×1` vector containing the adjacency number of each node:
+
+      + `0` for nodes in the clique,
+      + `1` for nodes in a disjoint component,
+      + `2` for nodes in the same component as the clique.
+
+  - `IndxNot::Vector{Int}`: `N×1` vector of nodes with no adjacencies to the clique.
+
+# Related
+
+  - [`breadth`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
+  - [`BubbleHierarchy`](@ref)
 """
 function FindDisjoint(Adj::AbstractMatrix{<:Real}, Cliq::AbstractVector{<:Real})
     N = size(Adj, 1)
@@ -416,19 +710,34 @@ function FindDisjoint(Adj::AbstractMatrix{<:Real}, Cliq::AbstractVector{<:Real})
 end
 
 """
-```
+```julia
 BuildHierarchy(M::AbstractMatrix{<:Real})
 ```
 
-Builds the predicted hierarchy.
+Builds the predicted parent hierarchy for 3-cliques in a Maximal Planar Graph (MPG).
 
-# Inputs
+This function constructs the parent index vector (`Pred`) for each 3-clique, given the node-to-clique membership matrix `M`. It is a core step in the DBHT (Direct Bubble Hierarchical Tree) clustering pipeline, enabling the construction of the clique hierarchy tree.
 
-  - `M`: `N×Nc` matrix of nodes and 3-cliques.
+# Arguments
 
-# Outputs
+  - `M`: `N×Nc` binary matrix of node-to-3-clique memberships, where `M[i, n] = 1` if node `i` belongs to 3-clique `n`.
 
-  - `Pred`: `Nc×1` vector of predicted hierarchies.
+# Details
+
+  - For each 3-clique, the function identifies its parent clique as the smallest superset among all cliques containing its nodes.
+  - If multiple parent candidates exist, the one with the smallest overlap is chosen.
+  - Root cliques (with no parent) are assigned a parent index of `0`.
+  - Used internally by [`CliqHierarchyTree2s`](@ref) and DBHT clustering routines.
+
+# Returns
+
+  - `Pred::Vector{Int}`: `Nc×1` vector of predicted parent indices for each 3-clique. `Pred[n] = 0` indicates a root clique.
+
+# Related
+
+  - [`CliqHierarchyTree2s`](@ref)
+  - [`BubbleHierarchy`](@ref)
+  - [`DBHT`](@ref)
 """
 function BuildHierarchy(M::AbstractMatrix{<:Real})
     N = size(M, 2)
@@ -451,28 +760,42 @@ function BuildHierarchy(M::AbstractMatrix{<:Real})
 end
 
 """
-```
+```julia
 AdjCliq(A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real},
         CliqRoot::AbstractVector{<:Real})
 ```
 
-Find adjacent clique to the root candidates.
+Find adjacent cliques to the root candidates in a Maximal Planar Graph (MPG).
 
-# Inputs
+This function computes the adjacency matrix among root candidate 3-cliques, identifying which root cliques are adjacent (i.e., share two vertices) in the graph. Used internally by [`CliqueRoot`](@ref) with [`EqualRoot`](@ref) to construct a root from the adjacency tree of all root candidates.
 
-  - `A`: `N×N` adjacency matrix.
-  - `CliqList`: `Nc×3` matrix. Each row vector lists the three vertices consisting of a 3-clique in the MPG.
-  - `CliqRoot`: `Nc×1` vector of root cliques.
+# Arguments
 
-# Outputs
+  - `A`: `N×N` adjacency matrix of the MPG.
+  - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
+  - `CliqRoot`: Vector of indices of root candidate cliques.
 
-  - `Adj`: `Nc×Nc` adjacency matrix of the cliques with the root cliques.
+# Details
+
+  - For each root candidate clique, the function checks which other root cliques share exactly two vertices (i.e., are adjacent in the clique graph).
+  - The resulting adjacency matrix is symmetric and encodes the adjacency structure among root cliques.
+  - Used to build a connected root structure when multiple root candidates exist in the DBHT hierarchy.
+
+# Returns
+
+  - `Adj::SparseMatrixCSC{Int, Int}`: `Nc×Nc` adjacency matrix of the cliques, where `Adj[i, j] = 1` if cliques `i` and `j` are adjacent among the root candidates.
+
+# Related
+
+  - [`CliqueRoot`](@ref)
+  - [`EqualRoot`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
 """
 function AdjCliq(A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real},
                  CliqRoot::AbstractVector{<:Real})
     Nc = size(CliqList, 1)
     N = size(A, 1)
-    Adj = spzeros(Nc, Nc)
+    Adj = spzeros(Int, Nc, Nc)
     Indicator = zeros(Int, N)
     for n in eachindex(CliqRoot)
         Indicator[CliqList[CliqRoot[n], :]] .= 1
@@ -488,21 +811,37 @@ function AdjCliq(A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real},
 end
 
 """
-```
+```julia
 BubbleHierarchy(Pred::AbstractVector{<:Real}, Sb::AbstractVector{<:Real})
 ```
 
-Build the bubble hierarchy.
+Build the bubble hierarchy from the clique hierarchy and separating set information.
 
-# Inputs
+This function constructs the bubble hierarchy tree and the bubble membership matrix for 3-cliques, given the predicted parent indices (`Pred`) and separating set vector (`Sb`). It is a core step in the DBHT (Direct Bubble Hierarchical Tree) clustering pipeline, grouping 3-cliques into bubbles and building the adjacency structure among bubbles.
 
-  - `Pred`: `Nc×1` vector of predicted hierarchies.
-  - `Sb`: `Nc×1` vector. `Sb[n] = 1` indicates 3-clique `n` is separating.
+# Arguments
 
-# Outputs
+  - `Pred`: `Nc×1` vector of predicted parent indices for each 3-clique, as returned by [`BuildHierarchy`](@ref).
+  - `Sb`: `Nc×1` vector indicating the size of the separating set for each 3-clique (`Sb[n] ≠ 0` means clique `n` is separating).
 
-  - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicated that 3-clique `n` belongs to bubble `bi`.
-  - `H2`: `Nb×Nb` adjacency matrix for the bubble hierarchical tree where `Nb` is the number of bubbles.
+# Details
+
+  - The function iteratively groups 3-cliques into bubbles, starting from root cliques and traversing the hierarchy.
+  - For each bubble, the membership of 3-cliques is recorded in `Mb`.
+  - The adjacency matrix `H` encodes the connections between bubbles, based on shared membership and hierarchical relationships.
+  - If there are multiple root cliques, an initial bubble is created for each root.
+  - Used internally by [`CliqHierarchyTree2s`](@ref) and DBHT clustering routines.
+
+# Returns
+
+  - `H::SparseMatrixCSC{Int, Int}`: `Nb×Nb` symmetric adjacency matrix representing the bubble hierarchy tree, where `Nb` is the number of bubbles.
+  - `Mb::Matrix{Int}`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates that 3-clique `n` belongs to bubble `bi`.
+
+# Related
+
+  - [`BuildHierarchy`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
+  - [`DBHT`](@ref)
 """
 function BubbleHierarchy(Pred::AbstractVector{<:Real}, Sb::AbstractVector{<:Real})
     Nc = size(Pred, 1)
@@ -531,8 +870,6 @@ function BubbleHierarchy(Pred::AbstractVector{<:Real}, Sb::AbstractVector{<:Real
                     NxtRoot = [NxtRoot; DirectChild[m]]
                 end
             end
-
-            DirectChild, TempVec = nothing, nothing
         end
         Root = sort!(unique(NxtRoot))
     end
@@ -552,11 +889,41 @@ function BubbleHierarchy(Pred::AbstractVector{<:Real}, Sb::AbstractVector{<:Real
 end
 
 """
+```julia
+CliqueRoot(::UniqueRoot, Root::AbstractVector, Pred::AbstractVector, Nc::Integer, args...)
 ```
-CliqueRoot(::UniqueRoot, Root, Pred, Nc, args...)
-```
+
+Construct the hierarchical adjacency matrix for 3-cliques in a Maximal Planar Graph (MPG) using the unique root selection method.
+
+This method enforces a unique root in the clique hierarchy. If multiple root candidates are present, a synthetic root is created and all root candidates are attached to it. Used internally by [`CliqHierarchyTree2s`](@ref) when the root selection method is [`UniqueRoot`](@ref).
+
+# Arguments
+
+  - `::UniqueRoot`: Root selection method enforcing a unique root.
+  - `Root`: Vector of indices of root candidate cliques.
+  - `Pred`: Vector of predicted parent indices for each clique.
+  - `Nc`: Number of 3-cliques.
+  - `args...`: Additional arguments (ignored for this method).
+
+# Details
+
+  - If there is more than one root candidate, a synthetic root node is appended and all root candidates are connected to it.
+  - The resulting matrix encodes the parent-child relationships among cliques, ensuring a single connected hierarchy.
+  - Used internally by DBHT clustering and related routines.
+
+# Returns
+
+  - `H::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
+
+# Related
+
+  - [`DBHTRootMethod`](@ref)
+  - [`UniqueRoot`](@ref)
+  - [`CliqueRoot`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
 """
-function CliqueRoot(::UniqueRoot, Root, Pred, Nc, args...)
+function CliqueRoot(::UniqueRoot, Root::AbstractVector, Pred::AbstractVector, Nc::Integer,
+                    args...)
     if length(Root) > 1
         push!(Pred, 0)
         Pred[Root] .= length(Pred)
@@ -570,7 +937,45 @@ function CliqueRoot(::UniqueRoot, Root, Pred, Nc, args...)
     end
     return H = H + transpose(H)
 end
-function CliqueRoot(::EqualRoot, Root, Pred, Nc, A, CliqList)
+
+"""
+```julia
+CliqueRoot(::EqualRoot, Root::AbstractVector, Pred::AbstractVector, Nc::Integer,
+           A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real})
+```
+
+Construct the hierarchical adjacency matrix for 3-cliques in a Maximal Planar Graph (MPG) using the equal root selection method.
+
+This method creates a root from the adjacency tree of all root candidate cliques, allowing for multiple equally plausible roots in the DBHT hierarchy. It is used internally by [`CliqHierarchyTree2s`](@ref) when the root selection method is [`EqualRoot`](@ref).
+
+# Arguments
+
+  - `::EqualRoot`: Root selection method that creates a root from the adjacency tree of all root candidates.
+  - `Root`: Vector of indices of root candidate cliques.
+  - `Pred`: Vector of predicted parent indices for each clique.
+  - `Nc`: Number of 3-cliques.
+  - `A`: `N×N` adjacency matrix of the MPG.
+  - `CliqList`: `Nc×3` matrix. Each row vector lists the three vertices consisting of a 3-clique in the MPG.
+
+# Details
+
+  - If there are multiple root candidates, their adjacency structure is computed using [`AdjCliq`](@ref) and incorporated into the hierarchy.
+  - The resulting matrix encodes both the parent-child relationships from `Pred` and the adjacency among root cliques.
+  - Used internally by DBHT clustering to support alternative root strategies.
+
+# Returns
+
+  - `H::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
+
+# Related
+
+  - [`DBHTRootMethod`](@ref)
+  - [`EqualRoot`](@ref)
+  - [`CliqueRoot`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
+"""
+function CliqueRoot(::EqualRoot, Root::AbstractVector, Pred::AbstractVector, Nc::Integer,
+                    A::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real})
     if length(Root) > 1
         Adj = AdjCliq(A, CliqList, Root)
     end
@@ -591,28 +996,41 @@ function CliqueRoot(::EqualRoot, Root, Pred, Nc, A, CliqList)
 end
 
 """
+```julia
+CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real}; root::DBHTRootMethod = UniqueRoot())
 ```
-CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real}, type::Symbol = :Unique)
-```
 
-Looks for 3-cliques of a Maximal Planar Graph (MPG), then construct a hierarchy of the cliques with the definition of "inside" a clique being a subgraph of smaller size when the entire graph is made disjoint by removing the clique [NHPG](@cite).
+Construct the clique and bubble hierarchy trees for a Maximal Planar Graph (MPG) using the DBHT (Direct Bubble Hierarchical Tree) approach.
 
-# Inputs
+This function builds the hierarchical structure of 3-cliques (triangles) and bubbles from the adjacency matrix of a planar graph, supporting different root selection strategies via the `root` argument. It is a core routine for DBHT clustering and related phylogenetic analyses.
 
-  - `Apm`: `N×N` adjacency matrix of an MPG.
+# Arguments
 
-  - `type`: type for finding the root of the graph [`DBHTRootMethod`](@ref). Uses Voronoi tesselation between tiling triangles.
+  - `Apm::AbstractMatrix{<:Real}`: Adjacency matrix of the MPG, where nonzero entries indicate edges.
+  - `root::DBHTRootMethod`: Root selection method for the clique hierarchy.
 
-      + [`UniqueRoot`](@ref): create a unique root.
-      + [`EqualRoot`](@ref): the root is created from the candidate's adjacency tree.
+# Details
 
-# Outputs
+  - The function first identifies all 3-cliques in the graph and computes their separating sets.
+  - It then builds the clique hierarchy using the specified root selection method.
+  - The bubble hierarchy is constructed from the clique hierarchy and separating sets.
+  - Used internally by DBHT clustering and for extracting hierarchical structures from planar graphs.
 
-  - `H1`: `Nc×Nc` adjacency matrix for 3-clique hierarchical tree where `Nc` is the number of 3-cliques.
-  - `H2`: `Nb×Nb` adjacency matrix for the bubble hierarchical tree where `Nb` is the number of bubbles.
-  - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicated that 3-clique `n` belongs to bubble `bi`.
-  - `CliqList`: `Nc×3` matrix. Each row vector lists the three vertices consisting of a 3-clique in the MPG.
-  - `Sb`: `Nc×1` vector. `Sb[n] = 1` indicates 3-clique `n` is separating.
+# Returns
+
+  - `H::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the hierarchical tree of 3-cliques.
+  - `H2::SparseMatrixCSC{Int, Int}`: Symmetric adjacency matrix representing the bubble hierarchy tree.
+  - `Mb::Matrix{Int}`: Bubble membership matrix for 3-cliques (`Nc×Nb`), where `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
+  - `CliqList::Matrix{Int}`: List of 3-cliques (`Nc×3`), each row contains the vertex indices of a 3-clique.
+  - `Sb::Vector{Int}`: Vector indicating the size of the separating set for each 3-clique.
+
+# Related
+
+  - [`DBHTRootMethod`](@ref)
+  - [`UniqueRoot`](@ref)
+  - [`EqualRoot`](@ref)
+  - [`DBHT`](@ref)
+  - [`PMFG_T2s`](@ref)
 """
 function CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real},
                              root::DBHTRootMethod = UniqueRoot())
@@ -657,25 +1075,41 @@ function CliqHierarchyTree2s(Apm::AbstractMatrix{<:Real},
 end
 
 """
-```
+```julia
 DirectHb(Rpm::AbstractMatrix{<:Real}, Hb::AbstractMatrix{<:Real},
          Mb::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
          CliqList::AbstractMatrix{<:Real})
 ```
 
-Computes the directions on each separating 3-clique of a Maximal Planar Graph (MPH), hence computes the Directed Bubble Hierarchy Tree (DBHT).
+Compute the directed bubble hierarchy tree (DBHT) for a Maximal Planar Graph (MPG).
 
-# Inputs
+This function assigns directions to each separating 3-clique in the undirected bubble tree of a Planar Maximally Filtered Graph (PMFG), producing the directed bubble hierarchy tree (DBHT). The direction is determined by comparing the sum of edge weights on either side of each separating clique, enabling the identification of converging and diverging bubbles.
 
-  - `Rpm`: `N×N` sparse weighted adjacency matrix of the Planar Maximally Filtered Graph (MPFG).
-  - `Hb`: Undirected bubble tree of the PMFG.
-  - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicated that 3-clique `n` belongs to bubble `bi`.
-  - `Mv`: `N×Nb` bubble membership matrix for vertices.
-  - `CliqList`: `Nc×3` matrix. Each row vector lists the three vertices consisting of a 3-clique in the MPG.
+# Arguments
 
-# Outputs
+  - `Rpm::AbstractMatrix{<:Real}`: `N×N` sparse weighted adjacency matrix of the PMFG.
+  - `Hb::AbstractMatrix{<:Real}`: Undirected bubble tree of the PMFG (as from [`BubbleHierarchy`](@ref)).
+  - `Mb::AbstractMatrix{<:Real}`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
+  - `Mv::AbstractMatrix{<:Real}`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `CliqList::AbstractMatrix{<:Real}`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
 
-  - `Hc`: `Nb×Nb` unweighted directed adjacency matrix of the DBHT. `Hc[i, j]=1` indicates a directed edge from bubble `i` to bubble `j`.
+# Details
+
+  - For each edge in the undirected bubble tree, the function determines the direction by removing the edge and comparing the sum of edge weights for the separating clique on each side.
+  - The resulting directed tree encodes the flow of hierarchical structure among bubbles, which is used for cluster assignment and further phylogenetic analysis.
+  - Used internally by [`BubbleCluster8s`](@ref) and DBHT clustering routines.
+
+# Returns
+
+  - `Hc::SparseMatrixCSC{Real, Int}`: `Nb×Nb` unweighted directed adjacency matrix of the DBHT. `Hc[i, j] = 1` indicates a directed edge from bubble `i` to bubble `j`.
+  - `Sep::Vector{Int}`: Vector indicating the type of each bubble (e.g., converging, diverging, or neutral).
+
+# Related
+
+  - [`BubbleHierarchy`](@ref)
+  - [`BubbleCluster8s`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
+  - [`DBHT`](@ref)
 """
 function DirectHb(Rpm::AbstractMatrix{<:Real}, Hb::AbstractMatrix{<:Real},
                   Mb::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
@@ -720,34 +1154,51 @@ function DirectHb(Rpm::AbstractMatrix{<:Real}, Hb::AbstractMatrix{<:Real},
         left > right ? Hc[bright, bleft] .= left : Hc[bleft, bright] .= right
     end
 
-    Sep = vec(Int.(sum(Hc; dims = 2) .== 0))
-    Sep[vec(sum(Hc; dims = 1) .== 0) .&& kb .> 1] .= 2
+    Sep = vec(Int.(iszero.(sum(Hc; dims = 2))))
+    Sep[vec(iszero.(sum(Hc; dims = 1))) .&& kb .> 1] .= 2
 
     return Hc, Sep
 end
 
 """
-```
+```julia
 BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real},
                 Hb::AbstractMatrix{<:Real}, Mb::AbstractMatrix{<:Real},
                 Mv::AbstractMatrix{<:Real}, CliqList::AbstractMatrix{<:Real})
 ```
 
-Obtains non-discrete and discrete clusterings from the bubble topology of the Planar Maximally Filtered Graph (PMFG).
+Obtain non-discrete and discrete clusterings from the bubble topology of the Planar Maximally Filtered Graph (PMFG).
 
-# Inputs
+This function assigns each vertex to a cluster based on the directed bubble hierarchy tree (DBHT) structure. It computes both a non-discrete cluster membership matrix and a discrete cluster assignment vector, using the converging bubbles identified in the directed bubble tree.
 
-  - `Rpm`: `N×N` sparse weighted adjacency matrix of the PMFG.
-  - `Dpm`: `N×N` shortest path lengths matrix of the PMFG.
-  - `Hb`: undirected bubble tree of the PMFG.
-  - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicated that 3-clique `n` belongs to bubble `bi`.
-  - `Mv`: `N×Nb` bubble membership matrix for vertices.
-  - `CliqList`: `Nc×3` matrix. Each row vector lists the three vertices consisting of a 3-clique in the MPG.
+# Arguments
 
-# Outputs
+  - `Rpm::AbstractMatrix{<:Real}`: `N×N` sparse weighted adjacency matrix of the PMFG.
+  - `Dpm::AbstractMatrix{<:Real}`: `N×N` shortest path lengths matrix of the PMFG.
+  - `Hb::AbstractMatrix{<:Real}`: Undirected bubble tree of the PMFG (from [`BubbleHierarchy`](@ref)).
+  - `Mb::AbstractMatrix{<:Real}`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
+  - `Mv::AbstractMatrix{<:Real}`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `CliqList::AbstractMatrix{<:Real}`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
 
-  - `Adjv`: `N×Nk` cluster membership matrix for vertices for non-discrete clustering via the bubble topology. `Adjv[n, k] = 1` indicates cluster membership of vertex `n` to the `k`'th non-discrete cluster.
-  - `Tc`: `N×1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`'th discrete cluster.
+# Details
+
+  - The function first computes the directed bubble hierarchy tree using [`DirectHb`](@ref).
+  - Converging bubbles are identified as cluster centers.
+  - Non-discrete cluster membership (`Adjv`) is determined by traversing the directed bubble tree from each converging bubble.
+  - Discrete cluster assignments (`Tc`) are made by resolving overlaps and assigning each vertex to the most strongly associated converging bubble, or, if ambiguous, to the closest converging bubble by shortest path.
+  - Used internally by DBHT clustering and for extracting cluster assignments from the PMFG bubble structure.
+
+# Returns
+
+  - `Adjv::SparseMatrixCSC{Int, Int}`: `N×Nk` cluster membership matrix for vertices for non-discrete clustering via the bubble topology. `Adjv[n, k] = 1` indicates cluster membership of vertex `n` to the `k`'th non-discrete cluster.
+  - `Tc::Vector{Int}`: `N×1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`'th discrete cluster.
+
+# Related
+
+  - [`DirectHb`](@ref)
+  - [`BubbleHierarchy`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
+  - [`DBHT`](@ref)
 """
 function BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real},
                          Hb::AbstractMatrix{<:Real}, Mb::AbstractMatrix{<:Real},
@@ -756,12 +1207,12 @@ function BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real
 
     N = size(Rpm, 1)    # Number of vertices in the PMFG
     indx = findall(Sep .== 1)   # Look for the converging bubbles
-    Adjv = spzeros(0, 0)
+    Adjv = spzeros(Int, 0, 0)
 
     dropzeros!(Hc)
     lidx = length(indx)
     if lidx > 1
-        Adjv = spzeros(size(Mv, 1), lidx)   # Set the non-discrete cluster membership matrix 'Adjv' at default
+        Adjv = spzeros(Int, size(Mv, 1), lidx)   # Set the non-discrete cluster membership matrix 'Adjv' at default
 
         # Identify the non-discrete cluster membership of vertices by each converging bubble
         for n in eachindex(indx)
@@ -805,22 +1256,36 @@ function BubbleCluster8s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real
 end
 
 """
-```
+```julia
 BubbleMember(Rpm::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
              Mc::AbstractMatrix{<:Real})
 ```
 
-Assigns each vertex in the to a specific bubble.
+Assign each vertex to a specific bubble in the bubble hierarchy.
 
-# Inputs
+This function determines the bubble membership of each vertex, resolving ambiguities when a vertex could belong to multiple bubbles. Assignment is based on the strength of connections (edge weights) between the vertex and each candidate bubble.
+
+# Arguments
 
   - `Rpm`: `N×N` sparse weighted adjacency matrix of the PMFG.
-  - `Mv`: `N×Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
-  - `Mc`: Matrix of the bubbles which coincide with the cluster.
+  - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Mc`: Matrix indicating bubbles that coincide with clusters.
 
-# Outputs
+# Details
 
-  - `Mvv`: Matrix of the vertices belonging to the bubble.
+  - Vertices belonging to a single bubble are assigned directly.
+  - For vertices that could belong to multiple bubbles, assignment is made to the bubble with the strongest normalized connection (fraction of edge weights).
+  - Used internally for intra- and inter-cluster hierarchy construction in DBHT clustering.
+
+# Returns
+
+  - `Mvv::Matrix{Int}`: `N×Nb` matrix where `Mvv[n, bi] = 1` if vertex `n` is assigned to bubble `bi`.
+
+# Related
+
+  - [`HierarchyConstruct4s`](@ref)
+  - [`BubbleHierarchy`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
 """
 function BubbleMember(Rpm::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
                       Mc::AbstractMatrix{<:Real})
@@ -844,23 +1309,37 @@ function BubbleMember(Rpm::AbstractMatrix{<:Real}, Mv::AbstractMatrix{<:Real},
 end
 
 """
-```
+```julia
 DendroConstruct(Zi::AbstractMatrix{<:Real}, LabelVec1::AbstractVector{<:Real},
                 LabelVec2::AbstractVector{<:Real},
                 LinkageDist::Union{<:Real, <:AbstractVector{<:Real}})
 ```
 
-Construct the linkage matrix by continuially adding rows to the matrix.
+Construct the linkage matrix by continually adding rows to the matrix.
+
+This function appends a new row to the linkage matrix at each iteration, recording the merge of clusters as indicated by changes in the label vectors. It is used internally for building dendrograms in DBHT and related hierarchical clustering routines.
 
 # Inputs
 
   - `Zi`: Linkage matrix at iteration `i` in the same format as the output from Matlab.
-  - `LabelVec1`: label vector for the vertices in the bubble for the previous valid iteration.
-  - `LabelVec2`: label vector for the vertices in the bubble for the trial iteration.
+  - `LabelVec1`: Label vector for the vertices in the bubble for the previous valid iteration.
+  - `LabelVec2`: Label vector for the vertices in the bubble for the trial iteration.
+  - `LinkageDist`: Linkage distance(s) for the current merge.
 
-# Outputs
+# Details
 
-  - `Z`: Linkage matrix at iteration `i + 1` in the same format as the output from Matlab.
+  - The function identifies which clusters have changed between `LabelVec1` and `LabelVec2` and appends a new row to the linkage matrix for the merge.
+  - The linkage matrix `Z` can be converted to a format compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) using [`turn_into_Hclust_merges`](@ref).
+  - Used internally by [`HierarchyConstruct4s`](@ref) and related routines for DBHT dendrogram construction.
+
+# Returns
+
+  - `Z::AbstractMatrix{<:Real}`: Linkage matrix at iteration `i + 1` in the same format as the output from Matlab.
+
+# Related
+
+  - [`HierarchyConstruct4s`](@ref)
+  - [`turn_into_Hclust_merges`](@ref)
 """
 function DendroConstruct(Zi::AbstractMatrix{<:Real}, LabelVec1::AbstractVector{<:Real},
                          LabelVec2::AbstractVector{<:Real},
@@ -871,21 +1350,34 @@ function DendroConstruct(Zi::AbstractMatrix{<:Real}, LabelVec1::AbstractVector{<
 end
 
 """
-```
+```julia
 LinkageFunction(d::AbstractMatrix{<:Real}, labelvec::AbstractVector{<:Real})
 ```
 
-Looks for the pair of clusters with the best linkage.
+Find the pair of clusters with the best linkage in a bubble.
+
+This function searches for the pair of clusters (as indicated by `labelvec`) with the strongest linkage according to the provided distance matrix `d`. The best linkage is defined as the pair with the maximum inter-cluster distance among all pairs of clusters in the bubble. Used internally for hierarchical linkage construction in DBHT dendrogram routines.
 
 # Inputs
 
-  - `d`: `Nv×Nv` distance matrix for a list of vertices assigned to a bubble.
-  - `labelvec`: label vector for the vertices in the bubble.
+  - `d`: `Nv×Nv` distance matrix for the vertices assigned to a bubble.
+  - `labelvec`: Label vector for the vertices in the bubble.
 
-# Outputs
+# Details
 
-  - `PairLink`: pair of links with the best linkage.
-  - `dvu`: value of the best linkage.
+  - For each unique pair of cluster labels, the function computes the maximum distance between their members.
+  - Returns the pair with the largest such distance and the corresponding value.
+  - Used in [`build_link_and_dendro`](@ref) and [`HierarchyConstruct4s`](@ref) to determine which clusters to merge at each step.
+
+# Returns
+
+  - `PairLink::Vector{Int}`: Pair of cluster labels with the best linkage.
+  - `dvu::Real`: Value of the best linkage (maximum inter-cluster distance).
+
+# Related
+
+  - [`build_link_and_dendro`](@ref)
+  - [`HierarchyConstruct4s`](@ref)
 """
 function LinkageFunction(d::AbstractMatrix{<:Real}, labelvec::AbstractVector{<:Real})
     lvec = sort!(unique(labelvec))
@@ -897,13 +1389,11 @@ function LinkageFunction(d::AbstractMatrix{<:Real}, labelvec::AbstractVector{<:R
             x1 = vecr .|| vecc
             dd = d[x1, x1]
             de = dd[dd .!= 0]
-
             Link1 = if !isempty(de)
                 hcat(lvec[r], lvec[c], vec(maximum(de; dims = 1)))
             else
                 hcat(lvec[r], lvec[c], 0)
             end
-
             Links = vcat(Links, Link1)
         end
     end
@@ -915,26 +1405,43 @@ end
 """
 ```
 build_link_and_dendro(rg::AbstractRange, dpm::AbstractMatrix{<:Real},
-                       LabelVec::AbstractVector{<:Real}, LabelVec1::AbstractVector{<:Real},
-                       LabelVec2::AbstractVector{<:Real}, V::AbstractVector{<:Real},
-                       nc::Real, Z::AbstractMatrix{<:Real})
+                      LabelVec::AbstractVector{<:Real}, LabelVec1::AbstractVector{<:Real},
+                      LabelVec2::AbstractVector{<:Real}, V::AbstractVector{<:Real},
+                      nc::Real, Z::AbstractMatrix{<:Real})
 ```
 
-Computes iterates over the vertices to construct the linkage matrix iteration by iteration.
+Iteratively construct the linkage matrix for a bubble or cluster.
+
+This function iterates over the vertices in a bubble or cluster, merging the pair of clusters with the best linkage at each step (as determined by [`LinkageFunction`](@ref)), and appending the corresponding row to the linkage matrix using [`DendroConstruct`](@ref). Used internally for building dendrograms in DBHT and related hierarchical clustering routines.
 
 # Inputs
 
-  - `rg`: range of indices of the vertices in a bubble.
-  - `dpm`: `Nv×Nv` distance matrix for a list of vertices assigned to a bubble.
-  - `LabelVec`: vector labels of all vertices.
-  - `LabelVec1`: label vector for the vertices in the bubble for the previous valid iteration.
-  - `LabelVec2`: label vector for the vertices in the bubble for the trial iteration.
+  - `rg`: Range of indices for the vertices in the bubble or cluster.
+  - `dpm`: Distance matrix for the vertices assigned to the bubble or cluster.
+  - `LabelVec`: Current label vector for the clusters.
+  - `LabelVec1`: Label vector for the previous valid iteration.
+  - `LabelVec2`: Label vector for the trial iteration.
+  - `V`: Indices of the vertices in the bubble or cluster.
+  - `nc::Real`: Inverse of the linkage distance (or a counter for the merge steps).
+  - `Z`: Current linkage matrix.
 
-# Outputs
+# Details
 
-  - `Z`: updated linkage matrix in the same format as the output from Matlab.
-  - `nc`: updated inverse of the linkage distance.
-  - `LabelVec1`: updated `LabelVec1` for the next iteration.
+  - At each iteration, finds the pair of clusters with the best linkage using [`LinkageFunction`](@ref).
+  - Merges the pair by updating the label vector, and appends a new row to the linkage matrix using [`DendroConstruct`](@ref).
+  - Continues until all clusters in the range are merged.
+
+# Returns
+
+  - `Z::AbstractMatrix{<:Real}`: Updated linkage matrix after all merges in the range.
+  - `nc::Real`: Updated inverse linkage distance or merge counter.
+  - `LabelVec1::AbstractVector{<:Real}`: Updated label vector for the next iteration.
+
+# Related
+
+  - [`LinkageFunction`](@ref)
+  - [`DendroConstruct`](@ref)
+  - [`HierarchyConstruct4s`](@ref)
 """
 function build_link_and_dendro(rg::AbstractRange, dpm::AbstractMatrix{<:Real},
                                LabelVec::AbstractVector{<:Real},
@@ -959,7 +1466,9 @@ HierarchyConstruct4s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real},
                      Tc::AbstractVector{<:Real}, Mv::AbstractMatrix{<:Real})
 ```
 
-Constructs the intra- and inter-cluster hierarchy by utilizing Bubble Hierarchy structure of a Maximal Planar graph, in this a Planar Maximally Filtered Graph (PMFG).
+Constructs the intra- and inter-cluster hierarchy by utilizing the Bubble Hierarchy structure of a Maximal Planar Graph, specifically a Planar Maximally Filtered Graph (PMFG).
+
+This function builds a hierarchical clustering (dendrogram) by first constructing intra-cluster linkages within each cluster (using the bubble structure), and then merging clusters to form the global hierarchy. It is a core step in the DBHT (Direct Bubble Hierarchical Tree) clustering pipeline.
 
 # Inputs
 
@@ -968,9 +1477,24 @@ Constructs the intra- and inter-cluster hierarchy by utilizing Bubble Hierarchy 
   - `Tc`: `N×1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`'th discrete cluster.
   - `Mv`: `N×Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
 
-# Outputs
+# Details
 
-  - `Z`: `(N-1)×3` linkage matrix in the same format as the output from Matlab.
+    - For each cluster, the function identifies the bubbles that coincide with the cluster and assigns each vertex to a specific bubble using [`BubbleMember`](@ref).
+    - It constructs intra-bubble and intra-cluster linkages using [`build_link_and_dendro`](@ref).
+    - After intra-cluster linkage, it merges clusters to form the global hierarchy using inter-cluster linkage steps.
+    - The resulting linkage matrix can be converted to a format compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) using [`turn_into_Hclust_merges`](@ref).
+    - Used internally by DBHT clustering routines for dendrogram construction.
+
+# Returns
+
+  - `Z::AbstractMatrix{<:Real}`: `(N-1)×3` linkage matrix in the same format as the output from Matlab, suitable for conversion to [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust).
+
+# Related
+
+  - [`BubbleMember`](@ref)
+  - [`build_link_and_dendro`](@ref)
+  - [`turn_into_Hclust_merges`](@ref)
+  - [`DBHT`](@ref)
 """
 function HierarchyConstruct4s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<:Real},
                               Tc::AbstractVector{<:Real}, Mv::AbstractMatrix{<:Real})
@@ -1027,19 +1551,33 @@ function HierarchyConstruct4s(Rpm::AbstractMatrix{<:Real}, Dpm::AbstractMatrix{<
 end
 
 """
-```
+```julia
 turn_into_Hclust_merges(Z::AbstractMatrix{<:Real})
 ```
 
-Turns a Matlab-style linkage matrix to a useable format for [`Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust).
+Convert a Matlab-style linkage matrix to a format compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust).
+
+This function transforms a linkage matrix produced by DBHT or similar hierarchical clustering routines into the format required by [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust), including proper indexing and cluster size tracking.
 
 # Inputs
 
-  - `Z`: Matlab-style linkage matrix.
+  - `Z`: Matlab-style linkage matrix, where each row represents a merge step with cluster indices and linkage heights.
 
-# Outputs
+# Details
 
-  - `Z`: Hclust-style linkage matrix.
+  - For each merge, leaf indices are converted to negative values, and cluster sizes are accumulated in the fourth column.
+  - Internal cluster indices are updated to reference the correct merged clusters.
+  - The resulting matrix can be passed directly to [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) for dendrogram construction and further analysis.
+
+# Returns
+
+  - `Z::AbstractMatrix{<:Real}`: Linkage matrix in [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format, with updated indices and cluster sizes.
+
+# Related
+
+  - [`HierarchyConstruct4s`](@ref)
+  - [`DendroConstruct`](@ref)
+  - [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust)
 """
 function turn_into_Hclust_merges(Z::AbstractMatrix{<:Real})
     N = size(Z, 1) + 1
@@ -1081,39 +1619,56 @@ function turn_into_Hclust_merges(Z::AbstractMatrix{<:Real})
 end
 
 """
-```
+```julia
 DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
-      type::Symbol = :Unique)
+      root::DBHTRootMethod = UniqueRoot())
 ```
 
 Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering algorithm [DBHTs](@cite). This version uses a graph-theoretic filtering technique called Triangulated Maximally Filtered Graph (TMFG).
 
+This function implements the full DBHT clustering pipeline: it constructs a Planar Maximally Filtered Graph (PMFG) from the similarity matrix, extracts the clique and bubble hierarchies, assigns clusters, and builds a hierarchical clustering (dendrogram) compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust).
+
 # Arguments
 
-  - `D`: `N×N` dissimilarity matrix, e.g. a distance matrix.
+  - `D`: `N×N` dissimilarity matrix (e.g., a distance matrix). Must be symmetric and non-empty.
+  - `S`: `N×N` non-negative similarity matrix. Must be symmetric and non-empty.
+  - `branchorder`: Ordering method for the dendrogram branches. Accepts `:optimal`, `:barjoseph`, or `:r`.
+  - `root`: Root selection method for the clique hierarchy.
 
-  - `S`: `N×N` non-negative sim matrix, examples include:
+# Validation
 
-      + ``\\mathbf{S} = \\mathbf{C} + \\lvert \\min \\mathbf{C} \\rvert``.
-      + ``\\mathbf{S} = \\lceil\\max \\left(\\mathbf{D}^{\\odot 2}\\right)\\rceil - \\mathbf{D}^{\\odot 2}``.
-      + ``\\mathbf{S} = \\exp \\odot (-\\mathbf{D})``.
+  - `!isempty(D) && issymmetric(D)`.
+  - `!isempty(S) && issymmetric(S)`.
+  - `size(D) == size(S)`.
 
-    Where ``\\mathbf{C}`` is the correlation matrix, ``\\mathbf{D}`` the dissimilarity matrix `D`, and ``\\odot`` the Hadamard (elementwise) operator.
-  - `branchorder`: parameter for ordering the final dendrogram's branches accepted by [`Clustering.jl`](https://github.com/JuliaStats/Clustering.jl).
-  - `type`: type for finding the root of a Direct Bubble Hierarchical Clustering Tree in case there is more than one candidate [`DBHTRootMethod`](@ref).
+# Details
 
-      + `:Unique`: create a unique root.
-      + `:Equal`: the root is created from the candidate's adjacency tree.
+  - Validates that `D` and `S` are non-empty, symmetric, and of equal size.
+  - Constructs the PMFG using [`PMFG_T2s`](@ref).
+  - Computes shortest path distances on the PMFG.
+  - Extracts clique and bubble hierarchies using [`CliqHierarchyTree2s`](@ref) and [`BubbleHierarchy`](@ref).
+  - Assigns clusters using [`BubbleCluster8s`](@ref).
+  - Builds the hierarchical clustering using [`HierarchyConstruct4s`](@ref) and converts it to [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format.
+  - Supports different root selection strategies and dendrogram branch orderings.
 
-# Outputs
+# Returns
 
-  - `T8`: `N×1` cluster membership vector.
-  - `Rpm`: `N×N` adjacency matrix of the Planar Maximally Filtered Graph (PMFG).
-  - `Adjv`: Bubble cluster membership matrix from [`BubbleCluster8s`](@ref).
-  - `Dpm`: `N×N` shortest path length matrix of the PMFG.
-  - `Mv`: `N×Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
-  - `Z`: `(N-1)×3` linkage matrix in the same format as the output from Matlab.
-  - `Z_hclust`: Z matrix in [Clustering.Hclust](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format.
+  - `T8::Vector{Int}`: `N×1` cluster membership vector.
+  - `Rpm::SparseMatrixCSC{<:Real, Int}`: `N×N` adjacency matrix of the Planar Maximally Filtered Graph (PMFG).
+  - `Adjv::SparseMatrixCSC{Int, Int}`: Bubble cluster membership matrix from [`BubbleCluster8s`](@ref).
+  - `Dpm::Matrix{<:Real}`: `N×N` shortest path length matrix of the PMFG.
+  - `Mv::SparseMatrixCSC{Int, Int}`: `N×Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Z::Matrix{<:Real}`: `(N-1)×3` linkage matrix in Matlab format.
+  - `Z_hclust::Clustering.Hclust`: Dendrogram in [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format.
+
+# Related
+
+  - [`DBHT`](@ref)
+  - [`CliqHierarchyTree2s`](@ref)
+  - [`BubbleCluster8s`](@ref)
+  - [`HierarchyConstruct4s`](@ref)
+  - [`turn_into_Hclust_merges`](@ref)
+  - [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust)
 """
 function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
                branchorder::Symbol = :optimal, root::DBHTRootMethod = UniqueRoot())
@@ -1159,7 +1714,40 @@ function DBHTs(D::AbstractMatrix{<:Real}, S::AbstractMatrix{<:Real};
 
     return T8, Rpm, Adjv, Dpm, Mv, Z, Z_hclust
 end
-function jlogo!(jlogo, sigma, source, sign)
+
+"""
+```julia
+jlogo!(jlogo::AbstractMatrix, sigma::AbstractMatrix, source::AbstractMatrix, sign::Integer)
+```
+
+Efficiently accumulate contributions to the sparse inverse covariance matrix for LoGo/DBHT.
+
+This internal function updates the `jlogo` matrix in-place by iterating over a list of cliques or separators (`source`), extracting the corresponding submatrix from the covariance matrix `sigma`, inverting it, and adding (or subtracting) the result to the appropriate block in `jlogo`, scaled by `sign`.
+
+# Arguments
+
+  - `jlogo`: The matrix to be updated in-place.
+  - `sigma`: The full covariance matrix.
+  - `source`: Each row contains indices of a clique or separator (e.g., 4-cliques or 3-cliques).
+  - `sign`: +1 for cliques, -1 for separators.
+
+# Details
+
+  - For each row in `source`, the function extracts the submatrix of `sigma` corresponding to the clique/separator.
+  - The inverse of this submatrix is computed and added to (or subtracted from) the corresponding block in `jlogo`.
+  - Used internally by [`J_LoGo`](@ref) to efficiently compute the sparse inverse covariance matrix for LoGo/DBHT.
+
+# Returns
+
+  - `nothing`, updates `jlogo` in-place.
+
+# Related
+
+  - [`J_LoGo`](@ref)
+  - [`LoGo`](@ref)
+"""
+function jlogo!(jlogo::AbstractMatrix, sigma::AbstractMatrix, source::AbstractMatrix,
+                sign::Integer)
     tmp = Matrix{eltype(sigma)}(undef, size(source, 2), size(source, 2))
 
     # Pre-compute indices for better cache locality
@@ -1191,28 +1779,86 @@ function jlogo!(jlogo, sigma, source, sign)
 end
 
 """
+```julia
+J_LoGo(sigma::AbstractMatrix, separators::AbstractMatrix, cliques::AbstractMatrix)
 ```
-J_LoGo(sigma, separators, cliques)
-```
 
-Compute the sparse inverse covariance from a clique tree and separators [J_LoGo](@cite).
+Compute the sparse inverse covariance matrix using the LoGo (Local-Global) algorithm [J_LoGo](@cite).
 
-# Inputs
+This function implements the LoGo sparse inverse covariance estimation by combining clique and separator contributions from a Planar Maximally Filtered Graph (PMFG) or similar clique tree structure. It efficiently accumulates the inverses of covariance submatrices corresponding to cliques and separators, producing a sparse precision (inverse covariance) matrix suitable for robust portfolio optimization and risk management.
 
-  - `sigma`: `N×N` covariance matrix.
-  - `separators`: list of 3-cliques that are not triangular faces.
-  - `cliques`: list of all 4-cliques.
+# Arguments
 
-# Outputs
+  - `sigma`: The covariance matrix (`N×N`).
+  - `separators`: Each row contains indices of a separator (typically 3-cliques).
+  - `cliques`: Each row contains indices of a clique (typically 4-cliques).
 
-  - `jlogo`: J_LoGo covariance matrix.
+# Details
+
+  - For each clique, the inverse of the corresponding submatrix of `sigma` is added to the output.
+  - For each separator, the inverse of the corresponding submatrix is subtracted.
+  - The resulting matrix is the sparse inverse covariance estimate, as described in the LoGo methodology.
+  - Used internally by [`LoGo`](@ref) and related estimators.
+
+# Returns
+
+  - `jlogo::Matrix{<:Real}`: The LoGo sparse inverse covariance matrix.
+
+# Related
+
+  - [`jlogo!`](@ref)
+  - [`LoGo`](@ref)
 """
-function J_LoGo(sigma, separators, cliques)
+function J_LoGo(sigma::AbstractMatrix, separators::AbstractMatrix, cliques::AbstractMatrix)
     jlogo = zeros(eltype(sigma), size(sigma))
     jlogo!(jlogo, sigma, cliques, 1)
     jlogo!(jlogo, sigma, separators, -1)
     return jlogo
 end
+
+"""
+```julia
+struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
+    clustering::T1
+    S::T2
+    D::T3
+    k::T4
+end
+```
+
+Result type for Direct Bubble Hierarchical Tree (DBHT) clustering.
+
+`DBHTClustering` encapsulates the output of a DBHT clustering analysis, including the hierarchical clustering result, similarity and distance matrices, and the optimal number of clusters. This struct is returned by [`clusterise`](@ref) when using a DBHT-based clustering estimator.
+
+# Fields
+
+  - `clustering`: Hierarchical clustering result, typically a [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) object.
+  - `S`: Similarity matrix used for DBHT clustering.
+  - `D`: Distance (dissimilarity) matrix used for DBHT clustering.
+  - `k`: Optimal number of clusters, as determined by the estimator's cluster selection method.
+
+# Constructor
+
+```julia
+DBHTClustering(; clustering::Clustering.Hclust, S::AbstractMatrix, D::AbstractMatrix,
+               k::Integer)
+```
+
+Keyword arguments correspond to the fields above.
+
+# Validation
+
+  - `!isempty(S)`
+  - `!isempty(D)`
+  - `size(S) == size(D)`
+  - `k >= 1`.
+
+# Related
+
+  - [`DBHT`](@ref)
+  - [`clusterise`](@ref)
+  - [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust)
+"""
 struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     clustering::T1
     S::T2
@@ -1225,11 +1871,48 @@ function DBHTClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
               AssertionError("The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))\nk >= 1 => k = $k"))
     return DBHTClustering(clustering, S, D, k)
 end
+
+"""
+```julia
+clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::AbstractMatrix{<:Real};
+           branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
+```
+
+Perform Direct Bubble Hierarchical Tree (DBHT) clustering using a `ClusteringEstimator` configured with a `DBHT` algorithm.
+
+This method computes the similarity and distance matrices from the input data matrix `X` using the estimator's configured estimators and algorithms, applies the DBHT clustering pipeline, and returns a [`DBHTClustering`](@ref) result containing the hierarchical clustering, similarity and distance matrices, and the optimal number of clusters.
+
+# Arguments
+
+  - `cle`: A `ClusteringEstimator` whose algorithm is a [`DBHT`](@ref) instance.
+  - `X`: Data matrix (`observations × assets` or `assets × observations` depending on `dims`).
+  - `branchorder`: Symbol specifying the dendrogram branch ordering method. Accepts `:optimal` (default), `:barjoseph`, or `:r`.
+  - `dims`: Integer specifying the dimension along which to compute statistics (`1` for columns/assets, `2` for rows).
+  - `kwargs...`: Additional keyword arguments passed to the underlying estimators.
+
+# Details
+
+  - Computes the similarity and distance matrices using the estimator's configured correlation and distance estimators.
+  - Applies the selected similarity transformation via [`dbht_similarity`](@ref).
+  - Runs the full DBHT clustering pipeline via [`DBHTs`](@ref), including PMFG construction, clique and bubble hierarchy extraction, and dendrogram construction.
+  - Determines the optimal number of clusters using the estimator's cluster selection method.
+  - Returns a [`DBHTClustering`](@ref) result encapsulating all relevant outputs.
+
+# Returns
+
+  - `clr::DBHTClustering`: DBHT clustering result.
+
+# Related
+
+  - [`DBHT`](@ref)
+  - [`DBHTClustering`](@ref)
+  - [`DBHTs`](@ref)
+  - [`dbht_similarity`](@ref)
+  - [`ClusteringEstimator`](@ref)
+"""
 function clusterise(cle::ClusteringEstimator{<:Any, <:Any, <:DBHT, <:Any},
                     X::AbstractMatrix{<:Real}; branchorder::Symbol = :optimal,
                     dims::Int = 1, kwargs...)
-    # S = cor(cle.ce, X; dims = dims, kwargs...)
-    # D = distance(cle.de, S, X; dims = dims, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
     S = dbht_similarity(cle.alg.sim; S = S, D = D)
     clustering = DBHTs(D, S; branchorder = branchorder, root = cle.alg.root)[end]
@@ -1239,7 +1922,66 @@ end
 function logo!(::Nothing, args...; kwargs...)
     return nothing
 end
+
+"""
+```julia
 abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
+```
+
+Abstract supertype for all inverse matrix sparsification algorithms in PortfolioOptimisers.jl.
+
+# Related
+
+  - [`AbstractMatrixProcessingAlgorithm`](@ref)
+  - [`LoGo`](@ref)
+"""
+abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
+
+"""
+```julia
+struct LoGo{T1, T2} <: InverseMatrixSparsificationAlgorithm
+    dist::T1
+    sim::T2
+end
+```
+
+LoGo (Local-Global) sparse inverse covariance estimation algorithm.
+
+`LoGo` is a composable algorithm type for estimating sparse inverse covariance matrices using the Planar Maximally Filtered Graph (PMFG) and clique-based decomposition, as described in [J_LoGo](@cite). It combines a distance estimator and a similarity matrix algorithm, both validated and extensible, to produce a robust, interpretable sparse precision matrix for use in portfolio optimization and risk management.
+
+# Fields
+
+  - `dist`: Distance matrix estimator.
+  - `sim`: Similarity matrix algorithm.
+
+# Constructor
+
+```julia
+LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+     sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
+```
+
+Keyword arguments correspond to the fields above.
+
+# Examples
+
+```julia
+julia> LoGo()
+LoGo
+  dist | Distance
+       |   alg | CanonicalDistance()
+   sim | MaximumDistanceSimilarity()
+```
+
+# Related
+
+  - [`InverseMatrixSparsificationAlgorithm`](@ref)
+  - [`AbstractDistanceEstimator`](@ref)
+  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`MaximumDistanceSimilarity`](@ref)
+  - [`ExponentialSimilarity`](@ref)
+  - [`GeneralExponentialSimilarity`](@ref)
+"""
 struct LoGo{T1, T2} <: InverseMatrixSparsificationAlgorithm
     dist::T1
     sim::T2
@@ -1248,6 +1990,29 @@ function LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDist
               sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())
     return LoGo(dist, sim)
 end
+
+"""
+```julia
+LoGo_dist_assert(dist::AbstractDistanceEstimator, sigma::AbstractMatrix, X::AbstractMatrix)
+```
+
+Validate compatibility of the distance estimator and covariance matrix for LoGo sparse inverse covariance estimation by checking `size(sigma, 1) == size(X, 2)`.
+
+# Arguments
+
+  - `dist`: Distance estimator, typically a subtype of `AbstractDistanceEstimator`.
+  - `sigma`: Covariance matrix (`N×N`).
+  - `X`: Data matrix (`T×N` or `N×T`).
+
+# Returns
+
+  - `nothing`. Throws an error if validation fails.
+
+# Related
+
+  - [`LoGo`](@ref)
+  - [`logo!`](@ref)
+"""
 function LoGo_dist_assert(::Union{Distance{<:VariationInfoDistance},
                                   GeneralDistance{<:VariationInfoDistance, <:Any},
                                   DistanceDistance{<:VariationInfoDistance, <:Any, <:Any,
@@ -1259,9 +2024,68 @@ function LoGo_dist_assert(::Union{Distance{<:VariationInfoDistance},
               DimensionMismatch("Number of columns of `sigma` must be equal to the number of rows of `X`:\nsize(sigma, 1) == size(X, 2) => $(size(sigma,1)) != $(size(X,2))"))
     return nothing
 end
+"""
+```julia
+LoGo_dist_assert(args...)
+```
+
+No-op fallback for other distance estimators.
+
+# Returns
+
+  - `nothing`.
+"""
 function LoGo_dist_assert(args...)
     return nothing
 end
+
+"""
+```julia
+logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix, X::AbstractMatrix;
+      dims::Int = 1, kwargs...)
+```
+
+Compute the LoGo (Local-Global) covariance matrix and update `sigma` in-place.
+
+This method implements the LoGo algorithm for sparse inverse covariance estimation using the Planar Maximally Filtered Graph (PMFG) and clique-based decomposition. It validates inputs, computes the similarity and distance matrices, constructs the PMFG, identifies cliques and separators, and updates the input covariance matrix `sigma` in-place by inverting the LoGo sparse inverse covariance estimate. The result is projected to the nearest positive definite matrix if a `Posdef` estimator is provided.
+
+# Arguments
+
+  - `je`: LoGo algorithm instance.
+  - `pdm`: Optional positive definite matrix estimator.
+  - `sigma`: Covariance matrix (`N×N`), updated in-place with the LoGo sparse inverse covariance.
+  - `X`: Data matrix (`T×N`).
+  - `dims`: Dimension along which to compute statistics (`1` for columns/assets, `2` for rows). Default: `1`.
+  - `kwargs...`: Additional keyword arguments passed to distance and similarity estimators.
+
+# Details
+
+  - If `rho` is a covariance matrix, it is converted to a correlation matrix using `StatsBase.cov2cor`.
+  - Computes the distance matrix using the configured distance estimator.
+  - Computes the similarity matrix using the configured similarity algorithm.
+  - Constructs the PMFG and extracts cliques and separators.
+  - Computes the LoGo sparse inverse covariance matrix via [`J_LoGo`](@ref).
+  - Updates `sigma` in-place with the inverse of the LoGo estimate.
+  - Projects the result to the nearest positive definite matrix if `pdm` is provided.
+
+# Validation
+
+    - `size(sigma, 1) == size(sigma, 2)`.
+    - `size(sigma, 1) == size(X, 2)`.
+
+# Returns
+
+  - `nothing`. The input `sigma` is updated in-place.
+
+# Related
+
+  - [`LoGo`](@ref)
+  - [`J_LoGo`](@ref)
+  - [`LoGo_dist_assert`](@ref)
+  - [`PMFG_T2s`](@ref)
+  - [`dbht_similarity`](@ref)
+  - [`Posdef`](@ref)
+"""
 function logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix,
                X::AbstractMatrix; dims::Int = 1, kwargs...)
     assert_matrix_issquare(sigma)
@@ -1281,6 +2105,42 @@ function logo!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix,
     posdef!(pdm, sigma)
     return nothing
 end
+
+"""
+```julia
+matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef}, sigma::AbstractMatrix,
+                             X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
+
+Apply the LoGo (Local-Global) transformation in-place to the covariance matrix as a matrix processing algorithm to.
+
+This method provides a standard interface for applying the LoGo algorithm to a covariance matrix within the matrix processing pipeline of PortfolioOptimisers.jl. It validates inputs, computes the LoGo sparse inverse covariance matrix, and updates `sigma` in-place. If a positive definite matrix estimator (`pdm`) is provided, the result is projected to the nearest positive definite matrix.
+
+# Arguments
+
+  - `je`: LoGo algorithm instance (`LoGo`).
+  - `pdm`: Optional positive definite matrix estimator (e.g., `Posdef()`), or `nothing`.
+  - `sigma`: Covariance matrix (`N×N`), updated in-place.
+  - `X`: Data matrix (`T×N` or `N×T`).
+  - `dims`: Dimension along which to compute statistics (`1` for columns/assets, `2` for rows). Default: `1`.
+  - `kwargs...`: Additional keyword arguments passed to distance and similarity estimators.
+
+# Details
+
+  - Internally, it calls [`logo!`](@ref) to perform the LoGo sparse inverse covariance estimation and update `sigma` in-place.
+  - Used in composable workflows for covariance matrix estimation.
+
+# Returns
+
+  - `nothing`. The input `sigma` is updated in-place.
+
+# Related
+
+  - [`LoGo`](@ref)
+  - [`logo!`](@ref)
+  - [`Posdef`](@ref)
+  - [`AbstractMatrixProcessingAlgorithm`](@ref)
+"""
 function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef},
                                       sigma::AbstractMatrix, X::AbstractMatrix;
                                       dims::Int = 1, kwargs...)
@@ -1288,4 +2148,4 @@ function matrix_processing_algorithm!(je::LoGo, pdm::Union{Nothing, <:Posdef},
 end
 
 export ExponentialSimilarity, GeneralExponentialSimilarity, MaximumDistanceSimilarity,
-       UniqueRoot, EqualRoot, DBHT, LoGo
+       UniqueRoot, EqualRoot, DBHT, LoGo, DBHTClustering

@@ -30,10 +30,9 @@ struct IntegerPhylogenyEstimator{T1, T2, T3} <: PhylogenyEstimator
     B::T2
     scale::T3
 end
-function _validate_length_integer_phylogeny_constraint_B(alg::PredefinedNumberClusters,
-                                                         B::AbstractVector)
-    @argcheck(length(B) <= alg.k,
-              DomainError("`length(B) <= alg.k`:\nlength(B) => $(length(B))\nalg.k => $(alg.k)"))
+function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::AbstractVector)
+    @argcheck(length(B) <= alg,
+              DomainError("`length(B) <= alg`:\nlength(B) => $(length(B))\nalg => $(alg)"))
     return nothing
 end
 function _validate_length_integer_phylogeny_constraint_B(args...)
