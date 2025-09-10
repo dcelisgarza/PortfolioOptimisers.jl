@@ -2,19 +2,13 @@
 
 ```@docs
 HierarchicalClustering
-HierarchicalClustering()
 clusterise(cle::PortfolioOptimisers.AbstractClusteringResult, args...; kwargs...)
 SecondOrderDifference
 PredefinedNumberClusters
-PredefinedNumberClusters()
 StandardisedSilhouetteScore
-StandardisedSilhouetteScore()
 OptimalNumberClusters
-OptimalNumberClusters()
 HClustAlgorithm
-HClustAlgorithm()
 ClusteringEstimator
-ClusteringEstimator()
 PortfolioOptimisers.AbstractClusteringEstimator
 PortfolioOptimisers.AbstractClusteringAlgorithm
 PortfolioOptimisers.AbstractOptimalNumberClustersEstimator

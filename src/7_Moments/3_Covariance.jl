@@ -1,6 +1,9 @@
 """
 ```julia
-struct GeneralWeightedCovariance{T1, T2} <: AbstractCovarianceEstimator end
+struct GeneralWeightedCovariance{T1, T2} <: AbstractCovarianceEstimator
+    ce::T1
+    w::T2
+end
 ```
 
 A flexible covariance estimator for PortfolioOptimisers.jl supporting arbitrary covariance estimators and optional observation weights.

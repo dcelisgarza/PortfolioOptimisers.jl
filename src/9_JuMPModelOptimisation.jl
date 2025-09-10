@@ -81,6 +81,7 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
     end
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
+
 """
 ```julia
 struct JuMPResult{T1, T2} <: AbstractJuMPResult

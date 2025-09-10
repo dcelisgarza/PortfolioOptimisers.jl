@@ -17,7 +17,9 @@ abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
 
 """
 ```julia
-struct KendallCovariance{T1} <: RankCovarianceEstimator end
+struct KendallCovariance{T1} <: RankCovarianceEstimator
+    ve::T1
+end
 ```
 
 Robust covariance estimator based on Kendall's tau rank correlation.
@@ -142,7 +144,9 @@ end
 
 """
 ```julia
-struct SpearmanCovariance{T1} <: RankCovarianceEstimator end
+struct SpearmanCovariance{T1} <: RankCovarianceEstimator
+    ve::T1
+end
 ```
 
 Robust covariance estimator based on Spearman's rho rank correlation.

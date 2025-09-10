@@ -78,7 +78,12 @@ abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 
 """
 ```julia
-abstract type HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult end
+struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
+    clustering::T1
+    S::T2
+    D::T3
+    k::T4
+end
 ```
 
 Result type for hierarchical clustering in PortfolioOptimisers.jl.
@@ -101,6 +106,13 @@ HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
 
 Keyword arguments correspond to the fields above.
 
+## Validation
+
+  - `!isempty(S)`.
+  - `!isempty(D)`.
+  - `size(S) == size(D)`.
+  - `k ≥ 1`.
+
 # Related
 
   - [`AbstractClusteringResult`](@ref)
@@ -112,38 +124,6 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     D::T3
     k::T4
 end
-"""
-```julia
-HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
-                       D::AbstractMatrix, k::Integer)
-```
-
-Construct a [`HierarchicalClustering`](@ref) result for hierarchical clustering.
-
-Creates a `HierarchicalClustering` object from the given clustering result, similarity and distance matrices, and number of clusters. Validates that the matrices are non-empty, of matching size, and that `k ≥ 1`.
-
-# Arguments
-
-  - `clustering`: The hierarchical clustering object.
-  - `S`: Similarity matrix.
-  - `D`: Distance matrix.
-  - `k`: Number of clusters.
-
-# Returns
-
-  - `HierarchicalClustering`: A result object encapsulating the clustering output.
-
-# Validation
-
-  - `!isempty(S)`.
-  - `!isempty(D)`.
-  - `size(S) == size(D)`.
-  - `k ≥ 1`.
-
-# Related
-
-  - [`AbstractClusteringResult`](@ref)
-"""
 function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
                                 D::AbstractMatrix, k::Integer)
     @argcheck(!isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
@@ -193,7 +173,9 @@ struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm end
 
 """
 ```julia
-struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm end
+struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm
+    k::T1
+end
 ```
 
 Algorithm type for specifying a fixed, user-defined number of clusters.
@@ -210,30 +192,9 @@ Algorithm type for specifying a fixed, user-defined number of clusters.
 PredefinedNumberClusters(; k::Integer = 1)
 ```
 
-# Related
+Keyword arguments correspond to the fields above.
 
-  - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
-  - [`OptimalNumberClusters`](@ref)
-"""
-struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm
-    k::T1
-end
-"""
-```julia
-PredefinedNumberClusters(; k::Integer = 1)
-```
-
-Construct a [`PredefinedNumberClusters`](@ref) algorithm with a fixed number of clusters.
-
-# Arguments
-
-  - `k``: The number of clusters (must be ≥ 1).
-
-# Returns
-
-  - `PredefinedNumberClusters`: An algorithm object specifying the fixed number of clusters.
-
-# Validation
+## Validation
 
   - `k >= 1`.
 
@@ -247,8 +208,12 @@ PredefinedNumberClusters
 
 # Related
 
-  - [`PredefinedNumberClusters`](@ref)
+  - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
+  - [`OptimalNumberClusters`](@ref)
 """
+struct PredefinedNumberClusters{T1} <: AbstractOptimalNumberClustersAlgorithm
+    k::T1
+end
 function PredefinedNumberClusters(; k::Integer = 1)
     @argcheck(k >= one(k), DomainError("`k` must be greater than or equal to 1:\nk => $k"))
     return PredefinedNumberClusters(k)
@@ -256,7 +221,9 @@ end
 
 """
 ```julia
-struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm end
+struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
+    metric::T1
+end
 ```
 
 Algorithm type for estimating the optimal number of clusters using the standardised silhouette score.
@@ -273,28 +240,7 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 PredefinedNumberClusters(; k::Integer = 1)
 ```
 
-# Related
-
-  - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
-  - [`OptimalNumberClusters`](@ref)
-"""
-struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
-    metric::T1
-end
-"""
-```julia
-StandardisedSilhouetteScore(; metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
-```
-
-Construct a [`StandardisedSilhouetteScore`](@ref) algorithm for optimal cluster number selection.
-
-# Arguments
-
-  - `metric`: The distance metric to use for silhouette calculation (optional). If `nothing`, the default metric is used.
-
-# Returns
-
-  - `StandardisedSilhouetteScore`: An algorithm object for silhouette-based cluster selection.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -302,12 +248,16 @@ Construct a [`StandardisedSilhouetteScore`](@ref) algorithm for optimal cluster 
 julia> StandardisedSilhouetteScore()
 StandardisedSilhouetteScore
   metric | nothing
-```
 
 # Related
 
-  - [`StandardisedSilhouetteScore`](@ref)
+  - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
+  - [`OptimalNumberClusters`](@ref)
+```
 """
+struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
+    metric::T1
+end
 function StandardisedSilhouetteScore(;
                                      metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
     return StandardisedSilhouetteScore(metric)
@@ -315,7 +265,10 @@ end
 
 """
 ```julia
-struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator end
+struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
+    max_k::T1
+    alg::T2
+end
 ```
 
 Estimator type for selecting the optimal number of clusters in PortfolioOptimisers.jl.
@@ -334,33 +287,9 @@ OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
                       alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
 ```
 
-# Related
+Keyword arguments correspond to the fields above.
 
-  - [`AbstractOptimalNumberClustersEstimator`](@ref)
-  - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
-"""
-struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
-    max_k::T1
-    alg::T2
-end
-"""
-```julia
-OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
-                      alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
-```
-
-Construct an [`OptimalNumberClusters`](@ref) estimator for optimal cluster number selection.
-
-# Arguments
-
-  - `max_k`: Maximum number of clusters to consider. If `nothing`, defaults to `ceil(Int, sqrt(N))`, where `N` is the number of assets.
-  - `alg`: Algorithm for selecting the optimal number of clusters.
-
-# Returns
-
-  - `OptimalNumberClusters`: An estimator object for optimal cluster number selection.
-
-# Validation
+## Validation
 
   - `max_k >= 1`.
 
@@ -375,8 +304,13 @@ OptimalNumberClusters
 
 # Related
 
-  - [`OptimalNumberClusters`](@ref)
+  - [`AbstractOptimalNumberClustersEstimator`](@ref)
+  - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
 """
+struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
+    max_k::T1
+    alg::T2
+end
 function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
                                alg::AbstractOptimalNumberClustersAlgorithm = SecondOrderDifference())
     if !isnothing(max_k)
@@ -388,7 +322,9 @@ end
 
 """
 ```julia
-struct HClustAlgorithm{T1} <: AbstractClusteringAlgorithm end
+struct HClustAlgorithm{T1} <: AbstractClusteringAlgorithm
+    linkage::T1
+end
 ```
 
 Algorithm type for hierarchical clustering in PortfolioOptimisers.jl.
@@ -405,28 +341,7 @@ Algorithm type for hierarchical clustering in PortfolioOptimisers.jl.
 HClustAlgorithm(; linkage::Symbol = :ward)
 ```
 
-# Related
-
-  - [`AbstractClusteringAlgorithm`](@ref)
-  - [`ClusteringEstimator`](@ref)
-"""
-struct HClustAlgorithm{T1} <: AbstractClusteringAlgorithm
-    linkage::T1
-end
-"""
-```julia
-HClustAlgorithm(; linkage::Symbol = :ward)
-```
-
-Construct an [`HClustAlgorithm`](@ref) for hierarchical clustering.
-
-# Arguments
-
-  - `linkage`: Linkage method to use for hierarchical clustering from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html).
-
-# Returns
-
-  - `HClustAlgorithm`: An algorithm object for hierarchical clustering.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -438,15 +353,24 @@ HClustAlgorithm
 
 # Related
 
-  - [`HClustAlgorithm`](@ref)
+  - [`AbstractClusteringAlgorithm`](@ref)
+  - [`ClusteringEstimator`](@ref)
 """
+struct HClustAlgorithm{T1} <: AbstractClusteringAlgorithm
+    linkage::T1
+end
 function HClustAlgorithm(; linkage::Symbol = :ward)
     return HClustAlgorithm(linkage)
 end
 
 """
 ```julia
-struct ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator end
+struct ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator
+    ce::T1
+    de::T2
+    alg::T3
+    onc::T4
+end
 ```
 
 Estimator type for clustering in PortfolioOptimisers.jl.
@@ -469,40 +393,7 @@ ClusteringEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCov
                     onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
 ```
 
-# Related
-
-  - [`AbstractClusteringEstimator`](@ref)
-  - [`AbstractClusteringAlgorithm`](@ref)
-  - [`AbstractOptimalNumberClustersEstimator`](@ref)
-"""
-struct ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator
-    ce::T1
-    de::T2
-    alg::T3
-    onc::T4
-end
-"""
-```julia
-ClusteringEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                    de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-                    alg::AbstractClusteringAlgorithm = HClustAlgorithm(),
-                    onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
-```
-
-Construct a [`ClusteringEstimator`](@ref) for clustering.
-
-Creates a clustering estimator using the specified covariance estimator, distance estimator, clustering algorithm, and optimal number of clusters estimator.
-
-# Arguments
-
-  - `ce`: Covariance estimator.
-  - `de`: Distance estimator.
-  - `alg`: Clustering algorithm.
-  - `onc`: Optimal number of clusters estimator.
-
-# Returns
-
-  - `ClusteringEstimator`: An estimator object for clustering.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -534,8 +425,16 @@ ClusteringEstimator
 
 # Related
 
-  - [`ClusteringEstimator`](@ref)
+  - [`AbstractClusteringEstimator`](@ref)
+  - [`AbstractClusteringAlgorithm`](@ref)
+  - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
+struct ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator
+    ce::T1
+    de::T2
+    alg::T3
+    onc::T4
+end
 function ClusteringEstimator(;
                              ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                              de::AbstractDistanceEstimator = Distance(;

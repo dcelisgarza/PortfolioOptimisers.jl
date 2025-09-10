@@ -1,6 +1,12 @@
 """
 ```julia
-struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult end
+struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
+    id::tid
+    left::tl
+    right::tr
+    height::td
+    level::tcnt
+end
 ```
 
 Node type for representing clusters in a hierarchical clustering tree.

@@ -1,8 +1,10 @@
 """
 ```julia
-struct SimpleVariance{T1 <: Union{Nothing, <:AbstractExpectedReturnsEstimator},
-                      T2 <: Union{Nothing, <:AbstractWeights}, T3 <: Bool} <:
-       AbstractVarianceEstimator end
+struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
+    me::T1
+    w::T2
+    corrected::T3
+end
 ```
 
 A flexible variance estimator for PortfolioOptimisers.jl supporting optional expected returns estimators, observation weights, and bias correction.

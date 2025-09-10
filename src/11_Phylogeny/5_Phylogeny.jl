@@ -22,7 +22,10 @@ abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 
 """
 ```julia
-struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm end
+struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
+    args::T1
+    kwargs::T2
+end
 ```
 
 Centrality algorithm type for betweenness centrality in PortfolioOptimisers.jl.
@@ -50,7 +53,7 @@ struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
 end
 """
 ```julia
-struct BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;)) end
+BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
 ```
 
 Construct a [`BetweennessCentrality`](@ref) algorithm.
@@ -79,7 +82,10 @@ end
 
 """
 ```julia
-struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm end
+struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
+    args::T1
+    kwargs::T2
+end
 ```
 
 Centrality algorithm type for closeness centrality in PortfolioOptimisers.jl.
@@ -107,7 +113,7 @@ struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
 end
 """
 ```julia
-struct ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;)) end
+ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
 ```
 
 Construct a [`ClosenessCentrality`](@ref) algorithm.
@@ -142,7 +148,10 @@ end
 
 """
 ```julia
-struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm end
+struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
+    kind::T1
+    kwargs::T2
+end
 ```
 
 Centrality algorithm type for degree centrality in PortfolioOptimisers.jl.
@@ -170,7 +179,7 @@ struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
 end
 """
 ```julia
-struct DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;)) end
+DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
 ```
 
 Construct a [`DegreeCentrality`](@ref) algorithm.
@@ -219,7 +228,9 @@ struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
 
 """
 ```julia
-struct KatzCentrality{T1} <: AbstractCentralityAlgorithm end
+struct KatzCentrality{T1} <: AbstractCentralityAlgorithm
+    alpha::T1
+end
 ```
 
 Centrality algorithm type for Katz centrality in PortfolioOptimisers.jl.
@@ -272,7 +283,11 @@ end
 
 """
 ```julia
-struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm end
+struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
+    n::T1
+    alpha::T2
+    epsilon::T3
+end
 ```
 
 Centrality algorithm type for PageRank in PortfolioOptimisers.jl.
@@ -356,7 +371,10 @@ struct RadialityCentrality <: AbstractCentralityAlgorithm end
 
 """
 ```julia
-struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm end
+struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
+    args::T1
+    kwargs::T2
+end
 ```
 
 Centrality algorithm type for stress centrality in PortfolioOptimisers.jl.
@@ -498,7 +516,10 @@ abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
 
 """
 ```julia
-struct KruskalTree{T1, T2} <: AbstractTreeType end
+struct KruskalTree{T1, T2} <: AbstractTreeType
+    args::T1
+    kwargs::T2
+end
 ```
 
 Algorithm type for Kruskal's minimum spanning tree (MST) in PortfolioOptimisers.jl.
@@ -555,7 +576,10 @@ end
 
 """
 ```julia
-struct BoruvkaTree{T1, T2} <: AbstractTreeType end
+struct BoruvkaTree{T1, T2} <: AbstractTreeType
+    args::T1
+    kwargs::T2
+end
 ```
 
 Algorithm type for Boruvka's minimum spanning tree (MST) in PortfolioOptimisers.jl.
@@ -612,7 +636,10 @@ end
 
 """
 ```julia
-struct PrimTree{T1, T2} <: AbstractTreeType end
+struct PrimTree{T1, T2} <: AbstractTreeType
+    args::T1
+    kwargs::T2
+end
 ```
 
 Algorithm type for Prim's minimum spanning tree (MST) in PortfolioOptimisers.jl.
@@ -723,7 +750,12 @@ abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
 
 """
 ```julia
-struct Network{T1, T2, T3, T4} <: AbstractNetworkEstimator end
+struct Network{T1, T2, T3, T4} <: AbstractNetworkEstimator
+    ce::T1
+    de::T2
+    alg::T3
+    n::T4
+end
 ```
 
 Estimator type for network-based phylogeny analysis in PortfolioOptimisers.jl.
@@ -837,7 +869,10 @@ abstract type AbstractCentralityEstimator <: AbstractPhylogenyEstimator end
 
 """
 ```julia
-struct Centrality{T1, T2} <: AbstractCentralityEstimator end
+struct Centrality{T1, T2} <: AbstractCentralityEstimator
+    ne::T1
+    cent::T2
+end
 ```
 
 Estimator type for centrality-based analysis in PortfolioOptimisers.jl.
