@@ -594,13 +594,6 @@ This function performs a breadth-first search (BFS) on a binary (directed or und
   - The `branch` vector allows reconstruction of the BFS tree.
   - Used internally for component analysis and separating set identification in DBHT and related algorithms.
 
-# Examples
-
-```jldoctest
-julia> distance, branch = breadth(CIJ, 1)
-using PortfolioOptimisers
-```
-
 # Notes
 
   - The BFS tree does not contain all paths (or all shortest paths), but allows the determination of at least one path with minimum distance.
