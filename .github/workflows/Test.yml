@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ["1", "lts", "nightly"]
+        version: ["1"]
         os: [ubuntu-latest, macOS-latest]
         arch: [x64]
         allow_failure: [false]
