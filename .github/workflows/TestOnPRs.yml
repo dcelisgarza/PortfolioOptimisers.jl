@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ["1"]
+        version: ["1", "pre", "lts", "nightly"]
         os: [ubuntu-latest, macOS-latest]
         arch: [x64]
         allow_failure: [false]
@@ -40,4 +40,4 @@ jobs:
           - version: ["pre", "lts", "nightly"]
             os: [ubuntu-latest, macOS-latest]
             arch: [x64]
-            allow_failure: true
+            allow_failure: [true]
