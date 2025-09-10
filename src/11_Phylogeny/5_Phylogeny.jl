@@ -30,7 +30,7 @@ end
 
 Centrality algorithm type for betweenness centrality in PortfolioOptimisers.jl.
 
-`BetweennessCentrality` computes the betweenness centrality of nodes in a graph, measuring the extent to which a node lies on shortest paths between other nodes.
+`BetweennessCentrality` computes the [betweenness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality) of nodes in a graph, measuring the extent to which a node lies on shortest paths between other nodes.
 
 # Fields
 
@@ -43,29 +43,7 @@ Centrality algorithm type for betweenness centrality in PortfolioOptimisers.jl.
 BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
 ```
 
-# Related
-
-  - [`AbstractCentralityAlgorithm`](@ref)
-"""
-struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
-    args::T1
-    kwargs::T2
-end
-"""
-```julia
-BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
-```
-
-Construct a [`BetweennessCentrality`](@ref) algorithm.
-
-# Arguments
-
-  - `args`: Positional arguments for the centrality computation.
-  - `kwargs`: Keyword arguments for the centrality computation.
-
-# Returns
-
-  - `BetweennessCentrality`: Algorithm object for betweenness centrality.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -75,7 +53,16 @@ BetweennessCentrality
     args | Tuple{}: ()
   kwargs | @NamedTuple{}: NamedTuple()
 ```
+
+# Related
+
+  - [`AbstractCentralityAlgorithm`](@ref)
+  - [`Graphs.betweenness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality)
 """
+struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
+    args::T1
+    kwargs::T2
+end
 function BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BetweennessCentrality(args, kwargs)
 end
@@ -90,7 +77,7 @@ end
 
 Centrality algorithm type for closeness centrality in PortfolioOptimisers.jl.
 
-`ClosenessCentrality` computes the closeness centrality of nodes in a graph, measuring how close a node is to all other nodes.
+`ClosenessCentrality` computes the [closeness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality) of nodes in a graph, measuring how close a node is to all other nodes.
 
 # Fields
 
@@ -103,35 +90,7 @@ Centrality algorithm type for closeness centrality in PortfolioOptimisers.jl.
 ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
 ```
 
-# Related
-
-  - [`AbstractCentralityAlgorithm`](@ref)
-"""
-struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
-    args::T1
-    kwargs::T2
-end
-"""
-```julia
-ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
-```
-
-Construct a [`ClosenessCentrality`](@ref) algorithm.
-
-# Arguments
-
-  - `args`: Positional arguments for the centrality computation.
-  - `kwargs`: Keyword arguments for the centrality computation.
-
-# Constructor
-
-```julia
-ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
-```
-
-# Returns
-
-  - `ClosenessCentrality`: Algorithm object for closeness centrality.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -141,7 +100,16 @@ ClosenessCentrality
     args | Tuple{}: ()
   kwargs | @NamedTuple{}: NamedTuple()
 ```
+
+# Related
+
+  - [`AbstractCentralityAlgorithm`](@ref)
+  - [`Graphs.closeness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality)
 """
+struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
+    args::T1
+    kwargs::T2
+end
 function ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return ClosenessCentrality(args, kwargs)
 end
@@ -156,7 +124,7 @@ end
 
 Centrality algorithm type for degree centrality in PortfolioOptimisers.jl.
 
-`DegreeCentrality` computes the degree centrality of nodes in a graph, measuring the number of edges connected to each node. The `kind` parameter specifies the type of degree (0: total, 1: in-degree, 2: out-degree).
+`DegreeCentrality` computes the [degree centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D) of nodes in a graph, measuring the number of edges connected to each node. The `kind` parameter specifies the type of degree (0: total, 1: in-degree, 2: out-degree).
 
 # Fields
 
@@ -169,31 +137,9 @@ Centrality algorithm type for degree centrality in PortfolioOptimisers.jl.
 DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
 ```
 
-# Related
+Keyword arguments correspond to the fields above.
 
-  - [`AbstractCentralityAlgorithm`](@ref)
-"""
-struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
-    kind::T1
-    kwargs::T2
-end
-"""
-```julia
-DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
-```
-
-Construct a [`DegreeCentrality`](@ref) algorithm.
-
-# Arguments
-
-  - `kind`: Degree type (0: total, 1: in-degree, 2: out-degree).
-  - `kwargs`: Keyword arguments for the centrality computation.
-
-# Returns
-
-  - `DegreeCentrality`: Algorithm object for degree centrality.
-
-# Validation
+## Validation
 
   - `0 <= kind <= 2`.
 
@@ -205,7 +151,16 @@ DegreeCentrality
     kind | Int64: 1
   kwargs | @NamedTuple{}: NamedTuple()
 ```
+
+# Related
+
+  - [`AbstractCentralityAlgorithm`](@ref)
+  - [`Graphs._degree_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D)
 """
+struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
+    kind::T1
+    kwargs::T2
+end
 function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
     @argcheck(kind in 0:2, DomainError("`kind` must be in (0:2):\nkind => $kind"))
     return DegreeCentrality(kind, kwargs)
@@ -216,13 +171,14 @@ end
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
 ```
 
-Centrality algorithm type for eigenvector centrality in PortfolioOptimisers.jl.
+Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.eigenvector_centrality-Tuple%7BAbstractGraph%7D) in PortfolioOptimisers.jl.
 
 `EigenvectorCentrality` computes the eigenvector centrality of nodes in a graph, measuring the influence of a node based on the centrality of its neighbors.
 
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
+  - [`Graphs.eigenvector_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.eigenvector_centrality-Tuple%7BAbstractGraph%7D)
 """
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
 
@@ -235,7 +191,7 @@ end
 
 Centrality algorithm type for Katz centrality in PortfolioOptimisers.jl.
 
-`KatzCentrality` computes the Katz centrality of nodes in a graph, measuring the influence of a node based on the number and length of walks between nodes, controlled by the attenuation factor `alpha`.
+`KatzCentrality` computes the [Katz centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality) of nodes in a graph, measuring the influence of a node based on the number and length of walks between nodes, controlled by the attenuation factor `alpha`.
 
 # Fields
 
@@ -247,27 +203,7 @@ Centrality algorithm type for Katz centrality in PortfolioOptimisers.jl.
 KatzCentrality(; alpha::Real = 0.3)
 ```
 
-# Related
-
-  - [`AbstractCentralityAlgorithm`](@ref)
-"""
-struct KatzCentrality{T1} <: AbstractCentralityAlgorithm
-    alpha::T1
-end
-"""
-```julia
-KatzCentrality(; alpha::Real = 0.3)
-```
-
-Construct a [`KatzCentrality`](@ref) algorithm.
-
-# Arguments
-
-  - `alpha`: Attenuation factor for Katz centrality.
-
-# Returns
-
-  - `KatzCentrality`: Algorithm object for Katz centrality.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -276,7 +212,15 @@ julia> KatzCentrality(; alpha = 0.5)
 KatzCentrality
   alpha | Float64: 0.5
 ```
+
+# Related
+
+  - [`AbstractCentralityAlgorithm`](@ref)
+  - [`Graphs.katz_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality)
 """
+struct KatzCentrality{T1} <: AbstractCentralityAlgorithm
+    alpha::T1
+end
 function KatzCentrality(; alpha::Real = 0.3)
     return KatzCentrality(alpha)
 end
@@ -292,7 +236,7 @@ end
 
 Centrality algorithm type for PageRank in PortfolioOptimisers.jl.
 
-`Pagerank` computes the PageRank of nodes in a graph, measuring the importance of nodes based on the structure of incoming links. The algorithm is controlled by the damping factor `alpha`, number of iterations `n`, and convergence tolerance `epsilon`.
+`Pagerank` computes the [PageRank](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer) of nodes in a graph, measuring the importance of nodes based on the structure of incoming links. The algorithm is controlled by the damping factor `alpha`, number of iterations `n`, and convergence tolerance `epsilon`.
 
 # Fields
 
@@ -306,33 +250,9 @@ Centrality algorithm type for PageRank in PortfolioOptimisers.jl.
 Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
 ```
 
-# Related
+Keyword arguments correspond to the fields above.
 
-  - [`AbstractCentralityAlgorithm`](@ref)
-"""
-struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
-    n::T1
-    alpha::T2
-    epsilon::T3
-end
-"""
-```julia
-Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
-```
-
-Construct a [`Pagerank`](@ref) algorithm.
-
-# Arguments
-
-  - `n`: Number of iterations (must be > 0).
-  - `alpha`: Damping factor (must be in (0, 1)).
-  - `epsilon`: Convergence tolerance (must be > 0).
-
-# Returns
-
-  - `Pagerank`: Algorithm object for PageRank centrality.
-
-# Validation
+## Validation
 
   - `n > 0`.
   - `0 < alpha < 1`.
@@ -347,7 +267,17 @@ Pagerank
     alpha | Float64: 0.9
   epsilon | Float64: 1.0e-8
 ```
+
+# Related
+
+  - [`AbstractCentralityAlgorithm`](@ref)
+  - [`Graphs.pagerank`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer)
 """
+struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
+    n::T1
+    alpha::T2
+    epsilon::T3
+end
 function Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
     @argcheck(n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
               DomainError("The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon"))
@@ -359,13 +289,14 @@ end
 struct RadialityCentrality <: AbstractCentralityAlgorithm end
 ```
 
-Centrality algorithm type for radiality centrality in PortfolioOptimisers.jl.
+Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.radiality_centrality-Tuple%7BAbstractGraph%7D) in PortfolioOptimisers.jl.
 
 `RadialityCentrality` computes the radiality centrality of nodes in a graph, measuring how close a node is to all other nodes, adjusted for the maximum possible distance.
 
 # Related
 
   - [`AbstractCentralityAlgorithm`](@ref)
+  - [`Graphs.radiality_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.radiality_centrality-Tuple%7BAbstractGraph%7D)
 """
 struct RadialityCentrality <: AbstractCentralityAlgorithm end
 
@@ -377,7 +308,7 @@ struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
 end
 ```
 
-Centrality algorithm type for stress centrality in PortfolioOptimisers.jl.
+Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality) in PortfolioOptimisers.jl.
 
 `StressCentrality` computes the stress centrality of nodes in a graph, measuring the number of shortest paths passing through each node.
 
@@ -392,29 +323,7 @@ Centrality algorithm type for stress centrality in PortfolioOptimisers.jl.
 StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
 ```
 
-# Related
-
-  - [`AbstractCentralityAlgorithm`](@ref)
-"""
-struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
-    args::T1
-    kwargs::T2
-end
-"""
-```julia
-StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
-```
-
-Construct a [`StressCentrality`](@ref) algorithm.
-
-# Arguments
-
-  - `args`: Positional arguments for the centrality computation.
-  - `kwargs`: Keyword arguments for the centrality computation.
-
-# Returns
-
-  - `StressCentrality`: Algorithm object for stress centrality.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -424,21 +333,23 @@ StressCentrality
     args | Tuple{}: ()
   kwargs | @NamedTuple{}: NamedTuple()
 ```
+
+# Related
+
+  - [`AbstractCentralityAlgorithm`](@ref)
+  - [`Graphs.stress_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality)
 """
+struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
+    args::T1
+    kwargs::T2
+end
 function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return StressCentrality(args, kwargs)
 end
 
 """
 ```julia
-calc_centrality(cent::BetweennessCentrality, g::AbstractGraph)
-calc_centrality(cent::ClosenessCentrality, g::AbstractGraph)
-calc_centrality(cent::DegreeCentrality, g::AbstractGraph)
-calc_centrality(::EigenvectorCentrality, g::AbstractGraph)
-calc_centrality(cent::KatzCentrality, g::AbstractGraph)
-calc_centrality(cent::Pagerank, g::AbstractGraph)
-calc_centrality(::RadialityCentrality, g::AbstractGraph)
-calc_centrality(cent::StressCentrality, g::AbstractGraph)
+calc_centrality(cent::AbstractCentralityAlgorithm, g::AbstractGraph)
 ```
 
 Compute node centrality scores for a graph using the specified centrality algorithm.
@@ -447,14 +358,17 @@ This function dispatches to the appropriate centrality computation from [`Graphs
 
 # Arguments
 
-  - `cent::BetweennessCentrality`: Computes betweenness centrality using `Graphs.betweenness_centrality`.
-  - `cent::ClosenessCentrality`: Computes closeness centrality using `Graphs.closeness_centrality`.
-  - `cent::DegreeCentrality`: Computes degree centrality using `Graphs._degree_centrality`.
-  - `cent::EigenvectorCentrality`: Computes eigenvector centrality using `Graphs.eigenvector_centrality`.
-  - `cent::KatzCentrality`: Computes Katz centrality using `Graphs.katz_centrality`.
-  - `cent::Pagerank`: Computes PageRank using `Graphs.pagerank`.
-  - `cent::RadialityCentrality`: Computes radiality centrality using `Graphs.radiality_centrality`.
-  - `cent::StressCentrality`: Computes stress centrality using `Graphs.stress_centrality`.
+  - `cent`: Centrality algorithm to use.
+
+      + `cent::BetweennessCentrality`: Computes betweenness centrality.
+      + `cent::ClosenessCentrality`: Computes closeness centrality.
+      + `cent::DegreeCentrality`: Computes degree centrality.
+      + `cent::EigenvectorCentrality`: Computes eigenvector centrality.
+      + `cent::KatzCentrality`: Computes Katz centrality.
+      + `cent::Pagerank`: Computes PageRank.
+      + `cent::RadialityCentrality`: Computes radiality centrality.
+      + `cent::StressCentrality`: Computes stress centrality.
+
   - `g`: Graph to compute centrality on.
 
 # Returns
@@ -463,6 +377,7 @@ This function dispatches to the appropriate centrality computation from [`Graphs
 
 # Related
 
+  - [`AbstractCentralityAlgorithm`](@ref)
   - [`BetweennessCentrality`](@ref)
   - [`ClosenessCentrality`](@ref)
   - [`DegreeCentrality`](@ref)
@@ -524,7 +439,7 @@ end
 
 Algorithm type for Kruskal's minimum spanning tree (MST) in PortfolioOptimisers.jl.
 
-`KruskalTree` specifies the use of Kruskal's algorithm for constructing a minimum spanning tree from a graph.
+`KruskalTree` specifies the use of [Kruskal's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.kruskal_mst) for constructing a minimum spanning tree from a graph.
 
 # Fields
 
@@ -537,29 +452,7 @@ Algorithm type for Kruskal's minimum spanning tree (MST) in PortfolioOptimisers.
 KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
 ```
 
-# Related
-
-  - [`AbstractTreeType`](@ref)
-"""
-struct KruskalTree{T1, T2} <: AbstractTreeType
-    args::T1
-    kwargs::T2
-end
-"""
-```julia
-KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
-```
-
-Construct a [`KruskalTree`](@ref) algorithm.
-
-# Arguments
-
-  - `args`: Positional arguments for the MST computation.
-  - `kwargs`: Keyword arguments for the MST computation.
-
-# Returns
-
-  - `KruskalTree`: Algorithm object for Kruskal's MST.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -569,7 +462,16 @@ KruskalTree
     args | Tuple{}: ()
   kwargs | @NamedTuple{}: NamedTuple()
 ```
+
+# Related
+
+  - [`AbstractTreeType`](@ref)
+  - [`Graphs.kruskal_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.kruskal_mst)
 """
+struct KruskalTree{T1, T2} <: AbstractTreeType
+    args::T1
+    kwargs::T2
+end
 function KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return KruskalTree(args, kwargs)
 end
@@ -584,7 +486,7 @@ end
 
 Algorithm type for Boruvka's minimum spanning tree (MST) in PortfolioOptimisers.jl.
 
-`BoruvkaTree` specifies the use of Boruvka's algorithm for constructing a minimum spanning tree from a graph.
+`BoruvkaTree` specifies the use of [Boruvka's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.boruvka_mst) for constructing a minimum spanning tree from a graph.
 
 # Fields
 
@@ -597,29 +499,7 @@ Algorithm type for Boruvka's minimum spanning tree (MST) in PortfolioOptimisers.
 BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
 ```
 
-# Related
-
-  - [`AbstractTreeType`](@ref)
-"""
-struct BoruvkaTree{T1, T2} <: AbstractTreeType
-    args::T1
-    kwargs::T2
-end
-"""
-```julia
-BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
-```
-
-Construct a [`BoruvkaTree`](@ref) algorithm.
-
-# Arguments
-
-  - `args`: Positional arguments for the MST computation.
-  - `kwargs`: Keyword arguments for the MST computation.
-
-# Returns
-
-  - `BoruvkaTree`: Algorithm object for Boruvka's MST.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -629,7 +509,16 @@ BoruvkaTree
     args | Tuple{}: ()
   kwargs | @NamedTuple{}: NamedTuple()
 ```
+
+# Related
+
+  - [`AbstractTreeType`](@ref)
+  - [`Graphs.boruvka_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.boruvka_mst)
 """
+struct BoruvkaTree{T1, T2} <: AbstractTreeType
+    args::T1
+    kwargs::T2
+end
 function BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BoruvkaTree(args, kwargs)
 end
@@ -644,7 +533,7 @@ end
 
 Algorithm type for Prim's minimum spanning tree (MST) in PortfolioOptimisers.jl.
 
-`PrimTree` specifies the use of Prim's algorithm for constructing a minimum spanning tree from a graph.
+`PrimTree` specifies the use of [Prim's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst) for constructing a minimum spanning tree from a graph.
 
 # Fields
 
@@ -657,29 +546,7 @@ Algorithm type for Prim's minimum spanning tree (MST) in PortfolioOptimisers.jl.
 PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
 ```
 
-# Related
-
-  - [`AbstractTreeType`](@ref)
-"""
-struct PrimTree{T1, T2} <: AbstractTreeType
-    args::T1
-    kwargs::T2
-end
-"""
-```julia
-PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
-```
-
-Construct a [`PrimTree`](@ref) algorithm.
-
-# Arguments
-
-  - `args`: Positional arguments for the MST computation.
-  - `kwargs`: Keyword arguments for the MST computation.
-
-# Returns
-
-  - `PrimTree`: Algorithm object for Prim's MST.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -689,16 +556,23 @@ PrimTree
     args | Tuple{}: ()
   kwargs | @NamedTuple{}: NamedTuple()
 ```
+
+# Related
+
+  - [`AbstractTreeType`](@ref)
+  - [`Graphs.prim_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst)
 """
+struct PrimTree{T1, T2} <: AbstractTreeType
+    args::T1
+    kwargs::T2
+end
 function PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return PrimTree(args, kwargs)
 end
 
 """
 ```julia
-calc_mst(alg::KruskalTree, g::AbstractGraph)
-calc_mst(alg::BoruvkaTree, g::AbstractGraph)
-calc_mst(alg::PrimTree, g::AbstractGraph)
+calc_mst(alg::AbstractTreeType, g::AbstractGraph)
 ```
 
 Compute the minimum spanning tree (MST) of a graph using the specified algorithm.
@@ -707,9 +581,12 @@ This function dispatches to the appropriate MST computation from `Graphs.jl` bas
 
 # Arguments
 
-  - `alg::KruskalTree`: Computes the MST using Kruskal's algorithm (`Graphs.kruskal_mst`).
-  - `alg::BoruvkaTree`: Computes the MST using Boruvka's algorithm (`Graphs.boruvka_mst`).
-  - `alg::PrimTree`: Computes the MST using Prim's algorithm (`Graphs.prim_mst`).
+  - `alg`: MST algorithm to use.
+
+      + `alg::KruskalTree`: Computes the MST using Kruskal's algorithm.
+      + `alg::BoruvkaTree`: Computes the MST using Boruvka's algorithm.
+      + `alg::PrimTree`: Computes the MST using Prim's algorithm.
+
   - `g::AbstractGraph`: Graph to compute the MST on.
 
 # Returns
@@ -778,40 +655,7 @@ Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
         n::Integer = 1)
 ```
 
-# Related
-
-  - [`AbstractNetworkEstimator`](@ref)
-  - [`AbstractTreeType`](@ref)
-  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
-"""
-struct Network{T1, T2, T3, T4} <: AbstractNetworkEstimator
-    ce::T1
-    de::T2
-    alg::T3
-    n::T4
-end
-"""
-```julia
-Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-        alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
-        n::Integer = 1)
-```
-
-Construct a [`Network`](@ref) estimator for network-based phylogeny analysis.
-
-Creates a network estimator using the specified covariance estimator, distance estimator, tree or similarity algorithm, and network depth.
-
-# Arguments
-
-  - `ce`: Covariance estimator.
-  - `de`: Distance estimator.
-  - `alg`: Tree or similarity matrix algorithm.
-  - `n`: Network depth parameter (integer).
-
-# Returns
-
-  - `Network`: An estimator object for network-based phylogeny analysis.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -842,8 +686,16 @@ Network
 
 # Related
 
-  - [`Network`](@ref)
+  - [`AbstractNetworkEstimator`](@ref)
+  - [`AbstractTreeType`](@ref)
+  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
 """
+struct Network{T1, T2, T3, T4} <: AbstractNetworkEstimator
+    ce::T1
+    de::T2
+    alg::T3
+    n::T4
+end
 function Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                  de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
                  alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
@@ -891,33 +743,7 @@ Centrality(; ne::AbstractNetworkEstimator = Network(),
            cent::AbstractCentralityAlgorithm = DegreeCentrality())
 ```
 
-# Related
-
-  - [`AbstractCentralityEstimator`](@ref)
-  - [`AbstractCentralityAlgorithm`](@ref)
-"""
-struct Centrality{T1, T2} <: AbstractCentralityEstimator
-    ne::T1
-    cent::T2
-end
-"""
-```julia
-Centrality(; ne::AbstractNetworkEstimator = Network(),
-           cent::AbstractCentralityAlgorithm = DegreeCentrality())
-```
-
-Construct a [`Centrality`](@ref) estimator for centrality-based analysis.
-
-Creates a centrality estimator using the specified network estimator and centrality algorithm.
-
-# Arguments
-
-  - `ne`: Network estimator.
-  - `cent`: Centrality algorithm.
-
-# Returns
-
-  - `Centrality`: An estimator object for centrality-based analysis.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -952,8 +778,13 @@ Centrality
 
 # Related
 
-  - [`Centrality`](@ref)
+  - [`AbstractCentralityEstimator`](@ref)
+  - [`AbstractCentralityAlgorithm`](@ref)
 """
+struct Centrality{T1, T2} <: AbstractCentralityEstimator
+    ne::T1
+    cent::T2
+end
 function Centrality(; ne::AbstractNetworkEstimator = Network(),
                     cent::AbstractCentralityAlgorithm = DegreeCentrality())
     return Centrality(ne, cent)
@@ -961,10 +792,7 @@ end
 
 """
 ```julia
-calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractTreeType, <:Any}, X::AbstractMatrix;
-               dims::Int = 1, kwargs...)
-calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any},
-               X::AbstractMatrix; dims::Int = 1, kwargs...)
+calc_adjacency(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```
 
 Compute the adjacency matrix for a network estimator.
@@ -1039,6 +867,7 @@ function phylogeny_matrix(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs.
     P .= clamp!(P, 0, 1) - I
     return P
 end
+
 """
 ```julia
 phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
@@ -1048,7 +877,7 @@ phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
 
 Compute the phylogeny matrix for a clustering estimator or result.
 
-This function applies clustering to the data, assigns assets to clusters, and constructs a binary phylogeny matrix indicating shared cluster membership, with self-loops removed.
+This function clusterises the data, cuts the tree into the optimal number of clusters, and constructs a binary phylogeny matrix indicating shared cluster membership, with self-loops removed.
 
 # Arguments
 
@@ -1065,7 +894,8 @@ This function applies clustering to the data, assigns assets to clusters, and co
 # Related
 
   - [`ClusteringEstimator`](@ref)
-  - [`phylogeny_matrix`](@ref)
+  - [`AbstractClusteringResult`](@ref)
+  - [`clusterise`](@ref)
 """
 function phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
                           X::AbstractMatrix; branchorder::Symbol = :optimal, dims::Int = 1,
