@@ -21,13 +21,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ["1", "pre", "lts", "nightly"]
+        version: ["1", "lts", "nightly"]
         os: [ubuntu-latest, macOS-latest]
         arch: [x64]
         allow_failure: [false]
         include:
-          - version: ["pre", "lts", "nightly"]
-          - os: [ubuntu-latest, macOS-latest]
-          - arch: [x64]
-          - allow_failure: true
+          - version: "pre"
+            os: ubuntu-latest
+            arch: x64
+            allow_failure: true
+          - version: "pre"
+            os: macOS-latest
+            arch: x64
+            allow_failure: true
+          - version: "lts"
+            os: ubuntu-latest
+            arch: x64
+            allow_failure: true
+          - version: "lts"
+            os: macOS-latest
+            arch: x64
+            allow_failure: true
+          - version: "nightly"
+            os: ubuntu-latest
+            arch: x64
+            allow_failure: true
+          - version: "nightly"
+            os: macOS-latest
+            arch: x64
+            allow_failure: true
 
