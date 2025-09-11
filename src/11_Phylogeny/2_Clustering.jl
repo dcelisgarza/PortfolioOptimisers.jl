@@ -203,13 +203,13 @@ Keyword arguments correspond to the fields above.
 julia> StandardisedSilhouetteScore()
 StandardisedSilhouetteScore
   metric | nothing
+```
 
 # Related
 
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
   - [`OptimalNumberClusters`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
-```
 """
 struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
     metric::T1

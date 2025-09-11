@@ -267,7 +267,7 @@ Keyword arguments correspond to the fields above.
 julia> AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"]))
 AssetSets
    key | String: "nx"
-  dict | Dict{String, Vector{String}}: Dict("group1" => ["A", "B"], "nx" => ["A", "B", "C"])
+  dict | Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"])
 ```
 
 # Related
@@ -1690,7 +1690,7 @@ AssetSetsMatrixEstimator
   val | String: "sector"
 
 julia> asset_sets_matrix(est, sets)
-2×3 BitMatrix:
+2×3 transpose(::BitMatrix) with eltype Bool:
  1  1  0
  0  0  1
 ```
