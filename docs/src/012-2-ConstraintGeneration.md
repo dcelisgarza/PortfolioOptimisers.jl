@@ -9,7 +9,8 @@ RhoParsingResult
 AssetSets
 parse_equation
 linear_constraints
+replace_group_by_assets
 PortfolioOptimisers.AbstractParsingResult
-PortfolioOptimisers.replace_group_by_assets
+PortfolioOptimisers.group_to_val!
 PortfolioOptimisers.estimator_to_val
 ```
