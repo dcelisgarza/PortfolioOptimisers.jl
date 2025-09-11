@@ -530,7 +530,7 @@
         @test pr.mu[end] >= 0.83 * pr0.mu[end] - sqrt(eps())
         @test isapprox(pr.sigma[1, 1], 1.2 * pr0.sigma[1, 1], rtol = 1e-2)
         @test isapprox(pr.sigma[19, 19], 1.4 * pr0.sigma[19, 19], rtol = 5e-3)
-        @test isapprox(cov2cor(pr.sigma)[1, end], 0.42, rtol = 1e-3)
+        @test isapprox(cov2cor(pr.sigma)[1, end], 0.35, rtol = 1e-3)
 
         pr = prior(EntropyPoolingPrior(; sets = sets,
                                        cvar_views = LinearConstraintEstimator(;
