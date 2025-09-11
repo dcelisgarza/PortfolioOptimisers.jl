@@ -604,9 +604,9 @@ function _collect_terms!(expr, coeff, terms)
             # Multiplication: find numeric and variable part
             a, b = expr.args[2], expr.args[3]
             if a isa Number
-                _collect_terms!(b, coeff * oftype(b, a), terms)
+                _collect_terms!(b, coeff * oftype(coeff, a), terms)
             elseif b isa Number
-                _collect_terms!(a, coeff * oftype(a, b), terms)
+                _collect_terms!(a, coeff * oftype(coeff, b), terms)
             else
                 # e.g. x*y, treat as variable
                 push!(terms, (coeff, string(expr)))
@@ -614,7 +614,7 @@ function _collect_terms!(expr, coeff, terms)
         elseif expr.head == :call && expr.args[1] == :/
             a, b = expr.args[2], expr.args[3]
             if b isa Number
-                _collect_terms!(a, coeff / oftype(a, b), terms)
+                _collect_terms!(a, coeff / oftype(coeff, b), terms)
             else
                 # e.g. x/y, treat as variable
                 push!(terms, (coeff, string(expr)))
