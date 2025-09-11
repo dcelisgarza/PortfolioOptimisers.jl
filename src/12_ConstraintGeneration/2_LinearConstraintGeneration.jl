@@ -1,3 +1,47 @@
+"""
+```julia
+struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
+    A::T1
+    B::T2
+end
+```
+
+Container for a set of linear constraints (either equality or inequality) in the form `A * x = B` or `A * x ≤ B`.
+
+`PartialLinearConstraint` stores the coefficient matrix `A` and right-hand side vector `B` for a group of linear constraints. This type is used internally by [`LinearConstraint`](@ref) to represent either the equality or inequality constraints in a portfolio optimisation problem.
+
+# Fields
+
+  - `A`: Coefficient matrix of the linear constraints (typically `AbstractMatrix`).
+  - `B`: Right-hand side vector of the linear constraints (typically `AbstractVector`).
+
+# Constructor
+
+```julia
+PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `!isempty(A)`.
+  - `!isempty(B)`.
+
+# Examples
+
+```jldoctest
+julia> PartialLinearConstraint(; A = [1.0 2.0; 3.0 4.0], B = [5.0, 6.0])
+PartialLinearConstraint
+  A | 2×2 Matrix{Float64}
+  B | Vector{Float64}: [5.0, 6.0]
+```
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`LinearConstraintEstimator`](@ref)
+"""
 struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
     A::T1
     B::T2
@@ -7,6 +51,59 @@ function PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
               DimensionMismatch("`A` and `B` must be non-empty:\nisempty(A) => $(isempty(A))\nisempty(B) => $(isempty(B))"))
     return PartialLinearConstraint(A, B)
 end
+
+"""
+```julia
+struct LinearConstraint{T1, T2} <: AbstractConstraintResult
+    ineq::T1
+    eq::T2
+end
+```
+
+Container for a set of linear constraints, separating inequality and equality constraints.
+
+`LinearConstraint` holds both the inequality and equality constraints for a portfolio optimisation problem, each represented as a [`PartialLinearConstraint`](@ref). This type is used to encapsulate all linear constraints in a unified structure, enabling composable and modular constraint handling.
+
+# Fields
+
+  - `ineq`: Inequality constraints, as a [`PartialLinearConstraint`](@ref) or `nothing`.
+  - `eq`: Equality constraints, as a [`PartialLinearConstraint`](@ref) or `nothing`.
+
+# Constructor
+
+```julia
+LinearConstraint(; ineq::Union{Nothing, <:PartialLinearConstraint} = nothing,
+                 eq::Union{Nothing, <:PartialLinearConstraint} = nothing)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `isnothing(ineq) ⊼ isnothing(eq)`, i.e. they cannot both be `nothing` at the same time.
+
+# Examples
+
+```jldoctest
+julia> ineq = PartialLinearConstraint(; A = [1.0 2.0; 3.0 4.0], B = [5.0, 6.0]);
+
+julia> eq = PartialLinearConstraint(; A = [7.0 8.0; 9.0 10.0], B = [11.0, 12.0]);
+
+julia> LinearConstraint(; ineq = ineq, eq = eq)
+LinearConstraint
+  ineq | PartialLinearConstraint
+       |   A | 2×2 Matrix{Float64}
+       |   B | Vector{Float64}: [5.0, 6.0]
+    eq | PartialLinearConstraint
+       |   A | 2×2 Matrix{Float64}
+       |   B | Vector{Float64}: [11.0, 12.0]
+```
+
+# Related
+
+  - [`PartialLinearConstraint`](@ref)
+  - [`LinearConstraintEstimator`](@ref)
+"""
 struct LinearConstraint{T1, T2} <: AbstractConstraintResult
     ineq::T1
     eq::T2
@@ -29,6 +126,291 @@ function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     else
         getfield(obj, sym)
     end
+end
+
+"""
+```julia
+abstract type AbstractParsingResult <: AbstractConstraintResult end
+```
+
+Abstract supertype for all equation parsing result types in PortfolioOptimisers.jl.
+
+All concrete types representing parsing results should subtype `AbstractParsingResult`. This enables a consistent interface for handling different types of parsed constraint equations.
+
+# Related
+
+  - [`ParsingResult`](@ref)
+  - [`RhoParsingResult`](@ref)
+"""
+abstract type AbstractParsingResult <: AbstractConstraintResult end
+
+"""
+```julia
+struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
+    vars::T1
+    coef::T2
+    op::T3
+    rhs::T4
+    eqn::T5
+end
+```
+
+Structured result for standard linear constraint equation parsing.
+
+`ParsingResult` is the canonical output of [`parse_equation`](@ref) for standard linear constraints. It stores all information needed to construct constraint matrices for portfolio optimisation, including variable names, coefficients, the comparison operator, right-hand side value, and a formatted equation string.
+
+# Fields
+
+  - `vars`: Vector of variable names as strings.
+  - `coef`: Vector of coefficients.
+  - `op`: The comparison operator as a string.
+  - `rhs`: The right-hand side value.
+  - `eqn`: The formatted equation string.
+
+# Related
+
+  - [`AbstractParsingResult`](@ref)
+  - [`parse_equation`](@ref)
+  - [`RhoParsingResult`](@ref)
+"""
+struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
+    vars::T1
+    coef::T2
+    op::T3
+    rhs::T4
+    eqn::T5
+end
+
+"""
+```julia
+struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
+    vars::T1
+    coef::T2
+    op::T3
+    rhs::T4
+    eqn::T5
+    ij::T6
+end
+```
+
+Structured result for correlation view constraint equation parsing.
+
+`RhoParsingResult` is produced when parsing correlation view constraints, such as those used in entropy pooling prior models. It extends the standard [`ParsingResult`](@ref) by including an `ij` field, which stores the tuple of asset pairs (indices) relevant for the correlation view.
+
+# Fields
+
+  - `vars`: Vector of variable names as strings.
+  - `coef`: Vector of coefficients.
+  - `op`: The comparison operator as a string.
+  - `rhs`: The right-hand side value.
+  - `eqn`: The formatted equation string.
+  - `ij`: Tuple or vector of asset index pairs for correlation views.
+
+# Details
+
+  - Produced by correlation view parsing routines, typically when the constraint involves asset pairs (e.g., `"(A, B) == 0.5"`).
+  - The `ij` field enables downstream routines to map parsed correlation views to the appropriate entries in the correlation matrix.
+  - Used internally for entropy pooling, Black-Litterman, and other advanced portfolio models that support correlation views.
+
+# Related
+
+  - [`AbstractParsingResult`](@ref)
+  - [`ParsingResult`](@ref)
+  - [`replace_prior_views`](@ref)
+"""
+struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
+    vars::T1
+    coef::T2
+    op::T3
+    rhs::T4
+    eqn::T5
+    ij::T6
+end
+Base.getindex(res::AbstractParsingResult, i) = i == 1 ? res : throw(BoundsError(res, i))
+
+"""
+```julia
+struct AssetSets{T1, T2} <: AbstractEstimator
+    key::T1
+    dict::T2
+end
+```
+
+Container for asset set and group information used in constraint generation.
+
+`AssetSets` provides a unified interface for specifying the asset universe and any groupings or partitions of assets. It is used throughout constraint generation and estimator routines to expand group references, map group names to asset lists, and validate asset membership.
+
+# Fields
+
+  - `key`: The key in `dict` that identifies the primary list of assets (typically a `Symbol` or `AbstractString`).
+  - `dict`: A dictionary mapping group names (or asset set names) to vectors of asset identifiers (typically `AbstractDict{<:Union{Symbol, AbstractString}, <:AbstractVector}`).
+
+# Constructor
+
+```julia
+AssetSets(; key::Union{Symbol, AbstractString} = "nx",
+          dict::AbstractDict{<:Union{Symbol, AbstractString}})
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `!isempty(dict)`.
+  - `haskey(dict, key)`.
+
+# Examples
+
+```jldoctest
+julia> AssetSets(; key = :nx, dict = Dict(:nx => ["A", "B", "C"], :group1 => ["A", "B"]))
+AssetSets
+   key | Symbol: :nx
+  dict | Dict{Symbol, Vector{String}}: Dict(:group1 => ["A", "B"], :nx => ["A", "B", "C"])
+```
+
+# Related
+
+  - [`replace_group_by_assets`](@ref)
+  - [`estimator_to_val`](@ref)
+  - [`linear_constraints`](@ref)
+"""
+struct AssetSets{T1, T2} <: AbstractEstimator
+    key::T1
+    dict::T2
+end
+function AssetSets(; key::Union{Symbol, <:AbstractString} = "nx",
+                   dict::AbstractDict{<:Union{Symbol, <:AbstractString}})
+    @argcheck(!isempty(dict) && haskey(dict, key),
+              AssertionError("The following conditions must be met:\n`dict` must be non-empty => !isempty(dict) = $(!isempty(dict))\n`dict` must contain `key` = $key, typeof(key) = $(typeof(key)) => haskey(dict, key) = $(haskey(dict, key))"))
+    return AssetSets(key, dict)
+end
+function nothing_asset_sets_view(sets::AssetSets, i::AbstractVector)
+    dict = Dict(k => v for (k, v) in sets.dict if k != sets.key)
+    dict[sets.key] = view(sets.dict[sets.key], i)
+    return AssetSets(; key = sets.key, dict = dict)
+end
+"""
+```julia
+nothing_asset_sets_view(::Nothing, ::Any)
+```
+
+No-op fallback for indexing `nothing` asset sets.
+"""
+function nothing_asset_sets_view(::Nothing, ::Any)
+    return nothing
+end
+
+"""
+Maps the assets in group `key` of `sdict` to their corresponding indices in `nx`, and sets the corresponding entries in the values array `arr` to `val`.
+"""
+function group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::Real,
+                       dict::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
+                                   <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                       arr::AbstractArray, strict::Bool)
+    assets = get(sdict, key, nothing)
+    if isnothing(assets)
+        if strict
+            throw(ArgumentError("$(key) is not in $(keys(sdict)).\n$(dict)"))
+        else
+            @warn("$(key) is not in $(keys(sdict)).\n$(dict)")
+        end
+    else
+        unique!(assets)
+        arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
+    end
+    return nothing
+end
+
+"""
+sets the array of values from a dict/vector of pairs or a single pair, based on the asset sets provided.
+
+  - `arr`: The array to be modified in-place.
+  - `dict`: A dictionary or vector of pairs mapping asset or group names to values, or a single pair.
+  - `sets`: The `AssetSets` containing the asset groups.
+  - `strict`: If `true`, throws an error if a key in `dict` is not found in the asset sets; if `false`, issues a warning instead.
+"""
+function estimator_to_val!(arr::AbstractArray,
+                           dict::Union{<:AbstractDict,
+                                       <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                           sets::AssetSets; strict::Bool = false)
+    nx = sets.dict[sets.key]
+    for (key, val) in dict
+        if key in nx
+            arr[nx[key]] .= val
+        else
+            group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
+        end
+    end
+    return nothing
+end
+"""
+sets the array of values from a single pair, based on the asset sets provided.
+
+  - `arr`: The array to be modified in-place.
+  - `dict`: A single pair mapping an asset or group name to a value.
+  - `sets`: The `AssetSets` containing the asset groups.
+  - `strict`: If `true`, throws an error if the key in `dict` is not found in the asset sets; if `false`, issues a warning instead.
+"""
+function estimator_to_val!(arr::AbstractArray, dict::Pair{<:Any, <:Real}, sets::AssetSets;
+                           strict::Bool = false)
+    nx = sets.dict[sets.key]
+    key, val = dict
+    if key in nx
+        arr[nx[key]] .= val
+    else
+        group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
+    end
+    return nothing
+end
+"""
+generates the array of values from a dict/vector of pairs, a single pair, or returns the value as-is.
+
+  - `dict`: A dictionary or vector of pairs mapping asset or group names to values, a single pair, or a numeric value.
+  - `sets`: The `AssetSets` containing the asset groups.
+  - `val`: The default value to fill in for assets/groups not specified in `dict`.
+  - `strict`: If `true`, throws an error if a key in `dict` is not found in the asset sets; if `false`, issues a warning instead.
+"""
+function estimator_to_val(dict::Union{<:AbstractDict,
+                                      <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                          sets::AssetSets, val::Real = 0.0; strict::Bool = false)
+    nx = sets.dict[sets.key]
+    arr = fill(val, length(nx))
+    for (key, val) in dict
+        if key in nx
+            arr[findfirst(x -> x == key, nx)] = val
+        else
+            group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
+        end
+    end
+    return arr
+end
+"""
+generates the array of values from a single pair, or returns the value as-is.
+
+  - `dict`: A single pair mapping an asset or group name to a value, or a numeric value.
+  - `sets`: The `AssetSets` containing the asset groups.
+  - `val`: The default value to fill in for assets/groups not specified in `dict`.
+  - `strict`: If `true`, throws an error if the key in `dict` is not found in the asset sets; if `false`, issues a warning instead.
+"""
+function estimator_to_val(dict::Pair{<:Any, <:Real}, sets::AssetSets, val::Real = 0.0;
+                          strict::Bool = false)
+    nx = sets.dict[sets.key]
+    arr = fill(val, length(nx))
+    key, val = dict
+    if key in nx
+        arr[findfirst(x -> x == key, nx)] = val
+    else
+        group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
+    end
+    return arr
+end
+"""
+fallback no-op
+returns the value as-is
+"""
+function estimator_to_val(val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...;
+                          kwargs...)
+    return val
 end
 
 # Recursively evaluate numeric functions
@@ -122,131 +504,6 @@ function _rethrow_parse_error(expr::Expr, side = :lhs)
     end
     return nothing
 end
-abstract type AbstractParsingResult <: AbstractConstraintResult end
-struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
-    vars::T1
-    coef::T2
-    op::T3
-    rhs::T4
-    eqn::T5
-end
-struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
-    vars::T1
-    coef::T2
-    op::T3
-    rhs::T4
-    eqn::T5
-    ij::T6
-end
-Base.getindex(res::AbstractParsingResult, i) = i == 1 ? res : throw(BoundsError(res, i))
-struct AssetSets{T1, T2} <: AbstractEstimator
-    key::T1
-    dict::T2
-end
-function AssetSets(; key::Union{Symbol, <:AbstractString} = "nx",
-                   dict::AbstractDict{<:Union{Symbol, <:AbstractString}})
-    @argcheck(!isempty(dict) && haskey(dict, key),
-              AssertionError("The following conditions must be met:\n`dict` must be non-empty => !isempty(dict) = $(!isempty(dict))\n`dict` must contain `key` = $key, typeof(key) = $(typeof(key)) => haskey(dict, key) = $(haskey(dict, key))"))
-    return AssetSets(key, dict)
-end
-function nothing_asset_sets_view(sets::AssetSets, i::AbstractVector)
-    dict = Dict(k => v for (k, v) in sets.dict if k != sets.key)
-    dict[sets.key] = view(sets.dict[sets.key], i)
-    return AssetSets(; key = sets.key, dict = dict)
-end
-"""
-```julia
-nothing_asset_sets_view(::Nothing, ::Any)
-```
-
-No-op fallback for indexing `nothing` asset sets.
-"""
-function nothing_asset_sets_view(::Nothing, ::Any)
-    return nothing
-end
-function group_to_val!(nx::AbstractVector, sdict::AbstractDict, key::Any, val::Real,
-                       dict::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
-                                   <:AbstractVector{<:Pair{<:Any, <:Real}}},
-                       arr::AbstractArray, strict::Bool)
-    assets = get(sdict, key, nothing)
-    if isnothing(assets)
-        if strict
-            throw(ArgumentError("$(key) is not in $(keys(sdict)).\n$(dict)"))
-        else
-            @warn("$(key) is not in $(keys(sdict)).\n$(dict)")
-        end
-    else
-        unique!(assets)
-        arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
-    end
-    return nothing
-end
-function estimator_to_val!(arr::AbstractArray,
-                           dict::Union{<:AbstractDict,
-                                       <:AbstractVector{<:Pair{<:Any, <:Real}}},
-                           sets::AssetSets; strict::Bool = false)
-    nx = sets.dict[sets.key]
-    for (key, val) in dict
-        if key in nx
-            arr[nx[key]] .= val
-        else
-            group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
-            # assets = get(sets.dict, key, nothing)
-            # if isnothing(assets)
-            #     if strict
-            #         throw(ArgumentError("$(key) is not in $(keys(sets.dict)).\n$(dict)"))
-            #     else
-            #         @warn("$(key) is not in $(keys(sets.dict)).\n$(dict)")
-            #     end
-            # else
-            #     unique!(assets)
-            #     arr[[findfirst(x -> x == asset, nx) for asset in assets]] .= val
-            # end
-        end
-    end
-    return nothing
-end
-function estimator_to_val!(arr::AbstractArray, dict::Pair{<:Any, <:Real}, sets::AssetSets;
-                           strict::Bool = false)
-    nx = sets.dict[sets.key]
-    key, val = dict
-    if key in nx
-        arr[nx[key]] .= val
-    else
-        group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
-    end
-    return nothing
-end
-function estimator_to_val(dict::Union{<:AbstractDict,
-                                      <:AbstractVector{<:Pair{<:Any, <:Real}}},
-                          sets::AssetSets, val::Real = 0.0; strict::Bool = false)
-    nx = sets.dict[sets.key]
-    arr = fill(val, length(nx))
-    for (key, val) in dict
-        if key in nx
-            arr[findfirst(x -> x == key, nx)] = val
-        else
-            group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
-        end
-    end
-    return arr
-end
-function estimator_to_val(dict::Pair{<:Any, <:Real}, sets::AssetSets, val::Real = 0.0;
-                          strict::Bool = false)
-    nx = sets.dict[sets.key]
-    arr = fill(val, length(nx))
-    key, val = dict
-    if key in nx
-        arr[findfirst(x -> x == key, nx)] = val
-    else
-        group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
-    end
-    return arr
-end
-function estimator_to_val(val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...;
-                          kwargs...)
-    return val
-end
 function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = Float64)
     # 3. Evaluate numeric functions on both sides
     lexpr = _eval_numeric_functions(lhs)
@@ -285,6 +542,57 @@ function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = F
 
     return ParsingResult(variables, coefficients, opstr, rhs_val, formatted)
 end
+"""
+```julia
+parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
+               datatype::DataType = Float64, kwargs...)
+```
+
+Parse a linear constraint equation from a string into a structured [`ParsingResult`](@ref).
+
+# Arguments
+
+  - `eqn`: The equation string to parse. Must contain exactly one comparison operator from `ops1`.
+  - `ops1`: Tuple of valid comparison operators as strings.
+  - `datatype`: The numeric type to use for coefficients and right-hand side.
+  - `kwargs...`: Additional keyword arguments, ignored.
+
+# Validation
+
+  - The equation must contain exactly one valid comparison operator from `ops1`.
+  - Both sides of the equation must be valid Julia expressions.
+
+# Details
+
+  - The function first checks for invalid operator patterns (e.g., `"++"`).
+  - It searches for the first occurrence of a valid comparison operator from `ops1` in the equation string. Errors if there are more than one or none.
+  - The equation is split into left- and right-hand sides using the detected operator.
+  - Both sides are parsed into Julia expressions using `Meta.parse`.
+  - Numeric functions and constants (e.g., `Inf`) are recursively evaluated.
+  - All terms are moved to the left-hand side and collected, separating coefficients and variables.
+  - The constant term is moved to the right-hand side, and the equation is formatted for display.
+  - The result is returned as a [`ParsingResult`](@ref) containing the collected information.
+
+# Returns
+
+  - `eqn::ParsingResult`: Structured parsing result.
+
+# Examples
+
+```jldoctest
+julia> parse_equation("w_A + 2w_B <= 1")
+PortfolioOptimisers.ParsingResult
+  vars | Vector{String}: ["w_A", "w_B"]
+  coef | Vector{Float64}: [1.0, 2.0]
+    op | String: "<="
+   rhs | Float64: 1.0
+   eqn | SubString{String}: "w_A + 2.0*w_B <= 1.0"
+```
+
+# Related
+
+  - [`ParsingResult`](@ref)
+"""
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)
     if occursin("++", eqn)
@@ -324,6 +632,70 @@ function parse_equation(eqn::AbstractVector{<:Union{<:AbstractString, Expr}};
                         datatype::DataType = Float64)
     return parse_equation.(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
 end
+
+"""
+```julia
+replace_group_by_assets(res::ParsingResult, sets::AssetSets; bl_flag::Bool = false,
+                        prior_flag::Bool = false, rho_flag::Bool = false)
+```
+
+Expand group or special variable references in a [`ParsingResult`](@ref) to their corresponding asset names.
+
+This function takes a [`ParsingResult`](@ref) containing variable names (which may include group names, `prior(...)` expressions, or correlation views like `(A, B)`), and replaces these with the actual asset names from the provided [`AssetSets`](@ref). It supports Black-Litterman-style group expansion, entropy pooling prior views, and correlation view parsing for advanced constraint generation.
+
+# Arguments
+
+  - `res`: A [`ParsingResult`](@ref) object containing variables and coefficients to be expanded.
+  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+  - `bl_flag`: If `true`, enables Black-Litterman-style group expansion.
+  - `prior_flag`: If `true`, enables expansion of `prior(...)` expressions for entropy pooling.
+  - `rho_flag`: If `true`, enables expansion of correlation views `(A, B)` for entropy pooling.
+
+# Validation
+
+    - `bl_flag` can only be `true` if both `prior_flag` and `rho_flag` are `false`.
+    - `rho_flag` can only be `true` if `prior_flag` is also `true`.
+
+# Details
+
+  - Group names in `res.vars` are replaced by the corresponding asset names from `sets.dict`.
+  - If `bl_flag` is `true`, coefficients for group references are divided equally among the assets in the group.
+  - If `prior_flag` is `true`, expands `prior(asset)` or `prior(group)` expressions for entropy pooling.
+  - If `rho_flag` is `true`, expands correlation view expressions `(A, B)` or `prior(A, B)` for entropy pooling, mapping them to asset pairs.
+  - If a variable or group is not found in `sets.dict`, it is skipped.
+
+# Returns
+
+  - `ParsingResult`: A new [`ParsingResult`](@ref) with all group and special variable references expanded to asset names.
+
+# Examples
+
+```jldoctest
+julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"], "group1" => ["A", "B"]));
+
+julia> res = parse_equation("group1 + 2C == 1")
+ParsingResult
+  vars | Vector{String}: ["C", "group1"]
+  coef | Vector{Float64}: [2.0, 1.0]
+    op | String: "=="
+   rhs | Float64: 1.0
+   eqn | SubString{String}: "2.0*C + group1 == 1.0"
+
+julia> replace_group_by_assets(res, sets)
+ParsingResult
+  vars | Vector{String}: ["C", "A", "B"]
+  coef | Vector{Float64}: [2.0, 1.0, 1.0]
+    op | String: "=="
+   rhs | Float64: 1.0
+   eqn | String: "2.0*C + 1.0*A + 1.0*B == 1.0"
+```
+
+# Related
+
+  - [`AssetSets`](@ref)
+  - [`ParsingResult`](@ref)
+  - [`parse_equation`](@ref)
+"""
 function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::Bool = false,
                                  prior_flag::Bool = false, rho_flag::Bool = false)
     if bl_flag && (rho_flag || prior_flag)
@@ -489,6 +861,64 @@ end
 function linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwargs...)
     return lcs
 end
+"""
+```julia
+linear_constraints(eqn::Union{<:AbstractString, Expr,
+                              <:AbstractVector{<:Union{<:AbstractString, Expr}}},
+                   sets::AssetSets; ops1::Tuple = ("==", "<=", ">="),
+                   ops2::Tuple = (:call, :(==), :(<=), :(>=)), datatype::DataType = Float64,
+                   strict::Bool = false, bl_flag::Bool = false)
+```
+
+Parse and convert one or more linear constraint equations into a [`LinearConstraint`](@ref) object.
+
+This function parses one or more constraint equations (as strings, expressions, or vectors thereof), replaces group or asset references using the provided [`AssetSets`](@ref), and constructs the corresponding constraint matrices. The result is a [`LinearConstraint`](@ref) object containing both equality and inequality constraints, suitable for use in portfolio optimisation routines.
+
+# Arguments
+
+  - `eqn`: A single constraint equation (as `AbstractString` or `Expr`), or a vector of such equations.
+  - `sets`: An [`AssetSets`](@ref) object specifying the asset universe and groupings.
+  - `ops1`: Tuple of valid comparison operators as strings (default: `("==", "<=", ">=")`).
+  - `ops2`: Tuple of valid comparison operators as expression heads (default: `(:call, :(==), :(<=), :(>=))`).
+  - `datatype`: Numeric type for coefficients and right-hand side (default: `Float64`).
+  - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning (default: `false`).
+  - `bl_flag`: If `true`, enables Black-Litterman-style group expansion (default: `false`).
+
+# Details
+
+  - Each equation is parsed using [`parse_equation`](@ref), supporting both string and expression input.
+  - Asset and group references in the equations are expanded using [`replace_group_by_assets`](@ref) and the provided `sets`.
+  - The function separates equality and inequality constraints, assembling the corresponding matrices and right-hand side vectors.
+  - Input validation is performed using `@argcheck` to ensure non-empty and consistent constraints.
+  - Returns `nothing` if no valid constraints are found after parsing and expansion.
+
+# Returns
+
+  - `LinearConstraint`: An object containing the assembled equality and inequality constraints, or `nothing` if no constraints are present.
+
+# Examples
+
+```jldoctest
+julia> sets = AssetSets(; key = :nx, dict = Dict(:nx => ["w_A", "w_B", "w_C"]));
+
+julia> linear_constraints(["w_A + w_B == 1", "w_A >= 0.1"], sets)
+LinearConstraint
+  ineq | PartialLinearConstraint
+       |   A | 1×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+       |   B | Vector{Float64}: [-0.1]
+    eq | PartialLinearConstraint
+       |   A | 1×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+       |   B | Vector{Float64}: [1.0]
+```
+
+# Related
+
+  - [`parse_equation`](@ref)
+  - [`replace_group_by_assets`](@ref)
+  - [`PartialLinearConstraint`](@ref)
+  - [`LinearConstraint`](@ref)
+  - [`AssetSets`](@ref)
+"""
 function linear_constraints(eqn::Union{<:AbstractString, Expr,
                                        <:AbstractVector{<:Union{<:AbstractString, Expr}}},
                             sets::AssetSets; ops1::Tuple = ("==", "<=", ">="),
@@ -576,6 +1006,58 @@ end
 function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector; kwargs...)
     return view(smtx, :, i)
 end
+
+"""
+```julia
+struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
+    val::T1
+end
+```
+
+Container for one or more linear constraint equations to be parsed and converted into constraint matrices.
+
+# Fields
+
+  - `val`: A single equation as an `AbstractString` or `Expr`, or a vector of such equations.
+
+# Constructor
+
+```julia
+LinearConstraintEstimator(;
+                          val::Union{<:AbstractString, Expr,
+                                     <:AbstractVector{<:Union{<:AbstractString, Expr}}})
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `!isempty(val)`.
+
+# Examples
+
+```jldoctest
+julia> lce = LinearConstraintEstimator(; val = ["w_A + w_B == 1", "w_A >= 0.1"]);
+
+julia> sets = AssetSets(; key = :nx, dict = Dict(:nx => ["w_A", "w_B"]));
+
+julia> linear_constraints(lce, sets)
+LinearConstraint
+  ineq | PartialLinearConstraint
+       |   A | 1×2 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+       |   B | Vector{Float64}: [-0.1]
+    eq | PartialLinearConstraint
+       |   A | 1×2 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+       |   B | Vector{Float64}: [1.0]
+```
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`PartialLinearConstraint`](@ref)
+  - [`parse_equation`](@ref)
+  - [`linear_constraints`](@ref)
+"""
 struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
     val::T1
 end
@@ -631,6 +1113,7 @@ function asset_sets_matrix_view(smtx::AbstractVector{<:Union{Nothing, <:Abstract
     return asset_sets_matrix_view.(smtx, Ref(i); kwargs...)
 end
 
-export AssetSets, PartialLinearConstraint, LinearConstraintEstimator, LinearConstraint,
-       AssetSetsMatrixEstimator, RiskBudgetResult, RiskBudgetEstimator, parse_equation,
-       replace_group_by_assets, linear_constraints, asset_sets_matrix
+export AssetSets, PartialLinearConstraint, LinearConstraint, LinearConstraintEstimator,
+       AssetSetsMatrixEstimator, RiskBudgetResult, RiskBudgetEstimator, ParsingResult,
+       RhoParsingResult, parse_equation, replace_group_by_assets, linear_constraints,
+       asset_sets_matrix
