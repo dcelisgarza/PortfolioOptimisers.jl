@@ -518,17 +518,17 @@
                                                                     alg = H2_EntropyPooling(),
                                                                     sets = sets,
                                                                     mu_views = LinearConstraintEstimator(;
-                                                                                                         val = ["AAPL<=0.75*prior(AAPL)",
-                                                                                                                "XOM >= 0.4*prior(XOM)"]),
+                                                                                                         val = ["AAPL<=0.92*prior(AAPL)",
+                                                                                                                "XOM >= 0.83*prior(XOM)"]),
                                                                     sigma_views = LinearConstraintEstimator(;
-                                                                                                            val = ["AAPL==0.2prior(AAPL)",
+                                                                                                            val = ["AAPL==1.2prior(AAPL)",
                                                                                                                    "WMT==1.4prior(WMT)"]),
                                                                     rho_views = LinearConstraintEstimator(;
                                                                                                           val = "(AAPL, XOM) == 0.35"))),
                    rd)
-        @test pr.mu[1] <= 0.75 * pr0.mu[1]
-        @test pr.mu[end] >= 0.4 * pr0.mu[end]
-        @test isapprox(pr.sigma[1, 1], 0.2 * pr0.sigma[1, 1], rtol = 1e-2)
+        @test pr.mu[1] <= 0.92 * pr0.mu[1]
+        @test pr.mu[end] >= 0.83 * pr0.mu[end]
+        @test isapprox(pr.sigma[1, 1], 1.2 * pr0.sigma[1, 1], rtol = 1e-2)
         @test isapprox(pr.sigma[19, 19], 1.4 * pr0.sigma[19, 19], rtol = 5e-3)
         @test isapprox(cov2cor(pr.sigma)[1, end], 0.35, rtol = 5e-4)
 
