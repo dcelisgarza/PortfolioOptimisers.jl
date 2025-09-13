@@ -21,6 +21,21 @@ end
 function sigma_ucs(uc::AbstractUncertaintySetResult, args...; kwargs...)
     return uc
 end
+function ucs_factory(::Nothing, ::Nothing)
+    return nothing
+end
+function ucs_factory(risk_ucs::Union{<:AbstractUncertaintySetResult,
+                                     <:AbstractUncertaintySetEstimator}, ::Any)
+    return risk_ucs
+end
+function ucs_factory(::Nothing,
+                     prior_ucs::Union{<:AbstractUncertaintySetResult,
+                                      <:AbstractUncertaintySetEstimator})
+    return prior_ucs
+end
+function ucs_view(risk_ucs::Union{Nothing, <:AbstractUncertaintySetEstimator}, ::Any)
+    return risk_ucs
+end
 function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     return ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
@@ -39,6 +54,14 @@ function BoxUncertaintySet(; lb::AbstractArray, ub::AbstractArray)
     @argcheck(!isempty(lb) && !isempty(ub))
     @argcheck(size(lb) == size(ub))
     return BoxUncertaintySet(lb, ub)
+end
+function ucs_view(risk_ucs::BoxUncertaintySet{<:AbstractVector, <:AbstractVector},
+                  i::AbstractVector)
+    return BoxUncertaintySet(; lb = view(risk_ucs.lb, i), ub = view(risk_ucs.ub, i))
+end
+function ucs_view(risk_ucs::BoxUncertaintySet{<:AbstractMatrix, <:AbstractMatrix},
+                  i::AbstractVector)
+    return BoxUncertaintySet(; lb = view(risk_ucs.lb, i, i), ub = view(risk_ucs.ub, i, i))
 end
 struct NormalKUncertaintyAlgorithm{T1} <: AbstractUncertaintyKAlgorithm
     kwargs::T1
@@ -86,6 +109,19 @@ function EllipseUncertaintySet(; sigma::AbstractMatrix, k::Real,
     assert_matrix_issquare(sigma)
     @argcheck(zero(k) < k)
     return EllipseUncertaintySet(sigma, k, class)
+end
+function ucs_view(risk_ucs::EllipseUncertaintySet{<:AbstractMatrix, <:Any,
+                                                  <:SigmaEllipseUncertaintySet},
+                  i::AbstractVector)
+    i = fourth_moment_index_factory(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
+    return EllipseUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
+                                 class = risk_ucs.class)
+end
+function ucs_view(risk_ucs::EllipseUncertaintySet{<:AbstractMatrix, <:Any,
+                                                  <:MuEllipseUncertaintySet},
+                  i::AbstractVector)
+    return EllipseUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
+                                 class = risk_ucs.class)
 end
 
 export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,

@@ -405,7 +405,7 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                      end)
         add_to_expression!(obj_expr, so * sc2 * tc)
     end
-    @objective(model, Min, t)
+    @objective(model, Min, obj_expr)
     return if optimise_JuMP_model!(model, slv).success
         pweights(value.(x))
     else
@@ -424,6 +424,7 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                    x[1:T]
                    t
                end)
+    @expression(model, obj_expr, so * t)
     # Equality constraints from A_eq and B_eq and probabilities equal to 1
     @constraints(model,
                  begin
@@ -455,7 +456,7 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                      end)
         add_to_expression!(obj_expr, so * sc2 * tc)
     end
-    @objective(model, Min, so * (t - dot(x, log_p)))
+    @objective(model, Min, obj_expr - so * dot(x, log_p))
     # Solve the optimization problem
     return if optimise_JuMP_model!(model, slv).success
         pweights(value.(x))

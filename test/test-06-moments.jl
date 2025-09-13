@@ -209,6 +209,15 @@ end
         @test isapprox(d1, dg1)
         @test isapprox(d2, dg2)
         @test isapprox(d1, d2)
+        if isa(de, Distance{<:SimpleAbsoluteDistance}) ||
+           isa(de, Distance{<:LogDistance}) ||
+           isa(de, GeneralDistance{<:Any, <:SimpleAbsoluteDistance}) ||
+           isa(de, GeneralDistance{<:Any, <:LogDistance})
+            r, d = cor_and_dist(de, ce, rd.X)
+            rg, dg = cor_and_dist(deg, ce, rd.X)
+            @test isapprox(r, rg)
+            @test isapprox(d, dg)
+        end
     end
 end
 @testset "Canonical Distance" begin
@@ -226,8 +235,9 @@ end
         @test isapprox(r1, cor(cei, rd.X))
         d3 = distance(de, cei, rd.X)
         d4 = if isa(ce, MutualInfoCovariance)
-            @test all(isapprox.((r1, d1), cor_and_dist(deg, ce, rd.X)))
-            @test isapprox(d1, distance(deg, ce, rd.X))
+            @test all(isapprox.((r1, d1), cor_and_dist(de, ce, rd.X)))
+            @test isapprox(d1, distance(de, ce, rd.X))
+            @test isapprox(d1, distance(de, cei, rd.X))
             distance(Distance(;
                               alg = VariationInfoDistance(; bins = ce.bins,
                                                           normalise = ce.normalise)),
@@ -241,6 +251,9 @@ end
         end
         d5 = distance(deg, ce, rd.X)
         d6 = if isa(ce, MutualInfoCovariance)
+            @test all(isapprox.((r1, d1), cor_and_dist(deg, ce, rd.X)))
+            @test isapprox(d1, distance(deg, ce, rd.X))
+            @test isapprox(d1, distance(deg, cei, rd.X))
             distance(GeneralDistance(;
                                      alg = VariationInfoDistance(; bins = ce.bins,
                                                                  normalise = ce.normalise)),
