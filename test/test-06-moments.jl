@@ -1,6 +1,6 @@
 @safetestset "Moments" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, CovarianceEstimation,
-          StableRNGs, StatsBase, LinearAlgebra
+          StableRNGs, StatsBase, LinearAlgebra, SparseArrays
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
