@@ -4,8 +4,8 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
     default::T3
 end
 function TurnoverEstimator(; w::AbstractVector{<:Real},
-                           val::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
-                                      <:AbstractVector{<:Pair{<:Any, <:Real}}},
+                           val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                                      <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                            default::Real = 0.0)
     @argcheck(!isempty(w) && !isempty(val) && default >= zero(default),
               AssertionError("The following conditions must hold:\n`w` must be non-empty => $(!isempty(w))\n`val` must be non-empty => $(!isempty(val))\n`default` must be non-negative: $default"))

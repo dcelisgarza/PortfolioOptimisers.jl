@@ -1,0 +1,13 @@
+# Base Constraint Generation
+
+```@docs
+EQ
+LEQ
+GEQ
+PortfolioOptimisers.AbstractConstraintResult
+PortfolioOptimisers.AbstractConstraintEstimator
+PortfolioOptimisers.ComparisonOperators
+PortfolioOptimisers.EqualityComparisonOperators
+PortfolioOptimisers.InequalityComparisonOperators
+PortfolioOptimisers.comparison_sign_ineq_flag
+```

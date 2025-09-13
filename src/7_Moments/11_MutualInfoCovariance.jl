@@ -1,9 +1,11 @@
 """
-    struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ve::T1
-        bins::T2
-        normalise::T3
-    end
+```julia
+struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
+    ve::T1
+    bins::T2
+    normalise::T3
+end
+```
 
 Covariance estimator based on mutual information.
 
@@ -17,15 +19,17 @@ Covariance estimator based on mutual information.
 
 # Constructor
 
-    MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                          bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
-                          normalise::Bool = true)
+```julia
+MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+                     bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
+                     normalise::Bool = true)
+```
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `bins` is an integer, asserts that `bins > 0`.
+  - If `bins` is an integer, `bins > 0`.
 
 # Examples
 
@@ -65,7 +69,9 @@ function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} 
 end
 
 """
-    cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the mutual information (MI) correlation matrix using a [`MutualInfoCovariance`](@ref) estimator.
 
@@ -84,7 +90,7 @@ This method computes the pairwise mutual information correlation matrix for the 
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 
@@ -102,7 +108,9 @@ function Statistics.cor(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int =
 end
 
 """
-    cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+cov(ce::MutualInfoCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute the mutual information (MI) covariance matrix using a [`MutualInfoCovariance`](@ref) estimator.
 
@@ -121,7 +129,7 @@ This method computes the pairwise mutual information covariance matrix for the i
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Examples
 

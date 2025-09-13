@@ -1,6 +1,11 @@
 """
-    SimpleVariance{T1 <: Union{Nothing, <:AbstractExpectedReturnsEstimator},
-                   T2 <: Union{Nothing, <:AbstractWeights}, T3 <: Bool}
+```julia
+struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
+    me::T1
+    w::T2
+    corrected::T3
+end
+```
 
 A flexible variance estimator for PortfolioOptimisers.jl supporting optional expected returns estimators, observation weights, and bias correction.
 
@@ -14,15 +19,17 @@ A flexible variance estimator for PortfolioOptimisers.jl supporting optional exp
 
 # Constructor
 
-    SimpleVariance(; me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                     w::Union{Nothing, <:AbstractWeights} = nothing,
-                     corrected::Bool = true)
+```julia
+SimpleVariance(;
+               me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
+               w::Union{Nothing, <:AbstractWeights} = nothing, corrected::Bool = true)
+```
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is provided, it must not be empty.
+  - If `w` is provided, `!isempty(w)`.
 
 # Examples
 
@@ -73,7 +80,9 @@ function SimpleVariance(;
 end
 
 """
-    std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```julia
+std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for an array.
 
@@ -127,7 +136,9 @@ function Statistics.std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1,
     end
 end
 """
-    std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
+```julia
+std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
+```
 
 Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a vector.
 
@@ -189,7 +200,9 @@ function Statistics.std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
     end
 end
 """
-    var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```julia
+var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for an array.
 
@@ -242,7 +255,9 @@ function Statistics.var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1,
     end
 end
 """
-    var(ve::SimpleVariance, X::AbstractVector; mean = nothing)
+```julia
+var(ve::SimpleVariance, X::AbstractVector; mean = nothing)
+```
 
 Compute the variance using a [`SimpleVariance`](@ref) estimator for a vector.
 

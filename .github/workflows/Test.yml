@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - dev*
     tags: ["*"]
   workflow_dispatch:
 
@@ -22,13 +21,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ["1", "lts", "pre", "nightly"]
-        os:
-          - ubuntu-latest
-          - macOS-latest
-          # - windows-latest
-        arch:
-          - x64
+        version: ["1"]
+        os: [ubuntu-latest, macOS-latest]
+        arch: [x64]
         allow_failure: [false]
         include:
           - version: "pre"
@@ -39,6 +34,14 @@ jobs:
             os: macOS-latest
             arch: x64
             allow_failure: true
+          - version: "lts"
+            os: ubuntu-latest
+            arch: x64
+            allow_failure: true
+          - version: "lts"
+            os: macOS-latest
+            arch: x64
+            allow_failure: true
           - version: "nightly"
             os: ubuntu-latest
             arch: x64
@@ -47,7 +50,4 @@ jobs:
             os: macOS-latest
             arch: x64
             allow_failure: true
-          # - version: "nightly"
-          #   os: windows-latest
-          #   arch: x64
-          #   allow_failure: true
+

@@ -58,11 +58,9 @@ end
 function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                           w::AbstractVector{<:AbstractJuMPScalar},
                                           sets::Union{Nothing, <:AssetSets} = nothing;
-                                          strict::Bool = false,
-                                          datatype::DataType = Float64)
+                                          strict::Bool = false)
     N = length(w)
-    rkb = risk_budget_constraints(rb.alg.rkb, sets; N = N, strict = strict,
-                                  datatype = datatype)
+    rkb = risk_budget_constraints(rb.alg.rkb, sets; N = N, strict = strict)
     rb = rkb.val
     @argcheck(length(rb) == N)
     sc = model[:sc]
@@ -85,7 +83,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          pr::AbstractPriorResult, wb::WeightBounds, args...)
     set_w!(model, pr.X, rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, model[:w], sets;
-                                           strict = rb.opt.strict, datatype = eltype(pr.X))
+                                           strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
     return ProcessedAssetRiskBudgetingAttributes(rkb)
 end
@@ -98,7 +96,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     b1, rr = set_factor_risk_contribution_constraints!(model, rb.alg.re, rd, rb.alg.flag,
                                                        rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, model[:w1], sets;
-                                           strict = rb.opt.strict, datatype = eltype(pr.X))
+                                           strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
 end

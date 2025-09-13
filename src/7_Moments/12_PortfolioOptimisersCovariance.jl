@@ -1,8 +1,10 @@
 """
-    struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
-        ce::T1
-        mp::T2
-    end
+```julia
+struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
+    ce::T1
+    mp::T2
+end
+```
 
 Composite covariance estimator with post-processing.
 
@@ -15,8 +17,10 @@ Composite covariance estimator with post-processing.
 
 # Constructor
 
-    PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
+```julia
+PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
+                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -59,7 +63,9 @@ function factory(ce::PortfolioOptimisersCovariance,
 end
 
 """
-    cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
+```julia
+cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
+```
 
 Compute the covariance matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
@@ -78,7 +84,7 @@ This method computes the covariance matrix for the input data matrix `X` using t
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 
@@ -101,7 +107,9 @@ function Statistics.cov(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; di
 end
 
 """
-    cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
+```julia
+cor(ce::PortfolioOptimisersCovariance, X::AbstractMatrix; dims = 1, kwargs...)
+```
 
 Compute the correlation matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.
 
@@ -120,7 +128,7 @@ This method computes the correlation matrix for the input data matrix `X` using 
 
 # Validation
 
-  - Asserts that `dims` is either `1` or `2`.
+  - `dims` is either `1` or `2`.
 
 # Related
 

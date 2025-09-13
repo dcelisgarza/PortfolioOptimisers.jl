@@ -1,5 +1,7 @@
 """
-    AbstractMatrixProcessingEstimator <: AbstractEstimator
+```julia
+abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
+```
 
 Abstract supertype for all matrix processing estimator types in PortfolioOptimisers.jl.
 
@@ -14,7 +16,9 @@ All concrete types that implement matrix processing routines—such as covarianc
 abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 
 """
-    AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm
+```julia
+abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
+```
 
 Abstract supertype for all matrix processing algorithm types in PortfolioOptimisers.jl.
 
@@ -29,7 +33,9 @@ All concrete types that implement a specific matrix processing algorithm (e.g., 
 abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
 
 """
-    matrix_processing_algorithm!(::Nothing, args...; kwargs...)
+```julia
+matrix_processing_algorithm!(::Nothing, args...; kwargs...)
+```
 
 No-op fallback for matrix processing algorithm routines.
 
@@ -55,7 +61,9 @@ function matrix_processing_algorithm!(::Nothing, args...; kwargs...)
     return nothing
 end
 """
-    matrix_processing_algorithm(::Nothing, args...; kwargs...)
+```julia
+matrix_processing_algorithm(::Nothing, args...; kwargs...)
+```
 
 Same as [`matrix_processing_algorithm!`](@ref), but meant for returning a new matrix instead of modifying it in-place.
 
@@ -70,12 +78,14 @@ function matrix_processing_algorithm(::Nothing, args...; kwargs...)
 end
 
 """
-    struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
-        pdm::T1
-        denoise::T2
-        detone::T3
-        alg::T4
-    end
+```julia
+struct DefaultMatrixProcessing{T1, T2, T3, T4} <: AbstractMatrixProcessingEstimator
+    pdm::T1
+    denoise::T2
+    detone::T3
+    alg::T4
+end
+```
 
 A flexible container type for configuring and applying matrix processing routines in PortfolioOptimisers.jl.
 
@@ -90,10 +100,12 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Constructor
 
-    DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
-                              denoise::Union{Nothing, <:Denoise} = nothing,
-                              detone::Union{Nothing, <:Detone} = nothing,
-                              alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
+```julia
+DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
+                        denoise::Union{Nothing, <:Denoise} = nothing,
+                        detone::Union{Nothing, <:Detone} = nothing,
+                        alg::Union{Nothing, <:AbstractMatrixProcessingAlgorithm} = nothing)
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -146,11 +158,13 @@ function DefaultMatrixProcessing(; pdm::Union{Nothing, <:Posdef} = Posdef(),
 end
 
 """
-    struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
-        denoise::T1
-        detone::T2
-        alg::T3
-    end
+```julia
+struct NonPositiveDefiniteMatrixProcessing{T1, T2, T3} <: AbstractMatrixProcessingEstimator
+    denoise::T1
+    detone::T2
+    alg::T3
+end
+```
 
 A container type for matrix processing pipelines that do **not** enforce positive definiteness in PortfolioOptimisers.jl.
 
@@ -164,10 +178,12 @@ A container type for matrix processing pipelines that do **not** enforce positiv
 
 # Constructor
 
-    NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
-                                          detone::Union{Nothing, <:Detone} = nothing,
-                                          alg::Union{Nothing,
-                                                     <:AbstractMatrixProcessingAlgorithm} = nothing)
+```julia
+NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise} = nothing,
+                                    detone::Union{Nothing, <:Detone} = nothing,
+                                    alg::Union{Nothing,
+                                               <:AbstractMatrixProcessingAlgorithm} = nothing)
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -215,8 +231,11 @@ function NonPositiveDefiniteMatrixProcessing(; denoise::Union{Nothing, <:Denoise
 end
 
 """
-    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix, X::AbstractMatrix, args...; kwargs...)
-    matrix_processing!(::Nothing, args...; kwargs...)
+```julia
+matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix,
+                   X::AbstractMatrix, args...; kwargs...)
+matrix_processing!(::Nothing, args...; kwargs...)
+```
 
 In-place processing of a covariance or correlation matrix.
 
@@ -321,8 +340,11 @@ function matrix_processing!(mp::NonPositiveDefiniteMatrixProcessing, sigma::Abst
     return nothing
 end
 """
-    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix, X::AbstractMatrix, args...; kwargs...)
-    matrix_processing(::Nothing, args...; kwargs...)
+```julia
+matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix,
+                  X::AbstractMatrix, args...; kwargs...)
+matrix_processing(::Nothing, args...; kwargs...)
+```
 
 Out-of-place version of [`matrix_processing!`](@ref).
 

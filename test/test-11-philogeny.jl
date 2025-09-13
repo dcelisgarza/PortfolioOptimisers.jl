@@ -138,26 +138,22 @@
                                                                                      alg = StandardisedSilhouetteScore(),
                                                                                      max_k = 100),
                                                                clr.clustering, clr.D)
-        @test 4 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = PredefinedNumberClusters(;
-                                                                                                                    k = 10),
-                                                                                     max_k = nothing),
-                                                               clr.clustering, clr.D)
-        @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = PredefinedNumberClusters(;
-                                                                                                                    k = 1),
-                                                                                     max_k = 5),
-                                                               clr.clustering, clr.D)
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = PredefinedNumberClusters(;
-                                                                                                                    k = 2),
-                                                                                     max_k = 5),
-                                                               clr.clustering, clr.D)
-        @test 2 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = PredefinedNumberClusters(;
-                                                                                                                    k = 3),
-                                                                                     max_k = 2),
-                                                               clr.clustering, clr.D)
+        @test 4 ==
+              PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 10,
+                                                                                max_k = nothing),
+                                                          clr.clustering, clr.D)
+        @test 1 ==
+              PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 1,
+                                                                                max_k = 5),
+                                                          clr.clustering, clr.D)
+        @test 2 ==
+              PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 2,
+                                                                                max_k = 5),
+                                                          clr.clustering, clr.D)
+        @test 2 ==
+              PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 3,
+                                                                                max_k = 2),
+                                                          clr.clustering, clr.D)
 
         clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
                                              de = DistanceDistance(;
@@ -173,11 +169,16 @@
                                                                    alg = CanonicalDistance()),
                                              alg = DBHT(; sim = MaximumDistanceSimilarity(),
                                                         root = UniqueRoot()),
-                                             onc = OptimalNumberClusters(;
-                                                                         alg = PredefinedNumberClusters(;
-                                                                                                        k = 5))),
-                         pr.X)
+                                             onc = OptimalNumberClusters(; alg = 5)), pr.X)
         @test clr.k == 4
+
+        clr = clusterise(ClusteringEstimator(; ce = PortfolioOptimisersCovariance(),
+                                             de = DistanceDistance(;
+                                                                   alg = CanonicalDistance()),
+                                             alg = DBHT(; sim = MaximumDistanceSimilarity(),
+                                                        root = EqualRoot()),
+                                             onc = OptimalNumberClusters(; alg = 2)), pr.X)
+        @test clr.k == 2
     end
     @testset "Centrality tests" begin
         ces = [BetweennessCentrality(), ClosenessCentrality(), DegreeCentrality(),

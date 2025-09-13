@@ -89,8 +89,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  sigma::AbstractMatrix)
     w = model[:w]
     N = length(w)
-    rkb = risk_budget_constraints(rrb.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict,
-                                  datatype = eltype(sigma))
+    rkb = risk_budget_constraints(rrb.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict)
     rb = rkb.val
     sc = model[:sc]
     @variables(model, begin

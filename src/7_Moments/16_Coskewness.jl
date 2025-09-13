@@ -1,5 +1,7 @@
 """
-    abstract type CoskewnessEstimator <: AbstractEstimator end
+```julia
+abstract type CoskewnessEstimator <: AbstractEstimator end
+```
 
 Abstract supertype for all coskewness estimators in PortfolioOptimisers.jl.
 
@@ -13,11 +15,13 @@ All concrete types implementing coskewness estimation algorithms should subtype 
 abstract type CoskewnessEstimator <: AbstractEstimator end
 
 """
-    struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
-        me::T1
-        mp::T2
-        alg::T3
-    end
+```julia
+struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
+    me::T1
+    mp::T2
+    alg::T3
+end
+```
 
 Container type for coskewness estimators.
 
@@ -31,9 +35,11 @@ Container type for coskewness estimators.
 
 # Constructor
 
-    Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                 mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
-                 alg::AbstractMomentAlgorithm = Full())
+```julia
+Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+           mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
+           alg::AbstractMomentAlgorithm = Full())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -73,7 +79,10 @@ function factory(ce::Coskewness, w::Union{Nothing, <:AbstractWeights} = nothing)
 end
 
 """
-    __coskewness(cskew::AbstractMatrix, X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
+```julia
+__coskewness(cskew::AbstractMatrix, X::AbstractMatrix,
+             mp::AbstractMatrixProcessingEstimator)
+```
 
 Internal helper for coskewness matrix processing.
 
@@ -114,7 +123,9 @@ function __coskewness(cskew::AbstractMatrix, X::AbstractMatrix,
 end
 
 """
-    _coskewness(y::AbstractMatrix, X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
+```julia
+_coskewness(y::AbstractMatrix, X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
+```
 
 Internal helper for coskewness computation.
 
@@ -147,7 +158,10 @@ function _coskewness(y::AbstractMatrix, X::AbstractMatrix,
     return cskew, V
 end
 """
-    coskewness(ske::Union{Nothing, <:Coskewness}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```julia
+coskewness(ske::Union{Nothing, <:Coskewness}, X::AbstractMatrix; dims::Int = 1,
+           mean = nothing, kwargs...)
+```
 
 Compute the full coskewness tensor and processed matrix for a dataset. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.
 
@@ -163,6 +177,10 @@ Compute the full coskewness tensor and processed matrix for a dataset. For `Full
   - `dims`: Dimension along which to compute the mean.
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+
+# Validation
+
+  - `dims` is either `1` or `2`.
 
 # Returns
 
