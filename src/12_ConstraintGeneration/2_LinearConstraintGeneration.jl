@@ -283,7 +283,7 @@ end
 function AssetSets(; key::AbstractString = "nx",
                    dict::AbstractDict{<:AbstractString, <:Any})
     @argcheck(!isempty(dict) && haskey(dict, key),
-              AssertionError("The following conditions must be met:\n`dict` must be non-empty => !isempty(dict) = $(!isempty(dict))\n`dict` must contain `key` = $key, typeof(key) = $(typeof(key)) => haskey(dict, key) = $(haskey(dict, key))"))
+              AssertionError("The following conditions must be met:\n`dict` must be non-empty => !isempty(dict) = $(!isempty(dict))\n`dict` must contain `key = $key``, haskey(dict, key) = $(haskey(dict, key))"))
     for k in keys(dict)
         if k == key
             continue

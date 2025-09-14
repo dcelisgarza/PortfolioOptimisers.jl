@@ -179,7 +179,8 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
             resi[i] = res
         end
     end
-    rdo = ReturnsResult(; nx = 1:(clr.k), X = pr.X * wi, nf = rd.nf, F = rd.F)
+    rdo = ReturnsResult(; nx = ["_$i" for i in 1:(clr.k)], X = pr.X * wi, nf = rd.nf,
+                        F = rd.F)
     reso = optimise!(nco.opto, rdo; dims = dims, branchorder = branchorder,
                      str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.cwf, nco.strict,

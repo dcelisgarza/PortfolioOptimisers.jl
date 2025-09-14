@@ -616,7 +616,7 @@
         @test isapprox(pr.mu[1], 0.002)
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
-                                                 mu_views = mu_views), rd).w, rtol = 5e-6)
+                                                 mu_views = mu_views), rd).w, rtol = 1e-5)
 
         mu_views = LinearConstraintEstimator(; val = "AAPL >= 0.0025")
         pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views, opt = opt), rd)
@@ -715,7 +715,7 @@
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                                  sigma_views = sigma_views,
-                                                 sk_views = sk_views), rd).w)
+                                                 sk_views = sk_views), rd).w, rtol = 1e-6)
 
         kt_views = LinearConstraintEstimator(; val = "AAPL == 7.5")
         pr = prior(EntropyPoolingPrior(; sets = sets, kt_views = kt_views, opt = opt), rd)

@@ -105,7 +105,7 @@ This function attempts to compute the weighted covariance matrix using the provi
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
-        cov(ce, X; dims = dims, mean = mean, kwargs...)
+        cov(ce, X; dims = dims, mean = mean)
     catch
         cov(ce, X; dims = dims, mean = mean)
     end
@@ -113,7 +113,7 @@ end
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix,
                     w::AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     return try
-        cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+        cov(ce, X, w; dims = dims, mean = mean)
     catch
         cov(ce, X, w; dims = dims, mean = mean)
     end
@@ -151,7 +151,7 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix; dims::
                     mean = nothing, kwargs...)
     return try
         try
-            cor(ce, X; dims = dims, mean = mean, kwargs...)
+            cor(ce, X; dims = dims, mean = mean)
         catch
             cor(ce, X; dims = dims, mean = mean)
         end

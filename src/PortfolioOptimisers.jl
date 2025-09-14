@@ -3,8 +3,8 @@ module PortfolioOptimisers
 using ArgCheck, AverageShiftedHistograms, Clustering, Distances, Distributions, FLoops, GLM,
       Impute, InteractiveUtils, Interfaces, JuMP, LinearAlgebra, LogExpFunctions,
       MultivariateStats, NearestCorrelationMatrix, Optim, Graphs, SimpleWeightedGraphs,
-      StatsAPI, PythonCall, Random, Roots, SparseArrays, Statistics, StatsBase, DataFrames,
-      TimeSeries
+      StatsAPI, PythonCall, PrecompileTools, Random, Roots, SparseArrays, Statistics,
+      StatsBase, DataFrames, TimeSeries
 
 # Turn readme into PortfolioOptimisers' docs.
 @doc let
@@ -138,5 +138,6 @@ include("./20_Expected_Returns.jl")
 include("./21_Plotting.jl")
 
 include("./22_Interfaces.jl")
+include("./23_Precompilation.jl")
 
 end
