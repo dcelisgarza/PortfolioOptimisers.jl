@@ -31,7 +31,7 @@
                                                                                                                            detone = Detone(),
                                                                                                                            alg = LoGo())),
                                                            horizon = 252)),
-               FactorPrior(;
+               FactorPrior(; re = StepwiseRegression(; crit = PValue(; threshold = 0.8)),
                            pe = EmpiricalPrior(;
                                                ce = PortfolioOptimisersCovariance(;
                                                                                   ce = GerberCovariance(;
@@ -115,11 +115,13 @@
                                                                                          Expr}["_1==0.008"]),
                                            sets = fsets, views_conf = [0.25],
                                            pe = FactorPrior(;
+                                                            re = StepwiseRegression(;
+                                                                                    crit = AIC()),
                                                             pe = EmpiricalPrior(;
                                                                                 ce = PortfolioOptimisersCovariance(;
                                                                                                                    ce = SmythBrobyCovariance(;
                                                                                                                                              alg = SmythBroby2()))))),
-               FactorBlackLittermanPrior(;
+               FactorBlackLittermanPrior(; re = StepwiseRegression(; crit = RSquared()),
                                          views = LinearConstraintEstimator(;
                                                                            val = ["_1==0.008"]),
                                          sets = fsets, views_conf = 0.25,
