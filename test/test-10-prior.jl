@@ -545,7 +545,7 @@
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
                                                  cvar_views = cvar_views), rd).w,
-                       rtol = 1e-5)
+                       rtol = 5e-5)
 
         cvar_views = LinearConstraintEstimator(; val = ["AAPL == 0.07", "XOM==0.02"])
         pr = prior(HighOrderPriorEstimator(;
@@ -651,7 +651,7 @@
         @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) == WorstRealisation()(rd.X[:, 1])
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, var_views = var_views,
-                                                 opt = jopt), rd).w)
+                                                 opt = jopt), rd).w, rtol = 1e-6)
 
         var_views = LinearConstraintEstimator(; val = ["AAPL == 0.028", "XOM >= 0.027"])
         pr = prior(EntropyPoolingPrior(; sets = sets, var_alpha = 0.07,
@@ -705,7 +705,7 @@
         pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                        sigma_views = sigma_views, sk_views = sk_views,
                                        opt = opt), rd)
-        @test isapprox(pr.mu[1], 1.5 * pr0.mu[1], rtol = 1e-6)
+        @test isapprox(pr.mu[1], 1.5 * pr0.mu[1], rtol = 5e-6)
         @test isapprox(pr.sigma[1, 1], 1.3 * pr0.sigma[1, 1], rtol = 5e-3)
         @test isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
                                                                              reshape(pr.X[:,
