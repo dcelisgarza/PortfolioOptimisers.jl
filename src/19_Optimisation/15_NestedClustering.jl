@@ -50,8 +50,8 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     @argcheck(!isa(opt.opt.gcard, LinearConstraint))
     @argcheck(!isa(opt.opt.sgcard, LinearConstraint))
     # @argcheck(!isa(opt.opt.smtx, AbstractMatrix))
-    @argcheck(!isa(opt.opt.nplg, PhylogenyResult))
-    @argcheck(!isa(opt.opt.cplg, PhylogenyResult))
+    @argcheck(!isa(opt.opt.nplg, AbstractPhylogenyConstraintResult))
+    @argcheck(!isa(opt.opt.cplg, AbstractPhylogenyConstraintResult))
     return nothing
 end
 function assert_internal_optimiser(opt::NestedClustering)

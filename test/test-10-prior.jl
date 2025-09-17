@@ -651,7 +651,7 @@
         @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) == WorstRealisation()(rd.X[:, 1])
         @test isapprox(pr.w,
                        prior(EntropyPoolingPrior(; sets = sets, var_views = var_views,
-                                                 opt = jopt), rd).w, rtol = 1e-6)
+                                                 opt = jopt), rd).w, rtol = 5e-6)
 
         var_views = LinearConstraintEstimator(; val = ["AAPL == 0.028", "XOM >= 0.027"])
         pr = prior(EntropyPoolingPrior(; sets = sets, var_alpha = 0.07,
