@@ -667,8 +667,8 @@ Format a single term in a linear constraint equation as a string.
 """
 function _format_term(coeff, var)
     return if isone(coeff)
-        var
-    elseif coeff == -one(coeff)
+        "$var"
+    elseif isone(-one(coeff))
         "-$var"
     else
         "$(coeff)*$var"
