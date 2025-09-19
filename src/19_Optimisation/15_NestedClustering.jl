@@ -8,6 +8,8 @@ struct NestedClusteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <: Optimisat
     retcode::T7
     w::T8
 end
+"""
+"""
 struct NestedClustering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
        ClusteringOptimisationEstimator
     pe::T1
@@ -48,8 +50,8 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     @argcheck(!isa(opt.opt.gcard, LinearConstraint))
     @argcheck(!isa(opt.opt.sgcard, LinearConstraint))
     # @argcheck(!isa(opt.opt.smtx, AbstractMatrix))
-    @argcheck(!isa(opt.opt.nplg, PhylogenyResult))
-    @argcheck(!isa(opt.opt.cplg, PhylogenyResult))
+    @argcheck(!isa(opt.opt.nplg, AbstractPhylogenyConstraintResult))
+    @argcheck(!isa(opt.opt.cplg, AbstractPhylogenyConstraintResult))
     return nothing
 end
 function assert_internal_optimiser(opt::NestedClustering)
@@ -177,7 +179,8 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
             resi[i] = res
         end
     end
-    rdo = ReturnsResult(; nx = 1:(clr.k), X = pr.X * wi, nf = rd.nf, F = rd.F)
+    rdo = ReturnsResult(; nx = ["_$i" for i in 1:(clr.k)], X = pr.X * wi, nf = rd.nf,
+                        F = rd.F)
     reso = optimise!(nco.opto, rdo; dims = dims, branchorder = branchorder,
                      str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.cwf, nco.strict,

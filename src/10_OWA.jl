@@ -1,5 +1,7 @@
 """
-    abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
+```julia
+abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
+```
 
 Abstract supertype for all Ordered Weights Array (OWA) estimator types in PortfolioOptimisers.jl.
 
@@ -14,7 +16,9 @@ All concrete types implementing OWA estimation algorithms should subtype `Abstra
 abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
 
 """
-    abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
+```julia
+abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
+```
 
 Abstract supertype for all Ordered Weights Array (OWA) algorithm types in PortfolioOptimisers.jl.
 
@@ -29,7 +33,9 @@ All concrete types implementing specific OWA algorithms should subtype `Abstract
 abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
 
 """
-    struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
+```julia
+struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
+```
 
 Represents the Maximum Entropy algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -43,7 +49,9 @@ The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resul
 struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm end
 
 """
-    struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
+```julia
+struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
+```
 
 Represents the Minimum Square Distance algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -57,7 +65,9 @@ The Minimum Square Distance algorithm finds OWA weights that minimize the square
 struct MinimumSquareDistance <: AbstractOrderedWeightsArrayAlgorithm end
 
 """
-    struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
+```julia
+struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
+```
 
 Represents the Minimum Sum of Squares algorithm for Ordered Weights Array (OWA) estimation.
 
@@ -71,9 +81,11 @@ The Minimum Sum of Squares algorithm minimizes the sum of squared OWA weights, p
 struct MinimumSumSquares <: AbstractOrderedWeightsArrayAlgorithm end
 
 """
-    struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
-        g::T1
-    end
+```julia
+struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
+    g::T1
+end
+```
 
 Estimator type for normalised constant relative risk aversion (CRRA) OWA weights.
 
@@ -81,38 +93,19 @@ This struct represents an estimator for Ordered Weights Array (OWA) weights base
 
 # Fields
 
-  - `g`: Risk aversion parameter, must satisfy `0 < g < 1`.
+  - `g`: Risk aversion parameter.
 
 # Constructor
 
-    NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
+```julia
+NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
+```
 
-# Related
+Keyword arguments correspond to the fields above.
 
-  - [`AbstractOrderedWeightsArrayEstimator`](@ref)
-  - [`owa_l_moment_crm`](@ref)
-"""
-struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
-    g::T1
-end
-"""
-    NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
+## Validation
 
-Construct a [`NormalisedConstantRelativeRiskAversion`](@ref) estimator for OWA weights.
-
-Creates an estimator using the specified risk aversion parameter `g`, which must be in the open interval `(0, 1)`. The resulting estimator can be used with OWA-based risk measures and moment calculations.
-
-# Arguments
-
-  - `g`: Risk aversion parameter.
-
-# Returns
-
-  - `NormalisedConstantRelativeRiskAversion`: Configured estimator.
-
-# Validation
-
-  - Asserts that `0 < g < 1`.
+  - `0 < g < 1`.
 
 # Examples
 
@@ -124,9 +117,12 @@ NormalisedConstantRelativeRiskAversion
 
 # Related
 
-  - [`NormalisedConstantRelativeRiskAversion`](@ref)
+  - [`AbstractOrderedWeightsArrayEstimator`](@ref)
   - [`owa_l_moment_crm`](@ref)
 """
+struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
+    g::T1
+end
 function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
     @argcheck(zero(g) < g < one(g),
               DomainError(g, range_msg("`g`", zero(g), one(g), g, false, false) * "."))
@@ -134,13 +130,15 @@ function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
 end
 
 """
-    struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
-        slv::T1
-        max_phi::T2
-        sc::T3
-        so::T4
-        alg::T5
-    end
+```julia
+struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
+    slv::T1
+    max_phi::T2
+    sc::T3
+    so::T4
+    alg::T5
+end
+```
 
 Estimator type for OWA weights using JuMP-based optimization.
 
@@ -156,50 +154,20 @@ Estimator type for OWA weights using JuMP-based optimization.
 
 # Constructor
 
-    OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
-             max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
-             alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+```julia
+OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(), max_phi::Real = 0.5,
+        sc::Real = 1.0, so::Real = 1.0,
+        alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+```
 
-# Related
+Keyword arguments correspond to the fields above.
 
-  - [`AbstractOrderedWeightsArrayEstimator`](@ref)
-  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
-  - [`owa_l_moment_crm`](@ref)
-  - [`Solver`](@ref)
-"""
-struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
-    slv::T1
-    max_phi::T2
-    sc::T3
-    so::T4
-    alg::T5
-end
-"""
-    OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
-             max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
-             alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+## Validation
 
-Construct a [`OWAJuMP`](@ref) estimator for OWA weights using JuMP-based optimization.
-
-Creates an estimator with the specified solver(s), maximum OWA weight, constraint/objective scaling, and OWA algorithm. This estimator can be used for flexible OWA weight estimation in portfolio optimization workflows.
-
-# Arguments
-
-  - `slv`: Solver or vector of solvers to use.
-  - `max_phi`: Maximum allowed value for any OWA weight.
-  - `sc`: Scaling parameter for constraints.
-  - `so`: Scaling parameter for the objective.
-  - `alg`: Algorithm for OWA weight estimation.
-
-# Returns
-
-  - `OWAJuMP`: Configured estimator.
-
-# Validation
-
-  - Asserts that `slv` is non-empty if a vector.
-  - Asserts that `0 < max_phi < 1`.
-  - Asserts that `sc` and `so` are positive and finite.
+  - `!isempty(slv)`.
+  - `0 < max_phi < 1`.
+  - `isfinite(sc)` and `sc > 0`.
+  - `isfinite(so)` and `so > 0`.
 
 # Examples
 
@@ -220,10 +188,18 @@ OWAJuMP
 
 # Related
 
-  - [`OWAJuMP`](@ref)
+  - [`AbstractOrderedWeightsArrayEstimator`](@ref)
   - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
   - [`owa_l_moment_crm`](@ref)
+  - [`Solver`](@ref)
 """
+struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
+    slv::T1
+    max_phi::T2
+    sc::T3
+    so::T4
+    alg::T5
+end
 function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
                  max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
                  alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
@@ -245,7 +221,9 @@ function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
 end
 
 """
-    ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real = 0.5)
+```julia
+ncrra_weights(weights::AbstractMatrix{<:Real}; g::Real = 0.5)
+```
 
 Compute normalised constant relative risk aversion (CRRA) Ordered Weights Array (OWA) weights.
 
@@ -254,7 +232,11 @@ This function generates OWA weights using a normalised CRRA scheme, parameterise
 # Arguments
 
   - `weights`: Matrix of weights (typically order statistics or moment weights).
-  - `g`: Risk aversion parameter, must satisfy `0 < g < 1`.
+  - `g`: Risk aversion parameter.
+
+# Validation
+
+  - `0 < g < 1`.
 
 # Returns
 
@@ -313,7 +295,9 @@ function ncrra_weights(weights::AbstractMatrix{<:Real}, g::Real = 0.5)
 end
 
 """
-    owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
+```julia
+owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
+```
 
 Construct a JuMP model for Ordered Weights Array (OWA) weight estimation.
 
@@ -361,7 +345,9 @@ function owa_model_setup(method::OWAJuMP, weights::AbstractMatrix{<:Real})
 end
 
 """
-    owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMatrix)
+```julia
+owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMatrix)
+```
 
 Solve a JuMP model for OWA weight estimation and extract the resulting OWA weights.
 
@@ -402,7 +388,10 @@ function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::AbstractMa
 end
 
 """
-    owa_l_moment_crm(method::AbstractOrderedWeightsArrayEstimator, weights::AbstractMatrix{<:Real})
+```julia
+owa_l_moment_crm(method::AbstractOrderedWeightsArrayEstimator,
+                 weights::AbstractMatrix{<:Real})
+```
 
 Compute Ordered Weights Array (OWA) linear moment convex risk measure (CRM) weights using various estimation methods.
 
@@ -478,14 +467,50 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MinimumS
     return owa_model_solve(model, method, weights)
 end
 
+"""
+```julia
+owa_gmd(T::Integer)
+```
+
+Compute the Ordered Weights Array (OWA) of the Gini Mean Difference (GMD) risk measure.
+
+# Arguments
+
+  - `T`: Number of observations.
+
+# Returns
+
+  - `w::Range`: Vector of OWA weights of length `T`.
+"""
 function owa_gmd(T::Integer)
-    # w = Vector{typeof(inv(T))}(undef, T)
-    # for i in eachindex(w)
-    #     w[i] = 2 * i - 1 - T
-    # end
-    # w = 2 / (T * (T - 1)) * w
     return (4 * range(1; stop = T) .- 2 * (T + 1)) / (T * (T - 1))
 end
+
+"""
+```julia
+owa_cvar(T::Integer; alpha::Real = 0.05)
+```
+
+Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Risk.
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alpha`: Confidence level for CVaR.
+
+# Validation
+
+  - `0 < alpha < 1`.
+
+# Returns
+
+  - `w::Vector{<:Real}`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_wcvar`](@ref)
+  - [`owa_tg`](@ref)
+"""
 function owa_cvar(T::Integer, alpha::Real = 0.05)
     @argcheck(zero(alpha) < alpha < one(alpha),
               DomainError(alpha,
@@ -493,10 +518,33 @@ function owa_cvar(T::Integer, alpha::Real = 0.05)
                                     false) * "."))
     k = floor(Int, T * alpha)
     w = zeros(typeof(alpha), T)
-    w[1:k] .= -1 / (T * alpha)
-    w[k + 1] = -1 - sum(w[1:k])
+    w[1:k] .= -one(alpha) / (T * alpha)
+    w[k + 1] = -one(alpha) - sum(w[1:k])
     return w
 end
+
+"""
+```julia
+owa_wcvar(T::Integer, alphas::AbstractVector{<:Real}, weights::AbstractVector{<:Real})
+```
+
+Compute the Ordered Weights Array (OWA) weights for a weighted combination of Conditional Value at Risk measures.
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alphas`: Vector of confidence levels.
+  - `weights`: Vector of weights.
+
+# Returns
+
+  - `w::Vector{<:Real}`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_cvar`](@ref)
+  - [`owa_tg`](@ref)
+"""
 function owa_wcvar(T::Integer, alphas::AbstractVector{<:Real},
                    weights::AbstractVector{<:Real})
     w = zeros(promote_type(eltype(alphas), eltype(weights)), T)
@@ -505,6 +553,37 @@ function owa_wcvar(T::Integer, alphas::AbstractVector{<:Real},
     end
     return w
 end
+
+"""
+```julia
+owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
+```
+
+Compute the Ordered Weights Array (OWA) weights for the tail Gini risk measure.
+
+This function approximates the tail Gini risk measure by integrating over a range of CVaR levels from `alpha_i` to `alpha`, using `a_sim` points. The resulting weights are suitable for tail risk assessment.
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alpha_i`: Lower bound for CVaR integration.
+  - `alpha`: Upper bound for CVaR integration.
+  - `a_sim`: Number of integration points.
+
+# Validation
+
+  - `0 < alpha_i < alpha < 1`.
+  - `a_sim > 0`.
+
+# Returns
+
+  - `w::Vector{<:Real}`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_cvar`](@ref)
+  - [`owa_wcvar`](@ref)
+"""
 function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Integer = 100)
     @argcheck(zero(alpha) < alpha_i < alpha < one(alpha) && a_sim > zero(a_sim),
               AssertionError("The following conditions must hold:\n`alpha_i` in (0, `alpha`) => $alpha_i\n`alpha` in (0, 1) => $alpha\n`a_sim` > 0 => $a_sim"))
@@ -518,20 +597,118 @@ function owa_tg(T::Integer; alpha_i::Real = 1e-4, alpha::Real = 0.05, a_sim::Int
     w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]
     return owa_wcvar(T, alphas, w)
 end
+
+"""
+```julia
+owa_wr(T::Integer)
+```
+
+Compute the Ordered Weights Array (OWA) weights for the worst realisation risk measure.
+
+This function returns a vector of OWA weights that select the minimum (worst) value among `T` observations.
+
+# Arguments
+
+  - `T`: Number of observations.
+
+# Returns
+
+  - `w::Vector{<:Real}`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_rg`](@ref)
+"""
 function owa_wr(T::Integer)
     w = zeros(typeof(inv(T)), T)
     w[1] = -1
     return w
 end
+
+"""
+```julia
+owa_rg(T::Integer)
+```
+
+Compute the Ordered Weights Array (OWA) weights for the range risk measure.
+
+This function returns a vector of OWA weights corresponding to the range (difference between maximum and minimum) returns among `T` observations.
+
+# Arguments
+
+  - `T`: Number of observations.
+
+# Returns
+
+  - `w::Vector`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_wr`](@ref)
+"""
 function owa_rg(T::Integer)
     w = zeros(typeof(inv(T)), T)
     w[1] = -1
     w[T] = 1
     return w
 end
+
+"""
+```julia
+owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
+```
+
+Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Risk Range risk measure.
+
+This function returns a vector of OWA weights corresponding to the difference between CVaR at level `alpha` (lower tail) and the reversed CVaR at level `beta` (upper tail).
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alpha`: CVaR confidence level for the lower tail.
+  - `beta`: CVaR confidence level for the upper tail.
+
+# Returns
+
+  - `w::Vector`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_cvar`](@ref)
+  - [`owa_rg`](@ref)
+"""
 function owa_cvarrg(T::Integer; alpha::Real = 0.05, beta::Real = alpha)
     return owa_cvar(T, alpha) - reverse(owa_cvar(T, beta))
 end
+
+"""
+```julia
+owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real}, weights_a::AbstractVector{<:Real};
+            betas::AbstractVector{<:Real} = alphas,
+            weights_b::AbstractVector{<:Real} = weights_a)
+```
+
+Compute the Ordered Weights Array (OWA) weights for the weighted Conditional Value at Risk Range risk measure.
+
+This function returns a vector of OWA weights corresponding to the difference between a weighted sum of CVaR measures at levels `alphas` with weights `weights_a` and the reversed weighted sum of CVaR measures at levels `betas` with weights `weights_b`.
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alphas`: Vector of lower tail CVaR confidence levels.
+  - `weights_a`: Vector of weights for lower tail CVaR.
+  - `betas`: Vector of upper tail CVaR confidence levels.
+  - `weights_b`: Vector of weights for upper tail CVaR.
+
+# Returns
+
+  - `w::Vector{<:Real}`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_wcvar`](@ref)
+  - [`owa_cvarrg`](@ref)
+"""
 function owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
                      weights_a::AbstractVector{<:Real},
                      betas::AbstractVector{<:Real} = alphas,
@@ -539,6 +716,36 @@ function owa_wcvarrg(T::Integer, alphas::AbstractVector{<:Real},
     w = owa_wcvar(T, alphas, weights_a) - reverse(owa_wcvar(T, betas, weights_b))
     return w
 end
+
+"""
+```julia
+owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05, a_sim::Integer = 100,
+         beta_i::Real = alpha_i, beta::Real = alpha, b_sim::Integer = a_sim)
+```
+
+Compute the Ordered Weights Array (OWA) weights for the tail Gini range risk measure.
+
+This function returns a vector of OWA weights corresponding to the difference between tail Gini measures for the lower and upper tails, each approximated by integrating over a range of CVaR levels.
+
+# Arguments
+
+  - `T`: Number of observations.
+  - `alpha_i`: Lower bound for lower tail CVaR integration.
+  - `alpha`: Upper bound for lower tail CVaR integration.
+  - `a_sim`: Number of integration points for lower tail.
+  - `beta_i`: Lower bound for upper tail CVaR integration.
+  - `beta`: Upper bound for upper tail CVaR integration.
+  - `b_sim`: Number of integration points for upper tail.
+
+# Returns
+
+  - `w::Vector`: Vector of OWA weights of length `T`.
+
+# Related
+
+  - [`owa_tg`](@ref)
+  - [`owa_rg`](@ref)
+"""
 function owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,
                   a_sim::Integer = 100, beta_i::Real = alpha_i, beta::Real = alpha,
                   b_sim::Integer = a_sim)
@@ -549,7 +756,9 @@ function owa_tgrg(T::Integer; alpha_i::Real = 0.0001, alpha::Real = 0.05,
 end
 
 """
-    owa_l_moment(T::Integer, k::Integer = 2)
+```julia
+owa_l_moment(T::Integer; k::Integer = 2)
+```
 
 Compute the linear moment weights for the linear moments convex risk measure (CRM).
 
@@ -586,8 +795,10 @@ function owa_l_moment(T::Integer, k::Integer = 2)
 end
 
 """
-    owa_l_moment_crm(T::Integer; k::Integer = 2,
-                     method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
+```julia
+owa_l_moment_crm(T::Integer; k::Integer = 2,
+                 method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion())
+```
 
 Compute the ordered weights array (OWA) linear moments convex risk measure (CRM) weights for a given number of observations and moment order.
 
@@ -601,7 +812,7 @@ This function constructs the OWA linear moment CRM weights matrix for order stat
 
 # Validation
 
-  - Asserts that `k >= 2`.
+  - `k >= 2`.
 
 # Returns
 

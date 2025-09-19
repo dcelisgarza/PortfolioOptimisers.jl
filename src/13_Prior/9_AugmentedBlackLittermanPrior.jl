@@ -28,8 +28,10 @@ function AugmentedBlackLittermanPrior(;
                                                      <:BlackLittermanViews},
                                       a_sets::Union{Nothing, <:AssetSets} = nothing,
                                       f_sets::Union{Nothing, <:AssetSets} = nothing,
-                                      a_views_conf::Union{Nothing, <:AbstractVector} = nothing,
-                                      f_views_conf::Union{Nothing, <:AbstractVector} = nothing,
+                                      a_views_conf::Union{Nothing, <:Real,
+                                                          <:AbstractVector} = nothing,
+                                      f_views_conf::Union{Nothing, <:Real,
+                                                          <:AbstractVector} = nothing,
                                       w::Union{Nothing, <:AbstractVector} = nothing,
                                       rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
                                       tau::Union{Nothing, <:Real} = nothing)

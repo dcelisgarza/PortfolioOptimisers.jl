@@ -545,8 +545,8 @@ end
 function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds,
                               card::Union{Nothing, <:Integer},
                               gcard::Union{Nothing, <:LinearConstraint},
-                              nplg::Union{Nothing, <:PhylogenyResult},
-                              cplg::Union{Nothing, <:PhylogenyResult},
+                              nplg::Union{Nothing, <:AbstractPhylogenyConstraintResult},
+                              cplg::Union{Nothing, <:AbstractPhylogenyConstraintResult},
                               lt::Union{Nothing, <:BuyInThreshold},
                               st::Union{Nothing, <:BuyInThreshold},
                               fees::Union{Nothing, <:Fees}, ss::Union{Nothing, <:Real})

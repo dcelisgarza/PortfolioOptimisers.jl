@@ -1,5 +1,7 @@
 """
-    abstract type AbstractJuMPResult <: AbstractResult end
+```julia
+abstract type AbstractJuMPResult <: AbstractResult end
+```
 
 Abstract supertype for all JuMP-based optimisation result types in PortfolioOptimisers.jl.
 
@@ -12,13 +14,15 @@ All concrete types representing the result of a JuMP model optimisation should s
 abstract type AbstractJuMPResult <: AbstractResult end
 
 """
-    struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
-        name::T1
-        solver::T2
-        settings::T3
-        check_sol::T4
-        add_bridges::T5
-    end
+```julia
+struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
+    name::T1
+    solver::T2
+    settings::T3
+    check_sol::T4
+    add_bridges::T5
+end
+```
 
 Container for configuring a JuMP solver and its settings.
 
@@ -34,45 +38,17 @@ The `Solver` struct encapsulates all information needed to set up and run a JuMP
 
 # Constructor
 
-    Solver(; name::Union{Symbol, <:AbstractString} = "", solver = nothing,
-             settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}} = nothing,
-             check_sol::NamedTuple = (;), add_bridges::Bool = true)
+```julia
+Solver(; name::Union{Symbol, <:AbstractString} = "", solver = nothing,
+       settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}} = nothing,
+       check_sol::NamedTuple = (;), add_bridges::Bool = true)
+```
 
-# Related
+Keyword arguments correspond to the fields above.
 
-  - [`optimise_JuMP_model!`](@ref)
-"""
-struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
-    name::T1
-    solver::T2
-    settings::T3
-    check_sol::T4
-    add_bridges::T5
-end
-"""
-    Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
-            settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}} = nothing,
-            check_sol::NamedTuple = (;), add_bridges::Bool = true)
+## Validation
 
-Construct a `Solver` object for configuring a JuMP solver.
-
-This constructor validates and packages the solver backend, settings, and options for use in model optimisation.
-
-# Arguments
-
-  - `name`: Symbol or string identifier for the solver.
-  - `solver`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
-  - `settings`: Solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).
-  - `check_sol`: Named tuple of solution for keyword arguments in [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible).
-  - `add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).
-
-# Returns
-
-  - `Solver`: Configured solver object.
-
-# Validation
-
-  - Asserts that `settings` is non-empty if provided as a dictionary or vector.
+  - If `settings` is a dictionary or vector, `!isempty(settings)`.
 
 # Examples
 
@@ -85,7 +61,18 @@ Solver
     check_sol | @NamedTuple{}: NamedTuple()
   add_bridges | Bool: true
 ```
+
+# Related
+
+  - [`optimise_JuMP_model!`](@ref)
 """
+struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
+    name::T1
+    solver::T2
+    settings::T3
+    check_sol::T4
+    add_bridges::T5
+end
 function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
                 settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}} = nothing,
                 check_sol::NamedTuple = (;), add_bridges::Bool = true)
@@ -96,10 +83,12 @@ function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = noth
 end
 
 """
-    struct JuMPResult{T1, T2} <: AbstractJuMPResult
-        trials::T1
-        success::T2
-    end
+```julia
+struct JuMPResult{T1, T2} <: AbstractJuMPResult
+    trials::T1
+    success::T2
+end
+```
 
 Result type for JuMP model optimisation.
 
@@ -112,31 +101,11 @@ The `JuMPResult` struct records the outcome of a JuMP optimisation, including tr
 
 # Constructor
 
-    JuMPResult(; trials::AbstractDict, success::Bool)
+```julia
+JuMPResult(; trials::AbstractDict, success::Bool)
+```
 
-# Related
-
-  - [`optimise_JuMP_model!`](@ref)
-"""
-struct JuMPResult{T1, T2} <: AbstractJuMPResult
-    trials::T1
-    success::T2
-end
-"""
-    JuMPResult(; trials::AbstractDict, success::Bool)
-
-Construct a `JuMPResult` object from solver trials and success status.
-
-If `success` is `false`, a warning is emitted with the trial errors.
-
-# Arguments
-
-  - `trials`: Dictionary of solver attempts and errors.
-  - `success`: Boolean indicating whether optimisation succeeded.
-
-# Returns
-
-  - `JuMPResult`: Result object.
+Keyword arguments correspond to the fields above.
 
 # Examples
 
@@ -146,7 +115,15 @@ JuMPResult
    trials | Dict{Symbol, Dict{Symbol, String}}: Dict(:HiGHS => Dict(:optimize! => "error"))
   success | Bool: true
 ```
+
+# Related
+
+  - [`optimise_JuMP_model!`](@ref)
 """
+struct JuMPResult{T1, T2} <: AbstractJuMPResult
+    trials::T1
+    success::T2
+end
 function JuMPResult(; trials::AbstractDict, success::Bool)
     if !success
         @warn("Model could not be solved satisfactorily.\n$trials")
@@ -155,7 +132,9 @@ function JuMPResult(; trials::AbstractDict, success::Bool)
 end
 
 """
-    set_solver_attributes(args...)
+```julia
+set_solver_attributes(args...)
+```
 
 Set solver attributes for a JuMP model.
 
@@ -173,8 +152,10 @@ function set_solver_attributes(args...)
     return nothing
 end
 """
-    set_solver_attributes(model::JuMP.Model,
-                          settings::Union{<:AbstractDict, <:AbstractVector{<:Pair}})
+```julia
+set_solver_attributes(model::JuMP.Model,
+                      settings::Union{<:AbstractDict, <:AbstractVector{<:Pair}})
+```
 
 Set multiple solver attributes on a JuMP model.
 
@@ -197,7 +178,9 @@ function set_solver_attributes(model::JuMP.Model,
     return nothing
 end
 """
-    set_solver_attributes(model::JuMP.Model, settings::Pair)
+```julia
+set_solver_attributes(model::JuMP.Model, settings::Pair)
+```
 
 Set a single solver attribute on a JuMP model.
 
@@ -216,8 +199,9 @@ function set_solver_attributes(model::JuMP.Model, settings::Pair)
 end
 
 """
-    optimise_JuMP_model!(model::JuMP.Model,
-                         slv::Union{<:Solver, <:AbstractVector{<:Solver}})
+```julia
+optimise_JuMP_model!(model::JuMP.Model, slv::Union{<:Solver, <:AbstractVector{<:Solver}})
+```
 
 Attempt to optimise a JuMP model using one or more configured solvers.
 

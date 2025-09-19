@@ -35,6 +35,8 @@ function get_black_litterman_views(lcs::Union{<:ParsingResult,
             end
             At += Ai * c
         end
+        @argcheck(any(x -> !iszero(x), At),
+                  DomainError("At least one entry in At must be non-zero:\nany(x -> !iszero(x), At) => $(any(x -> !iszero(x), At))"))
         append!(P, At)
         append!(Q, lc.rhs)
     end
@@ -64,18 +66,17 @@ function assert_bl_views_conf(::Nothing, args...)
     return nothing
 end
 function assert_bl_views_conf(views_conf::Real,
-                              val::Union{<:AbstractString, Expr,
-                                         <:AbstractVector{<:Union{<:AbstractString, Expr}}})
-    @argcheck(!isa(val, AbstractVector))
+                              ::Union{<:AbstractString, Expr,
+                                      <:AbstractVector{<:Union{<:AbstractString, Expr}}})
     @argcheck(zero(views_conf) < views_conf < one(views_conf))
     return nothing
 end
 function assert_bl_views_conf(views_conf::AbstractVector{<:Real},
                               val::Union{<:AbstractString, Expr,
                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}})
-    @argcheck(isa(val, AbstractVector))
-    @argcheck(!isempty(views_conf))
-    @argcheck(length(val) == length(views_conf))
+    if isa(val, AbstractVector)
+        @argcheck(length(val) == length(views_conf))
+    end
     @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end

@@ -23,7 +23,7 @@ function FactorBlackLittermanPrior(;
                                    views::Union{<:LinearConstraintEstimator,
                                                 <:BlackLittermanViews},
                                    sets::Union{Nothing, <:AssetSets} = nothing,
-                                   views_conf::Union{Nothing, <:AbstractVector} = nothing,
+                                   views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
                                    w::Union{Nothing, <:AbstractWeights} = nothing,
                                    rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
                                    tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)

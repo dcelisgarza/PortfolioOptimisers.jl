@@ -1,5 +1,7 @@
 """
-    AbstractDenoiseEstimator <: AbstractEstimator
+```julia
+abstract type AbstractDenoiseEstimator <: AbstractEstimator end
+```
 
 Abstract supertype for all denoising estimator types in PortfolioOptimisers.jl.
 
@@ -15,7 +17,9 @@ All concrete types that implement denoising of covariance or correlation matrice
 abstract type AbstractDenoiseEstimator <: AbstractEstimator end
 
 """
-    AbstractDenoiseAlgorithm <: AbstractAlgorithm
+```julia
+abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
+```
 
 Abstract supertype for all denoising algorithm types in PortfolioOptimisers.jl.
 
@@ -31,7 +35,9 @@ All concrete types that implement a specific denoising algorithm (e.g., spectral
 abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
 
 """
-    SpectralDenoise <: AbstractDenoiseAlgorithm
+```julia
+struct SpectralDenoise <: AbstractDenoiseAlgorithm end
+```
 
 A denoising algorithm that sets the smallest `num_factors` eigenvalues of a covariance or correlation matrix to zero, effectively removing the principal components relating to random noise according to random matrix theory-based approaches.
 
@@ -51,7 +57,9 @@ SpectralDenoise()
 struct SpectralDenoise <: AbstractDenoiseAlgorithm end
 
 """
-    FixedDenoise <: AbstractDenoiseAlgorithm
+```julia
+struct FixedDenoise <: AbstractDenoiseAlgorithm end
+```
 
 A denoising algorithm that replaces the smallest `num_factors` eigenvalues of a covariance or correlation matrix with their average, effectively averaging the principal components relating to random noise according to random matrix theory-based approaches.
 
@@ -71,25 +79,29 @@ FixedDenoise()
 struct FixedDenoise <: AbstractDenoiseAlgorithm end
 
 """
-    struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
-        alpha::T1
-    end
+```julia
+struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
+    alpha::T1
+end
+```
 
 A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a covariance or correlation matrix towards their diagonal, controlled by the shrinkage parameter `alpha`. This approach interpolates between no shrinkage (`alpha = 0`) and full shrinkage (`alpha = 1`), providing a flexible way to regularize noisy eigenvalues.
 
 # Fields
 
-  - `alpha`: The shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues. Must be in the range `[0, 1]`, where `0` means no shrinkage and `1` means full shrinkage.
+  - `alpha`: The shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues.
 
 # Constructor
 
-    ShrunkDenoise(; alpha::Real = 0.0)
+```julia
+ShrunkDenoise(; alpha::Real = 0.0)
+```
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - Throws an error if `alpha` is not in `[0, 1]`.
+  - `0 <= alpha <= 1`.
 
 # Examples
 
@@ -117,14 +129,16 @@ function ShrunkDenoise(; alpha::Real = 0.0)
 end
 
 """
-    struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
-        alg::T1
-        args::T2
-        kwargs::T3
-        kernel::T4
-        m::T5
-        n::T6
-    end
+```julia
+struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
+    alg::T1
+    args::T2
+    kwargs::T3
+    kernel::T4
+    m::T5
+    n::T6
+end
+```
 
 A flexible container type for configuring and applying denoising algorithms to covariance or correlation matrices in PortfolioOptimisers.jl.
 
@@ -141,12 +155,11 @@ A flexible container type for configuring and applying denoising algorithms to c
 
 # Constructor
 
-    Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(),
-             m::Integer = 10,
-             n::Integer = 1000,
-             kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
-             args::Tuple = (),
-             kwargs::NamedTuple = (;))
+```julia
+Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), m::Integer = 10,
+        n::Integer = 1000, kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
+        args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -198,7 +211,10 @@ function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple 
 end
 
 """
-    _denoise!(alg::AbstractDenoiseAlgorithm, X::AbstractMatrix, vals::AbstractVector, vecs::AbstractMatrix, num_factors::Integer)
+```julia
+_denoise!(alg::AbstractDenoiseAlgorithm, X::AbstractMatrix, vals::AbstractVector,
+          vecs::AbstractMatrix, num_factors::Integer)
+```
 
 In-place denoising of a covariance or correlation matrix using a specific denoising algorithm.
 
@@ -261,9 +277,11 @@ function _denoise!(de::ShrunkDenoise, X::AbstractMatrix, vals::AbstractVector,
 end
 
 """
-    errPDF(x::Real, vals::AbstractVector, q::Real;
-           kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
-           n::Integer = 1000)
+```julia
+errPDF(x::Real, vals::AbstractVector, q::Real;
+       kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
+       n::Integer = 1000)
+```
 
 Compute the sum of squared errors (SSE) between the theoretical Marčenko–Pastur (MP) eigenvalue density and the empirical eigenvalue density estimated from observed eigenvalues.
 
@@ -303,10 +321,11 @@ function errPDF(x::Real, vals::AbstractVector, q::Real;
 end
 
 """
-    find_max_eval(vals::AbstractVector, q::Real;
-                  kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
-                  m::Integer = 10, n::Integer = 1000, args::Tuple = (),
-                  kwargs::NamedTuple = (;))
+```julia
+find_max_eval(vals::AbstractVector, q::Real;
+              kernel::Any = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
+              n::Integer = 1000, args::Tuple = (), kwargs::NamedTuple = (;))
+```
 
 Estimate the upper edge of the Marčenko–Pastur (MP) distribution for a set of eigenvalues, used to separate signal from noise in random matrix denoising.
 
@@ -343,8 +362,10 @@ function find_max_eval(vals::AbstractVector, q::Real;
 end
 
 """
-    denoise!(de::Denoise, X::AbstractMatrix, q::Real, pdm::Union{Nothing, <:Posdef} = Posdef())
-    denoise!(::Nothing, args...)
+```julia
+denoise!(de::Denoise, X::AbstractMatrix, q::Real; pdm::Union{Nothing, <:Posdef} = Posdef())
+denoise!(::Nothing, args...)
+```
 
 In-place denoising of a covariance or correlation matrix using a [`Denoise`](@ref) estimator.
 
@@ -364,12 +385,6 @@ For covariance matrices, the function internally converts to a correlation matri
 # Returns
 
   - `nothing`. The input matrix `X` is modified in-place.
-
-# Validation
-
-  - If `X` is a covariance matrix, it is internally converted to a correlation matrix for denoising and then rescaled.
-  - The number of factors is determined automatically from the spectrum and kernel parameters.
-  - If `pdm` is provided, the result is projected to the nearest positive definite matrix.
 
 # Examples
 
@@ -433,8 +448,10 @@ function denoise!(de::Denoise, X::AbstractMatrix, q::Real,
 end
 
 """
-    denoise(de::Denoise, X::AbstractMatrix, q::Real, pdm::Union{Nothing, <:Posdef} = Posdef())
-    denoise(::Nothing, args...)
+```julia
+denoise(de::Denoise, X::AbstractMatrix, q::Real; pdm::Union{Nothing, <:Posdef} = Posdef())
+denoise(::Nothing, args...)
+```
 
 Out-of-place version of [`denoise!`](@ref).
 

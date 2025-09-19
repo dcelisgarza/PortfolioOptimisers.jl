@@ -1,6 +1,6 @@
 @safetestset "Moments" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, CovarianceEstimation,
-          StableRNGs, StatsBase
+          StableRNGs, StatsBase, LinearAlgebra, SparseArrays
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -143,6 +143,11 @@
             end
             @test success
         end
+        @test isapprox(df[!, "40"],
+                       vec(cov(PortfolioOptimisersCovariance(;
+                                                             mp = DefaultMatrixProcessing(;
+                                                                                          alg = LoGo())),
+                               rd.X)))
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
@@ -224,6 +229,15 @@
             @test isapprox(d1, dg1)
             @test isapprox(d2, dg2)
             @test isapprox(d1, d2)
+            if isa(de, Distance{<:SimpleAbsoluteDistance}) ||
+               isa(de, Distance{<:LogDistance}) ||
+               isa(de, GeneralDistance{<:Any, <:SimpleAbsoluteDistance}) ||
+               isa(de, GeneralDistance{<:Any, <:LogDistance})
+                r, d = cor_and_dist(de, ce, rd.X)
+                rg, dg = cor_and_dist(deg, ce, rd.X)
+                @test isapprox(r, rg)
+                @test isapprox(d, dg)
+            end
         end
     end
     @testset "Canonical Distance" begin
@@ -241,6 +255,9 @@
             @test isapprox(r1, cor(cei, rd.X))
             d3 = distance(de, cei, rd.X)
             d4 = if isa(ce, MutualInfoCovariance)
+                @test all(isapprox.((r1, d1), cor_and_dist(de, ce, rd.X)))
+                @test isapprox(d1, distance(de, ce, rd.X))
+                @test isapprox(d1, distance(de, cei, rd.X))
                 distance(Distance(;
                                   alg = VariationInfoDistance(; bins = ce.bins,
                                                               normalise = ce.normalise)),
@@ -254,6 +271,9 @@
             end
             d5 = distance(deg, ce, rd.X)
             d6 = if isa(ce, MutualInfoCovariance)
+                @test all(isapprox.((r1, d1), cor_and_dist(deg, ce, rd.X)))
+                @test isapprox(d1, distance(deg, ce, rd.X))
+                @test isapprox(d1, distance(deg, cei, rd.X))
                 distance(GeneralDistance(;
                                          alg = VariationInfoDistance(; bins = ce.bins,
                                                                      normalise = ce.normalise)),

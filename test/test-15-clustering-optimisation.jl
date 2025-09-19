@@ -72,6 +72,10 @@
           TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0)),
           RiskTrackingRiskMeasure(; r = StandardDeviation(),
                                   tracking = WeightsTracking(; w = w0)),
+          TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0), alg = NOCTracking()),
+          RiskTrackingRiskMeasure(; r = StandardDeviation(),
+                                  tracking = WeightsTracking(; w = w0),
+                                  alg = DependentVariableTracking()),
           RiskRatioRiskMeasure()]
     @testset "HierarchicalRiskParity" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity1.csv.gz"),
@@ -87,6 +91,8 @@
             @test success
         end
     end
+    df = CSV.read(joinpath(@__DIR__, "./assets/HierarchicalRiskParity1.csv.gz"), DataFrame)
+
     @testset "HierarchicalRiskParity vector rm" begin
         sces = [SumScalariser(), MaxScalariser(), LogSumExpScalariser(; gamma = 1.2e2),
                 LogSumExpScalariser(; gamma = 1e6)]

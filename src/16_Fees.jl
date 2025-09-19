@@ -7,14 +7,14 @@ struct FeesEstimator{T1, T2, T3, T4, T5, T6} <: AbstractEstimator
     kwargs::T6
 end
 function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
-                       l::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
-                                <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
-                       s::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
-                                <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
-                       fl::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
-                                 <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
-                       fs::Union{Nothing, <:AbstractDict, <:Pair{<:Any, <:Real},
-                                 <:AbstractVector{<:Pair{<:Any, <:Real}}} = nothing,
+                       l::Union{Nothing, <:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                                <:AbstractVector{<:Pair{<:AbstractString, <:Real}}} = nothing,
+                       s::Union{Nothing, <:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                                <:AbstractVector{<:Pair{<:AbstractString, <:Real}}} = nothing,
+                       fl::Union{Nothing, <:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                                 <:AbstractVector{<:Pair{<:AbstractString, <:Real}}} = nothing,
+                       fs::Union{Nothing, <:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                                 <:AbstractVector{<:Pair{<:AbstractString, <:Real}}} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))
     if isa(l, Union{<:AbstractDict, <:AbstractVector})
         @argcheck(!isempty(l), IsEmptyError(non_empty_msg("`l`") * "."))

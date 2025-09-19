@@ -1,9 +1,11 @@
 """
-    struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
-        ce::T1
-        w::T2
-        l::T3
-    end
+```julia
+struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
+    ce::T1
+    w::T2
+    l::T3
+end
+```
 
 Container type for equilibrium expected returns estimators.
 
@@ -17,15 +19,17 @@ Container type for equilibrium expected returns estimators.
 
 # Constructor
 
-    EquilibriumExpectedReturns(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                 w::Union{Nothing, <:AbstractVector} = nothing,
-                                 l::Real = 1)
+```julia
+EquilibriumExpectedReturns(;
+                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                           w::Union{Nothing, <:AbstractVector} = nothing, l::Real = 1)
+```
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is provided, it must not be empty.
+  - If `w` is provided, `!isempty(w)`.
 
 # Examples
 
@@ -75,7 +79,9 @@ function factory(ce::EquilibriumExpectedReturns, args...)
 end
 
 """
-    mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```julia
+mean(me::EquilibriumExpectedReturns, X::AbstractMatrix; dims::Int = 1, kwargs...)
+```
 
 Compute equilibrium expected returns from a covariance estimator, weights, and risk aversion.
 

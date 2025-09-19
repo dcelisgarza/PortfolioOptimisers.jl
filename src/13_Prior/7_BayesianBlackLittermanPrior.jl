@@ -16,7 +16,7 @@ function BayesianBlackLittermanPrior(;
                                      views::Union{<:LinearConstraintEstimator,
                                                   <:BlackLittermanViews},
                                      sets::Union{Nothing, <:AssetSets} = nothing,
-                                     views_conf::Union{Nothing, <:AbstractVector} = nothing,
+                                     views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
                                      rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
     if isa(views, LinearConstraintEstimator)
         @argcheck(!isnothing(sets))

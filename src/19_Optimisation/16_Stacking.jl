@@ -77,7 +77,7 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
         wi[:, i] = res.w
         resi[i] = res
     end
-    rdo = ReturnsResult(; nx = 1:Ni, X = pr.X * wi, nf = rd.nf, F = rd.F)
+    rdo = ReturnsResult(; nx = ["_$i" for i in 1:Ni], X = pr.X * wi, nf = rd.nf, F = rd.F)
     reso = optimise!(st.opto, rdo; dims = dims, branchorder = branchorder,
                      str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(st.wb, st.sets, st.cwf, st.strict, resi,

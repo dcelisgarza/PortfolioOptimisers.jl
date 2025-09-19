@@ -2,8 +2,10 @@ struct BuyInThresholdEstimator{T1} <: AbstractConstraintEstimator
     val::T1
 end
 function BuyInThresholdEstimator(;
-                                 val::Union{<:AbstractDict, <:Pair{<:Any, <:Real},
-                                            <:AbstractVector{<:Pair{<:Any, <:Real}}})
+                                 val::Union{<:AbstractDict,
+                                            <:Pair{<:AbstractString, <:Real},
+                                            <:AbstractVector{<:Pair{<:AbstractString,
+                                                                    <:Real}}})
     @argcheck(!isempty(val))
     return BuyInThresholdEstimator(val)
 end

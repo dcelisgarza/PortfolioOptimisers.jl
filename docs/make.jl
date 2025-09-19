@@ -71,13 +71,16 @@ makedocs(; #modules = [PortfolioOptimisers],
                                   canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl"),
          pages = ["index.md";
                   "Examples" => examples_nav;
-                  numbered_pages[40:end];
+                  numbered_pages[47:end];
                   "API" => [numbered_pages[1:6];
                             "Moments" => numbered_pages[7:27];
                             "Distance" => numbered_pages[28:32];
                             "JuMP Model Optimisation" => numbered_pages[33];
                             "Ordered Weights Array" => numbered_pages[34];
-                            "Phylogeny" => numbered_pages[35:39]]],
+                            "Phylogeny" => numbered_pages[35:39];
+                            "Constraint Generation" => numbered_pages[40:44];
+                            "Prior" => numbered_pages[45];
+                            "Optimisation" => numbered_pages[46]]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 

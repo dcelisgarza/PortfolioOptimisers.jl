@@ -1,5 +1,10 @@
 """
-    GeneralWeightedCovariance{T1, T2} <: AbstractCovarianceEstimator
+```julia
+struct GeneralWeightedCovariance{T1, T2} <: AbstractCovarianceEstimator
+    ce::T1
+    w::T2
+end
+```
 
 A flexible covariance estimator for PortfolioOptimisers.jl supporting arbitrary covariance estimators and optional observation weights.
 
@@ -12,15 +17,18 @@ A flexible covariance estimator for PortfolioOptimisers.jl supporting arbitrary 
 
 # Constructor
 
-    GeneralWeightedCovariance(; ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
-                                                                                                 corrected = true),
-                                w::Union{Nothing, <:AbstractWeights} = nothing)
+```julia
+GeneralWeightedCovariance(;
+                          ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
+                                                                                         corrected = true),
+                          w::Union{Nothing, <:AbstractWeights} = nothing)
+```
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - If `w` is provided, it must not be empty.
+  - If `w` is provided, `!isempty(w)`.
 
 # Examples
 
@@ -62,7 +70,10 @@ function GeneralWeightedCovariance(;
 end
 
 """
-    cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```julia
+cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing,
+    kwargs...)
+```
 
 Compute the covariance matrix using a [`GeneralWeightedCovariance`](@ref) estimator.
 
@@ -95,7 +106,10 @@ function Statistics.cov(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::
 end
 
 """
-    cor(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```julia
+cor(ce::GeneralWeightedCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing,
+    kwargs...)
+```
 
 Compute the correlation matrix using a [`GeneralWeightedCovariance`](@ref) estimator.
 
@@ -132,11 +146,13 @@ function factory(ce::GeneralWeightedCovariance,
 end
 
 """
-    struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        me::T1
-        ce::T2
-        alg::T3
-    end
+```julia
+struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
+    me::T1
+    ce::T2
+    alg::T3
+end
+```
 
 A flexible container type for configuring and applying joint expected returns and covariance estimation in PortfolioOptimisers.jl.
 
@@ -150,9 +166,11 @@ A flexible container type for configuring and applying joint expected returns an
 
 # Constructor
 
-    Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                 ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance(),
-                 alg::AbstractMomentAlgorithm = Full())
+```julia
+Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+           ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance(),
+           alg::AbstractMomentAlgorithm = Full())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -192,7 +210,9 @@ function factory(ce::Covariance, w::Union{Nothing, <:AbstractWeights} = nothing)
 end
 
 """
-    cov(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```julia
+cov(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```
 
 Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 
@@ -234,7 +254,9 @@ function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::AbstractMatrix;
 end
 
 """
-    cor(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```julia
+cor(ce::Covariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```
 
 Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 

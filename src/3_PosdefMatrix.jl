@@ -1,5 +1,7 @@
 """
-    AbstractPosdefEstimator <: AbstractEstimator
+```julia
+abstract type AbstractPosdefEstimator <: AbstractEstimator end
+```
 
 Abstract supertype for all positive definite matrix estimator types in PortfolioOptimisers.jl.
 
@@ -15,9 +17,11 @@ All concrete types that implement positive definite matrix projection or estimat
 abstract type AbstractPosdefEstimator <: AbstractEstimator end
 
 """
-    struct Posdef{T1} <: AbstractPosdefEstimator
-        alg::T1
-    end
+```julia
+struct Posdef{T1} <: AbstractPosdefEstimator
+    alg::T1
+end
+```
 
 A concrete estimator type for projecting a matrix to the nearest positive definite (PD) matrix, typically used for covariance or correlation matrices.
 
@@ -27,7 +31,9 @@ A concrete estimator type for projecting a matrix to the nearest positive defini
 
 # Constructor
 
-    Posdef(; alg::Any = NearestCorrelationMatrix.Newton)
+```julia
+Posdef(; alg::Any = NearestCorrelationMatrix.Newton)
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -55,8 +61,10 @@ function Posdef(; alg::Any = NearestCorrelationMatrix.Newton)
 end
 
 """
-    posdef!(pdm::Posdef, X::AbstractMatrix)
-    posdef!(::Nothing, args...)
+```julia
+posdef!(pdm::Posdef, X::AbstractMatrix)
+posdef!(::Nothing, args...)
+```
 
 In-place projection of a matrix to the nearest positive definite (PD) matrix using the specified estimator.
 
@@ -133,8 +141,10 @@ function posdef!(pdm::Posdef, X::AbstractMatrix)
 end
 
 """
-    posdef(pdm::Posdef, X::AbstractMatrix)
-    posdef(::Nothing, args...)
+```julia
+posdef(pdm::Posdef, X::AbstractMatrix)
+posdef(::Nothing, args...)
+```
 
 Out-of-place version of [`posdef!`](@ref).
 

@@ -1,6 +1,6 @@
-abstract type PhylogenyEstimator <: AbstractConstraintEstimator end
-abstract type PhylogenyResult <: AbstractConstraintResult end
-struct SemiDefinitePhylogenyEstimator{T1, T2} <: PhylogenyEstimator
+abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimator end
+abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
+struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
     pe::T1
     p::T2
 end
@@ -11,7 +11,7 @@ function SemiDefinitePhylogenyEstimator(;
     @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
     return SemiDefinitePhylogenyEstimator(pe, p)
 end
-struct SemiDefinitePhylogeny{T1, T2} <: PhylogenyResult
+struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
     A::T1
     p::T2
 end
@@ -25,15 +25,14 @@ function phylogeny_constraints(plc::SemiDefinitePhylogenyEstimator, X::AbstractM
     return SemiDefinitePhylogeny(; A = phylogeny_matrix(plc.pe, X; dims = dims, kwargs...),
                                  p = plc.p)
 end
-struct IntegerPhylogenyEstimator{T1, T2, T3} <: PhylogenyEstimator
+struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
     pe::T1
     B::T2
     scale::T3
 end
-function _validate_length_integer_phylogeny_constraint_B(alg::PredefinedNumberClusters,
-                                                         B::AbstractVector)
-    @argcheck(length(B) <= alg.k,
-              DomainError("`length(B) <= alg.k`:\nlength(B) => $(length(B))\nalg.k => $(alg.k)"))
+function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::AbstractVector)
+    @argcheck(length(B) <= alg,
+              DomainError("`length(B) <= alg`:\nlength(B) => $(length(B))\nalg => $(alg)"))
     return nothing
 end
 function _validate_length_integer_phylogeny_constraint_B(args...)
@@ -65,7 +64,7 @@ function IntegerPhylogenyEstimator(;
     end
     return IntegerPhylogenyEstimator(pe, B, scale)
 end
-struct IntegerPhylogeny{T1, T2, T3} <: PhylogenyResult
+struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
     A::T1
     B::T2
     scale::T3
@@ -116,7 +115,7 @@ end
 function vec_to_real_measure(val::Real, ::AbstractVector)
     return val
 end
-struct CentralityEstimator{T1, T2, T3} <: PhylogenyEstimator
+struct CentralityEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
     A::T1
     B::T2
     comp::T3

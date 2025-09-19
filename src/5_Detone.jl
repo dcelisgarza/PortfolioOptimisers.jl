@@ -14,9 +14,11 @@ All concrete types representing detoning estimators (such as [`Detone`](@ref)) s
 abstract type AbstractDetoneEstimator <: AbstractEstimator end
 
 """
-    struct Detone{T1} <: AbstractDetoneEstimator
-        n::T1
-    end
+```julia
+struct Detone{T1} <: AbstractDetoneEstimator
+    n::T1
+end
+```
 
 A concrete detoning estimator for removing the top `n` principal components (market modes) from a covariance or correlation matrix.
 
@@ -26,13 +28,15 @@ A concrete detoning estimator for removing the top `n` principal components (mar
 
 # Constructor
 
-    Detone(; n::Integer = 1)
+```julia
+Detone(; n::Integer = 1)
+```
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `n` must satisfy `n ≥ 0`.
+  - `n > 0`.
 
 # Examples
 
@@ -56,8 +60,10 @@ function Detone(; n::Integer = 1)
 end
 
 """
-    detone!(dt::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
-    detone!(::Nothing, args...)
+```julia
+detone!(dt::Detone, X::AbstractMatrix; pdm::Union{Nothing, <:Posdef} = Posdef())
+detone!(::Nothing, args...)
+```
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
 
@@ -79,9 +85,7 @@ For covariance matrices, the function internally converts to a correlation matri
 
 # Validation
 
-  - If `X` is a covariance matrix, it is internally converted to a correlation matrix for detoning and then rescaled.
-  - The number of components removed is validated to be within the matrix size.
-  - If `pdm` is provided, the result is projected to the nearest positive definite matrix.
+  - `1 <= dt.n <= size(X, 2)`.
 
 # Examples
 
@@ -143,8 +147,10 @@ function detone!(ce::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = 
 end
 
 """
-    detone(dt::Detone, X::AbstractMatrix, pdm::Union{Nothing, <:Posdef} = Posdef())
-    detone(::Nothing, args...)
+```julia
+detone(dt::Detone, X::AbstractMatrix; pdm::Union{Nothing, <:Posdef} = Posdef())
+detone(::Nothing, args...)
+```
 
 Out-of-place version of [`detone!`](@ref).
 

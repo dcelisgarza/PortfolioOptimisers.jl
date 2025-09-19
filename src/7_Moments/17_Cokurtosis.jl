@@ -1,5 +1,7 @@
 """
-    abstract type CokurtosisEstimator <: AbstractEstimator end
+```julia
+abstract type CokurtosisEstimator <: AbstractEstimator end
+```
 
 Abstract supertype for all cokurtosis estimators in PortfolioOptimisers.jl.
 
@@ -13,11 +15,13 @@ All concrete types implementing cokurtosis estimation algorithms should subtype 
 abstract type CokurtosisEstimator <: AbstractEstimator end
 
 """
-    struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
-        me::T1
-        mp::T2
-        alg::T3
-    end
+```julia
+struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
+    me::T1
+    mp::T2
+    alg::T3
+end
+```
 
 Container type for cokurtosis estimators.
 
@@ -31,9 +35,11 @@ Container type for cokurtosis estimators.
 
 # Constructor
 
-    Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                 mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
-                 alg::AbstractMomentAlgorithm = Full())
+```julia
+Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+           mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+           alg::AbstractMomentAlgorithm = Full())
+```
 
 Keyword arguments correspond to the fields above.
 
@@ -75,7 +81,9 @@ function factory(ce::Cokurtosis, w::Union{Nothing, <:AbstractWeights} = nothing)
 end
 
 """
-    _cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
+```julia
+_cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
+```
 
 Internal helper for cokurtosis computation.
 
@@ -106,7 +114,10 @@ function _cokurtosis(X::AbstractMatrix, mp::AbstractMatrixProcessingEstimator)
 end
 
 """
-    cokurtosis(ke::Union{Nothing, <:Cokurtosis}, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
+```julia
+cokurtosis(ke::Union{Nothing, <:Cokurtosis}, X::AbstractMatrix; dims::Int = 1,
+           mean = nothing, kwargs...)
+```
 
 Compute the cokurtosis tensor for a dataset.
 
@@ -124,6 +135,10 @@ This method computes the cokurtosis tensor using the estimator's mean and matrix
   - `dims`: Dimension along which to compute the mean.
   - `mean`: Optional mean vector. If not provided, computed using the estimator's mean estimator.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+
+# Validation
+
+  - `dims` is either `1` or `2`.
 
 # Returns
 
