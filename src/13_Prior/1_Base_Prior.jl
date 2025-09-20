@@ -27,8 +27,9 @@ end
 function clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...)
     return clusterise(cle, pr.X; kwargs...)
 end
-function phylogeny_matrix(necle::Union{<:AbstractPhylogenyEstimator, <:ClusteringResult},
-                          pr::AbstractPriorResult; kwargs...)
+function phylogeny_matrix(necle::Union{<:AbstractPhylogenyEstimator,
+                                       <:AbstractPhylogenyResult}, pr::AbstractPriorResult;
+                          kwargs...)
     return phylogeny_matrix(necle, pr.X; kwargs...)
 end
 function centrality_vector(necte::Union{<:NetworkEstimator, <:Centrality},
@@ -38,7 +39,7 @@ function centrality_vector(necte::Union{<:NetworkEstimator, <:Centrality},
 end
 function average_centrality(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
                             w::AbstractVector, pr::AbstractPriorResult; kwargs...)
-    return dot(centrality_vector(ne, cent, pr.X; kwargs...), w)
+    return dot(centrality_vector(ne, cent, pr.X; kwargs...).X, w)
 end
 function average_centrality(cte::Centrality, w::AbstractVector, pr::AbstractPriorResult;
                             kwargs...)

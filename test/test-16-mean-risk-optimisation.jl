@@ -864,28 +864,28 @@
                                                      bgt = 1, cent = ces[1],
                                                      wb = WeightBounds(; lb = -1, ub = 1))))
         @test average_centrality(ces[1].A, res.w, pr.X) >=
-              minimum(centrality_vector(ces[1].A, pr.X))
+              minimum(centrality_vector(ces[1].A, pr.X).X)
 
         res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                  opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
                                                      bgt = 1, cent = ces[2],
                                                      wb = WeightBounds(; lb = -1, ub = 1))))
         @test average_centrality(ces[2].A, res.w, pr.X) <=
-              mean(centrality_vector(ces[2].A, pr.X))
+              mean(centrality_vector(ces[2].A, pr.X).X)
 
         res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                  opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
                                                      bgt = 1, cent = ces[3],
                                                      wb = WeightBounds(; lb = -1, ub = 1))))
         @test isapprox(average_centrality(ces[3].A, res.w, pr.X),
-                       median(centrality_vector(ces[3].A, pr.X)))
+                       median(centrality_vector(ces[3].A, pr.X).X))
 
         res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                  opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
                                                      bgt = 1, cent = ces[4],
                                                      wb = WeightBounds(; lb = -1, ub = 1))))
         @test isapprox(average_centrality(ces[4].A, res.w, pr.X),
-                       maximum(centrality_vector(ces[4].A, pr.X)))
+                       maximum(centrality_vector(ces[4].A, pr.X).X))
 
         res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                  opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,

@@ -45,3 +45,23 @@ All concrete types representing the result of a phylogeny estimation should subt
   - [`AbstractPhylogenyAlgorithm`](@ref)
 """
 abstract type AbstractPhylogenyResult <: AbstractResult end
+
+struct PhylogenyResult{T} <: AbstractPhylogenyResult
+    X::T
+end
+function PhylogenyResult(; X::Union{<:AbstractMatrix, <:AbstractVector})
+    @argcheck(!isempty(X))
+    if isa(X, AbstractMatrix)
+        @argcheck(issymmetric(X))
+        @argcheck(all(x -> iszero(x), diag(X)))
+    end
+    return PhylogenyResult(X)
+end
+function phylogeny_matrix(ph::PhylogenyResult, args...; kwargs...)
+    return ph
+end
+function centrality_vector(ph::PhylogenyResult{<:AbstractVector}, args...; kwargs...)
+    return ph
+end
+
+export PhylogenyResult

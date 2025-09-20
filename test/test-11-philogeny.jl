@@ -189,7 +189,7 @@
         w = fill(inv(20), 20)
         wak = Float64[]
         for (i, ce) in enumerate(ces)
-            v1 = centrality_vector(Centrality(; cent = ce), pr.X)
+            v1 = centrality_vector(Centrality(; cent = ce), pr.X).X
             res = isapprox(v1, df1[!, i])
             if !res
                 println("Default centrality iteration: $i")
@@ -209,7 +209,7 @@
     @testset "Phylogeny matrix" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix1.csv.gz"), DataFrame)
         for i in 1:8
-            A = phylogeny_matrix(NetworkEstimator(; n = i), pr.X)
+            A = phylogeny_matrix(NetworkEstimator(; n = i), pr.X).X
             res = isapprox(vec(A), df[!, i])
             if !res
                 println("Iteration $i failed on detault network estimator.")
@@ -221,7 +221,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix2.csv.gz"), DataFrame)
         for i in 1:5
             A = phylogeny_matrix(NetworkEstimator(; n = i,
-                                                  alg = MaximumDistanceSimilarity()), pr.X)
+                                                  alg = MaximumDistanceSimilarity()), pr.X).X
             res = isapprox(vec(A), df[!, i])
             if !res
                 println("Iteration $i failed on MaximumDistanceSimilarity.")
@@ -231,7 +231,7 @@
         end
 
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix3.csv.gz"), DataFrame)
-        A = phylogeny_matrix(ClusteringEstimator(), pr.X)
+        A = phylogeny_matrix(ClusteringEstimator(), pr.X).X
         @test isapprox(vec(A), df[!, 1])
 
         w = fill(inv(20), 20)

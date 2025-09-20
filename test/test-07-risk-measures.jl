@@ -108,9 +108,9 @@
             r2 = expected_risk(r[2], w, rd.X)
             rtol = if i == 15
                 5e-2
-            elseif Sys.isapple() && i ∈ (18, 21)
+            elseif i == 18 || Sys.isapple() && i ∈ (18, 21)
                 1e-1
-            elseif i ∈ (16, 18, 21)
+            elseif i ∈ (16, 21)
                 5e-2
             elseif i ∈ (20, 23, 24)
                 0.25

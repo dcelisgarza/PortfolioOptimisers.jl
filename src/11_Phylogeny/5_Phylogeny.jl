@@ -20,6 +20,12 @@ All concrete types implementing specific centrality algorithms (e.g., betweennes
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 
+function centrality_vector(ph::PhylogenyResult{<:AbstractMatrix},
+                           cent::AbstractCentralityAlgorithm; kwargs...)
+    G = SimpleGraph(ph.X)
+    return PhylogenyResult(; X = calc_centrality(cent, G))
+end
+
 """
 ```julia
 struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
@@ -741,7 +747,8 @@ Estimator type for centrality-based analysis in PortfolioOptimisers.jl.
 # Constructor
 
 ```julia
-Centrality(; ne::AbstractNetworkEstimator = NetworkEstimator(),
+Centrality(;
+           ne::Union{<:AbstractNetworkEstimator, <:AbstractPhylogenyResult} = NetworkEstimator(),
            cent::AbstractCentralityAlgorithm = DegreeCentrality())
 ```
 
@@ -787,7 +794,8 @@ struct Centrality{T1, T2} <: AbstractCentralityEstimator
     ne::T1
     cent::T2
 end
-function Centrality(; ne::AbstractNetworkEstimator = NetworkEstimator(),
+function Centrality(;
+                    ne::Union{<:AbstractNetworkEstimator, <:AbstractPhylogenyResult} = NetworkEstimator(),
                     cent::AbstractCentralityAlgorithm = DegreeCentrality())
     return Centrality(ne, cent)
 end
@@ -868,7 +876,7 @@ function phylogeny_matrix(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1
         P .+= A^i
     end
     P .= clamp!(P, 0, 1) - I
-    return P
+    return PhylogenyResult(; X = P)
 end
 
 """
@@ -910,19 +918,7 @@ function phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClustering
         idx = clusters .== i
         P[idx, i] .= one(eltype(P))
     end
-    return P * transpose(P) - I
-end
-
-struct PredifinedPhylogeny{T} <: AbstractPhylogenyEstimator
-    X::T
-end
-function PredifinedPhylogeny(; X::AbstractMatrix)
-    @argcheck(issymmetric(X))
-    @argcheck(all(x -> iszero(x), diag(X)))
-    return PredifinedPhylogeny(X)
-end
-function phylogeny_matrix(pe::PredifinedPhylogeny, args...; kwargs...)
-    return pe.X
+    return PhylogenyResult(; X = P * transpose(P) - I)
 end
 
 """
@@ -955,9 +951,9 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
 """
 function centrality_vector(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
                            X::AbstractMatrix; dims::Int = 1, kwargs...)
-    P = phylogeny_matrix(ne, X; dims = dims, kwargs...)
+    P = phylogeny_matrix(ne, X; dims = dims, kwargs...).X
     G = SimpleGraph(P)
-    return calc_centrality(cent, G)
+    return PhylogenyResult(; X = calc_centrality(cent, G))
 end
 
 """
@@ -1020,7 +1016,7 @@ This function computes the centrality vector and returns the weighted average us
 """
 function average_centrality(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
                             w::AbstractVector, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...), w)
+    return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...).X, w)
 end
 """
 ```julia
@@ -1083,6 +1079,11 @@ function asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
     c /= sum(aw)
     return c
 end
+#! Add docstring
+function asset_phylogeny(w::AbstractVector, ph::PhylogenyResult{<:AbstractMatrix})
+    return asset_phylogeny(w, ph.X)
+end
+
 """
 ```julia
 asset_phylogeny(cle::Union{<:NetworkEstimator, <:ClusteringEstimator}, w::AbstractVector,
@@ -1110,13 +1111,18 @@ This function computes the phylogeny matrix using the estimator and data, then c
   - [`phylogeny_matrix`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(cle::Union{<:NetworkEstimator, <:ClusteringEstimator},
-                         w::AbstractVector, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator,
+                                    <:AbstractClusteringResult}, w::AbstractVector,
+                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     return asset_phylogeny(w, phylogeny_matrix(cle, X; dims = dims, kwargs...))
+end
+#! Write docs
+function asset_phylogeny(ph::PhylogenyResult{<:AbstractMatrix}, w::AbstractVector, args...;
+                         kwargs...)
+    return asset_phylogeny(w, ph)
 end
 
 export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
        KatzCentrality, Pagerank, RadialityCentrality, StressCentrality, KruskalTree,
-       BoruvkaTree, PrimTree, NetworkEstimator, PredifinedPhylogeny, phylogeny_matrix,
-       average_centrality, asset_phylogeny, AbstractCentralityAlgorithm, Centrality,
-       centrality_vector
+       BoruvkaTree, PrimTree, NetworkEstimator, phylogeny_matrix, average_centrality,
+       asset_phylogeny, AbstractCentralityAlgorithm, Centrality, centrality_vector
