@@ -98,6 +98,7 @@ function distance(de::DistanceDistance, ce::StatsBase.CovarianceEstimator,
     dist = distance(Distance(; alg = de.alg), ce, X; dims = dims, kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
+
 """
 ```julia
 distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
@@ -127,6 +128,7 @@ function distance(de::DistanceDistance, rho::AbstractMatrix, args...; kwargs...)
     dist = distance(Distance(; alg = de.alg), rho, args...; kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
+
 """
 ```julia
 cor_and_dist(de::DistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;

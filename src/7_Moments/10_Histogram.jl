@@ -53,6 +53,7 @@ Histogram binning algorithm using Knuth's rule.
   - [`get_bin_width_func`](@ref)
 """
 struct Knuth <: AstroPyBins end
+
 """
 ```julia
 struct FreedmanDiaconis <: AstroPyBins end
@@ -71,6 +72,7 @@ Histogram binning algorithm using the Freedman-Diaconis rule.
   - [`get_bin_width_func`](@ref)
 """
 struct FreedmanDiaconis <: AstroPyBins end
+
 """
 ```julia
 struct Scott <: AstroPyBins end
@@ -89,6 +91,7 @@ Histogram binning algorithm using Scott's rule.
   - [`get_bin_width_func`](@ref)
 """
 struct Scott <: AstroPyBins end
+
 """
 ```julia
 struct HacineGharbiRavier <: AbstractBins end

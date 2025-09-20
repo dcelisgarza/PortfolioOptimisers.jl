@@ -144,6 +144,7 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
+
 """
 ```julia
 StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
@@ -219,6 +220,7 @@ end
 function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
+
 """
 ```julia
 StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
@@ -543,6 +545,7 @@ function regression_view(re::Regression, i::AbstractVector)
     return Regression(; M = view(re.M, i, :),
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
+
 """
 ```julia
 regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)

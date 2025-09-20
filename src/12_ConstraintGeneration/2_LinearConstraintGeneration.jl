@@ -308,6 +308,7 @@ function nothing_asset_sets_view(sets::AssetSets, i::AbstractVector)
     end
     return AssetSets(; key = key, dict = dict)
 end
+
 """
 ```julia
 nothing_asset_sets_view(::Nothing, ::Any)
@@ -444,6 +445,7 @@ function estimator_to_val(dict::Pair{<:Any, <:Real}, sets::AssetSets, val::Real 
     end
     return arr
 end
+
 """
 ```julia
 estimator_to_val(val::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, args...; kwargs...)
@@ -523,6 +525,7 @@ function _eval_numeric_functions(expr)
         expr
     end
 end
+
 """
 ```julia
 _collect_terms(expr::Union{Symbol, Expr, <:Number})
@@ -557,6 +560,7 @@ function _collect_terms(expr)
     _collect_terms!(expr, 1.0, terms)
     return terms
 end
+
 """
 ```julia
 _collect_terms!(expr, coeff, terms)
@@ -636,6 +640,7 @@ function _collect_terms!(expr, coeff, terms)
         end
     end
 end
+
 """
 ```julia
 _format_term(coeff, var)
@@ -674,6 +679,7 @@ function _format_term(coeff, var)
         "$(coeff)*$var"
     end
 end
+
 """
 ```julia
 _rethrow_parse_error(expr; side = :lhs)
@@ -720,6 +726,7 @@ function _rethrow_parse_error(expr::Expr, side = :lhs)
     end
     return nothing
 end
+
 """
 ```julia
 _parse_equation(lhs, opstr::AbstractString, rhs; datatype::DataType = Float64)
@@ -792,6 +799,7 @@ function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = F
 
     return ParsingResult(variables, coefficients, opstr, rhs_val, formatted)
 end
+
 """
 ```julia
 parse_equation(eqn::Union{<:AbstractString, Expr,
@@ -1236,6 +1244,7 @@ function LinearConstraintEstimator(;
     end
     return LinearConstraintEstimator(val)
 end
+
 """
 ```julia
 linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwargs...)
@@ -1264,6 +1273,7 @@ This method is used to pass through an already constructed [`LinearConstraint`](
 function linear_constraints(lcs::Union{Nothing, LinearConstraint}, args...; kwargs...)
     return lcs
 end
+
 """
 ```julia
 linear_constraints(eqn::Union{<:AbstractString, Expr,
@@ -1332,6 +1342,7 @@ function linear_constraints(eqn::Union{<:AbstractString, Expr,
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets; datatype = datatype, strict = strict)
 end
+
 """
 ```julia
 linear_constraints(lcs::Union{<:LinearConstraintEstimator,
@@ -1494,6 +1505,7 @@ end
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
     return rb
 end
+
 """
 ```julia
 risk_budget_constraints(::Nothing, args...; N::Real, datatype::DataType = Float64,
@@ -1533,6 +1545,7 @@ function risk_budget_constraints(::Nothing, args...; N::Real, kwargs...)
     iN = inv(N)
     return RiskBudgetResult(; val = range(; start = iN, stop = iN, length = N))
 end
+
 """
 ```julia
 risk_budget_constraints(rb::RiskBudgetResult, args...; kwargs...)
@@ -1568,6 +1581,7 @@ RiskBudgetResult
 function risk_budget_constraints(rb::RiskBudgetResult, args...; kwargs...)
     return rb
 end
+
 """
 ```julia
 risk_budget_constraints(rb::Union{<:AbstractDict{<:AbstractString, <:Real},
@@ -1625,6 +1639,7 @@ function risk_budget_constraints(rb::Union{<:AbstractDict{<:AbstractString, <:Re
     val = estimator_to_val(rb, sets, inv(N); strict = strict)
     return RiskBudgetResult(; val = val / sum(val))
 end
+
 """
 ```julia
 risk_budget_constraints(rb::Union{<:RiskBudgetEstimator,
@@ -1708,6 +1723,7 @@ function AssetSetsMatrixEstimator(; val::AbstractString)
     @argcheck(!isempty(val))
     return AssetSetsMatrixEstimator(val)
 end
+
 """
 ```julia
 asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSets)
@@ -1768,6 +1784,7 @@ function asset_sets_matrix(smtx::Union{Symbol, <:AbstractString}, sets::AssetSet
     end
     return transpose(A)
 end
+
 """
 ```julia
 asset_sets_matrix(smtx::Union{Nothing, <:AbstractMatrix}, args...)
@@ -1795,6 +1812,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
 function asset_sets_matrix(smtx::Union{Nothing, <:AbstractMatrix}, args...)
     return smtx
 end
+
 """
 ```julia
 asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
@@ -1811,6 +1829,7 @@ It is used for type stability and to provide a uniform interface for processing 
 function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
 end
+
 """
 ```julia
 asset_sets_matrix(smtx::AbstractVector{<:Union{<:AbstractMatrix,
@@ -1827,6 +1846,7 @@ function asset_sets_matrix(smtx::AbstractVector{<:Union{<:AbstractMatrix,
                            sets::AssetSets)
     return asset_sets_matrix.(smtx, Ref(sets))
 end
+
 """
 """
 function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector; kwargs...)

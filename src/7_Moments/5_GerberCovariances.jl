@@ -390,6 +390,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::Abstrac
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0}, X::AbstractMatrix)
@@ -443,6 +444,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0},
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::AbstractMatrix,
@@ -495,6 +497,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::Abstrac
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1}, X::AbstractMatrix)
@@ -550,6 +553,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1},
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix,
@@ -608,6 +612,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::Abstrac
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}, X::AbstractMatrix)

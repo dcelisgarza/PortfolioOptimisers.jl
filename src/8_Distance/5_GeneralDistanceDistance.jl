@@ -75,6 +75,7 @@ function GeneralDistanceDistance(; dist::Distances.Metric = Distances.Euclidean(
     @argcheck(power >= one(power))
     return GeneralDistanceDistance(dist, args, kwargs, power, alg)
 end
+
 """
 ```julia
 distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;
@@ -109,6 +110,7 @@ function distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator
                     kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
+
 """
 ```julia
 distance(de::GeneralDistanceDistance, rho::AbstractMatrix, args...; kwargs...)
@@ -140,6 +142,7 @@ function distance(de::GeneralDistanceDistance, rho::AbstractMatrix, args...; kwa
                     kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
+
 """
 ```julia
 cor_and_dist(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator,

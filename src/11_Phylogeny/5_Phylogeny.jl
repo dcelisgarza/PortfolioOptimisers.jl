@@ -1,5 +1,143 @@
 """
 ```julia
+struct PhylogenyResult{T} <: AbstractPhylogenyResult
+    X::T
+end
+```
+
+Container type for phylogeny matrix or vector results in PortfolioOptimisers.jl.
+
+`PhylogenyResult` stores the output of phylogeny-based estimation routines, such as network or clustering-based phylogeny matrices, or centrality vectors. It is used throughout the package to represent validated phylogeny structures for constraint generation, centrality analysis, and related workflows.
+
+# Fields
+
+  - `X`: The phylogeny matrix or centrality vector.
+
+# Constructor
+
+```julia
+PhylogenyResult(; X::Union{<:AbstractMatrix, <:AbstractVector})
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `!isempty(X)`.
+
+  - If `X` is a matrix:
+
+      + Must be symmetric, `issymmetric(X) == true`.
+      + Must have zero diagonal, `all(x -> iszero(x), diag(X)) == true`.
+
+# Examples
+
+```jldoctest
+julia> PhylogenyResult(; X = [0 1 0; 1 0 1; 0 1 0])
+PhylogenyResult
+  X | 3×3 Matrix{Int64}
+
+julia> PhylogenyResult(; X = [0.2, 0.5, 0.3])
+PhylogenyResult
+  X | Vector{Float64}: [0.2, 0.5, 0.3]
+```
+
+# Related
+
+  - [`AbstractPhylogenyResult`](@ref)
+  - [`phylogeny_matrix`](@ref)
+  - [`centrality_vector`](@ref)
+"""
+struct PhylogenyResult{T} <: AbstractPhylogenyResult
+    X::T
+end
+function PhylogenyResult(; X::Union{<:AbstractMatrix, <:AbstractVector})
+    @argcheck(!isempty(X))
+    if isa(X, AbstractMatrix)
+        @argcheck(issymmetric(X))
+        @argcheck(all(x -> iszero(x), diag(X)))
+    end
+    return PhylogenyResult(X)
+end
+
+"""
+```julia
+phylogeny_matrix(ph::PhylogenyResult{<:AbstractMatrix}, args...; kwargs...)
+```
+
+Fallback no-op for returning a validated phylogeny matrix result as-is.
+
+This method provides a generic interface for handling precomputed phylogeny matrices wrapped in a [`PhylogenyResult`](@ref). It simply returns the input object unchanged, enabling consistent downstream workflows for constraint generation and analysis.
+
+# Arguments
+
+  - `ph::PhylogenyResult{<:AbstractMatrix}`: Phylogeny matrix result object.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - The input `ph` object.
+
+# Examples
+
+```jldoctest
+julia> ph = PhylogenyResult(; X = [0 1 0; 1 0 1; 0 1 0]);
+
+julia> phylogeny_matrix(ph)
+PhylogenyResult
+  X | 3×3 Matrix{Int64}
+```
+
+# Related
+
+  - [`PhylogenyResult`](@ref)
+  - [`phylogeny_matrix`](@ref)
+"""
+function phylogeny_matrix(ph::PhylogenyResult{<:AbstractMatrix}, args...; kwargs...)
+    return ph
+end
+
+"""
+```julia
+centrality_vector(ph::PhylogenyResult{<:AbstractVector}, args...; kwargs...)
+```
+
+Fallback no-op for returning a validated centrality vector result as-is.
+
+This method provides a generic interface for handling precomputed centrality vectors wrapped in a [`PhylogenyResult`](@ref). It simply returns the input object unchanged, enabling consistent downstream workflows for centrality-based analysis and constraint generation.
+
+# Arguments
+
+  - `ph::PhylogenyResult{<:AbstractVector}`: Centrality vector result object.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - The input `ph` object.
+
+# Examples
+
+```jldoctest
+julia> ph = PhylogenyResult(; X = [0.2, 0.5, 0.3]);
+
+julia> centrality_vector(ph)
+PhylogenyResult
+  X | Vector{Float64}: [0.2, 0.5, 0.3]
+```
+
+# Related
+
+  - [`PhylogenyResult`](@ref)
+  - [`centrality_vector`](@ref)
+"""
+function centrality_vector(ph::PhylogenyResult{<:AbstractVector}, args...; kwargs...)
+    return ph
+end
+
+"""
+```julia
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 ```
 
@@ -1028,6 +1166,7 @@ function average_centrality(ne::Union{<:AbstractPhylogenyEstimator,
                             X::AbstractMatrix; dims::Int = 1, kwargs...)
     return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...).X, w)
 end
+
 """
 ```julia
 average_centrality(cte::CentralityEstimator, w::AbstractVector, X::AbstractMatrix;
@@ -1067,7 +1206,7 @@ asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
 
 Compute the asset phylogeny score for a set of weights and a phylogeny matrix.
 
-This function computes the weighted sum of the phylogeny matrix, normalised by the sum of absolute weights.
+This function computes the weighted sum of the phylogeny matrix, normalised by the sum of absolute weights. The asset phylogeny score quantifies the degree of phylogenetic (network or cluster-based) structure present in the portfolio allocation.
 
 # Arguments
 
@@ -1089,7 +1228,14 @@ function asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
     c /= sum(aw)
     return c
 end
-#! Add docstring
+
+"""
+```julia
+asset_phylogeny(w::AbstractVector, ph::PhylogenyResult{<:AbstractMatrix})
+```
+
+Calls `asset_phylogeny` with the phylogeny matrix `X` from a `PhylogenyResult`.
+"""
 function asset_phylogeny(w::AbstractVector, ph::PhylogenyResult{<:AbstractMatrix})
     return asset_phylogeny(w, ph.X)
 end
@@ -1126,13 +1272,40 @@ function asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator,
                          X::AbstractMatrix; dims::Int = 1, kwargs...)
     return asset_phylogeny(w, phylogeny_matrix(cle, X; dims = dims, kwargs...))
 end
-#! Write docs
+
+"""
+```julia
+asset_phylogeny(ph::PhylogenyResult{<:AbstractMatrix}, w::AbstractVector, args...;
+                kwargs...)
+```
+
+Compute the asset phylogeny score for a set of portfolio weights and a phylogeny matrix result, forwarding additional arguments.
+
+This method provides compatibility with workflows that pass extra positional or keyword arguments. It extracts the phylogeny matrix from the `PhylogenyResult` and delegates to `asset_phylogeny(w, ph)`, ignoring any additional arguments.
+
+# Arguments
+
+  - `ph::PhylogenyResult{<:AbstractMatrix}`: Phylogeny matrix result object.
+  - `w::AbstractVector`: Portfolio weights vector.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `score::Real`: Asset phylogeny score.
+
+# Related
+
+  - [`PhylogenyResult`](@ref)
+  - [`asset_phylogeny`](@ref)
+"""
 function asset_phylogeny(ph::PhylogenyResult{<:AbstractMatrix}, w::AbstractVector, args...;
                          kwargs...)
     return asset_phylogeny(w, ph)
 end
 
-export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
-       KatzCentrality, Pagerank, RadialityCentrality, StressCentrality, KruskalTree,
-       BoruvkaTree, PrimTree, NetworkEstimator, phylogeny_matrix, average_centrality,
-       asset_phylogeny, AbstractCentralityAlgorithm, CentralityEstimator, centrality_vector
+export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentrality,
+       EigenvectorCentrality, KatzCentrality, Pagerank, RadialityCentrality,
+       StressCentrality, KruskalTree, BoruvkaTree, PrimTree, NetworkEstimator,
+       phylogeny_matrix, average_centrality, asset_phylogeny, AbstractCentralityAlgorithm,
+       CentralityEstimator, centrality_vector

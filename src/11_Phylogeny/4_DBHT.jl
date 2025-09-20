@@ -2017,6 +2017,7 @@ function LoGo_dist_assert(::Union{Distance{<:VariationInfoDistance},
               DimensionMismatch("Number of columns of `sigma` must be equal to the number of rows of `X`:\nsize(sigma, 1) == size(X, 2) => $(size(sigma,1)) != $(size(X,2))"))
     return nothing
 end
+
 """
 ```julia
 LoGo_dist_assert(args...)

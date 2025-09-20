@@ -23,11 +23,9 @@ Node type for representing clusters in a hierarchical clustering tree.
 
 # Constructor
 
-```julia
-ClusterNode(id; left::Union{Nothing, <:ClusterNode} = nothing,
-            right::Union{Nothing, <:ClusterNode} = nothing, height::Real = 0.0,
-            level::Int = 1)
-```
+    ClusterNode(id, left::Union{Nothing, <:ClusterNode} = nothing,
+                right::Union{Nothing, <:ClusterNode} = nothing, height::Real = 0.0,
+                level::Int = 1)
 
 Positional and keyword arguments correspond to the fields above. The `level` is automatically computed based on the levels of child nodes if they exist.
 

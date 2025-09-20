@@ -1,6 +1,7 @@
 # Phylogeny
 
 ```@docs
+PhylogenyResult
 BetweennessCentrality
 ClosenessCentrality
 DegreeCentrality

@@ -60,6 +60,7 @@ These methods are called internally when no matrix processing algorithm is speci
 function matrix_processing_algorithm!(::Nothing, args...; kwargs...)
     return nothing
 end
+
 """
 ```julia
 matrix_processing_algorithm(::Nothing, args...; kwargs...)
@@ -339,6 +340,7 @@ function matrix_processing!(mp::NonPositiveDefiniteMatrixProcessing, sigma::Abst
     matrix_processing_algorithm!(mp.alg, nothing, sigma, X; kwargs...)
     return nothing
 end
+
 """
 ```julia
 matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::AbstractMatrix,

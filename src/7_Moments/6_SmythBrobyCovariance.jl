@@ -469,6 +469,7 @@ function sb_delta(xi::Real, xj::Real, mui::Real, muj::Real, sigmai::Real, sigmaj
 
     return kappa / (one(gamma) + gamma^n)
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -549,6 +550,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -624,6 +626,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -704,6 +707,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -783,6 +787,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -861,6 +866,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -934,6 +940,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1020,6 +1027,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1102,6 +1110,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1194,6 +1203,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1283,6 +1293,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1365,6 +1376,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1523,6 +1535,7 @@ function Statistics.cor(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:A
     X = (X .- mean_vec) ⊘ std_vec
     return smythbroby(ce, X)
 end
+
 """
 ```julia
 cov(ce::SmythBrobyCovariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)

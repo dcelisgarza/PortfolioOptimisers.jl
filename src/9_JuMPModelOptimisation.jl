@@ -151,6 +151,7 @@ This is a generic fallback that does nothing if no model or settings are provide
 function set_solver_attributes(args...)
     return nothing
 end
+
 """
 ```julia
 set_solver_attributes(model::JuMP.Model,
@@ -177,6 +178,7 @@ function set_solver_attributes(model::JuMP.Model,
     end
     return nothing
 end
+
 """
 ```julia
 set_solver_attributes(model::JuMP.Model, settings::Pair)

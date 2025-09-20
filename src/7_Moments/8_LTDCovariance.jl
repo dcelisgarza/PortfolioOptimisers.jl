@@ -156,6 +156,7 @@ function Statistics.cor(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwa
     end
     return lower_tail_dependence(X, ce.alpha, ce.threads)
 end
+
 """
 ```julia
 cov(ce::LTDCovariance, X::AbstractMatrix; dims::Int = 1, kwargs...)

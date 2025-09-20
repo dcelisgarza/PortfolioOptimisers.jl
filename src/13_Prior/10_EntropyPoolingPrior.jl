@@ -584,6 +584,7 @@ function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVe
     end
     return nothing
 end
+
 """
 """
 function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets;

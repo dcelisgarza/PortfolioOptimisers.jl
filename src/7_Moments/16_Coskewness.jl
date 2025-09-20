@@ -157,6 +157,7 @@ function _coskewness(y::AbstractMatrix, X::AbstractMatrix,
     V = __coskewness(cskew, X, mp)
     return cskew, V
 end
+
 """
 ```julia
 coskewness(ske::Union{Nothing, <:Coskewness}, X::AbstractMatrix; dims::Int = 1,

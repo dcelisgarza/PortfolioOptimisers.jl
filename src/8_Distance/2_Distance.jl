@@ -109,6 +109,7 @@ function distance(::Distance{<:CanonicalDistance}, ce::StatsBase.CovarianceEstim
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
     return distance(Distance(; alg = SimpleDistance()), ce, X; dims = dims, kwargs...)
 end
+
 """
 ```julia
 distance(de::Distance{<:LogDistance},
@@ -144,6 +145,7 @@ function distance(::Distance{<:LogDistance},
     rho = cor(ce, X; dims = dims, kwargs...)
     return -log.(rho)
 end
+
 """
 ```julia
 distance(::Distance{<:CanonicalDistance},
@@ -204,6 +206,7 @@ function distance(::Distance{<:CanonicalDistance},
                   X::AbstractMatrix; dims::Int = 1, kwargs...)
     return distance(Distance(; alg = CorrelationDistance()), ce, X; dims = dims, kwargs...)
 end
+
 """
 ```julia
 distance(de::Distance{<:VariationInfoDistance}, ::Any, X::AbstractMatrix; dims::Int = 1,
@@ -215,10 +218,10 @@ Compute the variation of information (VI) distance matrix from a data matrix.
 # Arguments
 
   - `de::Distance{<:VariationInfoDistance}`: Distance estimator with [`VariationInfoDistance`](@ref) algorithm.
-  - `::Any`: Placeholder for compatibility, ignored.
+  - `::Any`: Placeholder for compatibility (ignored).
   - `X`: Data matrix (observations × features).
   - `dims`: Dimension along which to compute the distance. If `2`, the data is transposed.
-  - `kwargs...`: Additional keyword arguments, ignored.
+  - `kwargs...`: Additional keyword arguments (ignored).
 
 # Validation
 

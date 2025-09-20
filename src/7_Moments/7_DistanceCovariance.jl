@@ -124,6 +124,7 @@ function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
     dcov2_yy = dot(B, B) / N2
     return sqrt(dcov2_xy) / sqrt(sqrt(dcov2_xx) * sqrt(dcov2_yy))
 end
+
 """
 ```julia
 cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
@@ -273,6 +274,7 @@ function cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
     dcov2_xy = dot(A, B) / N2
     return sqrt(dcov2_xy)
 end
+
 """
 ```julia
 cov_distance(ce::DistanceCovariance, X::AbstractMatrix)
