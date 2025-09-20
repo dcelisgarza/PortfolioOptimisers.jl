@@ -12,7 +12,7 @@ StressCentrality
 KruskalTree
 BoruvkaTree
 PrimTree
-Network
+NetworkEstimator
 Centrality
 phylogeny_matrix
 centrality_vector

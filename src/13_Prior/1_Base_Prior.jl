@@ -27,16 +27,16 @@ end
 function clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...)
     return clusterise(cle, pr.X; kwargs...)
 end
-function phylogeny_matrix(necle::Union{<:Network, <:ClusteringEstimator},
+function phylogeny_matrix(necle::Union{<:AbstractPhylogenyEstimator, <:ClusteringResult},
                           pr::AbstractPriorResult; kwargs...)
     return phylogeny_matrix(necle, pr.X; kwargs...)
 end
-function centrality_vector(necte::Union{<:Network, <:Centrality},
+function centrality_vector(necte::Union{<:NetworkEstimator, <:Centrality},
                            cent::AbstractCentralityAlgorithm, pr::AbstractPriorResult;
                            kwargs...)
     return centrality_vector(necte, pr.X; kwargs...)
 end
-function average_centrality(ne::Network, cent::AbstractCentralityAlgorithm,
+function average_centrality(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
                             w::AbstractVector, pr::AbstractPriorResult; kwargs...)
     return dot(centrality_vector(ne, cent, pr.X; kwargs...), w)
 end

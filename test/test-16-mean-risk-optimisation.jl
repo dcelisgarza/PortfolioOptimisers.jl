@@ -711,7 +711,7 @@
         @test norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3
     end
     @testset "Phylogeny" begin
-        plc = IntegerPhylogenyEstimator(; pe = Network(), B = 1)
+        plc = IntegerPhylogenyEstimator(; pe = NetworkEstimator(), B = 1)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, cplg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.001)
         res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
@@ -729,7 +729,7 @@
                         7.766000981009452e-15, -2.3067244875711246e-15,
                         -3.831552897938868e-15, 0.999998251856358], rtol = 1e-6)
 
-        plc = IntegerPhylogenyEstimator(; pe = Network(), B = 2)
+        plc = IntegerPhylogenyEstimator(; pe = NetworkEstimator(), B = 2)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, nplg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.0001)
         res = optimise!(MeanRisk(; obj = MinimumRisk(), opt = opt))

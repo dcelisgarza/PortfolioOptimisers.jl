@@ -1,12 +1,114 @@
+"""
+```julia
 abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimator end
+```
+
+Abstract supertype for all phylogeny-based constraint estimators in PortfolioOptimisers.jl.
+
+All concrete types implementing phylogeny-based constraint generation algorithms should subtype `AbstractPhylogenyConstraintEstimator`. This enables a consistent interface for phylogeny-derived constraint estimators throughout the package, supporting composable workflows for portfolio optimisation with phylogenetic structure.
+
+# Related
+
+  - [`AbstractConstraintEstimator`](@ref)
+  - [`SemiDefinitePhylogenyEstimator`](@ref)
+  - [`IntegerPhylogenyEstimator`](@ref)
+  - [`phylogeny_constraints`](@ref)
+"""
+abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimator end
+
+"""
+```julia
 abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
+```
+
+Abstract supertype for all phylogeny-based constraint result types in PortfolioOptimisers.jl.
+
+All concrete types representing the result of phylogeny-based constraint generation algorithms should subtype `AbstractPhylogenyConstraintResult`. This enables a consistent interface for handling phylogeny-derived constraint results, supporting composable and extensible workflows in portfolio optimisation with phylogenetic structure.
+
+# Related
+
+  - [`AbstractConstraintResult`](@ref)
+  - [`SemiDefinitePhylogeny`](@ref)
+  - [`IntegerPhylogeny`](@ref)
+  - [`phylogeny_constraints`](@ref)
+"""
+abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
+
+"""
+```julia
+struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
+    pe::T1
+    p::T2
+end
+```
+
+Estimator for generating semi-definite phylogeny-based constraints in portfolio optimisation.
+
+`SemiDefinitePhylogenyEstimator` wraps a phylogeny estimator or clustering result (`pe`) and a non-negative penalty parameter (`p`). The penalty blurs the contribution of the asset phylogeny to the optimisation. It is used to construct semi-definite constraint matrices that encode phylogenetic structure among assets, supporting composable constraint generation workflows.
+
+# Fields
+
+  - `pe`: Phylogeny estimator or clustering result.
+  - `p`: Non-negative penalty parameter.
+
+# Constructor
+
+```julia
+SemiDefinitePhylogenyEstimator(;
+                               pe::Union{<:AbstractPhylogenyEstimator,
+                                         <:AbstractClusteringResult} = NetworkEstimator(),
+                               p::Real = 0.05)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `pe` is a matrix, `issymmetric(pe)` and `all(x -> iszero(x), diag(pe))`.
+  - `p >= 0`.
+
+# Examples
+
+```jldoctest
+julia> SemiDefinitePhylogenyEstimator(; pe = NetworkEstimator(), p = 0.1)
+SemiDefinitePhylogenyEstimator
+  pe | NetworkEstimator
+     |    ce | PortfolioOptimisersCovariance
+     |       |   ce | Covariance
+     |       |      |    me | SimpleExpectedReturns
+     |       |      |       |   w | nothing
+     |       |      |    ce | GeneralWeightedCovariance
+     |       |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     |       |      |       |    w | nothing
+     |       |      |   alg | Full()
+     |       |   mp | DefaultMatrixProcessing
+     |       |      |       pdm | Posdef
+     |       |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+     |       |      |   denoise | nothing
+     |       |      |    detone | nothing
+     |       |      |       alg | nothing
+     |    de | Distance
+     |       |   alg | CanonicalDistance()
+     |   alg | KruskalTree
+     |       |     args | Tuple{}: ()
+     |       |   kwargs | @NamedTuple{}: NamedTuple()
+     |     n | Int64: 1
+   p | Float64: 0.1
+```
+
+# Related
+
+  - [`AbstractPhylogenyConstraintEstimator`](@ref)
+  - [`SemiDefinitePhylogeny`](@ref)
+  - [`phylogeny_constraints`](@ref)
+"""
 struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
     pe::T1
     p::T2
 end
 function SemiDefinitePhylogenyEstimator(;
                                         pe::Union{<:AbstractPhylogenyEstimator,
-                                                  <:AbstractClusteringResult} = Network(),
+                                                  <:AbstractClusteringResult} = NetworkEstimator(),
                                         p::Real = 0.05)
     @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
     return SemiDefinitePhylogenyEstimator(pe, p)
@@ -52,7 +154,7 @@ function validate_length_integer_phylogeny_constraint_B(args...)
 end
 function IntegerPhylogenyEstimator(;
                                    pe::Union{<:AbstractPhylogenyEstimator,
-                                             <:AbstractClusteringResult} = Network(),
+                                             <:AbstractClusteringResult} = NetworkEstimator(),
                                    B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                                    scale::Real = 100_000.0)
     if isa(B, AbstractVector)
