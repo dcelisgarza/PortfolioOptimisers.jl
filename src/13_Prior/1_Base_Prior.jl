@@ -27,22 +27,30 @@ end
 function clusterise(cle::ClusteringEstimator, pr::AbstractPriorResult; kwargs...)
     return clusterise(cle, pr.X; kwargs...)
 end
-function phylogeny_matrix(necle::Union{<:AbstractPhylogenyEstimator,
-                                       <:AbstractPhylogenyResult}, pr::AbstractPriorResult;
+function phylogeny_matrix(necle::Union{<:AbstractNetworkEstimator,
+                                       <:AbstractClusteringEstimator,
+                                       <:AbstractClusteringResult}, pr::AbstractPriorResult;
                           kwargs...)
     return phylogeny_matrix(necle, pr.X; kwargs...)
 end
-function centrality_vector(necte::Union{<:NetworkEstimator, <:Centrality},
-                           cent::AbstractCentralityAlgorithm, pr::AbstractPriorResult;
-                           kwargs...)
+function centrality_vector(necte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
     return centrality_vector(necte, pr.X; kwargs...)
 end
-function average_centrality(ne::NetworkEstimator, cent::AbstractCentralityAlgorithm,
-                            w::AbstractVector, pr::AbstractPriorResult; kwargs...)
+function centrality_vector(ne::Union{<:AbstractNetworkEstimator,
+                                     <:AbstractClusteringEstimator,
+                                     <:AbstractClusteringResult},
+                           cent::AbstractCentralityAlgorithm, pr::AbstractPriorResult;
+                           kwargs...)
+    return centrality_vector(ne, cent, pr.X; kwargs...)
+end
+function average_centrality(ne::Union{<:AbstractPhylogenyEstimator,
+                                      <:AbstractPhylogenyResult},
+                            cent::AbstractCentralityAlgorithm, w::AbstractVector,
+                            pr::AbstractPriorResult; kwargs...)
     return dot(centrality_vector(ne, cent, pr.X; kwargs...).X, w)
 end
-function average_centrality(cte::Centrality, w::AbstractVector, pr::AbstractPriorResult;
-                            kwargs...)
+function average_centrality(cte::CentralityEstimator, w::AbstractVector,
+                            pr::AbstractPriorResult; kwargs...)
     return average_centrality(cte.ne, cte.cent, w, pr.X; kwargs...)
 end
 

@@ -115,18 +115,18 @@ end
 function vec_to_real_measure(val::Real, ::AbstractVector)
     return val
 end
-struct CentralityEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
+struct CentralityConstraint{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
     A::T1
     B::T2
     comp::T3
 end
-function CentralityEstimator(; A::Centrality = Centrality(),
-                             B::Union{<:Real, <:VectorToRealMeasure} = MinValue(),
-                             comp::ComparisonOperators = LEQ())
-    return CentralityEstimator(A, B, comp)
+function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
+                              B::Union{<:Real, <:VectorToRealMeasure} = MinValue(),
+                              comp::ComparisonOperators = LEQ())
+    return CentralityConstraint(A, B, comp)
 end
-function centrality_constraints(ccs::Union{<:CentralityEstimator,
-                                           <:AbstractVector{<:CentralityEstimator}},
+function centrality_constraints(ccs::Union{<:CentralityConstraint,
+                                           <:AbstractVector{<:CentralityConstraint}},
                                 X::AbstractMatrix; dims::Int = 1, kwargs...)
     if isa(ccs, AbstractVector)
         @argcheck(!isempty(ccs))
@@ -182,5 +182,5 @@ function centrality_constraints(::Nothing, args...; kwargs...)
 end
 
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
-       IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityEstimator,
+       IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityConstraint,
        phylogeny_constraints, centrality_constraints

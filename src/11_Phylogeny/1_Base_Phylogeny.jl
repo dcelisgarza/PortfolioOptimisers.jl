@@ -57,7 +57,7 @@ function PhylogenyResult(; X::Union{<:AbstractMatrix, <:AbstractVector})
     end
     return PhylogenyResult(X)
 end
-function phylogeny_matrix(ph::PhylogenyResult, args...; kwargs...)
+function phylogeny_matrix(ph::PhylogenyResult{<:AbstractMatrix}, args...; kwargs...)
     return ph
 end
 function centrality_vector(ph::PhylogenyResult{<:AbstractVector}, args...; kwargs...)

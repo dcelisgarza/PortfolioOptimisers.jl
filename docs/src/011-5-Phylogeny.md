@@ -13,7 +13,7 @@ KruskalTree
 BoruvkaTree
 PrimTree
 NetworkEstimator
-Centrality
+CentralityEstimator
 phylogeny_matrix
 centrality_vector
 average_centrality
