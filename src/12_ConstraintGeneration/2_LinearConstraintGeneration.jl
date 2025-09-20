@@ -652,7 +652,7 @@ Format a single term in a linear constraint equation as a string.
 
 # Details
 
-    - If `coeff == 1`, returns `var` (no explicit coefficient).
+    - If `coeff == 1`, returns `"\$var"` (no explicit coefficient).
     - If `coeff == -1`, returns `"-\$(var)"` (no explicit coefficient).
     - Otherwise, returns `"\$(coeff)*\$(var)"`.
 

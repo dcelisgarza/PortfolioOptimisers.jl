@@ -20,6 +20,12 @@ All concrete types implementing specific centrality algorithms (e.g., betweennes
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 
+function centrality_vector(ph::PhylogenyResult{<:AbstractMatrix},
+                           cent::AbstractCentralityAlgorithm, args...; kwargs...)
+    G = SimpleGraph(ph.X)
+    return PhylogenyResult(; X = calc_centrality(cent, G))
+end
+
 """
 ```julia
 struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
@@ -620,14 +626,14 @@ All concrete types implementing network-based estimation algorithms should subty
 
 # Related
 
-  - [`Network`](@ref)
+  - [`NetworkEstimator`](@ref)
   - [`AbstractCentralityEstimator`](@ref)
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
 
 """
 ```julia
-struct Network{T1, T2, T3, T4} <: AbstractNetworkEstimator
+struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
     ce::T1
     de::T2
     alg::T3
@@ -637,22 +643,22 @@ end
 
 Estimator type for network-based phylogeny analysis in PortfolioOptimisers.jl.
 
-`Network` encapsulates the configuration for constructing a network from asset data, including the covariance estimator, distance estimator, tree or similarity algorithm, and the network depth parameter.
+`NetworkEstimator` encapsulates the configuration for constructing a network from asset data, including the covariance estimator, distance estimator, tree or similarity algorithm, and the network depth parameter.
 
 # Fields
 
   - `ce`: Covariance estimator.
   - `de`: Distance estimator.
   - `alg`: Tree or similarity matrix algorithm.
-  - `n`: Network depth parameter.
+  - `n`: NetworkEstimator depth parameter.
 
 # Constructor
 
 ```julia
-Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-        alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
-        n::Integer = 1)
+NetworkEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                 de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+                 alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
+                 n::Integer = 1)
 ```
 
 Keyword arguments correspond to the fields above.
@@ -660,8 +666,8 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> Network()
-Network
+julia> NetworkEstimator()
+NetworkEstimator
    ce | PortfolioOptimisersCovariance
       |   ce | Covariance
       |      |    me | SimpleExpectedReturns
@@ -690,17 +696,19 @@ Network
   - [`AbstractTreeType`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
 """
-struct Network{T1, T2, T3, T4} <: AbstractNetworkEstimator
+struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
     ce::T1
     de::T2
     alg::T3
     n::T4
 end
-function Network(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                 de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-                 alg::Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType} = KruskalTree(),
-                 n::Integer = 1)
-    return Network(ce, de, alg, n)
+function NetworkEstimator(;
+                          ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                          de::AbstractDistanceEstimator = Distance(;
+                                                                   alg = CanonicalDistance()),
+                          alg::Union{<:AbstractSimilarityMatrixAlgorithm,
+                                     <:AbstractTreeType} = KruskalTree(), n::Integer = 1)
+    return NetworkEstimator(ce, de, alg, n)
 end
 
 """
@@ -714,14 +722,14 @@ All concrete types implementing centrality-based estimation algorithms should su
 
 # Related
 
-  - [`Centrality`](@ref)
+  - [`CentralityEstimator`](@ref)
   - [`AbstractCentralityAlgorithm`](@ref)
 """
 abstract type AbstractCentralityEstimator <: AbstractPhylogenyEstimator end
 
 """
 ```julia
-struct Centrality{T1, T2} <: AbstractCentralityEstimator
+struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
     ne::T1
     cent::T2
 end
@@ -729,18 +737,19 @@ end
 
 Estimator type for centrality-based analysis in PortfolioOptimisers.jl.
 
-`Centrality` encapsulates the configuration for computing centrality measures on a network, including the network estimator and the centrality algorithm.
+`CentralityEstimator` encapsulates the configuration for computing centrality measures on a network, including the network estimator and the centrality algorithm.
 
 # Fields
 
-  - `ne`: Network estimator.
+  - `ne`: NetworkEstimator estimator.
   - `cent`: Centrality algorithm.
 
 # Constructor
 
 ```julia
-Centrality(; ne::AbstractNetworkEstimator = Network(),
-           cent::AbstractCentralityAlgorithm = DegreeCentrality())
+CentralityEstimator(;
+                    ne::Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult} = NetworkEstimator(),
+                    cent::AbstractCentralityAlgorithm = DegreeCentrality())
 ```
 
 Keyword arguments correspond to the fields above.
@@ -748,9 +757,9 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> Centrality()
-Centrality
-    ne | Network
+julia> CentralityEstimator()
+CentralityEstimator
+    ne | NetworkEstimator
        |    ce | PortfolioOptimisersCovariance
        |       |   ce | Covariance
        |       |      |    me | SimpleExpectedReturns
@@ -781,28 +790,30 @@ Centrality
   - [`AbstractCentralityEstimator`](@ref)
   - [`AbstractCentralityAlgorithm`](@ref)
 """
-struct Centrality{T1, T2} <: AbstractCentralityEstimator
+struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
     ne::T1
     cent::T2
 end
-function Centrality(; ne::AbstractNetworkEstimator = Network(),
-                    cent::AbstractCentralityAlgorithm = DegreeCentrality())
-    return Centrality(ne, cent)
+function CentralityEstimator(;
+                             ne::Union{<:AbstractPhylogenyEstimator,
+                                       <:AbstractPhylogenyResult} = NetworkEstimator(),
+                             cent::AbstractCentralityAlgorithm = DegreeCentrality())
+    return CentralityEstimator(ne, cent)
 end
 
 """
 ```julia
-calc_adjacency(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs...)
+calc_adjacency(ne::NetworkEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```
 
 Compute the adjacency matrix for a network estimator.
 
 # Arguments
 
-  - `ne`: Network estimator.
+  - `ne`: NetworkEstimator estimator.
 
-      + `ne::Network{<:Any, <:Any, <:AbstractTreeType, <:Any}`: Constructs a weighted graph from the distance matrix and computes the minimum spanning tree, returning the adjacency matrix of the resulting graph.
-      + `ne::Network{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: Computes the similarity and distance matrices, applies the [`PMFG_T2s`](@ref) algorithm, and returns the adjacency matrix of the resulting graph..
+      + `ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any}`: Constructs a weighted graph from the distance matrix and computes the minimum spanning tree, returning the adjacency matrix of the resulting graph.
+      + `ne::NetworkEstimator{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm, <:Any}`: Computes the similarity and distance matrices, applies the [`PMFG_T2s`](@ref) algorithm, and returns the adjacency matrix of the resulting graph..
 
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute (default: `1`).
@@ -814,19 +825,20 @@ Compute the adjacency matrix for a network estimator.
 
 # Related
 
-  - [`Network`](@ref)
+  - [`NetworkEstimator`](@ref)
   - [`calc_mst`](@ref)
   - [`PMFG_T2s`](@ref)
 """
-function calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractTreeType, <:Any},
+function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
                         X::AbstractMatrix; dims::Int = 1, kwargs...)
     D = distance(ne.de, ne.ce, X; dims = dims, kwargs...)
     G = SimpleWeightedGraph(D)
     tree = calc_mst(ne.alg, G)
     return adjacency_matrix(SimpleGraph(G[tree]))
 end
-function calc_adjacency(ne::Network{<:Any, <:Any, <:AbstractSimilarityMatrixAlgorithm,
-                                    <:Any}, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function calc_adjacency(ne::NetworkEstimator{<:Any, <:Any,
+                                             <:AbstractSimilarityMatrixAlgorithm, <:Any},
+                        X::AbstractMatrix; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(ne.de, ne.ce, X; dims = dims, kwargs...)
     S = dbht_similarity(ne.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
@@ -835,7 +847,7 @@ end
 
 """
 ```julia
-phylogeny_matrix(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs...)
+phylogeny_matrix(ne::AbstractNetworkEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```
 
 Compute the phylogeny matrix for a network estimator.
@@ -844,7 +856,7 @@ This function constructs the adjacency matrix for the network, then computes the
 
 # Arguments
 
-  - `ne`: Network estimator.
+  - `ne`: NetworkEstimator estimator.
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute (default: `1`).
   - `kwargs...`: Additional keyword arguments.
@@ -855,22 +867,23 @@ This function constructs the adjacency matrix for the network, then computes the
 
 # Related
 
-  - [`Network`](@ref)
+  - [`NetworkEstimator`](@ref)
   - [`calc_adjacency`](@ref)
 """
-function phylogeny_matrix(ne::Network, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function phylogeny_matrix(ne::AbstractNetworkEstimator, X::AbstractMatrix; dims::Int = 1,
+                          kwargs...)
     A = calc_adjacency(ne, X; dims = dims, kwargs...)
     P = zeros(Int, size(Matrix(A)))
     for i in 0:(ne.n)
         P .+= A^i
     end
     P .= clamp!(P, 0, 1) - I
-    return P
+    return PhylogenyResult(; X = P)
 end
 
 """
 ```julia
-phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
+phylogeny_matrix(cle::Union{<:AbstractClusteringEstimator, <:AbstractClusteringResult},
                  X::AbstractMatrix; branchorder::Symbol = :optimal, dims::Int = 1,
                  kwargs...)
 ```
@@ -897,9 +910,9 @@ This function clusterises the data, cuts the tree into the optimal number of clu
   - [`AbstractClusteringResult`](@ref)
   - [`clusterise`](@ref)
 """
-function phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
-                          X::AbstractMatrix; branchorder::Symbol = :optimal, dims::Int = 1,
-                          kwargs...)
+function phylogeny_matrix(cle::Union{<:AbstractClusteringEstimator,
+                                     <:AbstractClusteringResult}, X::AbstractMatrix;
+                          branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     res = clusterise(cle, X; branchorder = branchorder, dims = dims, kwargs...)
     clusters = cutree(res.clustering; k = res.k)
     P = zeros(Int, size(X, 2), res.k)
@@ -907,13 +920,14 @@ function phylogeny_matrix(cle::Union{<:ClusteringEstimator, <:AbstractClustering
         idx = clusters .== i
         P[idx, i] .= one(eltype(P))
     end
-    return P * transpose(P) - I
+    return PhylogenyResult(; X = P * transpose(P) - I)
 end
 
 """
 ```julia
-centrality_vector(ne::Network, cent::AbstractCentralityAlgorithm, X::AbstractMatrix;
-                  dims::Int = 1, kwargs...)
+centrality_vector(ne::Union{<:AbstractNetworkEstimator, <:AbstractClusteringEstimator,
+                            <:AbstractClusteringResult}, cent::AbstractCentralityAlgorithm,
+                  X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```
 
 Compute the centrality vector for a network and centrality algorithm.
@@ -922,7 +936,7 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
 
 # Arguments
 
-  - `ne`: Network estimator.
+  - `ne`: Phylogeny estimator.
   - `cent`: Centrality algorithm.
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute (default: `1`).
@@ -934,20 +948,23 @@ This function constructs the phylogeny matrix for the network, builds a graph, a
 
 # Related
 
-  - [`Network`](@ref)
-  - [`Centrality`](@ref)
+  - [`NetworkEstimator`](@ref)
+  - [`CentralityEstimator`](@ref)
   - [`calc_centrality`](@ref)
 """
-function centrality_vector(ne::Network, cent::AbstractCentralityAlgorithm,
-                           X::AbstractMatrix; dims::Int = 1, kwargs...)
-    P = phylogeny_matrix(ne, X; dims = dims, kwargs...)
+function centrality_vector(ne::Union{<:AbstractNetworkEstimator,
+                                     <:AbstractClusteringEstimator,
+                                     <:AbstractClusteringResult},
+                           cent::AbstractCentralityAlgorithm, X::AbstractMatrix;
+                           dims::Int = 1, kwargs...)
+    P = phylogeny_matrix(ne, X; dims = dims, kwargs...).X
     G = SimpleGraph(P)
-    return calc_centrality(cent, G)
+    return PhylogenyResult(; X = calc_centrality(cent, G))
 end
 
 """
 ```julia
-centrality_vector(cte::Centrality, X::AbstractMatrix; dims::Int = 1, kwargs...)
+centrality_vector(cte::CentralityEstimator, X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```
 
 Compute the centrality vector for a centrality estimator.
@@ -967,17 +984,19 @@ This function applies the centrality algorithm in the estimator to the network c
 
 # Related
 
-  - [`Centrality`](@ref)
+  - [`CentralityEstimator`](@ref)
   - [`centrality_vector`](@ref)
 """
-function centrality_vector(cte::Centrality, X::AbstractMatrix; dims::Int = 1, kwargs...)
+function centrality_vector(cte::CentralityEstimator, X::AbstractMatrix; dims::Int = 1,
+                           kwargs...)
     return centrality_vector(cte.ne, cte.cent, X; dims = dims, kwargs...)
 end
 
 """
 ```julia
-average_centrality(ne::Network, cent::AbstractCentralityAlgorithm, w::AbstractVector,
-                   X::AbstractMatrix; dims::Int = 1, kwargs...)
+average_centrality(ne::Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult},
+                   cent::AbstractCentralityAlgorithm, w::AbstractVector, X::AbstractMatrix;
+                   dims::Int = 1, kwargs...)
 ```
 
 Compute the weighted average centrality for a network and centrality algorithm.
@@ -986,7 +1005,7 @@ This function computes the centrality vector and returns the weighted average us
 
 # Arguments
 
-  - `ne`: Network estimator.
+  - `ne`: NetworkEstimator estimator.
   - `cent`: Centrality algorithm.
   - `w`: Weights vector.
   - `X`: Data matrix (observations × assets).
@@ -999,18 +1018,20 @@ This function computes the centrality vector and returns the weighted average us
 
 # Related
 
-  - [`Network`](@ref)
-  - [`Centrality`](@ref)
+  - [`NetworkEstimator`](@ref)
+  - [`CentralityEstimator`](@ref)
   - [`centrality_vector`](@ref)
 """
-function average_centrality(ne::Network, cent::AbstractCentralityAlgorithm,
-                            w::AbstractVector, X::AbstractMatrix; dims::Int = 1, kwargs...)
-    return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...), w)
+function average_centrality(ne::Union{<:AbstractPhylogenyEstimator,
+                                      <:AbstractPhylogenyResult},
+                            cent::AbstractCentralityAlgorithm, w::AbstractVector,
+                            X::AbstractMatrix; dims::Int = 1, kwargs...)
+    return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...).X, w)
 end
 """
 ```julia
-average_centrality(cte::Centrality, w::AbstractVector, X::AbstractMatrix; dims::Int = 1,
-                   kwargs...)
+average_centrality(cte::CentralityEstimator, w::AbstractVector, X::AbstractMatrix;
+                   dims::Int = 1, kwargs...)
 ```
 
 Compute the weighted average centrality for a centrality estimator.
@@ -1031,10 +1052,10 @@ This function applies the centrality algorithm in the estimator to the network a
 
 # Related
 
-  - [`Centrality`](@ref)
+  - [`CentralityEstimator`](@ref)
   - [`average_centrality`](@ref)
 """
-function average_centrality(cte::Centrality, w::AbstractVector, X::AbstractMatrix;
+function average_centrality(cte::CentralityEstimator, w::AbstractVector, X::AbstractMatrix;
                             dims::Int = 1, kwargs...)
     return average_centrality(cte.ne, cte.cent, w, X; dims = dims, kwargs...)
 end
@@ -1068,9 +1089,14 @@ function asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
     c /= sum(aw)
     return c
 end
+#! Add docstring
+function asset_phylogeny(w::AbstractVector, ph::PhylogenyResult{<:AbstractMatrix})
+    return asset_phylogeny(w, ph.X)
+end
+
 """
 ```julia
-asset_phylogeny(cle::Union{<:Network, <:ClusteringEstimator}, w::AbstractVector,
+asset_phylogeny(cle::Union{<:NetworkEstimator, <:ClusteringEstimator}, w::AbstractVector,
                 X::AbstractMatrix; dims::Int = 1, kwargs...)
 ```
 
@@ -1080,7 +1106,7 @@ This function computes the phylogeny matrix using the estimator and data, then c
 
 # Arguments
 
-  - `cle`: Network or clustering estimator.
+  - `cle`: NetworkEstimator or clustering estimator.
   - `w`: Weights vector.
   - `X`: Data matrix (observations × assets).
   - `dims`: Dimension along which to compute (default: `1`).
@@ -1095,12 +1121,18 @@ This function computes the phylogeny matrix using the estimator and data, then c
   - [`phylogeny_matrix`](@ref)
   - [`asset_phylogeny`](@ref)
 """
-function asset_phylogeny(cle::Union{<:Network, <:ClusteringEstimator}, w::AbstractVector,
+function asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator,
+                                    <:AbstractClusteringResult}, w::AbstractVector,
                          X::AbstractMatrix; dims::Int = 1, kwargs...)
     return asset_phylogeny(w, phylogeny_matrix(cle, X; dims = dims, kwargs...))
+end
+#! Write docs
+function asset_phylogeny(ph::PhylogenyResult{<:AbstractMatrix}, w::AbstractVector, args...;
+                         kwargs...)
+    return asset_phylogeny(w, ph)
 end
 
 export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
        KatzCentrality, Pagerank, RadialityCentrality, StressCentrality, KruskalTree,
-       BoruvkaTree, PrimTree, Network, phylogeny_matrix, average_centrality,
-       asset_phylogeny, AbstractCentralityAlgorithm, Centrality, centrality_vector
+       BoruvkaTree, PrimTree, NetworkEstimator, phylogeny_matrix, average_centrality,
+       asset_phylogeny, AbstractCentralityAlgorithm, CentralityEstimator, centrality_vector

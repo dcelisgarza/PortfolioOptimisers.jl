@@ -6,7 +6,7 @@ struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEsti
 end
 function SemiDefinitePhylogenyEstimator(;
                                         pe::Union{<:AbstractPhylogenyEstimator,
-                                                  <:AbstractClusteringResult} = Network(),
+                                                  <:AbstractClusteringResult} = NetworkEstimator(),
                                         p::Real = 0.05)
     @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
     return SemiDefinitePhylogenyEstimator(pe, p)
@@ -15,10 +15,10 @@ struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
     A::T1
     p::T2
 end
-function SemiDefinitePhylogeny(; A::AbstractMatrix{<:Real}, p::Real = 0.05)
-    @argcheck(!isempty(A))
+function SemiDefinitePhylogeny(; A::PhylogenyResult{<:AbstractMatrix{<:Real}},
+                               p::Real = 0.05)
     @argcheck(p >= zero(p))
-    return SemiDefinitePhylogeny(A, p)
+    return SemiDefinitePhylogeny(A.X, p)
 end
 function phylogeny_constraints(plc::SemiDefinitePhylogenyEstimator, X::AbstractMatrix;
                                dims::Int = 1, kwargs...)
@@ -52,7 +52,7 @@ function validate_length_integer_phylogeny_constraint_B(args...)
 end
 function IntegerPhylogenyEstimator(;
                                    pe::Union{<:AbstractPhylogenyEstimator,
-                                             <:AbstractClusteringResult} = Network(),
+                                             <:AbstractClusteringResult} = NetworkEstimator(),
                                    B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                                    scale::Real = 100_000.0)
     if isa(B, AbstractVector)
@@ -69,10 +69,10 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
     B::T2
     scale::T3
 end
-function IntegerPhylogeny(; A::AbstractMatrix{<:Real},
+function IntegerPhylogeny(; A::PhylogenyResult{<:AbstractMatrix{<:Real}},
                           B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                           scale::Real = 100_000.0)
-    @argcheck(!isempty(A))
+    A = A.X
     A = unique(A + I; dims = 1)
     if isa(B, AbstractVector)
         @argcheck(!isempty(B))
@@ -115,18 +115,18 @@ end
 function vec_to_real_measure(val::Real, ::AbstractVector)
     return val
 end
-struct CentralityEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
+struct CentralityConstraint{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
     A::T1
     B::T2
     comp::T3
 end
-function CentralityEstimator(; A::Centrality = Centrality(),
-                             B::Union{<:Real, <:VectorToRealMeasure} = MinValue(),
-                             comp::ComparisonOperators = LEQ())
-    return CentralityEstimator(A, B, comp)
+function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
+                              B::Union{<:Real, <:VectorToRealMeasure} = MinValue(),
+                              comp::ComparisonOperators = LEQ())
+    return CentralityConstraint(A, B, comp)
 end
-function centrality_constraints(ccs::Union{<:CentralityEstimator,
-                                           <:AbstractVector{<:CentralityEstimator}},
+function centrality_constraints(ccs::Union{<:CentralityConstraint,
+                                           <:AbstractVector{<:CentralityConstraint}},
                                 X::AbstractMatrix; dims::Int = 1, kwargs...)
     if isa(ccs, AbstractVector)
         @argcheck(!isempty(ccs))
@@ -136,7 +136,7 @@ function centrality_constraints(ccs::Union{<:CentralityEstimator,
     A_eq = Vector{eltype(X)}(undef, 0)
     B_eq = Vector{eltype(X)}(undef, 0)
     for cc in ccs
-        A = centrality_vector(cc.A, X; dims = dims, kwargs...)
+        A = centrality_vector(cc.A, X; dims = dims, kwargs...).X
         lhs_flag = isempty(A) || all(iszero, A)
         if lhs_flag
             continue
@@ -182,5 +182,5 @@ function centrality_constraints(::Nothing, args...; kwargs...)
 end
 
 export SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator,
-       IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityEstimator,
+       IntegerPhylogeny, MinValue, MeanValue, MedianValue, MaxValue, CentralityConstraint,
        phylogeny_constraints, centrality_constraints
