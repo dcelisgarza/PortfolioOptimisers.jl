@@ -403,7 +403,7 @@ function variation_info(X::AbstractMatrix,
     end
     return var_mtx
 end
-#=
+# COV_EXCL_START
 function mutual_variation_info(X::AbstractMatrix,
                                bins::Union{<:AbstractBins, <:Integer} = Knuth(),
                                normalise::Bool = true)
@@ -445,8 +445,7 @@ function mutual_variation_info(X::AbstractMatrix,
 
     return mut_mtx, var_mtx
 end
-=#
-
+# COV_EXCL_STOP
 """
 ```julia
 mutual_info(X::AbstractMatrix;

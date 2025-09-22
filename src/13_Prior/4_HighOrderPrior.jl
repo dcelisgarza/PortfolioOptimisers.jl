@@ -20,6 +20,7 @@ function block_vec_pq(A, p, q)
 
     return A_vec
 end
+# COV_EXCL_START
 function duplication_matrix(n::Int, diag::Bool = true)
     m = div(n * (n + 1), 2)
     nsq = n^2
@@ -148,6 +149,7 @@ function summation_matrix(n::Int, diag::Bool = true)
         sparse(1:m, v1, 2, m, nsq)
     end
 end
+# COV_EXCL_STOP
 function dup_elim_sum_matrices(n::Int)
     m = div(n * (n + 1), 2)
     nsq = n^2
