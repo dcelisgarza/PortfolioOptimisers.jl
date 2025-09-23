@@ -287,7 +287,7 @@
             println("Frontier formulation failed")
             find_tol(hcat(res3.w...), hcat(res4.w...))
         end
-        rks = expected_risk.(Ref(r), res1.w, Ref(pr))
+        rks = expected_risk.(Ref(r), res3.w, Ref(pr))
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
         rts = expected_return.(ArithmeticReturn(), res1.w, Ref(pr))
@@ -370,7 +370,6 @@
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
-        #=
         res3 = optimise!(MeanRisk(;
                                   r = LowOrderMoment(;
                                                      settings = RiskMeasureSettings(;
@@ -393,36 +392,33 @@
                                                                              alg = SecondCentralMoment(;
                                                                                                        alg = RSOCRiskExpr()))),
                                   obj = MaximumReturn(), opt = opt))
-        res = isapprox(hcat(res3.w...), hcat(res4.w...); rtol = 1e-6)
+        res = isapprox(hcat(res3.w...), hcat(res4.w...); rtol = 5e-6)
         if !res
             println("Frontier formulation failed")
             find_tol(hcat(res3.w...), hcat(res4.w...))
         end
-        rks = expected_risk.(Ref(r), res1.w, Ref(pr))
+        rks = expected_risk.(Ref(r), res3.w, Ref(pr))
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
-        rts = expected_return.(ArithmeticReturn(), res1.w, Ref(pr))
+        rts = expected_return.(ArithmeticReturn(), res3.w, Ref(pr))
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
-        opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
         res5 = optimise!(MeanRisk(;
                                   r = LowOrderMoment(;
-                                                     settings = RiskMeasureSettings(;
-                                                                                    ),
                                                      alg = LowOrderDeviation(;
                                                                              alg = SecondCentralMoment(;
                                                                                                        alg = QuadRiskExpr()))),
                                   opt = opt))
         res6 = optimise!(MeanRisk(;
                                   r = LowOrderMoment(;
-                                                     settings = RiskMeasureSettings(;
-                                                                                    ),
                                                      alg = LowOrderDeviation(;
                                                                              alg = SecondCentralMoment(;
                                                                                                        alg = RSOCRiskExpr()))),
                                   opt = opt))
-        res = isapprox(hcat(res5.w...), hcat(res6.w...); rtol = 5e-4)
+        res = isapprox(hcat(res5.w...), hcat(res6.w...); rtol = 5e-3)
         if !res
             println("Frontier formulation failed")
             find_tol(hcat(res5.w...), hcat(res6.w...))
@@ -436,11 +432,21 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             ret = ArithmeticReturn(;
-                                                   lb = range(; start = rt_min, stop = rt_max,
-                                                              length = 5)))
-        res7 = optimise!(MeanRisk(; r = Variance(;), opt = opt))
-        res8 = optimise!(MeanRisk(; r = Variance(; alg = QuadRiskExpr()), opt = opt))
-        res = isapprox(hcat(res7.w...), hcat(res8.w...); rtol = 5e-4)
+                                                   lb = range(; start = rt_min,
+                                                              stop = rt_max, length = 5)))
+        res7 = optimise!(MeanRisk(;
+                                  r = LowOrderMoment(; settings = RiskMeasureSettings(;),
+                                                     alg = LowOrderDeviation(;
+                                                                             alg = SecondCentralMoment(;
+                                                                                                       alg = QuadRiskExpr()))),
+                                  opt = opt))
+        res8 = optimise!(MeanRisk(;
+                                  r = LowOrderMoment(; settings = RiskMeasureSettings(;),
+                                                     alg = LowOrderDeviation(;
+                                                                             alg = SecondCentralMoment(;
+                                                                                                       alg = RSOCRiskExpr()))),
+                                  opt = opt))
+        res = isapprox(hcat(res7.w...), hcat(res8.w...); rtol = 5e-3)
         if !res
             println("Frontier formulation failed")
             find_tol(hcat(res7.w...), hcat(res8.w...))
@@ -451,7 +457,6 @@
         rts = expected_return.(ArithmeticReturn(), res7.w, Ref(pr))
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
-        =#
     end
     @testset "Scalarisers" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv)
