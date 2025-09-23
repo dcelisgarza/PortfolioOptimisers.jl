@@ -67,6 +67,15 @@
           OrderedWeightsArray(; alg = ExactOrderedWeightsArray()), OrderedWeightsArray(),
           OrderedWeightsArrayRange(), NegativeSkewness(),
           NegativeSkewness(; alg = QuadRiskExpr())]
+    sets = AssetSets(;
+                     dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
+                                 "group2" => rd.nx[2:2:end],
+                                 "clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
+                                                 3, 3, 3, 3, 3, 3],
+                                 "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
+                                                 3, 1, 2, 3, 1, 2], "c1" => rd.nx[1:3:end],
+                                 "c2" => rd.nx[2:3:end], "c3" => rd.nx[3:3:end]))
+    fsets = AssetSets(; dict = Dict("nx" => rd.nf))
     @testset "Asset Risk Budgeting" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgeting1.csv.gz"), DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
@@ -187,6 +196,21 @@
             end
             @test success
         end
+
+        r = factory(Variance(), pr, slv)
+        rb = RiskBudgeting(;
+                           alg = AssetRiskBudgeting(;
+                                                    rkb = RiskBudgetEstimator(;
+                                                                              val = ["AAPL" => 0.5,
+                                                                                     "MSFT" => 0.25,
+                                                                                     "LLY" => 0.125])),
+                           opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets))
+        res = optimise!(rb, rd)
+        @test isa(res.retcode, OptimisationSuccess)
+        rkc = risk_contribution(r, res.w, pr.X)
+        rkc /= sum(rkc)
+        rkb = risk_budget_constraints(rb.alg.rkb, sets)
+        @test isapprox(rkc, rkb.val, rtol = 5e-5)
     end
     @testset "Factor Risk Budgeting" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgeting1.csv.gz"), DataFrame)
@@ -251,6 +275,7 @@
             end
             @test success
         end
+
         df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgeting2.csv.gz"), DataFrame)
         rr = regression(StepwiseRegression(; alg = Backward()), rd)
         for (i, r) in enumerate(rs)
@@ -316,5 +341,23 @@
             end
             @test success
         end
+
+        r = factory(Variance(), pr, slv)
+        rb = RiskBudgeting(;
+                           alg = FactorRiskBudgeting(; re = rr,
+                                                     rkb = RiskBudgetEstimator(;
+                                                                               val = "MTUM" => 0.5)),
+                           opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                               sbgt = BudgetRange(; lb = 0, ub = nothing),
+                                               bgt = 1,
+                                               wb = WeightBounds(; lb = nothing,
+                                                                 ub = nothing),
+                                               sets = fsets))
+        res = optimise!(rb, rd)
+        @test isa(res.retcode, OptimisationSuccess)
+        rkc = factor_risk_contribution(r, res.w, pr.X; re = res.prb.rr)
+        rkc[1:5] /= sum(rkc[1:5])
+        rkb = risk_budget_constraints(rb.alg.rkb, fsets)
+        @test isapprox(rkc[1:5], rkb.val, rtol = 5e-4)
     end
 end

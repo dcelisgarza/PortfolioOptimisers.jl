@@ -382,7 +382,7 @@ end
 ```julia
 estimator_to_val(dict::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
                              <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                 sets::AssetSets; strict::Bool = false)
+                 sets::AssetSets; val::Real = 0.0, strict::Bool = false)
 ```
 
 Return value for assets or groups, based on a mapping and asset sets.
@@ -394,6 +394,7 @@ The function creates the vector and sets the values for assets or groups as spec
   - `arr`: The array to be modified in-place.
   - `dict`: A dictionary, vector of pairs, or single pair mapping asset or group names to values.
   - `sets`: The [`AssetSets`](@ref) containing the asset universe and group definitions.
+  - `val`: The default value to assign to assets not specified in `dict`.
   - `strict`: If `true`, throws an error if a key in `dict` is not found in the asset sets; if `false`, issues a warning.
 
 # Details

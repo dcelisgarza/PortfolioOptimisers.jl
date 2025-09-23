@@ -26,4 +26,10 @@
     @test res.op == "=="
     @test res.rhs == -4.0
     @test res.eqn == "5.0*z + (0.3333333333333333x) / (2 ^ z * y) == -4.0"
+    res = parse_equation("-x>=-1.0y+2")
+    @test res.vars == ["x", "y"]
+    @test res.coef == [-1.0, 1.0]
+    @test res.op == ">="
+    @test res.rhs == 2.0
+    @test res.eqn == "-x + y >= 2.0"
 end
