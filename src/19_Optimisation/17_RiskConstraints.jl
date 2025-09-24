@@ -576,8 +576,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                args...; kwargs...)
-    b = !isnothing(r.alg.b) ? r.alg.b : 1e3
-    s = !isnothing(r.alg.s) ? r.alg.s : 1e-5
+    b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
+    s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:var_risk_, i)
     sc = model[:sc]
@@ -611,8 +611,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                args...; kwargs...)
-    b = !isnothing(r.alg.b) ? r.alg.b : 1e3
-    s = !isnothing(r.alg.s) ? r.alg.s : 1e-5
+    b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
+    s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:var_range_risk_, i)
     sc = model[:sc]
