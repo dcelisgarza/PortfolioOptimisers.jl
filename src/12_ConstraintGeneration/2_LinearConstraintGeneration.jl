@@ -507,7 +507,7 @@ Recursively evaluate numeric functions and constants in a Julia expression.
   - [`_parse_equation`](@ref)
 """
 function _eval_numeric_functions(expr)
-    return if expr isa Expr
+    return if isa(expr, Expr)
         if expr.head == :call
             fname = expr.args[1]
             # Only evaluate if all arguments are numeric
@@ -520,7 +520,7 @@ function _eval_numeric_functions(expr)
         else
             Expr(expr.head, map(_eval_numeric_functions, expr.args)...)
         end
-    elseif expr isa Symbol && expr == :Inf
+    elseif isa(expr, Symbol) && expr == :Inf
         Inf
     else
         expr
@@ -600,17 +600,17 @@ Recursively collect and expand terms from a Julia expression for linear constrai
   - [`_parse_equation`](@ref)
 """
 function _collect_terms!(expr, coeff, terms)
-    if expr isa Number
+    if isa(expr, Number)
         push!(terms, (coeff * oftype(coeff, expr), nothing))
-    elseif expr isa Symbol
+    elseif isa(expr, Symbol)
         push!(terms, (coeff, string(expr)))
-    elseif expr isa Expr
+    elseif isa(expr, Expr)
         if expr.head == :call && expr.args[1] == :*
             # Multiplication: find numeric and variable part
             a, b = expr.args[2], expr.args[3]
-            if a isa Number
+            if isa(a, Number)
                 _collect_terms!(b, coeff * oftype(coeff, a), terms)
-            elseif b isa Number
+            elseif isa(b, Number)
                 _collect_terms!(a, coeff * oftype(coeff, b), terms)
             else
                 # e.g. x*y, treat as variable
@@ -618,7 +618,7 @@ function _collect_terms!(expr, coeff, terms)
             end
         elseif expr.head == :call && expr.args[1] == :/
             a, b = expr.args[2], expr.args[3]
-            if b isa Number
+            if isa(b, Number)
                 _collect_terms!(a, coeff / oftype(coeff, b), terms)
             else
                 # e.g. x/y, treat as variable

@@ -290,7 +290,7 @@
         rks = expected_risk.(Ref(r), res3.w, Ref(pr))
         @test issorted(rks)
         @test all(rk_min - sqrt(eps()) .<= rks .<= rk_max + sqrt(eps()))
-        rts = expected_return.(ArithmeticReturn(), res1.w, Ref(pr))
+        rts = expected_return.(ArithmeticReturn(), res3.w, Ref(pr))
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
@@ -1204,5 +1204,40 @@
         rkc = rkc / sum(rkc)
         @test all(rkc .- 0.2 .- 20 * sqrt(eps()) .< 0)
         @test abs(sum(rkc[3:3:end]) - 0.1) < 20 * sqrt(eps())
+    end
+    @testset "Weighted risk expressions" begin
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        rs1 = [LowOrderMoment(; mu = 0),
+               LowOrderMoment(; mu = 0,
+                              alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+               LowOrderMoment(; mu = 0,
+                              alg = LowOrderDeviation(; alg = SecondCentralMoment())),
+               ConditionalValueatRisk(), EntropicValueatRisk(),
+               ConditionalValueatRiskRange(), EntropicValueatRiskRange()]
+        rs2 = [LowOrderMoment(; mu = 0, w = wp),
+               LowOrderMoment(; mu = 0, w = wp,
+                              alg = LowOrderDeviation(; alg = SecondLowerMoment())),
+               LowOrderMoment(; mu = 0, w = wp,
+                              alg = LowOrderDeviation(; alg = SecondCentralMoment())),
+               ConditionalValueatRisk(; w = wp), EntropicValueatRisk(; w = wp),
+               ConditionalValueatRiskRange(; w = wp), EntropicValueatRiskRange(; w = wp)]
+        for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
+            res1 = optimise!(MeanRisk(; r = r1, opt = opt))
+            res2 = optimise!(MeanRisk(; r = r2, opt = opt))
+            rtol = if i ∈ (2, 5, 7)
+                5e-5
+            elseif i == 3
+                5e-3
+            else
+                1e-6
+            end
+            res = isapprox(res1.w, res2.w; rtol = rtol)
+            if !res
+                println("Iteration $i failed:")
+                find_tol(res1.w, res2.w)
+                display([res1.w res2.w res1.w - res2.w])
+            end
+            @test res
+        end
     end
 end

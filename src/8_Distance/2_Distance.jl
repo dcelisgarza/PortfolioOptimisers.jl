@@ -218,7 +218,7 @@ Compute the variation of information (VI) distance matrix from a data matrix.
 # Arguments
 
   - `de::Distance{<:VariationInfoDistance}`: Distance estimator with [`VariationInfoDistance`](@ref) algorithm.
-  - `::Any`: Placeholder for compatibility (ignored).
+  - `::Any`: Covariance estimator placeholder for API compatibility (ignored).
   - `X`: Data matrix (observations × features).
   - `dims`: Dimension along which to compute the distance. If `2`, the data is transposed.
   - `kwargs...`: Additional keyword arguments (ignored).
