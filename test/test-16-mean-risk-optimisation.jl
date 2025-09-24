@@ -190,10 +190,6 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
         for obj in objs, ret in rets, r in rs
-            if i <= 204
-                i += 1
-                continue
-            end
             opt = if isa(r,
                          Union{<:ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
                                <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
@@ -1217,23 +1213,33 @@
     end
     @testset "Weighted risk expressions" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv)
+        mip_opt = JuMPOptimiser(; pe = pr, slv = mip_slv)
         rs1 = [LowOrderMoment(; mu = 0),
                LowOrderMoment(; mu = 0,
                               alg = LowOrderDeviation(; alg = SecondLowerMoment())),
                LowOrderMoment(; mu = 0,
                               alg = LowOrderDeviation(; alg = SecondCentralMoment())),
                ConditionalValueatRisk(), EntropicValueatRisk(),
-               ConditionalValueatRiskRange(), EntropicValueatRiskRange()]
+               ConditionalValueatRiskRange(), EntropicValueatRiskRange(),
+               DistributionallyRobustConditionalValueatRisk(; l = 1e-1, r = 1e-3),
+               ValueatRisk()]
         rs2 = [LowOrderMoment(; mu = 0, w = wp),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = LowOrderDeviation(; alg = SecondLowerMoment())),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = LowOrderDeviation(; alg = SecondCentralMoment())),
                ConditionalValueatRisk(; w = wp), EntropicValueatRisk(; w = wp),
-               ConditionalValueatRiskRange(; w = wp), EntropicValueatRiskRange(; w = wp)]
+               ConditionalValueatRiskRange(; w = wp), EntropicValueatRiskRange(; w = wp),
+               DistributionallyRobustConditionalValueatRisk(; l = 1e-1, r = 1e-3, w = wp),
+               ValueatRisk(; w = wp)]
         for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
-            res1 = optimise!(MeanRisk(; r = r1, opt = opt))
-            res2 = optimise!(MeanRisk(; r = r2, opt = opt))
+            res1, res2 = if isa(r1, ValueatRisk)
+                optimise!(MeanRisk(; r = r1, opt = mip_opt)),
+                optimise!(MeanRisk(; r = r2, opt = mip_opt))
+            else
+                optimise!(MeanRisk(; r = r1, opt = opt)),
+                optimise!(MeanRisk(; r = r2, opt = opt))
+            end
             rtol = if i ∈ (2, 7)
                 5e-5
             elseif i == 3
