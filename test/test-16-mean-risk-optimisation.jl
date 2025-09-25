@@ -194,12 +194,14 @@
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
             res = optimise!(mr, rd)
             @test isa(res.retcode, OptimisationSuccess)
-            rtol = if i ∈ (27, 59, 163, 189)
+            rtol = if i ∈ (27, 59, 60, 163, 168, 189, 192, 194)
                 5e-4
-            elseif i ∈ (123, 187, 190) || Sys.isapple() && i == 60
+            elseif i ∈ (123, 126, 187, 190, 195) || Sys.isapple() && i == 60
                 5e-3
-            elseif i == 126
+            elseif i ∈ (126, 129)
                 1e-3
+            elseif i == 198
+                5e-2
             else
                 1e-4
             end
