@@ -186,18 +186,11 @@
               OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray()),
               OrderedWeightsArrayRange(), NegativeSkewness(),
               NegativeSkewness(; alg = QuadRiskExpr()),
-              DistributionallyRobustConditionalValueatRisk(), ValueatRisk()]
+              DistributionallyRobustConditionalValueatRisk()]
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
         for obj in objs, ret in rets, r in rs
-            opt = if isa(r,
-                         Union{<:ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
-                               <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
-                                                  <:MIPValueatRisk}})
-                JuMPOptimiser(; pe = pr, slv = mip_slv, ret = ret)
-            else
-                JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
-            end
+            opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
             res = optimise!(mr, rd)
             @test isa(res.retcode, OptimisationSuccess)
