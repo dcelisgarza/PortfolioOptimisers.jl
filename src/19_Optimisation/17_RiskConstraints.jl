@@ -283,7 +283,6 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
     return ucs_variance_risk, key
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertaintySet,
-                                r_sigma::Union{Nothing, <:AbstractMatrix},
                                 sigma::AbstractMatrix)
     sc = model[:sc]
     if !haskey(model, :E)
@@ -292,9 +291,6 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertain
         @variable(model, E[1:N, 1:N], Symmetric)
         @expression(model, WpE, W + E)
         @constraint(model, ceucs_variance, sc * E in PSDCone())
-    end
-    if !isnothing(r_sigma)
-        sigma = r_sigma
     end
     key = Symbol(:eucs_variance_risk_, i)
     WpE = model[:WpE]
@@ -323,11 +319,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
     end
     set_sdp_constraints!(model)
     ucs = r.ucs
-    X = pr.X
-    r_sigma = r.sigma
-    sigma = pr.sigma
+    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     ucs_variance_risk, key = set_ucs_variance_risk!(model, i, sigma_ucs(ucs, rd; kwargs...),
-                                                    r_sigma, sigma)
+                                                    sigma)
     set_risk_bounds_and_expression!(model, opt, ucs_variance_risk, r.settings, key)
     return nothing
 end
@@ -695,13 +689,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                args...; kwargs...)
     alg = r.alg
-    sigma = alg.sigma
     mu = nothing_scalar_array_factory(alg.mu, pr.mu)
-    G = if isnothing(sigma)
-        get_chol_or_sigma_pm(model, pr)
-    else
-        cholesky(sigma).U
-    end
+    G = isnothing(alg.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(alg.sigma).U
     w = model[:w]
     sc = model[:sc]
     z = compute_value_at_risk_z(r.alg.dist, r.alpha)
@@ -721,12 +710,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                args...; kwargs...)
     alg = r.alg
-    sigma = alg.sigma
-    G = if isnothing(sigma)
-        get_chol_or_sigma_pm(model, pr)
-    else
-        cholesky(sigma).U
-    end
+    G = isnothing(alg.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(alg.sigma).U
     w = model[:w]
     sc = model[:sc]
     dist = r.alg.dist

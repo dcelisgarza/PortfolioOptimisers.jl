@@ -1,6 +1,6 @@
 @safetestset "Mean Risk Optimisation" begin
     using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, HiGHS, Pajarito,
-          JuMP, StatsBase, StableRNGs, LinearAlgebra
+          JuMP, StatsBase, StableRNGs, LinearAlgebra, Distributions
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -186,10 +186,11 @@
               OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray()),
               OrderedWeightsArrayRange(), NegativeSkewness(),
               NegativeSkewness(; alg = QuadRiskExpr()),
-              DistributionallyRobustConditionalValueatRisk()]
+              DistributionallyRobustConditionalValueatRisk(),
+              ValueatRisk(; alg = DistributionValueatRisk())]
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
-        for obj in objs, ret in rets, r in rs
+        for r in rs, obj in objs, ret in rets
             opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
             res = optimise!(mr, rd)
@@ -458,6 +459,31 @@
         rts = expected_return.(ArithmeticReturn(), res7.w, Ref(pr))
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
+
+        # opt = JuMPOptimiser(; pe = pr, slv = slv)
+        # res9 = optimise!(MeanRisk(;
+        #                           r = ValueatRisk(;
+        #                                           alg = DistributionValueatRisk(;
+        #                                                                         dist = Laplace())),
+        #                           opt = opt))
+        # res10 = optimise!(MeanRisk(;
+        #                            r = ValueatRisk(;
+        #                                            alg = DistributionValueatRisk(;
+        #                                                                          dist = TDist(5)),),
+        #                            opt = opt))
+        # @test isapprox(res9.w, res10.w; rtol = 5e-2)
+
+        # res11 = optimise!(MeanRisk(;
+        #                           r = ValueatRiskRange(;
+        #                                           alg = DistributionValueatRisk(;
+        #                                                                         dist = Laplace())),
+        #                           opt = opt))
+        # res12 = optimise!(MeanRisk(;
+        #                            r = ValueatRiskRange(;
+        #                                            alg = DistributionValueatRisk(;
+        #                                                                          dist = TDist(5)),),
+        #                            opt = opt))
+        # @test isapprox(res11.w, res12.w; rtol = 5e-2)
     end
     @testset "Scalarisers" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv)
@@ -1217,7 +1243,10 @@
                ConditionalValueatRisk(), EntropicValueatRisk(),
                ConditionalValueatRiskRange(), EntropicValueatRiskRange(),
                DistributionallyRobustConditionalValueatRisk(; l = 1e-1, r = 1e-3),
-               ValueatRisk()]
+               ValueatRisk(), ValueatRiskRange()
+               #    ValueatRisk(; alg = DistributionValueatRisk())
+               #    ValueatRiskRange(; alg = DistributionValueatRisk())
+               ]
         rs2 = [LowOrderMoment(; mu = 0, w = wp),
                LowOrderMoment(; mu = 0, w = wp,
                               alg = LowOrderDeviation(; alg = SecondLowerMoment())),
@@ -1226,9 +1255,16 @@
                ConditionalValueatRisk(; w = wp), EntropicValueatRisk(; w = wp),
                ConditionalValueatRiskRange(; w = wp), EntropicValueatRiskRange(; w = wp),
                DistributionallyRobustConditionalValueatRisk(; l = 1e-1, r = 1e-3, w = wp),
-               ValueatRisk(; w = wp)]
+               ValueatRisk(; w = wp), ValueatRiskRange(; w = wp)
+               #    ValueatRisk(; alg = DistributionValueatRisk(), w = wp)
+               #    ValueatRiskRange(; alg = DistributionValueatRisk(), w = wp)
+               ]
         for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
-            res1, res2 = if isa(r1, ValueatRisk)
+            res1, res2 = if isa(r1,
+                                Union{<:ValueatRiskValueatRisk{<:Any, <:Any, <:Any,
+                                                               <:MIPValueatRisk},
+                                      <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
+                                                         <:MIPValueatRisk}})
                 optimise!(MeanRisk(; r = r1, opt = mip_opt)),
                 optimise!(MeanRisk(; r = r2, opt = mip_opt))
             else
@@ -1254,3 +1290,13 @@
         end
     end
 end
+
+# opt = JuMPOptimiser(; pe = pr, slv = slv)
+# mip_opt = JuMPOptimiser(; pe = pr, slv = mip_slv)
+
+# res1 = optimise!(MeanRisk(; r = ValueatRisk(), opt = mip_opt))
+# res2 = optimise!(MeanRisk(; r = ValueatRisk(; alg = DistributionValueatRisk()), opt = opt))
+
+# res3 = optimise!(MeanRisk(; r = ValueatRiskRange(), opt = mip_opt))
+# res4 = optimise!(MeanRisk(; r = ValueatRiskRange(; alg = DistributionValueatRisk()),
+#                           opt = opt))
