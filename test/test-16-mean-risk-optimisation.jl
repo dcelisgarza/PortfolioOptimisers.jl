@@ -195,17 +195,7 @@
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
             res = optimise!(mr, rd)
             @test isa(res.retcode, OptimisationSuccess)
-            rtol = if i ∈ (27, 59, 60, 163, 168, 189, 192, 194)
-                5e-4
-            elseif i ∈ (123, 126, 187, 190, 195) || Sys.isapple() && i == 60
-                5e-3
-            elseif i ∈ (126, 129)
-                1e-3
-            elseif i == 198
-                5e-2
-            else
-                1e-4
-            end
+            rtol = 1e-6
             success = isapprox(res.w, df[!, i]; rtol = rtol)
             if !success
                 println("Counter: $i")
@@ -1261,8 +1251,7 @@
                ]
         for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
             res1, res2 = if isa(r1,
-                                Union{<:ValueatRiskValueatRisk{<:Any, <:Any, <:Any,
-                                                               <:MIPValueatRisk},
+                                Union{<:ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
                                       <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                          <:MIPValueatRisk}})
                 optimise!(MeanRisk(; r = r1, opt = mip_opt)),
