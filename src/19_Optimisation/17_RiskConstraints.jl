@@ -682,6 +682,17 @@ end
 function compute_value_at_risk_z(::Laplace, alpha::Real)
     return -log(2 * alpha) / sqrt(2)
 end
+function compute_value_at_risk_cz(dist::Normal, alpha::Real)
+    return quantile(dist, alpha)
+end
+function compute_value_at_risk_cz(dist::TDist, alpha::Real)
+    d = dof(dist)
+    @argcheck(d > 2)
+    return quantile(dist, alpha) * sqrt((d - 2) / d)
+end
+function compute_value_at_risk_cz(::Laplace, alpha::Real)
+    return -log(2 * (one(alpha) - alpha)) / sqrt(2)
+end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any,
                                               <:DistributionValueatRisk},
@@ -710,18 +721,22 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                args...; kwargs...)
     alg = r.alg
+    mu = nothing_scalar_array_factory(alg.mu, pr.mu)
     G = isnothing(alg.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(alg.sigma).U
     w = model[:w]
     sc = model[:sc]
     dist = r.alg.dist
     z_l = compute_value_at_risk_z(dist, r.alpha)
-    z_h = compute_value_at_risk_z(dist, r.beta)
+    z_h = compute_value_at_risk_cz(dist, r.beta)
     key = Symbol(:var_range_risk_, i)
-    g_var = model[Symbol(:g_var_, i)] = @variable(model)
+    g_var = model[Symbol(:g_var_range_, i)] = @variable(model)
+    var_range_mu = model[Symbol(:var_range_mu_, i)] = @expression(model, dot(mu, w))
     var_risk_l, var_risk_h = model[Symbol(:var_risk_l_, i)], model[Symbol(:var_risk_h_, i)] = @expressions(model,
                                                                                                            begin
+                                                                                                               -var_range_mu +
                                                                                                                z_l *
                                                                                                                g_var
+                                                                                                               -var_range_mu +
                                                                                                                z_h *
                                                                                                                g_var
                                                                                                            end)
