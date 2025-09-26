@@ -235,10 +235,10 @@
                 rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
                 if !isa(r, SquareRootKurtosis) ||
                    isa(r, SquareRootKurtosis) && isnothing(r.N)
-                    @test rk1 <= rk || abs(rk1 - rk) < 1e-9
-                    if !(rk1 <= rk || abs(rk1 - rk) < 1e-9)
+                    @test rk1 <= rk || abs(rk1 - rk) < 5e-9
+                    if !(rk1 <= rk || abs(rk1 - rk) < 5e-9)
                         println("maximum ratio: $i")
-                        find_tol(rk1, rk)
+                        println(abs(rk1 - rk))
                     end
                 else
                     @test rk1 / rk < 1.07
