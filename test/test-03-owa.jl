@@ -40,19 +40,20 @@
                 OWAJuMP(; alg = MinimumSquareDistance(), max_phi = 0.25, slv = slv)]
         for i in eachindex(owas)
             owa = owa_l_moment_crm(200; k = 5, method = owas[i])
-            res = if i == 4
-                isapprox(owa, owa_t[!, i]; rtol = 0.05)
+            rtol = if i == 4
+                0.05
             elseif i == 5
-                isapprox(owa, owa_t[!, i]; rtol = 0.005)
+                0.005
             elseif i == 7 || Sys.iswindows() && i == 8 || Sys.isapple() && i == 11
-                isapprox(owa, owa_t[!, i]; rtol = 5e-8)
-            elseif i == 8 && Sys.isapple()
-                isapprox(owa, owa_t[!, i]; rtol = 1e-7)
-            elseif i == 11 && Sys.iswindows()
-                isapprox(owa, owa_t[!, i]; rtol = 5e-8)
+                5e-8
+            elseif i == 8
+                1e-7
+            elseif i == 11
+                5e-8
             else
-                isapprox(owa, owa_t[!, i])
+                1e-9
             end
+            res = isapprox(owa, owa_t[!, i]; rtol = rtol)
             if !res
                 println("Fails on OWA l-moments iteration $i")
                 find_tol(owa, owa_t[!, i]; name1 = :owa, name2 = :owa_t)

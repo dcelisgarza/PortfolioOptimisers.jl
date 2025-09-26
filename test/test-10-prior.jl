@@ -547,14 +547,14 @@
                                                  cvar_views = cvar_views), rd).w,
                        rtol = 5e-5)
 
-        cvar_views = LinearConstraintEstimator(; val = ["AAPL == 0.07", "XOM==0.02"])
+        cvar_views = LinearConstraintEstimator(; val = ["AAPL == 0.06", "XOM==0.04"])
         pr = prior(HighOrderPriorEstimator(;
                                            pe = EntropyPoolingPrior(; sets = sets,
                                                                     alg = H2_EntropyPooling(),
                                                                     cvar_views = cvar_views)),
                    rd)
-        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.07, rtol = 1e-5)
-        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.02, rtol = 1e-4)
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.06, rtol = 1e-5)
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.04, rtol = 1e-4)
         @test isapprox(pr.w,
                        prior(HighOrderPriorEstimator(;
                                                      pe = EntropyPoolingPrior(; sets = sets,
@@ -814,14 +814,14 @@
                                                  cvar_views = cvar_views), rd).w,
                        rtol = 1e-5)
 
-        cvar_views = LinearConstraintEstimator(; val = ["AAPL == 0.07", "XOM==0.02"])
+        cvar_views = LinearConstraintEstimator(; val = ["AAPL == 0.06", "XOM==0.04"])
         pr = prior(HighOrderPriorEstimator(;
                                            pe = EntropyPoolingPrior(; sets = sets,
                                                                     alg = H2_EntropyPooling(),
                                                                     cvar_views = cvar_views,
                                                                     opt = opt)), rd)
-        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.07, rtol = 1e-5)
-        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.02, rtol = 1e-4)
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.06, rtol = 1e-5)
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.04, rtol = 1e-4)
         @test isapprox(pr.w,
                        prior(HighOrderPriorEstimator(;
                                                      pe = EntropyPoolingPrior(; sets = sets,
