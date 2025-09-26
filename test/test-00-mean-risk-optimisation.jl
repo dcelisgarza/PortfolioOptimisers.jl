@@ -237,11 +237,14 @@
                 rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
                 if !isa(r, SquareRootKurtosis) ||
                    isa(r, SquareRootKurtosis) && isnothing(r.N)
-                    if i in Sys.isapple() && (203, 204)
-                        @test abs(rk1 - rk) < 0.00022
-                    else
-                        @test rk1 <= rk || abs(rk1 - rk) < 1e-10
+                    res = rk1 <= rk || abs(rk1 - rk) < 1e-10
+                    if !res
+                        println("Fails on MeanRisk MaximumRatio iteration $i")
+                        find_tol(rk1, rk; name1 = :rk1, name2 = :rk)
+                        println(rk1 - rk)
+                        println(rk1 / rk)
                     end
+                    @test res
                 else
                     @test rk1 / rk < 1.07
                 end
