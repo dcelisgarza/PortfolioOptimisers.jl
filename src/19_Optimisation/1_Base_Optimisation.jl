@@ -4,6 +4,9 @@ abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
 abstract type OptimisationAlgorithm <: AbstractAlgorithm end
 abstract type OptimisationResult <: AbstractResult end
 abstract type OptimisationReturnCode <: AbstractResult end
+abstract type CrossValidationEstimator <: AbstractEstimator end
+abstract type CrossValidationResult <: AbstractResult end
+abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
 struct OptimisationSuccess{T1} <: OptimisationReturnCode
     res::T1
 end
@@ -39,6 +42,13 @@ end
 function assert_external_optimiser(::OptimisationResult)
     return nothing
 end
-function efficient_frontier! end
+function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::ReturnsResult,
+                                         wi::AbstractMatrix, pr::AbstractPriorResult,
+                                         resi::AbstractVector{<:OptimisationResult};
+                                         kwargs...)
+    iv = isnothing(rd.iv) ? nothing : rd.iv * wi
+    ivpa = (isnothing(rd.ivpa) || isa(rd.ivpa, Real)) ? rd.ivpa : transpose(wi) * rd.ivpa
+    return pr.X * wi, rd.F, rd.ts, iv, ivpa
+end
 
-export optimise!, efficient_frontier!, OptimisationSuccess, OptimisationFailure
+export optimise!, OptimisationSuccess, OptimisationFailure
