@@ -1,6 +1,6 @@
 using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
-      Handcalcs, StatsBase
+      Handcalcs, StatsBase, DocumenterVitepress
 
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers);
                     recursive = true)
@@ -67,8 +67,8 @@ makedocs(; #modules = [PortfolioOptimisers],
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
          sitename = "PortfolioOptimisers.jl",
-         format = Documenter.HTML(;
-                                  canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl"),
+         format = DocumenterVitepress.MarkdownVitepress(;
+                                                        repo = "https://dcelisgarza.github.io/PortfolioOptimisers.jl"),
          pages = ["index.md";
                   "Examples" => examples_nav;
                   numbered_pages[47:end];
@@ -84,4 +84,8 @@ makedocs(; #modules = [PortfolioOptimisers],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 
-deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl")
+DocumenterVitepress.deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl",
+                               target = "build", devbranch = "main", branch = "gh-pages",
+                               push_preview = true)
+
+# ~/docs $ npm run docs:dev
