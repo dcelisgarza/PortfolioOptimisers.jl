@@ -4,6 +4,8 @@ import mathjax3 from "markdown-it-mathjax3";
 import footnote from "markdown-it-footnote";
 import path from 'path'
 
+// console.log(process.env)
+
 function getBaseRepository(base: string): string {
     if (!base || base === '/') return '/';
     const parts = base.split('/').filter(Boolean);
@@ -21,25 +23,24 @@ const navTemp = {
 const nav = [
     ...navTemp.nav,
     {
-        component: 'VersionPicker'
+        component: 'VersionPicker',
     }
 ]
-
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-    base: 'REPLACE_ME_DOCUMENTER_VITEPRESS',// TODO: replace this in makedocs!
+    base: 'REPLACE_ME_DOCUMENTER_VITEPRESS', // TODO: replace this in makedocs!
     title: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
     description: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
     lastUpdated: true,
     cleanUrls: true,
     outDir: 'REPLACE_ME_DOCUMENTER_VITEPRESS', // This is required for MarkdownVitepress to work correctly...
+
     head: [
         ['link', { rel: 'icon', href: 'REPLACE_ME_DOCUMENTER_VITEPRESS_FAVICON' }],
         ['script', { src: `${getBaseRepository(baseTemp.base)}versions.js` }],
         // ['script', {src: '/versions.js'], for custom domains, I guess if deploy_url is available.
         ['script', { src: `${baseTemp.base}siteinfo.js` }]
     ],
-
     vite: {
         define: {
             __DEPLOY_ABSPATH__: JSON.stringify('REPLACE_ME_DOCUMENTER_VITEPRESS_DEPLOY_ABSPATH'),
@@ -67,6 +68,7 @@ export default defineConfig({
             ],
         },
     },
+
     markdown: {
         math: true,
         config(md) {
@@ -77,10 +79,11 @@ export default defineConfig({
         theme: {
             light: "github-light",
             dark: "github-dark"
-        }
+        },
     },
     themeConfig: {
         outline: 'deep',
+        // https://vitepress.dev/reference/default-theme-config
         logo: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
         search: {
             provider: 'local',
@@ -92,11 +95,11 @@ export default defineConfig({
         sidebar: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
         editLink: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
         socialLinks: [
-            { icon: 'github', link: 'REPLACE_ME_DOCUMENTER_VITEPRESS' }
+            { icon: 'slack', link: 'https://julialang.org/slack/' }
         ],
         footer: {
-            message: 'Made with <a href="https://luxdl.github.io/DocumenterVitepress.jl/dev/" target="_blank"><strong>DocumenterVitepress.jl</strong></a><br>',
+            message: 'Made with <a href="https://documenter.juliadocs.org/stable/" target="_blank"><strong>Documenter.jl</strong></a>, <a href="https://vitepress.dev" target="_blank"><strong>VitePress</strong></a> and <a href="https://luxdl.github.io/DocumenterVitepress.jl/stable/" target="_blank"><strong>DocumenterVitepress.jl</strong></a> <br>',
             copyright: `© Copyright ${new Date().getUTCFullYear()}.`
-        }
+        },
     }
 })
