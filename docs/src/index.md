@@ -1,3 +1,28 @@
+```@raw html
+---
+# https://vitepress.dev/reference/default-theme-home-page
+layout: home
+
+hero:
+  name: "PortfolioOptimisers.jl"
+  text:
+  tagline: 🦍🤝💪 💎🙌 🚀🌕.
+  image:
+    src: logo.svg
+    alt: PortfolioOptimisers
+  actions:
+    - theme: brand
+      text: Get Started
+      link: examples/1-Getting-Started
+    - theme: alt
+      text: View on Github
+      link: https://github.com/dcelisgarza/PortfolioOptimisers.jl
+    - theme: alt
+      text: API
+      link: 001-Base
+---
+```
+
 ```@meta
 CurrentModule = PortfolioOptimisers
 ```
@@ -28,3 +53,5 @@ There are three overarching design choices in `PortfolioOptimisers.jl`:
      5. we try to keep the most basal parameters in the most basal data structures, improving code reusability and maintainability, reduces the memory footprint, and allows for more flexibility.
 
 These design choices increase initial usage and development friction by raising the skill floor and lowering convenience, but ensures correctness, robustness, performance, and maintainability.
+
+:gorilla: 

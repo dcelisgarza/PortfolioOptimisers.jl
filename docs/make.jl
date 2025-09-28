@@ -43,7 +43,7 @@ build_path_md = joinpath(@__DIR__, "src", "examples/")
 files = readdir(example_path)
 code_files = filter(x -> endswith(x, ".jl"), files)
 data_files = filter(x -> (endswith(x, ".csv") || endswith(x, ".csv.gz")), files)
-examples_nav = fix_suffix_md.("./examples/" .* code_files)
+examples_nav = fix_suffix_md.("examples/" .* code_files)
 
 for file in data_files
     cp(joinpath(@__DIR__, "../examples/" * file),
