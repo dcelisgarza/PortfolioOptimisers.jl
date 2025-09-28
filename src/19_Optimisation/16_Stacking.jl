@@ -82,7 +82,7 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
         wi[:, i] = res.w
         resi[i] = res
     end
-    X, F, ts, iv, ivpa = predict_outer_estimator_returns(st, rd, wi, pr, resi)
+    X, F, ts, iv, ivpa = predict_outer_estimator_returns(st, rd, pr, wi, resi)
     rdo = ReturnsResult(; nx = ["_$i" for i in 1:Ni], X = X, nf = rd.nf, F = F, ts = ts,
                         iv = iv, ivpa = ivpa)
     reso = optimise!(st.opto, rdo; dims = dims, branchorder = branchorder,

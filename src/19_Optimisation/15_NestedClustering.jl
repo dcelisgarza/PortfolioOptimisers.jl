@@ -185,7 +185,7 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
             resi[i] = res
         end
     end
-    X, F, ts, iv, ivpa = predict_outer_estimator_returns(nco, rd, wi, pr, resi; cls = cls)
+    X, F, ts, iv, ivpa = predict_outer_estimator_returns(nco, rd, pr, wi, resi; cls = cls)
     rdo = ReturnsResult(; nx = ["_$i" for i in 1:(clr.k)], X = X, nf = rd.nf, F = F,
                         ts = ts, iv = iv, ivpa = ivpa)
     reso = optimise!(nco.opto, rdo; dims = dims, branchorder = branchorder,
