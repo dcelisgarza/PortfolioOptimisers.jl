@@ -1,4 +1,3 @@
-
 @safetestset "Factor risk contribution" begin
     using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)

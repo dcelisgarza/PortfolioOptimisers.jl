@@ -634,10 +634,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                      s * T) <=
                                                                                     0
                                                                                     sc *
+                                                                                    sc *
                                                                                     (sum(z_var_h) -
                                                                                      beta *
                                                                                      T +
-                                                                                     s * T) >=
+                                                                                     s * T) <=
                                                                                     0
                                                                                 end)
     else
@@ -656,7 +657,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                          z_var_h) -
                                                                                      beta *
                                                                                      sw +
-                                                                                     s * sw) >=
+                                                                                     s * sw) <=
                                                                                     0
                                                                                 end)
     end
