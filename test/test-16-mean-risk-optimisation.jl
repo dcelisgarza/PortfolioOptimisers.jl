@@ -192,7 +192,7 @@
               ValueatRiskRange(; alg = DistributionValueatRisk())]
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
-        for r in rs[(end - 1):end], obj in objs, ret in rets
+        for r in rs, obj in objs, ret in rets
             opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
             res = optimise!(mr, rd)
