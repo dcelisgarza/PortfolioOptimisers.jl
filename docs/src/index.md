@@ -53,5 +53,3 @@ There are three overarching design choices in `PortfolioOptimisers.jl`:
      5. we try to keep the most basal parameters in the most basal data structures, improving code reusability and maintainability, reduces the memory footprint, and allows for more flexibility.
 
 These design choices increase initial usage and development friction by raising the skill floor and lowering convenience, but ensures correctness, robustness, performance, and maintainability.
-
-:gorilla: 

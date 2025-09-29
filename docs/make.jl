@@ -71,7 +71,6 @@ makedocs(; #modules = [PortfolioOptimisers],
                                                         repo = "https://dcelisgarza.github.io/PortfolioOptimisers.jl"),
          pages = ["index.md";
                   "Examples" => examples_nav;
-                  numbered_pages[47:end];
                   "API" => [numbered_pages[1:6];
                             "Moments" => numbered_pages[7:27];
                             "Distance" => numbered_pages[28:32];
@@ -80,7 +79,9 @@ makedocs(; #modules = [PortfolioOptimisers],
                             "Phylogeny" => numbered_pages[35:39];
                             "Constraint Generation" => numbered_pages[40:44];
                             "Prior" => numbered_pages[45];
-                            "Optimisation" => numbered_pages[46]]],
+                            "Optimisation" => numbered_pages[46]];
+                  numbered_pages[end];
+                  "Contribute" => numbered_pages[47:(end - 1)]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 
