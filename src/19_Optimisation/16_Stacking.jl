@@ -92,6 +92,7 @@ function optimise!(st::Stacking, rd::ReturnsResult = ReturnsResult(); dims::Int 
     return if isa(retcode, OptimisationSuccess) || isnothing(st.fallback)
         StackingOptimisation(typeof(st), pr, wb, resi, reso, st.cv, retcode, w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(st.fallback, rd; dims = dims, branchorder = branchorder,
                   str_names = str_names, save = save, kwargs...)
     end

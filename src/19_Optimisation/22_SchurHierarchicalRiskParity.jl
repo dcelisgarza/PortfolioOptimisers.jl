@@ -238,6 +238,7 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
     return if isa(retcode, OptimisationSuccess) || isnothing(sh.fallback)
         SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gamma, retcode, w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(sh.fallback, rd; dims = dims, kwargs...)
     end
 end
@@ -260,6 +261,7 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
     return if isa(retcode, OptimisationSuccess) || isnothing(sh.fallback)
         SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gammas, retcode, w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(sh.fallback, rd; dims = dims, kwargs...)
     end
 end

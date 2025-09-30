@@ -76,6 +76,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     return if isa(retcode, OptimisationSuccess) || isnothing(hrp.fallback)
         HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(hrp.fallback, rd; dims = dims, kwargs...)
     end
 end
@@ -177,6 +178,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any,
     return if isa(retcode, OptimisationSuccess) || isnothing(hrp.fallback)
         HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(hrp.fallback, rd; dims = dims, kwargs...)
     end
 end

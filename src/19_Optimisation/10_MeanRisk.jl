@@ -245,6 +245,7 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
                                                           ret), retcode, sol,
                          ifelse(save, model, nothing))
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(mr.fallback, rd; dims = dims, str_names = str_names, save = save,
                   kwargs...)
     end

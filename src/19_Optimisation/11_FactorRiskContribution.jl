@@ -117,6 +117,7 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                                frc_nplg, frc_cplg, retcode, sol,
                                                ifelse(save, model, nothing))
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(frc.fallback, rd; dims = dims, str_names = str_names, save = save,
                   kwargs...)
     end

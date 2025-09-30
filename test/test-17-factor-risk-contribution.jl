@@ -69,4 +69,16 @@
     @test rkc[2] >= -0.07
     @test rkc[5] <= 0.74
     @test isapprox(rkc[1], 0.09, rtol = 5e-5)
+
+    res = optimise!(FactorRiskContribution(; r = [ConditionalValueatRisk(), Variance()],
+                                           wi = range(; start = inv(size(rd.F, 2)),
+                                                      stop = inv(size(rd.F, 2)),
+                                                      length = size(rd.F, 2)),
+                                           opt = JuMPOptimiser(; pe = pr,
+                                                               slv = Solver(;
+                                                                            solver = Clarabel.Optimizer,
+                                                                            settings = ["verbose" => false,
+                                                                                        "max_iter" => 1])),
+                                           fallback = InverseVolatility(; pe = pr)), rd)
+    @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
 end

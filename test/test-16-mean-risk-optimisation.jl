@@ -215,6 +215,8 @@
                 1e-3
             elseif i in (198, 210)
                 5e-2
+            elseif i == 208
+                1e-4
             else
                 1e-6
             end
@@ -255,6 +257,14 @@
             end
             i += 1
         end
+        res = optimise!(MeanRisk(; wi = w0,
+                                 opt = JuMPOptimiser(; pe = pr,
+                                                     slv = Solver(;
+                                                                  solver = Clarabel.Optimizer,
+                                                                  settings = ["verbose" => false,
+                                                                              "max_iter" => 1])),
+                                 fallback = InverseVolatility(; pe = pr)))
+        @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
     end
     @testset "Formulations" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv)

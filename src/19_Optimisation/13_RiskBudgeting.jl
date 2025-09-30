@@ -139,6 +139,7 @@ function optimise!(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
                                                                        ret), prb, retcode,
                                       sol, ifelse(save, model, nothing))
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(rb.fallback, rd; dims = dims, str_names = str_names, save = save,
                   kwargs...)
     end

@@ -481,6 +481,7 @@ function optimise!(hec::HierarchicalEqualRiskContribution,
     return if isa(retcode, OptimisationSuccess) || isnothing(hec.fallback)
         HierarchicalOptimisation(typeof(hec), pr, fees, wb, clr, retcode, w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(hec.fallback, rd; dims = dims, kwargs...)
     end
 end

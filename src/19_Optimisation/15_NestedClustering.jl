@@ -197,6 +197,7 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
         NestedClusteringOptimisation(typeof(nco), pr, wb, clr, resi, reso, nco.cv, retcode,
                                      w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(nco.fallback, rd; dims = dims, branchorder = branchorder,
                   str_names = str_names, save = save, kwargs...)
     end

@@ -502,8 +502,6 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing; rd = rd)
     scalarise_risk_expression!(model, opt.sce)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
-    # set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
-    # retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return if isa(retcode, OptimisationSuccess) || isnothing(noc.fallback)
@@ -526,6 +524,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                          noc_retcode, retcode, sol,
                                          ifelse(save, model, nothing))
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(noc.fallback, rd; dims = dims, str_names = str_names, save = save,
                   kwargs...)
     end
@@ -564,8 +563,6 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_sdp_phylogeny_constraints!(model, opt.nplg, :sdp_nplg)
     set_sdp_phylogeny_constraints!(model, opt.cplg, :sdp_cplg)
     add_custom_constraint!(model, opt.ccnt, opt, opt.pe)
-    # set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
-    # retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, rt_min, rt_max, w_min,
                                   w_max, Val(haskey(model, :ret_frontier)),
                                   Val(haskey(model, :risk_frontier)))
@@ -590,6 +587,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                          noc_retcode, retcode, sol,
                                          ifelse(save, model, nothing))
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(noc.fallback, rd; dims = dims, str_names = str_names, save = save,
                   kwargs...)
     end
