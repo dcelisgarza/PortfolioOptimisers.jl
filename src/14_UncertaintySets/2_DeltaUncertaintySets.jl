@@ -2,6 +2,11 @@ struct DeltaUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetEstimator
     pe::T1
     dmu::T2
     dsigma::T3
+    function DeltaUncertaintySet(pe::AbstractPriorEstimator, dmu::Real, dsigma::Real)
+        @argcheck(dmu >= 0.0)
+        @argcheck(dsigma >= 0.0)
+        return new{typeof(pe), typeof(dmu), typeof(dsigma)}(pe, dmu, dsigma)
+    end
 end
 function DeltaUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
                              dmu::Real = 0.1, dsigma::Real = 0.1)

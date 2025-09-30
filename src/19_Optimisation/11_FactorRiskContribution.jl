@@ -10,6 +10,41 @@ struct FactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     wi::T8
     flag::T9
     fallback::T10
+    function FactorRiskContribution(opt::JuMPOptimiser,
+                                    re::Union{<:Regression, <:AbstractRegressionEstimator},
+                                    r::Union{<:RiskMeasure,
+                                             <:AbstractVector{<:RiskMeasure}},
+                                    obj::ObjectiveFunction,
+                                    nplg::Union{Nothing, <:SemiDefinitePhylogenyEstimator,
+                                                <:SemiDefinitePhylogeny},
+                                    cplg::Union{Nothing, <:SemiDefinitePhylogenyEstimator,
+                                                <:SemiDefinitePhylogeny},
+                                    sets::Union{Nothing, <:AssetSets},
+                                    wi::Union{Nothing, <:AbstractVector{<:Real}},
+                                    flag::Bool,
+                                    fallback::Union{Nothing, <:OptimisationEstimator})
+        if isa(r, AbstractVector)
+            @argcheck(!isempty(r))
+        end
+        if isa(wi, AbstractVector)
+            @argcheck(!isempty(wi))
+        end
+        @argcheck(!isa(opt.nplg,
+                       Union{<:SemiDefinitePhylogenyEstimator, <:SemiDefinitePhylogeny}))
+        @argcheck(!isa(opt.cplg,
+                       Union{<:SemiDefinitePhylogenyEstimator, <:SemiDefinitePhylogeny}))
+        return new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(nplg),
+                   typeof(cplg), typeof(sets), typeof(wi), typeof(flag), typeof(fallback)}(opt,
+                                                                                           re,
+                                                                                           r,
+                                                                                           obj,
+                                                                                           nplg,
+                                                                                           cplg,
+                                                                                           sets,
+                                                                                           wi,
+                                                                                           flag,
+                                                                                           fallback)
+    end
 end
 function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 re::Union{<:Regression, <:AbstractRegressionEstimator} = StepwiseRegression(),
@@ -23,16 +58,6 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                                 flag::Bool = true,
                                 fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    if isa(r, AbstractVector)
-        @argcheck(!isempty(r))
-    end
-    if isa(wi, AbstractVector)
-        @argcheck(!isempty(wi))
-    end
-    @argcheck(!isa(opt.nplg,
-                   Union{<:SemiDefinitePhylogenyEstimator, <:SemiDefinitePhylogeny}))
-    @argcheck(!isa(opt.cplg,
-                   Union{<:SemiDefinitePhylogenyEstimator, <:SemiDefinitePhylogeny}))
     return FactorRiskContribution(opt, re, r, obj, nplg, cplg, sets, wi, flag, fallback)
 end
 function opt_view(frc::FactorRiskContribution, i::AbstractVector, X::AbstractMatrix)

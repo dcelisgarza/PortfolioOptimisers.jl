@@ -55,11 +55,15 @@ struct LTDCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ve::T1
     alpha::T2
     threads::T3
+    function LTDCovariance(ve::AbstractVarianceEstimator, alpha::Real,
+                           threads::FLoops.Transducers.Executor)
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        return new{typeof(ve), typeof(alpha), typeof(threads)}(ve, alpha, threads)
+    end
 end
 function LTDCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                        alpha::Real = 0.05,
                        threads::FLoops.Transducers.Executor = ThreadedEx())
-    @argcheck(zero(alpha) < alpha < one(alpha))
     return LTDCovariance(ve, alpha, threads)
 end
 function factory(ce::LTDCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)

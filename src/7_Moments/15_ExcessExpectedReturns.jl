@@ -42,6 +42,9 @@ ExcessExpectedReturns
 struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
     me::T1
     rf::T2
+    function ExcessExpectedReturns(me::AbstractExpectedReturnsEstimator, rf::Real)
+        return new{typeof(me), typeof(rf)}(me, rf)
+    end
 end
 function ExcessExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),

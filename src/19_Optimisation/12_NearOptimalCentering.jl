@@ -35,6 +35,61 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
     ucs_flag::T11
     alg::T12
     fallback::T13
+    function NearOptimalCentering(opt::JuMPOptimiser,
+                                  r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+                                  obj::Union{Nothing, <:ObjectiveFunction},
+                                  bins::Union{Nothing, <:Real},
+                                  w_min::Union{Nothing, <:AbstractVector{<:Real}},
+                                  w_min_ini::Union{Nothing, <:AbstractVector{<:Real}},
+                                  w_opt::Union{Nothing, <:AbstractVector},
+                                  w_opt_ini::Union{Nothing, <:AbstractVector},
+                                  w_max::Union{Nothing, <:AbstractVector{<:Real}},
+                                  w_max_ini::Union{Nothing, <:AbstractVector{<:Real}},
+                                  ucs_flag::Bool, alg::NearOptimalCenteringAlgorithm,
+                                  fallback::Union{Nothing, <:OptimisationEstimator})
+        if isa(r, AbstractVector)
+            @argcheck(!isempty(r))
+            @argcheck(!any(x -> isa(x, QuadExpressionRiskMeasures), r))
+        else
+            @argcheck(!isa(r, QuadExpressionRiskMeasures))
+        end
+        if isa(w_min, AbstractVector)
+            @argcheck(!isempty(w_min))
+        end
+        if isa(w_min_ini, AbstractVector)
+            @argcheck(!isempty(w_min_ini))
+        end
+        if isa(w_opt, AbstractVector)
+            @argcheck(!isempty(w_opt))
+        end
+        if isa(w_opt_ini, AbstractVector)
+            @argcheck(!isempty(w_opt_ini))
+        end
+        if isa(w_max, AbstractVector)
+            @argcheck(!isempty(w_max))
+        end
+        if isa(w_max_ini, AbstractVector)
+            @argcheck(!isempty(w_max_ini))
+        end
+        if isa(bins, Real)
+            @argcheck(isfinite(bins) && bins > 0)
+        end
+        return new{typeof(opt), typeof(r), typeof(obj), typeof(bins), typeof(w_min),
+                   typeof(w_min_ini), typeof(w_opt), typeof(w_opt_ini), typeof(w_max),
+                   typeof(w_max_ini), typeof(ucs_flag), typeof(alg), typeof(fallback)}(opt,
+                                                                                       r,
+                                                                                       obj,
+                                                                                       bins,
+                                                                                       w_min,
+                                                                                       w_min_ini,
+                                                                                       w_opt,
+                                                                                       w_opt_ini,
+                                                                                       w_max,
+                                                                                       w_max_ini,
+                                                                                       ucs_flag,
+                                                                                       alg,
+                                                                                       fallback)
+    end
 end
 function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
@@ -49,33 +104,6 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               ucs_flag::Bool = true,
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
                               fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    if isa(r, AbstractVector)
-        @argcheck(!isempty(r))
-        @argcheck(!any(x -> isa(x, QuadExpressionRiskMeasures), r))
-    else
-        @argcheck(!isa(r, QuadExpressionRiskMeasures))
-    end
-    if isa(w_min, AbstractVector)
-        @argcheck(!isempty(w_min))
-    end
-    if isa(w_min_ini, AbstractVector)
-        @argcheck(!isempty(w_min_ini))
-    end
-    if isa(w_opt, AbstractVector)
-        @argcheck(!isempty(w_opt))
-    end
-    if isa(w_opt_ini, AbstractVector)
-        @argcheck(!isempty(w_opt_ini))
-    end
-    if isa(w_max, AbstractVector)
-        @argcheck(!isempty(w_max))
-    end
-    if isa(w_max_ini, AbstractVector)
-        @argcheck(!isempty(w_max_ini))
-    end
-    if isa(bins, Real)
-        @argcheck(isfinite(bins) && bins > 0)
-    end
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fallback)
 end

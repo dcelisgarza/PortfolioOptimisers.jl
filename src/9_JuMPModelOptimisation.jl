@@ -72,13 +72,20 @@ struct Solver{T1, T2, T3, T4, T5} <: AbstractEstimator
     settings::T3
     check_sol::T4
     add_bridges::T5
+    function Solver(name::Union{Symbol, <:AbstractString}, solver::Any,
+                    settings::Union{Nothing, <:AbstractDict, <:Pair,
+                                    <:AbstractVector{<:Pair}}, check_sol::NamedTuple,
+                    add_bridges::Bool)
+        if isa(settings, Union{<:AbstractDict, <:AbstractVector})
+            @argcheck(!isempty(settings), IsEmptyError(non_empty_msg("`settings`") * "."))
+        end
+        return new{typeof(name), typeof(solver), typeof(settings), typeof(check_sol),
+                   typeof(add_bridges)}(name, solver, settings, check_sol, add_bridges)
+    end
 end
 function Solver(; name::Union{Symbol, <:AbstractString} = "", solver::Any = nothing,
                 settings::Union{Nothing, <:AbstractDict, <:Pair, <:AbstractVector{<:Pair}} = nothing,
                 check_sol::NamedTuple = (;), add_bridges::Bool = true)
-    if isa(settings, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(settings), IsEmptyError(non_empty_msg("`settings`") * "."))
-    end
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
 
@@ -123,11 +130,14 @@ JuMPResult
 struct JuMPResult{T1, T2} <: AbstractJuMPResult
     trials::T1
     success::T2
+    function JuMPResult(trials::AbstractDict, success::Bool)
+        if !success
+            @warn("Model could not be solved satisfactorily.\n$trials")
+        end
+        return new{typeof(trials), typeof(success)}(trials, success)
+    end
 end
 function JuMPResult(; trials::AbstractDict, success::Bool)
-    if !success
-        @warn("Model could not be solved satisfactorily.\n$trials")
-    end
     return JuMPResult(trials, success)
 end
 

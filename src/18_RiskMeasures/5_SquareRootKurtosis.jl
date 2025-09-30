@@ -5,6 +5,34 @@ struct SquareRootKurtosis{T1, T2, T3, T4, T5, T6} <: SquareRootKurtosisRiskMeasu
     kt::T4
     N::T5
     alg::T6
+    function SquareRootKurtosis(settings::RiskMeasureSettings,
+                                w::Union{Nothing, <:AbstractWeights},
+                                mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                                kt::Union{Nothing, <:AbstractMatrix},
+                                N::Union{Nothing, <:Integer}, alg::AbstractMomentAlgorithm)
+        mu_flag = isa(mu, AbstractVector)
+        kt_flag = isa(kt, AbstractMatrix)
+        if mu_flag
+            @argcheck(!isempty(mu) && all(isfinite, mu))
+        elseif isa(mu, Real)
+            @argcheck(isfinite(mu))
+        end
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        if kt_flag
+            @argcheck(!isempty(kt))
+            assert_matrix_issquare(kt)
+        end
+        if mu_flag && kt_flag
+            @argcheck(length(mu)^2 == size(kt, 2))
+        end
+        if !isnothing(N)
+            @argcheck(N > zero(N))
+        end
+        return new{typeof(settings), typeof(w), typeof(mu), typeof(kt), typeof(N),
+                   typeof(alg)}(settings, w, mu, kt, N, alg)
+    end
 end
 function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                             w::Union{Nothing, <:AbstractWeights} = nothing,
@@ -12,26 +40,6 @@ function SquareRootKurtosis(; settings::RiskMeasureSettings = RiskMeasureSetting
                             kt::Union{Nothing, <:AbstractMatrix} = nothing,
                             N::Union{Nothing, <:Integer} = nothing,
                             alg::AbstractMomentAlgorithm = Full())
-    mu_flag = isa(mu, AbstractVector)
-    kt_flag = isa(kt, AbstractMatrix)
-    if mu_flag
-        @argcheck(!isempty(mu) && all(isfinite, mu))
-    elseif isa(mu, Real)
-        @argcheck(isfinite(mu))
-    end
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
-    if kt_flag
-        @argcheck(!isempty(kt))
-        assert_matrix_issquare(kt)
-    end
-    if mu_flag && kt_flag
-        @argcheck(length(mu)^2 == size(kt, 2))
-    end
-    if !isnothing(N)
-        @argcheck(N > zero(N))
-    end
     return SquareRootKurtosis(settings, w, mu, kt, N, alg)
 end
 function calc_moment_target(::SquareRootKurtosis{<:Any, Nothing, Nothing, <:Any, <:Any,

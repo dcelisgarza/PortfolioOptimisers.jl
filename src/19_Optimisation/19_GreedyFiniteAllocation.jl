@@ -10,6 +10,9 @@ struct GreedyAllocation{T1, T2, T3} <: BaseFiniteAllocationOptimisationEstimator
     unit::T1
     args::T2
     kwargs::T3
+    function GreedyAllocation(unit::Real, args::Tuple, kwargs::NamedTuple)
+        return new{typeof(unit), typeof(args), typeof(kwargs)}(unit, args, kwargs)
+    end
 end
 function GreedyAllocation(; unit::Real = 1, args::Tuple = (), kwargs::NamedTuple = (;))
     return GreedyAllocation(unit, args, kwargs)

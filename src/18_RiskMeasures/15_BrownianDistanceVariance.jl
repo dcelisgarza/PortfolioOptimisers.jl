@@ -5,6 +5,11 @@ struct BrownianDistanceVariance{T1, T2, T3} <: RiskMeasure
     settings::T1
     alg::T2
     algc::T3
+    function BrownianDistanceVariance(settings::RiskMeasureSettings,
+                                      alg::Union{<:RSOCRiskExpr, <:QuadRiskExpr},
+                                      algc::BrownianDistanceVarianceFormulation)
+        return new{typeof(settings), typeof(alg), typeof(algc)}(settings, alg, algc)
+    end
 end
 function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   alg::Union{<:RSOCRiskExpr, <:QuadRiskExpr} = RSOCRiskExpr(),

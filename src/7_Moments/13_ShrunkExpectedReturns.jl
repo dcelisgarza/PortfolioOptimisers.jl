@@ -137,6 +137,9 @@ JamesStein
 """
 struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
     target::T1
+    function JamesStein(target::AbstractShrunkExpectedReturnsTarget)
+        return new{typeof(target)}(target)
+    end
 end
 function JamesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return JamesStein(target)
@@ -182,6 +185,9 @@ BayesStein
 """
 struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
     target::T1
+    function BayesStein(target::AbstractShrunkExpectedReturnsTarget)
+        return new{typeof(target)}(target)
+    end
 end
 function BayesStein(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return BayesStein(target)
@@ -227,6 +233,9 @@ BodnarOkhrinParolya
 """
 struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
     target::T1
+    function BodnarOkhrinParolya(target::AbstractShrunkExpectedReturnsTarget)
+        return new{typeof(target)}(target)
+    end
 end
 function BodnarOkhrinParolya(; target::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return BodnarOkhrinParolya(target)
@@ -297,6 +306,11 @@ struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimat
     me::T1
     ce::T2
     alg::T3
+    function ShrunkExpectedReturns(me::AbstractExpectedReturnsEstimator,
+                                   ce::StatsBase.CovarianceEstimator,
+                                   alg::AbstractShrunkExpectedReturnsAlgorithm)
+        return new{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)
+    end
 end
 function ShrunkExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),

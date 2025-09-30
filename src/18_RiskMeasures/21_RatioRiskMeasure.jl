@@ -1,6 +1,9 @@
 struct RiskRatioRiskMeasure{T1, T2} <: HierarchicalRiskMeasure
     r1::T1
     r2::T2
+    function RiskRatioRiskMeasure(r1::AbstractBaseRiskMeasure, r2::AbstractBaseRiskMeasure)
+        return new{typeof(r1), typeof(r2)}(r1, r2)
+    end
 end
 function RiskRatioRiskMeasure(; r1::AbstractBaseRiskMeasure = Variance(),
                               r2::AbstractBaseRiskMeasure = ConditionalValueatRisk())

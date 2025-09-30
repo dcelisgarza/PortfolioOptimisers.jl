@@ -41,6 +41,9 @@ Distance
 """
 struct Distance{T1} <: AbstractDistanceEstimator
     alg::T1
+    function Distance(alg::AbstractDistanceAlgorithm)
+        return new{typeof(alg)}(alg)
+    end
 end
 function Distance(; alg::AbstractDistanceAlgorithm = SimpleDistance())
     return Distance(alg)

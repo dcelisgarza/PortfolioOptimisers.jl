@@ -1,6 +1,10 @@
 abstract type RiskBudgetingAlgorithm <: OptimisationAlgorithm end
 struct AssetRiskBudgeting{T1} <: RiskBudgetingAlgorithm
     rkb::T1
+    function AssetRiskBudgeting(rkb::Union{Nothing, <:RiskBudgetEstimator,
+                                           <:RiskBudgetResult})
+        return new{typeof(rkb)}(rkb)
+    end
 end
 function AssetRiskBudgeting(;
                             rkb::Union{Nothing, <:RiskBudgetEstimator, <:RiskBudgetResult} = nothing)
@@ -13,6 +17,11 @@ struct FactorRiskBudgeting{T1, T2, T3} <: RiskBudgetingAlgorithm
     re::T1
     rkb::T2
     flag::T3
+    function FactorRiskBudgeting(re::Union{<:Regression, <:AbstractRegressionEstimator},
+                                 rkb::Union{Nothing, <:RiskBudgetEstimator,
+                                            <:RiskBudgetResult}, flag::Bool)
+        return new{typeof(re), typeof(rkb), typeof(flag)}(re, rkb, flag)
+    end
 end
 function FactorRiskBudgeting(;
                              re::Union{<:Regression, <:AbstractRegressionEstimator} = StepwiseRegression(),
@@ -30,21 +39,32 @@ struct RiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     rba::T3
     wi::T4
     fallback::T5
+    function RiskBudgeting(opt::JuMPOptimiser,
+                           r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+                           rba::RiskBudgetingAlgorithm,
+                           wi::Union{Nothing, <:AbstractVector{<:Real}},
+                           fallback::Union{Nothing, <:OptimisationEstimator})
+        if isa(r, AbstractVector)
+            @argcheck(!isempty(r))
+        end
+        if isa(wi, AbstractVector)
+            @argcheck(!isempty(wi))
+        end
+        if isa(rba.rkb, RiskBudgetEstimator)
+            @argcheck(!isnothing(opt.sets))
+        end
+        return new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fallback)}(opt,
+                                                                                      r,
+                                                                                      rba,
+                                                                                      wi,
+                                                                                      fallback)
+    end
 end
 function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                        r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                        wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                        fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    if isa(r, AbstractVector)
-        @argcheck(!isempty(r))
-    end
-    if isa(wi, AbstractVector)
-        @argcheck(!isempty(wi))
-    end
-    if isa(rba.rkb, RiskBudgetEstimator)
-        @argcheck(!isnothing(opt.sets))
-    end
     return RiskBudgeting(opt, r, rba, wi, fallback)
 end
 function opt_view(rb::RiskBudgeting, i::AbstractVector, X::AbstractMatrix)

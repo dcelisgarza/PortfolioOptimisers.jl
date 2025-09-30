@@ -4,6 +4,13 @@ struct FactorPrior{T1, T2, T3, T4, T5} <: AbstractLowOrderPriorEstimator_2_1
     re::T3
     ve::T4
     rsd::T5
+    function FactorPrior(pe::AbstractLowOrderPriorEstimatorMap_2_1,
+                         mp::AbstractMatrixProcessingEstimator,
+                         re::AbstractRegressionEstimator, ve::AbstractVarianceEstimator,
+                         rsd::Bool)
+        return new{typeof(pe), typeof(mp), typeof(re), typeof(ve), typeof(rsd)}(pe, mp, re,
+                                                                                ve, rsd)
+    end
 end
 function FactorPrior(; pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPrior(),
                      mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),

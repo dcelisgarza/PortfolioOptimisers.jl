@@ -191,6 +191,40 @@ struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
     sk::T5
     V::T6
     skmp::T7
+    function HighOrderPrior(pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix},
+                            L2::Union{Nothing, <:AbstractMatrix},
+                            S2::Union{Nothing, <:AbstractMatrix},
+                            sk::Union{Nothing, <:AbstractMatrix},
+                            V::Union{Nothing, <:AbstractMatrix},
+                            skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
+        kt_flag = isa(kt, AbstractMatrix)
+        L2_flag = isa(L2, AbstractMatrix)
+        S2_flag = isa(S2, AbstractMatrix)
+        if kt_flag || L2_flag || S2_flag
+            @argcheck(kt_flag && L2_flag && S2_flag)
+            @argcheck(!isempty(kt) && !isempty(L2) && !isempty(S2))
+            assert_matrix_issquare(kt)
+            N = length(pr.mu)
+            @argcheck(length(pr.mu)^2 == size(kt, 1))
+            @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
+        end
+        sk_flag = isa(sk, AbstractMatrix)
+        V_flag = isa(V, AbstractMatrix)
+        if sk_flag
+            @argcheck(!isempty(sk))
+            @argcheck(length(pr.mu)^2 == size(sk, 2))
+        end
+        if V_flag
+            @argcheck(!isempty(V))
+            assert_matrix_issquare(V)
+        end
+        if sk_flag || V_flag
+            @argcheck(sk_flag && V_flag,
+                      "If either sk or V, is nothing, both must be nothing.")
+        end
+        return new{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk), typeof(V),
+                   typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
+    end
 end
 function HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix},
                         L2::Union{Nothing, <:AbstractMatrix},
@@ -198,30 +232,6 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:Abstract
                         sk::Union{Nothing, <:AbstractMatrix},
                         V::Union{Nothing, <:AbstractMatrix},
                         skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
-    kt_flag = isa(kt, AbstractMatrix)
-    L2_flag = isa(L2, AbstractMatrix)
-    S2_flag = isa(S2, AbstractMatrix)
-    if kt_flag || L2_flag || S2_flag
-        @argcheck(kt_flag && L2_flag && S2_flag)
-        @argcheck(!isempty(kt) && !isempty(L2) && !isempty(S2))
-        assert_matrix_issquare(kt)
-        N = length(pr.mu)
-        @argcheck(length(pr.mu)^2 == size(kt, 1))
-        @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
-    end
-    sk_flag = isa(sk, AbstractMatrix)
-    V_flag = isa(V, AbstractMatrix)
-    if sk_flag
-        @argcheck(!isempty(sk))
-        @argcheck(length(pr.mu)^2 == size(sk, 2))
-    end
-    if V_flag
-        @argcheck(!isempty(V))
-        assert_matrix_issquare(V)
-    end
-    if sk_flag || V_flag
-        @argcheck(sk_flag && V_flag, "If either sk or V, is nothing, both must be nothing.")
-    end
     return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
 end
 function dup_elim_sum_view(args...)
@@ -269,11 +279,11 @@ struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
     pe::T1
     kte::T2
     ske::T3
-end
-function factory(pe::HighOrderPriorEstimator,
-                 w::Union{Nothing, <:AbstractWeights} = nothing)
-    return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
-                                   ske = factory(pe.ske, w))
+    function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2,
+                                     kte::Union{Nothing, <:CokurtosisEstimator},
+                                     ske::Union{Nothing, <:CoskewnessEstimator})
+        return new{typeof(pe), typeof(kte), typeof(ske)}(pe, kte, ske)
+    end
 end
 function HighOrderPriorEstimator(;
                                  pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
@@ -282,6 +292,11 @@ function HighOrderPriorEstimator(;
                                  ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
                                                                                          alg = Full()))
     return HighOrderPriorEstimator(pe, kte, ske)
+end
+function factory(pe::HighOrderPriorEstimator,
+                 w::Union{Nothing, <:AbstractWeights} = nothing)
+    return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
+                                   ske = factory(pe.ske, w))
 end
 function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
     return if sym == :me

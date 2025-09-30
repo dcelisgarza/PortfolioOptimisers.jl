@@ -3,12 +3,17 @@ struct RiskTrackingError{T1, T2, T3, T4} <: AbstractTracking
     r::T2
     err::T3
     alg::T4
+    function RiskTrackingError(tracking::WeightsTracking, r::AbstractBaseRiskMeasure,
+                               err::Real, alg::VariableTracking)
+        @argcheck(isfinite(err) && err >= zero(err))
+        r = no_bounds_no_risk_expr_risk_measure(r)
+        return new{typeof(tracking), typeof(r), typeof(err), typeof(alg)}(tracking, r, err,
+                                                                          alg)
+    end
 end
 function RiskTrackingError(; tracking::WeightsTracking,
                            r::AbstractBaseRiskMeasure = Variance(), err::Real = 0.0,
                            alg::VariableTracking = IndependentVariableTracking())
-    @argcheck(isfinite(err) && err >= zero(err))
-    r = no_bounds_no_risk_expr_risk_measure(r)
     return RiskTrackingError(tracking, r, err, alg)
 end
 function tracking_view(::Nothing, args...)
@@ -33,6 +38,10 @@ struct TrackingRiskMeasure{T1, T2, T3} <: RiskMeasure
     settings::T1
     tracking::T2
     alg::T3
+    function TrackingRiskMeasure(settings::RiskMeasureSettings,
+                                 tracking::AbstractTrackingAlgorithm, alg::NormTracking)
+        return new{typeof(settings), typeof(tracking), typeof(alg)}(settings, tracking, alg)
+    end
 end
 function TrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              tracking::AbstractTrackingAlgorithm,
@@ -60,12 +69,19 @@ struct RiskTrackingRiskMeasure{T1, T2, T3, T4} <: RiskMeasure
     tracking::T2
     r::T3
     alg::T4
+    function RiskTrackingRiskMeasure(settings::RiskMeasureSettings,
+                                     tracking::WeightsTracking, r::AbstractBaseRiskMeasure,
+                                     alg::VariableTracking)
+        r = no_bounds_no_risk_expr_risk_measure(r)
+        return new{typeof(settings), typeof(tracking), typeof(r), typeof(alg)}(settings,
+                                                                               tracking, r,
+                                                                               alg)
+    end
 end
 function RiskTrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  tracking::WeightsTracking,
                                  r::AbstractBaseRiskMeasure = Variance(),
                                  alg::VariableTracking = IndependentVariableTracking())
-    r = no_bounds_no_risk_expr_risk_measure(r)
     return RiskTrackingRiskMeasure(settings, tracking, r, alg)
 end
 function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,

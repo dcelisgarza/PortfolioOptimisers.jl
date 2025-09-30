@@ -1,19 +1,25 @@
 struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
     ucs::T1
     lb::T2
+    function ArithmeticReturn(ucs::Union{Nothing, <:AbstractUncertaintySetResult,
+                                         <:AbstractUncertaintySetEstimator},
+                              lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier})
+        if isa(ucs, EllipseUncertaintySet)
+            @argcheck(isa(ucs,
+                          EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
+        end
+        if isa(lb, Real)
+            @argcheck(isfinite(lb))
+        elseif isa(lb, AbstractVector)
+            @argcheck(!isempty(lb) && all(isfinite, lb))
+        end
+        return new{typeof(ucs), typeof(lb)}(ucs, lb)
+    end
 end
 function ArithmeticReturn(;
                           ucs::Union{Nothing, <:AbstractUncertaintySetResult,
                                      <:AbstractUncertaintySetEstimator} = nothing,
                           lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing)
-    if isa(ucs, EllipseUncertaintySet)
-        @argcheck(isa(ucs, EllipseUncertaintySet{<:Any, <:Any, <:MuEllipseUncertaintySet}))
-    end
-    if isa(lb, Real)
-        @argcheck(isfinite(lb))
-    elseif isa(lb, AbstractVector)
-        @argcheck(!isempty(lb) && all(isfinite, lb))
-    end
     return ArithmeticReturn(ucs, lb)
 end
 function jump_returns_view(r::ArithmeticReturn, i::AbstractVector, args...)
@@ -26,17 +32,21 @@ end
 struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
     w::T1
     lb::T2
+    function KellyReturn(w::Union{Nothing, <:AbstractWeights},
+                         lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier})
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        if isa(lb, Real)
+            @argcheck(isfinite(lb))
+        elseif isa(lb, AbstractVector)
+            @argcheck(!isempty(lb) && all(isfinite, lb))
+        end
+        return new{typeof(w), typeof(lb)}(w, lb)
+    end
 end
 function KellyReturn(; w::Union{Nothing, <:AbstractWeights} = nothing,
                      lb::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing)
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
-    if isa(lb, Real)
-        @argcheck(isfinite(lb))
-    elseif isa(lb, AbstractVector)
-        @argcheck(!isempty(lb) && all(isfinite, lb))
-    end
     return KellyReturn(w, lb)
 end
 function no_bounds_returns_estimator(r::KellyReturn, args...)
@@ -60,19 +70,25 @@ end
 struct MinimumRisk <: ObjectiveFunction end
 struct MaximumUtility{T1} <: ObjectiveFunction
     l::T1
+    function MaximumUtility(l::Real)
+        @argcheck(l >= zero(l))
+        return new{typeof(l)}(l)
+    end
 end
 function MaximumUtility(; l::Real = 2)
-    @argcheck(l >= zero(l))
     return MaximumUtility(l)
 end
 struct MaximumRatio{T1, T2} <: ObjectiveFunction
     rf::T1
     ohf::T2
+    function MaximumRatio(rf::Real, ohf::Union{Nothing, <:Real})
+        if !isnothing(ohf)
+            @argcheck(ohf > zero(ohf))
+        end
+        return new{typeof(rf), typeof(ohf)}(rf, ohf)
+    end
 end
 function MaximumRatio(; rf::Real = 0.0, ohf::Union{Nothing, <:Real} = nothing)
-    if !isnothing(ohf)
-        @argcheck(ohf > zero(ohf))
-    end
     return MaximumRatio(rf, ohf)
 end
 struct MaximumReturn <: ObjectiveFunction end

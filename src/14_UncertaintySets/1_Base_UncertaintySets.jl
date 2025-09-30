@@ -49,10 +49,13 @@ struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
 struct BoxUncertaintySet{T1, T2} <: AbstractUncertaintySetResult
     lb::T1
     ub::T2
+    function BoxUncertaintySet(lb::AbstractArray, ub::AbstractArray)
+        @argcheck(!isempty(lb) && !isempty(ub))
+        @argcheck(size(lb) == size(ub))
+        return new{typeof(lb), typeof(ub)}(lb, ub)
+    end
 end
 function BoxUncertaintySet(; lb::AbstractArray, ub::AbstractArray)
-    @argcheck(!isempty(lb) && !isempty(ub))
-    @argcheck(size(lb) == size(ub))
     return BoxUncertaintySet(lb, ub)
 end
 function ucs_view(risk_ucs::BoxUncertaintySet{<:AbstractVector, <:AbstractVector},
@@ -65,6 +68,9 @@ function ucs_view(risk_ucs::BoxUncertaintySet{<:AbstractMatrix, <:AbstractMatrix
 end
 struct NormalKUncertaintyAlgorithm{T1} <: AbstractUncertaintyKAlgorithm
     kwargs::T1
+    function NormalKUncertaintyAlgorithm(kwargs::NamedTuple)
+        return new{typeof(kwargs)}(kwargs)
+    end
 end
 function NormalKUncertaintyAlgorithm(; kwargs::NamedTuple = (;))
     return NormalKUncertaintyAlgorithm(kwargs)
@@ -88,6 +94,10 @@ end
 struct EllipseUncertaintySetAlgorithm{T1, T2} <: AbstractUncertaintySetAlgorithm
     method::T1
     diagonal::T2
+    function EllipseUncertaintySetAlgorithm(method::Union{<:AbstractUncertaintyKAlgorithm,
+                                                          <:Real}, diagonal::Bool)
+        return new{typeof(method), typeof(diagonal)}(method, diagonal)
+    end
 end
 function EllipseUncertaintySetAlgorithm(;
                                         method::Union{<:AbstractUncertaintyKAlgorithm,
@@ -102,12 +112,16 @@ struct EllipseUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetResult
     sigma::T1
     k::T2
     class::T3
+    function EllipseUncertaintySet(sigma::AbstractMatrix, k::Real,
+                                   class::AbstractEllipseUncertaintySetResultClass)
+        @argcheck(!isempty(sigma))
+        assert_matrix_issquare(sigma)
+        @argcheck(zero(k) < k)
+        return new{typeof(sigma), typeof(k), typeof(class)}(sigma, k, class)
+    end
 end
 function EllipseUncertaintySet(; sigma::AbstractMatrix, k::Real,
                                class::AbstractEllipseUncertaintySetResultClass)
-    @argcheck(!isempty(sigma))
-    assert_matrix_issquare(sigma)
-    @argcheck(zero(k) < k)
     return EllipseUncertaintySet(sigma, k, class)
 end
 function ucs_view(risk_ucs::EllipseUncertaintySet{<:AbstractMatrix, <:Any,

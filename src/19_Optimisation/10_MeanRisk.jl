@@ -4,18 +4,28 @@ struct MeanRisk{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     obj::T3
     wi::T4
     fallback::T5
+    function MeanRisk(opt::JuMPOptimiser,
+                      r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+                      obj::ObjectiveFunction, wi::Union{Nothing, <:AbstractVector{<:Real}},
+                      fallback::Union{Nothing, <:OptimisationEstimator})
+        if isa(r, AbstractVector)
+            @argcheck(!isempty(r))
+        end
+        if isa(wi, AbstractVector)
+            @argcheck(!isempty(wi))
+        end
+        return new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fallback)}(opt,
+                                                                                      r,
+                                                                                      obj,
+                                                                                      wi,
+                                                                                      fallback)
+    end
 end
 function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(),
                   r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(),
                   wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                   fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    if isa(r, AbstractVector)
-        @argcheck(!isempty(r))
-    end
-    if isa(wi, AbstractVector)
-        @argcheck(!isempty(wi))
-    end
     return MeanRisk(opt, r, obj, wi, fallback)
 end
 function opt_view(mr::MeanRisk, i::AbstractVector, X::AbstractMatrix)

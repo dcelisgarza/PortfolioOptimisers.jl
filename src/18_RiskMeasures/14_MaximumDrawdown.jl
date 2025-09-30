@@ -1,5 +1,8 @@
 struct MaximumDrawdown{T1} <: RiskMeasure
     settings::T1
+    function MaximumDrawdown(settings::RiskMeasureSettings)
+        return new{typeof(settings)}(settings)
+    end
 end
 function MaximumDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings())
     return MaximumDrawdown(settings)
@@ -23,6 +26,9 @@ function (::MaximumDrawdown)(x::AbstractVector)
 end
 struct RelativeMaximumDrawdown{T1} <: HierarchicalRiskMeasure
     settings::T1
+    function RelativeMaximumDrawdown(settings::HierarchicalRiskMeasureSettings)
+        return new{typeof(settings)}(settings)
+    end
 end
 function RelativeMaximumDrawdown(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())

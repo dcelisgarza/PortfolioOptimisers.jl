@@ -15,6 +15,9 @@ end
 struct CVaREntropyPooling{T1, T2} <: AbstractEntropyPoolingOptimiser
     args::T1
     kwargs::T2
+    function CVaREntropyPooling(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple = (;))
     return CVaREntropyPooling(args, kwargs)
@@ -25,11 +28,19 @@ struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimise
     sc1::T3
     sc2::T4
     alg::T5
+    function OptimEntropyPooling(args::Tuple, kwargs::NamedTuple, sc1::Real, sc2::Real,
+                                 alg::AbstractEntropyPoolingOptAlgorithm)
+        @argcheck(sc1 >= zero(sc1))
+        return new{typeof(args), typeof(kwargs), typeof(sc1), typeof(sc2), typeof(alg)}(args,
+                                                                                        kwargs,
+                                                                                        sc1,
+                                                                                        sc2,
+                                                                                        alg)
+    end
 end
 function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Real = 1,
                              sc2::Real = 1e3,
                              alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
-    @argcheck(sc1 >= zero(sc1))
     return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
 end
 struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
@@ -38,16 +49,23 @@ struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
     sc2::T3
     so::T4
     alg::T5
+    function JuMPEntropyPooling(slv::Union{<:Solver, <:AbstractVector{<:Solver}}, sc1::Real,
+                                sc2::Real, so::Real,
+                                alg::AbstractEntropyPoolingOptAlgorithm)
+        if isa(slv, AbstractVector)
+            @argcheck(!isempty(slv))
+        end
+        @argcheck(sc1 >= zero(sc1))
+        @argcheck(sc2 >= zero(sc2))
+        @argcheck(so >= zero(so))
+        return new{typeof(slv), typeof(sc1), typeof(sc2), typeof(so), typeof(alg)}(slv, sc1,
+                                                                                   sc2, so,
+                                                                                   alg)
+    end
 end
 function JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                             sc1::Real = 1, sc2::Real = 1e5, so::Real = 1,
                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
-    if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
-    end
-    @argcheck(sc1 >= zero(sc1))
-    @argcheck(sc2 >= zero(sc2))
-    @argcheck(so >= zero(so))
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
 struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,
@@ -68,6 +86,55 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
     opt::T14
     w::T15
     alg::T16
+    function EntropyPoolingPrior(pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2,
+                                 mu_views::Union{Nothing, <:LinearConstraintEstimator},
+                                 var_views::Union{Nothing, <:LinearConstraintEstimator},
+                                 cvar_views::Union{Nothing, <:LinearConstraintEstimator},
+                                 sigma_views::Union{Nothing, <:LinearConstraintEstimator},
+                                 sk_views::Union{Nothing, <:LinearConstraintEstimator},
+                                 kt_views::Union{Nothing, <:LinearConstraintEstimator},
+                                 rho_views::Union{Nothing, <:LinearConstraintEstimator},
+                                 var_alpha::Real, cvar_alpha::Real,
+                                 sets::Union{Nothing, <:AssetSets},
+                                 ds_opt::Union{Nothing, <:CVaREntropyPooling},
+                                 dm_opt::Union{Nothing, <:OptimEntropyPooling},
+                                 opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling},
+                                 w::Union{Nothing, AbstractVector},
+                                 alg::AbstractEntropyPoolingAlgorithm)
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        if !isnothing(mu_views) ||
+           !isnothing(var_views) ||
+           !isnothing(cvar_views) ||
+           !isnothing(sigma_views) ||
+           !isnothing(sk_views) ||
+           !isnothing(kt_views) ||
+           !isnothing(rho_views)
+            @argcheck(!isnothing(sets))
+        end
+        @argcheck(zero(var_alpha) < var_alpha < one(var_alpha))
+        @argcheck(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha))
+        return new{typeof(pe), typeof(mu_views), typeof(var_views), typeof(cvar_views),
+                   typeof(sigma_views), typeof(sk_views), typeof(kt_views),
+                   typeof(rho_views), typeof(var_alpha), typeof(cvar_alpha), typeof(sets),
+                   typeof(ds_opt), typeof(dm_opt), typeof(opt), typeof(w), typeof(alg)}(pe,
+                                                                                        mu_views,
+                                                                                        var_views,
+                                                                                        cvar_views,
+                                                                                        sigma_views,
+                                                                                        sk_views,
+                                                                                        kt_views,
+                                                                                        rho_views,
+                                                                                        var_alpha,
+                                                                                        cvar_alpha,
+                                                                                        sets,
+                                                                                        ds_opt,
+                                                                                        dm_opt,
+                                                                                        opt,
+                                                                                        w,
+                                                                                        alg)
+    end
 end
 function EntropyPoolingPrior(;
                              pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
@@ -85,20 +152,6 @@ function EntropyPoolingPrior(;
                              opt::Union{<:OptimEntropyPooling, <:JuMPEntropyPooling} = OptimEntropyPooling(),
                              w::Union{Nothing, AbstractVector} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
-    if !isnothing(mu_views) ||
-       !isnothing(var_views) ||
-       !isnothing(cvar_views) ||
-       !isnothing(sigma_views) ||
-       !isnothing(sk_views) ||
-       !isnothing(kt_views) ||
-       !isnothing(rho_views)
-        @argcheck(!isnothing(sets))
-    end
-    @argcheck(zero(var_alpha) < var_alpha < one(var_alpha))
-    @argcheck(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha))
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views, sk_views,
                                kt_views, rho_views, var_alpha, cvar_alpha, sets, ds_opt,
                                dm_opt, opt, w, alg)

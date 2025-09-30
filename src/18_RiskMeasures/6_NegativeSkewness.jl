@@ -4,22 +4,31 @@ struct NegativeSkewness{T1, T2, T3, T4, T5} <: AbstractNegativeSkewRiskMeasure
     sk::T3
     V::T4
     alg::T5
+    function NegativeSkewness(settings::RiskMeasureSettings,
+                              mp::AbstractMatrixProcessingEstimator,
+                              sk::Union{Nothing, <:AbstractMatrix},
+                              V::Union{Nothing, <:AbstractMatrix}, alg::QuadSqrtRiskExpr)
+        sk_flag = isnothing(sk)
+        V_flag = isnothing(V)
+        if sk_flag || V_flag
+            @argcheck(sk_flag && V_flag,
+                      "If either sk or V, is nothing, both must be nothing.")
+        else
+            @argcheck(!isempty(sk))
+            @argcheck(!isempty(V))
+            @argcheck(size(sk, 1)^2 == size(sk, 2))
+            assert_matrix_issquare(V)
+        end
+        return new{typeof(settings), typeof(mp), typeof(sk), typeof(V), typeof(alg)}(settings,
+                                                                                     mp, sk,
+                                                                                     V, alg)
+    end
 end
 function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                           mp::AbstractMatrixProcessingEstimator = NonPositiveDefiniteMatrixProcessing(),
                           sk::Union{Nothing, <:AbstractMatrix} = nothing,
                           V::Union{Nothing, <:AbstractMatrix} = nothing,
                           alg::QuadSqrtRiskExpr = SqrtRiskExpr())
-    sk_flag = isnothing(sk)
-    V_flag = isnothing(V)
-    if sk_flag || V_flag
-        @argcheck(sk_flag && V_flag, "If either sk or V, is nothing, both must be nothing.")
-    else
-        @argcheck(!isempty(sk))
-        @argcheck(!isempty(V))
-        @argcheck(size(sk, 1)^2 == size(sk, 2))
-        assert_matrix_issquare(V)
-    end
     return NegativeSkewness(settings, mp, sk, V, alg)
 end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SqrtRiskExpr})(w::AbstractVector)

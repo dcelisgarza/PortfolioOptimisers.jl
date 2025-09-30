@@ -163,10 +163,13 @@ GeneralExponentialSimilarity
 struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
     coef::T1
     power::T2
+    function GeneralExponentialSimilarity(coef::Real, power::Real)
+        @argcheck(coef >= zero(coef) && power >= zero(power),
+                  AssertionError("The following conditions must hold:\n`coef` must be non-negative: coef => $coef\n`power` must be non-negative: power => $power"))
+        return new{typeof(coef), typeof(power)}(coef, power)
+    end
 end
 function GeneralExponentialSimilarity(; coef::Real = 1.0, power::Real = 1.0)
-    @argcheck(coef >= zero(coef) && power >= zero(power),
-              AssertionError("The following conditions must hold:\n`coef` must be non-negative: coef => $coef\n`power` must be non-negative: power => $power"))
     return GeneralExponentialSimilarity(coef, power)
 end
 
@@ -262,6 +265,9 @@ DBHT
 struct DBHT{T1, T2} <: AbstractClusteringAlgorithm
     sim::T1
     root::T2
+    function DBHT(sim::AbstractSimilarityMatrixAlgorithm, root::DBHTRootMethod)
+        return new{typeof(sim), typeof(root)}(sim, root)
+    end
 end
 function DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
               root::DBHTRootMethod = UniqueRoot())
@@ -1857,11 +1863,15 @@ struct DBHTClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     S::T2
     D::T3
     k::T4
+    function DBHTClustering(clustering::Clustering.Hclust, S::AbstractMatrix,
+                            D::AbstractMatrix, k::Integer)
+        @argcheck(!isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
+                  AssertionError("The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))\nk >= 1 => k = $k"))
+        return new{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering, S, D, k)
+    end
 end
 function DBHTClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
                         D::AbstractMatrix, k::Integer)
-    @argcheck(!isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
-              AssertionError("The following conditions must hold:\nDistance (`D`) matrix must be non-empty: isempty(D) => $(isempty(D))\n`D` matrix must be symmetric: issymmetric(D) => $(issymmetric(D))\nSimilarity (`S`) matrix must be non-empty: isempty(S) => $(isempty(S))\n`S` matrix must be symmetric: issymmetric(S) => $(issymmetric(S))\nsize(D) == size(S) => $(size(D)) != $(size(S))\nk >= 1 => k = $k"))
     return DBHTClustering(clustering, S, D, k)
 end
 
@@ -1978,6 +1988,9 @@ LoGo
 struct LoGo{T1, T2} <: InverseMatrixSparsificationAlgorithm
     dist::T1
     sim::T2
+    function LoGo(dist::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm)
+        return new{typeof(dist), typeof(sim)}(dist, sim)
+    end
 end
 function LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
               sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity())

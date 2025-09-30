@@ -21,6 +21,9 @@ function OptimisationFailure(; res = nothing)
 end
 struct SingletonOptimisation{T1} <: OptimisationResult
     retcode::T1
+    function SingletonOptimisation(retcode::OptimisationReturnCode)
+        return new{typeof(retcode)}(retcode)
+    end
 end
 function SingletonOptimisation(; retcode::OptimisationReturnCode)
     return SingletonOptimisation(retcode)

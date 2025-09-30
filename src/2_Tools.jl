@@ -141,6 +141,102 @@ struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
     ts::T5
     iv::T6
     ivpa::T7
+    function ReturnsResult(nx::Union{Nothing, <:AbstractVector},
+                           X::Union{Nothing, <:AbstractMatrix},
+                           nf::Union{Nothing, <:AbstractVector},
+                           F::Union{Nothing, <:AbstractMatrix},
+                           ts::Union{Nothing, <:AbstractVector},
+                           iv::Union{Nothing, <:AbstractMatrix},
+                           ivpa::Union{Nothing, <:Real, <:AbstractVector})
+        nxs_flag = !isnothing(nx)
+        X_flag = !isnothing(X)
+        if nxs_flag || X_flag
+            @argcheck((nxs_flag && X_flag),
+                      IsNothingError(uppercasefirst(mul_cond_msg(some_msg("`nx`", nx),
+                                                                 some_msg("`X`", X)))))
+            @argcheck(!isempty(nx) && !isempty(X),
+                      IsEmptyError(uppercasefirst(mul_cond_msg(non_empty_msg(`nx`, nx),
+                                                               non_empty_msg("`X`", X)))))
+            @argcheck(length(nx) == size(X, 2),
+                      DimensionMismatch(comp_msg("length of `nx`",
+                                                 "number of columns of `X`", :eq,
+                                                 length(nx), size(X, 2)) * "."))
+        end
+        nfs_flag = !isnothing(nf)
+        F_flag = !isnothing(F)
+        if nfs_flag || F_flag
+            @argcheck(nfs_flag && F_flag,
+                      IsNothingError(uppercasefirst(mul_cond_msg(some_msg("`nf`", nf),
+                                                                 some_msg("`F`", F)))))
+            @argcheck(!isempty(nf) && !isempty(F),
+                      IsEmptyError(uppercasefirst(mul_cond_msg(non_empty_msg(`nf`, nf),
+                                                               non_empty_msg("`F`", F)))))
+            @argcheck(length(nf) == size(F, 2),
+                      DimensionMismatch(comp_msg("length of `nf`",
+                                                 "number of columns of `F`", :eq,
+                                                 length(nf), size(F, 2)) * "."))
+        end
+        if X_flag && F_flag
+            @argcheck(size(X, 1) == size(F, 1),
+                      DimensionMismatch(comp_msg("number of rows of `X`",
+                                                 "number of rows of `F`", :eq, size(X, 1),
+                                                 size(F, 1)) * "."))
+        end
+        if !isnothing(ts)
+            @argcheck(!isempty(ts), IsEmptyError(non_empty_msg("`ts`") * "."))
+            if X_flag
+                @argcheck(length(ts) == size(X, 1),
+                          DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
+                                                                    "number of rows of `X`",
+                                                                    :eq, length(ts),
+                                                                    size(X, 1))) * "."))
+            elseif F_flag
+                @argcheck(length(ts) == size(F, 1),
+                          DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
+                                                                    "number of rows of `F`",
+                                                                    :eq, length(ts),
+                                                                    size(F, 1))) * "."))
+            else
+                throw(IsNothingEmptyError(uppercasefirst("at least one of " *
+                                                         mul_cond_msg(nothing_non_empty_msg("`X`",
+                                                                                            X),
+                                                                      nothing_non_empty_msg("`F`",
+                                                                                            F))) *
+                                          "."))
+            end
+        end
+        if !isnothing(iv)
+            @argcheck(!isempty(iv), IsEmptyError(non_empty_msg("`iv`") * "."))
+            @argcheck(size(iv) == size(X),
+                      DimensionMismatch(uppercasefirst(comp_msg("size of `iv`",
+                                                                "size of `X`", :eq,
+                                                                size(iv), size(X))) * "."))
+            @argcheck(all(x -> x >= zero(eltype(iv)), iv),
+                      DomainError(iv, "all entries of " * non_neg_msg("`iv`") * "."))
+            if isa(ivpa, Real)
+                @argcheck(isfinite(ivpa), DomainError(ivpa, non_finite_msg("`ivpa`") * "."))
+                @argcheck(ivpa > zero(ivpa),
+                          DomainError(ivpa, comp_msg("`ivpa`", zero(ivpa), :gt) * "."))
+            elseif isa(ivpa, AbstractVector)
+                @argcheck(!isempty(ivpa), IsEmptyError(non_empty_msg("`ivpa`") * "."))
+                @argcheck(length(ivpa) == size(iv, 2),
+                          DimensionMismatch(uppercasefirst(comp_msg("length of `ivpa`",
+                                                                    "number of columns of `iv`",
+                                                                    :eq, length(ivpa),
+                                                                    size(iv, 2))) * "."))
+                @argcheck(all(x -> isfinite(x), ivpa),
+                          DomainError(ivpa,
+                                      "all entries of " * non_finite_msg("`ivpa`") * "."))
+                @argcheck(all(x -> x > zero(eltype(ivpa)), ivpa),
+                          DomainError(ivpa,
+                                      "all entries of " *
+                                      comp_msg("`ivpa`", "0", :geq) *
+                                      "."))
+            end
+        end
+        return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(ts), typeof(iv),
+                   typeof(ivpa)}(nx, X, nf, F, ts, iv, ivpa)
+    end
 end
 function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                        X::Union{Nothing, <:AbstractMatrix} = nothing,
@@ -149,86 +245,6 @@ function ReturnsResult(; nx::Union{Nothing, <:AbstractVector} = nothing,
                        ts::Union{Nothing, <:AbstractVector} = nothing,
                        iv::Union{Nothing, <:AbstractMatrix} = nothing,
                        ivpa::Union{Nothing, <:Real, <:AbstractVector} = nothing)
-    nxs_flag = !isnothing(nx)
-    X_flag = !isnothing(X)
-    if nxs_flag || X_flag
-        @argcheck((nxs_flag && X_flag),
-                  IsNothingError(uppercasefirst(mul_cond_msg(some_msg("`nx`", nx),
-                                                             some_msg("`X`", X)))))
-        @argcheck(!isempty(nx) && !isempty(X),
-                  IsEmptyError(uppercasefirst(mul_cond_msg(non_empty_msg(`nx`, nx),
-                                                           non_empty_msg("`X`", X)))))
-        @argcheck(length(nx) == size(X, 2),
-                  DimensionMismatch(comp_msg("length of `nx`", "number of columns of `X`",
-                                             :eq, length(nx), size(X, 2)) * "."))
-    end
-    nfs_flag = !isnothing(nf)
-    F_flag = !isnothing(F)
-    if nfs_flag || F_flag
-        @argcheck(nfs_flag && F_flag,
-                  IsNothingError(uppercasefirst(mul_cond_msg(some_msg("`nf`", nf),
-                                                             some_msg("`F`", F)))))
-        @argcheck(!isempty(nf) && !isempty(F),
-                  IsEmptyError(uppercasefirst(mul_cond_msg(non_empty_msg(`nf`, nf),
-                                                           non_empty_msg("`F`", F)))))
-        @argcheck(length(nf) == size(F, 2),
-                  DimensionMismatch(comp_msg("length of `nf`", "number of columns of `F`",
-                                             :eq, length(nf), size(F, 2)) * "."))
-    end
-    if X_flag && F_flag
-        @argcheck(size(X, 1) == size(F, 1),
-                  DimensionMismatch(comp_msg("number of rows of `X`",
-                                             "number of rows of `F`", :eq, size(X, 1),
-                                             size(F, 1)) * "."))
-    end
-    if !isnothing(ts)
-        @argcheck(!isempty(ts), IsEmptyError(non_empty_msg("`ts`") * "."))
-        if X_flag
-            @argcheck(length(ts) == size(X, 1),
-                      DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
-                                                                "number of rows of `X`",
-                                                                :eq, length(ts),
-                                                                size(X, 1))) * "."))
-        elseif F_flag
-            @argcheck(length(ts) == size(F, 1),
-                      DimensionMismatch(uppercasefirst(comp_msg("length of `ts`",
-                                                                "number of rows of `F`",
-                                                                :eq, length(ts),
-                                                                size(F, 1))) * "."))
-        else
-            throw(IsNothingEmptyError(uppercasefirst("at least one of " *
-                                                     mul_cond_msg(nothing_non_empty_msg("`X`",
-                                                                                        X),
-                                                                  nothing_non_empty_msg("`F`",
-                                                                                        F))) *
-                                      "."))
-        end
-    end
-    if !isnothing(iv)
-        @argcheck(!isempty(iv), IsEmptyError(non_empty_msg("`iv`") * "."))
-        @argcheck(size(iv) == size(X),
-                  DimensionMismatch(uppercasefirst(comp_msg("size of `iv`", "size of `X`",
-                                                            :eq, size(iv), size(X))) * "."))
-        @argcheck(all(x -> x >= zero(eltype(iv)), iv),
-                  DomainError(iv, "all entries of " * non_neg_msg("`iv`") * "."))
-        if isa(ivpa, Real)
-            @argcheck(isfinite(ivpa), DomainError(ivpa, non_finite_msg("`ivpa`") * "."))
-            @argcheck(ivpa > zero(ivpa),
-                      DomainError(ivpa, comp_msg("`ivpa`", zero(ivpa), :gt) * "."))
-        elseif isa(ivpa, AbstractVector)
-            @argcheck(!isempty(ivpa), IsEmptyError(non_empty_msg("`ivpa`") * "."))
-            @argcheck(length(ivpa) == size(iv, 2),
-                      DimensionMismatch(uppercasefirst(comp_msg("length of `ivpa`",
-                                                                "number of columns of `iv`",
-                                                                :eq, length(ivpa),
-                                                                size(iv, 2))) * "."))
-            @argcheck(all(x -> isfinite(x), ivpa),
-                      DomainError(ivpa, "all entries of " * non_finite_msg("`ivpa`") * "."))
-            @argcheck(all(x -> x > zero(eltype(ivpa)), ivpa),
-                      DomainError(ivpa,
-                                  "all entries of " * comp_msg("`ivpa`", "0", :geq) * "."))
-        end
-    end
     return ReturnsResult(nx, X, nf, F, ts, iv, ivpa)
 end
 function returns_result_view(rd::ReturnsResult, i::AbstractVector)

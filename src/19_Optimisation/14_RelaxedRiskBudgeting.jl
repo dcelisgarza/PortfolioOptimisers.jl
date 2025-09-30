@@ -3,9 +3,12 @@ struct BasicRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 struct RegularisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 struct RegularisedPenalisedRelaxedRiskBudgeting{T1} <: RelaxedRiskBudgetingAlgorithm
     p::T1
+    function RegularisedPenalisedRelaxedRiskBudgeting(p::Real)
+        @argcheck(isfinite(p) && p > zero(p))
+        return new{typeof(p)}(p)
+    end
 end
 function RegularisedPenalisedRelaxedRiskBudgeting(; p::Real = 1.0)
-    @argcheck(isfinite(p) && p > zero(p))
     return RegularisedPenalisedRelaxedRiskBudgeting(p)
 end
 struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
@@ -14,18 +17,28 @@ struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     wi::T3
     alg::T4
     fallback::T5
+    function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
+                                  wi::Union{Nothing, <:AbstractVector{<:Real}},
+                                  alg::RelaxedRiskBudgetingAlgorithm,
+                                  fallback::Union{Nothing, <:OptimisationEstimator})
+        if isa(wi, AbstractVector)
+            @argcheck(!isempty(wi))
+        end
+        if isa(rba.rkb, RiskBudgetEstimator)
+            @argcheck(!isnothing(opt.sets))
+        end
+        return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fallback)}(opt,
+                                                                                        rba,
+                                                                                        wi,
+                                                                                        alg,
+                                                                                        fallback)
+    end
 end
 function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                               rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                               wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
                               fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    if isa(wi, AbstractVector)
-        @argcheck(!isempty(wi))
-    end
-    if isa(rba.rkb, RiskBudgetEstimator)
-        @argcheck(!isnothing(opt.sets))
-    end
     return RelaxedRiskBudgeting(opt, rba, wi, alg, fallback)
 end
 function opt_view(rrb::RelaxedRiskBudgeting, i::AbstractVector, X::AbstractMatrix)

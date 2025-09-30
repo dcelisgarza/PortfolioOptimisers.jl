@@ -1,5 +1,11 @@
 struct MeanReturn{T1} <: NoOptimisationRiskMeasure
     w::T1
+    function MeanReturn(w::Union{Nothing, <:AbstractWeights})
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        return MeanReturn(w)
+    end
 end
 function MeanReturn(; w::Union{Nothing, <:AbstractWeights} = nothing)
     return MeanReturn(w)
@@ -17,38 +23,59 @@ end
 struct ThirdCentralMoment{T1, T2} <: AbstractMomentNoOptimisationRiskMeasure
     w::T1
     mu::T2
+    function ThirdCentralMoment(w::Union{Nothing, <:AbstractWeights},
+                                mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}})
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        if isa(mu, AbstractVector)
+            @argcheck(!isempty(mu))
+        end
+        return new{typeof(w), typeof(mu)}(w, mu)
+    end
 end
 function ThirdCentralMoment(; w::Union{Nothing, <:AbstractWeights} = nothing,
                             mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
-    if isa(mu, AbstractVector)
-        @argcheck(!isempty(mu))
-    end
     return ThirdCentralMoment(w, mu)
 end
 struct Skewness{T1, T2, T3} <: AbstractMomentNoOptimisationRiskMeasure
     ve::T1
     w::T2
     mu::T3
+    function Skewness(ve::AbstractVarianceEstimator, w::Union{Nothing, <:AbstractWeights},
+                      mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}})
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        if isa(mu, AbstractVector)
+            @argcheck(!isempty(mu))
+        end
+        return new{typeof(ve), typeof(w), typeof(mu)}(ve, w, mu)
+    end
 end
 function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   w::Union{Nothing, <:AbstractWeights} = nothing,
                   mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
-    if isa(mu, AbstractVector)
-        @argcheck(!isempty(mu))
-    end
     return Skewness(ve, w, mu)
 end
 struct Kurtosis{T1, T2, T3} <: AbstractMomentNoOptimisationRiskMeasure
     ve::T1
     w::T2
     mu::T3
+    function Kurtosis(ve::AbstractVarianceEstimator, w::Union{Nothing, <:AbstractWeights},
+                      mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}})
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        if isa(mu, AbstractVector)
+            @argcheck(!isempty(mu))
+        end
+        return new{typeof(ve), typeof(w), typeof(mu)}(ve, w, mu)
+    end
 end
 function Kurtosis(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   w::Union{Nothing, <:AbstractWeights} = nothing,
                   mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing)
-    if isa(mu, AbstractVector)
-        @argcheck(!isempty(mu))
-    end
     return Kurtosis(ve, w, mu)
 end
 function calc_moment_target(::Union{<:ThirdCentralMoment{Nothing, Nothing},

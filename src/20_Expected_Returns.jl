@@ -49,6 +49,9 @@ function expected_risk_ret_sric(r::AbstractBaseRiskMeasure, ret::JuMPReturnsEsti
 end
 struct ReturnRiskMeasure{T1} <: NoOptimisationRiskMeasure
     rt::T1
+    function ReturnRiskMeasure(rt::JuMPReturnsEstimator)
+        return new{typeof(rt)}(rt)
+    end
 end
 function ReturnRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn())
     return ReturnRiskMeasure(rt)
@@ -69,6 +72,10 @@ struct RatioRiskMeasure{T1, T2, T3} <: NoOptimisationRiskMeasure
     rt::T1
     rk::T2
     rf::T3
+    function RatioRiskMeasure(rt::JuMPReturnsEstimator, rk::AbstractBaseRiskMeasure,
+                              rf::Real)
+        return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
+    end
 end
 function RatioRiskMeasure(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
                           rk::AbstractBaseRiskMeasure = Variance(), rf::Real = 0.0)

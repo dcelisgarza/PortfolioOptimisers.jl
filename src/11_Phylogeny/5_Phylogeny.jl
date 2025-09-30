@@ -50,13 +50,16 @@ PhylogenyResult
 """
 struct PhylogenyResult{T} <: AbstractPhylogenyResult
     X::T
+    function PhylogenyResult(X::Union{<:AbstractMatrix, <:AbstractVector})
+        @argcheck(!isempty(X))
+        if isa(X, AbstractMatrix)
+            @argcheck(issymmetric(X))
+            @argcheck(all(x -> iszero(x), diag(X)))
+        end
+        return new{typeof(X)}(X)
+    end
 end
 function PhylogenyResult(; X::Union{<:AbstractMatrix, <:AbstractVector})
-    @argcheck(!isempty(X))
-    if isa(X, AbstractMatrix)
-        @argcheck(issymmetric(X))
-        @argcheck(all(x -> iszero(x), diag(X)))
-    end
     return PhylogenyResult(X)
 end
 
@@ -206,6 +209,9 @@ BetweennessCentrality
 struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
+    function BetweennessCentrality(args::Tuple, kwargs::NamedTuple)
+        return BetweennessCentrality(args, kwargs)
+    end
 end
 function BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BetweennessCentrality(args, kwargs)
@@ -253,6 +259,9 @@ ClosenessCentrality
 struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
+    function ClosenessCentrality(args::Tuple, kwargs::NamedTuple)
+        return ClosenessCentrality(args, kwargs)
+    end
 end
 function ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return ClosenessCentrality(args, kwargs)
@@ -304,9 +313,12 @@ DegreeCentrality
 struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
     kind::T1
     kwargs::T2
+    function DegreeCentrality(kind::Integer, kwargs::NamedTuple)
+        @argcheck(kind in 0:2, DomainError("`kind` must be in (0:2):\nkind => $kind"))
+        return new{typeof(kind), typeof(kwargs)}(kind, kwargs)
+    end
 end
 function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
-    @argcheck(kind in 0:2, DomainError("`kind` must be in (0:2):\nkind => $kind"))
     return DegreeCentrality(kind, kwargs)
 end
 
@@ -364,6 +376,9 @@ KatzCentrality
 """
 struct KatzCentrality{T1} <: AbstractCentralityAlgorithm
     alpha::T1
+    function KatzCentrality(alpha::Real)
+        return new{typeof(alpha)}(alpha)
+    end
 end
 function KatzCentrality(; alpha::Real = 0.3)
     return KatzCentrality(alpha)
@@ -421,10 +436,13 @@ struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
     n::T1
     alpha::T2
     epsilon::T3
+    function Pagerank(alpha::Real, n::Integer, epsilon::Real)
+        @argcheck(n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
+                  DomainError("The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon"))
+        return new{typeof(n), typeof(alpha), typeof(epsilon)}(n, alpha, epsilon)
+    end
 end
 function Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
-    @argcheck(n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
-              DomainError("The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon"))
     return Pagerank(n, alpha, epsilon)
 end
 
@@ -486,6 +504,9 @@ StressCentrality
 struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
+    function StressCentrality(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return StressCentrality(args, kwargs)
@@ -615,6 +636,9 @@ KruskalTree
 struct KruskalTree{T1, T2} <: AbstractTreeType
     args::T1
     kwargs::T2
+    function KruskalTree(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return KruskalTree(args, kwargs)
@@ -662,6 +686,9 @@ BoruvkaTree
 struct BoruvkaTree{T1, T2} <: AbstractTreeType
     args::T1
     kwargs::T2
+    function BoruvkaTree(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BoruvkaTree(args, kwargs)
@@ -709,6 +736,9 @@ PrimTree
 struct PrimTree{T1, T2} <: AbstractTreeType
     args::T1
     kwargs::T2
+    function PrimTree(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return PrimTree(args, kwargs)
@@ -839,6 +869,12 @@ struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
     de::T2
     alg::T3
     n::T4
+    function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
+                              de::AbstractDistanceEstimator,
+                              alg::Union{<:AbstractSimilarityMatrixAlgorithm,
+                                         <:AbstractTreeType}, n::Integer)
+        return new{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
+    end
 end
 function NetworkEstimator(;
                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
@@ -931,6 +967,11 @@ CentralityEstimator
 struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
     ne::T1
     cent::T2
+    function CentralityEstimator(ne::Union{<:AbstractPhylogenyEstimator,
+                                           <:AbstractPhylogenyResult},
+                                 cent::AbstractCentralityAlgorithm)
+        return new{typeof(ne), typeof(cent)}(ne, cent)
+    end
 end
 function CentralityEstimator(;
                              ne::Union{<:AbstractPhylogenyEstimator,

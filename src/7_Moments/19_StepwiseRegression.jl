@@ -40,9 +40,12 @@ PValue
 """
 struct PValue{T1} <: AbstractStepwiseRegressionCriterion
     threshold::T1
+    function PValue(threshold::Real)
+        @argcheck(zero(threshold) < threshold < one(threshold))
+        return new{typeof(threshold)}(threshold)
+    end
 end
 function PValue(; threshold::Real = 0.05)
-    @argcheck(zero(threshold) < threshold < one(threshold))
     return PValue(threshold)
 end
 
@@ -131,6 +134,11 @@ struct StepwiseRegression{T1, T2, T3} <: AbstractRegressionEstimator
     crit::T1
     alg::T2
     target::T3
+    function StepwiseRegression(crit::AbstractStepwiseRegressionCriterion,
+                                alg::AbstractStepwiseRegressionAlgorithm,
+                                target::AbstractRegressionTarget)
+        return new{typeof(crit), typeof(alg), typeof(target)}(crit, alg, target)
+    end
 end
 function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = Forward(),

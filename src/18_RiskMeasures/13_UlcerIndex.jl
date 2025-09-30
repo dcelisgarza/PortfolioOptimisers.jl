@@ -1,5 +1,8 @@
 struct UlcerIndex{T1} <: RiskMeasure
     settings::T1
+    function UlcerIndex(settings::RiskMeasureSettings)
+        return new{typeof(settings)}(settings)
+    end
 end
 function UlcerIndex(; settings::RiskMeasureSettings = RiskMeasureSettings())
     return UlcerIndex(settings)
@@ -23,6 +26,9 @@ function (::UlcerIndex)(x::AbstractVector)
 end
 struct RelativeUlcerIndex{T1} <: HierarchicalRiskMeasure
     settings::T1
+    function RelativeUlcerIndex(settings::HierarchicalRiskMeasureSettings)
+        return new{typeof(settings)}(settings)
+    end
 end
 function RelativeUlcerIndex(;
                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())

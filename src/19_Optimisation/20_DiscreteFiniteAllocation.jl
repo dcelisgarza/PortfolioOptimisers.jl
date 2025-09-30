@@ -16,15 +16,21 @@ struct DiscreteAllocation{T1, T2, T3, T4} <: BaseFiniteAllocationOptimisationEst
     sc::T2
     so::T3
     fallback::T4
+    function DiscreteAllocation(slv::Union{<:Solver, <:AbstractVector{<:Solver}}, sc::Real,
+                                so::Real,
+                                fallback::BaseFiniteAllocationOptimisationEstimator)
+        if isa(slv, AbstractVector)
+            @argcheck(!isempty(slv))
+        end
+        @argcheck(sc > zero(sc))
+        @argcheck(so > zero(so))
+        return new{typeof(slv), typeof(sc), typeof(so), typeof(fallback)}(slv, sc, so,
+                                                                          fallback)
+    end
 end
 function DiscreteAllocation(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                             sc::Real = 1, so::Real = 1,
                             fallback::BaseFiniteAllocationOptimisationEstimator = GreedyAllocation())
-    if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
-    end
-    @argcheck(sc > zero(sc))
-    @argcheck(so > zero(so))
     return DiscreteAllocation(slv, sc, so, fallback)
 end
 function finite_sub_allocation(w::AbstractVector, p::AbstractVector, cash::Real, bgt::Real,

@@ -7,20 +7,23 @@ end
 struct BudgetRange{T1, T2} <: BudgetEstimator
     lb::T1
     ub::T2
+    function BudgetRange(lb::Union{Nothing, <:Real}, ub::Union{Nothing, <:Real})
+        lb_flag = isnothing(lb)
+        ub_flag = isnothing(ub)
+        @argcheck(lb_flag ⊼ ub_flag)
+        if !lb_flag
+            @argcheck(isfinite(lb))
+        end
+        if !ub_flag
+            @argcheck(isfinite(ub))
+        end
+        if !lb_flag && !ub_flag
+            @argcheck(lb <= ub)
+        end
+        return new{typeof(lb), typeof(ub)}(lb, ub)
+    end
 end
 function BudgetRange(; lb::Union{Nothing, <:Real} = 1.0, ub::Union{Nothing, <:Real} = 1.0)
-    lb_flag = isnothing(lb)
-    ub_flag = isnothing(ub)
-    @argcheck(lb_flag ⊼ ub_flag)
-    if !lb_flag
-        @argcheck(isfinite(lb))
-    end
-    if !ub_flag
-        @argcheck(isfinite(ub))
-    end
-    if !lb_flag && !ub_flag
-        @argcheck(lb <= ub)
-    end
     return BudgetRange(lb, ub)
 end
 function budget_view(bgt::Union{<:Real, <:BudgetRange}, ::Any)
@@ -36,33 +39,45 @@ struct BudgetCosts{T1, T2, T3, T4, T5, T6} <: BudgetCostEstimator
     vn::T4
     up::T5
     un::T6
+    function BudgetCosts(bgt::Union{<:Real, <:BudgetRange}, w::AbstractVector{<:Real},
+                         vp::Union{<:Real, <:AbstractVector{<:Real}},
+                         vn::Union{<:Real, <:AbstractVector{<:Real}},
+                         up::Union{<:Real, <:AbstractVector{<:Real}},
+                         un::Union{<:Real, <:AbstractVector{<:Real}})
+        @argcheck(!isempty(w))
+        if isa(vp, AbstractVector)
+            @argcheck(!isempty(vp) && all(x -> x >= zero(x), vp))
+        else
+            @argcheck(vp >= zero(vp))
+        end
+        if isa(vn, AbstractVector)
+            @argcheck(!isempty(vn) && all(x -> x >= zero(x), vn))
+        else
+            @argcheck(vn >= zero(vn))
+        end
+        if isa(up, AbstractVector)
+            @argcheck(!isempty(up) && all(x -> x >= zero(x), up))
+        else
+            @argcheck(up >= zero(up))
+        end
+        if isa(un, AbstractVector)
+            @argcheck(!isempty(un) && all(x -> x >= zero(x), un))
+        else
+            @argcheck(un >= zero(un))
+        end
+        return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un)}(bgt,
+                                                                                           w,
+                                                                                           vp,
+                                                                                           vn,
+                                                                                           up,
+                                                                                           un)
+    end
 end
 function BudgetCosts(; bgt::Union{<:Real, <:BudgetRange} = 1.0, w::AbstractVector{<:Real},
                      vp::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
                      vn::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
                      up::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
                      un::Union{<:Real, <:AbstractVector{<:Real}} = 1.0)
-    @argcheck(!isempty(w))
-    if isa(vp, AbstractVector)
-        @argcheck(!isempty(vp) && all(x -> x >= zero(x), vp))
-    else
-        @argcheck(vp >= zero(vp))
-    end
-    if isa(vn, AbstractVector)
-        @argcheck(!isempty(vn) && all(x -> x >= zero(x), vn))
-    else
-        @argcheck(vn >= zero(vn))
-    end
-    if isa(up, AbstractVector)
-        @argcheck(!isempty(up) && all(x -> x >= zero(x), up))
-    else
-        @argcheck(up >= zero(up))
-    end
-    if isa(un, AbstractVector)
-        @argcheck(!isempty(un) && all(x -> x >= zero(x), un))
-    else
-        @argcheck(un >= zero(un))
-    end
     return BudgetCosts(bgt, w, vp, vn, up, un)
 end
 function budget_view(bgt::BudgetCosts, i::AbstractVector)
@@ -81,6 +96,40 @@ struct BudgetMarketImpact{T1, T2, T3, T4, T5, T6, T7} <: BudgetCostEstimator
     up::T5
     un::T6
     beta::T7
+    function BudgetMarketImpact(bgt::Union{<:Real, <:BudgetRange},
+                                w::AbstractVector{<:Real},
+                                vp::Union{<:Real, <:AbstractVector{<:Real}},
+                                vn::Union{<:Real, <:AbstractVector{<:Real}},
+                                up::Union{<:Real, <:AbstractVector{<:Real}},
+                                un::Union{<:Real, <:AbstractVector{<:Real}}, beta::Real)
+        @argcheck(!isempty(w))
+        if isa(vp, AbstractVector)
+            @argcheck(!isempty(vp) && all(x -> x >= zero(x), vp))
+        else
+            @argcheck(vp >= zero(vp))
+        end
+        if isa(vn, AbstractVector)
+            @argcheck(!isempty(vn) && all(x -> x >= zero(x), vn))
+        else
+            @argcheck(vn >= zero(vn))
+        end
+        if isa(up, AbstractVector)
+            @argcheck(!isempty(up) && all(x -> x >= zero(x), up))
+        else
+            @argcheck(up >= zero(up))
+        end
+        if isa(un, AbstractVector)
+            @argcheck(!isempty(un) && all(x -> x >= zero(x), un))
+        else
+            @argcheck(un >= zero(un))
+        end
+        @argcheck(zero(beta) <= beta <= one(beta),
+                  DomainError(beta,
+                              range_msg("`beta`", zero(beta), one(beta), nothing, true,
+                                        true) * "."))
+        return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un),
+                   typeof(beta)}(bgt, w, vp, vn, up, un, beta)
+    end
 end
 function BudgetMarketImpact(; bgt::Union{<:Real, <:BudgetRange} = 1.0,
                             w::AbstractVector{<:Real},
@@ -89,31 +138,6 @@ function BudgetMarketImpact(; bgt::Union{<:Real, <:BudgetRange} = 1.0,
                             up::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
                             un::Union{<:Real, <:AbstractVector{<:Real}} = 1.0,
                             beta::Real = 2 / 3)
-    @argcheck(!isempty(w))
-    if isa(vp, AbstractVector)
-        @argcheck(!isempty(vp) && all(x -> x >= zero(x), vp))
-    else
-        @argcheck(vp >= zero(vp))
-    end
-    if isa(vn, AbstractVector)
-        @argcheck(!isempty(vn) && all(x -> x >= zero(x), vn))
-    else
-        @argcheck(vn >= zero(vn))
-    end
-    if isa(up, AbstractVector)
-        @argcheck(!isempty(up) && all(x -> x >= zero(x), up))
-    else
-        @argcheck(up >= zero(up))
-    end
-    if isa(un, AbstractVector)
-        @argcheck(!isempty(un) && all(x -> x >= zero(x), un))
-    else
-        @argcheck(un >= zero(un))
-    end
-    @argcheck(zero(beta) <= beta <= one(beta),
-              DomainError(beta,
-                          range_msg("`beta`", zero(beta), one(beta), nothing, true, true) *
-                          "."))
     return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
 end
 function budget_view(bgt::BudgetMarketImpact, i::AbstractVector)

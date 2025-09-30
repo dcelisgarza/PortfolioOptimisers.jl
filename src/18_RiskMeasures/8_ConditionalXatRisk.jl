@@ -2,14 +2,18 @@ struct ConditionalValueatRisk{T1, T2, T3} <: RiskMeasure
     settings::T1
     alpha::T2
     w::T3
+    function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Real,
+                                    w::Union{Nothing, <:AbstractWeights})
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
+    end
 end
 function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 alpha::Real = 0.05,
                                 w::Union{Nothing, <:AbstractWeights} = nothing)
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
     return ConditionalValueatRisk(settings, alpha, w)
 end
 function factory(r::ConditionalValueatRisk, prior::AbstractPriorResult, args...; kwargs...)
@@ -22,16 +26,25 @@ struct DistributionallyRobustConditionalValueatRisk{T1, T2, T3, T4, T5} <: RiskM
     l::T3
     r::T4
     w::T5
+    function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
+                                                          alpha::Real, l::Real, r::Real,
+                                                          w::Union{Nothing,
+                                                                   <:AbstractWeights})
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
+                                                                                     alpha,
+                                                                                     l, r,
+                                                                                     w)
+    end
 end
 function DistributionallyRobustConditionalValueatRisk(;
                                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                       alpha::Real = 0.05, l::Real = 1.0,
                                                       r::Real = 0.02,
                                                       w::Union{Nothing, <:AbstractWeights} = nothing)
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
     return DistributionallyRobustConditionalValueatRisk(settings, alpha, l, r, w)
 end
 function factory(r::DistributionallyRobustConditionalValueatRisk,
@@ -76,16 +89,21 @@ struct ConditionalValueatRiskRange{T1, T2, T3, T4} <: RiskMeasure
     alpha::T2
     beta::T3
     w::T4
+    function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Real,
+                                         beta::Real, w::Union{Nothing, <:AbstractWeights})
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(zero(beta) < beta < one(beta))
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w)}(settings,
+                                                                             alpha, beta, w)
+    end
 end
 function ConditionalValueatRiskRange(;
                                      settings::RiskMeasureSettings = RiskMeasureSettings(),
                                      alpha::Real = 0.05, beta::Real = 0.05,
                                      w::Union{Nothing, <:AbstractWeights} = nothing)
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    @argcheck(zero(beta) < beta < one(beta))
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
 function factory(r::ConditionalValueatRiskRange, prior::AbstractPriorResult, args...;
@@ -104,6 +122,21 @@ struct DistributionallyRobustConditionalValueatRiskRange{T1, T2, T3, T4, T5, T6,
     l_b::T6
     r_b::T7
     w::T8
+    function DistributionallyRobustConditionalValueatRiskRange(settings::RiskMeasureSettings,
+                                                               alpha::Real, l_a::Real,
+                                                               r_a::Real, beta::Real,
+                                                               l_b::Real, r_b::Real,
+                                                               w::Union{Nothing,
+                                                                        <:AbstractWeights})
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(zero(beta) < beta < one(beta))
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(alpha), typeof(l_a), typeof(r_a), typeof(beta),
+                   typeof(l_b), typeof(r_b), typeof(w)}(settings, alpha, l_a, r_a, beta,
+                                                        l_b, r_b, w)
+    end
 end
 function DistributionallyRobustConditionalValueatRiskRange(;
                                                            settings::RiskMeasureSettings = RiskMeasureSettings(),
@@ -115,11 +148,6 @@ function DistributionallyRobustConditionalValueatRiskRange(;
                                                            r_b::Real = 0.02,
                                                            w::Union{Nothing,
                                                                     <:AbstractWeights} = nothing)
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    @argcheck(zero(beta) < beta < one(beta))
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
     return DistributionallyRobustConditionalValueatRiskRange(settings, alpha, l_a, r_a,
                                                              beta, l_b, r_b, w)
 end
@@ -194,10 +222,13 @@ end
 struct ConditionalDrawdownatRisk{T1, T2} <: RiskMeasure
     settings::T1
     alpha::T2
+    function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Real)
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        return new{typeof(settings), typeof(alpha)}(settings, alpha)
+    end
 end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                    alpha::Real = 0.05)
-    @argcheck(zero(alpha) < alpha < one(alpha))
     return ConditionalDrawdownatRisk(settings, alpha)
 end
 function (r::ConditionalDrawdownatRisk)(x::AbstractVector)
@@ -225,11 +256,15 @@ end
 struct RelativeConditionalDrawdownatRisk{T1, T2} <: HierarchicalRiskMeasure
     settings::T1
     alpha::T2
+    function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
+                                               alpha::Real)
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        return new{typeof(settings), typeof(alpha)}(settings, alpha)
+    end
 end
 function RelativeConditionalDrawdownatRisk(;
                                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                            alpha::Real = 0.05)
-    @argcheck(zero(alpha) < alpha < one(alpha))
     return RelativeConditionalDrawdownatRisk(settings, alpha)
 end
 function (r::RelativeConditionalDrawdownatRisk)(x::AbstractVector)

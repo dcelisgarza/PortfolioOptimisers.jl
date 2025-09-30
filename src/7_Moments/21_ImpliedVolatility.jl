@@ -7,15 +7,17 @@ struct ImpliedVolatilityRegression{T1, T2,
     ws::T2
     # crit::T3
     re::T3
+    function ImpliedVolatilityRegression(ve::AbstractVarianceEstimator, ws::Real,
+                                         re::AbstractRegressionTarget)
+        @argcheck(ws > 2)
+        return new{typeof(ve), typeof(ws), typeof(re)}(ve, ws, re)
+    end
 end
 function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                      ws::Real = 20,
                                      #  crit::AbstractStepwiseRegressionCriterion = RSquared(),
                                      re::AbstractRegressionTarget = LinearModel())
-    @argcheck(ws > 2)
-    return ImpliedVolatilityRegression(ve, ws,
-                                       #   crit,
-                                       re)
+    return ImpliedVolatilityRegression(ve, ws, re)
 end
 struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
 struct ImpliedVolatility{T1, T2, T3, T4} <: AbstractCovarianceEstimator
@@ -23,12 +25,17 @@ struct ImpliedVolatility{T1, T2, T3, T4} <: AbstractCovarianceEstimator
     mp::T2
     alg::T3
     af::T4
+    function ImpliedVolatility(ce::AbstractCovarianceEstimator,
+                               mp::AbstractMatrixProcessingEstimator,
+                               alg::ImpliedVolatilityAlgorithm, af::Real)
+        @argcheck(isfinite(af) && af > zero(af))
+        return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
+    end
 end
 function ImpliedVolatility(; ce::AbstractCovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
                            af::Real = 252)
-    @argcheck(isfinite(af) && af > zero(af))
     return ImpliedVolatility(ce, mp, alg, af)
 end
 function factory(ce::ImpliedVolatility, w::Union{Nothing, <:AbstractWeights} = nothing)

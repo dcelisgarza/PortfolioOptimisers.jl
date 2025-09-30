@@ -3,9 +3,12 @@ abstract type ClusteringOptimisationEstimator <: OptimisationEstimator end
 abstract type WeightFinaliser <: AbstractAlgorithm end
 struct IterativeWeightFinaliser{T1} <: WeightFinaliser
     iter::T1
+    function IterativeWeightFinaliser(iter::Integer)
+        @argcheck(iter > 0)
+        return new{typeof(iter)}(iter)
+    end
 end
 function IterativeWeightFinaliser(; iter::Integer = 100)
-    @argcheck(iter > 0)
     return IterativeWeightFinaliser(iter)
 end
 abstract type JuMPWeightFiniliserFormulation <: AbstractAlgorithm end
@@ -18,15 +21,19 @@ struct JuMPWeightFiniliser{T1, T2, T3, T4} <: WeightFinaliser
     sc::T2
     so::T3
     alg::T4
+    function JuMPWeightFiniliser(slv::Union{<:Solver, <:AbstractVector{<:Solver}}, sc::Real,
+                                 so::Real, alg::JuMPWeightFiniliserFormulation)
+        if isa(slv, AbstractVector)
+            @argcheck(!isempty(slv))
+        end
+        @argcheck(sc > zero(sc))
+        @argcheck(so > zero(so))
+        return new{typeof(slv), typeof(sc), typeof(so), typeof(alg)}(slv, sc, so, alg)
+    end
 end
 function JuMPWeightFiniliser(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
                              sc::Real = 1.0, so::Real = 1.0,
                              alg::JuMPWeightFiniliserFormulation = RelativeErrorWeightFiniliser())
-    if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
-    end
-    @argcheck(sc > zero(sc))
-    @argcheck(so > zero(so))
     return JuMPWeightFiniliser(slv, sc, so, alg)
 end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,

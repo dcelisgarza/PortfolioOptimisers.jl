@@ -5,9 +5,12 @@ abstract type NormTracking <: TrackingFormulation end
 abstract type VariableTracking <: TrackingFormulation end
 struct SOCTracking{T1} <: NormTracking
     ddof::T1
+    function SOCTracking(ddof::Integer)
+        @argcheck(ddof > 0, DomainError("`ddof` must be greater than 0:\nddof => $ddof"))
+        return new{typeof(ddof)}(ddof)
+    end
 end
 function SOCTracking(; ddof::Integer = 1)
-    @argcheck(ddof > 0, DomainError("`ddof` must be greater than 0:\nddof => $ddof"))
     return SOCTracking(ddof)
 end
 struct NOCTracking <: NormTracking end
@@ -27,10 +30,13 @@ end
 struct WeightsTracking{T1, T2} <: AbstractTrackingAlgorithm
     fees::T1
     w::T2
+    function WeightsTracking(fees::Union{Nothing, <:Fees}, w::AbstractVector{<:Real})
+        @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
+        return new{typeof(fees), typeof(w)}(fees, w)
+    end
 end
 function WeightsTracking(; fees::Union{Nothing, <:Fees} = nothing,
                          w::AbstractVector{<:Real})
-    @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
     return WeightsTracking(fees, w)
 end
 function factory(tracking::WeightsTracking, w::AbstractVector)
@@ -46,9 +52,12 @@ function tracking_benchmark(tracking::WeightsTracking, X::AbstractMatrix{<:Real}
 end
 struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
     w::T1
+    function ReturnsTracking(w::AbstractVector{<:Real})
+        @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
+        return new{typeof(w)}(w)
+    end
 end
 function ReturnsTracking(; w::AbstractVector{<:Real})
-    @argcheck(!isempty(w), IsEmptyError(non_empty_msg("`w`") * "."))
     return ReturnsTracking(w)
 end
 function tracking_view(tracking::ReturnsTracking, ::Any)
@@ -64,11 +73,15 @@ struct TrackingError{T1, T2, T3} <: AbstractTracking
     tracking::T1
     err::T2
     alg::T3
+    function TrackingError(tracking::AbstractTrackingAlgorithm, err::Real,
+                           alg::NormTracking)
+        @argcheck(isfinite(err) && err >= zero(err),
+                  DomainError("`err` must be finite and non-negative:\nerr => $err"))
+        return new{typeof(tracking), typeof(err), typeof(alg)}(tracking, err, alg)
+    end
 end
 function TrackingError(; tracking::AbstractTrackingAlgorithm, err::Real = 0.0,
                        alg::NormTracking = SOCTracking())
-    @argcheck(isfinite(err) && err >= zero(err),
-              DomainError("`err` must be finite and non-negative:\nerr => $err"))
     return TrackingError(tracking, err, alg)
 end
 function tracking_view(tracking::TrackingError, i::AbstractVector, args...)

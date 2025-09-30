@@ -5,6 +5,35 @@ struct FeesEstimator{T1, T2, T3, T4, T5, T6} <: AbstractEstimator
     fl::T4
     fs::T5
     kwargs::T6
+    function FeesEstimator(tn::Union{Nothing, <:TurnoverEstimator, <:Turnover},
+                           l::Union{Nothing, <:AbstractDict,
+                                    <:Pair{<:AbstractString, <:Real},
+                                    <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+                           s::Union{Nothing, <:AbstractDict,
+                                    <:Pair{<:AbstractString, <:Real},
+                                    <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+                           fl::Union{Nothing, <:AbstractDict,
+                                     <:Pair{<:AbstractString, <:Real},
+                                     <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+                           fs::Union{Nothing, <:AbstractDict,
+                                     <:Pair{<:AbstractString, <:Real},
+                                     <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
+                           kwargs::NamedTuple = (; atol = 1e-8))
+        if isa(l, Union{<:AbstractDict, <:AbstractVector})
+            @argcheck(!isempty(l), IsEmptyError(non_empty_msg("`l`") * "."))
+        end
+        if isa(s, Union{<:AbstractDict, <:AbstractVector})
+            @argcheck(!isempty(s), IsEmptyError(non_empty_msg("`s`") * "."))
+        end
+        if isa(fl, Union{<:AbstractDict, <:AbstractVector})
+            @argcheck(!isempty(fl), IsEmptyError(non_empty_msg("`fl`") * "."))
+        end
+        if isa(fs, Union{<:AbstractDict, <:AbstractVector})
+            @argcheck(!isempty(fs), IsEmptyError(non_empty_msg("`fs`") * "."))
+        end
+        return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
+                   typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
+    end
 end
 function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
                        l::Union{Nothing, <:AbstractDict, <:Pair{<:AbstractString, <:Real},
@@ -16,18 +45,6 @@ function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = n
                        fs::Union{Nothing, <:AbstractDict, <:Pair{<:AbstractString, <:Real},
                                  <:AbstractVector{<:Pair{<:AbstractString, <:Real}}} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))
-    if isa(l, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(l), IsEmptyError(non_empty_msg("`l`") * "."))
-    end
-    if isa(s, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(s), IsEmptyError(non_empty_msg("`s`") * "."))
-    end
-    if isa(fl, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(fl), IsEmptyError(non_empty_msg("`fl`") * "."))
-    end
-    if isa(fs, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(fs), IsEmptyError(non_empty_msg("`fs`") * "."))
-    end
     return FeesEstimator(tn, l, s, fl, fs, kwargs)
 end
 function fees_view(fees::FeesEstimator, i::AbstractVector)
@@ -50,6 +67,39 @@ struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
     fl::T4
     fs::T5
     kwargs::T6
+    function Fees(tn::Union{Nothing, <:Turnover},
+                  l::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                  s::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                  fl::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                  fs::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                  kwargs::NamedTuple = (; atol = 1e-8))
+        if isa(l, Real)
+            @argcheck(l >= zero(l), DomainError("`l` must be non-negative:\nl => $l"))
+        elseif isa(l, AbstractVector)
+            @argcheck(!isempty(l) && all(x -> x >= zero(x), l),
+                      AssertionError("`l` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), l) => $(all(x -> x >= zero(x), l))"))
+        end
+        if isa(s, Real)
+            @argcheck(s >= zero(s), DomainError("`s` must be non-negative:\ns => $s"))
+        elseif isa(s, AbstractVector)
+            @argcheck(!isempty(s) && all(x -> x >= zero(x), s),
+                      AssertionError("`s` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), s) => $(all(x -> x >= zero(x), s))"))
+        end
+        if isa(fl, Real)
+            @argcheck(fl >= zero(fl), DomainError("`fl` must be non-negative:\nfl => $fl"))
+        elseif isa(fl, AbstractVector)
+            @argcheck(!isempty(fl) && all(x -> x >= zero(x), fl),
+                      AssertionError("`fl` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), fl) => $(all(x -> x >= zero(x), fl))"))
+        end
+        if isa(fs, Real)
+            @argcheck(fs >= zero(fs), DomainError("`fs` must be non-negative:\nfs => $fs"))
+        elseif isa(fs, AbstractVector)
+            @argcheck(!isempty(fs) && all(x -> x >= zero(x), fs),
+                      AssertionError("`fs` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), fs) => $(all(x -> x >= zero(x), fs))"))
+        end
+        return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
+                   typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
+    end
 end
 function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
               l::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
@@ -57,30 +107,6 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
               fl::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
               fs::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
               kwargs::NamedTuple = (; atol = 1e-8))
-    if isa(l, Real)
-        @argcheck(l >= zero(l), DomainError("`l` must be non-negative:\nl => $l"))
-    elseif isa(l, AbstractVector)
-        @argcheck(!isempty(l) && all(x -> x >= zero(x), l),
-                  AssertionError("`l` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), l) => $(all(x -> x >= zero(x), l))"))
-    end
-    if isa(s, Real)
-        @argcheck(s >= zero(s), DomainError("`s` must be non-negative:\ns => $s"))
-    elseif isa(s, AbstractVector)
-        @argcheck(!isempty(s) && all(x -> x >= zero(x), s),
-                  AssertionError("`s` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), s) => $(all(x -> x >= zero(x), s))"))
-    end
-    if isa(fl, Real)
-        @argcheck(fl >= zero(fl), DomainError("`fl` must be non-negative:\nfl => $fl"))
-    elseif isa(fl, AbstractVector)
-        @argcheck(!isempty(fl) && all(x -> x >= zero(x), fl),
-                  AssertionError("`fl` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), fl) => $(all(x -> x >= zero(x), fl))"))
-    end
-    if isa(fs, Real)
-        @argcheck(fs >= zero(fs), DomainError("`fs` must be non-negative:\nfs => $fs"))
-    elseif isa(fs, AbstractVector)
-        @argcheck(!isempty(fs) && all(x -> x >= zero(x), fs),
-                  AssertionError("`fs` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), fs) => $(all(x -> x >= zero(x), fs))"))
-    end
     return Fees(tn, l, s, fl, fs, kwargs)
 end
 function fees_constraints(fees::Union{Nothing, <:Fees}, args...; kwargs...)

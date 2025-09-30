@@ -21,6 +21,37 @@ struct Stacking{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
     strict::T8
     threads::T9
     fallback::T10
+    function Stacking(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
+                      wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
+                      sets::Union{Nothing, <:AssetSets},
+                      opti::AbstractVector{<:Union{<:OptimisationEstimator,
+                                                   <:OptimisationResult}},
+                      opto::OptimisationEstimator,
+                      cv::Union{Nothing, <:CrossValidationEstimator}, cwf::WeightFinaliser,
+                      strict::Bool, threads::FLoops.Transducers.Executor,
+                      fallback::Union{Nothing, <:OptimisationEstimator})
+        assert_external_optimiser(opto)
+        if isa(wb, WeightBoundsEstimator)
+            @argcheck(!isnothing(sets))
+        end
+        return new{typeof(pe), typeof(wb), typeof(sets), typeof(opti), typeof(opto),
+                   typeof(cv), typeof(cwf), typeof(strict), typeof(threads),
+                   typeof(fallback)}(pe, wb, sets, opti, opto, cv, cwf, strict, threads,
+                                     fallback)
+    end
+end
+function Stacking(;
+                  pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
+                  wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
+                  sets::Union{Nothing, <:AssetSets} = nothing,
+                  opti::AbstractVector{<:Union{<:OptimisationEstimator,
+                                               <:OptimisationResult}},
+                  opto::OptimisationEstimator,
+                  cv::Union{Nothing, <:CrossValidationEstimator} = nothing,
+                  cwf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
+                  threads::FLoops.Transducers.Executor = ThreadedEx(),
+                  fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
+    return Stacking(pe, wb, sets, opti, opto, cv, cwf, strict, threads, fallback)
 end
 function assert_external_optimiser(opt::Stacking)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
@@ -37,23 +68,6 @@ function assert_internal_optimiser(opt::Stacking)
         assert_internal_optimiser(opt.opti)
     end
     return nothing
-end
-function Stacking(;
-                  pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                  wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
-                  sets::Union{Nothing, <:AssetSets} = nothing,
-                  opti::AbstractVector{<:Union{<:OptimisationEstimator,
-                                               <:OptimisationResult}},
-                  opto::OptimisationEstimator,
-                  cv::Union{Nothing, <:CrossValidationEstimator} = nothing,
-                  cwf::WeightFinaliser = IterativeWeightFinaliser(), strict::Bool = false,
-                  threads::FLoops.Transducers.Executor = ThreadedEx(),
-                  fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    assert_external_optimiser(opto)
-    if isa(wb, WeightBoundsEstimator)
-        @argcheck(!isnothing(sets))
-    end
-    return Stacking(pe, wb, sets, opti, opto, cv, cwf, strict, threads, fallback)
 end
 function opt_view(st::Stacking, i::AbstractVector, X::AbstractMatrix)
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X

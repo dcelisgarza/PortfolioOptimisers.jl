@@ -34,10 +34,14 @@ end
 struct WeightBounds{T1, T2} <: AbstractConstraintResult
     lb::T1
     ub::T2
+    function WeightBounds(lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                          ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}})
+        validate_bounds(lb, ub)
+        return new{typeof(lb), typeof(ub)}(lb, ub)
+    end
 end
 function WeightBounds(; lb::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 0.0,
                       ub::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = 1.0)
-    validate_bounds(lb, ub)
     return WeightBounds(lb, ub)
 end
 function weight_bounds_view(wb::WeightBounds, i::AbstractVector)
@@ -50,6 +54,24 @@ struct UniformScaledBounds <: CustomWeightBoundsConstraint end
 struct WeightBoundsEstimator{T1, T2} <: AbstractConstraintEstimator
     lb::T1
     ub::T2
+    function WeightBoundsEstimator(lb::Union{Nothing, <:AbstractDict,
+                                             <:Pair{<:AbstractString, <:Real},
+                                             <:AbstractVector{<:Pair{<:AbstractString,
+                                                                     <:Real}},
+                                             <:CustomWeightBoundsConstraint},
+                                   ub::Union{Nothing, <:AbstractDict,
+                                             <:Pair{<:AbstractString, <:Real},
+                                             <:AbstractVector{<:Pair{<:AbstractString,
+                                                                     <:Real}},
+                                             <:CustomWeightBoundsConstraint})
+        if isa(lb, Union{<:AbstractDict, <:AbstractVector})
+            @argcheck(!isempty(lb), IsEmptyError(non_empty_msg("`lb`") * "."))
+        end
+        if isa(ub, Union{<:AbstractDict, <:AbstractVector})
+            @argcheck(!isempty(ub), IsEmptyError(non_empty_msg("`ub`") * "."))
+        end
+        return new{typeof(lb), typeof(ub)}(lb, ub)
+    end
 end
 function WeightBoundsEstimator(;
                                lb::Union{Nothing, <:AbstractDict,
@@ -60,12 +82,6 @@ function WeightBoundsEstimator(;
                                          <:Pair{<:AbstractString, <:Real},
                                          <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
                                          <:CustomWeightBoundsConstraint} = nothing)
-    if isa(lb, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(lb), IsEmptyError(non_empty_msg("`lb`") * "."))
-    end
-    if isa(ub, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(ub), IsEmptyError(non_empty_msg("`ub`") * "."))
-    end
     return WeightBoundsEstimator(lb, ub)
 end
 function weight_bounds_view(wb::Union{<:AbstractString, Expr,

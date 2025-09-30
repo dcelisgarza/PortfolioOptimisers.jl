@@ -53,9 +53,12 @@ Detone
 """
 struct Detone{T1} <: AbstractDetoneEstimator
     n::T1
+    function Detone(n::Integer)
+        @argcheck(n > zero(n), DomainError(n, comp_msg("`n`", 1, :gt, n) * "."))
+        return new{typeof(n)}(n)
+    end
 end
 function Detone(; n::Integer = 1)
-    @argcheck(n > zero(n), DomainError(n, comp_msg("`n`", 1, :gt, n) * "."))
     return Detone(n)
 end
 

@@ -45,10 +45,13 @@ PartialLinearConstraint
 struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
     A::T1
     B::T2
+    function PartialLinearConstraint(A::AbstractMatrix, B::AbstractVector)
+        @argcheck(!isempty(A) && !isempty(B),
+                  DimensionMismatch("`A` and `B` must be non-empty:\nisempty(A) => $(isempty(A))\nisempty(B) => $(isempty(B))"))
+        return new{typeof(A), typeof(B)}(A, B)
+    end
 end
 function PartialLinearConstraint(; A::AbstractMatrix, B::AbstractVector)
-    @argcheck(!isempty(A) && !isempty(B),
-              DimensionMismatch("`A` and `B` must be non-empty:\nisempty(A) => $(isempty(A))\nisempty(B) => $(isempty(B))"))
     return PartialLinearConstraint(A, B)
 end
 
@@ -107,11 +110,15 @@ LinearConstraint
 struct LinearConstraint{T1, T2} <: AbstractConstraintResult
     ineq::T1
     eq::T2
+    function LinearConstraint(ineq::Union{Nothing, <:PartialLinearConstraint},
+                              eq::Union{Nothing, <:PartialLinearConstraint})
+        @argcheck(isnothing(ineq) ⊼ isnothing(eq),
+                  AssertionError("`ineq` and `eq` cannot both be `nothing`:\nisnothing(ineq) => $(isnothing(ineq))\nisnothing(eq) => $(isnothing(eq))"))
+        return new{typeof(ineq), typeof(eq)}(ineq, eq)
+    end
 end
 function LinearConstraint(; ineq::Union{Nothing, <:PartialLinearConstraint} = nothing,
                           eq::Union{Nothing, <:PartialLinearConstraint} = nothing)
-    @argcheck(isnothing(ineq) ⊼ isnothing(eq),
-              AssertionError("`ineq` and `eq` cannot both be `nothing`:\nisnothing(ineq) => $(isnothing(ineq))\nisnothing(eq) => $(isnothing(eq))"))
     return LinearConstraint(ineq, eq)
 end
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
@@ -179,6 +186,17 @@ struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
     op::T3
     rhs::T4
     eqn::T5
+    function ParsingResult(vars::AbstractVector{<:AbstractString},
+                           coef::AbstractVector{<:Real}, op::AbstractString, rhs::Real,
+                           eqn::AbstractString)
+        @argcheck(length(vars) == length(coef),
+                  DimensionMismatch("`vars` and `coef` must have the same length:\nlength(vars) => $(length(vars))\nlength(coef) => $(length(coef))"))
+        return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn)}(vars,
+                                                                                     coef,
+                                                                                     op,
+                                                                                     rhs,
+                                                                                     eqn)
+    end
 end
 
 """
@@ -225,6 +243,16 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
     rhs::T4
     eqn::T5
     ij::T6
+    function RhoParsingResult(vars::AbstractVector{<:AbstractString},
+                              coef::AbstractVector{<:Real}, op::AbstractString, rhs::Real,
+                              eqn::AbstractString,
+                              ij::Union{<:Tuple{<:Integer, <:Integer},
+                                        <:AbstractVector{<:Tuple{<:Integer, <:Integer}}})
+        @argcheck(length(vars) == length(coef),
+                  DimensionMismatch("`vars` and `coef` must have the same length:\nlength(vars) => $(length(vars))\nlength(coef) => $(length(coef))"))
+        return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn),
+                   typeof(ij)}(vars, coef, op, rhs, eqn, ij)
+    end
 end
 Base.getindex(res::AbstractParsingResult, i) = i == 1 ? res : throw(BoundsError(res, i))
 
@@ -279,19 +307,22 @@ AssetSets
 struct AssetSets{T1, T2} <: AbstractEstimator
     key::T1
     dict::T2
+    function AssetSets(key::AbstractString, dict::AbstractDict{<:AbstractString, <:Any})
+        @argcheck(!isempty(dict) && haskey(dict, key),
+                  AssertionError("The following conditions must be met:\n`dict` must be non-empty => !isempty(dict) = $(!isempty(dict))\n`dict` must contain `key = $key``, haskey(dict, key) = $(haskey(dict, key))"))
+        for k in keys(dict)
+            if k == key
+                continue
+            elseif startswith(k, key)
+                @argcheck(length(dict[k]) == length(dict[key]),
+                          DimensionMismatch("$k starts with $key, so length(dict[$k]) => $(length(dict[k])), must be equal to length(dict[$key]) => $(length(dict[key]))"))
+            end
+        end
+        return new{typeof(key), typeof(dict)}(key, dict)
+    end
 end
 function AssetSets(; key::AbstractString = "nx",
                    dict::AbstractDict{<:AbstractString, <:Any})
-    @argcheck(!isempty(dict) && haskey(dict, key),
-              AssertionError("The following conditions must be met:\n`dict` must be non-empty => !isempty(dict) = $(!isempty(dict))\n`dict` must contain `key = $key``, haskey(dict, key) = $(haskey(dict, key))"))
-    for k in keys(dict)
-        if k == key
-            continue
-        elseif startswith(k, key)
-            @argcheck(length(dict[k]) == length(dict[key]),
-                      DimensionMismatch("$k starts with $key, so length(dict[$k]) => $(length(dict[k])), must be equal to length(dict[$key]) => $(length(dict[key]))"))
-        end
-    end
     return AssetSets(key, dict)
 end
 function nothing_asset_sets_view(sets::AssetSets, i::AbstractVector)
@@ -797,7 +828,6 @@ function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = F
     lhs_str = replace(lhs_str, "+ -" => "-", "  " => " ")
     rhs_str = string(rhs_val)
     formatted = strip("$lhs_str $opstr $rhs_str")
-
     return ParsingResult(variables, coefficients, opstr, rhs_val, formatted)
 end
 
@@ -1235,14 +1265,19 @@ LinearConstraint
 """
 struct LinearConstraintEstimator{T1} <: AbstractConstraintEstimator
     val::T1
+    function LinearConstraintEstimator(val::Union{<:AbstractString, Expr,
+                                                  <:AbstractVector{<:Union{<:AbstractString,
+                                                                           Expr}}})
+        if isa(val, Union{<:AbstractString, <:AbstractVector})
+            @argcheck(!isempty(val))
+        end
+        return new{typeof(val)}(val)
+    end
 end
 function LinearConstraintEstimator(;
                                    val::Union{<:AbstractString, Expr,
                                               <:AbstractVector{<:Union{<:AbstractString,
                                                                        Expr}}})
-    if isa(val, Union{<:AbstractString, <:AbstractVector})
-        @argcheck(!isempty(val))
-    end
     return LinearConstraintEstimator(val)
 end
 
@@ -1419,10 +1454,13 @@ RiskBudgetResult
 """
 struct RiskBudgetResult{T1} <: AbstractConstraintResult
     val::T1
+    function RiskBudgetResult(val::AbstractVector{<:Real})
+        @argcheck(!isempty(val) && all(x -> x >= zero(x), val),
+                  AssertionError("`val` must be non-empty and all its entries must be non-negative:\n!isempty(val) => $(!isempty(val))\nall(x -> x >= zero(x), val) => $(all(x -> x >= zero(x), val))"))
+        return new{typeof(val)}(val)
+    end
 end
 function RiskBudgetResult(; val::AbstractVector{<:Real})
-    @argcheck(!isempty(val) && all(x -> x >= zero(x), val),
-              AssertionError("`val` must be non-empty and all its entries must be non-negative:\n!isempty(val) => $(!isempty(val))\nall(x -> x >= zero(x), val) => $(all(x -> x >= zero(x), val))"))
     return RiskBudgetResult(val)
 end
 function risk_budget_view(::Nothing, args...)
@@ -1483,24 +1521,30 @@ RiskBudgetEstimator
 """
 struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
     val::T1
+    function RiskBudgetEstimator(val::Union{<:AbstractDict,
+                                            <:Pair{<:AbstractString, <:Real},
+                                            <:AbstractVector{<:Union{<:Pair{<:AbstractString,
+                                                                            <:Real}}}})
+        if isa(val, Union{<:AbstractDict, <:AbstractVector})
+            @argcheck(!isempty(val), IsEmptyError(non_empty_msg("`val`") * "."))
+            if isa(val, AbstractDict)
+                @argcheck(all(x -> x >= zero(x), values(val)),
+                          DomainError("All entries of `val` must be non-negative"))
+            elseif isa(val, AbstractVector{<:Pair})
+                @argcheck(all(x -> x >= zero(x), getproperty.(val, :second)),
+                          DomainError("The numerical value of all entries of `val` must be non-negative"))
+            end
+        elseif isa(val, Pair)
+            @argcheck(val.second >= zero(val.second),
+                      DomainError("The numerical value of `val` must be non-negative:\nval.second => $(val.second)"))
+        end
+        return new{typeof(val)}(val)
+    end
 end
 function RiskBudgetEstimator(;
                              val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
                                         <:AbstractVector{<:Union{<:Pair{<:AbstractString,
                                                                         <:Real}}}})
-    if isa(val, Union{<:AbstractDict, <:AbstractVector})
-        @argcheck(!isempty(val), IsEmptyError(non_empty_msg("`val`") * "."))
-        if isa(val, AbstractDict)
-            @argcheck(all(x -> x >= zero(x), values(val)),
-                      DomainError("All entries of `val` must be non-negative"))
-        elseif isa(val, AbstractVector{<:Pair})
-            @argcheck(all(x -> x >= zero(x), getproperty.(val, :second)),
-                      DomainError("The numerical value of all entries of `val` must be non-negative"))
-        end
-    elseif isa(val, Pair)
-        @argcheck(val.second >= zero(val.second),
-                  DomainError("The numerical value of `val` must be non-negative:\nval.second => $(val.second)"))
-    end
     return RiskBudgetEstimator(val)
 end
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
@@ -1719,9 +1763,12 @@ julia> asset_sets_matrix(est, sets)
 """
 struct AssetSetsMatrixEstimator{T1} <: AbstractConstraintEstimator
     val::T1
+    function AssetSetsMatrixEstimator(val::AbstractString)
+        @argcheck(!isempty(val))
+        return new{typeof(val)}(val)
+    end
 end
 function AssetSetsMatrixEstimator(; val::AbstractString)
-    @argcheck(!isempty(val))
     return AssetSetsMatrixEstimator(val)
 end
 

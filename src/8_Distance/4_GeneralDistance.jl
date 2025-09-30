@@ -60,10 +60,13 @@ GeneralDistance
 struct GeneralDistance{T1, T2} <: AbstractDistanceEstimator
     power::T1
     alg::T2
+    function GeneralDistance(power::Integer, alg::AbstractDistanceAlgorithm)
+        @argcheck(power >= one(power))
+        return new{typeof(power), typeof(alg)}(power, alg)
+    end
 end
 function GeneralDistance(; power::Integer = 1,
                          alg::AbstractDistanceAlgorithm = SimpleDistance())
-    @argcheck(power >= one(power))
     return GeneralDistance(power, alg)
 end
 

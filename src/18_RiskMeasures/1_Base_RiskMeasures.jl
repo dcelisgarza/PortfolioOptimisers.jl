@@ -24,36 +24,45 @@ struct Frontier{T1, T2, T3} <: AbstractAlgorithm
     N::T1
     factor::T2
     flag::T3
+    function Frontier(N::Integer, factor::Real, flag::Bool)
+        @argcheck(N > zero(N))
+        @argcheck(isfinite(factor) && factor > zero(factor))
+        return new{typeof(N), typeof(factor), typeof(flag)}(N, factor, flag)
+    end
 end
 function Frontier(; N::Integer = 20)
-    @argcheck(N > zero(N))
-    factor = 1
-    flag = true
     return Frontier(N, 1, true)
 end
 function _Frontier(; N::Integer = 20, factor::Real, flag::Bool)
-    @argcheck(N > zero(N))
-    @argcheck(isfinite(factor) && factor > zero(factor))
     return Frontier(N, factor, flag)
 end
 struct RiskMeasureSettings{T1, T2, T3} <: AbstractRiskMeasureSettings
     scale::T1
     ub::T2
     rke::T3
+    function RiskMeasureSettings(scale::Real,
+                                 ub::Union{Nothing, <:Real, <:AbstractVector, <:Frontier},
+                                 rke::Bool)
+        if isa(ub, Real)
+            @argcheck(isfinite(ub) && ub > zero(ub))
+        elseif isa(ub, AbstractVector)
+            @argcheck(!isempty(ub) && all(isfinite, ub) && all(x -> x > zero(x), ub))
+        end
+        @argcheck(isfinite(scale))
+        return new{typeof(scale), typeof(ub), typeof(rke)}(scale, ub, rke)
+    end
 end
 function RiskMeasureSettings(; scale::Real = 1.0,
                              ub::Union{Nothing, <:Real, <:AbstractVector, <:Frontier} = nothing,
                              rke::Bool = true)
-    if isa(ub, Real)
-        @argcheck(isfinite(ub) && ub > zero(ub))
-    elseif isa(ub, AbstractVector)
-        @argcheck(!isempty(ub) && all(isfinite, ub) && all(x -> x > zero(x), ub))
-    end
-    @argcheck(isfinite(scale))
     return RiskMeasureSettings(scale, ub, rke)
 end
 struct HierarchicalRiskMeasureSettings{T1} <: AbstractRiskMeasureSettings
     scale::T1
+    function HierarchicalRiskMeasureSettings(scale::Real)
+        @argcheck(isfinite(scale))
+        return new{typeof(scale)}(scale)
+    end
 end
 function HierarchicalRiskMeasureSettings(; scale::Real = 1.0)
     return HierarchicalRiskMeasureSettings(scale)
@@ -83,9 +92,12 @@ struct SumScalariser <: Scalariser end
 struct MaxScalariser <: Scalariser end
 struct LogSumExpScalariser{T1} <: Scalariser
     gamma::T1
+    function LogSumExpScalariser(gamma::Real)
+        @argcheck(gamma > zero(gamma))
+        return new{typeof(gamma)}(gamma)
+    end
 end
 function LogSumExpScalariser(; gamma::Real = 1.0)
-    @argcheck(gamma > zero(gamma))
     return LogSumExpScalariser(gamma)
 end
 function expected_risk end

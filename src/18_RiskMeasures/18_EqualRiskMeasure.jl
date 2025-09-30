@@ -1,5 +1,8 @@
 struct EqualRiskMeasure{T1} <: HierarchicalRiskMeasure
     settings::T1
+    function EqualRiskMeasure(settings::HierarchicalRiskMeasureSettings)
+        return new{typeof(settings)}(settings)
+    end
 end
 function EqualRiskMeasure(;
                           settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
