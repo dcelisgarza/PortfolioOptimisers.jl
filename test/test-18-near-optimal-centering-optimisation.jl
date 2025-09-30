@@ -56,7 +56,7 @@
                                   "reduced_tol_infeas_rel" => 1e-4))]
     pr = prior(HighOrderPriorEstimator(), rd)
     rf = 4.2 / 100 / 252
-    @testset "Unconstrained Efficient Frontier" begin
+    @testset "Unconstrained" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier1.csv.gz"),
                       DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
@@ -116,6 +116,7 @@
 
         w0 = range(; start = inv(length(pr.mu)), stop = inv(length(pr.mu)),
                    length = length(pr.mu))
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
         res = optimise!(NearOptimalCentering(; w_min_ini = w0,
                                              w_min = optimise!(MeanRisk(; opt = opt)).w,
                                              w_opt_ini = w0,
@@ -135,7 +136,7 @@
                                              fallback = InverseVolatility(; pe = pr)))
         @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
     end
-    @testset "Constrained Efficient Frontier" begin
+    @testset "Constrained" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/NearOptimalCenteringFrontier3.csv.gz"),
                       DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
