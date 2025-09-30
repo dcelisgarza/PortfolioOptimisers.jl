@@ -24,6 +24,9 @@ function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
     if isa(wi, AbstractVector)
         @argcheck(!isempty(wi))
     end
+    if isa(rkb, RiskBudgetEstimator)
+        @argcheck(!isnothing(opt.sets))
+    end
     return RelaxedRiskBudgeting(opt, rkb, wi, alg, fallback)
 end
 function opt_view(rrb::RelaxedRiskBudgeting, i::AbstractVector, X::AbstractMatrix)

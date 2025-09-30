@@ -211,6 +211,18 @@
         rkc /= sum(rkc)
         rkb = risk_budget_constraints(rb.alg.rkb, sets)
         @test isapprox(rkc, rkb.val, rtol = 5e-5)
+
+        res = optimise!(RiskBudgeting(; wi = w0,
+                                      alg = AssetRiskBudgeting(;
+                                                               rkb = RiskBudgetEstimator(;
+                                                                                         val = ["AAPL" => 0.5])),
+                                      opt = JuMPOptimiser(; pe = pr, sets = sets,
+                                                          slv = Solver(;
+                                                                       solver = Clarabel.Optimizer,
+                                                                       settings = ["verbose" => false,
+                                                                                   "max_iter" => 1])),
+                                      fallback = InverseVolatility(; pe = pr)))
+        @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
     end
     @testset "Factor Risk Budgeting" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgeting1.csv.gz"), DataFrame)
