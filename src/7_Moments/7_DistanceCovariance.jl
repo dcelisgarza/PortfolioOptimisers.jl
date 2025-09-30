@@ -59,7 +59,11 @@ struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
     function DistanceCovariance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
                                 w::Union{Nothing, <:AbstractWeights},
                                 threads::FLoops.Transducers.Executor)
-        return DistanceCovariance(dist, args, kwargs, w, threads)
+        return new{typeof(dist), typeof(args), typeof(kwargs), typeof(w), typeof(threads)}(dist,
+                                                                                           args,
+                                                                                           kwargs,
+                                                                                           w,
+                                                                                           threads)
     end
 end
 function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
