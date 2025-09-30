@@ -22,7 +22,8 @@ struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
         if !isnothing(tau)
             @argcheck(tau > zero(tau))
         end
-        return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
+        return new{typeof(pe), typeof(mp), typeof(views), typeof(sets), typeof(views_conf),
+                   typeof(rf), typeof(tau)}(pe, mp, views, sets, views_conf, rf, tau)
     end
 end
 function BlackLittermanPrior(;
