@@ -210,7 +210,7 @@ struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
     function BetweennessCentrality(args::Tuple, kwargs::NamedTuple)
-        return BetweennessCentrality(args, kwargs)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
 function BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
@@ -260,7 +260,7 @@ struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
     function ClosenessCentrality(args::Tuple, kwargs::NamedTuple)
-        return ClosenessCentrality(args, kwargs)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
 function ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
@@ -436,13 +436,13 @@ struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
     n::T1
     alpha::T2
     epsilon::T3
-    function Pagerank(alpha::Real, n::Integer, epsilon::Real)
+    function Pagerank(n::Integer, alpha::Real, epsilon::Real)
         @argcheck(n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
                   DomainError("The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon"))
         return new{typeof(n), typeof(alpha), typeof(epsilon)}(n, alpha, epsilon)
     end
 end
-function Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
+function Pagerank(; n::Integer = 100, alpha::Real = 0.85, epsilon::Real = 1e-6)
     return Pagerank(n, alpha, epsilon)
 end
 
