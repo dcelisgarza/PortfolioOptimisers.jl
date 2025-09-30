@@ -105,7 +105,7 @@
     df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedRiskBudgeting2.csv.gz"), DataFrame)
     for (i, alg) in enumerate(algs)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
-        rb = RelaxedRiskBudgeting(; opt = opt, rkb = RiskBudgetResult(; val = 20:-1:1),
+        rb = RelaxedRiskBudgeting(; opt = opt, rba = RiskBudgetResult(; val = 20:-1:1),
                                   alg = alg)
         res = optimise!(rb)
         @test isa(res.retcode, OptimisationSuccess)

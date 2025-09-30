@@ -10,13 +10,13 @@ function RegularisedPenalisedRelaxedRiskBudgeting(; p::Real = 1.0)
 end
 struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     opt::T1
-    rkb::T2
+    rba::T2
     wi::T3
     alg::T4
     fallback::T5
 end
 function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
-                              rkb::Union{Nothing, <:RiskBudgetEstimator,
+                              rba::Union{Nothing, <:RiskBudgetEstimator,
                                          <:RiskBudgetResult} = nothing,
                               wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
@@ -24,17 +24,17 @@ function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
     if isa(wi, AbstractVector)
         @argcheck(!isempty(wi))
     end
-    if isa(rkb, RiskBudgetEstimator)
+    if isa(rba, RiskBudgetEstimator)
         @argcheck(!isnothing(opt.sets))
     end
-    return RelaxedRiskBudgeting(opt, rkb, wi, alg, fallback)
+    return RelaxedRiskBudgeting(opt, rba, wi, alg, fallback)
 end
 function opt_view(rrb::RelaxedRiskBudgeting, i::AbstractVector, X::AbstractMatrix)
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
-    rkb = risk_budget_view(rrb.rkb, i)
+    rba = risk_budget_view(rrb.rba, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
-    return RelaxedRiskBudgeting(; opt = opt, rkb = rkb, wi = wi, alg = rrb.alg,
+    return RelaxedRiskBudgeting(; opt = opt, rba = rba, wi = wi, alg = rrb.alg,
                                 fallback = rrb.fallback)
 end
 function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting,
@@ -92,8 +92,8 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  sigma::AbstractMatrix)
     w = model[:w]
     N = length(w)
-    rkb = risk_budget_constraints(rrb.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict)
-    rb = rkb.val
+    rba = risk_budget_constraints(rrb.rba, rrb.opt.sets; N = N, strict = rrb.opt.strict)
+    rb = rba.val
     sc = model[:sc]
     @variables(model, begin
                    psi >= 0
@@ -111,7 +111,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                       sc * (w[i] - zeta[i])] in SecondOrderCone()
                  end)
     set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, sigma)
-    return rkb
+    return rba
 end
 function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)

@@ -27,13 +27,13 @@ end
 struct RiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     opt::T1
     r::T2
-    alg::T3
+    rba::T3
     wi::T4
     fallback::T5
 end
 function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                        r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
-                       alg::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
+                       rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                        wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                        fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
     if isa(r, AbstractVector)
@@ -42,25 +42,25 @@ function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
     if isa(wi, AbstractVector)
         @argcheck(!isempty(wi))
     end
-    if isa(alg.rkb, RiskBudgetEstimator)
+    if isa(rba.rkb, RiskBudgetEstimator)
         @argcheck(!isnothing(opt.sets))
     end
-    return RiskBudgeting(opt, r, alg, wi, fallback)
+    return RiskBudgeting(opt, r, rba, wi, fallback)
 end
 function opt_view(rb::RiskBudgeting, i::AbstractVector, X::AbstractMatrix)
     X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
     opt = opt_view(rb.opt, i, X)
     r = risk_measure_view(rb.r, i, X)
-    alg = risk_budgeting_algorithm_view(rb.alg, i)
+    rba = risk_budgeting_algorithm_view(rb.rba, i)
     wi = nothing_scalar_array_view(rb.wi, i)
-    return RiskBudgeting(; opt = opt, r = r, alg = alg, wi = wi, fallback = rb.fallback)
+    return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi, fallback = rb.fallback)
 end
 function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                           w::AbstractVector{<:AbstractJuMPScalar},
                                           sets::Union{Nothing, <:AssetSets} = nothing;
                                           strict::Bool = false)
     N = length(w)
-    rkb = risk_budget_constraints(rb.alg.rkb, sets; N = N, strict = strict)
+    rkb = risk_budget_constraints(rb.rba.rkb, sets; N = N, strict = strict)
     rb = rkb.val
     @argcheck(length(rb) == N)
     sc = model[:sc]
@@ -93,7 +93,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          sets::Union{Nothing, <:AssetSets},
                                          pr::AbstractPriorResult, wb::WeightBounds,
                                          rd::ReturnsResult)
-    b1, rr = set_factor_risk_contribution_constraints!(model, rb.alg.re, rd, rb.alg.flag,
+    b1, rr = set_factor_risk_contribution_constraints!(model, rb.rba.re, rd, rb.rba.flag,
                                                        rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, model[:w1], sets;
                                            strict = rb.opt.strict)

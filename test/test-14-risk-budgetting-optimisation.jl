@@ -140,7 +140,7 @@
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
             rb = RiskBudgeting(; r = r, opt = opt,
-                               alg = AssetRiskBudgeting(;
+                               rba = AssetRiskBudgeting(;
                                                         rkb = RiskBudgetResult(;
                                                                                val = 1:20)))
             res = optimise!(rb, rd)
@@ -199,7 +199,7 @@
 
         r = factory(Variance(), pr, slv)
         rb = RiskBudgeting(;
-                           alg = AssetRiskBudgeting(;
+                           rba = AssetRiskBudgeting(;
                                                     rkb = RiskBudgetEstimator(;
                                                                               val = ["AAPL" => 0.5,
                                                                                      "MSFT" => 0.25,
@@ -209,11 +209,11 @@
         @test isa(res.retcode, OptimisationSuccess)
         rkc = risk_contribution(r, res.w, pr.X)
         rkc /= sum(rkc)
-        rkb = risk_budget_constraints(rb.alg.rkb, sets)
+        rkb = risk_budget_constraints(rb.rba.rkb, sets)
         @test isapprox(rkc, rkb.val, rtol = 5e-5)
 
         res = optimise!(RiskBudgeting(; wi = w0,
-                                      alg = AssetRiskBudgeting(;
+                                      rba = AssetRiskBudgeting(;
                                                                rkb = RiskBudgetEstimator(;
                                                                                          val = ["AAPL" => 0.5])),
                                       opt = JuMPOptimiser(; pe = pr, sets = sets,
@@ -234,7 +234,7 @@
             if i == 25
                 continue
             end
-            rb = RiskBudgeting(; r = r, opt = opt, alg = FactorRiskBudgeting(; re = rr))
+            rb = RiskBudgeting(; r = r, opt = opt, rba = FactorRiskBudgeting(; re = rr))
             res = optimise!(rb, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
@@ -296,7 +296,7 @@
             end
             opt = JuMPOptimiser(; pe = pr, slv = slv)
             rb = RiskBudgeting(; r = r, opt = opt,
-                               alg = FactorRiskBudgeting(; flag = true, re = rr,
+                               rba = FactorRiskBudgeting(; flag = true, re = rr,
                                                          rkb = RiskBudgetResult(;
                                                                                 val = 1:5)))
             res = optimise!(rb, rd)
@@ -356,7 +356,7 @@
 
         r = factory(Variance(), pr, slv)
         rb = RiskBudgeting(;
-                           alg = FactorRiskBudgeting(; re = rr,
+                           rba = FactorRiskBudgeting(; re = rr,
                                                      rkb = RiskBudgetEstimator(;
                                                                                val = "MTUM" => 0.5)),
                            opt = JuMPOptimiser(; pe = pr, slv = slv,
@@ -369,7 +369,7 @@
         @test isa(res.retcode, OptimisationSuccess)
         rkc = factor_risk_contribution(r, res.w, pr.X; re = res.prb.rr)
         rkc[1:5] /= sum(rkc[1:5])
-        rkb = risk_budget_constraints(rb.alg.rkb, fsets)
+        rkb = risk_budget_constraints(rb.rba.rkb, fsets)
         @test isapprox(rkc[1:5], rkb.val, rtol = 5e-4)
     end
 end
