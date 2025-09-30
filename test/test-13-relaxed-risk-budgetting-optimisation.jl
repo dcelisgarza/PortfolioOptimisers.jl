@@ -22,6 +22,8 @@
         end
     end
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end],
+                           TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
     slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
                   check_sol = (; allow_local = true, allow_almost = true),
@@ -65,77 +67,141 @@
     algs = [BasicRelaxedRiskBudgeting(), RegularisedRelaxedRiskBudgeting(),
             RegularisedPenalisedRelaxedRiskBudgeting(),
             RegularisedPenalisedRelaxedRiskBudgeting(; p = 50)]
-    df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedRiskBudgeting1.csv.gz"), DataFrame)
-    r = factory(StandardDeviation(), pr, slv)
-    for (i, alg) in enumerate(algs)
-        opt = JuMPOptimiser(; pe = pr, slv = slv)
-        rb = RelaxedRiskBudgeting(; opt = opt, alg = alg)
-        res = optimise!(rb)
-        @test isa(res.retcode, OptimisationSuccess)
-        rkc = risk_contribution(r, res.w, pr.X)
-        v1, m1 = findmin(rkc)
-        v2, m2 = findmax(rkc)
-        rtol = if i == 4
-            0.5
-        else
-            5e-6
-        end
-        success = isapprox(v2 / v1, 1; rtol = rtol)
-        if !success
-            println("Extrema $i fails")
-            find_tol(v2 / v1, 1)
-        end
-        @test success
+    @testset "Asset Risk Budgeting" begin
+        df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedAssetRiskBudgeting1.csv.gz"),
+                      DataFrame)
+        r = factory(StandardDeviation(), pr, slv)
+        for (i, alg) in enumerate(algs)
+            opt = JuMPOptimiser(; pe = pr, slv = slv)
+            rb = RelaxedRiskBudgeting(; opt = opt, alg = alg)
+            res = optimise!(rb)
+            @test isa(res.retcode, OptimisationSuccess)
+            rkc = risk_contribution(r, res.w, pr.X)
+            v1, m1 = findmin(rkc)
+            v2, m2 = findmax(rkc)
+            rtol = if i == 4
+                0.5
+            else
+                5e-6
+            end
+            success = isapprox(v2 / v1, 1; rtol = rtol)
+            if !success
+                println("Extrema $i fails")
+                find_tol(v2 / v1, 1)
+            end
+            @test success
 
-        rtol = if Sys.isapple() && i ∈ (2, 5, 12)
-            1e-4
-        elseif Sys.isapple() && i == 17
-            5e-3
-        else
-            1e-6
+            rtol = if Sys.isapple() && i ∈ (2, 5, 12)
+                1e-4
+            elseif Sys.isapple() && i == 17
+                5e-3
+            else
+                1e-6
+            end
+            success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Weights and Contribution $i fails")
+                find_tol([res.w; rkc], df[!, "$i"])
+            end
+            @test success
         end
-        success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
-        if !success
-            println("Weights and Contribution $i fails")
-            find_tol([res.w; rkc], df[!, "$i"])
+
+        df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedAssetRiskBudgeting2.csv.gz"),
+                      DataFrame)
+        for (i, alg) in enumerate(algs)
+            opt = JuMPOptimiser(; pe = pr, slv = slv)
+            rb = RelaxedRiskBudgeting(; opt = opt,
+                                      rba = AssetRiskBudgeting(;
+                                                               rkb = RiskBudgetResult(;
+                                                                                      val = 20:-1:1)),
+                                      alg = alg)
+            res = optimise!(rb)
+            @test isa(res.retcode, OptimisationSuccess)
+            rkc = risk_contribution(r, res.w, pr.X)
+            v1, m1 = findmin(rkc)
+            v2, m2 = findmax(rkc)
+            rtol = if Sys.isapple() && i == 9
+                5e-4
+            elseif Sys.isapple() && i == 14
+                1e-2
+            else
+                1e-6
+            end
+            success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Weights and Contribution $i fails")
+                find_tol([res.w; rkc], df[!, "$i"])
+            end
+            @test success
         end
-        @test success
+
+        res = optimise!(RelaxedRiskBudgeting(; wi = w0,
+                                             opt = JuMPOptimiser(; pe = pr,
+                                                                 slv = Solver(;
+                                                                              solver = Clarabel.Optimizer,
+                                                                              settings = ["verbose" => false,
+                                                                                          "max_iter" => 1])),
+                                             fallback = InverseVolatility(; pe = pr)))
+        @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
     end
+    @testset "Factor Risk Budgeting" begin
+        r = factory(StandardDeviation(), pr, slv)
+        df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedFactorRiskBudgeting1.csv.gz"),
+                      DataFrame)
+        opt = JuMPOptimiser(; pe = pr, slv = slv,
+                            sbgt = BudgetRange(; lb = 0, ub = nothing), bgt = 1,
+                            wb = WeightBounds(; lb = nothing, ub = nothing))
+        rr = regression(StepwiseRegression(), rd)
+        for (i, alg) in enumerate(algs)
+            rb = RelaxedRiskBudgeting(; opt = opt, rba = FactorRiskBudgeting(; re = rr))
+            res = optimise!(rb, rd)
+            rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
+                                           re = res.prb.rr)
+            v1 = minimum(rkc[1:5])
+            v2 = maximum(rkc[1:5])
+            rtol = 0.25
+            success = isapprox(v2 / v1, 1; rtol = rtol)
+            if !success
+                println("Extrema $i fails")
+                find_tol(v2 / v1, 1)
+            end
+            @test success
 
-    df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedRiskBudgeting2.csv.gz"), DataFrame)
-    for (i, alg) in enumerate(algs)
-        opt = JuMPOptimiser(; pe = pr, slv = slv)
-        rb = RelaxedRiskBudgeting(; opt = opt,
-                                  rba = AssetRiskBudgeting(;
-                                                           rkb = RiskBudgetResult(;
-                                                                                  val = 20:-1:1)),
-                                  alg = alg)
-        res = optimise!(rb)
-        @test isa(res.retcode, OptimisationSuccess)
-        rkc = risk_contribution(r, res.w, pr.X)
-        v1, m1 = findmin(rkc)
-        v2, m2 = findmax(rkc)
-        rtol = if Sys.isapple() && i == 9
-            5e-4
-        elseif Sys.isapple() && i == 14
-            1e-2
-        else
-            1e-6
+            rtol = 1e-6
+            success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Weights and Contribution $i fails")
+                find_tol([res.w; rkc], df[!, "$i"])
+            end
+            @test success
         end
-        success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
-        if !success
-            println("Weights and Contribution $i fails")
-            find_tol([res.w; rkc], df[!, "$i"])
+        df = CSV.read(joinpath(@__DIR__, "./assets/RelaxedFactorRiskBudgeting2.csv.gz"),
+                      DataFrame)
+        for (i, alg) in enumerate(algs)
+            rb = RelaxedRiskBudgeting(; opt = opt,
+                                      rba = FactorRiskBudgeting(; re = rr,
+                                                                rkb = RiskBudgetResult(;
+                                                                                       val = 1:5)))
+            res = optimise!(rb, rd)
+            rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
+                                           re = res.prb.rr)
+            v1 = minimum(rkc[1:5])
+            v2 = maximum(rkc[1:5])
+            rtol = 1.1
+            success = isapprox(v2 / v1, 5; rtol = rtol)
+            if !success
+                println("Extrema $i fails")
+                find_tol(v2 / v1, 5)
+            end
+            @test success
+
+            rtol = 1e-6
+            success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Weights and Contribution $i fails")
+                find_tol([res.w; rkc], df[!, "$i"])
+            end
+            @test success
         end
-        @test success
     end
-
-    res = optimise!(RelaxedRiskBudgeting(; wi = w0,
-                                         opt = JuMPOptimiser(; pe = pr,
-                                                             slv = Solver(;
-                                                                          solver = Clarabel.Optimizer,
-                                                                          settings = ["verbose" => false,
-                                                                                      "max_iter" => 1])),
-                                         fallback = InverseVolatility(; pe = pr)))
-    @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
 end

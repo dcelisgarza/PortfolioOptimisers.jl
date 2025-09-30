@@ -121,7 +121,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     b1, rr = set_factor_risk_contribution_constraints!(model, rrb.rba.re, rd, rrb.rba.flag,
                                                        rrb.wi)
     rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, model[:w1],
-                                                   transpose(rr.L) * pr.sigma * rr.L)
+                                                   Matrix(Symmetric(rr.L \ pr.sigma * b1)))
     set_weight_constraints!(model, wb, rrb.opt.bgt, rrb.opt.sbgt)
     return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
 end

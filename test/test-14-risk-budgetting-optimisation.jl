@@ -77,7 +77,7 @@
                                  "c2" => rd.nx[2:3:end], "c3" => rd.nx[3:3:end]))
     fsets = AssetSets(; dict = Dict("nx" => rd.nf))
     @testset "Asset Risk Budgeting" begin
-        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgeting1.csv.gz"), DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "./assets/AssetRiskBudgeting1.csv.gz"), DataFrame)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
@@ -136,7 +136,7 @@
             @test success
         end
 
-        df = CSV.read(joinpath(@__DIR__, "./assets/RiskBudgeting2.csv.gz"), DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "./assets/AssetRiskBudgeting2.csv.gz"), DataFrame)
         for (i, r) in enumerate(rs)
             r = factory(r, pr, slv)
             rb = RiskBudgeting(; r = r, opt = opt,
