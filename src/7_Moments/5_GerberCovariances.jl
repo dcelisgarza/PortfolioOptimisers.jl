@@ -339,7 +339,8 @@ struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
                               pdm::Union{Nothing, <:Posdef}, threshold::Real,
                               alg::GerberCovarianceAlgorithm)
         @argcheck(zero(threshold) < threshold < one(threshold))
-        return GerberCovariance(ve, pdm, threshold, alg)
+        return new{typeof(ve), typeof(pdm), typeof(threshold), typeof(alg)}(ve, pdm,
+                                                                            threshold, alg)
     end
 end
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
