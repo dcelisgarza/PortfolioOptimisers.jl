@@ -12,7 +12,7 @@ abstract type DeviationLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
 struct SecondLowerMoment{T1} <: DeviationLowerMoment
     alg::T1
     function SecondLowerMoment(alg::SecondMomentAlgorithm)
-        return SecondLowerMoment(alg)
+        return new{typeof(alg)}(alg)
     end
 end
 function SecondLowerMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
@@ -21,7 +21,7 @@ end
 struct SecondCentralMoment{T1} <: DeviationLowerMoment
     alg::T1
     function SecondCentralMoment(alg::SecondMomentAlgorithm)
-        return SecondCentralMoment(alg)
+        return new{typeof(alg)}(alg)
     end
 end
 function SecondCentralMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
