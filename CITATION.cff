@@ -6,5 +6,7 @@ message: >-
   metadata from this file.
 type: software
 authors:
-  - given-names: Daniel Celis Garza
+  - family-names: Celis Garza
+    given-names: Daniel
     email: daniel.celis.garza@gmail.com
+date-released: 2025-10-01
