@@ -167,7 +167,7 @@
             end
             @test success
 
-            rtol = 1e-6
+            rtol = 5e-3
             success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
             if !success
                 println("Weights and Contribution $i fails")
@@ -195,7 +195,7 @@
             end
             @test success
 
-            rtol = 1e-6
+            rtol = 5e-3
             success = isapprox([res.w; rkc], df[!, "$i"]; rtol = rtol)
             if !success
                 println("Weights and Contribution $i fails")

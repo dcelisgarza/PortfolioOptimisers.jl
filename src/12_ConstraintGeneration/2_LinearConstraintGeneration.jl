@@ -245,7 +245,10 @@ struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
     ij::T6
     function RhoParsingResult(vars::AbstractVector{<:AbstractString},
                               coef::AbstractVector{<:Real}, op::AbstractString, rhs::Real,
-                              eqn::AbstractString, ij)
+                              eqn::AbstractString,
+                              ij::AbstractVector{<:Union{<:Tuple{<:Integer, <:Integer},
+                                                         <:Tuple{<:AbstractVector{<:Integer},
+                                                                 <:AbstractVector{<:Integer}}}})
         @argcheck(length(vars) == length(coef),
                   DimensionMismatch("`vars` and `coef` must have the same length:\nlength(vars) => $(length(vars))\nlength(coef) => $(length(coef))"))
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn),
