@@ -64,14 +64,18 @@ struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEs
     ce::T1
     w::T2
     l::T3
+    function EquilibriumExpectedReturns(ce::StatsBase.CovarianceEstimator,
+                                        w::Union{Nothing, <:AbstractVector}, l::Real)
+        if isa(w, AbstractVector)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
+    end
 end
 function EquilibriumExpectedReturns(;
                                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                     w::Union{Nothing, <:AbstractVector} = nothing,
                                     l::Real = 1)
-    if isa(w, AbstractVector)
-        @argcheck(!isempty(w))
-    end
     return EquilibriumExpectedReturns(ce, w, l)
 end
 function factory(ce::EquilibriumExpectedReturns, args...)

@@ -122,10 +122,13 @@ NormalisedConstantRelativeRiskAversion
 """
 struct NormalisedConstantRelativeRiskAversion{T1} <: AbstractOrderedWeightsArrayEstimator
     g::T1
+    function NormalisedConstantRelativeRiskAversion(g::Real)
+        @argcheck(zero(g) < g < one(g),
+                  DomainError(g, range_msg("`g`", zero(g), one(g), g, false, false) * "."))
+        return new{typeof(g)}(g)
+    end
 end
 function NormalisedConstantRelativeRiskAversion(; g::Real = 0.5)
-    @argcheck(zero(g) < g < one(g),
-              DomainError(g, range_msg("`g`", zero(g), one(g), g, false, false) * "."))
     return NormalisedConstantRelativeRiskAversion(g)
 end
 
@@ -199,24 +202,33 @@ struct OWAJuMP{T1, T2, T3, T4, T5} <: AbstractOrderedWeightsArrayEstimator
     sc::T3
     so::T4
     alg::T5
+    function OWAJuMP(slv::Union{<:Solver, <:AbstractVector{<:Solver}}, max_phi::Real,
+                     sc::Real, so::Real, alg::AbstractOrderedWeightsArrayAlgorithm)
+        if isa(slv, AbstractVector)
+            @argcheck(!isempty(slv), IsEmptyError(non_empty_msg("`slv`") * "."))
+        end
+        @argcheck(zero(max_phi) < max_phi < one(max_phi),
+                  DomainError(max_phi,
+                              range_msg("`max_phi`", zero(max_phi), one(max_phi), max_phi,
+                                        false, false) * "."))
+        @argcheck(isfinite(sc) && sc > zero(sc),
+                  AssertionError(uppercasefirst(mul_cond_msg([non_finite_msg("`sc`"),
+                                                              comp_msg("`sc`", "0", :gt,
+                                                                       sc)]))))
+        @argcheck(isfinite(so) && so > zero(so),
+                  AssertionError(uppercasefirst(mul_cond_msg([non_finite_msg("`so`"),
+                                                              comp_msg("`so`", "0", :gt,
+                                                                       so)]))))
+        return new{typeof(slv), typeof(max_phi), typeof(sc), typeof(so), typeof(alg)}(slv,
+                                                                                      max_phi,
+                                                                                      sc,
+                                                                                      so,
+                                                                                      alg)
+    end
 end
 function OWAJuMP(; slv::Union{<:Solver, <:AbstractVector{<:Solver}} = Solver(),
                  max_phi::Real = 0.5, sc::Real = 1.0, so::Real = 1.0,
                  alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
-    if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv), IsEmptyError(non_empty_msg("`slv`") * "."))
-    end
-    @argcheck(zero(max_phi) < max_phi < one(max_phi),
-              DomainError(max_phi,
-                          range_msg("`max_phi`", zero(max_phi), one(max_phi), max_phi,
-                                    false, false) * "."))
-    @argcheck(isfinite(sc) && sc > zero(sc),
-              AssertionError(uppercasefirst(mul_cond_msg([non_finite_msg("`sc`"),
-                                                          comp_msg("`sc`", "0", :gt, sc)]))))
-
-    @argcheck(isfinite(so) && so > zero(so),
-              AssertionError(uppercasefirst(mul_cond_msg([non_finite_msg("`so`"),
-                                                          comp_msg("`so`", "0", :gt, so)]))))
     return OWAJuMP(slv, max_phi, sc, so, alg)
 end
 

@@ -52,6 +52,10 @@ PortfolioOptimisersCovariance
 struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
     ce::T1
     mp::T2
+    function PortfolioOptimisersCovariance(ce::AbstractCovarianceEstimator,
+                                           mp::AbstractMatrixProcessingEstimator)
+        return new{typeof(ce), typeof(mp)}(ce, mp)
+    end
 end
 function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
                                        mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing())

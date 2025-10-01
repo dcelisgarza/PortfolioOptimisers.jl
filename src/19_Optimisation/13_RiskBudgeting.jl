@@ -1,6 +1,10 @@
 abstract type RiskBudgetingAlgorithm <: OptimisationAlgorithm end
 struct AssetRiskBudgeting{T1} <: RiskBudgetingAlgorithm
     rkb::T1
+    function AssetRiskBudgeting(rkb::Union{Nothing, <:RiskBudgetEstimator,
+                                           <:RiskBudgetResult})
+        return new{typeof(rkb)}(rkb)
+    end
 end
 function AssetRiskBudgeting(;
                             rkb::Union{Nothing, <:RiskBudgetEstimator, <:RiskBudgetResult} = nothing)
@@ -13,6 +17,11 @@ struct FactorRiskBudgeting{T1, T2, T3} <: RiskBudgetingAlgorithm
     re::T1
     rkb::T2
     flag::T3
+    function FactorRiskBudgeting(re::Union{<:Regression, <:AbstractRegressionEstimator},
+                                 rkb::Union{Nothing, <:RiskBudgetEstimator,
+                                            <:RiskBudgetResult}, flag::Bool)
+        return new{typeof(re), typeof(rkb), typeof(flag)}(re, rkb, flag)
+    end
 end
 function FactorRiskBudgeting(;
                              re::Union{<:Regression, <:AbstractRegressionEstimator} = StepwiseRegression(),
@@ -27,40 +36,50 @@ end
 struct RiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     opt::T1
     r::T2
-    alg::T3
+    rba::T3
     wi::T4
     fallback::T5
+    function RiskBudgeting(opt::JuMPOptimiser,
+                           r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+                           rba::RiskBudgetingAlgorithm,
+                           wi::Union{Nothing, <:AbstractVector{<:Real}},
+                           fallback::Union{Nothing, <:OptimisationEstimator})
+        if isa(r, AbstractVector)
+            @argcheck(!isempty(r))
+        end
+        if isa(wi, AbstractVector)
+            @argcheck(!isempty(wi))
+        end
+        if isa(rba.rkb, RiskBudgetEstimator)
+            @argcheck(!isnothing(opt.sets))
+        end
+        return new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fallback)}(opt,
+                                                                                      r,
+                                                                                      rba,
+                                                                                      wi,
+                                                                                      fallback)
+    end
 end
 function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                        r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = Variance(),
-                       alg::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
+                       rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                        wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                        fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    if isa(r, AbstractVector)
-        @argcheck(!isempty(r))
-    end
-    if isa(wi, AbstractVector)
-        @argcheck(!isempty(wi))
-    end
-    if isa(alg.rkb, RiskBudgetEstimator)
-        @argcheck(!isnothing(opt.sets))
-    end
-    return RiskBudgeting(opt, r, alg, wi, fallback)
+    return RiskBudgeting(opt, r, rba, wi, fallback)
 end
 function opt_view(rb::RiskBudgeting, i::AbstractVector, X::AbstractMatrix)
     X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
     opt = opt_view(rb.opt, i, X)
     r = risk_measure_view(rb.r, i, X)
-    alg = risk_budgeting_algorithm_view(rb.alg, i)
+    rba = risk_budgeting_algorithm_view(rb.rba, i)
     wi = nothing_scalar_array_view(rb.wi, i)
-    return RiskBudgeting(; opt = opt, r = r, alg = alg, wi = wi, fallback = rb.fallback)
+    return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi, fallback = rb.fallback)
 end
 function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
-                                          w::AbstractVector{<:AbstractJuMPScalar},
-                                          sets::Union{Nothing, <:AssetSets} = nothing;
+                                          w::AbstractVector{<:AbstractJuMPScalar};
                                           strict::Bool = false)
     N = length(w)
-    rkb = risk_budget_constraints(rb.alg.rkb, sets; N = N, strict = strict)
+    rkb = risk_budget_constraints(rb.rba.rkb, rb.opt.sets; N = N, strict = strict)
     rb = rkb.val
     @argcheck(length(rb) == N)
     sc = model[:sc]
@@ -79,24 +98,19 @@ end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rb::RiskBudgeting{<:Any, <:Any,
                                                            <:AssetRiskBudgeting, <:Any},
-                                         sets::Union{Nothing, <:AssetSets},
                                          pr::AbstractPriorResult, wb::WeightBounds, args...)
     set_w!(model, pr.X, rb.wi)
-    rkb = _set_risk_budgeting_constraints!(model, rb, model[:w], sets;
-                                           strict = rb.opt.strict)
+    rkb = _set_risk_budgeting_constraints!(model, rb, model[:w]; strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
     return ProcessedAssetRiskBudgetingAttributes(rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rb::RiskBudgeting{<:Any, <:Any,
                                                            <:FactorRiskBudgeting, <:Any},
-                                         sets::Union{Nothing, <:AssetSets},
-                                         pr::AbstractPriorResult, wb::WeightBounds,
-                                         rd::ReturnsResult)
-    b1, rr = set_factor_risk_contribution_constraints!(model, rb.alg.re, rd, rb.alg.flag,
+                                         ::Any, wb::WeightBounds, rd::ReturnsResult)
+    b1, rr = set_factor_risk_contribution_constraints!(model, rb.rba.re, rd, rb.rba.flag,
                                                        rb.wi)
-    rkb = _set_risk_budgeting_constraints!(model, rb, model[:w1], sets;
-                                           strict = rb.opt.strict)
+    rkb = _set_risk_budgeting_constraints!(model, rb, model[:w1]; strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
 end
@@ -108,7 +122,7 @@ function optimise!(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
-    prb = set_risk_budgeting_constraints!(model, rb, rb.opt.sets, pr, wb, rd)
+    prb = set_risk_budgeting_constraints!(model, rb, pr, wb, rd)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, rb.opt.lcm, :lcm_ineq, :lcm_eq)
@@ -139,6 +153,7 @@ function optimise!(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
                                                                        ret), prb, retcode,
                                       sol, ifelse(save, model, nothing))
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(rb.fallback, rd; dims = dims, str_names = str_names, save = save,
                   kwargs...)
     end

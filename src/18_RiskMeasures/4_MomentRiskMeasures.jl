@@ -11,12 +11,18 @@ struct FirstLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
 abstract type DeviationLowerMoment <: AbstractLowOrderMomentMeasureAlgorithm end
 struct SecondLowerMoment{T1} <: DeviationLowerMoment
     alg::T1
+    function SecondLowerMoment(alg::SecondMomentAlgorithm)
+        return new{typeof(alg)}(alg)
+    end
 end
 function SecondLowerMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
     return SecondLowerMoment(alg)
 end
 struct SecondCentralMoment{T1} <: DeviationLowerMoment
     alg::T1
+    function SecondCentralMoment(alg::SecondMomentAlgorithm)
+        return new{typeof(alg)}(alg)
+    end
 end
 function SecondCentralMoment(; alg::SecondMomentAlgorithm = SOCRiskExpr())
     return SecondCentralMoment(alg)
@@ -25,10 +31,13 @@ struct MeanAbsoluteDeviation <: DeviationLowerMoment end
 struct LowOrderDeviation{T1, T2} <: AbstractLowOrderDeviationMeasureAlgorithm
     ve::T1
     alg::T2
+    function LowOrderDeviation(ve::AbstractVarianceEstimator, alg::DeviationLowerMoment)
+        @argcheck(!isa(alg, MeanAbsoluteDeviation))
+        return new{typeof(ve), typeof(alg)}(ve, alg)
+    end
 end
 function LowOrderDeviation(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
                            alg::DeviationLowerMoment = SecondLowerMoment())
-    @argcheck(!isa(alg, MeanAbsoluteDeviation))
     return LowOrderDeviation(ve, alg)
 end
 abstract type AbstractUnionHighOrderMomentMeasureAlgorithm <: AbstractMomentMeasureAlgorithm end
@@ -42,6 +51,10 @@ struct FourthCentralMoment <: AbstractHighOrderMomentMeasureAlgorithm end
 struct HighOrderDeviation{T1, T2} <: AbstractHighOrderDeviationMeasureAlgorithm
     ve::T1
     alg::T2
+    function HighOrderDeviation(ve::AbstractVarianceEstimator,
+                                alg::AbstractHighOrderMomentMeasureAlgorithm)
+        return new{typeof(ve), typeof(alg)}(ve, alg)
+    end
 end
 function HighOrderDeviation(;
                             ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
@@ -60,19 +73,26 @@ struct LowOrderMoment{T1, T2, T3, T4} <: AbstractMomentRiskMeasure
     w::T2
     mu::T3
     alg::T4
+    function LowOrderMoment(settings::RiskMeasureSettings,
+                            w::Union{Nothing, <:AbstractWeights},
+                            mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                            alg::AbstractUnionLowOrderMomentMeasureAlgorithm)
+        if isa(mu, AbstractVector)
+            @argcheck(!isempty(mu) && all(isfinite, mu))
+        elseif isa(mu, Real)
+            @argcheck(isfinite(mu))
+        end
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w, mu,
+                                                                         alg)
+    end
 end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         w::Union{Nothing, <:AbstractWeights} = nothing,
                         mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                         alg::AbstractUnionLowOrderMomentMeasureAlgorithm = FirstLowerMoment())
-    if isa(mu, AbstractVector)
-        @argcheck(!isempty(mu) && all(isfinite, mu))
-    elseif isa(mu, Real)
-        @argcheck(isfinite(mu))
-    end
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
     return LowOrderMoment(settings, w, mu, alg)
 end
 struct HighOrderMoment{T1, T2, T3, T4} <: AbstractMomentHierarchicalRiskMeasure
@@ -80,19 +100,26 @@ struct HighOrderMoment{T1, T2, T3, T4} <: AbstractMomentHierarchicalRiskMeasure
     w::T2
     mu::T3
     alg::T4
+    function HighOrderMoment(settings::RiskMeasureSettings,
+                             w::Union{Nothing, <:AbstractWeights},
+                             mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                             alg::AbstractUnionHighOrderMomentMeasureAlgorithm)
+        if isa(mu, AbstractVector)
+            @argcheck(!isempty(mu) && all(isfinite, mu))
+        elseif isa(mu, Real)
+            @argcheck(isfinite(mu))
+        end
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w, mu,
+                                                                         alg)
+    end
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                          w::Union{Nothing, <:AbstractWeights} = nothing,
                          mu::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
                          alg::AbstractUnionHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
-    if isa(mu, AbstractVector)
-        @argcheck(!isempty(mu) && all(isfinite, mu))
-    elseif isa(mu, Real)
-        @argcheck(isfinite(mu))
-    end
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
     return HighOrderMoment(settings, w, mu, alg)
 end
 function calc_moment_target(::Union{<:LowOrderMoment{<:Any, Nothing, Nothing, <:Any},

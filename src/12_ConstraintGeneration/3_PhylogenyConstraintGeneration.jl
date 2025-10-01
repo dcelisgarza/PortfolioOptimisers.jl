@@ -3,32 +3,38 @@ abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
 struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
     pe::T1
     p::T2
+    function SemiDefinitePhylogenyEstimator(pe::Union{<:AbstractPhylogenyEstimator,
+                                                      <:AbstractClusteringResult}, p::Real)
+        @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
+        return new{typeof(pe), typeof(p)}(pe, p)
+    end
 end
 function SemiDefinitePhylogenyEstimator(;
                                         pe::Union{<:AbstractPhylogenyEstimator,
                                                   <:AbstractClusteringResult} = NetworkEstimator(),
                                         p::Real = 0.05)
-    @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
     return SemiDefinitePhylogenyEstimator(pe, p)
 end
 struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
     A::T1
     p::T2
+    function SemiDefinitePhylogeny(A::AbstractMatrix{<:Real}, p::Real)
+        @argcheck(p >= zero(p))
+        return new{typeof(A), typeof(p)}(A, p)
+    end
 end
-function SemiDefinitePhylogeny(; A::PhylogenyResult{<:AbstractMatrix{<:Real}},
-                               p::Real = 0.05)
-    @argcheck(p >= zero(p))
+function SemiDefinitePhylogeny(A::PhylogenyResult{<:AbstractMatrix{<:Real}}, p::Real)
     return SemiDefinitePhylogeny(A.X, p)
+end
+function SemiDefinitePhylogeny(;
+                               A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
+                                        <:AbstractMatrix{<:Real}}, p::Real = 0.05)
+    return SemiDefinitePhylogeny(A, p)
 end
 function phylogeny_constraints(plc::SemiDefinitePhylogenyEstimator, X::AbstractMatrix;
                                dims::Int = 1, kwargs...)
     return SemiDefinitePhylogeny(; A = phylogeny_matrix(plc.pe, X; dims = dims, kwargs...),
                                  p = plc.p)
-end
-struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
-    pe::T1
-    B::T2
-    scale::T3
 end
 function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::AbstractVector)
     @argcheck(length(B) <= alg,
@@ -50,37 +56,57 @@ end
 function validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
+struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
+    pe::T1
+    B::T2
+    scale::T3
+    function IntegerPhylogenyEstimator(pe::Union{<:AbstractPhylogenyEstimator,
+                                                 <:AbstractClusteringResult},
+                                       B::Union{<:Integer, <:AbstractVector{<:Integer}},
+                                       scale::Real)
+        if isa(B, AbstractVector)
+            @argcheck(!isempty(B))
+            @argcheck(all(x -> x >= zero(x), B))
+            validate_length_integer_phylogeny_constraint_B(pe, B)
+        else
+            @argcheck(B >= zero(B))
+        end
+        return new{typeof(pe), typeof(B), typeof(scale)}(pe, B, scale)
+    end
+end
 function IntegerPhylogenyEstimator(;
                                    pe::Union{<:AbstractPhylogenyEstimator,
                                              <:AbstractClusteringResult} = NetworkEstimator(),
                                    B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                                    scale::Real = 100_000.0)
-    if isa(B, AbstractVector)
-        @argcheck(!isempty(B))
-        @argcheck(all(x -> x >= zero(x), B))
-        validate_length_integer_phylogeny_constraint_B(pe, B)
-    else
-        @argcheck(B >= zero(B))
-    end
     return IntegerPhylogenyEstimator(pe, B, scale)
 end
 struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
     A::T1
     B::T2
     scale::T3
+    function IntegerPhylogeny(A::AbstractMatrix{<:Real},
+                              B::Union{<:Integer, <:AbstractVector{<:Integer}}, scale::Real)
+        A = unique(A + I; dims = 1)
+        if isa(B, AbstractVector)
+            @argcheck(!isempty(B))
+            @argcheck(size(A, 1) == length(B))
+            @argcheck(all(x -> x >= zero(x), B))
+        else
+            @argcheck(B >= zero(B))
+        end
+        return new{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
+    end
 end
-function IntegerPhylogeny(; A::PhylogenyResult{<:AbstractMatrix{<:Real}},
+function IntegerPhylogeny(A::PhylogenyResult{<:AbstractMatrix{<:Real}},
+                          B::Union{<:Integer, <:AbstractVector{<:Integer}}, scale::Real)
+    return IntegerPhylogeny(A.X, B, scale)
+end
+function IntegerPhylogeny(;
+                          A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
+                                   <:AbstractMatrix{<:Real}},
                           B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                           scale::Real = 100_000.0)
-    A = A.X
-    A = unique(A + I; dims = 1)
-    if isa(B, AbstractVector)
-        @argcheck(!isempty(B))
-        @argcheck(size(A, 1) == length(B))
-        @argcheck(all(x -> x >= zero(x), B))
-    else
-        @argcheck(B >= zero(B))
-    end
     return IntegerPhylogeny(A, B, scale)
 end
 function phylogeny_constraints(plc::IntegerPhylogenyEstimator, X::AbstractMatrix;
@@ -119,6 +145,11 @@ struct CentralityConstraint{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
     A::T1
     B::T2
     comp::T3
+    function CentralityConstraint(A::CentralityEstimator,
+                                  B::Union{<:Real, <:VectorToRealMeasure},
+                                  comp::ComparisonOperators)
+        return new{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
+    end
 end
 function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
                               B::Union{<:Real, <:VectorToRealMeasure} = MinValue(),

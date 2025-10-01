@@ -10,15 +10,22 @@ struct Variance{T1, T2, T3, T4} <: JuMPRiskContributionSigmaRiskMeasure
     sigma::T2
     rc::T3
     alg::T4
+    function Variance(settings::RiskMeasureSettings,
+                      sigma::Union{Nothing, <:AbstractMatrix},
+                      rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint},
+                      alg::VarianceAlgorithm)
+        if isa(sigma, AbstractMatrix)
+            @argcheck(!isempty(sigma))
+            assert_matrix_issquare(sigma)
+        end
+        return new{typeof(settings), typeof(sigma), typeof(rc), typeof(alg)}(settings,
+                                                                             sigma, rc, alg)
+    end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   sigma::Union{Nothing, <:AbstractMatrix} = nothing,
                   rc::Union{Nothing, <:LinearConstraintEstimator, <:LinearConstraint} = nothing,
                   alg::VarianceAlgorithm = SOCRiskExpr())
-    if isa(sigma, AbstractMatrix)
-        @argcheck(!isempty(sigma))
-        assert_matrix_issquare(sigma)
-    end
     return Variance(settings, sigma, rc, alg)
 end
 function (r::Variance)(w::AbstractVector)
@@ -37,13 +44,17 @@ end
 struct StandardDeviation{T1, T2} <: SigmaRiskMeasure
     settings::T1
     sigma::T2
+    function StandardDeviation(settings::RiskMeasureSettings,
+                               sigma::Union{Nothing, <:AbstractMatrix})
+        if isa(sigma, AbstractMatrix)
+            @argcheck(!isempty(sigma))
+            assert_matrix_issquare(sigma)
+        end
+        return new{typeof(settings), typeof(sigma)}(settings, sigma)
+    end
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                            sigma::Union{Nothing, <:AbstractMatrix} = nothing)
-    if isa(sigma, AbstractMatrix)
-        @argcheck(!isempty(sigma))
-        assert_matrix_issquare(sigma)
-    end
     return StandardDeviation(settings, sigma)
 end
 function (r::StandardDeviation)(w::AbstractVector)
@@ -61,14 +72,20 @@ struct UncertaintySetVariance{T1, T2, T3} <: SigmaRiskMeasure
     settings::T1
     ucs::T2
     sigma::T3
+    function UncertaintySetVariance(settings::RiskMeasureSettings,
+                                    ucs::Union{Nothing, <:AbstractUncertaintySetResult,
+                                               <:AbstractUncertaintySetEstimator},
+                                    sigma::Union{Nothing, <:AbstractMatrix{<:Real}})
+        if isa(sigma, AbstractMatrix)
+            @argcheck(!isempty(sigma))
+        end
+        return new{typeof(settings), typeof(ucs), typeof(sigma)}(settings, ucs, sigma)
+    end
 end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 ucs::Union{Nothing, <:AbstractUncertaintySetResult,
-                                           <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(;),
+                                           <:AbstractUncertaintySetEstimator} = NormalUncertaintySet(),
                                 sigma::Union{Nothing, <:AbstractMatrix{<:Real}} = nothing)
-    if isa(sigma, AbstractMatrix)
-        @argcheck(!isempty(sigma))
-    end
     return UncertaintySetVariance(settings, ucs, sigma)
 end
 function (r::UncertaintySetVariance)(w::AbstractVector)

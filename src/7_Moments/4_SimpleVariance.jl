@@ -68,14 +68,18 @@ struct SimpleVariance{T1, T2, T3} <: AbstractVarianceEstimator
     me::T1
     w::T2
     corrected::T3
+    function SimpleVariance(me::Union{Nothing, <:AbstractExpectedReturnsEstimator},
+                            w::Union{Nothing, <:AbstractWeights}, corrected::Bool)
+        if isa(me, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
+    end
 end
 function SimpleVariance(;
                         me::Union{Nothing, <:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
                         w::Union{Nothing, <:AbstractWeights} = nothing,
                         corrected::Bool = true)
-    if isa(me, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
     return SimpleVariance(me, w, corrected)
 end
 
@@ -135,6 +139,7 @@ function Statistics.std(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1,
         std(X, ve.w, dims; corrected = ve.corrected, mean = mu)
     end
 end
+
 """
 ```julia
 std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
@@ -199,6 +204,7 @@ function Statistics.std(ve::SimpleVariance, X::AbstractVector; mean = nothing)
         std(X, ve.w; corrected = ve.corrected, mean = mean)
     end
 end
+
 """
 ```julia
 var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1, mean = nothing, kwargs...)
@@ -254,6 +260,7 @@ function Statistics.var(ve::SimpleVariance, X::AbstractMatrix; dims::Int = 1,
         var(X, ve.w, dims; corrected = ve.corrected, mean = mu)
     end
 end
+
 """
 ```julia
 var(ve::SimpleVariance, X::AbstractVector; mean = nothing)

@@ -140,10 +140,14 @@ LinearModel
 """
 struct LinearModel{T1} <: AbstractRegressionTarget
     kwargs::T1
+    function LinearModel(kwargs::NamedTuple)
+        return new{typeof(kwargs)}(kwargs)
+    end
 end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
+
 """
 ```julia
 StatsAPI.fit(target::LinearModel, X::AbstractMatrix, y::AbstractVector)
@@ -215,10 +219,14 @@ GeneralisedLinearModel
 struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
     args::T1
     kwargs::T2
+    function GeneralisedLinearModel(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
+
 """
 ```julia
 StatsAPI.fit(target::GeneralisedLinearModel, X::AbstractMatrix, y::AbstractVector)
@@ -473,17 +481,21 @@ struct Regression{T1, T2, T3} <: AbstractRegressionResult
     M::T1
     L::T2
     b::T3
+    function Regression(M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix},
+                        b::Union{Nothing, <:AbstractVector})
+        @argcheck(!isempty(M))
+        if isa(b, AbstractVector)
+            @argcheck(!isempty(b))
+            @argcheck(length(b) == size(M, 1))
+        end
+        if !isnothing(L)
+            @argcheck(size(L, 1) == size(M, 1))
+        end
+        return new{typeof(M), typeof(L), typeof(b)}(M, L, b)
+    end
 end
 function Regression(; M::AbstractMatrix, L::Union{Nothing, <:AbstractMatrix} = nothing,
                     b::Union{Nothing, <:AbstractVector} = nothing)
-    @argcheck(!isempty(M))
-    if isa(b, AbstractVector)
-        @argcheck(!isempty(b))
-        @argcheck(length(b) == size(M, 1))
-    end
-    if !isnothing(L)
-        @argcheck(size(L, 1) == size(M, 1))
-    end
     return Regression(M, L, b)
 end
 function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
@@ -543,6 +555,7 @@ function regression_view(re::Regression, i::AbstractVector)
     return Regression(; M = view(re.M, i, :),
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
+
 """
 ```julia
 regression_view(re::Union{Nothing, <:AbstractRegressionEstimator}, args...)

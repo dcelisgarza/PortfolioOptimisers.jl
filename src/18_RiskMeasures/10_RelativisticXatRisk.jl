@@ -82,19 +82,29 @@ struct RelativisticValueatRisk{T1, T2, T3, T4, T5} <: SolverRiskMeasure
     alpha::T3
     kappa::T4
     w::T5
+    function RelativisticValueatRisk(settings::RiskMeasureSettings,
+                                     slv::Union{Nothing, <:Solver,
+                                                <:AbstractVector{<:Solver}}, alpha::Real,
+                                     kappa::Real, w::Union{Nothing, AbstractWeights})
+        if isa(slv, AbstractVector)
+            @argcheck(!isempty(slv))
+        end
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(zero(kappa) < kappa < one(kappa))
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
+                                                                                           slv,
+                                                                                           alpha,
+                                                                                           kappa,
+                                                                                           w)
+    end
 end
 function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  slv::Union{Nothing, <:Solver, <:AbstractVector{<:Solver}} = nothing,
                                  alpha::Real = 0.05, kappa::Real = 0.3,
                                  w::Union{Nothing, AbstractWeights} = nothing)
-    if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
-    end
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    @argcheck(zero(kappa) < kappa < one(kappa))
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
     return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
 function factory(r::RelativisticValueatRisk, prior::AbstractPriorResult,
@@ -116,6 +126,26 @@ struct RelativisticValueatRiskRange{T1, T2, T3, T4, T5, T6, T7} <: SolverRiskMea
     beta::T5
     kappa_b::T6
     w::T7
+    function RelativisticValueatRiskRange(settings::RiskMeasureSettings,
+                                          slv::Union{Nothing, <:Solver,
+                                                     <:AbstractVector{<:Solver}},
+                                          alpha::Real, kappa_a::Real, beta::Real,
+                                          kappa_b::Real,
+                                          w::Union{Nothing, <:AbstractWeights})
+        if isa(slv, AbstractVector)
+            @argcheck(!isempty(slv))
+        end
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(zero(kappa_a) < kappa_a < one(kappa_a))
+        @argcheck(zero(beta) < beta < one(beta))
+        @argcheck(zero(kappa_b) < kappa_b < one(kappa_b))
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa_a),
+                   typeof(beta), typeof(kappa_b), typeof(w)}(settings, slv, alpha, kappa_a,
+                                                             beta, kappa_b, w)
+    end
 end
 function RelativisticValueatRiskRange(;
                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
@@ -124,16 +154,6 @@ function RelativisticValueatRiskRange(;
                                       alpha::Real = 0.05, kappa_a::Real = 0.3,
                                       beta::Real = 0.05, kappa_b::Real = 0.3,
                                       w::Union{Nothing, <:AbstractWeights} = nothing)
-    if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
-    end
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    @argcheck(zero(kappa_a) < kappa_a < one(kappa_a))
-    @argcheck(zero(beta) < beta < one(beta))
-    @argcheck(zero(kappa_b) < kappa_b < one(kappa_b))
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
 function (r::RelativisticValueatRiskRange)(x::AbstractVector)
@@ -152,16 +172,24 @@ struct RelativisticDrawdownatRisk{T1, T2, T3, T4} <: SolverRiskMeasure
     slv::T2
     alpha::T3
     kappa::T4
+    function RelativisticDrawdownatRisk(settings,
+                                        slv::Union{Nothing, <:Solver,
+                                                   <:AbstractVector{<:Solver}}, alpha::Real,
+                                        kappa::Real)
+        if isa(slv, AbstractVector)
+            @argcheck(!isempty(slv))
+        end
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(zero(kappa) < kappa < one(kappa))
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa)}(settings,
+                                                                                slv, alpha,
+                                                                                kappa)
+    end
 end
 function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(),
                                     slv::Union{Nothing, <:Solver,
                                                <:AbstractVector{<:Solver}} = nothing,
                                     alpha::Real = 0.05, kappa::Real = 0.3)
-    if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
-    end
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    @argcheck(zero(kappa) < kappa < one(kappa))
     return RelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
 function (r::RelativisticDrawdownatRisk)(x::AbstractVector)
@@ -184,17 +212,25 @@ struct RelativeRelativisticDrawdownatRisk{T1, T2, T3, T4} <: SolverHierarchicalR
     slv::T2
     alpha::T3
     kappa::T4
+    function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
+                                                slv::Union{Nothing, <:Solver,
+                                                           <:AbstractVector{<:Solver}},
+                                                alpha::Real, kappa::Real)
+        if isa(slv, AbstractVector)
+            @argcheck(!isempty(slv))
+        end
+        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(zero(kappa) < kappa < one(kappa))
+        return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa)}(settings,
+                                                                                slv, alpha,
+                                                                                kappa)
+    end
 end
 function RelativeRelativisticDrawdownatRisk(;
                                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                             slv::Union{Nothing, <:Solver,
                                                        <:AbstractVector{<:Solver}} = nothing,
-                                            alpha::Real = 0.05, kappa = 0.3)
-    if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
-    end
-    @argcheck(zero(alpha) < alpha < one(alpha))
-    @argcheck(zero(kappa) < kappa < one(kappa))
+                                            alpha::Real = 0.05, kappa::Real = 0.3)
     return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa)
 end
 function (r::RelativeRelativisticDrawdownatRisk)(x::AbstractVector)

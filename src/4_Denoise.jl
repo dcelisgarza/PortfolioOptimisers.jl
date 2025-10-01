@@ -119,12 +119,15 @@ ShrunkDenoise
 """
 struct ShrunkDenoise{T1} <: AbstractDenoiseAlgorithm
     alpha::T1
+    function ShrunkDenoise(alpha::Real)
+        @argcheck(zero(alpha) <= alpha <= one(alpha),
+                  DomainError(alpha,
+                              range_msg("`alpha`", zero(alpha), one(alpha), nothing, true,
+                                        true) * "."))
+        return new{typeof(alpha)}(alpha)
+    end
 end
 function ShrunkDenoise(; alpha::Real = 0.0)
-    @argcheck(zero(alpha) <= alpha <= one(alpha),
-              DomainError(alpha,
-                          range_msg("`alpha`", zero(alpha), one(alpha), nothing, true,
-                                    true) * "."))
     return ShrunkDenoise(alpha)
 end
 
@@ -202,6 +205,13 @@ struct Denoise{T1, T2, T3, T4, T5, T6} <: AbstractDenoiseEstimator
     kernel::T4
     m::T5
     n::T6
+    function Denoise(alg::AbstractDenoiseAlgorithm, args::Tuple, kwargs::NamedTuple, kernel,
+                     m::Integer, n::Integer)
+        @argcheck(m > 1, DomainError(m, comp_msg("`m`", 1, :gt, m) * "."))
+        @argcheck(n > 1, DomainError(n, comp_msg("`n`", 1, :gt, n) * "."))
+        return new{typeof(alg), typeof(args), typeof(kwargs), typeof(kernel), typeof(m),
+                   typeof(n)}(alg, args, kwargs, kernel, m, n)
+    end
 end
 function Denoise(; alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple = (),
                  kwargs::NamedTuple = (;),

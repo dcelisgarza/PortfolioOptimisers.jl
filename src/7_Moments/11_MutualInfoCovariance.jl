@@ -54,13 +54,17 @@ struct MutualInfoCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
     ve::T1
     bins::T2
     normalise::T3
+    function MutualInfoCovariance(ve::AbstractVarianceEstimator,
+                                  bins::Union{<:AbstractBins, <:Integer}, normalise::Bool)
+        if isa(bins, Integer)
+            @argcheck(bins > zero(bins))
+        end
+        return new{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins, normalise)
+    end
 end
 function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                               bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                               normalise::Bool = true)
-    if isa(bins, Integer)
-        @argcheck(bins > zero(bins))
-    end
     return MutualInfoCovariance(ve, bins, normalise)
 end
 function factory(ce::MutualInfoCovariance, w::Union{Nothing, <:AbstractWeights} = nothing)

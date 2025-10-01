@@ -131,6 +131,197 @@ struct JuMPOptimiser{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14
     l2::T35
     ss::T36
     strict::T37
+    function JuMPOptimiser(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
+                           slv::Union{<:Solver, <:AbstractVector{<:Solver}},
+                           wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
+                           bgt::Union{Nothing, <:Real, <:BudgetConstraintEstimator},
+                           sbgt::Union{Nothing, <:Real, <:BudgetRange},
+                           lt::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold},
+                           st::Union{Nothing, <:BuyInThresholdEstimator, <:BuyInThreshold},
+                           lcs::Union{Nothing, <:LinearConstraintEstimator,
+                                      <:LinearConstraint},
+                           lcm::Union{Nothing, <:LinearConstraint},
+                           cent::Union{Nothing, <:CentralityConstraint,
+                                       <:AbstractVector{<:CentralityConstraint},
+                                       <:LinearConstraint},
+                           gcard::Union{Nothing, <:LinearConstraintEstimator,
+                                        <:LinearConstraint},
+                           sgcard::Union{Nothing, <:LinearConstraintEstimator,
+                                         <:LinearConstraint,
+                                         <:AbstractVector{<:Union{<:LinearConstraintEstimator,
+                                                                  <:LinearConstraint}}},
+                           smtx::Union{Nothing, <:AssetSetsMatrixEstimator,
+                                       <:AbstractMatrix,
+                                       <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
+                                                                <:AbstractMatrix}}},
+                           sgmtx::Union{Nothing, <:AssetSetsMatrixEstimator,
+                                        <:AbstractMatrix,
+                                        <:AbstractVector{<:Union{<:AssetSetsMatrixEstimator,
+                                                                 <:AbstractMatrix}}},
+                           slt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                                      <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                                               <:BuyInThresholdEstimator}}},
+                           sst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                                      <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                                               <:BuyInThresholdEstimator}}},
+                           sglt::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                                       <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                                                <:BuyInThresholdEstimator}}},
+                           sgst::Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator,
+                                       <:AbstractVector{<:Union{Nothing, <:BuyInThreshold,
+                                                                <:BuyInThresholdEstimator}}},
+                           sets::Union{Nothing, <:AssetSets},
+                           nplg::Union{Nothing, <:AbstractPhylogenyConstraintEstimator,
+                                       <:AbstractPhylogenyConstraintResult},
+                           cplg::Union{Nothing, <:AbstractPhylogenyConstraintEstimator,
+                                       <:AbstractPhylogenyConstraintResult},
+                           tn::Union{Nothing, <:TurnoverEstimator, <:Turnover,
+                                     <:AbstractVector{<:Union{<:TurnoverEstimator,
+                                                              <:Turnover}}},
+                           te::Union{Nothing, <:AbstractTracking,
+                                     <:AbstractVector{<:AbstractTracking}},
+                           fees::Union{Nothing, <:FeesEstimator, <:Fees},
+                           ret::JuMPReturnsEstimator, sce::Scalariser,
+                           ccnt::Union{Nothing, <:CustomJuMPConstraint},
+                           cobj::Union{Nothing, <:CustomJuMPObjective}, sc::Real, so::Real,
+                           card::Union{Nothing, <:Integer},
+                           scard::Union{Nothing, <:Integer, <:AbstractVector{<:Integer}},
+                           nea::Union{Nothing, <:Real}, l1::Union{Nothing, <:Real},
+                           l2::Union{Nothing, <:Real}, ss::Union{Nothing, <:Real},
+                           strict::Bool)
+        if isa(bgt, Real)
+            @argcheck(isfinite(bgt))
+        elseif isa(bgt, BudgetCostEstimator)
+            @argcheck(isnothing(sbgt))
+        end
+        if isa(sbgt, Real)
+            @argcheck(isfinite(sbgt) && sbgt >= 0)
+        end
+        if isa(cent, AbstractVector)
+            @argcheck(!isempty(cent))
+        end
+        if !isnothing(card)
+            @argcheck(isfinite(card) && card > 0)
+        end
+        if isa(scard, Integer)
+            @argcheck(isfinite(scard) && scard > 0)
+            @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
+            @argcheck(isa(slt, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
+            @argcheck(isa(sst, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
+        elseif isa(scard, AbstractVector)
+            @argcheck(!isempty(scard))
+            @argcheck(all(isfinite, scard) && all(x -> x > 0, scard))
+            @argcheck(isa(smtx, AbstractVector))
+            @argcheck(length(scard) == length(smtx))
+            if isa(slt, AbstractVector)
+                @argcheck(!isempty(slt))
+                @argcheck(length(scard) == length(slt))
+            end
+            if isa(sst, AbstractVector)
+                @argcheck(!isempty(sst))
+                @argcheck(length(scard) == length(sst))
+            end
+        elseif isnothing(scard) &&
+               (isa(slt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) ||
+                isa(sst, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}))
+            @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
+        elseif isnothing(scard) && (isa(slt, AbstractVector) || isa(sst, AbstractVector))
+            @argcheck(isa(smtx, AbstractVector))
+            @argcheck(!isempty(smtx))
+            if isa(slt, AbstractVector)
+                @argcheck(!isempty(slt))
+                @argcheck(length(slt) == length(smtx))
+            end
+            if isa(sst, AbstractVector)
+                @argcheck(!isempty(sst))
+                @argcheck(length(sst) == length(smtx))
+            end
+        end
+        if isa(sgcard, Union{<:LinearConstraintEstimator, <:LinearConstraint})
+            @argcheck(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
+            @argcheck(isa(sglt,
+                          Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
+            @argcheck(isa(sgst,
+                          Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
+            if isa(sgcard, LinearConstraint) && isa(smtx, AbstractMatrix)
+                N = size(smtx, 1)
+                N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
+                N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
+                @argcheck(N == N_ineq + N_eq)
+            end
+        elseif isa(sgcard, AbstractVector)
+            @argcheck(!isempty(sgcard))
+            @argcheck(isa(sgmtx, AbstractVector))
+            @argcheck(!isempty(sgmtx))
+            @argcheck(length(sgcard) == length(sgmtx))
+            if isa(sglt, AbstractVector)
+                @argcheck(!isempty(sglt))
+                @argcheck(length(sgcard) == length(sglt))
+            end
+            if isa(sgst, AbstractVector)
+                @argcheck(length(sgcard) == length(sgst))
+            end
+            for (sgc, smt) in zip(sgcard, sgmtx)
+                if isa(sgc, LinearConstraint) && isa(smt, AbstractMatrix)
+                    N = size(smt, 1)
+                    N_ineq = !isnothing(sgc.ineq) ? length(sgc.B_ineq) : 0
+                    N_eq = !isnothing(sgc.eq) ? length(sgc.B_eq) : 0
+                    @argcheck(N == N_ineq + N_eq)
+                end
+            end
+        elseif isnothing(sgcard) &&
+               (isa(sglt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) ||
+                isa(sgst, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}))
+            @argcheck(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
+        elseif isnothing(sgcard) && (isa(sglt, AbstractVector) || isa(sgst, AbstractVector))
+            @argcheck(isa(sgmtx, AbstractVector))
+            @argcheck(!isempty(sgmtx))
+            if isa(sglt, AbstractVector)
+                @argcheck(!isempty(sglt))
+                @argcheck(length(sglt) == length(sgmtx))
+            end
+            if isa(sgst, AbstractVector)
+                @argcheck(!isempty(sgst))
+                @argcheck(length(sgst) == length(sgmtx))
+            end
+        end
+        if isa(wb, WeightBoundsEstimator) ||
+           isa(lt, BuyInThresholdEstimator) ||
+           isa(st, BuyInThresholdEstimator) ||
+           isa(lcs, LinearConstraintEstimator) ||
+           isa(cent, LinearConstraintEstimator) ||
+           isa(gcard, LinearConstraintEstimator) ||
+           !isa(sgcard,
+                Union{Nothing, <:LinearConstraint, <:AbstractVector{<:LinearConstraint}}) ||
+           !isnothing(scard) ||
+           isa(fees, FeesEstimator)
+            @argcheck(!isnothing(sets))
+        end
+        if isa(tn, AbstractVector)
+            @argcheck(!isempty(tn))
+        end
+        if isa(te, AbstractVector)
+            @argcheck(!isempty(te))
+        end
+        if !isnothing(nea)
+            @argcheck(nea > zero(nea))
+        end
+        if isa(slv, AbstractVector)
+            @argcheck(!isempty(slv))
+        end
+        return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
+                   typeof(lt), typeof(st), typeof(lcs), typeof(lcm), typeof(cent),
+                   typeof(gcard), typeof(sgcard), typeof(smtx), typeof(sgmtx), typeof(slt),
+                   typeof(sst), typeof(sglt), typeof(sgst), typeof(sets), typeof(nplg),
+                   typeof(cplg), typeof(tn), typeof(te), typeof(fees), typeof(ret),
+                   typeof(sce), typeof(ccnt), typeof(cobj), typeof(sc), typeof(so),
+                   typeof(card), typeof(scard), typeof(nea), typeof(l1), typeof(l2),
+                   typeof(ss), typeof(strict)}(pe, slv, wb, bgt, sbgt, lt, st, lcs, lcm,
+                                               cent, gcard, sgcard, smtx, sgmtx, slt, sst,
+                                               sglt, sgst, sets, nplg, cplg, tn, te, fees,
+                                               ret, sce, ccnt, cobj, sc, so, card, scard,
+                                               nea, l1, l2, ss, strict)
+    end
 end
 function JuMPOptimiser(;
                        pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
@@ -189,124 +380,6 @@ function JuMPOptimiser(;
                        l1::Union{Nothing, <:Real} = nothing,
                        l2::Union{Nothing, <:Real} = nothing,
                        ss::Union{Nothing, <:Real} = nothing, strict::Bool = false)
-    if isa(bgt, Real)
-        @argcheck(isfinite(bgt))
-    elseif isa(bgt, BudgetCostEstimator)
-        @argcheck(isnothing(sbgt))
-    end
-    if isa(sbgt, Real)
-        @argcheck(isfinite(sbgt) && sbgt >= 0)
-    end
-    if isa(cent, AbstractVector)
-        @argcheck(!isempty(cent))
-    end
-    if !isnothing(card)
-        @argcheck(isfinite(card) && card > 0)
-    end
-    if isa(scard, Integer)
-        @argcheck(isfinite(scard) && scard > 0)
-        @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
-        @argcheck(isa(slt, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
-        @argcheck(isa(sst, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
-    elseif isa(scard, AbstractVector)
-        @argcheck(!isempty(scard))
-        @argcheck(all(isfinite, scard) && all(x -> x > 0, scard))
-        @argcheck(isa(smtx, AbstractVector))
-        @argcheck(length(scard) == length(smtx))
-        if isa(slt, AbstractVector)
-            @argcheck(!isempty(slt))
-            @argcheck(length(scard) == length(slt))
-        end
-        if isa(sst, AbstractVector)
-            @argcheck(!isempty(sst))
-            @argcheck(length(scard) == length(sst))
-        end
-    elseif isnothing(scard) &&
-           (isa(slt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) ||
-            isa(sst, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}))
-        @argcheck(isa(smtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
-    elseif isnothing(scard) && (isa(slt, AbstractVector) || isa(sst, AbstractVector))
-        @argcheck(isa(smtx, AbstractVector))
-        @argcheck(!isempty(smtx))
-        if isa(slt, AbstractVector)
-            @argcheck(!isempty(slt))
-            @argcheck(length(slt) == length(smtx))
-        end
-        if isa(sst, AbstractVector)
-            @argcheck(!isempty(sst))
-            @argcheck(length(sst) == length(smtx))
-        end
-    end
-    if isa(sgcard, Union{<:LinearConstraintEstimator, <:LinearConstraint})
-        @argcheck(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
-        @argcheck(isa(sglt, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
-        @argcheck(isa(sgst, Union{Nothing, <:BuyInThreshold, <:BuyInThresholdEstimator}))
-        if isa(sgcard, LinearConstraint) && isa(smtx, AbstractMatrix)
-            N = size(smtx, 1)
-            N_ineq = !isnothing(sgcard.ineq) ? length(sgcard.B_ineq) : 0
-            N_eq = !isnothing(sgcard.eq) ? length(sgcard.B_eq) : 0
-            @argcheck(N == N_ineq + N_eq)
-        end
-    elseif isa(sgcard, AbstractVector)
-        @argcheck(!isempty(sgcard))
-        @argcheck(isa(sgmtx, AbstractVector))
-        @argcheck(!isempty(sgmtx))
-        @argcheck(length(sgcard) == length(sgmtx))
-        if isa(sglt, AbstractVector)
-            @argcheck(!isempty(sglt))
-            @argcheck(length(sgcard) == length(sglt))
-        end
-        if isa(sgst, AbstractVector)
-            @argcheck(length(sgcard) == length(sgst))
-        end
-        for (sgc, smt) in zip(sgcard, sgmtx)
-            if isa(sgc, LinearConstraint) && isa(smt, AbstractMatrix)
-                N = size(smt, 1)
-                N_ineq = !isnothing(sgc.ineq) ? length(sgc.B_ineq) : 0
-                N_eq = !isnothing(sgc.eq) ? length(sgc.B_eq) : 0
-                @argcheck(N == N_ineq + N_eq)
-            end
-        end
-    elseif isnothing(sgcard) &&
-           (isa(sglt, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}) ||
-            isa(sgst, Union{<:BuyInThreshold, <:BuyInThresholdEstimator}))
-        @argcheck(isa(sgmtx, Union{<:AssetSetsMatrixEstimator, <:AbstractMatrix}))
-    elseif isnothing(sgcard) && (isa(sglt, AbstractVector) || isa(sgst, AbstractVector))
-        @argcheck(isa(sgmtx, AbstractVector))
-        @argcheck(!isempty(sgmtx))
-        if isa(sglt, AbstractVector)
-            @argcheck(!isempty(sglt))
-            @argcheck(length(sglt) == length(sgmtx))
-        end
-        if isa(sgst, AbstractVector)
-            @argcheck(!isempty(sgst))
-            @argcheck(length(sgst) == length(sgmtx))
-        end
-    end
-    if isa(wb, WeightBoundsEstimator) ||
-       isa(lt, BuyInThresholdEstimator) ||
-       isa(st, BuyInThresholdEstimator) ||
-       isa(lcs, LinearConstraintEstimator) ||
-       isa(cent, LinearConstraintEstimator) ||
-       isa(gcard, LinearConstraintEstimator) ||
-       !isa(sgcard,
-            Union{Nothing, <:LinearConstraint, <:AbstractVector{<:LinearConstraint}}) ||
-       !isnothing(scard) ||
-       isa(fees, FeesEstimator)
-        @argcheck(!isnothing(sets))
-    end
-    if isa(tn, AbstractVector)
-        @argcheck(!isempty(tn))
-    end
-    if isa(te, AbstractVector)
-        @argcheck(!isempty(te))
-    end
-    if !isnothing(nea)
-        @argcheck(nea > zero(nea))
-    end
-    if isa(slv, AbstractVector)
-        @argcheck(!isempty(slv))
-    end
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcs, lcm, cent, gcard, sgcard,
                          smtx, sgmtx, slt, sst, sglt, sgst, sets, nplg, cplg, tn, te, fees,
                          ret, sce, ccnt, cobj, sc, so, card, scard, nea, l1, l2, ss, strict)

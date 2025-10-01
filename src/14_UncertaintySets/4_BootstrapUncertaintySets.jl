@@ -20,15 +20,24 @@ struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySet
     q::T5
     seed::T6
     bootstrap::T7
+    function ARCHUncertaintySet(pe::AbstractPriorEstimator,
+                                alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
+                                block_size::Integer, q::Real,
+                                seed::Union{Nothing, <:Integer},
+                                bootstrap::ARCHBootstrapSet)
+        @argcheck(n_sim > zero(n_sim))
+        @argcheck(block_size > zero(block_size))
+        @argcheck(zero(q) < q < one(q))
+        return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(block_size), typeof(q),
+                   typeof(seed), typeof(bootstrap)}(pe, alg, n_sim, block_size, q, seed,
+                                                    bootstrap)
+    end
 end
 function ARCHUncertaintySet(; pe::AbstractPriorEstimator = EmpiricalPrior(),
                             alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                             n_sim::Integer = 3_000, block_size::Integer = 3, q::Real = 0.05,
                             seed::Union{Nothing, <:Integer} = nothing,
                             bootstrap::ARCHBootstrapSet = StationaryBootstrap())
-    @argcheck(n_sim > zero(n_sim))
-    @argcheck(block_size > zero(block_size))
-    @argcheck(zero(q) < q < one(q))
     return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, seed, bootstrap)
 end
 function bootstrap_generator(ue::ARCHUncertaintySet, X::AbstractMatrix; kwargs...)

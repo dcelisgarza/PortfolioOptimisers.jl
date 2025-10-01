@@ -56,6 +56,15 @@ struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
     kwargs::T3
     w::T4
     threads::T5
+    function DistanceCovariance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
+                                w::Union{Nothing, <:AbstractWeights},
+                                threads::FLoops.Transducers.Executor)
+        return new{typeof(dist), typeof(args), typeof(kwargs), typeof(w), typeof(threads)}(dist,
+                                                                                           args,
+                                                                                           kwargs,
+                                                                                           w,
+                                                                                           threads)
+    end
 end
 function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
@@ -124,6 +133,7 @@ function cor_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
     dcov2_yy = dot(B, B) / N2
     return sqrt(dcov2_xy) / sqrt(sqrt(dcov2_xx) * sqrt(dcov2_yy))
 end
+
 """
 ```julia
 cor_distance(ce::DistanceCovariance, X::AbstractMatrix)
@@ -273,6 +283,7 @@ function cov_distance(ce::DistanceCovariance, v1::AbstractVector, v2::AbstractVe
     dcov2_xy = dot(A, B) / N2
     return sqrt(dcov2_xy)
 end
+
 """
 ```julia
 cov_distance(ce::DistanceCovariance, X::AbstractMatrix)

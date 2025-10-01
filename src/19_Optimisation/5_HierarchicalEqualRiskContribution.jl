@@ -7,6 +7,25 @@ struct HierarchicalEqualRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
     sceo::T5
     threads::T6
     fallback::T7
+    function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
+                                               ri::Union{<:OptimisationRiskMeasure,
+                                                         <:AbstractVector{<:OptimisationRiskMeasure}},
+                                               ro::Union{<:OptimisationRiskMeasure,
+                                                         <:AbstractVector{<:OptimisationRiskMeasure}},
+                                               scei::Scalariser, sceo::Scalariser,
+                                               threads::FLoops.Transducers.Executor,
+                                               fallback::Union{Nothing,
+                                                               <:OptimisationEstimator})
+        if isa(ri, AbstractVector)
+            @argcheck(!isempty(ri))
+        end
+        if isa(ro, AbstractVector)
+            @argcheck(!isempty(ro))
+        end
+        return new{typeof(opt), typeof(ri), typeof(ro), typeof(scei), typeof(sceo),
+                   typeof(threads), typeof(fallback)}(opt, ri, ro, scei, sceo, threads,
+                                                      fallback)
+    end
 end
 function HierarchicalEqualRiskContribution(;
                                            opt::HierarchicalOptimiser = HierarchicalOptimiser(),
@@ -19,12 +38,6 @@ function HierarchicalEqualRiskContribution(;
                                            threads::FLoops.Transducers.Executor = ThreadedEx(),
                                            fallback::Union{Nothing,
                                                            <:OptimisationEstimator} = nothing)
-    if isa(ri, AbstractVector)
-        @argcheck(!isempty(ri))
-    end
-    if isa(ro, AbstractVector)
-        @argcheck(!isempty(ro))
-    end
     return HierarchicalEqualRiskContribution(opt, ri, ro, scei, sceo, threads, fallback)
 end
 function opt_view(hec::HierarchicalEqualRiskContribution, i::AbstractVector,
@@ -481,6 +494,7 @@ function optimise!(hec::HierarchicalEqualRiskContribution,
     return if isa(retcode, OptimisationSuccess) || isnothing(hec.fallback)
         HierarchicalOptimisation(typeof(hec), pr, fees, wb, clr, retcode, w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(hec.fallback, rd; dims = dims, kwargs...)
     end
 end

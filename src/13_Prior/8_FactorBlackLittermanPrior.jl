@@ -13,6 +13,30 @@ struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T
     l::T11
     tau::T12
     rsd::T13
+    function FactorBlackLittermanPrior(pe::AbstractLowOrderPriorEstimatorMap_2_1,
+                                       f_mp::AbstractMatrixProcessingEstimator,
+                                       mp::AbstractMatrixProcessingEstimator,
+                                       re::AbstractRegressionEstimator,
+                                       ve::AbstractVarianceEstimator,
+                                       views::Union{<:LinearConstraintEstimator,
+                                                    <:BlackLittermanViews},
+                                       sets::Union{Nothing, <:AssetSets},
+                                       views_conf::Union{Nothing, <:Real, <:AbstractVector},
+                                       w::Union{Nothing, <:AbstractWeights}, rf::Real,
+                                       l::Union{Nothing, <:Real},
+                                       tau::Union{Nothing, <:Real}, rsd::Bool)
+        if isa(views, LinearConstraintEstimator)
+            @argcheck(!isnothing(sets))
+        end
+        assert_bl_views_conf(views_conf, views)
+        if !isnothing(tau)
+            @argcheck(tau > zero(tau))
+        end
+        return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(re), typeof(ve),
+                   typeof(views), typeof(sets), typeof(views_conf), typeof(w), typeof(rf),
+                   typeof(l), typeof(tau), typeof(rsd)}(pe, f_mp, mp, re, ve, views, sets,
+                                                        views_conf, w, rf, l, tau, rsd)
+    end
 end
 function FactorBlackLittermanPrior(;
                                    pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPrior(),
@@ -27,13 +51,6 @@ function FactorBlackLittermanPrior(;
                                    w::Union{Nothing, <:AbstractWeights} = nothing,
                                    rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
                                    tau::Union{Nothing, <:Real} = nothing, rsd::Bool = true)
-    if isa(views, LinearConstraintEstimator)
-        @argcheck(!isnothing(sets))
-    end
-    assert_bl_views_conf(views_conf, views)
-    if !isnothing(tau)
-        @argcheck(tau > zero(tau))
-    end
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end

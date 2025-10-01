@@ -35,6 +35,61 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
     ucs_flag::T11
     alg::T12
     fallback::T13
+    function NearOptimalCentering(opt::JuMPOptimiser,
+                                  r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}},
+                                  obj::Union{Nothing, <:ObjectiveFunction},
+                                  bins::Union{Nothing, <:Real},
+                                  w_min::Union{Nothing, <:AbstractVector{<:Real}},
+                                  w_min_ini::Union{Nothing, <:AbstractVector{<:Real}},
+                                  w_opt::Union{Nothing, <:AbstractVector},
+                                  w_opt_ini::Union{Nothing, <:AbstractVector},
+                                  w_max::Union{Nothing, <:AbstractVector{<:Real}},
+                                  w_max_ini::Union{Nothing, <:AbstractVector{<:Real}},
+                                  ucs_flag::Bool, alg::NearOptimalCenteringAlgorithm,
+                                  fallback::Union{Nothing, <:OptimisationEstimator})
+        if isa(r, AbstractVector)
+            @argcheck(!isempty(r))
+            @argcheck(!any(x -> isa(x, QuadExpressionRiskMeasures), r))
+        else
+            @argcheck(!isa(r, QuadExpressionRiskMeasures))
+        end
+        if isa(w_min, AbstractVector)
+            @argcheck(!isempty(w_min))
+        end
+        if isa(w_min_ini, AbstractVector)
+            @argcheck(!isempty(w_min_ini))
+        end
+        if isa(w_opt, AbstractVector)
+            @argcheck(!isempty(w_opt))
+        end
+        if isa(w_opt_ini, AbstractVector)
+            @argcheck(!isempty(w_opt_ini))
+        end
+        if isa(w_max, AbstractVector)
+            @argcheck(!isempty(w_max))
+        end
+        if isa(w_max_ini, AbstractVector)
+            @argcheck(!isempty(w_max_ini))
+        end
+        if isa(bins, Real)
+            @argcheck(isfinite(bins) && bins > 0)
+        end
+        return new{typeof(opt), typeof(r), typeof(obj), typeof(bins), typeof(w_min),
+                   typeof(w_min_ini), typeof(w_opt), typeof(w_opt_ini), typeof(w_max),
+                   typeof(w_max_ini), typeof(ucs_flag), typeof(alg), typeof(fallback)}(opt,
+                                                                                       r,
+                                                                                       obj,
+                                                                                       bins,
+                                                                                       w_min,
+                                                                                       w_min_ini,
+                                                                                       w_opt,
+                                                                                       w_opt_ini,
+                                                                                       w_max,
+                                                                                       w_max_ini,
+                                                                                       ucs_flag,
+                                                                                       alg,
+                                                                                       fallback)
+    end
 end
 function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               r::Union{<:RiskMeasure, <:AbstractVector{<:RiskMeasure}} = StandardDeviation(),
@@ -49,33 +104,6 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               ucs_flag::Bool = true,
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
                               fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    if isa(r, AbstractVector)
-        @argcheck(!isempty(r))
-        @argcheck(!any(x -> isa(x, QuadExpressionRiskMeasures), r))
-    else
-        @argcheck(!isa(r, QuadExpressionRiskMeasures))
-    end
-    if isa(w_min, AbstractVector)
-        @argcheck(!isempty(w_min))
-    end
-    if isa(w_min_ini, AbstractVector)
-        @argcheck(!isempty(w_min_ini))
-    end
-    if isa(w_opt, AbstractVector)
-        @argcheck(!isempty(w_opt))
-    end
-    if isa(w_opt_ini, AbstractVector)
-        @argcheck(!isempty(w_opt_ini))
-    end
-    if isa(w_max, AbstractVector)
-        @argcheck(!isempty(w_max))
-    end
-    if isa(w_max_ini, AbstractVector)
-        @argcheck(!isempty(w_max_ini))
-    end
-    if isa(bins, Real)
-        @argcheck(isfinite(bins) && bins > 0)
-    end
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fallback)
 end
@@ -502,8 +530,6 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing; rd = rd)
     scalarise_risk_expression!(model, opt.sce)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
-    # set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
-    # retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return if isa(retcode, OptimisationSuccess) || isnothing(noc.fallback)
@@ -526,6 +552,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                          noc_retcode, retcode, sol,
                                          ifelse(save, model, nothing))
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(noc.fallback, rd; dims = dims, str_names = str_names, save = save,
                   kwargs...)
     end
@@ -564,8 +591,6 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_sdp_phylogeny_constraints!(model, opt.nplg, :sdp_nplg)
     set_sdp_phylogeny_constraints!(model, opt.cplg, :sdp_cplg)
     add_custom_constraint!(model, opt.ccnt, opt, opt.pe)
-    # set_near_optimal_objective_function!(noc.alg, model, rk_opt, rt_opt, opt)
-    # retcode, sol = optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, rt_min, rt_max, w_min,
                                   w_max, Val(haskey(model, :ret_frontier)),
                                   Val(haskey(model, :risk_frontier)))
@@ -590,6 +615,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                          noc_retcode, retcode, sol,
                                          ifelse(save, model, nothing))
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(noc.fallback, rd; dims = dims, str_names = str_names, save = save,
                   kwargs...)
     end

@@ -17,6 +17,24 @@ struct HierarchicalOptimiser{T1, T2, T3, T4, T5, T6, T7, T8} <:
     sets::T6
     cwf::T7
     strict::T8
+    function HierarchicalOptimiser(pe::Union{<:AbstractPriorEstimator,
+                                             <:AbstractPriorResult},
+                                   cle::Union{<:ClusteringEstimator,
+                                              <:AbstractClusteringResult},
+                                   slv::Union{Nothing, <:Solver,
+                                              <:AbstractVector{<:Solver}},
+                                   fees::Union{Nothing, <:FeesEstimator, <:Fees},
+                                   wb::Union{Nothing, <:WeightBoundsEstimator,
+                                             <:WeightBounds},
+                                   sets::Union{Nothing, <:AssetSets}, cwf::WeightFinaliser,
+                                   strict::Bool)
+        if isa(wb, WeightBoundsEstimator)
+            @argcheck(!isnothing(sets))
+        end
+        return new{typeof(pe), typeof(cle), typeof(slv), typeof(fees), typeof(wb),
+                   typeof(sets), typeof(cwf), typeof(strict)}(pe, cle, slv, fees, wb, sets,
+                                                              cwf, strict)
+    end
 end
 function HierarchicalOptimiser(;
                                pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
@@ -28,9 +46,6 @@ function HierarchicalOptimiser(;
                                sets::Union{Nothing, <:AssetSets} = nothing,
                                cwf::WeightFinaliser = IterativeWeightFinaliser(),
                                strict::Bool = false)
-    if isa(wb, WeightBoundsEstimator)
-        @argcheck(!isnothing(sets))
-    end
     return HierarchicalOptimiser(pe, cle, slv, fees, wb, sets, cwf, strict)
 end
 function opt_view(hco::HierarchicalOptimiser, i::AbstractVector)

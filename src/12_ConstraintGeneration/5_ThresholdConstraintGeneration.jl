@@ -1,23 +1,32 @@
 struct BuyInThresholdEstimator{T1} <: AbstractConstraintEstimator
     val::T1
+    function BuyInThresholdEstimator(val::Union{<:AbstractDict,
+                                                <:Pair{<:AbstractString, <:Real},
+                                                <:AbstractVector{<:Pair{<:AbstractString,
+                                                                        <:Real}}})
+        @argcheck(!isempty(val))
+        return new{typeof(val)}(val)
+    end
 end
 function BuyInThresholdEstimator(;
                                  val::Union{<:AbstractDict,
                                             <:Pair{<:AbstractString, <:Real},
                                             <:AbstractVector{<:Pair{<:AbstractString,
                                                                     <:Real}}})
-    @argcheck(!isempty(val))
     return BuyInThresholdEstimator(val)
 end
 struct BuyInThreshold{T1} <: AbstractConstraintResult
     val::T1
+    function BuyInThreshold(val::Union{<:Real, <:AbstractVector{<:Real}})
+        if isa(val, Real)
+            @argcheck(isfinite(val) && val >= zero(val))
+        elseif isa(val, AbstractVector)
+            @argcheck(all(x -> (isfinite(x) && x >= 0), val))
+        end
+        return new{typeof(val)}(val)
+    end
 end
 function BuyInThreshold(; val::Union{<:Real, <:AbstractVector{<:Real}})
-    if isa(val, Real)
-        @argcheck(isfinite(val) && val >= zero(val))
-    elseif isa(val, AbstractVector)
-        @argcheck(all(x -> (isfinite(x) && x >= 0), val))
-    end
     return BuyInThreshold(val)
 end
 function threshold_view(t::Union{Nothing, <:BuyInThresholdEstimator}, ::Any)

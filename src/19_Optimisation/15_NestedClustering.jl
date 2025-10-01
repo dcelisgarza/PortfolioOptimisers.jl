@@ -1,28 +1,16 @@
-struct NestedClusteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <: OptimisationResult
+struct NestedClusteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
+       OptimisationResult
     oe::T1
     pr::T2
     wb::T3
     clr::T4
     resi::T5
     reso::T6
-    retcode::T7
-    w::T8
+    cv::T7
+    retcode::T8
+    w::T9
 end
-"""
-"""
-struct NestedClustering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
-       ClusteringOptimisationEstimator
-    pe::T1
-    cle::T2
-    wb::T3
-    sets::T4
-    opti::T5
-    opto::T6
-    cwf::T7
-    strict::T8
-    threads::T9
-    fallback::T10
-end
+
 function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
     @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
     return nothing
@@ -54,14 +42,6 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     @argcheck(!isa(opt.opt.cplg, AbstractPhylogenyConstraintResult))
     return nothing
 end
-function assert_internal_optimiser(opt::NestedClustering)
-    @argcheck(!isa(opt.cle, AbstractClusteringResult))
-    assert_external_optimiser(opt.opto)
-    if !(opt.opti === opt.opto)
-        assert_internal_optimiser(opt.opti)
-    end
-    return nothing
-end
 function assert_internal_optimiser(opt::AbstractVector{<:Union{<:OptimisationEstimator,
                                                                <:OptimisationResult}})
     assert_internal_optimiser.(opt)
@@ -80,6 +60,70 @@ function assert_external_optimiser(opt::JuMPOptimisationEstimator)
     assert_internal_optimiser(opt)
     return nothing
 end
+function assert_external_optimiser(opt::AbstractVector{<:Union{<:OptimisationEstimator,
+                                                               <:OptimisationResult}})
+    assert_external_optimiser.(opt)
+    return nothing
+end
+"""
+"""
+struct NestedClustering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11} <:
+       ClusteringOptimisationEstimator
+    pe::T1
+    cle::T2
+    wb::T3
+    sets::T4
+    opti::T5
+    opto::T6
+    cv::T7
+    cwf::T8
+    strict::T9
+    threads::T10
+    fallback::T11
+    function NestedClustering(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult},
+                              cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult},
+                              wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds},
+                              sets::Union{Nothing, <:AssetSets},
+                              opti::OptimisationEstimator, opto::OptimisationEstimator,
+                              cv::Union{Nothing, <:CrossValidationEstimator},
+                              cwf::WeightFinaliser, strict::Bool,
+                              threads::FLoops.Transducers.Executor,
+                              fallback::Union{Nothing, <:OptimisationEstimator})
+        assert_external_optimiser(opto)
+        if !(opti === opto)
+            assert_internal_optimiser(opti)
+        end
+        if isa(wb, WeightBoundsEstimator)
+            @argcheck(!isnothing(sets))
+        end
+        return new{typeof(pe), typeof(cle), typeof(wb), typeof(sets), typeof(opti),
+                   typeof(opto), typeof(cv), typeof(cwf), typeof(strict), typeof(threads),
+                   typeof(fallback)}(pe, cle, wb, sets, opti, opto, cv, cwf, strict,
+                                     threads, fallback)
+    end
+end
+function NestedClustering(;
+                          pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
+                          cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult} = ClusteringEstimator(),
+                          wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
+                          sets::Union{Nothing, <:AssetSets} = nothing,
+                          opti::OptimisationEstimator, opto::OptimisationEstimator,
+                          cv::Union{Nothing, <:CrossValidationEstimator} = nothing,
+                          cwf::WeightFinaliser = IterativeWeightFinaliser(),
+                          strict::Bool = false,
+                          threads::FLoops.Transducers.Executor = ThreadedEx(),
+                          fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
+    return NestedClustering(pe, cle, wb, sets, opti, opto, cv, cwf, strict, threads,
+                            fallback)
+end
+function assert_internal_optimiser(opt::NestedClustering)
+    @argcheck(!isa(opt.cle, AbstractClusteringResult))
+    assert_external_optimiser(opt.opto)
+    if !(opt.opti === opt.opto)
+        assert_internal_optimiser(opt.opti)
+    end
+    return nothing
+end
 function assert_external_optimiser(opt::NestedClustering)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.pe, AbstractPriorResult))
@@ -90,30 +134,6 @@ function assert_external_optimiser(opt::NestedClustering)
     end
     return nothing
 end
-function assert_external_optimiser(opt::AbstractVector{<:Union{<:OptimisationEstimator,
-                                                               <:OptimisationResult}})
-    assert_external_optimiser.(opt)
-    return nothing
-end
-function NestedClustering(;
-                          pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior(),
-                          cle::Union{<:ClusteringEstimator, <:AbstractClusteringResult} = ClusteringEstimator(),
-                          wb::Union{Nothing, <:WeightBoundsEstimator, <:WeightBounds} = nothing,
-                          sets::Union{Nothing, <:AssetSets} = nothing,
-                          opti::OptimisationEstimator, opto::OptimisationEstimator,
-                          cwf::WeightFinaliser = IterativeWeightFinaliser(),
-                          strict::Bool = false,
-                          threads::FLoops.Transducers.Executor = ThreadedEx(),
-                          fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    assert_external_optimiser(opto)
-    if !(opti === opto)
-        assert_internal_optimiser(opti)
-    end
-    if isa(wb, WeightBoundsEstimator)
-        @argcheck(!isnothing(sets))
-    end
-    return NestedClustering(pe, cle, wb, sets, opti, opto, cwf, strict, threads, fallback)
-end
 function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
     X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
     pe = prior_view(nco.pe, i)
@@ -122,7 +142,7 @@ function opt_view(nco::NestedClustering, i::AbstractVector, X::AbstractMatrix)
     opti = opt_view(nco.opti, i, X)
     opto = opt_view(nco.opto, i, X)
     return NestedClustering(; pe = pe, cle = nco.cle, wb = wb, sets = sets, opti = opti,
-                            opto = opto, cwf = nco.cwf, strict = nco.strict,
+                            opto = opto, cv = nco.cv, cwf = nco.cwf, strict = nco.strict,
                             threads = nco.threads, fallback = nco.fallback)
 end
 function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsEstimator,
@@ -179,16 +199,19 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
             resi[i] = res
         end
     end
-    rdo = ReturnsResult(; nx = ["_$i" for i in 1:(clr.k)], X = pr.X * wi, nf = rd.nf,
-                        F = rd.F)
+    X, F, ts, iv, ivpa = predict_outer_estimator_returns(nco, rd, pr, wi, resi; cls = cls)
+    rdo = ReturnsResult(; nx = ["_$i" for i in 1:(clr.k)], X = X, nf = rd.nf, F = F,
+                        ts = ts, iv = iv, ivpa = ivpa)
     reso = optimise!(nco.opto, rdo; dims = dims, branchorder = branchorder,
                      str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.cwf, nco.strict,
                                                  resi, reso, wi * reso.w;
                                                  datatype = eltype(pr.X))
     return if isa(retcode, OptimisationSuccess) || isnothing(nco.fallback)
-        NestedClusteringOptimisation(typeof(nco), pr, wb, clr, resi, reso, retcode, w)
+        NestedClusteringOptimisation(typeof(nco), pr, wb, clr, resi, reso, nco.cv, retcode,
+                                     w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(nco.fallback, rd; dims = dims, branchorder = branchorder,
                   str_names = str_names, save = save, kwargs...)
     end

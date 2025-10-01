@@ -123,11 +123,15 @@ struct HierarchicalClustering{T1, T2, T3, T4} <: AbstractClusteringResult
     S::T2
     D::T3
     k::T4
+    function HierarchicalClustering(clustering::Clustering.Hclust, S::AbstractMatrix,
+                                    D::AbstractMatrix, k::Integer)
+        @argcheck(!isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
+                  AssertionError("The following conditions must hold:\n`S` must be non-empty => $(!isempty(S))\n`D` must be non-empty => $(!isempty(D))\n`S` and `D` must have the same size => $(size(S) == size(D))\nk must be greater than or equal to 1 => $k"))
+        return new{typeof(clustering), typeof(S), typeof(D), typeof(k)}(clustering, S, D, k)
+    end
 end
 function HierarchicalClustering(; clustering::Clustering.Hclust, S::AbstractMatrix,
                                 D::AbstractMatrix, k::Integer)
-    @argcheck(!isempty(S) && !isempty(D) && size(S) == size(D) && k >= one(k),
-              AssertionError("The following conditions must hold:\n`S` must be non-empty => $(!isempty(S))\n`D` must be non-empty => $(!isempty(D))\n`S` and `D` must have the same size => $(size(S) == size(D))\nk must be greater than or equal to 1 => $k"))
     return HierarchicalClustering(clustering, S, D, k)
 end
 
@@ -213,6 +217,9 @@ StandardisedSilhouetteScore
 """
 struct StandardisedSilhouetteScore{T1} <: AbstractOptimalNumberClustersAlgorithm
     metric::T1
+    function StandardisedSilhouetteScore(metric::Union{Nothing, <:Distances.SemiMetric})
+        return new{typeof(metric)}(metric)
+    end
 end
 function StandardisedSilhouetteScore(;
                                      metric::Union{Nothing, <:Distances.SemiMetric} = nothing)
@@ -267,18 +274,23 @@ OptimalNumberClusters
 struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
     max_k::T1
     alg::T2
+    function OptimalNumberClusters(max_k::Union{Nothing, <:Integer},
+                                   alg::Union{<:Integer,
+                                              <:AbstractOptimalNumberClustersAlgorithm})
+        if !isnothing(max_k)
+            @argcheck(max_k >= one(max_k),
+                      DomainError("`max_k` must be greater than or equal to 1:\nmax_k => $max_k"))
+        end
+        if isa(alg, Integer)
+            @argcheck(alg >= one(alg),
+                      DomainError("`alg` must be greater than or equal to 1:\nalg => $alg"))
+        end
+        return new{typeof(max_k), typeof(alg)}(max_k, alg)
+    end
 end
 function OptimalNumberClusters(; max_k::Union{Nothing, <:Integer} = nothing,
                                alg::Union{<:Integer,
                                           <:AbstractOptimalNumberClustersAlgorithm} = SecondOrderDifference())
-    if !isnothing(max_k)
-        @argcheck(max_k >= one(max_k),
-                  DomainError("`max_k` must be greater than or equal to 1:\nmax_k => $max_k"))
-    end
-    if isa(alg, Integer)
-        @argcheck(alg >= one(alg),
-                  DomainError("`alg` must be greater than or equal to 1:\nalg => $alg"))
-    end
     return OptimalNumberClusters(max_k, alg)
 end
 
@@ -320,6 +332,9 @@ HClustAlgorithm
 """
 struct HClustAlgorithm{T1} <: AbstractClusteringAlgorithm
     linkage::T1
+    function HClustAlgorithm(linkage::Symbol)
+        return new{typeof(linkage)}(linkage)
+    end
 end
 function HClustAlgorithm(; linkage::Symbol = :ward)
     return HClustAlgorithm(linkage)
@@ -396,6 +411,12 @@ struct ClusteringEstimator{T1, T2, T3, T4} <: AbstractClusteringEstimator
     de::T2
     alg::T3
     onc::T4
+    function ClusteringEstimator(ce::StatsBase.CovarianceEstimator,
+                                 de::AbstractDistanceEstimator,
+                                 alg::AbstractClusteringAlgorithm,
+                                 onc::AbstractOptimalNumberClustersEstimator)
+        return new{typeof(ce), typeof(de), typeof(alg), typeof(onc)}(ce, de, alg, onc)
+    end
 end
 function ClusteringEstimator(;
                              ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),

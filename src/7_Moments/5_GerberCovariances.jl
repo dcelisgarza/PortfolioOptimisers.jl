@@ -161,6 +161,9 @@ NormalisedGerber0
 """
 struct NormalisedGerber0{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
+    function NormalisedGerber0(me::AbstractExpectedReturnsEstimator)
+        return new{typeof(me)}(me)
+    end
 end
 function NormalisedGerber0(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber0(me)
@@ -207,6 +210,9 @@ NormalisedGerber1
 """
 struct NormalisedGerber1{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
+    function NormalisedGerber1(me::AbstractExpectedReturnsEstimator)
+        return new{typeof(me)}(me)
+    end
 end
 function NormalisedGerber1(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber1(me)
@@ -253,6 +259,9 @@ NormalisedGerber2
 """
 struct NormalisedGerber2{T1} <: NormalisedGerberCovarianceAlgorithm
     me::T1
+    function NormalisedGerber2(me::AbstractExpectedReturnsEstimator)
+        return new{typeof(me)}(me)
+    end
 end
 function NormalisedGerber2(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns())
     return NormalisedGerber2(me)
@@ -326,11 +335,17 @@ struct GerberCovariance{T1, T2, T3, T4} <: BaseGerberCovariance
     pdm::T2
     threshold::T3
     alg::T4
+    function GerberCovariance(ve::StatsBase.CovarianceEstimator,
+                              pdm::Union{Nothing, <:Posdef}, threshold::Real,
+                              alg::GerberCovarianceAlgorithm)
+        @argcheck(zero(threshold) < threshold < one(threshold))
+        return new{typeof(ve), typeof(pdm), typeof(threshold), typeof(alg)}(ve, pdm,
+                                                                            threshold, alg)
+    end
 end
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                           pdm::Union{Nothing, <:Posdef} = Posdef(), threshold::Real = 0.5,
                           alg::GerberCovarianceAlgorithm = Gerber1())
-    @argcheck(zero(threshold) < threshold < one(threshold))
     return GerberCovariance(ve, pdm, threshold, alg)
 end
 
@@ -390,6 +405,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::Abstrac
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0}, X::AbstractMatrix)
@@ -443,6 +459,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber0},
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::AbstractMatrix,
@@ -495,6 +512,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::Abstrac
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1}, X::AbstractMatrix)
@@ -550,6 +568,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber1},
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::AbstractMatrix,
@@ -608,6 +627,7 @@ function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::Abstrac
     posdef!(ce.pdm, rho)
     return rho
 end
+
 """
 ```julia
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:NormalisedGerber2}, X::AbstractMatrix)

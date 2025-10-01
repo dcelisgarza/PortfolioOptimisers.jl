@@ -283,7 +283,6 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
     return ucs_variance_risk, key
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertaintySet,
-                                r_sigma::Union{Nothing, <:AbstractMatrix},
                                 sigma::AbstractMatrix)
     sc = model[:sc]
     if !haskey(model, :E)
@@ -292,9 +291,6 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipseUncertain
         @variable(model, E[1:N, 1:N], Symmetric)
         @expression(model, WpE, W + E)
         @constraint(model, ceucs_variance, sc * E in PSDCone())
-    end
-    if !isnothing(r_sigma)
-        sigma = r_sigma
     end
     key = Symbol(:eucs_variance_risk_, i)
     WpE = model[:WpE]
@@ -323,11 +319,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
     end
     set_sdp_constraints!(model)
     ucs = r.ucs
-    X = pr.X
-    r_sigma = r.sigma
-    sigma = pr.sigma
+    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     ucs_variance_risk, key = set_ucs_variance_risk!(model, i, sigma_ucs(ucs, rd; kwargs...),
-                                                    r_sigma, sigma)
+                                                    sigma)
     set_risk_bounds_and_expression!(model, opt, ucs_variance_risk, r.settings, key)
     return nothing
 end
@@ -576,8 +570,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                args...; kwargs...)
-    b = !isnothing(r.alg.b) ? r.alg.b : 1e3
-    s = !isnothing(r.alg.s) ? r.alg.s : 1e-5
+    b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
+    s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:var_risk_, i)
     sc = model[:sc]
@@ -611,8 +605,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                args...; kwargs...)
-    b = !isnothing(r.alg.b) ? r.alg.b : 1e3
-    s = !isnothing(r.alg.s) ? r.alg.s : 1e-5
+    b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
+    s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:var_range_risk_, i)
     sc = model[:sc]
@@ -643,7 +637,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                     (sum(z_var_h) -
                                                                                      beta *
                                                                                      T +
-                                                                                     s * T) >=
+                                                                                     s * T) <=
                                                                                     0
                                                                                 end)
     else
@@ -662,7 +656,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                          z_var_h) -
                                                                                      beta *
                                                                                      sw +
-                                                                                     s * sw) >=
+                                                                                     s * sw) <=
                                                                                     0
                                                                                 end)
     end
@@ -688,6 +682,17 @@ end
 function compute_value_at_risk_z(::Laplace, alpha::Real)
     return -log(2 * alpha) / sqrt(2)
 end
+function compute_value_at_risk_cz(dist::Normal, alpha::Real)
+    return quantile(dist, alpha)
+end
+function compute_value_at_risk_cz(dist::TDist, alpha::Real)
+    d = dof(dist)
+    @argcheck(d > 2)
+    return quantile(dist, alpha) * sqrt((d - 2) / d)
+end
+function compute_value_at_risk_cz(::Laplace, alpha::Real)
+    return -log(2 * (one(alpha) - alpha)) / sqrt(2)
+end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any,
                                               <:DistributionValueatRisk},
@@ -695,13 +700,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                args...; kwargs...)
     alg = r.alg
-    sigma = alg.sigma
     mu = nothing_scalar_array_factory(alg.mu, pr.mu)
-    G = if isnothing(sigma)
-        get_chol_or_sigma_pm(model, pr)
-    else
-        cholesky(sigma).U
-    end
+    G = isnothing(alg.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(alg.sigma).U
     w = model[:w]
     sc = model[:sc]
     z = compute_value_at_risk_z(r.alg.dist, r.alpha)
@@ -721,23 +721,22 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
                                args...; kwargs...)
     alg = r.alg
-    sigma = alg.sigma
-    G = if isnothing(sigma)
-        get_chol_or_sigma_pm(model, pr)
-    else
-        cholesky(sigma).U
-    end
+    mu = nothing_scalar_array_factory(alg.mu, pr.mu)
+    G = isnothing(alg.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(alg.sigma).U
     w = model[:w]
     sc = model[:sc]
     dist = r.alg.dist
     z_l = compute_value_at_risk_z(dist, r.alpha)
-    z_h = compute_value_at_risk_z(dist, r.beta)
+    z_h = compute_value_at_risk_cz(dist, r.beta)
     key = Symbol(:var_range_risk_, i)
-    g_var = model[Symbol(:g_var_, i)] = @variable(model)
+    g_var = model[Symbol(:g_var_range_, i)] = @variable(model)
+    var_range_mu = model[Symbol(:var_range_mu_, i)] = @expression(model, dot(mu, w))
     var_risk_l, var_risk_h = model[Symbol(:var_risk_l_, i)], model[Symbol(:var_risk_h_, i)] = @expressions(model,
                                                                                                            begin
+                                                                                                               -var_range_mu +
                                                                                                                z_l *
                                                                                                                g_var
+                                                                                                               -var_range_mu +
                                                                                                                z_h *
                                                                                                                g_var
                                                                                                            end)

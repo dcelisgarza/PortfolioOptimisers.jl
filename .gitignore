@@ -14,3 +14,5 @@ node_modules
 *.CondaPkg/*
 /docs/.CondaPkg/*
 /test/.CondaPkg/*
+/docs/node_modules/*
+/docs/package-lock.json

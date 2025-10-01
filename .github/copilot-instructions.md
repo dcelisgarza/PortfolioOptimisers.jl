@@ -16,7 +16,7 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 
   - **Contributing and development:**
     
-      + Follow the guidelines in [`090-contributing.md`](../docs/src/090-contributing.md) and [`091-developer.md`](../docs/src/091-developer.md).
+      + Follow the guidelines in [`1-contributing.md`](../docs/src/contribute/1-contributing.md) and [`2-developer.md`](../docs/src/contribute/2-developer.md).
 
   - **Examples:**
     
@@ -56,7 +56,7 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
       + Keep commits atomic and rebase on `main` before PR.
   - **Releases:**
     
-      + Use a `release-x.y.z` branch, update `Project.toml` and `CHANGELOG.md`, and follow the release checklist in `091-developer.md`.
+      + Use a `release-x.y.z` branch, update `Project.toml` and `CHANGELOG.md`, and follow the release checklist in `2-developer.md`.
 
 ## Integration & Dependencies
 
@@ -100,8 +100,8 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 ## References
 
   - Main entry: [src/PortfolioOptimisers.jl](../src/PortfolioOptimisers.jl)
-  - Developer guide: [docs/src/091-developer.md](../docs/src/091-developer.md)
-  - Contributing: [contributing](../docs/src/090-contributing.md)
+  - Developer guide: [developer](../docs/src/contribute/2-developer.md)
+  - Contributing: [contributing](../docs/src/contribute/1-contributing.md)
   - Tests: [test](../test/)
   - Docs: [docs](../docs/)
 
@@ -116,4 +116,4 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 
 * * *
 
-For further details, see the [README.md](../README.md), [`091-developer.md`](../docs/src/091-developer.md) and in-code documentation.
+For further details, see the [README.md](../README.md), [`developer`](../docs/src/contribute/2-developer.md) and in-code documentation.

@@ -15,6 +15,45 @@ struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11
     rf::T13
     l::T14
     tau::T15
+    function AugmentedBlackLittermanPrior(a_pe::AbstractLowOrderPriorEstimatorMap_2_1,
+                                          f_pe::AbstractLowOrderPriorEstimatorMap_2_1,
+                                          mp::AbstractMatrixProcessingEstimator,
+                                          re::AbstractRegressionEstimator,
+                                          ve::AbstractVarianceEstimator,
+                                          a_views::Union{<:LinearConstraintEstimator,
+                                                         <:BlackLittermanViews},
+                                          f_views::Union{<:LinearConstraintEstimator,
+                                                         <:BlackLittermanViews},
+                                          a_sets::Union{Nothing, <:AssetSets},
+                                          f_sets::Union{Nothing, <:AssetSets},
+                                          a_views_conf::Union{Nothing, <:Real,
+                                                              <:AbstractVector},
+                                          f_views_conf::Union{Nothing, <:Real,
+                                                              <:AbstractVector},
+                                          w::Union{Nothing, <:AbstractVector}, rf::Real,
+                                          l::Union{Nothing, <:Real},
+                                          tau::Union{Nothing, <:Real})
+        if isa(w, AbstractVector)
+            @argcheck(!isempty(w))
+        end
+        if isa(a_views, LinearConstraintEstimator)
+            @argcheck(!isnothing(a_sets))
+        end
+        if isa(f_views, LinearConstraintEstimator)
+            @argcheck(!isnothing(f_sets))
+        end
+        assert_bl_views_conf(a_views_conf, a_views)
+        assert_bl_views_conf(f_views_conf, f_views)
+        if !isnothing(tau)
+            @argcheck(tau > zero(tau))
+        end
+        return new{typeof(a_pe), typeof(f_pe), typeof(mp), typeof(re), typeof(ve),
+                   typeof(a_views), typeof(f_views), typeof(a_sets), typeof(f_sets),
+                   typeof(a_views_conf), typeof(f_views_conf), typeof(w), typeof(rf),
+                   typeof(l), typeof(tau)}(a_pe, f_pe, mp, re, ve, a_views, f_views, a_sets,
+                                           f_sets, a_views_conf, f_views_conf, w, rf, l,
+                                           tau)
+    end
 end
 function AugmentedBlackLittermanPrior(;
                                       a_pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPrior(),
@@ -35,20 +74,6 @@ function AugmentedBlackLittermanPrior(;
                                       w::Union{Nothing, <:AbstractVector} = nothing,
                                       rf::Real = 0.0, l::Union{Nothing, <:Real} = nothing,
                                       tau::Union{Nothing, <:Real} = nothing)
-    if isa(w, AbstractVector)
-        @argcheck(!isempty(w))
-    end
-    if isa(a_views, LinearConstraintEstimator)
-        @argcheck(!isnothing(a_sets))
-    end
-    if isa(f_views, LinearConstraintEstimator)
-        @argcheck(!isnothing(f_sets))
-    end
-    assert_bl_views_conf(a_views_conf, a_views)
-    assert_bl_views_conf(f_views_conf, f_views)
-    if !isnothing(tau)
-        @argcheck(tau > zero(tau))
-    end
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, ve, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end

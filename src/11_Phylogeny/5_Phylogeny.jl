@@ -1,5 +1,146 @@
 """
 ```julia
+struct PhylogenyResult{T} <: AbstractPhylogenyResult
+    X::T
+end
+```
+
+Container type for phylogeny matrix or vector results in PortfolioOptimisers.jl.
+
+`PhylogenyResult` stores the output of phylogeny-based estimation routines, such as network or clustering-based phylogeny matrices, or centrality vectors. It is used throughout the package to represent validated phylogeny structures for constraint generation, centrality analysis, and related workflows.
+
+# Fields
+
+  - `X`: The phylogeny matrix or centrality vector.
+
+# Constructor
+
+```julia
+PhylogenyResult(; X::Union{<:AbstractMatrix, <:AbstractVector})
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `!isempty(X)`.
+
+  - If `X` is a matrix:
+
+      + Must be symmetric, `issymmetric(X) == true`.
+      + Must have zero diagonal, `all(x -> iszero(x), diag(X)) == true`.
+
+# Examples
+
+```jldoctest
+julia> PhylogenyResult(; X = [0 1 0; 1 0 1; 0 1 0])
+PhylogenyResult
+  X | 3×3 Matrix{Int64}
+
+julia> PhylogenyResult(; X = [0.2, 0.5, 0.3])
+PhylogenyResult
+  X | Vector{Float64}: [0.2, 0.5, 0.3]
+```
+
+# Related
+
+  - [`AbstractPhylogenyResult`](@ref)
+  - [`phylogeny_matrix`](@ref)
+  - [`centrality_vector`](@ref)
+"""
+struct PhylogenyResult{T} <: AbstractPhylogenyResult
+    X::T
+    function PhylogenyResult(X::Union{<:AbstractMatrix, <:AbstractVector})
+        @argcheck(!isempty(X))
+        if isa(X, AbstractMatrix)
+            @argcheck(issymmetric(X))
+            @argcheck(all(x -> iszero(x), diag(X)))
+        end
+        return new{typeof(X)}(X)
+    end
+end
+function PhylogenyResult(; X::Union{<:AbstractMatrix, <:AbstractVector})
+    return PhylogenyResult(X)
+end
+
+"""
+```julia
+phylogeny_matrix(ph::PhylogenyResult{<:AbstractMatrix}, args...; kwargs...)
+```
+
+Fallback no-op for returning a validated phylogeny matrix result as-is.
+
+This method provides a generic interface for handling precomputed phylogeny matrices wrapped in a [`PhylogenyResult`](@ref). It simply returns the input object unchanged, enabling consistent downstream workflows for constraint generation and analysis.
+
+# Arguments
+
+  - `ph::PhylogenyResult{<:AbstractMatrix}`: Phylogeny matrix result object.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - The input `ph` object.
+
+# Examples
+
+```jldoctest
+julia> ph = PhylogenyResult(; X = [0 1 0; 1 0 1; 0 1 0]);
+
+julia> phylogeny_matrix(ph)
+PhylogenyResult
+  X | 3×3 Matrix{Int64}
+```
+
+# Related
+
+  - [`PhylogenyResult`](@ref)
+  - [`phylogeny_matrix`](@ref)
+"""
+function phylogeny_matrix(ph::PhylogenyResult{<:AbstractMatrix}, args...; kwargs...)
+    return ph
+end
+
+"""
+```julia
+centrality_vector(ph::PhylogenyResult{<:AbstractVector}, args...; kwargs...)
+```
+
+Fallback no-op for returning a validated centrality vector result as-is.
+
+This method provides a generic interface for handling precomputed centrality vectors wrapped in a [`PhylogenyResult`](@ref). It simply returns the input object unchanged, enabling consistent downstream workflows for centrality-based analysis and constraint generation.
+
+# Arguments
+
+  - `ph::PhylogenyResult{<:AbstractVector}`: Centrality vector result object.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - The input `ph` object.
+
+# Examples
+
+```jldoctest
+julia> ph = PhylogenyResult(; X = [0.2, 0.5, 0.3]);
+
+julia> centrality_vector(ph)
+PhylogenyResult
+  X | Vector{Float64}: [0.2, 0.5, 0.3]
+```
+
+# Related
+
+  - [`PhylogenyResult`](@ref)
+  - [`centrality_vector`](@ref)
+"""
+function centrality_vector(ph::PhylogenyResult{<:AbstractVector}, args...; kwargs...)
+    return ph
+end
+
+"""
+```julia
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 ```
 
@@ -68,6 +209,9 @@ BetweennessCentrality
 struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
+    function BetweennessCentrality(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BetweennessCentrality(args, kwargs)
@@ -115,6 +259,9 @@ ClosenessCentrality
 struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
+    function ClosenessCentrality(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return ClosenessCentrality(args, kwargs)
@@ -166,9 +313,12 @@ DegreeCentrality
 struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
     kind::T1
     kwargs::T2
+    function DegreeCentrality(kind::Integer, kwargs::NamedTuple)
+        @argcheck(kind in 0:2, DomainError("`kind` must be in (0:2):\nkind => $kind"))
+        return new{typeof(kind), typeof(kwargs)}(kind, kwargs)
+    end
 end
 function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
-    @argcheck(kind in 0:2, DomainError("`kind` must be in (0:2):\nkind => $kind"))
     return DegreeCentrality(kind, kwargs)
 end
 
@@ -226,6 +376,9 @@ KatzCentrality
 """
 struct KatzCentrality{T1} <: AbstractCentralityAlgorithm
     alpha::T1
+    function KatzCentrality(alpha::Real)
+        return new{typeof(alpha)}(alpha)
+    end
 end
 function KatzCentrality(; alpha::Real = 0.3)
     return KatzCentrality(alpha)
@@ -283,10 +436,13 @@ struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
     n::T1
     alpha::T2
     epsilon::T3
+    function Pagerank(n::Integer, alpha::Real, epsilon::Real)
+        @argcheck(n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
+                  DomainError("The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon"))
+        return new{typeof(n), typeof(alpha), typeof(epsilon)}(n, alpha, epsilon)
+    end
 end
-function Pagerank(; alpha::Real = 0.85, n::Integer = 100, epsilon::Real = 1e-6)
-    @argcheck(n > 0 && zero(alpha) < alpha < one(alpha) && epsilon > zero(epsilon),
-              DomainError("The following conditions must hold:\nn > 0 => n = $n\nalpha must be in (0, 1) => alpha = $alpha\nepsilon > 0 => epsilon = $epsilon"))
+function Pagerank(; n::Integer = 100, alpha::Real = 0.85, epsilon::Real = 1e-6)
     return Pagerank(n, alpha, epsilon)
 end
 
@@ -348,6 +504,9 @@ StressCentrality
 struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
     args::T1
     kwargs::T2
+    function StressCentrality(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return StressCentrality(args, kwargs)
@@ -477,6 +636,9 @@ KruskalTree
 struct KruskalTree{T1, T2} <: AbstractTreeType
     args::T1
     kwargs::T2
+    function KruskalTree(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return KruskalTree(args, kwargs)
@@ -524,6 +686,9 @@ BoruvkaTree
 struct BoruvkaTree{T1, T2} <: AbstractTreeType
     args::T1
     kwargs::T2
+    function BoruvkaTree(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BoruvkaTree(args, kwargs)
@@ -571,6 +736,9 @@ PrimTree
 struct PrimTree{T1, T2} <: AbstractTreeType
     args::T1
     kwargs::T2
+    function PrimTree(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
 end
 function PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return PrimTree(args, kwargs)
@@ -701,6 +869,12 @@ struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
     de::T2
     alg::T3
     n::T4
+    function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
+                              de::AbstractDistanceEstimator,
+                              alg::Union{<:AbstractSimilarityMatrixAlgorithm,
+                                         <:AbstractTreeType}, n::Integer)
+        return new{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
+    end
 end
 function NetworkEstimator(;
                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
@@ -793,6 +967,11 @@ CentralityEstimator
 struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
     ne::T1
     cent::T2
+    function CentralityEstimator(ne::Union{<:AbstractPhylogenyEstimator,
+                                           <:AbstractPhylogenyResult},
+                                 cent::AbstractCentralityAlgorithm)
+        return new{typeof(ne), typeof(cent)}(ne, cent)
+    end
 end
 function CentralityEstimator(;
                              ne::Union{<:AbstractPhylogenyEstimator,
@@ -1028,6 +1207,7 @@ function average_centrality(ne::Union{<:AbstractPhylogenyEstimator,
                             X::AbstractMatrix; dims::Int = 1, kwargs...)
     return dot(centrality_vector(ne, cent, X; dims = dims, kwargs...).X, w)
 end
+
 """
 ```julia
 average_centrality(cte::CentralityEstimator, w::AbstractVector, X::AbstractMatrix;
@@ -1067,7 +1247,7 @@ asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
 
 Compute the asset phylogeny score for a set of weights and a phylogeny matrix.
 
-This function computes the weighted sum of the phylogeny matrix, normalised by the sum of absolute weights.
+This function computes the weighted sum of the phylogeny matrix, normalised by the sum of absolute weights. The asset phylogeny score quantifies the degree of phylogenetic (network or cluster-based) structure present in the portfolio allocation.
 
 # Arguments
 
@@ -1089,7 +1269,14 @@ function asset_phylogeny(w::AbstractVector, X::AbstractMatrix)
     c /= sum(aw)
     return c
 end
-#! Add docstring
+
+"""
+```julia
+asset_phylogeny(w::AbstractVector, ph::PhylogenyResult{<:AbstractMatrix})
+```
+
+Calls `asset_phylogeny` with the phylogeny matrix `X` from a `PhylogenyResult`.
+"""
 function asset_phylogeny(w::AbstractVector, ph::PhylogenyResult{<:AbstractMatrix})
     return asset_phylogeny(w, ph.X)
 end
@@ -1126,13 +1313,40 @@ function asset_phylogeny(cle::Union{<:AbstractPhylogenyEstimator,
                          X::AbstractMatrix; dims::Int = 1, kwargs...)
     return asset_phylogeny(w, phylogeny_matrix(cle, X; dims = dims, kwargs...))
 end
-#! Write docs
+
+"""
+```julia
+asset_phylogeny(ph::PhylogenyResult{<:AbstractMatrix}, w::AbstractVector, args...;
+                kwargs...)
+```
+
+Compute the asset phylogeny score for a set of portfolio weights and a phylogeny matrix result, forwarding additional arguments.
+
+This method provides compatibility with workflows that pass extra positional or keyword arguments. It extracts the phylogeny matrix from the `PhylogenyResult` and delegates to `asset_phylogeny(w, ph)`, ignoring any additional arguments.
+
+# Arguments
+
+  - `ph::PhylogenyResult{<:AbstractMatrix}`: Phylogeny matrix result object.
+  - `w::AbstractVector`: Portfolio weights vector.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `score::Real`: Asset phylogeny score.
+
+# Related
+
+  - [`PhylogenyResult`](@ref)
+  - [`asset_phylogeny`](@ref)
+"""
 function asset_phylogeny(ph::PhylogenyResult{<:AbstractMatrix}, w::AbstractVector, args...;
                          kwargs...)
     return asset_phylogeny(w, ph)
 end
 
-export BetweennessCentrality, ClosenessCentrality, DegreeCentrality, EigenvectorCentrality,
-       KatzCentrality, Pagerank, RadialityCentrality, StressCentrality, KruskalTree,
-       BoruvkaTree, PrimTree, NetworkEstimator, phylogeny_matrix, average_centrality,
-       asset_phylogeny, AbstractCentralityAlgorithm, CentralityEstimator, centrality_vector
+export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentrality,
+       EigenvectorCentrality, KatzCentrality, Pagerank, RadialityCentrality,
+       StressCentrality, KruskalTree, BoruvkaTree, PrimTree, NetworkEstimator,
+       phylogeny_matrix, average_centrality, asset_phylogeny, AbstractCentralityAlgorithm,
+       CentralityEstimator, centrality_vector

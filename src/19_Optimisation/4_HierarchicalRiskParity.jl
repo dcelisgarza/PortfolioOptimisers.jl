@@ -3,15 +3,23 @@ struct HierarchicalRiskParity{T1, T2, T3, T4} <: ClusteringOptimisationEstimator
     r::T2
     sce::T3
     fallback::T4
+    function HierarchicalRiskParity(opt::HierarchicalOptimiser,
+                                    r::Union{<:OptimisationRiskMeasure,
+                                             <:AbstractVector{<:OptimisationRiskMeasure}},
+                                    sce::Scalariser,
+                                    fallback::Union{Nothing, <:OptimisationEstimator})
+        if isa(r, AbstractVector)
+            @argcheck(!isempty(r))
+        end
+        return new{typeof(opt), typeof(r), typeof(sce), typeof(fallback)}(opt, r, sce,
+                                                                          fallback)
+    end
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::Union{<:OptimisationRiskMeasure,
                                          <:AbstractVector{<:OptimisationRiskMeasure}} = Variance(),
                                 sce::Scalariser = SumScalariser(),
                                 fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    if isa(r, AbstractVector)
-        @argcheck(!isempty(r))
-    end
     return HierarchicalRiskParity(opt, r, sce, fallback)
 end
 function opt_view(hrp::HierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
@@ -76,6 +84,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     return if isa(retcode, OptimisationSuccess) || isnothing(hrp.fallback)
         HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(hrp.fallback, rd; dims = dims, kwargs...)
     end
 end
@@ -177,6 +186,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any,
     return if isa(retcode, OptimisationSuccess) || isnothing(hrp.fallback)
         HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(hrp.fallback, rd; dims = dims, kwargs...)
     end
 end

@@ -1,6 +1,6 @@
 using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
-      Handcalcs, StatsBase
+      Handcalcs, StatsBase, DocumenterVitepress
 
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers);
                     recursive = true)
@@ -43,7 +43,7 @@ build_path_md = joinpath(@__DIR__, "src", "examples/")
 files = readdir(example_path)
 code_files = filter(x -> endswith(x, ".jl"), files)
 data_files = filter(x -> (endswith(x, ".csv") || endswith(x, ".csv.gz")), files)
-examples_nav = fix_suffix_md.("./examples/" .* code_files)
+example_pages = fix_suffix_md.("examples/" .* code_files)
 
 for file in data_files
     cp(joinpath(@__DIR__, "../examples/" * file),
@@ -58,30 +58,48 @@ for file in code_files
                       preprocess = pre_process_content_nb, documenter = true, credit = true)
 end
 
-page_rename = Dict("developer.md" => "Developer docs") # Without the numbers
-numbered_pages = [file
-                  for file in readdir(joinpath(@__DIR__, "src"))
-                  if file != "index.md" && splitext(file)[2] == ".md"]
+root_pages = [file
+              for file in readdir(joinpath(@__DIR__, "src")) if splitext(file)[2] == ".md"]
+api_pages = [item for item in walkdir(joinpath(@__DIR__, "src/api"))]
+contribute = [joinpath("contribute", file)
+              for file in readdir(joinpath(@__DIR__, "src/contribute"))
+              if splitext(file)[2] == ".md"]
+idx1 = findfirst("api", api_pages[1][1])[1]
 
 makedocs(; #modules = [PortfolioOptimisers],
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
          sitename = "PortfolioOptimisers.jl",
-         format = Documenter.HTML(;
-                                  canonical = "https://dcelisgarza.github.io/PortfolioOptimisers.jl"),
-         pages = ["index.md";
-                  "Examples" => examples_nav;
-                  numbered_pages[47:end];
-                  "API" => [numbered_pages[1:6];
-                            "Moments" => numbered_pages[7:27];
-                            "Distance" => numbered_pages[28:32];
-                            "JuMP Model Optimisation" => numbered_pages[33];
-                            "Ordered Weights Array" => numbered_pages[34];
-                            "Phylogeny" => numbered_pages[35:39];
-                            "Constraint Generation" => numbered_pages[40:44];
-                            "Prior" => numbered_pages[45];
-                            "Optimisation" => numbered_pages[46]]],
+         format = DocumenterVitepress.MarkdownVitepress(;
+                                                        repo = "https://dcelisgarza.github.io/PortfolioOptimisers.jl"),
+         pages = [root_pages; "Examples" => example_pages;
+                  "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
+                            "Moments" => joinpath.(api_pages[2][1][idx1:end],
+                                                   api_pages[2][3])
+                            "Distance" => joinpath.(api_pages[3][1][idx1:end],
+                                                    api_pages[3][3])
+                            "Phylogeny" => joinpath.(api_pages[4][1][idx1:end],
+                                                     api_pages[4][3])
+                            "Constraint Generation" => joinpath.(api_pages[5][1][idx1:end],
+                                                                 api_pages[5][3])
+                            "Prior" => joinpath.(api_pages[6][1][idx1:end], api_pages[6][3]);
+                            "Uncertainty Sets" => joinpath.(api_pages[7][1][idx1:end],
+                                                            api_pages[7][3])
+                            "Risk Measures" => joinpath.(api_pages[8][1][idx1:end],
+                                                         api_pages[8][3])
+                            "Optimisation" => joinpath.(api_pages[9][1][idx1:end],
+                                                        api_pages[9][3])];
+                  "Contribute" => contribute],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 
-deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl")
+DocumenterVitepress.deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl",
+                               target = "build", devbranch = "main", branch = "gh-pages",
+                               push_preview = true)
+
+# ~/docs $ npm run docs:dev
+
+# allpages = String[]
+# for page in api_pages
+#     append!(allpages, joinpath.(page[1][idx1:end], page[3]))
+# end

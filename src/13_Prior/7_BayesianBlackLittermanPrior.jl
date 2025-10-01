@@ -7,6 +7,24 @@ struct BayesianBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
     views_conf::T5
     rf::T6
     tau::T7
+    function BayesianBlackLittermanPrior(pe::AbstractLowOrderPriorEstimatorMap_2_2,
+                                         mp::AbstractMatrixProcessingEstimator,
+                                         views::Union{<:LinearConstraintEstimator,
+                                                      <:BlackLittermanViews},
+                                         sets::Union{Nothing, <:AssetSets},
+                                         views_conf::Union{Nothing, <:Real,
+                                                           <:AbstractVector}, rf::Real,
+                                         tau::Union{Nothing, <:Real})
+        if isa(views, LinearConstraintEstimator)
+            @argcheck(!isnothing(sets))
+        end
+        assert_bl_views_conf(views_conf, views)
+        if !isnothing(tau)
+            @argcheck(tau > zero(tau))
+        end
+        return new{typeof(pe), typeof(mp), typeof(views), typeof(sets), typeof(views_conf),
+                   typeof(rf), typeof(tau)}(pe, mp, views, sets, views_conf, rf, tau)
+    end
 end
 function BayesianBlackLittermanPrior(;
                                      pe::AbstractLowOrderPriorEstimatorMap_2_2 = FactorPrior(;
@@ -18,13 +36,6 @@ function BayesianBlackLittermanPrior(;
                                      sets::Union{Nothing, <:AssetSets} = nothing,
                                      views_conf::Union{Nothing, <:Real, <:AbstractVector} = nothing,
                                      rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
-    if isa(views, LinearConstraintEstimator)
-        @argcheck(!isnothing(sets))
-    end
-    assert_bl_views_conf(views_conf, views)
-    if !isnothing(tau)
-        @argcheck(tau > zero(tau))
-    end
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
 function factory(pe::BayesianBlackLittermanPrior,

@@ -183,13 +183,16 @@ VariationInfoDistance
 struct VariationInfoDistance{T1, T2} <: AbstractDistanceAlgorithm
     bins::T1
     normalise::T2
+    function VariationInfoDistance(bins::Union{<:AbstractBins, <:Integer}, normalise::Bool)
+        if isa(bins, Integer)
+            @argcheck(bins > zero(bins))
+        end
+        return new{typeof(bins), typeof(normalise)}(bins, normalise)
+    end
 end
 function VariationInfoDistance(;
                                bins::Union{<:AbstractBins, <:Integer} = HacineGharbiRavier(),
                                normalise::Bool = true)
-    if isa(bins, Integer)
-        @argcheck(bins > zero(bins))
-    end
     return VariationInfoDistance(bins, normalise)
 end
 

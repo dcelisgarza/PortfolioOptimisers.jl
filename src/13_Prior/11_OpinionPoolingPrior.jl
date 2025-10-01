@@ -10,6 +10,29 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <:
     w::T5
     alg::T6
     threads::T7
+    function OpinionPoolingPrior(pes::AbstractVector{<:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
+                                 pe1::Union{Nothing,
+                                            <:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
+                                 pe2::AbstractLowOrderPriorEstimatorMap_1o2_1o2,
+                                 p::Union{Nothing, <:Real},
+                                 w::Union{Nothing, <:AbstractVector},
+                                 alg::OpinionPoolingAlgorithm,
+                                 threads::FLoops.Transducers.Executor)
+        @argcheck(!isempty(pes))
+        if !isnothing(p)
+            @argcheck(p >= zero(p))
+        end
+        if isa(w, AbstractVector)
+            @argcheck(!isempty(w) && length(w) == length(pes))
+            @argcheck(all(x -> zero(x) <= x <= one(x), w),
+                      DomainError(w,
+                                  range_msg("all entries of `w`", zero(w), one(w), nothing,
+                                            true, true) * "."))
+            @argcheck(sum(w) <= one(eltype(w)))
+        end
+        return new{typeof(pes), typeof(pe1), typeof(pe2), typeof(p), typeof(w), typeof(alg),
+                   typeof(threads)}(pes, pe1, pe2, p, w, alg, threads)
+    end
 end
 function OpinionPoolingPrior(;
                              pes::AbstractVector{<:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
@@ -20,18 +43,6 @@ function OpinionPoolingPrior(;
                              w::Union{Nothing, <:AbstractVector} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
                              threads::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
-    @argcheck(!isempty(pes))
-    if !isnothing(p)
-        @argcheck(p >= zero(p))
-    end
-    if isa(w, AbstractVector)
-        @argcheck(!isempty(w) && length(w) == length(pes))
-        @argcheck(all(x -> zero(x) <= x <= one(x), w),
-                  DomainError(w,
-                              range_msg("all entries of `w`", zero(w), one(w), nothing,
-                                        true, true) * "."))
-        @argcheck(sum(w) <= one(eltype(w)))
-    end
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, threads)
 end
 function robust_probabilities(ow::AbstractVector, args...)

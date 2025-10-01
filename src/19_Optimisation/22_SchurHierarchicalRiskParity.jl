@@ -15,14 +15,19 @@ struct MonotonicSchur{T1, T2, T3, T4} <: SchurAlgorithm
     tol::T2
     iter::T3
     strict::T4
+    function MonotonicSchur(N::Integer, tol::Real, iter::Union{Nothing, Integer},
+                            strict::Bool)
+        @argcheck(N > 0)
+        @argcheck(tol > 0)
+        if !isnothing(iter)
+            @argcheck(iter > 0)
+        end
+        return new{typeof(N), typeof(tol), typeof(iter), typeof(strict)}(N, tol, iter,
+                                                                         strict)
+    end
 end
 function MonotonicSchur(; N::Integer = 10, tol::Real = 1e-4,
                         iter::Union{Nothing, Integer} = nothing, strict::Bool = false)
-    @argcheck(N > 0)
-    @argcheck(tol > 0)
-    if !isnothing(iter)
-        @argcheck(iter > 0)
-    end
     return MonotonicSchur(N, tol, iter, strict)
 end
 struct SchurParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
@@ -31,11 +36,19 @@ struct SchurParams{T1, T2, T3, T4, T5} <: AbstractAlgorithm
     pdm::T3
     alg::T4
     flag::T5
+    function SchurParams(r::Union{<:StandardDeviation, <:Variance}, gamma::Real,
+                         pdm::Union{Nothing, <:Posdef}, alg::SchurAlgorithm, flag::Bool)
+        @argcheck(one(gamma) >= gamma >= zero(gamma))
+        return new{typeof(r), typeof(gamma), typeof(pdm), typeof(alg), typeof(flag)}(r,
+                                                                                     gamma,
+                                                                                     pdm,
+                                                                                     alg,
+                                                                                     flag)
+    end
 end
 function SchurParams(; r::Union{<:StandardDeviation, <:Variance} = Variance(),
                      gamma::Real = 0.5, pdm::Union{Nothing, <:Posdef} = Posdef(),
                      alg::SchurAlgorithm = MonotonicSchur(), flag::Bool = true)
-    @argcheck(one(gamma) >= gamma >= zero(gamma))
     return SchurParams(r, gamma, pdm, alg, flag)
 end
 function schur_params_view(sp::SchurParams, i::AbstractVector, X::AbstractMatrix)
@@ -47,14 +60,20 @@ struct SchurHierarchicalRiskParity{T1, T2, T3} <: ClusteringOptimisationEstimato
     opt::T1
     params::T2
     fallback::T3
+    function SchurHierarchicalRiskParity(opt::HierarchicalOptimiser,
+                                         params::Union{<:SchurParams,
+                                                       <:AbstractVector{<:SchurParams}},
+                                         fallback::Union{Nothing, <:OptimisationEstimator})
+        if isa(params, AbstractVector)
+            @argcheck(!isempty(params))
+        end
+        return new{typeof(opt), typeof(params), typeof(fallback)}(opt, params, fallback)
+    end
 end
 function SchurHierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                      params::Union{<:SchurParams,
                                                    <:AbstractVector{<:SchurParams}} = SchurParams(),
                                      fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    if isa(params, AbstractVector)
-        @argcheck(!isempty(params))
-    end
     return SchurHierarchicalRiskParity(opt, params, fallback)
 end
 function opt_view(sh::SchurHierarchicalRiskParity, i::AbstractVector, X::AbstractMatrix)
@@ -238,6 +257,7 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
     return if isa(retcode, OptimisationSuccess) || isnothing(sh.fallback)
         SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gamma, retcode, w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(sh.fallback, rd; dims = dims, kwargs...)
     end
 end
@@ -260,6 +280,7 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
     return if isa(retcode, OptimisationSuccess) || isnothing(sh.fallback)
         SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gammas, retcode, w)
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(sh.fallback, rd; dims = dims, kwargs...)
     end
 end

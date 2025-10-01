@@ -58,14 +58,18 @@ GeneralWeightedCovariance
 struct GeneralWeightedCovariance{T1, T2} <: AbstractCovarianceEstimator
     ce::T1
     w::T2
+    function GeneralWeightedCovariance(ce::StatsBase.CovarianceEstimator,
+                                       w::Union{Nothing, <:AbstractWeights})
+        if isa(w, AbstractWeights)
+            @argcheck(!isempty(w))
+        end
+        return new{typeof(ce), typeof(w)}(ce, w)
+    end
 end
 function GeneralWeightedCovariance(;
                                    ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                                   corrected = true),
                                    w::Union{Nothing, <:AbstractWeights} = nothing)
-    if isa(w, AbstractWeights)
-        @argcheck(!isempty(w))
-    end
     return GeneralWeightedCovariance(ce, w)
 end
 
@@ -199,6 +203,10 @@ struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
     me::T1
     ce::T2
     alg::T3
+    function Covariance(me::AbstractExpectedReturnsEstimator,
+                        ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm)
+        return new{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)
+    end
 end
 function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     ce::StatsBase.CovarianceEstimator = GeneralWeightedCovariance(),

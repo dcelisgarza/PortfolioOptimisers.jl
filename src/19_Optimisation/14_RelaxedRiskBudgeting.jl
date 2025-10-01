@@ -3,42 +3,57 @@ struct BasicRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 struct RegularisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
 struct RegularisedPenalisedRelaxedRiskBudgeting{T1} <: RelaxedRiskBudgetingAlgorithm
     p::T1
+    function RegularisedPenalisedRelaxedRiskBudgeting(p::Real)
+        @argcheck(isfinite(p) && p > zero(p))
+        return new{typeof(p)}(p)
+    end
 end
 function RegularisedPenalisedRelaxedRiskBudgeting(; p::Real = 1.0)
-    @argcheck(isfinite(p) && p > zero(p))
     return RegularisedPenalisedRelaxedRiskBudgeting(p)
 end
 struct RelaxedRiskBudgeting{T1, T2, T3, T4, T5} <: JuMPOptimisationEstimator
     opt::T1
-    rkb::T2
+    rba::T2
     wi::T3
     alg::T4
     fallback::T5
+    function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
+                                  wi::Union{Nothing, <:AbstractVector{<:Real}},
+                                  alg::RelaxedRiskBudgetingAlgorithm,
+                                  fallback::Union{Nothing, <:OptimisationEstimator})
+        if isa(wi, AbstractVector)
+            @argcheck(!isempty(wi))
+        end
+        if isa(rba.rkb, RiskBudgetEstimator)
+            @argcheck(!isnothing(opt.sets))
+        end
+        return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fallback)}(opt,
+                                                                                        rba,
+                                                                                        wi,
+                                                                                        alg,
+                                                                                        fallback)
+    end
 end
 function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
-                              rkb::Union{Nothing, <:RiskBudgetEstimator,
-                                         <:RiskBudgetResult} = nothing,
+                              rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                               wi::Union{Nothing, <:AbstractVector{<:Real}} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
                               fallback::Union{Nothing, <:OptimisationEstimator} = nothing)
-    if isa(wi, AbstractVector)
-        @argcheck(!isempty(wi))
-    end
-    return RelaxedRiskBudgeting(opt, rkb, wi, alg, fallback)
+    return RelaxedRiskBudgeting(opt, rba, wi, alg, fallback)
 end
 function opt_view(rrb::RelaxedRiskBudgeting, i::AbstractVector, X::AbstractMatrix)
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
-    rkb = risk_budget_view(rrb.rkb, i)
+    rba = risk_budgeting_algorithm_view(rrb.rba, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
-    return RelaxedRiskBudgeting(; opt = opt, rkb = rkb, wi = wi, alg = rrb.alg,
+    return RelaxedRiskBudgeting(; opt = opt, rba = rba, wi = wi, alg = rrb.alg,
                                 fallback = rrb.fallback)
 end
 function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting,
                                                      model::JuMP.Model,
+                                                     w::AbstractVector{<:AbstractJuMPScalar},
                                                      sigma::AbstractMatrix)
     sc = model[:sc]
-    w = model[:w]
     psi = model[:psi]
     G = cholesky(sigma).U
     @constraint(model, cbasic_rrp, [sc * psi; sc * G * w] in SecondOrderCone())
@@ -46,9 +61,9 @@ function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting
 end
 function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBudgeting,
                                                      model::JuMP.Model,
+                                                     w::AbstractVector{<:AbstractJuMPScalar},
                                                      sigma::AbstractMatrix)
     sc = model[:sc]
-    w = model[:w]
     psi = model[:psi]
     G = cholesky(sigma).U
     @variable(model, rho >= 0)
@@ -64,9 +79,9 @@ function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBud
 end
 function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRelaxedRiskBudgeting,
                                                      model::JuMP.Model,
+                                                     w::AbstractVector{<:AbstractJuMPScalar},
                                                      sigma::AbstractMatrix)
     sc = model[:sc]
-    w = model[:w]
     psi = model[:psi]
     G = cholesky(sigma).U
     theta = Diagonal(sqrt.(diag(sigma)))
@@ -84,12 +99,12 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
                  end)
     return nothing
 end
-function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
-                                                 rrb::RelaxedRiskBudgeting,
-                                                 sigma::AbstractMatrix)
-    w = model[:w]
+function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
+                                                  rrb::RelaxedRiskBudgeting,
+                                                  w::AbstractVector{<:AbstractJuMPScalar},
+                                                  sigma::AbstractMatrix)
     N = length(w)
-    rkb = risk_budget_constraints(rrb.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict)
+    rkb = risk_budget_constraints(rrb.rba.rkb, rrb.opt.sets; N = N, strict = rrb.opt.strict)
     rb = rkb.val
     sc = model[:sc]
     @variables(model, begin
@@ -107,8 +122,32 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                       sc * (2 * gamma * sqrt(rb[i]))
                       sc * (w[i] - zeta[i])] in SecondOrderCone()
                  end)
-    set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, sigma)
+    set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, w, sigma)
     return rkb
+end
+function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
+                                                 rrb::RelaxedRiskBudgeting{<:Any,
+                                                                           <:FactorRiskBudgeting,
+                                                                           <:Any, <:Any},
+                                                 pr::AbstractPriorResult, wb::WeightBounds,
+                                                 rd::ReturnsResult)
+    b1, rr = set_factor_risk_contribution_constraints!(model, rrb.rba.re, rd, rrb.rba.flag,
+                                                       rrb.wi)
+    rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, model[:w1],
+                                                   Matrix(Symmetric(rr.L \ pr.sigma * b1)))
+    set_weight_constraints!(model, wb, rrb.opt.bgt, rrb.opt.sbgt)
+    return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
+end
+function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
+                                                 rrb::RelaxedRiskBudgeting{<:Any,
+                                                                           <:AssetRiskBudgeting,
+                                                                           <:Any, <:Any},
+                                                 pr::AbstractPriorResult, wb::WeightBounds,
+                                                 args...)
+    set_w!(model, pr.X, rrb.wi)
+    set_weight_constraints!(model, wb, rrb.opt.bgt, nothing, true)
+    rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, model[:w], pr.sigma)
+    return ProcessedAssetRiskBudgetingAttributes(rkb)
 end
 function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
@@ -119,8 +158,7 @@ function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)
     @expression(model, k, 1)
-    set_w!(model, pr.X, rrb.wi)
-    set_weight_constraints!(model, wb, rrb.opt.bgt, nothing, false)
+    prb = set_relaxed_risk_budgeting_constraints!(model, rrb, pr, wb, rd)
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, rrb.opt.lcm, :lcm_ineq, :lcm_eq)
@@ -134,7 +172,6 @@ function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_l1_regularisation!(model, rrb.opt.l1)
     set_l2_regularisation!(model, rrb.opt.l2)
     set_non_fixed_fees!(model, fees)
-    prb = set_relaxed_risk_budgeting_constraints!(model, rrb, pr.sigma)
     set_return_constraints!(model, ret, MinimumRisk(), pr; rd = rd)
     set_sdp_phylogeny_constraints!(model, nplg, :sdp_nplg)
     set_sdp_phylogeny_constraints!(model, cplg, :sdp_cplg)
@@ -151,6 +188,7 @@ function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
                                                                        ret), prb, retcode,
                                       sol, ifelse(save, model, nothing))
     else
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(rrb.fallback, rd; dims = dims, str_names = str_names, save = save,
                   kwargs...)
     end

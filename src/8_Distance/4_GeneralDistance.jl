@@ -60,12 +60,16 @@ GeneralDistance
 struct GeneralDistance{T1, T2} <: AbstractDistanceEstimator
     power::T1
     alg::T2
+    function GeneralDistance(power::Integer, alg::AbstractDistanceAlgorithm)
+        @argcheck(power >= one(power))
+        return new{typeof(power), typeof(alg)}(power, alg)
+    end
 end
 function GeneralDistance(; power::Integer = 1,
                          alg::AbstractDistanceAlgorithm = SimpleDistance())
-    @argcheck(power >= one(power))
     return GeneralDistance(power, alg)
 end
+
 """
 ```julia
 distance(de::GeneralDistance{<:Any,
@@ -139,6 +143,7 @@ function distance(de::GeneralDistance{<:Any, <:CanonicalDistance},
     return distance(GeneralDistance(; power = de.power, alg = SimpleDistance()), ce, X;
                     dims = dims, kwargs...)
 end
+
 """
 ```julia
 distance(de::GeneralDistance{<:Any, <:LogDistance},
@@ -174,6 +179,7 @@ function distance(de::GeneralDistance{<:Any, <:LogDistance},
     rho = cor(ce, X; dims = dims, kwargs...) .^ de.power
     return -log.(rho)
 end
+
 """
 ```julia
 distance(de::GeneralDistance{<:Any, <:CanonicalDistance},
@@ -236,6 +242,7 @@ function distance(de::GeneralDistance{<:Any, <:CanonicalDistance},
     return distance(GeneralDistance(; power = de.power, alg = CorrelationDistance()), ce, X;
                     dims = dims, kwargs...)
 end
+
 """
 ```julia
 distance(de::GeneralDistance{<:Any, <:VariationInfoDistance}, ::Any, X::AbstractMatrix;
@@ -274,6 +281,7 @@ function distance(de::GeneralDistance{<:Any, <:VariationInfoDistance}, ::Any,
     end
     return variation_info(X, de.alg.bins, de.alg.normalise) .^ de.power
 end
+
 """
 ```julia
 distance(de::GeneralDistance{<:Any,

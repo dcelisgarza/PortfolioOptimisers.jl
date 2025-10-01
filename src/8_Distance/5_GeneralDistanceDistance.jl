@@ -67,14 +67,24 @@ struct GeneralDistanceDistance{T1, T2, T3, T4, T5} <: AbstractDistanceEstimator
     kwargs::T3
     power::T4
     alg::T5
+    function GeneralDistanceDistance(dist::Distances.Metric, args::Tuple,
+                                     kwargs::NamedTuple, power::Integer,
+                                     alg::AbstractDistanceAlgorithm)
+        @argcheck(power >= one(power))
+        return new{typeof(dist), typeof(args), typeof(kwargs), typeof(power), typeof(alg)}(dist,
+                                                                                           args,
+                                                                                           kwargs,
+                                                                                           power,
+                                                                                           alg)
+    end
 end
 function GeneralDistanceDistance(; dist::Distances.Metric = Distances.Euclidean(),
                                  args::Tuple = (), kwargs::NamedTuple = (;),
                                  power::Integer = 1,
                                  alg::AbstractDistanceAlgorithm = SimpleDistance())
-    @argcheck(power >= one(power))
     return GeneralDistanceDistance(dist, args, kwargs, power, alg)
 end
+
 """
 ```julia
 distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator, X::AbstractMatrix;
@@ -109,6 +119,7 @@ function distance(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator
                     kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
+
 """
 ```julia
 distance(de::GeneralDistanceDistance, rho::AbstractMatrix, args...; kwargs...)
@@ -140,6 +151,7 @@ function distance(de::GeneralDistanceDistance, rho::AbstractMatrix, args...; kwa
                     kwargs...)
     return Distances.pairwise(de.dist, dist, de.args...; de.kwargs...)
 end
+
 """
 ```julia
 cor_and_dist(de::GeneralDistanceDistance, ce::StatsBase.CovarianceEstimator,

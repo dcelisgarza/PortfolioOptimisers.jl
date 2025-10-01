@@ -13,6 +13,9 @@ struct NaiveOptimisation{T1, T2, T3, T4} <: OptimisationResult
 end
 struct InverseVolatility{T1} <: NaiveOptimisationEstimator
     pe::T1
+    function InverseVolatility(pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult})
+        return new{typeof(pe)}(pe)
+    end
 end
 function InverseVolatility(;
                            pe::Union{<:AbstractPriorEstimator, <:AbstractPriorResult} = EmpiricalPrior())
@@ -46,6 +49,9 @@ function optimise!(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
 end
 struct RandomWeights{T1} <: NaiveOptimisationEstimator
     rng::T1
+    function RandomWeights(rng::Union{Nothing, <:AbstractRNG})
+        return new{typeof(rng)}(rng)
+    end
 end
 function RandomWeights(; rng::Union{Nothing, <:AbstractRNG} = nothing)
     return RandomWeights(rng)
