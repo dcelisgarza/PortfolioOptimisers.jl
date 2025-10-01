@@ -634,7 +634,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                      s * T) <=
                                                                                     0
                                                                                     sc *
-                                                                                    sc *
                                                                                     (sum(z_var_h) -
                                                                                      beta *
                                                                                      T +
