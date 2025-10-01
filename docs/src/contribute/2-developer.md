@@ -2,7 +2,7 @@
 
 !!! note "Contributing guidelines"
     
-    If you haven't, please read the [Contributing guidelines](090-contributing.md) first.
+    If you haven't, please read the [Contributing guidelines](1-contributing.md) first.
 
 If you want to make contributions to this package that involves code, then this guide is for you.
 

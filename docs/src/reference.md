@@ -16,12 +16,6 @@
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 ```
 
-## Contents
-
-```@contents
-Pages = ["95-reference.md"]
-```
-
 ## Index
 
 ```@index
