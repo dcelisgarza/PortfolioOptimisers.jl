@@ -71,7 +71,7 @@ makedocs(; #modules = [PortfolioOptimisers],
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
          sitename = "PortfolioOptimisers.jl",
          format = DocumenterVitepress.MarkdownVitepress(;
-                                                        repo = "https://dcelisgarza.github.io/PortfolioOptimisers.jl"),
+                                                        repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl"),
          pages = [root_pages; "Examples" => example_pages;
                   "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
                             "Moments" => joinpath.(api_pages[2][1][idx1:end],
