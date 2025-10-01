@@ -136,9 +136,10 @@ include("./19_Optimisation/22_SchurHierarchicalRiskParity.jl")
 
 include("./20_Expected_Returns.jl")
 
-include("./21_Interfaces.jl")
-include("./22_Precompilation.jl")
+include("./21_Plotting.jl")
 
-include("./23_Plotting.jl")
+include("./22_Interfaces.jl")
+
+include("./23_Precompilation.jl")
 
 end

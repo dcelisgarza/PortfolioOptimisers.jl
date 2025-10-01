@@ -12,7 +12,7 @@ hero:
     alt: PortfolioOptimisers
   actions:
     - theme: brand
-      text: Get Started
+      text: Getting Started
       link: examples/1_Getting_Started
     - theme: alt
       text: View on Github
@@ -26,3 +26,9 @@ hero:
 ```@meta
 CurrentModule = PortfolioOptimisers
 ```
+
+# Welcome to PortfolioOptimisers.jl!
+
+[`PortfolioOptimisers.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl) is a package for portfolio optimisation written in Julia.
+
+The feature list is quite large and under active development. New features will be added over time. Check out the examples and API documentation for details.
