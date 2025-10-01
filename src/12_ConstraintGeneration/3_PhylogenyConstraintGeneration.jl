@@ -18,14 +18,18 @@ end
 struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
     A::T1
     p::T2
-    function SemiDefinitePhylogeny(A::PhylogenyResult{<:AbstractMatrix{<:Real}}, p::Real)
+    function SemiDefinitePhylogeny(A::AbstractMatrix{<:Real}, p::Real)
         @argcheck(p >= zero(p))
-        return new{typeof(A.X), typeof(p)}(A.X, p)
+        return new{typeof(A), typeof(p)}(A, p)
     end
 end
-function SemiDefinitePhylogeny(; A::PhylogenyResult{<:AbstractMatrix{<:Real}},
-                               p::Real = 0.05)
+function SemiDefinitePhylogeny(A::PhylogenyResult{<:AbstractMatrix{<:Real}}, p::Real)
     return SemiDefinitePhylogeny(A.X, p)
+end
+function SemiDefinitePhylogeny(;
+                               A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
+                                        <:AbstractMatrix{<:Real}}, p::Real = 0.05)
+    return SemiDefinitePhylogeny(A, p)
 end
 function phylogeny_constraints(plc::SemiDefinitePhylogenyEstimator, X::AbstractMatrix;
                                dims::Int = 1, kwargs...)
@@ -81,9 +85,8 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
     A::T1
     B::T2
     scale::T3
-    function IntegerPhylogeny(A::PhylogenyResult{<:AbstractMatrix{<:Real}},
+    function IntegerPhylogeny(A::AbstractMatrix{<:Real},
                               B::Union{<:Integer, <:AbstractVector{<:Integer}}, scale::Real)
-        A = A.X
         A = unique(A + I; dims = 1)
         if isa(B, AbstractVector)
             @argcheck(!isempty(B))
@@ -95,7 +98,13 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
         return new{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
     end
 end
-function IntegerPhylogeny(; A::PhylogenyResult{<:AbstractMatrix{<:Real}},
+function IntegerPhylogeny(A::PhylogenyResult{<:AbstractMatrix{<:Real}},
+                          B::Union{<:Integer, <:AbstractVector{<:Integer}}, scale::Real)
+    return IntegerPhylogeny(A.X, B, scale)
+end
+function IntegerPhylogeny(;
+                          A::Union{<:PhylogenyResult{<:AbstractMatrix{<:Real}},
+                                   <:AbstractMatrix{<:Real}},
                           B::Union{<:Integer, <:AbstractVector{<:Integer}} = 1,
                           scale::Real = 100_000.0)
     return IntegerPhylogeny(A, B, scale)
