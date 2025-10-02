@@ -20,7 +20,14 @@ hero:
     - theme: alt
       text: API
       link: api/00_Introduction
+
+authors:
+  - name: Daniel Celis Garza
+    platform: github
+    link: https://github.com/dcelisgarza
 ---
+
+<Authors />
 ```
 
 ```@meta
