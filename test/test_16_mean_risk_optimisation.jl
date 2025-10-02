@@ -160,6 +160,9 @@
                                           rng = StableRNG(987654321),
                                           alg = EllipseUncertaintySetAlgorithm()), rd.X)
     rf = 4.2 / 100 / 252
+    rd2 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                      timestamp = :Date)[(end - 50):end])
+    pr2 = prior(EmpiricalPrior(), rd2)
     @testset "Mean Risk" begin
         objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf)]
         rets = [ArithmeticReturn(), KellyReturn()]
@@ -266,10 +269,6 @@
                                  fallback = InverseVolatility(; pe = pr)))
         @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
 
-        rd2 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
-                                                            "./assets/SP500.csv.gz"));
-                                          timestamp = :Date)[(end - 50):end])
-        pr2 = prior(EmpiricalPrior(), rd2)
         r = BrownianDistanceVariance()
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1BDV.csv.gz"), DataFrame)
         i = 1
@@ -278,12 +277,19 @@
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
             res = optimise!(mr, rd2)
             @test isa(res.retcode, OptimisationSuccess)
-            rtol = 1e-6
+            rtol = if i == 4
+                5e-6
+            elseif i == 6
+                5e-5
+            else
+                1e-6
+            end
             success = isapprox(res.w, df[!, i]; rtol = rtol)
             if !success
                 println("Counter: $i")
                 find_tol(res.w, df[!, i])
             end
+            @test success
             i += 1
         end
     end
@@ -537,12 +543,7 @@
                                    opt = opt))
         @test isapprox(res11.w, res12.w; rtol = 5e-4)
 
-        rd2 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
-                                                            "./assets/SP500.csv.gz"));
-                                          timestamp = :Date)[(end - 50):end])
-        pr2 = prior(EmpiricalPrior(), rd2)
         opt = JuMPOptimiser(; pe = pr2, slv = slv)
-
         mr = MeanRisk(;
                       r = BrownianDistanceVariance(; algc = IneqBrownianDistanceVariance()),
                       opt = opt)

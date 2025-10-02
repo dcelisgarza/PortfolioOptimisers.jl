@@ -1299,7 +1299,7 @@ This method is used to pass through an already constructed [`LinearConstraint`](
 
 # Returns
 
-  - `lcs`: Input is unchanged.
+  - `lcs`: The input, unchanged.
 
 # Related
 
