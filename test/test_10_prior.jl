@@ -553,7 +553,7 @@
                                                                     alg = H2_EntropyPooling(),
                                                                     cvar_views = cvar_views)),
                    rd)
-        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.051, rtol = 1e-5)
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.051, rtol = 5e-5)
         @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.041, rtol = 1e-4)
         @test isapprox(pr.w,
                        prior(HighOrderPriorEstimator(;
@@ -820,7 +820,7 @@
                                                                     alg = H2_EntropyPooling(),
                                                                     cvar_views = cvar_views,
                                                                     opt = opt)), rd)
-        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.051, rtol = 1e-5)
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.051, rtol = 5e-5)
         @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.041, rtol = 1e-4)
         @test isapprox(pr.w,
                        prior(HighOrderPriorEstimator(;

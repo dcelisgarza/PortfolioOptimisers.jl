@@ -28,11 +28,11 @@ BuyInThresholdEstimator(;
 ```jldoctest
 julia> BuyInThresholdEstimator(Dict("A" => 0.05, "B" => 0.1))
 BuyInThresholdEstimator
-  val | Dict{String, Float64}: Dict("A" => 0.05, "B" => 0.1)
+  val | Dict{String, Float64}: Dict("B" => 0.1, "A" => 0.05)
 
 julia> BuyInThresholdEstimator(["A" => 0.05, "B" => 0.1])
 BuyInThresholdEstimator
-  val | Vector{Pair{String, Float64}}: [("A", 0.05), ("B", 0.1)]
+  val | Vector{Pair{String, Float64}}: ["A" => 0.05, "B" => 0.1]
 ```
 
 # Related
@@ -152,7 +152,7 @@ BuyInThreshold
   val | Float64: 0.05
 
 julia> threshold_constraints(nothing)
-nothing
+
 ```
 
 # Related

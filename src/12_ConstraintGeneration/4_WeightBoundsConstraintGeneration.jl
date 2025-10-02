@@ -474,10 +474,7 @@ Generate a vector of portfolio weight bounds from a scalar bound.
 
 ```jldoctest
 julia> PortfolioOptimisers.weight_bounds_constraints_side(0.1, 3, -Inf)
-3-element StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}}:
- 0.1
- 0.1
- 0.1
+StepRangeLen(0.1, 0.0, 3)
 
 julia> PortfolioOptimisers.weight_bounds_constraints_side(Inf, 3, -Inf)
 3-element Vector{Float64}:

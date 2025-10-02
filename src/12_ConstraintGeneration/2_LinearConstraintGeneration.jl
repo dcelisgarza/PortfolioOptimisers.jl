@@ -1895,7 +1895,6 @@ function asset_sets_matrix(smtx::AbstractVector{<:Union{<:AbstractMatrix,
                            sets::AssetSets)
     return asset_sets_matrix.(smtx, Ref(sets))
 end
-
 """
 """
 function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector; kwargs...)

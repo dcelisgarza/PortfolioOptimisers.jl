@@ -73,7 +73,7 @@ SemiDefinitePhylogenyEstimator
      |       |      |    me | SimpleExpectedReturns
      |       |      |       |   w | nothing
      |       |      |    ce | GeneralWeightedCovariance
-     |       |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+     |       |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
      |       |      |       |    w | nothing
      |       |      |   alg | Full()
      |       |   mp | DefaultMatrixProcessing
@@ -241,7 +241,7 @@ IntegerPhylogenyEstimator
         |       |      |    me | SimpleExpectedReturns
         |       |      |       |   w | nothing
         |       |      |    ce | GeneralWeightedCovariance
-        |       |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+        |       |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
         |       |      |       |    w | nothing
         |       |      |   alg | Full()
         |       |   mp | DefaultMatrixProcessing
@@ -637,7 +637,7 @@ CentralityConstraint
        |        |       |      |    me | SimpleExpectedReturns
        |        |       |      |       |   w | nothing
        |        |       |      |    ce | GeneralWeightedCovariance
-       |        |       |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+       |        |       |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
        |        |       |      |       |    w | nothing
        |        |       |      |   alg | Full()
        |        |       |   mp | DefaultMatrixProcessing
