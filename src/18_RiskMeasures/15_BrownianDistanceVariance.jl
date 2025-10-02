@@ -12,8 +12,8 @@ struct BrownianDistanceVariance{T1, T2, T3} <: RiskMeasure
     end
 end
 function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                  alg::Union{<:RSOCRiskExpr, <:QuadRiskExpr} = RSOCRiskExpr(),
-                                  algc::BrownianDistanceVarianceFormulation = IneqBrownianDistanceVariance())
+                                  alg::Union{<:RSOCRiskExpr, <:QuadRiskExpr} = QuadRiskExpr(),
+                                  algc::BrownianDistanceVarianceFormulation = NormOneConeBrownianDistanceVariance())
     return BrownianDistanceVariance(settings, alg, algc)
 end
 function (::BrownianDistanceVariance)(x::AbstractVector)
