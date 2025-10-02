@@ -266,17 +266,17 @@
                                  fallback = InverseVolatility(; pe = pr)))
         @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
 
-        rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
-                                                           "./assets/SP500.csv.gz"));
-                                         timestamp = :Date)[(end - 50):end])
-        pr = prior(EmpiricalPrior(), rd)
+        rd2 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
+                                                            "./assets/SP500.csv.gz"));
+                                          timestamp = :Date)[(end - 50):end])
+        pr2 = prior(EmpiricalPrior(), rd2)
         r = BrownianDistanceVariance()
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1BDV.csv.gz"), DataFrame)
         i = 1
         for obj in objs, ret in rets
-            opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
+            opt = JuMPOptimiser(; pe = pr2, slv = slv, ret = ret)
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
-            res = optimise!(mr, rd)
+            res = optimise!(mr, rd2)
             @test isa(res.retcode, OptimisationSuccess)
             rtol = 1e-6
             success = isapprox(res.w, df[!, i]; rtol = rtol)
@@ -537,11 +537,11 @@
                                    opt = opt))
         @test isapprox(res11.w, res12.w; rtol = 5e-4)
 
-        rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
-                                                           "./assets/SP500.csv.gz"));
-                                         timestamp = :Date)[(end - 50):end])
-        pr = prior(EmpiricalPrior(), rd)
-        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        rd2 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
+                                                            "./assets/SP500.csv.gz"));
+                                          timestamp = :Date)[(end - 50):end])
+        pr2 = prior(EmpiricalPrior(), rd2)
+        opt = JuMPOptimiser(; pe = pr2, slv = slv)
 
         mr = MeanRisk(;
                       r = BrownianDistanceVariance(; algc = IneqBrownianDistanceVariance()),

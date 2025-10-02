@@ -137,8 +137,8 @@ Return the multiplicative sign and inequality flag for a given comparison operat
 
 # Returns
 
-  - `sign`: The multiplicative sign for the constraint.
-  - `is_inequality`: `true` if the operator is an inequality, `false` for equality.
+  - `sign::Int`: The multiplicative sign for the constraint.
+  - `is_inequality::Bool`: `true` if the operator is an inequality, `false` for equality.
 
 # Examples
 

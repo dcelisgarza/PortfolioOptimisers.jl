@@ -563,7 +563,7 @@ Reduce a vector of real values to a single real value using a specified measure.
 
 # Returns
 
-  - A single real value, computed according to `measure`.
+  - `score::Real`: computed value according to `measure`.
 
 # Examples
 
@@ -701,7 +701,7 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
 
 # Returns
 
-  - `LinearConstraint`: An object containing the assembled inequality and equality constraints, or `nothing` if no constraints are present.
+  - `lc::Union{Nothing, <:LinearConstraint}`: An object containing the assembled inequality and equality constraints, or `nothing` if no constraints are present.
 
 # Details
 

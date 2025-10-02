@@ -49,7 +49,8 @@ function threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
                           val = estimator_to_val(t.val, sets, zero(datatype);
                                                  strict = strict))
 end
-function threshold_constraints(bounds::UniformScaledBounds, sets::AssetSets; kwargs...)
+function threshold_constraints(bounds::UniformlyDistributedBounds, sets::AssetSets;
+                               kwargs...)
     return BuyInThreshold(; val = inv(length(sets.dict[sets.key])))
 end
 function threshold_constraints(t::AbstractVector{<:Union{Nothing, <:BuyInThresholdEstimator,
