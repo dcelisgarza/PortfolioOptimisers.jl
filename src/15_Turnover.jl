@@ -18,10 +18,10 @@ Estimator for turnover portfolio constraints.
 # Constructor
 
 ```julia
-TurnoverEstimator(w::AbstractVector{<:Real},
+TurnoverEstimator(; w::AbstractVector{<:Real},
                   val::Union{<:AbstractDict, <:Pair{<:AbstractString, <:Real},
                              <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
-                  default::Real)
+                  default::Real = 0.0)
 ```
 
 ## Validation
@@ -55,18 +55,7 @@ struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
                                           <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                                default::Real)
         @argcheck(!isempty(w))
-        if isa(val, Union{<:AbstractDict, <:AbstractVector})
-            @argcheck(!isempty(val))
-            if isa(val, AbstractDict)
-                @argcheck(any(isfinite, values(val)))
-                @argcheck(all(x -> x >= zero(x), values(val)))
-            elseif isa(val, AbstractVector)
-                @argcheck(any(isfinite, getindex.(val, 2)))
-                @argcheck(all(x -> x[2] >= zero(x[2]), val))
-            end
-        else
-            @argcheck(isfinite(val[2]) && val[2] >= zero(eltype(val[2])))
-        end
+        assert_nonneg_finite_val(val)
         @argcheck(default >= zero(default))
         return new{typeof(w), typeof(val), typeof(default)}(w, val, default)
     end
@@ -141,7 +130,7 @@ Container for turnover portfolio constraints.
 # Constructor
 
 ```julia
-Turnover(; w::AbstractVector{<:Real}, val::Union{<:Real, <:AbstractVector{<:Real}})
+Turnover(; w::AbstractVector{<:Real}, val::Union{<:Real, <:AbstractVector{<:Real}} = 0.0)
 ```
 
 ## Validation
