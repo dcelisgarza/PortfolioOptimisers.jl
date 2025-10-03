@@ -376,7 +376,7 @@ Generate portfolio weight bounds constraints from a `WeightBoundsEstimator` and 
   - `wb`: [`WeightBoundsEstimator`](@ref) specifying lower and upper bounds.
   - `sets`: [`AssetSets`](@ref) containing asset names or indices.
   - `strict`: If `true`, enforces strict matching between assets and bounds (throws error on mismatch); if `false`, issues a warning.
-  - `datatype`: Output data type for bounds (default: `Float64`).
+  - `datatype`: Output data type for bounds.
   - `kwargs...`: Additional keyword arguments passed to bound extraction routines.
 
 # Returns

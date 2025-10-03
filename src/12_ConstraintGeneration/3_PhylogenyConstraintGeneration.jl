@@ -696,7 +696,7 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
 
   - `ccs`: A single [`CentralityConstraint`](@ref) or a vector of such estimators.
   - `X`: Data matrix of asset features or returns.
-  - `dims`: Dimension along which to compute centrality (default: `1`).
+  - `dims`: Dimension along which to compute centrality.
   - `kwargs...`: Additional keyword arguments passed to the centrality estimator.
 
 # Returns

@@ -176,7 +176,7 @@ Generate buy-in threshold portfolio constraints from a `BuyInThresholdEstimator`
 
   - `t`: [`BuyInThresholdEstimator`](@ref) specifying asset-specific threshold values.
   - `sets`: [`AssetSets`](@ref) containing asset names or indices.
-  - `datatype`: Output data type for thresholds (default: `Float64`).
+  - `datatype`: Output data type for thresholds.
   - `strict`: If `true`, enforces strict matching between assets and thresholds (throws error on mismatch); if `false`, issues a warning.
 
 # Returns
