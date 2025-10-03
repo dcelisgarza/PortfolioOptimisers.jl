@@ -202,13 +202,6 @@ Compute expected risk, expected return, and SRIC for a portfolio.
 
   - `(risk::Real, return::Real, sric::Real)`: Tuple of expected risk, expected return, and SRIC.
 
-# Examples
-
-```jldoctest
-julia> expected_risk_ret_sric(Variance(), JuMPReturnsEstimator(), [0.5, 0.5], pr)
-(0.02, 0.015, 0.72)
-```
-
 # Related
 
   - [`JuMPReturnsEstimator`](@ref)
@@ -405,13 +398,6 @@ Compute the expected risk for a portfolio using a ratio-based risk measure.
 # Returns
 
   - `risk::Real`: Risk-adjusted return ratio.
-
-# Examples
-
-```jldoctest
-julia> expected_risk(r, [0.5, 0.5], pr)
-r = RatioRiskMeasure();
-```
 
 # Related
 

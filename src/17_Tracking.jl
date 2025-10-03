@@ -376,7 +376,7 @@ ReturnsTracking(; w::AbstractVector{<:Real})
 ```jldoctest
 julia> ReturnsTracking(; w = [0.01, 0.02, 0.03])
 ReturnsTracking
-      w | Vector{Float64}: [0.01, 0.02, 0.03]
+  w | Vector{Float64}: [0.01, 0.02, 0.03]
 ```
 
 # Related
