@@ -1637,7 +1637,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     vals_A = clamp.(real(vals_A), 0, Inf) .+ clamp.(imag(vals_A), 0, Inf)im
     Bi = Vector{Matrix{eltype(kt)}}(undef, Nf)
     N_eig = length(vals_A)
-    @inbounds for i in 1:Nf
+    for i in eachindex(Bi)
         j = i - 1
         B = reshape(real(complex(sqrt(vals_A[end - j])) * view(vecs_A, :, N_eig - j)), N, N)
         Bi[i] = B

@@ -1,5 +1,4 @@
-struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
-       AbstractLowOrderPriorEstimator_1o2_1o2
+struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorEstimator_AF
     pe::T1
     mp::T2
     views::T3
@@ -7,7 +6,7 @@ struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
     views_conf::T5
     rf::T6
     tau::T7
-    function BlackLittermanPrior(pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2,
+    function BlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mp::AbstractMatrixProcessingEstimator,
                                  views::Union{<:LinearConstraintEstimator,
                                               <:BlackLittermanViews},
@@ -27,8 +26,8 @@ struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <:
     end
 end
 function BlackLittermanPrior(;
-                             pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(;
-                                                                                            me = EquilibriumExpectedReturns()),
+                             pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
+                                                                                        me = EquilibriumExpectedReturns()),
                              mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                              views::Union{<:LinearConstraintEstimator,
                                           <:BlackLittermanViews},

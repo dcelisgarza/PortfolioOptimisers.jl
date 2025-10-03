@@ -279,14 +279,14 @@ struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
     pe::T1
     kte::T2
     ske::T3
-    function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2,
+    function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                      kte::Union{Nothing, <:CokurtosisEstimator},
                                      ske::Union{Nothing, <:CoskewnessEstimator})
         return new{typeof(pe), typeof(kte), typeof(ske)}(pe, kte, ske)
     end
 end
 function HighOrderPriorEstimator(;
-                                 pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
+                                 pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
                                  kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
                                                                                          alg = Full()),
                                  ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;

@@ -1,8 +1,7 @@
 abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
 struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
 struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
-struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <:
-       AbstractLowOrderPriorEstimator_1o2_1o2
+struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorEstimator_AF
     pes::T1
     pe1::T2
     pe2::T3
@@ -10,10 +9,10 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <:
     w::T5
     alg::T6
     threads::T7
-    function OpinionPoolingPrior(pes::AbstractVector{<:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
+    function OpinionPoolingPrior(pes::AbstractVector{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                  pe1::Union{Nothing,
-                                            <:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
-                                 pe2::AbstractLowOrderPriorEstimatorMap_1o2_1o2,
+                                            <:AbstractLowOrderPriorEstimator_A_F_AF},
+                                 pe2::AbstractLowOrderPriorEstimator_A_F_AF,
                                  p::Union{Nothing, <:Real},
                                  w::Union{Nothing, <:AbstractVector},
                                  alg::OpinionPoolingAlgorithm,
@@ -34,11 +33,9 @@ struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <:
                    typeof(threads)}(pes, pe1, pe2, p, w, alg, threads)
     end
 end
-function OpinionPoolingPrior(;
-                             pes::AbstractVector{<:AbstractLowOrderPriorEstimatorMap_1o2_1o2},
-                             pe1::Union{Nothing,
-                                        <:AbstractLowOrderPriorEstimatorMap_1o2_1o2} = nothing,
-                             pe2::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
+function OpinionPoolingPrior(; pes::AbstractVector{<:EntropyPoolingPrior},
+                             pe1::Union{Nothing, <:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
+                             pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
                              p::Union{Nothing, <:Real} = nothing,
                              w::Union{Nothing, <:AbstractVector} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
@@ -89,7 +86,6 @@ function prior(pe::OpinionPoolingPrior, X::AbstractMatrix,
     let X = X, F = F, pw = pw
         @floop pe.threads for (i, pe) in enumerate(pe.pes)
             pr = prior(pe, X, F; strict = strict, kwargs...)
-            @argcheck(!isnothing(pr.w))
             pw[:, i] = pr.w
         end
     end

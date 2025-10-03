@@ -1,18 +1,28 @@
 abstract type AbstractPriorEstimator <: AbstractEstimator end
 abstract type AbstractLowOrderPriorEstimator <: AbstractPriorEstimator end
-abstract type AbstractLowOrderPriorEstimator_1_1 <: AbstractLowOrderPriorEstimator end
-abstract type AbstractLowOrderPriorEstimator_2_1 <: AbstractLowOrderPriorEstimator end
-abstract type AbstractLowOrderPriorEstimator_2_2 <: AbstractLowOrderPriorEstimator end
-abstract type AbstractLowOrderPriorEstimator_1o2_1o2 <: AbstractLowOrderPriorEstimator end
-const AbstractLowOrderPriorEstimatorMap_2_1 = Union{<:AbstractLowOrderPriorEstimator_1_1,
-                                                    <:AbstractLowOrderPriorEstimator_1o2_1o2}
-const AbstractLowOrderPriorEstimatorMap_2_2 = Union{<:AbstractLowOrderPriorEstimator_2_1,
-                                                    <:AbstractLowOrderPriorEstimator_2_2,
-                                                    <:AbstractLowOrderPriorEstimator_1o2_1o2}
-const AbstractLowOrderPriorEstimatorMap_1o2_1o2 = Union{<:AbstractLowOrderPriorEstimator_1_1,
-                                                        <:AbstractLowOrderPriorEstimator_2_1,
-                                                        <:AbstractLowOrderPriorEstimator_2_2,
-                                                        <:AbstractLowOrderPriorEstimator_1o2_1o2}
+"""
+Only uses asset returns
+"""
+abstract type AbstractLowOrderPriorEstimator_A <: AbstractLowOrderPriorEstimator end
+"""
+Uses asset and factor returns.
+"""
+abstract type AbstractLowOrderPriorEstimator_F <: AbstractLowOrderPriorEstimator end
+"""
+Uses asset returns and optionally factor returns.
+"""
+abstract type AbstractLowOrderPriorEstimator_AF <: AbstractLowOrderPriorEstimator end
+
+const AbstractLowOrderPriorEstimator_A_AF = Union{AbstractLowOrderPriorEstimator_A,
+                                                  AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_F_AF = Union{AbstractLowOrderPriorEstimator_F,
+                                                  AbstractLowOrderPriorEstimator_AF}
+const AbstractLowOrderPriorEstimator_A_F_AF = Union{AbstractLowOrderPriorEstimator_A,
+                                                    AbstractLowOrderPriorEstimator_F,
+                                                    AbstractLowOrderPriorEstimator_AF}
+
+"""
+"""
 abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
 """
 """

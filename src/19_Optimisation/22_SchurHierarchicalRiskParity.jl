@@ -132,7 +132,7 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::Weigh
     w = ones(eltype(pr.X), size(pr.X, 2))
     pdm = params.pdm
     flag = params.flag
-    @inbounds while length(items) > 0
+    while length(items) > 0
         items = [i[j:k] for i in items
                  for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
                  if length(i) > 1]

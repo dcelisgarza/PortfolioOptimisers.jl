@@ -1,5 +1,5 @@
 struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13,
-                                    T14, T15} <: AbstractLowOrderPriorEstimator_2_2
+                                    T14, T15} <: AbstractLowOrderPriorEstimator_F
     a_pe::T1
     f_pe::T2
     mp::T3
@@ -15,8 +15,8 @@ struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11
     rf::T13
     l::T14
     tau::T15
-    function AugmentedBlackLittermanPrior(a_pe::AbstractLowOrderPriorEstimatorMap_2_1,
-                                          f_pe::AbstractLowOrderPriorEstimatorMap_2_1,
+    function AugmentedBlackLittermanPrior(a_pe::AbstractLowOrderPriorEstimator_A_AF,
+                                          f_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           mp::AbstractMatrixProcessingEstimator,
                                           re::AbstractRegressionEstimator,
                                           ve::AbstractVarianceEstimator,
@@ -56,8 +56,8 @@ struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11
     end
 end
 function AugmentedBlackLittermanPrior(;
-                                      a_pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPrior(),
-                                      f_pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPrior(),
+                                      a_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+                                      f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                                       mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                                       re::AbstractRegressionEstimator = StepwiseRegression(),
                                       ve::AbstractVarianceEstimator = SimpleVariance(),
