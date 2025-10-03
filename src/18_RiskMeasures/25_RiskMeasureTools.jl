@@ -22,8 +22,7 @@ for r in traverse_concrete_subtypes(RiskMeasure)
              function no_bounds_no_risk_expr_risk_measure(r::$(r))
                  pnames = Tuple(setdiff(propertynames(r), (:settings,)))
                  settings = r.settings
-                 settings = RiskMeasureSettings(; rke = settings.rke,
-                                                scale = settings.scale)
+                 settings = RiskMeasureSettings(; rke = false, scale = 1)
                  return if isempty(pnames)
                      $(r)(; settings = settings)
                  else

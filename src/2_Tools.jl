@@ -35,11 +35,13 @@ function assert_nonneg_finite_val(val::AbstractVector{<:Real})
     return nothing
 end
 function assert_nonneg_finite_val(val::Pair)
-    @argcheck(isfinite(val[2]) && val[2] >= zero(eltype(val[2])))
+    @argcheck(isfinite(val[2]))
+    @argcheck(val[2] >= zero(val[2]))
     return nothing
 end
 function assert_nonneg_finite_val(val::Real)
-    @argcheck(isfinite(val) && val >= zero(eltype(val)))
+    @argcheck(isfinite(val))
+    @argcheck(val >= zero(val))
     return nothing
 end
 function assert_nonneg_finite_val(::Nothing)
