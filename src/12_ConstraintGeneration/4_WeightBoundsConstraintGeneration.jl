@@ -363,9 +363,10 @@ function get_weight_bounds(wb::UniformlyDistributedBounds, lub::Bool, sets::Asse
     return lub ? inv(length(sets.dict[sets.key])) : one(datatype)
 end
 """
-    weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets;
-                             strict::Bool = false, datatype::DataType = Float64,
-                             kwargs...)
+```julia
+weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets; strict::Bool = false,
+                          datatype::DataType = Float64, kwargs...)
+```
 
 Generate portfolio weight bounds constraints from a `WeightBoundsEstimator` and asset set.
 
@@ -419,7 +420,9 @@ function weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets;
                                                datatype = datatype))
 end
 """
-    weight_bounds_constraints_side(::Nothing, N::Integer, val::Real)
+```julia
+weight_bounds_constraints_side(::Nothing, N::Integer, val::Real)
+```
 
 Generate a vector of portfolio weight bounds when no constraint is specified.
 
@@ -454,7 +457,9 @@ function weight_bounds_constraints_side(::Nothing, N::Integer, val::Real)
     return fill(val, N)
 end
 """
-    weight_bounds_constraints_side(wb::Real, N::Integer, val::Real)
+```julia
+weight_bounds_constraints_side(wb::Real, N::Integer, val::Real)
+```
 
 Generate a vector of portfolio weight bounds from a scalar bound.
 
@@ -497,7 +502,9 @@ function weight_bounds_constraints_side(wb::Real, N::Integer, val::Real)
     end
 end
 """
-    weight_bounds_constraints_side(wb::AbstractVector, args...)
+```julia
+weight_bounds_constraints_side(wb::AbstractVector, args...)
+```
 
 Propagate asset-specific portfolio weight bounds from a vector.
 
@@ -532,8 +539,10 @@ function weight_bounds_constraints_side(wb::AbstractVector, args...)
     return wb
 end
 """
-    weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...;
-                             scalar::Bool = false, N::Integer = 0, kwargs...)
+```julia
+weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...; scalar::Bool = false,
+                          N::Integer = 0, kwargs...)
+```
 
 Propagate or expand portfolio weight bounds constraints from a `WeightBounds` object.
 
@@ -585,8 +594,10 @@ function weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...;
                         ub = weight_bounds_constraints_side(wb.ub, N, Inf))
 end
 """
-    weight_bounds_constraints(wb::WeightBounds{<:AbstractVector, <:AbstractVector},
-                             args...; kwargs...)
+```julia
+weight_bounds_constraints(wb::WeightBounds{<:AbstractVector, <:AbstractVector}, args...;
+                          kwargs...)
+```
 
 Propagate asset-specific portfolio weight bounds constraints from a `WeightBounds` object with vector bounds.
 
@@ -623,8 +634,10 @@ function weight_bounds_constraints(wb::WeightBounds{<:AbstractVector, <:Abstract
     return wb
 end
 """
-    weight_bounds_constraints(wb::Nothing, args...; scalar::Bool = false,
-                             N::Integer = 0, kwargs...)
+```julia
+weight_bounds_constraints(wb::Nothing, args...; scalar::Bool = false, N::Integer = 0,
+                          kwargs...)
+```
 
 Generate unconstrained portfolio weight bounds when no bounds are specified.
 

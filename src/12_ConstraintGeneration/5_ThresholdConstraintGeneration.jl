@@ -1,7 +1,9 @@
 """
-    struct BuyInThresholdEstimator{T1} <: AbstractConstraintEstimator
-        val::T1
-    end
+```julia
+struct BuyInThresholdEstimator{T1} <: AbstractConstraintEstimator
+    val::T1
+end
+```
 
 Estimator for buy-in threshold portfolio constraints.
 
@@ -61,9 +63,11 @@ function BuyInThresholdEstimator(;
     return BuyInThresholdEstimator(val)
 end
 """
-    struct BuyInThreshold{T1} <: AbstractConstraintResult
-        val::T1
-    end
+```julia
+struct BuyInThreshold{T1} <: AbstractConstraintResult
+    val::T1
+end
+```
 
 Container for buy-in threshold portfolio constraints.
 
@@ -128,7 +132,9 @@ function threshold_view(t::AbstractVector{<:Union{Nothing, <:BuyInThreshold,
     return threshold_view.(t, Ref(i))
 end
 """
-    threshold_constraints(t::Union{Nothing, <:BuyInThreshold}, args...; kwargs...)
+```julia
+threshold_constraints(t::Union{Nothing, <:BuyInThreshold}, args...; kwargs...)
+```
 
 Propagate or pass through buy-in threshold portfolio constraints.
 
@@ -165,8 +171,10 @@ function threshold_constraints(t::Union{Nothing, <:BuyInThreshold}, args...; kwa
     return t
 end
 """
-    threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
-                         datatype::DataType = Float64, strict::Bool = false)
+```julia
+threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
+                      datatype::DataType = Float64, strict::Bool = false)
+```
 
 Generate buy-in threshold portfolio constraints from a `BuyInThresholdEstimator` and asset set.
 
@@ -214,8 +222,9 @@ function threshold_constraints(t::BuyInThresholdEstimator, sets::AssetSets;
                                                  strict = strict))
 end
 """
-    threshold_constraints(bounds::UniformlyDistributedBounds, sets::AssetSets;
-                         kwargs...)
+```julia
+threshold_constraints(bounds::UniformlyDistributedBounds, sets::AssetSets; kwargs...)
+```
 
 Generate uniform buy-in threshold portfolio constraints for all assets.
 

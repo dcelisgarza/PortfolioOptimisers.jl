@@ -1,9 +1,11 @@
 """
-    struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
-        w::T1
-        val::T2
-        default::T3
-    end
+```julia
+struct TurnoverEstimator{T1, T2, T3} <: AbstractEstimator
+    w::T1
+    val::T2
+    default::T3
+end
+```
 
 Estimator for turnover portfolio constraints.
 
@@ -67,7 +69,9 @@ function TurnoverEstimator(; w::AbstractVector{<:Real},
     return TurnoverEstimator(w, val, default)
 end
 """
-    turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false)
+```julia
+turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bool = false)
+```
 
 Generate turnover portfolio constraints from a `TurnoverEstimator` and asset set.
 
@@ -113,10 +117,12 @@ function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets; strict::Bo
                     val = estimator_to_val(tn.val, sets, tn.default; strict = strict))
 end
 """
-    struct Turnover{T1, T2} <: AbstractResult
-        w::T1
-        val::T2
-    end
+```julia
+struct Turnover{T1, T2} <: AbstractResult
+    w::T1
+    val::T2
+end
+```
 
 Container for turnover portfolio constraints.
 
@@ -183,7 +189,9 @@ function Turnover(; w::AbstractVector{<:Real},
     return Turnover(w, val)
 end
 """
-    turnover_constraints(tn::Union{Nothing, <:Turnover}, args...; kwargs...)
+```julia
+turnover_constraints(tn::Union{Nothing, <:Turnover}, args...; kwargs...)
+```
 
 Propagate or pass through turnover portfolio constraints.
 

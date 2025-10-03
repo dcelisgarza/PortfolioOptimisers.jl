@@ -140,7 +140,7 @@ SemiDefinitePhylogeny(;
 
 ## Validation
 
-  - `A` must be symmetric with zero diagonal.
+  - `issymmetric(A)` and `all(x -> iszero(x), diag(A))`.
   - `p >= 0`.
 
 # Examples
@@ -323,7 +323,7 @@ IntegerPhylogeny(;
 
 ## Validation
 
-  - `A` matrix must be symmetric with zero diagonal.
+  - `issymmetric(A)` and `all(x -> iszero(x), diag(A))`.
   - If `B` is a vector: `!isempty(B)`, `all(x -> x >= 0, B)`, and `size(unique(A + I; dims = 1), 1) == length(B)`.
   - If `B` is an integer: `B >= 0`.
 

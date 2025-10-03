@@ -1436,8 +1436,8 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `val` must be non-empty.
-  - All entries of `val` must be non-negative.
+  - `!isempty(val)`.
+  - `all(x -> x >= zero(x), val)`.
 
 # Examples
 
