@@ -1,15 +1,15 @@
 abstract type AbstractPriorEstimator <: AbstractEstimator end
 abstract type AbstractLowOrderPriorEstimator <: AbstractPriorEstimator end
-abstract type AbstractLowOrderPriorEstimator_1_0 <: AbstractLowOrderPriorEstimator end
+abstract type AbstractLowOrderPriorEstimator_1_1 <: AbstractLowOrderPriorEstimator end
 abstract type AbstractLowOrderPriorEstimator_2_1 <: AbstractLowOrderPriorEstimator end
 abstract type AbstractLowOrderPriorEstimator_2_2 <: AbstractLowOrderPriorEstimator end
 abstract type AbstractLowOrderPriorEstimator_1o2_1o2 <: AbstractLowOrderPriorEstimator end
-const AbstractLowOrderPriorEstimatorMap_2_1 = Union{<:AbstractLowOrderPriorEstimator_1_0,
+const AbstractLowOrderPriorEstimatorMap_2_1 = Union{<:AbstractLowOrderPriorEstimator_1_1,
                                                     <:AbstractLowOrderPriorEstimator_1o2_1o2}
 const AbstractLowOrderPriorEstimatorMap_2_2 = Union{<:AbstractLowOrderPriorEstimator_2_1,
                                                     <:AbstractLowOrderPriorEstimator_2_2,
                                                     <:AbstractLowOrderPriorEstimator_1o2_1o2}
-const AbstractLowOrderPriorEstimatorMap_1o2_1o2 = Union{<:AbstractLowOrderPriorEstimator_1_0,
+const AbstractLowOrderPriorEstimatorMap_1o2_1o2 = Union{<:AbstractLowOrderPriorEstimator_1_1,
                                                         <:AbstractLowOrderPriorEstimator_2_1,
                                                         <:AbstractLowOrderPriorEstimator_2_2,
                                                         <:AbstractLowOrderPriorEstimator_1o2_1o2}
