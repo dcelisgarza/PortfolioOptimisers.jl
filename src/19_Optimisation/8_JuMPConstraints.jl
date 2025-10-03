@@ -1200,17 +1200,16 @@ function set_l2_regularisation!(model::JuMP.Model, l2::Real)
     add_to_objective_penalty!(model, l2)
     return nothing
 end
-function set_sdp_constraints!(model::JuMP.Model, w_key::Symbol = :w, W_key::Symbol = :W)
-    if haskey(model, W_key)
-        return model[W_key]
+function set_sdp_constraints!(model::JuMP.Model)
+    if haskey(model, :W)
+        return model[:W]
     end
-    w = model[w_key]
+    w = model[:w]
     k = ifelse(haskey(model, :crkb), 1, model[:k])
     sc = model[:sc]
     N = length(w)
-    W = model[W_key] = @variable(model, [1:N, 1:N], Symmetric)
-    M = model[Symbol(W_key, :_M)] = @expression(model,
-                                                hcat(vcat(W, transpose(w)), vcat(w, k)))
+    W = model[:W] = @variable(model, [1:N, 1:N], Symmetric)
+    M = model[Symbol(:W, :_M)] = @expression(model, hcat(vcat(W, transpose(w)), vcat(w, k)))
     model[Symbol(:M, :_PSD)] = @constraint(model, sc * M in PSDCone())
     return W
 end
