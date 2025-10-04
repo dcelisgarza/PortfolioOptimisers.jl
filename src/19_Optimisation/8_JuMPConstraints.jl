@@ -1087,9 +1087,9 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     te_dw = Symbol(:te_dw_, i)
     #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
     #! This expression should be the new :w
-    model[te_dw] = @expression(model, w - wb * k)
+    model[Symbol(:w_, te_dw)] = @expression(model, w - wb * k)
     #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
-    risk_expr = set_risk!(model, i, r, opt, pr, cplg, nplg, args...)[1]
+    risk_expr = set_risk_constraints!(model, te_dw, r, opt, pr, cplg, nplg, args...)
     model[Symbol(:cter_, i)] = @constraint(model, sc * (risk_expr - err * k) <= 0)
     return nothing
 end
@@ -1112,7 +1112,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     t_dr = model[Symbol(:t_dr_, i)] = @variable(model)
     #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
     #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
-    risk_expr = set_risk!(model, i, r, opt, pr, cplg, nplg, args...)[1]
+    risk_expr = set_risk_constraints!(model, t_dr, r, opt, pr, cplg, nplg, args...)
     dr = model[Symbol(:dr_, i)] = @expression(model, risk_expr - rb * k)
     model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = @constraints(model,
                                                                           begin
