@@ -1090,8 +1090,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     #! This expression should be the new :w
     model[Symbol(:w_, te_dw)] = @expression(model, w - wb * k)
     #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
-    risk_expr = set_risk_constraints!(model, te_dw, r, opt, pr, cplg, nplg, fees, args...;
-                                      kwargs...)
+    risk_expr = set_triv_risk_constraints!(model, te_dw, r, opt, pr, cplg, nplg, fees,
+                                           args...; kwargs...)
     model[Symbol(:cter_, i)] = @constraint(model, sc * (risk_expr - err * k) <= 0)
     return nothing
 end
@@ -1113,8 +1113,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     sc = model[:sc]
     key = Symbol(:t_dr_, i)
     t_dr = model[key] = @variable(model)
-    risk_expr = set_tracking_dv_risk_constraints!(model, key, ri, opt, pr, cplg, nplg, fees,
-                                                  args...; kwargs...)
+    risk_expr = set_trdv_risk_constraints!(model, key, ri, opt, pr, cplg, nplg, fees,
+                                           args...; kwargs...)
     dr = model[Symbol(:dr_, i)] = @expression(model, risk_expr - rb * k)
     model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = @constraints(model,
                                                                           begin
