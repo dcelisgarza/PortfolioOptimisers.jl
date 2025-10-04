@@ -1016,13 +1016,13 @@ function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
     set_turnover_fees!(model, fees.tn)
     return nothing
 end
-function set_tracking_error_constraints!(args...)
+function set_tracking_error_constraints!(args...; kwargs...)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
                                          te::TrackingError{<:Any, <:Any, <:NOCTracking},
-                                         args...)
+                                         args...; kwargs...)
     X = pr.X
     k = model[:k]
     sc = model[:sc]
@@ -1048,7 +1048,7 @@ end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
                                          te::TrackingError{<:Any, <:Any, <:SOCTracking},
-                                         args...)
+                                         args...; kwargs...)
     X = pr.X
     k = model[:k]
     sc = model[:sc]
@@ -1077,7 +1077,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          cplg::Union{Nothing, <:SemiDefinitePhylogeny,
                                                      <:IntegerPhylogeny},
                                          nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                     <:IntegerPhylogeny}, args...)
+                                                     <:IntegerPhylogeny},
+                                         fees::Union{Nothing, <:Fees}, args...; kwargs...)
     r = te.r
     wb = te.tracking.w
     err = te.err
@@ -1089,7 +1090,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     #! This expression should be the new :w
     model[Symbol(:w_, te_dw)] = @expression(model, w - wb * k)
     #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
-    risk_expr = set_risk_constraints!(model, te_dw, r, opt, pr, cplg, nplg, args...)
+    risk_expr = set_risk_constraints!(model, te_dw, r, opt, pr, cplg, nplg, fees, args...)
     model[Symbol(:cter_, i)] = @constraint(model, sc * (risk_expr - err * k) <= 0)
     return nothing
 end
@@ -1102,17 +1103,17 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                                      <:IntegerPhylogeny},
                                          nplg::Union{Nothing, <:SemiDefinitePhylogeny,
                                                      <:IntegerPhylogeny},
-                                         fees::Union{Nothing, <:Fees}, args...)
-    r = te.r
+                                         fees::Union{Nothing, <:Fees}, args...; kwargs...)
+    ri = te.r
     wb = te.tracking.w
     err = te.err
-    rb = expected_risk(r, wb, pr.X, fees)
+    rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
     k = model[:k]
     sc = model[:sc]
-    t_dr = model[Symbol(:t_dr_, i)] = @variable(model)
-    #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
-    #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
-    risk_expr = set_risk_constraints!(model, t_dr, r, opt, pr, cplg, nplg, args...)
+    key = Symbol(:t_dr_, i)
+    t_dr = model[key] = @variable(model)
+    risk_expr = set_tracking_dv_risk_constraints!(model, key, ri, opt, pr, cplg, nplg, fees,
+                                                  args...; kwargs...)
     dr = model[Symbol(:dr_, i)] = @expression(model, risk_expr - rb * k)
     model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = @constraints(model,
                                                                           begin
@@ -1129,9 +1130,9 @@ end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
                                          tres::Union{<:AbstractTracking,
                                                      <:AbstractVector{<:AbstractTracking}},
-                                         args...)
+                                         args...; kwargs...)
     for (i, te) in enumerate(tres)
-        set_tracking_error_constraints!(model, i, pr, te, args...)
+        set_tracking_error_constraints!(model, i, pr, te, args...; kwargs...)
     end
     return nothing
 end

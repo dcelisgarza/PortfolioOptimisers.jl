@@ -239,7 +239,7 @@ function optimise!(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_l1_regularisation!(model, mr.opt.l1)
     set_l2_regularisation!(model, mr.opt.l2)
     set_non_fixed_fees!(model, fees)
-    set_risk_constraints!(model, mr.r, mr, pr, nplg, cplg; rd = rd)
+    set_risk_constraints!(model, mr.r, mr, pr, nplg, cplg, fees; rd = rd)
     scalarise_risk_expression!(model, mr.opt.sce)
     set_return_constraints!(model, ret, mr.obj, pr; rd = rd)
     set_sdp_phylogeny_constraints!(model, nplg, :sdp_nplg)

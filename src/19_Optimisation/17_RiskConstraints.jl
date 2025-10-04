@@ -235,7 +235,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::FactorRiskContribution, pr::AbstractPriorResult, ::Any,
-                               ::Any, b1::AbstractMatrix, args...; kwargs...)
+                               ::Any, ::Any, b1::AbstractMatrix, args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
@@ -2127,14 +2127,14 @@ function set_tracking_dv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMea
                                            cplg::Union{Nothing, <:SemiDefinitePhylogeny,
                                                        <:IntegerPhylogeny},
                                            nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                       <:IntegerPhylogeny}, args...;
-                                           kwargs...)
+                                                       <:IntegerPhylogeny},
+                                           fees::Union{Nothing, <:Fees}, args...; kwargs...)
     variance_flag = haskey(model, :variance_flag)
     rc_variance = haskey(model, :rc_variance)
     Au = haskey(model, :Au)
     E = haskey(model, :E)
 
-    risk_expr = set_risk_constraints!(model, i, r, opt, pr, cplg, nplg, args...)
+    risk_expr = set_risk_constraints!(model, i, r, opt, pr, cplg, nplg, fees, args...)
 
     if !variance_flag && haskey(model, :variance_flag)
         unregister(model, :variance_flag)
@@ -2162,15 +2162,16 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                cplg::Union{Nothing, <:SemiDefinitePhylogeny,
                                            <:IntegerPhylogeny},
                                nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny}, args...; kwargs...)
+                                           <:IntegerPhylogeny},
+                               fees::Union{Nothing, <:Fees}, args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tracking.w
-    rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, opt.opt.fees)
+    rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
     k = model[:k]
     sc = model[:sc]
     tracking_risk = model[key] = @variable(model)
-    risk_expr = set_tracking_dv_risk_constraints!(model, i, ri, opt, pr, cplg, nplg,
+    risk_expr = set_tracking_dv_risk_constraints!(model, i, ri, opt, pr, cplg, nplg, fees,
                                                   args...; kwargs...)
     dr = model[Symbol(:rdr_, i)] = @expression(model, risk_expr - rb * k)
     model[Symbol(:crtr_noc_, i)] = @constraint(model,

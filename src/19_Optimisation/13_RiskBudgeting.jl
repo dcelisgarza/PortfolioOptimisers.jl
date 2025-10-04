@@ -135,7 +135,7 @@ function optimise!(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     set_l1_regularisation!(model, rb.opt.l1)
     set_l2_regularisation!(model, rb.opt.l2)
     set_non_fixed_fees!(model, fees)
-    set_risk_constraints!(model, rb.r, rb, pr, nplg, cplg; rd = rd)
+    set_risk_constraints!(model, rb.r, rb, pr, nplg, cplg, fees; rd = rd)
     scalarise_risk_expression!(model, rb.opt.sce)
     set_return_constraints!(model, ret, MinimumRisk(), pr; rd = rd)
     set_sdp_phylogeny_constraints!(model, nplg, :sdp_nplg)
