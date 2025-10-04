@@ -197,6 +197,7 @@
               TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0)),
               TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0),
                                   alg = NOCTracking())]
+
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
         for r in rs, obj in objs, ret in rets
@@ -264,6 +265,30 @@
             end
             i += 1
         end
+
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1DT.csv.gz"), DataFrame)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        tracking = WeightsTracking(; w = w0)
+        for (i, r) in pairs(rs)
+            r1 = RiskTrackingRiskMeasure(; tracking = tracking, r = r,
+                                         alg = DependentVariableTracking())
+            mr = MeanRisk(; r = r1, opt = opt)
+            res = optimise!(mr, rd)
+            if isa(r, PortfolioOptimisers.QuadExpressionRiskMeasures)
+                @test isa(res.retcode, OptimisationFailure)
+                continue
+            else
+                @test isa(res.retcode, OptimisationSuccess)
+            end
+            rtol = 1e-6
+            success = isapprox(res.w, df[!, i]; rtol = rtol)
+            if !success
+                println("Counter: $i")
+                find_tol(res.w, df[!, i])
+            end
+            @test success
+        end
+
         res = optimise!(MeanRisk(; wi = w0,
                                  opt = JuMPOptimiser(; pe = pr,
                                                      slv = Solver(;
