@@ -88,7 +88,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::StandardDeviation,
                                args...; kwargs...)
     sd_risk, key = set_risk!(model, i, r, opt, pr, args...; kwargs...)
     set_risk_bounds_and_expression!(model, opt, sd_risk, r.settings, key)
-    return nothing
+    return sd_risk
 end
 function sdp_rc_variance_flag!(::JuMP.Model,
                                ::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
@@ -231,7 +231,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
     ub = variance_risk_bounds_val(sdp_flag, r.settings.ub)
     set_variance_risk_bounds_and_expression!(model, opt, var_bound_expr, ub, var_bound_key,
                                              variance_risk, r.settings)
-    return nothing
+    return variance_risk
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::FactorRiskContribution, pr::AbstractPriorResult, ::Any,
@@ -2132,20 +2132,19 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tracking.w
-    rb = expected_risk(r, wb, pr.X, opt.opt.fees)
+    rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, opt.opt.fees)
     k = model[:k]
     sc = model[:sc]
-    te_dw = Symbol(:rte_w_, i)
-    tracking_risk = model[Symbol(key, i)] = @variable(model)
+    tracking_risk = model[key] = @variable(model)
     #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
     #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
     risk_expr = set_risk_constraints!(model, i, ri, opt, pr, cplg, nplg, args...)
     dr = model[Symbol(:rdr_, i)] = @expression(model, risk_expr - rb * k)
-    model[Symbol(:crter_noc_, i)] = @constraint(model,
-                                                [sc * tracking_risk;
-                                                 sc * dr] in MOI.NormOneCone(2))
+    model[Symbol(:crtr_noc_, i)] = @constraint(model,
+                                               [sc * tracking_risk;
+                                                sc * dr] in MOI.NormOneCone(2))
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
-    return nothing
+    return tracking_risk
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::TurnoverRiskMeasure,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
