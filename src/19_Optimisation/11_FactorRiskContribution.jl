@@ -112,12 +112,13 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, frc.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, frc.opt.te, frc, nplg, cplg, fees)
+    set_tracking_error_constraints!(model, pr, frc.opt.te, frc, nplg, cplg, fees, b1;
+                                    rd = rd)
     set_number_effective_assets!(model, frc.opt.nea)
     set_l1_regularisation!(model, frc.opt.l1)
     set_l2_regularisation!(model, frc.opt.l2)
     set_non_fixed_fees!(model, fees)
-    set_risk_constraints!(model, frc.r, frc, pr, nplg, cplg, b1; rd = rd)
+    set_risk_constraints!(model, frc.r, frc, pr, nplg, cplg, fees, b1; rd = rd)
     scalarise_risk_expression!(model, frc.opt.sce)
     set_return_constraints!(model, ret, frc.obj, pr; rd = rd)
     frc_nplg = phylogeny_constraints(frc.nplg, rd.F)
