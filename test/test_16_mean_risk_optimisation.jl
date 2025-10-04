@@ -192,7 +192,11 @@
               DistributionallyRobustConditionalValueatRisk(),
               ValueatRisk(; alg = DistributionValueatRisk()),
               DistributionallyRobustConditionalValueatRiskRange(),
-              ValueatRiskRange(; alg = DistributionValueatRisk())]
+              ValueatRiskRange(; alg = DistributionValueatRisk()),
+              TurnoverRiskMeasure(; w = w0),
+              TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0)),
+              TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0),
+                                  alg = NOCTracking())]
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
         for r in rs, obj in objs, ret in rets
