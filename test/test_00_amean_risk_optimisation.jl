@@ -266,14 +266,14 @@
             i += 1
         end
 
-        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1DT.csv.gz"), DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskDT.csv.gz"), DataFrame)
         tracking = WeightsTracking(; w = w0)
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         i = 1
         for r in rs
             r1 = RiskTrackingRiskMeasure(; tracking = tracking, r = r,
                                          alg = DependentVariableTracking())
-            mr = MeanRisk(; r = r1, opt = opt)
+            mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
             res = optimise!(mr, rd)
             if isa(r, PortfolioOptimisers.QuadExpressionRiskMeasures)
                 @test isa(res.retcode, OptimisationFailure)
@@ -282,25 +282,27 @@
             else
                 @test isa(res.retcode, OptimisationSuccess)
             end
-            rtol = if i == 14
-                5e-5
-            elseif i == 15
-                0.05
-            elseif i == 16
-                1e-5
-            elseif i == 26
-                5e-6
-            elseif i == 17
-                0.25
-            elseif i in (18, 23)
-                0.1
-            elseif i == 24
-                0.5
-            elseif i == 28
-                5e-4
-            else
-                1e-6
+            rtol = 1e-6
+            success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Counter: $i")
+                find_tol(res.w, df[!, "$i"])
+                display([res.w df[!, "$i"]])
             end
+            @test success
+            i += 1
+        end
+
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskIT.csv.gz"), DataFrame)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        i = 1
+        for r in rs
+            r1 = RiskTrackingRiskMeasure(; tracking = tracking, r = r,
+                                         alg = IndependentVariableTracking())
+            mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
+            res = optimise!(mr, rd)
+            @test isa(res.retcode, OptimisationSuccess)
+            rtol = 1e-6
             success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
             if !success
                 println("Counter: $i")
@@ -321,7 +323,7 @@
         @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
 
         r = BrownianDistanceVariance()
-        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1BDV.csv.gz"), DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskBDV.csv.gz"), DataFrame)
         i = 1
         for obj in objs, ret in rets
             opt = JuMPOptimiser(; pe = pr2, slv = slv, ret = ret)
