@@ -1085,8 +1085,11 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     k = model[:k]
     sc = model[:sc]
     te_dw = Symbol(:te_dw_, i)
+    #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
+    #! This expression should be the new :w
     model[te_dw] = @expression(model, w - wb * k)
-    risk_expr = set_risk!(model, te_dw, r, opt, pr, cplg, nplg, args...)[1]
+    #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
+    risk_expr = set_risk!(model, i, r, opt, pr, cplg, nplg, args...)[1]
     model[Symbol(:cter_, i)] = @constraint(model, sc * (risk_expr - err * k) <= 0)
     return nothing
 end
@@ -1106,9 +1109,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     rb = expected_risk(r, wb, pr.X, fees)
     k = model[:k]
     sc = model[:sc]
-    te_dw = Symbol(:te_w_, i)
     t_dr = model[Symbol(:t_dr_, i)] = @variable(model)
-    risk_expr = set_risk!(model, te_dw, r, opt, pr, cplg, nplg, args...)[1]
+    #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
+    #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
+    risk_expr = set_risk!(model, i, r, opt, pr, cplg, nplg, args...)[1]
     dr = model[Symbol(:dr_, i)] = @expression(model, risk_expr - rb * k)
     model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = @constraints(model,
                                                                           begin

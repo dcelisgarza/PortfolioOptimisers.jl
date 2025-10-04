@@ -2112,19 +2112,23 @@ function set_risk!(model::JuMP.Model, i::Any,
     w = model[:w]
     k = model[:k]
     te_dw = Symbol(:rte_dw_, i)
+    #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
+    #! This expression should be the new :w
     model[te_dw] = @expression(model, w - wb * k)
-    tracking_risk = set_risk!(model, te_dw, ri, opt, pr, cplg, nplg, args...)[1]
+    #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
+    tracking_risk = set_risk!(model, i, ri, opt, pr, cplg, nplg, args...)[1]
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return nothing
 end
-function set_risk!(model::JuMP.Model, i::Any,
-                   r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
-                                              <:DependentVariableTracking},
-                   opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
-                   pr::AbstractPriorResult,
-                   cplg::Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny},
-                   nplg::Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny},
-                   args...; kwargs...)
+function set_risk_constraints!(model::JuMP.Model, i::Any,
+                               r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
+                                                          <:DependentVariableTracking},
+                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               cplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                           <:IntegerPhylogeny},
+                               nplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                           <:IntegerPhylogeny}, args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tracking.w
@@ -2133,7 +2137,9 @@ function set_risk!(model::JuMP.Model, i::Any,
     sc = model[:sc]
     te_dw = Symbol(:rte_w_, i)
     tracking_risk = model[Symbol(key, i)] = @variable(model)
-    risk_expr = set_risk!(model, te_dw, ri, opt, pr, cplg, nplg, args...)[1]
+    #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
+    #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
+    risk_expr = set_risk!(model, i, ri, opt, pr, cplg, nplg, args...)[1]
     dr = model[Symbol(:rdr_, i)] = @expression(model, risk_expr - rb * k)
     model[Symbol(:crter_noc_, i)] = @constraint(model,
                                                 [sc * tracking_risk;
