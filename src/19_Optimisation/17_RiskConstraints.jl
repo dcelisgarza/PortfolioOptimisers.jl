@@ -2106,7 +2106,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                cplg::Union{Nothing, <:SemiDefinitePhylogeny,
                                            <:IntegerPhylogeny},
                                nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny}, args...; kwargs...)
+                                           <:IntegerPhylogeny},
+                               fees::Union{Nothing, <:Fees}, args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tracking.w
@@ -2116,10 +2117,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
     #! This expression should be the new :w
     model[te_dw] = @expression(model, w - wb * k)
-    #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
-    tracking_risk = set_risk_constraints!(model, i, ri, opt, pr, cplg, nplg, args...)
+    tracking_risk = set_risk_constraints!(model, i, ri, opt, pr, cplg, nplg, fees, args...;
+                                          kwargs...)
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
-    return nothing
+    return tracking_risk
 end
 function set_tracking_dv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                            opt::Union{<:MeanRisk, <:NearOptimalCentering,
@@ -2132,23 +2133,40 @@ function set_tracking_dv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMea
                                            fees::Union{Nothing, <:Fees}, args...; kwargs...)
     variance_flag = haskey(model, :variance_flag)
     rc_variance = haskey(model, :rc_variance)
+    W = haskey(model, :W)
     Au = haskey(model, :Au)
     E = haskey(model, :E)
 
     risk_expr = set_risk_constraints!(model, i, r, opt, pr, cplg, nplg, fees, args...)
 
     if !variance_flag && haskey(model, :variance_flag)
+        model[Symbol(:triv_, i, :_variance_flag)] = model[:variance_flag]
         unregister(model, :variance_flag)
     end
+    if !W && haskey(model, :W)
+        model[Symbol(:triv_, i, :_W)] = model[:W]
+        model[Symbol(:triv_, i, :_M)] = model[:M]
+        model[Symbol(:triv_, i, :_M_PSD)] = model[:M_PSD]
+        unregister(model, :W)
+        unregister(model, :M)
+        unregister(model, :M_PSD)
+    end
     if !rc_variance && haskey(model, :rc_variance)
+        model[Symbol(:triv_, i, :_rc_variance)] = model[:rc_variance]
         unregister(model, :rc_variance)
     end
     if !Au && haskey(model, :Au)
+        model[Symbol(:triv_, i, :_Au)] = model[:Au]
+        model[Symbol(:triv_, i, :_Al)] = model[:Al]
+        model[Symbol(:triv_, i, :_cbucs_variance)] = model[:cbucs_variance]
         unregister(model, :Au)
         unregister(model, :Al)
         unregister(model, :cbucs_variance)
     end
     if !E && haskey(model, :E)
+        model[Symbol(:triv_, i, :_E)] = model[:E]
+        model[Symbol(:triv_, i, :_WpE)] = model[:WpE]
+        model[Symbol(:triv_, i, :_ceucs_variance)] = model[:ceucs_variance]
         unregister(model, :E)
         unregister(model, :WpE)
         unregister(model, :ceucs_variance)

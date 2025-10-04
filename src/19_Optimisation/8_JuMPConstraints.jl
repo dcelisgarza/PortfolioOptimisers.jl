@@ -1214,9 +1214,9 @@ function set_sdp_constraints!(model::JuMP.Model)
     k = ifelse(haskey(model, :crkb), 1, model[:k])
     sc = model[:sc]
     N = length(w)
-    W = model[:W] = @variable(model, [1:N, 1:N], Symmetric)
-    M = model[Symbol(:W, :_M)] = @expression(model, hcat(vcat(W, transpose(w)), vcat(w, k)))
-    model[Symbol(:M, :_PSD)] = @constraint(model, sc * M in PSDCone())
+    @variable(model, W[1:N, 1:N], Symmetric)
+    @expression(model, M, hcat(vcat(W, transpose(w)), vcat(w, k)))
+    @constraint(model, M_PSD, sc * M in PSDCone())
     return W
 end
 function set_sdp_frc_constraints!(model::JuMP.Model)
