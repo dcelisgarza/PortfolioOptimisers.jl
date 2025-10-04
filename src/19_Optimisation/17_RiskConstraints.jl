@@ -1686,7 +1686,7 @@ function set_owa_constraints!(model::JuMP.Model, X::AbstractMatrix)
     net_X = set_net_portfolio_returns!(model, X)
     T = size(X, 1)
     @variable(model, owa[1:T])
-    @constraint(model, sc * (net_X - owa) == 0)
+    @constraint(model, owac, sc * (net_X - owa) == 0)
     return owa
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
@@ -2098,6 +2098,295 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
+function set_risk_tr_constraints!(key::Any, model::JuMP.Model, r::RiskMeasure,
+                                  opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
+                                  cplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                              <:IntegerPhylogeny},
+                                  nplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                              <:IntegerPhylogeny},
+                                  fees::Union{Nothing, <:Fees}, args...; kwargs...)
+    return set_risk_constraints!(model, Symbol(key, 1), r, opt, pr, cplg, nplg, fees,
+                                 args...; kwargs...)
+end
+function set_risk_tr_constraints!(key::Any, model::JuMP.Model,
+                                  rs::AbstractVector{<:RiskMeasure},
+                                  opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
+                                  cplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                              <:IntegerPhylogeny},
+                                  nplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                              <:IntegerPhylogeny},
+                                  fees::Union{Nothing, <:Fees}, args...; kwargs...)
+    for (i, r) in enumerate(rs)
+        set_risk_constraints!(model, Symbol(key, i), r, opt, pr, cplg, nplg, fees, args...;
+                              kwargs...)
+    end
+    return nothing
+end
+function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+                                    opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                               <:RiskBudgeting}, pr::AbstractPriorResult,
+                                    cplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                <:IntegerPhylogeny},
+                                    nplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                <:IntegerPhylogeny},
+                                    fees::Union{Nothing, <:Fees}, args...; kwargs...)
+    if haskey(model, :variance_flag)
+        model[:oldvariance_flag] = model[:variance_flag]
+        unregister(model, :variance_flag)
+    end
+    if haskey(model, :rc_variance)
+        model[:oldrc_variance] = model[:rc_variance]
+        unregister(model, :rc_variance)
+    end
+    if haskey(model, :W)
+        model[:oldW] = model[:W]
+        model[:oldM] = model[:M]
+        model[:oldM_PSD] = model[:M_PSD]
+        unregister(model, :W)
+        unregister(model, :M)
+        unregister(model, :M_PSD)
+    end
+    if haskey(model, :Au)
+        model[:oldAu] = model[:Au]
+        model[:oldAl] = model[:Al]
+        model[:oldcbucs_variance] = model[:cbucs_variance]
+        unregister(model, :Au)
+        unregister(model, :Al)
+        unregister(model, :cbucs_variance)
+    end
+    if haskey(model, :E)
+        model[:oldE] = model[:E]
+        model[:oldWpE] = model[:WpE]
+        model[:oldceucs_variance] = model[:ceucs_variance]
+        unregister(model, :E)
+        unregister(model, :WpE)
+        unregister(model, :ceucs_variance)
+    end
+    if haskey(model, :X)
+        model[:oldX] = model[:X]
+        unregister(model, :X)
+    end
+    if haskey(model, :net_X)
+        model[:oldnet_X] = model[:net_X]
+        unregister(model, :net_X)
+    end
+    if haskey(model, :Xap1)
+        model[:oldXap1] = model[:Xap1]
+        unregister(model, :Xap1)
+    end
+    if haskey(model, :wr_risk)
+        model[:oldwr_risk] = model[:wr_risk]
+        model[:oldcwr] = model[:cwr]
+        unregister(model, :wr_risk)
+        unregister(model, :cwr)
+    end
+    if haskey(model, :range_risk)
+        model[:oldbr_risk] = model[:br_risk]
+        model[:oldrange_risk] = model[:range_risk]
+        model[:oldcbr] = model[:cbr]
+        unregister(model, :br_risk)
+        unregister(model, :range_risk)
+        unregister(model, :cbr)
+    end
+    if haskey(model, :dd)
+        model[:olddd] = model[:dd]
+        model[:oldcdd_start] = model[:cdd_start]
+        model[:oldcdd_geq_0] = model[:cdd_geq_0]
+        model[:oldcdd] = model[:cdd]
+        unregister(model, :dd)
+        unregister(model, :cdd_start)
+        unregister(model, :cdd_geq_0)
+        unregister(model, :cdd)
+    end
+    if haskey(model, :mdd_risk)
+        model[:oldmdd_risk] = model[:mdd_risk]
+        model[:oldcmdd_risk] = model[:cmdd_risk]
+        unregister(model, :mdd_risk)
+        unregister(model, :cmdd_risk)
+    end
+    if haskey(model, :uci)
+        model[:olduci] = model[:uci]
+        model[:olduci_risk] = model[:uci_risk]
+        model[:oldcuci_soc] = model[:cuci_soc]
+        unregister(model, :uci)
+        unregister(model, :uci_risk)
+        unregister(model, :cuci_soc)
+    end
+    if haskey(model, :owa)
+        model[:oldowa] = model[:owa]
+        model[:oldowac] = model[:owac]
+        unregister(model, :owa)
+        unregister(model, :owac)
+    end
+    if haskey(model, :bdvariance_risk)
+        model[:oldDt] = model[:Dt]
+        model[:oldDx] = model[:Dx]
+        unregister(model, :Dt)
+        unregister(model, :Dx)
+    end
+
+    risk_expr = set_risk_tr_constraints!(Symbol(:triv_, i, :_), model, r, opt, pr, cplg,
+                                         nplg, fees, args...; kwargs...)
+
+    if haskey(model, :variance_flag)
+        model[Symbol(:triv_, i, :_variance_flag)] = model[:variance_flag]
+        unregister(model, :variance_flag)
+        model[:variance_flag] = model[:oldvariance_flag]
+        unregister(model, :oldvariance_flag)
+    end
+    if haskey(model, :rc_variance)
+        model[Symbol(:triv_, i, :_rc_variance)] = model[:rc_variance]
+        unregister(model, :rc_variance)
+        model[:rc_variance] = model[:oldrc_variance]
+        unregister(model, :oldrc_variance)
+    end
+    if haskey(model, :W)
+        model[Symbol(:triv_, i, :_W)] = model[:W]
+        model[Symbol(:triv_, i, :_M)] = model[:M]
+        model[Symbol(:triv_, i, :_M_PSD)] = model[:M_PSD]
+        unregister(model, :W)
+        unregister(model, :M)
+        unregister(model, :M_PSD)
+
+        model[:W] = model[:oldW]
+        model[:M] = model[:oldM]
+        model[:M_PSD] = model[:oldM_PSD]
+        unregister(model, :oldW)
+        unregister(model, :oldM)
+        unregister(model, :oldM_PSD)
+    end
+    if haskey(model, :Au)
+        model[Symbol(:triv_, i, :_Au)] = model[:Au]
+        model[Symbol(:triv_, i, :_Al)] = model[:Al]
+        model[Symbol(:triv_, i, :_cbucs_variance)] = model[:cbucs_variance]
+        unregister(model, :Au)
+        unregister(model, :Al)
+        unregister(model, :cbucs_variance)
+    end
+    if haskey(model, :E)
+        model[Symbol(:triv_, i, :_E)] = model[:E]
+        model[Symbol(:triv_, i, :_WpE)] = model[:WpE]
+        model[Symbol(:triv_, i, :_ceucs_variance)] = model[:ceucs_variance]
+        unregister(model, :E)
+        unregister(model, :WpE)
+        unregister(model, :ceucs_variance)
+    end
+    if haskey(model, :X)
+        model[Symbol(:triv_, i, :_X)] = model[:X]
+        unregister(model, :X)
+
+        model[:X] = model[:oldX]
+        unregister(model, :oldX)
+    end
+    if haskey(model, :net_X)
+        model[:Symbol(:triv_, i, :_net_X)] = model[:net_X]
+        unregister(model, :net_X)
+
+        model[:net_X] = model[:oldnet_X]
+        unregister(model, :oldnet_X)
+    end
+    if haskey(model, :Xap1)
+        model[Symbol(:triv_, i, :_Xap1)] = model[:Xap1]
+        unregister(model, :Xap1)
+
+        model[:Xap1] = model[:oldXap1]
+        unregister(model, :oldXap1)
+    end
+    if haskey(model, :wr_risk)
+        model[Symbol(:triv_, i, :_wr_risk)] = model[:wr_risk]
+        model[Symbol(:triv_, i, :_cwr)] = model[:cwr]
+        unregister(model, :wr_risk)
+        unregister(model, :cwr)
+
+        model[:wr_risk] = model[:oldwr_risk]
+        model[:cwr] = model[:oldcwr]
+        unregister(model, :oldwr_risk)
+        unregister(model, :oldcwr)
+    end
+    if haskey(model, :range_risk)
+        model[Symbol(:triv_, i, :_br_risk)] = model[:br_risk]
+        model[Symbol(:triv_, i, :_range_risk)] = model[:range_risk]
+        model[Symbol(:triv_, i, :_cbr)] = model[:cbr]
+        unregister(model, :br_risk)
+        unregister(model, :range_risk)
+        unregister(model, :cbr)
+
+        model[:br_risk] = model[:oldbr_risk]
+        model[:range_risk] = model[:oldrange_risk]
+        model[:cbr] = model[:oldcbr]
+        unregister(model, :oldbr_risk)
+        unregister(model, :oldrange_risk)
+        unregister(model, :oldcbr)
+    end
+    if haskey(model, :dd)
+        model[Symbol(:triv_, i, :_dd)] = model[:dd]
+        model[Symbol(:triv_, i, :_cdd_start)] = model[:cdd_start]
+        model[Symbol(:triv_, i, :_cdd_geq_0)] = model[:cdd_geq_0]
+        model[Symbol(:triv_, i, :_cdd)] = model[:cdd]
+        unregister(model, :dd)
+        unregister(model, :cdd_start)
+        unregister(model, :cdd_geq_0)
+        unregister(model, :cdd)
+
+        model[:dd] = model[:olddd]
+        model[:cdd_start] = model[:oldcdd_start]
+        model[:cdd_geq_0] = model[:oldcdd_geq_0]
+        model[:cdd] = model[:oldcdd]
+        unregister(model, :olddd)
+        unregister(model, :oldcdd_start)
+        unregister(model, :oldcdd_geq_0)
+        unregister(model, :oldcdd)
+    end
+    if haskey(model, :mdd_risk)
+        model[Symbol(:triv_, i, :_mdd_risk)] = model[:mdd_risk]
+        model[Symbol(:triv_, i, :_cmdd_risk)] = model[:cmdd_risk]
+        unregister(model, :mdd_risk)
+        unregister(model, :cmdd_risk)
+
+        model[:mdd_risk] = model[:oldmdd_risk]
+        model[:cmdd_risk] = model[:oldcmdd_risk]
+        unregister(model, :oldmdd_risk)
+        unregister(model, :cmdd_risk)
+    end
+    if haskey(model, :uci)
+        model[:olduci] = model[:uci]
+        model[:olduci_risk] = model[:uci_risk]
+        model[:oldcuci_soc] = model[:cuci_soc]
+        unregister(model, :uci)
+        unregister(model, :uci_risk)
+        unregister(model, :cuci_soc)
+
+        model[:uci] = model[:olduci]
+        model[:uci_risk] = model[:olduci_risk]
+        model[:cuci_soc] = model[:oldcuci_soc]
+        unregister(model, :olduci)
+        unregister(model, :olduci_risk)
+        unregister(model, :oldcuci_soc)
+    end
+    if haskey(model, :owa)
+        model[:oldowa] = model[:owa]
+        model[:oldowac] = model[:owac]
+        unregister(model, :owa)
+        unregister(model, :owac)
+
+        model[:owa] = model[:oldowa]
+        model[:owac] = model[:oldowac]
+        unregister(model, :oldowa)
+        unregister(model, :oldowac)
+    end
+    if haskey(model, :bdvariance_risk)
+        model[:oldDt] = model[:Dt]
+        model[:oldDx] = model[:Dx]
+        unregister(model, :Dt)
+        unregister(model, :Dx)
+
+        model[:Dt] = model[:oldDt]
+        model[:Dx] = model[:oldDx]
+        unregister(model, :oldDt)
+        unregister(model, :oldDx)
+    end
+    return risk_expr
+end
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:IndependentVariableTracking},
@@ -2113,63 +2402,135 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     wb = r.tracking.w
     w = model[:w]
     k = model[:k]
-    te_dw = Symbol(:rte_dw_, i)
-    #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
-    #! This expression should be the new :w
-    model[te_dw] = @expression(model, w - wb * k)
-    tracking_risk = set_risk_constraints!(model, i, ri, opt, pr, cplg, nplg, fees, args...;
-                                          kwargs...)
+    model[:oldw] = model[:w]
+    unregister(model, :w)
+    model[:w] = @expression(model, w - wb * k)
+    tracking_risk = set_triv_risk_constraints!(model, i, ri, opt, pr, cplg, nplg, fees,
+                                               args...; kwargs...)
+    model[Symbol(:triv_, i, :_w)] = model[:w]
+    model[:w] = model[:oldw]
+    unregister(model, :oldw)
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
-function set_tracking_dv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-                                           opt::Union{<:MeanRisk, <:NearOptimalCentering,
-                                                      <:RiskBudgeting},
-                                           pr::AbstractPriorResult,
-                                           cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                       <:IntegerPhylogeny},
-                                           nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                       <:IntegerPhylogeny},
-                                           fees::Union{Nothing, <:Fees}, args...; kwargs...)
+function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+                                    opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                               <:RiskBudgeting}, pr::AbstractPriorResult,
+                                    cplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                <:IntegerPhylogeny},
+                                    nplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                                <:IntegerPhylogeny},
+                                    fees::Union{Nothing, <:Fees}, args...; kwargs...)
     variance_flag = haskey(model, :variance_flag)
     rc_variance = haskey(model, :rc_variance)
     W = haskey(model, :W)
     Au = haskey(model, :Au)
     E = haskey(model, :E)
-
-    risk_expr = set_risk_constraints!(model, i, r, opt, pr, cplg, nplg, fees, args...)
-
-    if !variance_flag && haskey(model, :variance_flag)
-        model[Symbol(:triv_, i, :_variance_flag)] = model[:variance_flag]
+    if variance_flag
+        model[:oldvariance_flag] = model[:variance_flag]
         unregister(model, :variance_flag)
     end
-    if !W && haskey(model, :W)
-        model[Symbol(:triv_, i, :_W)] = model[:W]
-        model[Symbol(:triv_, i, :_M)] = model[:M]
-        model[Symbol(:triv_, i, :_M_PSD)] = model[:M_PSD]
+    if rc_variance
+        model[:oldrc_variance] = model[:rc_variance]
+        unregister(model, :rc_variance)
+    end
+    if W
+        model[:oldW] = model[:W]
+        model[:oldM] = model[:M]
+        model[:oldM_PSD] = model[:M_PSD]
         unregister(model, :W)
         unregister(model, :M)
         unregister(model, :M_PSD)
     end
-    if !rc_variance && haskey(model, :rc_variance)
-        model[Symbol(:triv_, i, :_rc_variance)] = model[:rc_variance]
-        unregister(model, :rc_variance)
-    end
-    if !Au && haskey(model, :Au)
-        model[Symbol(:triv_, i, :_Au)] = model[:Au]
-        model[Symbol(:triv_, i, :_Al)] = model[:Al]
-        model[Symbol(:triv_, i, :_cbucs_variance)] = model[:cbucs_variance]
+    if Au
+        model[:oldAu] = model[:Au]
+        model[:oldAl] = model[:Al]
+        model[:oldcbucs_variance] = model[:cbucs_variance]
         unregister(model, :Au)
         unregister(model, :Al)
         unregister(model, :cbucs_variance)
     end
-    if !E && haskey(model, :E)
-        model[Symbol(:triv_, i, :_E)] = model[:E]
-        model[Symbol(:triv_, i, :_WpE)] = model[:WpE]
-        model[Symbol(:triv_, i, :_ceucs_variance)] = model[:ceucs_variance]
+    if E
+        model[:oldE] = model[:E]
+        model[:oldWpE] = model[:WpE]
+        model[:oldceucs_variance] = model[:ceucs_variance]
         unregister(model, :E)
         unregister(model, :WpE)
         unregister(model, :ceucs_variance)
+    end
+
+    risk_expr = set_risk_tr_constraints!(Symbol(:trdv_, i, :_), model, r, opt, pr, cplg,
+                                         nplg, fees, args...; kwargs...)
+
+    if !variance_flag && haskey(model, :variance_flag) || haskey(model, :oldvariance_flag)
+        model[Symbol(:trdv_, i, :_variance_flag)] = model[:variance_flag]
+        unregister(model, :variance_flag)
+
+        if haskey(model, :oldvariance_flag)
+            model[:variance_flag] = model[:oldvariance_flag]
+            println(model[:oldvariance_flag])
+            unregister(model, :oldvariance_flag)
+        end
+    end
+    if !rc_variance && haskey(model, :rc_variance) || haskey(model, :oldrc_variance)
+        model[Symbol(:trdv_, i, :_rc_variance)] = model[:rc_variance]
+        unregister(model, :rc_variance)
+
+        if haskey(model, :oldrc_variance)
+            model[:rc_variance] = model[:oldrc_variance]
+            unregister(model, :oldrc_variance)
+        end
+    end
+    if !W && haskey(model, :W) || haskey(model, :oldW)
+        model[Symbol(:trdv_, i, :_W)] = model[:W]
+        model[Symbol(:trdv_, i, :_M)] = model[:M]
+        model[Symbol(:trdv_, i, :_M_PSD)] = model[:M_PSD]
+        unregister(model, :W)
+        unregister(model, :M)
+        unregister(model, :M_PSD)
+
+        if haskey(model, :oldW)
+            model[:W] = model[:oldW]
+            model[:M] = model[:oldM]
+            model[:M_PSD] = model[:oldM_PSD]
+            unregister(model, :oldW)
+            unregister(model, :oldM)
+            unregister(model, :oldM_PSD)
+        end
+    end
+    if !Au && haskey(model, :Au) || haskey(model, :oldAu)
+        model[Symbol(:trdv_, i, :_Au)] = model[:Au]
+        model[Symbol(:trdv_, i, :_Al)] = model[:Al]
+        model[Symbol(:trdv_, i, :_cbucs_variance)] = model[:cbucs_variance]
+        unregister(model, :Au)
+        unregister(model, :Al)
+        unregister(model, :cbucs_variance)
+
+        if haskey(model, :oldAu)
+            model[:Au] = model[:oldAu]
+            model[:Al] = model[:oldAl]
+            model[:cbucs_variance] = model[:oldcbucs_variance]
+            unregister(model, :oldAu)
+            unregister(model, :oldAl)
+            unregister(model, :oldcbucs_variance)
+        end
+    end
+    if !E && haskey(model, :E) || haskey(model, :oldE)
+        model[Symbol(:trdv_, i, :_E)] = model[:E]
+        model[Symbol(:trdv_, i, :_WpE)] = model[:WpE]
+        model[Symbol(:trdv_, i, :_ceucs_variance)] = model[:ceucs_variance]
+        unregister(model, :E)
+        unregister(model, :WpE)
+        unregister(model, :ceucs_variance)
+
+        if haskey(model, :oldE)
+            model[:E] = model[:oldE]
+            model[:WpE] = model[:oldWpE]
+            model[:ceucs_variance] = model[:oldceucs_variance]
+            unregister(model, :oldE)
+            unregister(model, :oldWpE)
+            unregister(model, :oldceucs_variance)
+        end
     end
     return risk_expr
 end
@@ -2190,8 +2551,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     k = model[:k]
     sc = model[:sc]
     tracking_risk = model[key] = @variable(model)
-    risk_expr = set_tracking_dv_risk_constraints!(model, i, ri, opt, pr, cplg, nplg, fees,
-                                                  args...; kwargs...)
+    risk_expr = set_trdv_risk_constraints!(model, i, ri, opt, pr, cplg, nplg, fees, args...;
+                                           kwargs...)
     dr = model[Symbol(:rdr_, i)] = @expression(model, risk_expr - rb * k)
     model[Symbol(:crtr_noc_, i)] = @constraint(model,
                                                [sc * tracking_risk;
