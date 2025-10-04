@@ -2130,6 +2130,7 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     nplg::Union{Nothing, <:SemiDefinitePhylogeny,
                                                 <:IntegerPhylogeny},
                                     fees::Union{Nothing, <:Fees}, args...; kwargs...)
+    #! Do the same as the dependent variable tracking.
     if haskey(model, :variance_flag)
         model[:oldvariance_flag] = model[:variance_flag]
         unregister(model, :variance_flag)
