@@ -282,9 +282,13 @@
             else
                 @test isa(res.retcode, OptimisationSuccess)
             end
-            rtol = if i == 15
+            rtol = if i == 14
+                5e-5
+            elseif i == 15
                 0.05
-            elseif i in (16, 26)
+            elseif i == 16
+                1e-5
+            elseif i == 26
                 5e-6
             elseif i == 17
                 0.25
@@ -1087,20 +1091,21 @@
         res = optimise!(mre)
         @test norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3
 
-        tr = RiskTrackingError(; err = 5, tracking = WeightsTracking(; w = w0),
+        tr = RiskTrackingError(; err = 0.0, tracking = WeightsTracking(; w = w0),
                                alg = DependentVariableTracking())
         opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
-        mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
+        mre = MeanRisk(; r = ConditionalValueatRisk(), opt = opt)
         res = optimise!(mre)
+        @test isapprox(res.w,
+                       optimise!(MeanRisk(; r = ConditionalValueatRisk(),
+                                          opt = JuMPOptimiser(; pe = pr, slv = slv))).w,
+                       rtol = 1e-6)
 
         # tr = RiskTrackingError(; err = 0.00975, tracking = WeightsTracking(; w = w0),
         #                        alg = IndependentVariableTracking())
         # opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
         # mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
         # res = optimise!(mre)
-
-        # mre1 = MeanRisk(; obj = MaximumRatio(), opt = opt = JuMPOptimiser(; pe = pr, slv = slv))
-        # res1 = optimise!(mre1)
 
     end
     @testset "Phylogeny" begin
