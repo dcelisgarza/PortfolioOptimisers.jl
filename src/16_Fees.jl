@@ -1,3 +1,73 @@
+"""
+```julia
+struct FeesEstimator{T1, T2, T3, T4, T5, T6} <: AbstractEstimator
+    tn::T1
+    l::T2
+    s::T3
+    fl::T4
+    fs::T5
+    kwargs::T6
+end
+```
+
+Estimator for portfolio transaction fees constraints.
+
+`FeesEstimator` specifies transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Asset-specific fees can be provided via dictionaries, pairs, or vectors of pairs. Input validation ensures all fee inputs are non-empty and non-negative where applicable.
+
+# Fields
+
+  - `tn`: Turnover estimator or result.
+  - `l`: Long proportional fees.
+  - `s`: Short proportional fees.
+  - `fl`: Long fixed fees.
+  - `fs`: Short fixed fees.
+  - `kwargs`: Named tuple of keyword arguments for rounding fixed fees calculation.
+
+# Constructor
+
+```julia
+FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
+              l::Union{Nothing, <:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                       <:AbstractVector{<:Pair{<:AbstractString, <:Real}}} = nothing,
+              s::Union{Nothing, <:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                       <:AbstractVector{<:Pair{<:AbstractString, <:Real}}} = nothing,
+              fl::Union{Nothing, <:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                        <:AbstractVector{<:Pair{<:AbstractString, <:Real}}} = nothing,
+              fs::Union{Nothing, <:AbstractDict, <:Pair{<:AbstractString, <:Real},
+                        <:AbstractVector{<:Pair{<:AbstractString, <:Real}}} = nothing,
+              kwargs::NamedTuple = (; atol = 1e-8))
+```
+
+## Validation
+
+  - If any fee input (`l`, `s`, `fl`, `fs`) is a dictionary or vector, it must be non-empty, finite, and non-negative.
+
+# Examples
+
+```jldoctest
+julia> FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1), 0.0),
+                     l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
+                     fl = Dict("A" => 5.0), fs = ["B" => 10.0])
+FeesEstimator
+      tn | TurnoverEstimator
+         |         w | Vector{Float64}: [0.2, 0.3, 0.5]
+         |       val | Dict{String, Float64}: Dict("A" => 0.1)
+         |   default | Float64: 0.0
+       l | Dict{String, Float64}: Dict("B" => 0.002, "A" => 0.001)
+       s | Vector{Pair{String, Float64}}: ["A" => 0.001, "B" => 0.002]
+      fl | Dict{String, Float64}: Dict("A" => 5.0)
+      fs | Vector{Pair{String, Float64}}: ["B" => 10.0]
+  kwargs | @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`fees_constraints`](@ref)
+  - [`TurnoverEstimator`](@ref)
+  - [`Turnover`](@ref)
+  - [`AbstractEstimator`](@ref)
+"""
 struct FeesEstimator{T1, T2, T3, T4, T5, T6} <: AbstractEstimator
     tn::T1
     l::T2
@@ -19,22 +89,61 @@ struct FeesEstimator{T1, T2, T3, T4, T5, T6} <: AbstractEstimator
                                      <:Pair{<:AbstractString, <:Real},
                                      <:AbstractVector{<:Pair{<:AbstractString, <:Real}}},
                            kwargs::NamedTuple = (; atol = 1e-8))
-        if isa(l, Union{<:AbstractDict, <:AbstractVector})
-            @argcheck(!isempty(l), IsEmptyError(non_empty_msg("`l`") * "."))
-        end
-        if isa(s, Union{<:AbstractDict, <:AbstractVector})
-            @argcheck(!isempty(s), IsEmptyError(non_empty_msg("`s`") * "."))
-        end
-        if isa(fl, Union{<:AbstractDict, <:AbstractVector})
-            @argcheck(!isempty(fl), IsEmptyError(non_empty_msg("`fl`") * "."))
-        end
-        if isa(fs, Union{<:AbstractDict, <:AbstractVector})
-            @argcheck(!isempty(fs), IsEmptyError(non_empty_msg("`fs`") * "."))
-        end
+        assert_nonneg_finite_val(l)
+        assert_nonneg_finite_val(s)
+        assert_nonneg_finite_val(fl)
+        assert_nonneg_finite_val(fs)
         return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
                    typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
     end
 end
+"""
+```julia
+julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
+fees_constraints(fees::FeesEstimator, sets::AssetSets; datatype::DataType = Float64,
+                 strict::Bool = false)
+``
+
+Generate portfolio transaction fee constraints from a `FeesEstimator` and asset set.
+
+`fees_constraints` constructs a [`Fees`](@ref) object representing transaction fee constraints for the assets in `sets`, using the specifications in `fees`. Supports asset-specific turnover, long/short proportional fees, and long/short fixed fees via dictionaries, pairs, or vectors of pairs, with flexible assignment and validation.
+
+# Arguments
+
+  - `fees`: [`FeesEstimator`](@ref) specifying turnover, proportional, and fixed fee values.
+  - `sets`: [`AssetSets`](@ref) containing asset names or indices.
+  - `datatype`: Output data type for fee values.
+  - `strict`: If `true`, enforces strict matching between assets and fee values (throws error on mismatch); if `false`, issues a warning.
+
+# Returns
+
+  - `Fees`: Object containing turnover, proportional, and fixed fee values aligned with `sets`.
+
+# Details
+
+  - Fee values are extracted and mapped to assets using `estimator_to_val`.
+  - If a fee value is missing for an asset, assigns zero unless `strict` is `true`.
+  - Turnover constraints are generated using `turnover_constraints`.
+
+# Examples
+
+```jldoctest
+
+julia> fees = FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1), 0.0),
+                            l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
+                            fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
+
+julia> fees_constraints(fees, sets)
+
+```
+
+# Related
+
+  - [`FeesEstimator`](@ref)
+  - [`Fees`](@ref)
+  - [`turnover_constraints`](@ref)
+  - [`AssetSets`](@ref)
+"""
 function FeesEstimator(; tn::Union{Nothing, <:TurnoverEstimator, <:Turnover} = nothing,
                        l::Union{Nothing, <:AbstractDict, <:Pair{<:AbstractString, <:Real},
                                 <:AbstractVector{<:Pair{<:AbstractString, <:Real}}} = nothing,
@@ -52,14 +161,73 @@ function fees_view(fees::FeesEstimator, i::AbstractVector)
     return FeesEstimator(; tn = tn, l = fees.l, s = fees.s, fl = fees.fl, fs = fees.fs,
                          kwargs = fees.kwargs)
 end
-function fees_constraints(fees::FeesEstimator, sets::AssetSets;
-                          datatype::DataType = Float64, strict::Bool = false)
-    return Fees(; tn = turnover_constraints(fees.tn, sets; strict = strict),
-                l = estimator_to_val(fees.l, sets, zero(datatype); strict = strict),
-                s = estimator_to_val(fees.s, sets, zero(datatype); strict = strict),
-                fl = estimator_to_val(fees.fl, sets, zero(datatype); strict = strict),
-                fs = estimator_to_val(fees.fs, sets, zero(datatype); strict = strict))
+"""
+```julia
+struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
+    tn::T1
+    l::T2
+    s::T3
+    fl::T4
+    fs::T5
+    kwargs::T6
 end
+```
+
+Container for portfolio transaction fee constraints.
+
+`Fees` stores transaction fee constraints for each asset in a portfolio, including turnover fees, long/short proportional fees, and long/short fixed fees. Fee values can be specified as scalars (applied to all assets) or as vectors of per-asset values. Input validation ensures all fee values are non-negative and, if vectors, non-empty.
+
+# Fields
+
+  - `tn`: Turnover constraint result.
+  - `l`: Long proportional fees.
+  - `s`: Short proportional fees.
+  - `fl`: Long fixed fees.
+  - `fs`: Short fixed fees.
+  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered negligible.
+
+# Constructor
+
+```julia
+Fees(; tn::Union{Nothing, <:Turnover} = nothing,
+     l::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+     s::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+     fl::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+     fs::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+     kwargs::NamedTuple = (; atol = 1e-8))
+```
+
+## Validation
+
+  - If any fee (`l`, `s`, `fl`, `fs`) is a scalar: must be finite and non-negative.
+  - If any fee is a vector: must be non-empty, all elements finite, and non-negative.
+
+# Examples
+
+```jldoctest
+julia> Fees(; tn = Turnover([0.2, 0.3, 0.5], [0.1, 0.0, 0.0]), l = [0.001, 0.002, 0.0],
+            s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0], fs = [0.0, 10.0, 0.0])
+Fees
+      tn | Turnover
+         |     w | Vector{Float64}: [0.2, 0.3, 0.5]
+         |   val | Vector{Float64}: [0.1, 0.0, 0.0]
+       l | Vector{Float64}: [0.001, 0.002, 0.0]
+       s | Vector{Float64}: [0.001, 0.002, 0.0]
+      fl | Vector{Float64}: [5.0, 0.0, 0.0]
+      fs | Vector{Float64}: [0.0, 10.0, 0.0]
+  kwargs | @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+```
+
+# Related
+
+  - [`FeesEstimator`](@ref)
+  - [`Turnover`](@ref)
+  - [`AbstractResult`](@ref)
+  - [`fees_constraints`](@ref)
+  - [`calc_fees`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
     tn::T1
     l::T2
@@ -73,30 +241,10 @@ struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
                   fl::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                   fs::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
                   kwargs::NamedTuple = (; atol = 1e-8))
-        if isa(l, Real)
-            @argcheck(l >= zero(l), DomainError("`l` must be non-negative:\nl => $l"))
-        elseif isa(l, AbstractVector)
-            @argcheck(!isempty(l) && all(x -> x >= zero(x), l),
-                      AssertionError("`l` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), l) => $(all(x -> x >= zero(x), l))"))
-        end
-        if isa(s, Real)
-            @argcheck(s >= zero(s), DomainError("`s` must be non-negative:\ns => $s"))
-        elseif isa(s, AbstractVector)
-            @argcheck(!isempty(s) && all(x -> x >= zero(x), s),
-                      AssertionError("`s` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), s) => $(all(x -> x >= zero(x), s))"))
-        end
-        if isa(fl, Real)
-            @argcheck(fl >= zero(fl), DomainError("`fl` must be non-negative:\nfl => $fl"))
-        elseif isa(fl, AbstractVector)
-            @argcheck(!isempty(fl) && all(x -> x >= zero(x), fl),
-                      AssertionError("`fl` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), fl) => $(all(x -> x >= zero(x), fl))"))
-        end
-        if isa(fs, Real)
-            @argcheck(fs >= zero(fs), DomainError("`fs` must be non-negative:\nfs => $fs"))
-        elseif isa(fs, AbstractVector)
-            @argcheck(!isempty(fs) && all(x -> x >= zero(x), fs),
-                      AssertionError("`fs` must be non-empty and all must be non-negative:\nall(x -> x >= zero(x), fs) => $(all(x -> x >= zero(x), fs))"))
-        end
+        assert_nonneg_finite_val(l)
+        assert_nonneg_finite_val(s)
+        assert_nonneg_finite_val(fl)
+        assert_nonneg_finite_val(fs)
         return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs),
                    typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
     end
@@ -109,6 +257,113 @@ function Fees(; tn::Union{Nothing, <:Turnover} = nothing,
               kwargs::NamedTuple = (; atol = 1e-8))
     return Fees(tn, l, s, fl, fs, kwargs)
 end
+"""
+```julia
+fees_constraints(fees::FeesEstimator, sets::AssetSets; datatype::DataType = Float64,
+                 strict::Bool = false)
+```
+
+Generate portfolio transaction fee constraints from a `FeesEstimator` and asset set.
+
+`fees_constraints` constructs a [`Fees`](@ref) object representing transaction fee constraints for the assets in `sets`, using the specifications in `fees`. Supports asset-specific turnover, long/short proportional fees, and long/short fixed fees via dictionaries, pairs, or vectors of pairs, with flexible assignment and validation.
+
+# Arguments
+
+  - `fees`: [`FeesEstimator`](@ref) specifying turnover, proportional, and fixed fee values.
+  - `sets`: [`AssetSets`](@ref) containing asset names or indices.
+  - `datatype`: Output data type for fee values.
+  - `strict`: If `true`, enforces strict matching between assets and fee values (throws error on mismatch); if `false`, issues a warning.
+
+# Returns
+
+  - `Fees`: Object containing turnover, proportional, and fixed fee values aligned with `sets`.
+
+# Details
+
+  - Fee values are extracted and mapped to assets using `estimator_to_val`.
+  - If a fee value is missing for an asset, assigns zero unless `strict` is `true`.
+  - Turnover constraints are generated using `turnover_constraints`.
+
+# Examples
+
+```jldoctest
+julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
+
+julia> fees = FeesEstimator(; tn = TurnoverEstimator([0.2, 0.3, 0.5], Dict("A" => 0.1), 0.0),
+                            l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
+                            fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
+
+julia> fees_constraints(fees, sets)
+Fees
+      tn | Turnover
+         |     w | Vector{Float64}: [0.2, 0.3, 0.5]
+         |   val | Vector{Float64}: [0.1, 0.0, 0.0]
+       l | Vector{Float64}: [0.001, 0.002, 0.0]
+       s | Vector{Float64}: [0.001, 0.002, 0.0]
+      fl | Vector{Float64}: [5.0, 0.0, 0.0]
+      fs | Vector{Float64}: [0.0, 10.0, 0.0]
+  kwargs | @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+```
+
+# Related
+
+  - [`FeesEstimator`](@ref)
+  - [`Fees`](@ref)
+  - [`turnover_constraints`](@ref)
+  - [`AssetSets`](@ref)
+"""
+function fees_constraints(fees::FeesEstimator, sets::AssetSets;
+                          datatype::DataType = Float64, strict::Bool = false)
+    return Fees(; tn = turnover_constraints(fees.tn, sets; strict = strict),
+                l = estimator_to_val(fees.l, sets, zero(datatype); strict = strict),
+                s = estimator_to_val(fees.s, sets, zero(datatype); strict = strict),
+                fl = estimator_to_val(fees.fl, sets, zero(datatype); strict = strict),
+                fs = estimator_to_val(fees.fs, sets, zero(datatype); strict = strict))
+end
+"""
+```julia
+fees_constraints(fees::Union{Nothing, <:Fees}, args...; kwargs...)
+```
+
+Propagate or pass through portfolio transaction fee constraints.
+
+`fees_constraints` returns the input [`Fees`](@ref) object or `nothing` unchanged. This method is used to propagate already constructed fee constraints or missing constraints, enabling composability and uniform interface handling in constraint generation workflows.
+
+# Arguments
+
+  - `fees`: An existing [`Fees`](@ref) object or `nothing`.
+  - `args...`: Additional positional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `Fees` or `nothing`: The input constraint object, unchanged.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; tn = Turnover([0.2, 0.3, 0.5], [0.1, 0.0, 0.0]), l = [0.001, 0.002, 0.0]);
+
+julia> fees_constraints(fees)
+Fees
+      tn | Turnover
+         |     w | Vector{Float64}: [0.2, 0.3, 0.5]
+         |   val | Vector{Float64}: [0.1, 0.0, 0.0]
+       l | Vector{Float64}: [0.001, 0.002, 0.0]
+       s | nothing
+      fl | nothing
+      fs | nothing
+  kwargs | @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
+
+julia> fees_constraints(nothing)
+
+```
+
+# Related
+
+  - [`FeesEstimator`](@ref)
+  - [`Fees`](@ref)
+"""
 function fees_constraints(fees::Union{Nothing, <:Fees}, args...; kwargs...)
     return fees
 end
@@ -127,6 +382,46 @@ function factory(fees::Fees, w::AbstractVector)
     return Fees(; tn = factory(fees.tn, w), l = fees.l, s = fees.s, fl = fees.fl,
                 fs = fees.fs, kwargs = fees.kwargs)
 end
+"""
+```julia
+calc_fees(w::AbstractVector, p::AbstractVector, ::Nothing, ::Function)
+calc_fees(w::AbstractVector, p::AbstractVector, fees::Real, op::Function)
+calc_fees(w::AbstractVector, p::AbstractVector, fees::AbstractVector{<:Real}, op::Function)
+```
+
+Compute the actual proportional fees for portfolio weights and prices.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+
+  - `p`: Asset prices.
+  - `fees`: Scalar fee value.
+
+      + `nothing`: No proportional fee, returns zero.
+      + `Real`: Single fee applied to all relevant assets.
+      + `AbstractVector{<:Real}`: Vector of fee values per asset.
+  - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
+
+# Returns
+
+  - `val::Real`: Total actual proportional fee.
+
+# Examples
+
+```jldoctest
+julia> calc_fees([0.1, 0.2], [100, 200], 0.01, .>=)
+0.5
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function calc_fees(w::AbstractVector, p::AbstractVector, ::Nothing, ::Function)
     return zero(promote_type(eltype(w), eltype(p)))
 end
@@ -139,6 +434,44 @@ function calc_fees(w::AbstractVector, p::AbstractVector, fees::AbstractVector{<:
     idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
     return dot(fees[idx], w[idx] .* p[idx])
 end
+"""
+```julia
+calc_fees(w::AbstractVector, p::AbstractVector, ::Nothing)
+calc_fees(w::AbstractVector, p::AbstractVector, tn::Turnover)
+```
+
+Compute the actual turnover fees for portfolio weights and prices.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+
+  - `p`: Asset prices.
+  - `tn`: Turnover structure.
+
+      + `nothing`: No turnover fee, returns zero.
+      + If `tn.val` is a `Real`: single turnover fee applied to all assets.
+      + If `tn.val` is an `AbstractVector{<:Real}`: vector of turnover fees per asset.
+
+# Returns
+
+  - `val::Real`: Actual turnover fee.
+
+# Examples
+
+```jldoctest
+julia> calc_fees([0.1, 0.2], [100, 200], Turnover([0.0, 0.0], 0.01))
+0.5
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function calc_fees(w::AbstractVector, p::AbstractVector, ::Nothing)
     return zero(promote_type(eltype(w), eltype(p)))
 end
@@ -149,6 +482,43 @@ function calc_fees(w::AbstractVector, p::AbstractVector,
                    tn::Turnover{<:Any, <:AbstractVector})
     return dot(tn.val, abs.(w - tn.w) .* p)
 end
+"""
+```julia
+calc_fees(w::AbstractVector, p::AbstractVector, fees::Fees)
+```
+
+Compute total actual fees for portfolio weights and prices.
+
+Sums actual proportional, fixed, and turnover fees for all assets.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `p`: Asset prices.
+  - `fees`: [`Fees`](@ref) structure.
+
+# Returns
+
+  - `val::Real`: Total actual fees.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; l = [0.01, 0.02], s = [0.01, 0.02], fl = [5.0, 0.0], fs = [0.0, 10.0]);
+
+julia> calc_fees([0.1, -0.2], [100, 200], fees)
+15.9
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_fees`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function calc_fees(w::AbstractVector, p::AbstractVector, fees::Fees)
     fees_long = calc_fees(w, p, fees.l, .>=)
     fees_short = -calc_fees(w, p, fees.s, .<)
@@ -157,6 +527,45 @@ function calc_fees(w::AbstractVector, p::AbstractVector, fees::Fees)
     fees_turnover = calc_fees(w, p, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
+"""
+```julia
+calc_fees(w::AbstractVector, ::Nothing, ::Function)
+calc_fees(w::AbstractVector, fees::Real, op::Function)
+calc_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function)
+```
+
+Compute the proportional fees for portfolio weights and prices.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+
+  - `fees`: Scalar fee value.
+
+      + `nothing`: No proportional fee, returns zero.
+      + `Real`: Single fee applied to all relevant assets.
+      + `AbstractVector{<:Real}`: Vector of fee values per asset.
+  - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
+
+# Returns
+
+  - `val::Real`: Total proportional fee.
+
+# Examples
+
+```jldoctest
+julia> calc_fees([0.1, 0.2], 0.01, .>=)
+0.003
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function calc_fees(w::AbstractVector, ::Nothing, ::Function)
     return zero(eltype(w))
 end
@@ -168,15 +577,93 @@ function calc_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function
     idx = op(w, zero(promote_type(eltype(w), eltype(fees))))
     return dot(fees[idx], w[idx])
 end
+"""
+```julia
+calc_fees(w::AbstractVector, ::Nothing)
+calc_fees(w::AbstractVector, tn::Turnover)
+```
+
+Compute the turnover fees for portfolio weights and prices.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+
+  - `tn`: Turnover structure.
+
+      + `nothing`: No turnover fee, returns zero.
+      + If `tn.val` is a `Real`: single turnover fee applied to all assets.
+      + If `tn.val` is an `AbstractVector{<:Real}`: vector of turnover fees per asset.
+
+# Returns
+
+  - `val::Real`: Turnover fee.
+
+# Examples
+
+```jldoctest
+julia> calc_fees([0.1, 0.2], Turnover([0.0, 0.0], 0.01))
+0.003
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
+function calc_fees(w::AbstractVector, ::Nothing)
+    return zero(eltype(w))
+end
 function calc_fees(w::AbstractVector, tn::Turnover{<:Any, <:Real})
     return sum(tn.val * abs.(w - tn.w))
 end
 function calc_fees(w::AbstractVector, tn::Turnover{<:Any, <:AbstractVector})
     return dot(tn.val, abs.(w - tn.w))
 end
-function calc_fees(w::AbstractVector, ::Nothing)
-    return zero(eltype(w))
-end
+"""
+```julia
+calc_fixed_fees(w::AbstractVector, ::Nothing, kwargs::NamedTuple, ::Function)
+calc_fixed_fees(w::AbstractVector, fees::Real, kwargs::NamedTuple, op::Function)
+calc_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real}, kwargs::NamedTuple,
+                op::Function)
+```
+
+Compute the fixed portfolio fees for assets that have been allocated.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+
+  - `fees`: Scalar fee value.
+
+      + `nothing`: No proportional fee, returns zero.
+      + `Real`: Single fee applied to all relevant assets.
+      + `AbstractVector{<:Real}`: Vector of fee values per asset.
+  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered negligible.
+  - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
+
+# Returns
+
+  - `val::Real`: Total fixed fee.
+
+# Examples
+
+```jldoctest
+julia> calc_fixed_fees([0.1, 0.2], 0.01, (; atol = 1e-6), .>=)
+0.02
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function calc_fixed_fees(w::AbstractVector, ::Nothing, kwargs::NamedTuple, op::Function)
     return zero(eltype(w))
 end
@@ -191,6 +678,41 @@ function calc_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
     idx2 = .!isapprox.(w[idx1], zero(promote_type(eltype(w), eltype(fees))); kwargs...)
     return sum(fees[idx1][idx2])
 end
+"""
+```julia
+calc_fees(w::AbstractVector, fees::Fees)
+```
+
+Compute total fees for portfolio weights and prices.
+
+Sums proportional, fixed, and turnover fees for all assets.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `p`: Asset prices.
+  - `fees`: [`Fees`](@ref) structure.
+
+# Returns
+
+  - `val::Real`: Total fees.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; l = [0.01, 0.02], s = [0.01, 0.02], fl = [5.0, 0.0], fs = [0.0, 10.0]);
+
+julia> calc_fees([0.1, -0.2], fees)
+15.004999999999999
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function calc_fees(w::AbstractVector, fees::Fees)
     fees_long = calc_fees(w, fees.l, .>=)
     fees_short = -calc_fees(w, fees.s, .<)
@@ -199,6 +721,201 @@ function calc_fees(w::AbstractVector, fees::Fees)
     fees_turnover = calc_fees(w, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
+"""
+```julia
+calc_asset_fees(w::AbstractVector, p::AbstractVector, ::Nothing, ::Function)
+calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::Real, op::Function)
+calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::AbstractVector{<:Real},
+                op::Function)
+```
+
+Compute the actual proportional per asset fees for portfolio weights and prices.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+
+  - `p`: Asset prices.
+  - `fees`: Scalar fee value.
+
+      + `nothing`: No proportional fee, returns zero.
+      + `Real`: Single fee applied to all relevant assets.
+      + `AbstractVector{<:Real}`: Vector of fee values per asset.
+  - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
+
+# Returns
+
+  - `val::AbstractVector{<:Real}`: Total actual proportional per asset fee.
+
+# Examples
+
+```jldoctest
+julia> calc_asset_fees([0.1, 0.2], [100, 200], 0.01, .>=)
+2-element Vector{Float64}:
+ 0.1
+ 0.4
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_fees`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
+function calc_asset_fees(w::AbstractVector, p::AbstractVector, ::Nothing, ::Function)
+    return zeros(promote_type(eltype(w), eltype(p)), length(w))
+end
+function calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::Real, op::Function)
+    fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
+    idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
+    fees_w[idx] .= fees * w[idx] ⊙ p[idx]
+    return fees_w
+end
+function calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::AbstractVector{<:Real},
+                         op::Function)
+    fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
+    idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
+    fees_w[idx] .= fees[idx] ⊙ w[idx] ⊙ p[idx]
+    return fees_w
+end
+"""
+```julia
+calc_asset_fees(w::AbstractVector, p::AbstractVector, ::Nothing)
+calc_asset_fees(w::AbstractVector, p::AbstractVector, tn::Turnover)
+```
+
+Compute the actual per asset turnover fees for portfolio weights and prices.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+
+  - `p`: Asset prices.
+  - `tn`: Turnover structure.
+
+      + `nothing`: No turnover fee, returns zero.
+      + If `tn.val` is a `Real`: single turnover fee applied to all assets.
+      + If `tn.val` is an `AbstractVector{<:Real}`: vector of turnover fees per asset.
+
+# Returns
+
+  - `val::Vector{<:Real}`: Actual per asset turnover fee.
+
+# Examples
+
+```jldoctest
+julia> calc_asset_fees([0.1, 0.2], [100, 200], Turnover([0.0, 0.0], 0.01))
+2-element Vector{Float64}:
+ 0.1
+ 0.4
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_fees`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
+function calc_asset_fees(w::AbstractVector, p::AbstractVector, ::Nothing)
+    return zeros(promote_type(eltype(w), eltype(p)), length(w))
+end
+function calc_asset_fees(w::AbstractVector, p::AbstractVector, tn::Turnover{<:Any, <:Real})
+    return tn.val * abs.(w - tn.w) ⊙ p
+end
+function calc_asset_fees(w::AbstractVector, p::AbstractVector,
+                         tn::Turnover{<:Any, <:AbstractVector})
+    return tn.val ⊙ abs.(w - tn.w) ⊙ p
+end
+"""
+```julia
+calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::Fees)
+```
+
+Compute total actual per asset fees for portfolio weights and prices.
+
+Sums actual proportional, fixed, and turnover fees for all assets.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `p`: Asset prices.
+  - `fees`: [`Fees`](@ref) structure.
+
+# Returns
+
+  - `val::Vector{<:Real}`: Total actual per asset fees.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; l = [0.01, 0.02], s = [0.01, 0.02], fl = [5.0, 0.0], fs = [0.0, 10.0]);
+
+julia> calc_asset_fees([0.1, -0.2], [100, 200], fees)
+2-element Vector{Float64}:
+  5.1
+ 10.8
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
+function calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::Fees)
+    fees_long = calc_asset_fees(w, p, fees.l, .>=)
+    fees_short = -calc_asset_fees(w, p, fees.s, .<)
+    fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.kwargs, .>=)
+    fees_fixed_short = calc_asset_fixed_fees(w, fees.fs, fees.kwargs, .<)
+    fees_turnover = calc_asset_fees(w, p, fees.tn)
+    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
+end
+"""
+```julia
+calc_asset_fees(w::AbstractVector, ::Nothing, ::Function)
+calc_asset_fees(w::AbstractVector, fees::Real, op::Function)
+calc_asset_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Function)
+```
+
+Compute the proportional per asset fees for portfolio weights and prices.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+
+  - `fees`: Scalar fee value.
+
+      + `nothing`: No proportional fee, returns zero.
+      + `Real`: Single fee applied to all relevant assets.
+      + `AbstractVector{<:Real}`: Vector of fee values per asset.
+  - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
+
+# Returns
+
+  - `val::Vector{<:Real}`: Total proportional per asset fee.
+
+# Examples
+
+```jldoctest
+julia> calc_asset_fees([0.1, 0.2], 0.01, .>=)
+2-element Vector{Float64}:
+ 0.001
+ 0.002
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function calc_asset_fees(w::AbstractVector, ::Nothing, ::Function)
     return zeros(eltype(w), length(w))
 end
@@ -214,6 +931,45 @@ function calc_asset_fees(w::AbstractVector, fees::AbstractVector{<:Real}, op::Fu
     fees_w[idx] .= fees[idx] ⊙ w[idx]
     return fees_w
 end
+"""
+```julia
+calc_asset_fees(w::AbstractVector, ::Nothing)
+calc_asset_fees(w::AbstractVector, tn::Turnover)
+```
+
+Compute the per asset turnover fees for portfolio weights and prices.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+
+  - `tn`: Turnover structure.
+
+      + `nothing`: No turnover fee, returns zero.
+      + If `tn.val` is a `Real`: single turnover fee applied to all assets.
+      + If `tn.val` is an `AbstractVector{<:Real}`: vector of turnover fees per asset.
+
+# Returns
+
+  - `val::Vector{<:Real}`: Per asset turnover fee.
+
+# Examples
+
+```jldoctest
+julia> calc_asset_fees([0.1, 0.2], Turnover([0.0, 0.0], 0.01))
+2-element Vector{Float64}:
+ 0.001
+ 0.002
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_fees`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function calc_asset_fees(w::AbstractVector, ::Nothing)
     return zeros(eltype(w), length(w))
 end
@@ -223,6 +979,49 @@ end
 function calc_asset_fees(w::AbstractVector, tn::Turnover{<:Any, <:AbstractVector})
     return tn.val ⊙ abs.(w - tn.w)
 end
+"""
+```julia
+calc_asset_fixed_fees(w::AbstractVector, ::Nothing, kwargs::NamedTuple, ::Function)
+calc_asset_fixed_fees(w::AbstractVector, fees::Real, kwargs::NamedTuple, op::Function)
+calc_asset_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real}, kwargs::NamedTuple,
+                      op::Function)
+```
+
+Compute the per asset fixed portfolio fees for assets that have been allocated.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+
+  - `fees`: Scalar fee value.
+
+      + `nothing`: No proportional fee, returns zero.
+      + `Real`: Single fee applied to all relevant assets.
+      + `AbstractVector{<:Real}`: Vector of fee values per asset.
+  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered negligible.
+  - `op`: Function to select assets, `.>=` for long, `<` for short (ignored if `fees` is `nothing`).
+
+# Returns
+
+  - `val::Vector{<:Real}`: Total per asset fixed fee.
+
+# Examples
+
+```jldoctest
+julia> calc_asset_fixed_fees([0.1, 0.2], 0.01, (; atol = 1e-6), .>=)
+2-element Vector{Float64}:
+ 0.01
+ 0.01
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_asset_fees`](@ref)
+  - [`calc_fees`](@ref)
+  - [`calc_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function calc_asset_fixed_fees(w::AbstractVector, ::Nothing, ::NamedTuple, ::Function)
     return zeros(eltype(w), length(w))
 end
@@ -242,6 +1041,43 @@ function calc_asset_fixed_fees(w::AbstractVector, fees::AbstractVector{<:Real},
     fees_w[idx1] .= fees[idx1][idx2]
     return fees_w
 end
+"""
+```julia
+calc_asset_fees(w::AbstractVector, fees::Fees)
+```
+
+Compute total per asset fees for portfolio weights and prices.
+
+Sums proportional, fixed, and turnover fees for all assets.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `p`: Asset prices.
+  - `fees`: [`Fees`](@ref) structure.
+
+# Returns
+
+  - `val::Vector{<:Real}`: Total per asset fees.
+
+# Examples
+
+```jldoctest
+julia> fees = Fees(; l = [0.01, 0.02], s = [0.01, 0.02], fl = [5.0, 0.0], fs = [0.0, 10.0]);
+
+julia> calc_asset_fees([0.1, -0.2], fees)
+2-element Vector{Float64}:
+  5.001
+ 10.004
+```
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`calc_fees`](@ref)
+  - [`calc_asset_fixed_fees`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function calc_asset_fees(w::AbstractVector, fees::Fees)
     fees_long = calc_asset_fees(w, fees.l, .>=)
     fees_short = -calc_asset_fees(w, fees.s, .<)
@@ -250,52 +1086,127 @@ function calc_asset_fees(w::AbstractVector, fees::Fees)
     fees_turnover = calc_asset_fees(w, fees.tn)
     return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
 end
-function calc_asset_fees(w::AbstractVector, p::AbstractVector, ::Nothing, ::Function)
-    return zeros(promote_type(eltype(w), eltype(p)), length(w))
-end
-function calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::Real, op::Function)
-    fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
-    idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    fees_w[idx] .= fees * w[idx] ⊙ p[idx]
-    return fees_w
-end
-function calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::AbstractVector{<:Real},
-                         op::Function)
-    fees_w = zeros(promote_type(eltype(w), eltype(p), eltype(fees)), length(w))
-    idx = op(w, zero(promote_type(eltype(w), eltype(p), eltype(fees))))
-    fees_w[idx] .= fees[idx] ⊙ w[idx] ⊙ p[idx]
-    return fees_w
-end
-function calc_asset_fees(w::AbstractVector, p::AbstractVector, tn::Turnover{<:Any, <:Real})
-    return tn.val * abs.(w - tn.w) ⊙ p
-end
-function calc_asset_fees(w::AbstractVector, p::AbstractVector, ::Nothing)
-    return zeros(promote_type(eltype(w), eltype(p)), length(w))
-end
-function calc_asset_fees(w::AbstractVector, p::AbstractVector,
-                         tn::Turnover{<:Any, <:AbstractVector})
-    return tn.val ⊙ abs.(w - tn.w) ⊙ p
-end
-function calc_asset_fees(w::AbstractVector, p::AbstractVector, fees::Fees)
-    fees_long = calc_asset_fees(w, p, fees.l, .>=)
-    fees_short = -calc_asset_fees(w, p, fees.s, .<)
-    fees_fixed_long = calc_asset_fixed_fees(w, fees.fl, fees.kwargs, .>=)
-    fees_fixed_short = calc_asset_fixed_fees(w, fees.fs, fees.kwargs, .<)
-    fees_turnover = calc_asset_fees(w, p, fees.tn)
-    return fees_long + fees_short + fees_fixed_long + fees_fixed_short + fees_turnover
-end
+"""
+```julia
+calc_net_returns(w::AbstractVector, X::AbstractMatrix, args...)
+calc_net_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees)
+```
+
+Compute the net portfolio returns. If `fees` is provided, it deducts the calculated fees from the gross returns.
+
+Returns the portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `X`: Asset return matrix (assets × periods).
+  - `fees`: [`Fees`](@ref) structure.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `Vector{<:Real}`: Portfolio net returns.
+
+# Examples
+
+```jldoctest
+julia> calc_net_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
+2-element Vector{Float64}:
+ 0.015
+ 0.035
+```
+
+# Related
+
+  - [`calc_net_asset_returns`](@ref)
+  - [`calc_fees`](@ref)
+"""
 function calc_net_returns(w::AbstractVector, X::AbstractMatrix, args...)
     return X * w
 end
 function calc_net_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees)
     return X * w .- calc_fees(w, fees)
 end
+"""
+```julia
+calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, args...)
+calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees)
+```
+
+Compute the per asset net portfolio returns. If `fees` is provided, it deducts the calculated fees from the gross returns.
+
+Returns the portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `X`: Asset return matrix (assets × periods).
+  - `fees`: [`Fees`](@ref) structure.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `Matrix{<:Real}`: Per asset portfolio net returns.
+
+# Examples
+
+```jldoctest
+julia> calc_net_asset_returns([0.5, 0.5], [0.01 0.02; 0.03 0.04])
+2×2 Matrix{Float64}:
+ 0.005  0.01
+ 0.015  0.02
+```
+
+# Related
+
+  - [`calc_net_returns`](@ref)
+  - [`calc_fees`](@ref)
+"""
 function calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, args...)
     return X ⊙ transpose(w)
 end
 function calc_net_asset_returns(w::AbstractVector, X::AbstractMatrix, fees::Fees)
     return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
+"""
+```julia
+cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
+```
+
+Compute simple or compounded cumulative returns along a specified dimension.
+
+`cumulative_returns` calculates the cumulative returns for an array of asset or portfolio returns. By default, it computes simple cumulative returns using `cumsum`. If `compound` is `true`, it computes compounded cumulative returns using `cumprod(one(eltype(X)) .+ X)`.
+
+# Arguments
+
+  - `X`: Array of asset or portfolio returns (vector, matrix, or higher-dimensional).
+  - `compound`: If `true`, computes compounded cumulative returns; otherwise, computes simple cumulative returns.
+  - `dims`: Dimension along which to compute cumulative returns.
+
+# Returns
+
+  - `ret::AbstractArray{<:Real}`: Array of cumulative returns, same shape as `X`.
+
+# Examples
+
+```jldoctest
+julia> cumulative_returns([0.01, 0.02, -0.01])
+3-element Vector{Float64}:
+ 0.01
+ 0.03
+ 0.02
+
+julia> cumulative_returns([0.01, 0.02, -0.01]; compound = true)
+3-element Vector{Float64}:
+ 1.01
+ 1.0302
+ 1.019898
+```
+
+# Related
+
+  - [`drawdowns`](@ref)
+"""
 function cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int = 1)
     return if compound
         cumprod(one(eltype(X)) .+ X; dims = dims)
@@ -303,6 +1214,46 @@ function cumulative_returns(X::AbstractArray; compound::Bool = false, dims::Int 
         cumsum(X; dims = dims)
     end
 end
+"""
+```julia
+drawdowns(X::AbstractArray; cX::Bool = false, compound::Bool = false, dims::Int = 1)
+```
+
+Compute simple or compounded drawdowns along a specified dimension.
+
+`drawdowns` calculates the drawdowns for an array of asset or portfolio returns. By default, it computes drawdowns from cumulative returns using `cumulative_returns`. If `compound` is `true`, it computes compounded drawdowns. If `cX` is `true`, treats `X` as cumulative returns; otherwise, computes cumulative returns first.
+
+# Arguments
+
+  - `X`: Array of asset or portfolio returns (vector, matrix, or higher-dimensional).
+  - `cX`: If `true`, treats `X` as cumulative returns; otherwise, computes cumulative returns from `X`.
+  - `compound`: If `true`, computes compounded drawdowns; otherwise, computes simple drawdowns.
+  - `dims`: Dimension along which to compute drawdowns.
+
+# Returns
+
+  - `dd::AbstractArray{<:Real}`: Array of drawdowns, same shape as `X`.
+
+# Examples
+
+```jldoctest
+julia> drawdowns([0.01, 0.02, -0.01])
+3-element Vector{Float64}:
+  0.0
+  0.0
+ -0.009999999999999998
+
+julia> drawdowns([0.01, 0.02, -0.01]; compound = true)
+3-element Vector{Float64}:
+  0.0
+  0.0
+ -0.010000000000000009
+```
+
+# Related
+
+  - [`cumulative_returns`](@ref)
+"""
 function drawdowns(X::AbstractArray; cX::Bool = false, compound::Bool = false,
                    dims::Int = 1)
     cX = !cX ? cumulative_returns(X; compound = compound, dims = dims) : X
@@ -314,5 +1265,6 @@ function drawdowns(X::AbstractArray; cX::Bool = false, compound::Bool = false,
     return nothing
 end
 
-export FeesEstimator, Fees, fees_constraints, calc_fees, calc_asset_fees, calc_net_returns,
-       calc_net_asset_returns, cumulative_returns, drawdowns
+export FeesEstimator, Fees, fees_constraints, calc_fees, calc_fixed_fees, calc_asset_fees,
+       calc_asset_fixed_fees, calc_net_returns, calc_net_asset_returns, cumulative_returns,
+       drawdowns

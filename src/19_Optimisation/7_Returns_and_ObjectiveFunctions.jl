@@ -1,3 +1,5 @@
+"""
+"""
 struct ArithmeticReturn{T1, T2} <: JuMPReturnsEstimator
     ucs::T1
     lb::T2
@@ -29,6 +31,8 @@ end
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
     return flag ? ArithmeticReturn(; ucs = r.ucs) : ArithmeticReturn()
 end
+"""
+"""
 struct KellyReturn{T1, T2} <: JuMPReturnsEstimator
     w::T1
     lb::T2

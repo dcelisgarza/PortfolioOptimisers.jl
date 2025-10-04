@@ -1750,7 +1750,7 @@ function jlogo!(jlogo::AbstractMatrix, sigma::AbstractMatrix, source::AbstractMa
     tmp = Matrix{eltype(sigma)}(undef, size(source, 2), size(source, 2))
 
     # Pre-compute indices for better cache locality
-    @inbounds for i in axes(source, 1)
+    for i in axes(source, 1)
         v = view(source, i, :)
 
         # Fill temp matrix directly

@@ -1,10 +1,10 @@
-struct FactorPrior{T1, T2, T3, T4, T5} <: AbstractLowOrderPriorEstimator_2_1
+struct FactorPrior{T1, T2, T3, T4, T5} <: AbstractLowOrderPriorEstimator_F
     pe::T1
     mp::T2
     re::T3
     ve::T4
     rsd::T5
-    function FactorPrior(pe::AbstractLowOrderPriorEstimatorMap_2_1,
+    function FactorPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                          mp::AbstractMatrixProcessingEstimator,
                          re::AbstractRegressionEstimator, ve::AbstractVarianceEstimator,
                          rsd::Bool)
@@ -12,7 +12,7 @@ struct FactorPrior{T1, T2, T3, T4, T5} <: AbstractLowOrderPriorEstimator_2_1
                                                                                 ve, rsd)
     end
 end
-function FactorPrior(; pe::AbstractLowOrderPriorEstimatorMap_2_1 = EmpiricalPrior(),
+function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                      mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
                      re::AbstractRegressionEstimator = StepwiseRegression(),
                      ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)

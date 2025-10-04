@@ -1,5 +1,7 @@
 """
+```julia
 abstract type AbstractDetoneEstimator <: AbstractEstimator end
+```
 
 Abstract supertype for all detoning estimators in PortfolioOptimisers.jl.
 

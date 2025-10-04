@@ -58,7 +58,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
                                    strict = hrp.opt.strict, datatype = eltype(pr.X))
     w = ones(eltype(pr.X), size(pr.X, 2))
     items = [clr.clustering.order]
-    @inbounds while length(items) > 0
+    while length(items) > 0
         items = [i[j:k] for i in items
                  for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
                  if length(i) > 1]
@@ -166,7 +166,7 @@ function optimise!(hrp::HierarchicalRiskParity{<:Any,
                                    strict = hrp.opt.strict, datatype = eltype(pr.X))
     w = ones(eltype(pr.X), size(pr.X, 2))
     items = [clr.clustering.order]
-    @inbounds while length(items) > 0
+    while length(items) > 0
         items = [i[j:k] for i in items
                  for (j, k) in ((1, div(length(i), 2)), (1 + div(length(i), 2), length(i)))
                  if length(i) > 1]

@@ -78,7 +78,7 @@ function prior_view(pr::LowOrderPrior, i::AbstractVector)
                          kld = pr.kld, ow = pr.ow, rr = regression_view(pr.rr, i),
                          f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w)
 end
-struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_1_0
+struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_A
     ce::T1
     me::T2
     horizon::T3

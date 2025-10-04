@@ -72,7 +72,7 @@ makedocs(; #modules = [PortfolioOptimisers],
          sitename = "PortfolioOptimisers.jl",
          format = DocumenterVitepress.MarkdownVitepress(;
                                                         repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl"),
-         pages = [root_pages; "Examples" => example_pages;
+         pages = ["Home" => root_pages[1]; "Examples" => example_pages;
                   "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
                             "Moments" => joinpath.(api_pages[2][1][idx1:end],
                                                    api_pages[2][3])
@@ -89,7 +89,8 @@ makedocs(; #modules = [PortfolioOptimisers],
                                                          api_pages[8][3])
                             "Optimisation" => joinpath.(api_pages[9][1][idx1:end],
                                                         api_pages[9][3])];
-                  "Contribute" => contribute],
+                  "Contribute" => contribute;
+                  "References" => root_pages[2]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 

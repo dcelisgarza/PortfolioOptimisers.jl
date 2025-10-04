@@ -69,7 +69,7 @@ function JuMPEntropyPooling(; slv::Union{<:Solver, <:AbstractVector{<:Solver}},
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
 struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,
-                           T16} <: AbstractLowOrderPriorEstimator_1o2_1o2
+                           T16} <: AbstractLowOrderPriorEstimator_AF
     pe::T1
     mu_views::T2
     var_views::T3
@@ -86,7 +86,7 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
     opt::T14
     w::T15
     alg::T16
-    function EntropyPoolingPrior(pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2,
+    function EntropyPoolingPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mu_views::Union{Nothing, <:LinearConstraintEstimator},
                                  var_views::Union{Nothing, <:LinearConstraintEstimator},
                                  cvar_views::Union{Nothing, <:LinearConstraintEstimator},
@@ -136,8 +136,7 @@ struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T1
                                                                                         alg)
     end
 end
-function EntropyPoolingPrior(;
-                             pe::AbstractLowOrderPriorEstimatorMap_1o2_1o2 = EmpiricalPrior(),
+function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
                              mu_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
                              var_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,
                              cvar_views::Union{Nothing, <:LinearConstraintEstimator} = nothing,

@@ -71,11 +71,10 @@ function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
 end
 function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
                    opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
-                   pr::AbstractPriorResult, args...;
-                   w_key::Symbol = isa(i, Integer) ? :w : i, kwargs...)
+                   pr::AbstractPriorResult, args...; kwargs...)
     key = Symbol(:sd_risk_, i)
     sc = model[:sc]
-    w = model[w_key]
+    w = model[:w]
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     sd_risk = model[key] = @variable(model)
     model[Symbol(:csd_risk_soc_, i)] = @constraint(model,
@@ -116,20 +115,16 @@ function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
     end
 end
 function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance, pr::AbstractPriorResult,
-                            flag::Bool, key::Symbol,
-                            w_key::Symbol = isa(i, Integer) ? :w : i,
-                            W_key::Symbol = isa(i, Integer) ? :W : Symbol(:W_, i))
+                            flag::Bool, key::Symbol)
     return if flag
-        set_sdp_variance_risk!(model, i, r, pr, key, w_key, W_key)
+        set_sdp_variance_risk!(model, i, r, pr, key)
     else
-        set_variance_risk!(model, i, r, pr, key, w_key)
+        set_variance_risk!(model, i, r, pr, key)
     end
 end
 function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
-                                pr::AbstractPriorResult, key::Symbol,
-                                w_key::Symbol = isa(i, Integer) ? :w : i,
-                                W_key::Symbol = isa(i, Integer) ? :W : Symbol(:W_, i))
-    W = set_sdp_constraints!(model, w_key, W_key)
+                                pr::AbstractPriorResult, key::Symbol)
+    W = set_sdp_constraints!(model)
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     sigma_W = model[Symbol(:sigma_W_, i)] = @expression(model, sigma * W)
     model[key] = @expression(model, tr(sigma_W))
@@ -137,10 +132,9 @@ function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:SOCRiskExpr},
-                            pr::AbstractPriorResult, key::Symbol,
-                            w_key::Symbol = isa(i, Integer) ? :w : i)
+                            pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
-    w = model[w_key]
+    w = model[:w]
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     key_dev = Symbol(:dev_, i)
     dev = model[key_dev] = @variable(model)
@@ -150,10 +144,9 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:QuadRiskExpr},
-                            pr::AbstractPriorResult, key::Symbol,
-                            w_key::Symbol = isa(i, Integer) ? :w : i)
+                            pr::AbstractPriorResult, key::Symbol)
     sc = model[:sc]
-    w = model[w_key]
+    w = model[:w]
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     G = isnothing(r.sigma) ? get_chol_or_sigma_pm(model, pr) : cholesky(r.sigma).U
     dev = model[Symbol(:dev_, i)] = @variable(model)
@@ -212,14 +205,13 @@ function set_risk!(model::JuMP.Model, i::Any, r::Variance,
                    pr::AbstractPriorResult,
                    cplg::Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny},
                    nplg::Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny},
-                   args...; w_key::Symbol = :w,
-                   W_key::Symbol = isa(i, Integer) ? :W : Symbol(:W_, i), kwargs...)
+                   args...; kwargs...)
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
     sdp_flag = sdp_variance_flag!(model, rc_flag, cplg, nplg)
     key = Symbol(:variance_risk_, i)
-    variance_risk = set_variance_risk!(model, i, r, pr, sdp_flag, key, w_key, W_key)
+    variance_risk = set_variance_risk!(model, i, r, pr, sdp_flag, key)
     rc_variance_constraints!(model, i, rc, variance_risk)
     return variance_risk, sdp_flag
 end
@@ -1637,7 +1629,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     vals_A = clamp.(real(vals_A), 0, Inf) .+ clamp.(imag(vals_A), 0, Inf)im
     Bi = Vector{Matrix{eltype(kt)}}(undef, Nf)
     N_eig = length(vals_A)
-    @inbounds for i in 1:Nf
+    for i in eachindex(Bi)
         j = i - 1
         B = reshape(real(complex(sqrt(vals_A[end - j])) * view(vecs_A, :, N_eig - j)), N, N)
         Bi[i] = B
@@ -2120,19 +2112,23 @@ function set_risk!(model::JuMP.Model, i::Any,
     w = model[:w]
     k = model[:k]
     te_dw = Symbol(:rte_dw_, i)
+    #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
+    #! This expression should be the new :w
     model[te_dw] = @expression(model, w - wb * k)
-    tracking_risk = set_risk!(model, te_dw, ri, opt, pr, cplg, nplg, args...)[1]
+    #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
+    tracking_risk = set_risk!(model, i, ri, opt, pr, cplg, nplg, args...)[1]
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return nothing
 end
-function set_risk!(model::JuMP.Model, i::Any,
-                   r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
-                                              <:DependentVariableTracking},
-                   opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
-                   pr::AbstractPriorResult,
-                   cplg::Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny},
-                   nplg::Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny},
-                   args...; kwargs...)
+function set_risk_constraints!(model::JuMP.Model, i::Any,
+                               r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
+                                                          <:DependentVariableTracking},
+                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               cplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                           <:IntegerPhylogeny},
+                               nplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                           <:IntegerPhylogeny}, args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tracking.w
@@ -2141,7 +2137,9 @@ function set_risk!(model::JuMP.Model, i::Any,
     sc = model[:sc]
     te_dw = Symbol(:rte_w_, i)
     tracking_risk = model[Symbol(key, i)] = @variable(model)
-    risk_expr = set_risk!(model, te_dw, ri, opt, pr, cplg, nplg, args...)[1]
+    #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
+    #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
+    risk_expr = set_risk!(model, i, ri, opt, pr, cplg, nplg, args...)[1]
     dr = model[Symbol(:rdr_, i)] = @expression(model, risk_expr - rb * k)
     model[Symbol(:crter_noc_, i)] = @constraint(model,
                                                 [sc * tracking_risk;

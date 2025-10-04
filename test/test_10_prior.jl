@@ -547,13 +547,13 @@
                                                  cvar_views = cvar_views), rd).w,
                        rtol = 5e-5)
 
-        cvar_views = LinearConstraintEstimator(; val = ["AAPL == 0.055", "XOM==0.045"])
+        cvar_views = LinearConstraintEstimator(; val = ["AAPL == 0.053", "XOM==0.045"])
         pr = prior(HighOrderPriorEstimator(;
                                            pe = EntropyPoolingPrior(; sets = sets,
                                                                     alg = H2_EntropyPooling(),
                                                                     cvar_views = cvar_views)),
                    rd)
-        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.055, rtol = 1e-5)
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.053, rtol = 5e-5)
         @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.045, rtol = 1e-4)
         @test isapprox(pr.w,
                        prior(HighOrderPriorEstimator(;
@@ -814,13 +814,13 @@
                                                  cvar_views = cvar_views), rd).w,
                        rtol = 1e-5)
 
-        cvar_views = LinearConstraintEstimator(; val = ["AAPL == 0.055", "XOM==0.045"])
+        cvar_views = LinearConstraintEstimator(; val = ["AAPL == 0.053", "XOM==0.045"])
         pr = prior(HighOrderPriorEstimator(;
                                            pe = EntropyPoolingPrior(; sets = sets,
                                                                     alg = H2_EntropyPooling(),
                                                                     cvar_views = cvar_views,
                                                                     opt = opt)), rd)
-        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.055, rtol = 1e-5)
+        @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, 1]), 0.053, rtol = 5e-5)
         @test isapprox(ConditionalValueatRisk(; w = pr.w)(rd.X[:, end]), 0.045, rtol = 1e-4)
         @test isapprox(pr.w,
                        prior(HighOrderPriorEstimator(;

@@ -1299,7 +1299,7 @@ This method is used to pass through an already constructed [`LinearConstraint`](
 
 # Returns
 
-  - `lcs`: Input is unchanged.
+  - `lcs`: The input, unchanged.
 
 # Related
 
@@ -1436,8 +1436,8 @@ Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `val` must be non-empty.
-  - All entries of `val` must be non-negative.
+  - `!isempty(val)`.
+  - `all(x -> x >= zero(x), val)`.
 
 # Examples
 
@@ -1895,7 +1895,6 @@ function asset_sets_matrix(smtx::AbstractVector{<:Union{<:AbstractMatrix,
                            sets::AssetSets)
     return asset_sets_matrix.(smtx, Ref(sets))
 end
-
 """
 """
 function asset_sets_matrix_view(smtx::AbstractMatrix, i::AbstractVector; kwargs...)

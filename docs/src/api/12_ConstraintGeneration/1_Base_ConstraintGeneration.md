@@ -6,8 +6,8 @@ LEQ
 GEQ
 PortfolioOptimisers.AbstractConstraintResult
 PortfolioOptimisers.AbstractConstraintEstimator
-PortfolioOptimisers.ComparisonOperators
-PortfolioOptimisers.EqualityComparisonOperators
-PortfolioOptimisers.InequalityComparisonOperators
+PortfolioOptimisers.ComparisonOperator
+PortfolioOptimisers.EqualityComparisonOperator
+PortfolioOptimisers.InequalityComparisonOperator
 PortfolioOptimisers.comparison_sign_ineq_flag
 ```

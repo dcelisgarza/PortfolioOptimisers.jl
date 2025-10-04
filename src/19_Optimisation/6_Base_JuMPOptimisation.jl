@@ -1,6 +1,8 @@
 abstract type BaseJuMPOptimisationEstimator <: BaseOptimisationEstimator end
 abstract type JuMPOptimisationEstimator <: OptimisationEstimator end
 abstract type ObjectiveFunction <: AbstractEstimator end
+"""
+"""
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     if !haskey(model, :G)

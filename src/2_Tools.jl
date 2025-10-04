@@ -16,6 +16,38 @@ and optimization routines.
 """
 abstract type AbstractReturnsResult <: AbstractResult end
 
+function assert_nonneg_finite_val(val::AbstractDict)
+    @argcheck(!isempty(val))
+    @argcheck(any(isfinite, values(val)))
+    @argcheck(all(x -> x >= zero(x), values(val)))
+    return nothing
+end
+function assert_nonneg_finite_val(val::AbstractVector{<:Pair})
+    @argcheck(!isempty(val))
+    @argcheck(any(isfinite, getindex.(val, 2)))
+    @argcheck(all(x -> x[2] >= zero(x[2]), val))
+    return nothing
+end
+function assert_nonneg_finite_val(val::AbstractVector{<:Real})
+    @argcheck(!isempty(val))
+    @argcheck(any(isfinite, val))
+    @argcheck(all(x -> x >= zero(x), val))
+    return nothing
+end
+function assert_nonneg_finite_val(val::Pair)
+    @argcheck(isfinite(val[2]))
+    @argcheck(val[2] >= zero(val[2]))
+    return nothing
+end
+function assert_nonneg_finite_val(val::Real)
+    @argcheck(isfinite(val))
+    @argcheck(val >= zero(val))
+    return nothing
+end
+function assert_nonneg_finite_val(::Nothing)
+    return nothing
+end
+
 """
 ```julia
 assert_matrix_issquare(A::AbstractMatrix)
