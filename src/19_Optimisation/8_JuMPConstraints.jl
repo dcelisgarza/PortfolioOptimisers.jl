@@ -1086,12 +1086,14 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     k = model[:k]
     sc = model[:sc]
     te_dw = Symbol(:te_dw_, i)
-    #! We need to do swap all possible risk variables that do not use i, for example :X, :net_X, :w, :W, :variance_flag, :rc_variance, as well as risk variables that can only appear once like :wr_risk, :range_risk, :mdd_risk, :uci_risk, etc (as their definitions use :w directly or indirectly via :X and :net_X). We need to swap back before returning from this function.
-    #! This expression should be the new :w
-    model[Symbol(:w_, te_dw)] = @expression(model, w - wb * k)
-    #! Use `risk_expr = set_risk_constraints!(...)`, we have to change them so they return the risk variable.
+    model[:oldw] = model[:w]
+    unregister(model, :w)
+    model[:w] = @expression(model, w - wb * k)
     risk_expr = set_triv_risk_constraints!(model, te_dw, r, opt, pr, cplg, nplg, fees,
                                            args...; kwargs...)
+    model[Symbol(:triv_, i, :_w)] = model[:w]
+    model[:w] = model[:oldw]
+    unregister(model, :oldw)
     model[Symbol(:cter_, i)] = @constraint(model, sc * (risk_expr - err * k) <= 0)
     return nothing
 end
