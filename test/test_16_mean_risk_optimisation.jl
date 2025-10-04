@@ -267,26 +267,29 @@
         end
 
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1DT.csv.gz"), DataFrame)
-        opt = JuMPOptimiser(; pe = pr, slv = slv)
         tracking = WeightsTracking(; w = w0)
-        for (i, r) in pairs(rs)
+        i = 1
+        for r in rs
             r1 = RiskTrackingRiskMeasure(; tracking = tracking, r = r,
                                          alg = DependentVariableTracking())
             mr = MeanRisk(; r = r1, opt = opt)
             res = optimise!(mr, rd)
             if isa(r, PortfolioOptimisers.QuadExpressionRiskMeasures)
                 @test isa(res.retcode, OptimisationFailure)
+                i += 1
                 continue
             else
                 @test isa(res.retcode, OptimisationSuccess)
             end
             rtol = 1e-6
-            success = isapprox(res.w, df[!, i]; rtol = rtol)
+            success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
             if !success
                 println("Counter: $i")
-                find_tol(res.w, df[!, i])
+                find_tol(res.w, df[!, "$i"])
+                display([res.w df[!, "$i"]])
             end
             @test success
+            i += 1
         end
 
         res = optimise!(MeanRisk(; wi = w0,
@@ -1068,6 +1071,22 @@
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise!(mre)
         @test norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3
+
+        tr = RiskTrackingError(; err = 5, tracking = WeightsTracking(; w = w0),
+                               alg = DependentVariableTracking())
+        opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
+        mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
+        res = optimise!(mre)
+
+        # tr = RiskTrackingError(; err = 0.00975, tracking = WeightsTracking(; w = w0),
+        #                        alg = IndependentVariableTracking())
+        # opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
+        # mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
+        # res = optimise!(mre)
+
+        # mre1 = MeanRisk(; obj = MaximumRatio(), opt = opt = JuMPOptimiser(; pe = pr, slv = slv))
+        # res1 = optimise!(mre1)
+
     end
     @testset "Phylogeny" begin
         plc = IntegerPhylogenyEstimator(; pe = NetworkEstimator(), B = 1)

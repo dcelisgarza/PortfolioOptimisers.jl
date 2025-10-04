@@ -2098,14 +2098,15 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
-function set_risk!(model::JuMP.Model, i::Any,
-                   r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
-                                              <:IndependentVariableTracking},
-                   opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
-                   pr::AbstractPriorResult,
-                   cplg::Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny},
-                   nplg::Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny},
-                   args...; kwargs...)
+function set_risk_constraints!(model::JuMP.Model, i::Any,
+                               r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
+                                                          <:IndependentVariableTracking},
+                               opt::Union{<:MeanRisk, <:NearOptimalCentering,
+                                          <:RiskBudgeting}, pr::AbstractPriorResult,
+                               cplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                           <:IntegerPhylogeny},
+                               nplg::Union{Nothing, <:SemiDefinitePhylogeny,
+                                           <:IntegerPhylogeny}, args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tracking.w

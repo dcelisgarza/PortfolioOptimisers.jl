@@ -12,7 +12,8 @@ struct RiskTrackingError{T1, T2, T3, T4} <: AbstractTracking
     end
 end
 function RiskTrackingError(; tracking::WeightsTracking,
-                           r::AbstractBaseRiskMeasure = Variance(), err::Real = 0.0,
+                           r::AbstractBaseRiskMeasure = StandardDeviation(),
+                           err::Real = 0.0,
                            alg::VariableTracking = IndependentVariableTracking())
     return RiskTrackingError(tracking, r, err, alg)
 end
@@ -121,4 +122,4 @@ function factory(r::RiskTrackingRiskMeasure, w::AbstractVector)
 end
 
 export SOCTracking, NOCTracking, IndependentVariableTracking, DependentVariableTracking,
-       TrackingRiskMeasure, RiskTrackingRiskMeasure
+       TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError
