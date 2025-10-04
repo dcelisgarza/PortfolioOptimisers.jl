@@ -268,6 +268,7 @@
 
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1DT.csv.gz"), DataFrame)
         tracking = WeightsTracking(; w = w0)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
         i = 1
         for r in rs
             r1 = RiskTrackingRiskMeasure(; tracking = tracking, r = r,
