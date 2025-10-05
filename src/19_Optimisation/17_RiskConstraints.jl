@@ -2251,7 +2251,6 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
 
         if haskey(model, :oldvariance_flag)
             model[:variance_flag] = model[:oldvariance_flag]
-            println(model[:oldvariance_flag])
             unregister(model, :oldvariance_flag)
         end
     end
@@ -2437,7 +2436,7 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
         end
     end
     if !bdvariance_risk && haskey(model, :bdvariance_risk) ||
-       haskey(model, :bdvariance_risk)
+       haskey(model, :oldbdvariance_risk)
         model[Symbol(:triv_, i, :_bdvariance_risk)] = model[:bdvariance_risk]
         model[Symbol(:triv_, i, :_Dt)] = model[:Dt]
         model[Symbol(:triv_, i, :_Dx)] = model[:Dx]
@@ -2537,7 +2536,6 @@ function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
 
         if haskey(model, :oldvariance_flag)
             model[:variance_flag] = model[:oldvariance_flag]
-            println(model[:oldvariance_flag])
             unregister(model, :oldvariance_flag)
         end
     end
