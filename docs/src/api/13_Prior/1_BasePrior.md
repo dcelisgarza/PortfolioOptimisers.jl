@@ -1,6 +1,8 @@
 # Base Prior
 
 ```@docs
+LowOrderPrior
+HighOrderPrior
 prior(pr::PortfolioOptimisers.AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
 prior(pr::PortfolioOptimisers.AbstractPriorResult, args...; kwargs...)
 clusterise(cle::ClusteringEstimator, pr::PortfolioOptimisers.AbstractPriorResult; kwargs...)

@@ -422,5 +422,309 @@ function average_centrality(cte::CentralityEstimator, w::AbstractVector,
                             pr::AbstractPriorResult; kwargs...)
     return average_centrality(cte.ne, cte.cent, w, pr.X; kwargs...)
 end
+"""
+```julia
+struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
+       AbstractPriorResult
+    X::T1
+    mu::T2
+    sigma::T3
+    chol::T4
+    w::T5
+    ens::T6
+    kld::T7
+    ow::T8
+    rr::T9
+    f_mu::T10
+    f_sigma::T11
+    f_w::T12
+end
+```
 
-export prior
+Container type for low order prior results in PortfolioOptimisers.jl.
+
+`LowOrderPrior` stores the output of low order prior estimation routines, including asset returns, mean vector, covariance matrix, Cholesky factor, weights, entropy, Kullback-Leibler divergence, outlier weights, regression results, and optional factor moments. It is used throughout the package to represent validated prior information for portfolio optimisation and analytics.
+
+# Fields
+
+  - `X`: Asset returns matrix.
+  - `mu`: Mean vector.
+  - `sigma`: Covariance matrix.
+  - `chol`: Cholesky factorisation of covariance matrix, factor models have a smaller factorisation which makes it more robust and efficient.
+  - `w`: Asset weights.
+  - `ens`: Entropy.
+  - `kld`: Kullback-Leibler divergence.
+  - `ow`: Opinion pooling weights.
+  - `rr`: Regression result.
+  - `f_mu`: Factor mean vector.
+  - `f_sigma`: Factor covariance matrix.
+  - `f_w`: Factor weights.
+
+# Constructor
+
+```julia
+LowOrderPrior(X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix;
+              chol::Union{Nothing, <:AbstractMatrix} = nothing,
+              w::Union{Nothing, <:AbstractWeights} = nothing,
+              ens::Union{Nothing, <:Real} = nothing,
+              kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+              ow::Union{Nothing, <:AbstractVector} = nothing,
+              rr::Union{Nothing, <:Regression} = nothing,
+              f_mu::Union{Nothing, <:AbstractVector} = nothing,
+              f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
+              f_w::Union{Nothing, <:AbstractVector} = nothing)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `X`, `mu`, and `sigma` must be non-empty.
+  - `size(X, 2) == length(mu)`.
+  - `sigma` must be square.
+  - If `w` is provided, it must be non-empty and `length(w) == size(X, 1)`.
+  - If `kld` is a vector, it must be non-empty.
+  - If `ow` is provided, it must be non-empty.
+  - If regression or factor moments are provided, all must be present and non-empty, and dimensions must match.
+  - If `chol` or `f_w` are provided, they must be non-empty and have correct dimensions.
+
+# Examples
+
+```jldoctest
+julia> LowOrderPrior(; X = [0.01 0.02; 0.03 0.04], mu = [0.02, 0.03],
+                     sigma = [0.0001 0.0002; 0.0002 0.0003])
+LowOrderPrior
+        X | 2×2 Matrix{Float64}
+       mu | Vector{Float64}: [0.02, 0.03]
+    sigma | 2×2 Matrix{Float64}
+     chol | nothing
+        w | nothing
+      ens | nothing
+      kld | nothing
+       ow | nothing
+       rr | nothing
+     f_mu | nothing
+  f_sigma | nothing
+      f_w | nothing
+```
+
+# Related
+
+  - [`AbstractPriorResult`](@ref)
+  - [`prior`](@ref)
+  - [`HighOrderPrior`](@ref)
+"""
+struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
+       AbstractPriorResult
+    X::T1
+    mu::T2
+    sigma::T3
+    chol::T4
+    w::T5
+    ens::T6
+    kld::T7
+    ow::T8
+    rr::T9
+    f_mu::T10
+    f_sigma::T11
+    f_w::T12
+    function LowOrderPrior(X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
+                           chol::Union{Nothing, <:AbstractMatrix},
+                           w::Union{Nothing, <:AbstractWeights},
+                           ens::Union{Nothing, <:Real},
+                           kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                           ow::Union{Nothing, <:AbstractVector},
+                           rr::Union{Nothing, <:Regression},
+                           f_mu::Union{Nothing, <:AbstractVector},
+                           f_sigma::Union{Nothing, <:AbstractMatrix},
+                           f_w::Union{Nothing, <:AbstractVector})
+        @argcheck(!isempty(X) && !isempty(mu) && !isempty(sigma))
+        @argcheck(size(X, 2) == length(mu))
+        assert_matrix_issquare(sigma)
+        if !isnothing(w)
+            @argcheck(!isempty(w))
+            @argcheck(length(w) == size(X, 1))
+        end
+        if isa(kld, AbstractVector)
+            @argcheck(!isempty(kld))
+        end
+        if !isnothing(ow)
+            @argcheck(!isempty(ow))
+        end
+        loadings_flag = !isnothing(rr)
+        f_mu_flag = !isnothing(f_mu)
+        f_sigma_flag = !isnothing(f_sigma)
+        if loadings_flag || f_mu_flag || f_sigma_flag
+            @argcheck(loadings_flag && f_mu_flag && f_sigma_flag)
+            @argcheck(!isempty(f_mu) && !isempty(f_sigma))
+            assert_matrix_issquare(f_sigma)
+            @argcheck(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1))
+            @argcheck(size(rr.M, 1) == length(mu))
+            if !isnothing(chol)
+                @argcheck(!isempty(chol))
+                @argcheck(length(mu) == size(chol, 2))
+            end
+            if !isnothing(f_w)
+                @argcheck(!isempty(f_w))
+                @argcheck(length(f_w) == size(X, 1))
+            end
+        end
+        return new{typeof(X), typeof(mu), typeof(sigma), typeof(chol), typeof(w),
+                   typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(f_mu),
+                   typeof(f_sigma), typeof(f_w)}(X, mu, sigma, chol, w, ens, kld, ow, rr,
+                                                 f_mu, f_sigma, f_w)
+    end
+end
+function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
+                       chol::Union{Nothing, <:AbstractMatrix} = nothing,
+                       w::Union{Nothing, <:AbstractWeights} = nothing,
+                       ens::Union{Nothing, <:Real} = nothing,
+                       kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                       ow::Union{Nothing, <:AbstractVector} = nothing,
+                       rr::Union{Nothing, <:Regression} = nothing,
+                       f_mu::Union{Nothing, <:AbstractVector} = nothing,
+                       f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
+                       f_w::Union{Nothing, <:AbstractVector} = nothing)
+    return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w)
+end
+function prior_view(pr::LowOrderPrior, i::AbstractVector)
+    chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
+    return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
+                         sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
+                         kld = pr.kld, ow = pr.ow, rr = regression_view(pr.rr, i),
+                         f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w)
+end
+"""
+```julia
+struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14} <:
+       AbstractPriorResult
+    X::T1
+    mu::T2
+    sigma::T3
+    chol::T4
+    w::T5
+    ens::T6
+    kld::T7
+    ow::T8
+    rr::T9
+    f_mu::T10
+    f_sigma::T11
+    f_w::T12
+    coskew::T13
+    cokurt::T14
+end
+```
+
+Container type for high order prior results in PortfolioOptimisers.jl.
+
+`HighOrderPrior` stores the output of high order prior estimation routines, including asset returns, mean vector, covariance matrix, Cholesky factor, weights, entropy, Kullback-Leibler divergence, outlier weights, regression results, optional factor moments, coskewness, and cokurtosis tensors. It is used throughout the package to represent validated prior information for portfolio optimisation and analytics involving higher moments.
+
+# Fields
+
+  - `X`: Asset returns matrix.
+  - `mu`: Mean vector.
+  - `sigma`: Covariance matrix.
+  - `chol`: Cholesky factor of covariance matrix.
+  - `w`: Asset weights.
+  - `ens`: Entropy.
+  - `kld`: Kullback-Leibler divergence.
+  - `ow`: Opinion pooling weights.
+  - `rr`: Regression result.
+  - `f_mu`: Factor mean vector.
+  - `f_sigma`: Factor covariance matrix.
+  - `f_w`: Factor weights.
+  - `coskew`: Coskewness tensor.
+  - `cokurt`: Cokurtosis tensor.
+
+# Constructor
+
+```julia
+HighOrderPrior(X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix;
+               chol::Union{Nothing, <:AbstractMatrix} = nothing,
+               w::Union{Nothing, <:AbstractWeights} = nothing,
+               ens::Union{Nothing, <:Real} = nothing,
+               kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+               ow::Union{Nothing, <:AbstractVector} = nothing,
+               rr::Union{Nothing, <:Regression} = nothing,
+               f_mu::Union{Nothing, <:AbstractVector} = nothing,
+               f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
+               f_w::Union{Nothing, <:AbstractVector} = nothing,
+               coskew::Union{Nothing, <:AbstractArray} = nothing,
+               cokurt::Union{Nothing, <:AbstractArray} = nothing)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - `X`, `mu`, and `sigma` must be non-empty.
+  - `size(X, 2) == length(mu)`.
+  - `sigma` must be square.
+  - If `w` is provided, it must be non-empty and `length(w) == size(X, 1)`.
+  - If `kld` is a vector, it must be non-empty.
+  - If `ow` is provided, it must be non-empty.
+  - If regression or factor moments are provided, all must be present and non-empty, and dimensions must match.
+  - If `chol`, `f_w`, `coskew`, or `cokurt` are provided, they must be non-empty and have correct dimensions.
+
+# Examples
+
+# Related
+
+  - [`AbstractPriorResult`](@ref)
+  - [`prior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
+    pr::T1
+    kt::T2
+    L2::T3
+    S2::T4
+    sk::T5
+    V::T6
+    skmp::T7
+    function HighOrderPrior(pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix},
+                            L2::Union{Nothing, <:AbstractMatrix},
+                            S2::Union{Nothing, <:AbstractMatrix},
+                            sk::Union{Nothing, <:AbstractMatrix},
+                            V::Union{Nothing, <:AbstractMatrix},
+                            skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
+        kt_flag = isa(kt, AbstractMatrix)
+        L2_flag = isa(L2, AbstractMatrix)
+        S2_flag = isa(S2, AbstractMatrix)
+        if kt_flag || L2_flag || S2_flag
+            @argcheck(kt_flag && L2_flag && S2_flag)
+            @argcheck(!isempty(kt) && !isempty(L2) && !isempty(S2))
+            assert_matrix_issquare(kt)
+            N = length(pr.mu)
+            @argcheck(length(pr.mu)^2 == size(kt, 1))
+            @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
+        end
+        sk_flag = isa(sk, AbstractMatrix)
+        V_flag = isa(V, AbstractMatrix)
+        if sk_flag
+            @argcheck(!isempty(sk))
+            @argcheck(length(pr.mu)^2 == size(sk, 2))
+        end
+        if V_flag
+            @argcheck(!isempty(V))
+            assert_matrix_issquare(V)
+        end
+        if sk_flag || V_flag
+            @argcheck(sk_flag && V_flag,
+                      "If either sk or V, is nothing, both must be nothing.")
+        end
+        return new{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk), typeof(V),
+                   typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
+    end
+end
+function HighOrderPrior(; pr::AbstractPriorResult,
+                        kt::Union{Nothing, <:AbstractMatrix} = nothing,
+                        L2::Union{Nothing, <:AbstractMatrix} = nothing,
+                        S2::Union{Nothing, <:AbstractMatrix} = nothing,
+                        sk::Union{Nothing, <:AbstractMatrix} = nothing,
+                        V::Union{Nothing, <:AbstractMatrix} = nothing,
+                        skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = nothing)
+    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
+end
+
+export prior, LowOrderPrior, HighOrderPrior

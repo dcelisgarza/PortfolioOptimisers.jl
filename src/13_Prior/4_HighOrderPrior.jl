@@ -183,57 +183,6 @@ function dup_elim_sum_matrices(n::Int)
 
     return d, l, s
 end
-struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
-    pr::T1
-    kt::T2
-    L2::T3
-    S2::T4
-    sk::T5
-    V::T6
-    skmp::T7
-    function HighOrderPrior(pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix},
-                            L2::Union{Nothing, <:AbstractMatrix},
-                            S2::Union{Nothing, <:AbstractMatrix},
-                            sk::Union{Nothing, <:AbstractMatrix},
-                            V::Union{Nothing, <:AbstractMatrix},
-                            skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
-        kt_flag = isa(kt, AbstractMatrix)
-        L2_flag = isa(L2, AbstractMatrix)
-        S2_flag = isa(S2, AbstractMatrix)
-        if kt_flag || L2_flag || S2_flag
-            @argcheck(kt_flag && L2_flag && S2_flag)
-            @argcheck(!isempty(kt) && !isempty(L2) && !isempty(S2))
-            assert_matrix_issquare(kt)
-            N = length(pr.mu)
-            @argcheck(length(pr.mu)^2 == size(kt, 1))
-            @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
-        end
-        sk_flag = isa(sk, AbstractMatrix)
-        V_flag = isa(V, AbstractMatrix)
-        if sk_flag
-            @argcheck(!isempty(sk))
-            @argcheck(length(pr.mu)^2 == size(sk, 2))
-        end
-        if V_flag
-            @argcheck(!isempty(V))
-            assert_matrix_issquare(V)
-        end
-        if sk_flag || V_flag
-            @argcheck(sk_flag && V_flag,
-                      "If either sk or V, is nothing, both must be nothing.")
-        end
-        return new{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk), typeof(V),
-                   typeof(skmp)}(pr, kt, L2, S2, sk, V, skmp)
-    end
-end
-function HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix},
-                        L2::Union{Nothing, <:AbstractMatrix},
-                        S2::Union{Nothing, <:AbstractMatrix},
-                        sk::Union{Nothing, <:AbstractMatrix},
-                        V::Union{Nothing, <:AbstractMatrix},
-                        skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
-    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp)
-end
 function dup_elim_sum_view(args...)
     return nothing, nothing, nothing
 end
@@ -325,4 +274,4 @@ function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
                           skmp = isnothing(sk) ? nothing : pe.ske.mp)
 end
 
-export HighOrderPrior, HighOrderPriorEstimator
+export HighOrderPriorEstimator
