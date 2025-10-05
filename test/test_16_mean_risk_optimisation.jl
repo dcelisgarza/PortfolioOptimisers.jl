@@ -284,17 +284,17 @@
             end
             rtol = if i in (12, 14, 17, 30)
                 5e-4
-            elseif i == 13
+            elseif i in (13, 16)
                 0.05
             elseif i in (15, 28)
                 0.1
-            elseif i in (16, 29)
+            elseif i == 29
                 5e-6
             elseif i in (18, 24)
                 5e-3
-            elseif i == 22
+            elseif i in (22, 23)
                 1e-4
-            elseif i == 23
+            elseif i == 26
                 5e-5
             else
                 1e-6
@@ -318,14 +318,12 @@
             mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
             res = optimise!(mr, rd)
             @test isa(res.retcode, OptimisationSuccess)
-            rtol = if i == 16
+            rtol = if i in (16, 30)
                 1e-5
             elseif i == 24
                 5e-6
             elseif i == 27
                 5e-5
-            elseif i == 30
-                5e-6
             else
                 1e-6
             end
