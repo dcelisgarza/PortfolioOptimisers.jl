@@ -450,7 +450,7 @@ Container type for low order prior results in PortfolioOptimisers.jl.
   - `X`: Asset returns matrix.
   - `mu`: Mean vector.
   - `sigma`: Covariance matrix.
-  - `chol`: Cholesky factorisation of covariance matrix, factor models have a smaller factorisation which makes it more robust and efficient.
+  - `chol`: Cholesky factorisation of the factor-adjusted covariance matrix. Factor models sparsify the covariance matrix, so using their smaller, sparser Cholesky factor makes for more numerically stable and efficient optimisations.
   - `w`: Asset weights.
   - `ens`: Entropy.
   - `kld`: Kullback-Leibler divergence.
@@ -666,7 +666,40 @@ Keyword arguments correspond to the fields above.
   - If regression or factor moments are provided, all must be present and non-empty, and dimensions must match.
   - If `chol`, `f_w`, `coskew`, or `cokurt` are provided, they must be non-empty and have correct dimensions.
 
-# Examples
+# Exmples
+
+```jldoctest
+julia> using StableRNGs
+
+julia> rng = StableRNG(1234);
+
+julia> X = rand(rng, 30, 3);
+
+julia> HighOrderPrior(LowOrderPrior(; X = X, mu = vec(mean(X; dims = 1)), sigma = cov(X)),
+                      cokurtosis(Cokurtosis(), X), PortfolioOptimisers.elimination_matrix(3),
+                      PortfolioOptimisers.summation_matrix(3), coskewness(Coskewness(), X)...,
+                      nothing)
+HighOrderPrior
+    pr | LowOrderPrior
+       |         X | 30×3 Matrix{Float64}
+       |        mu | Vector{Float64}: [0.4344395582263021, 0.4828107025557837, 0.49205915481935103]
+       |     sigma | 3×3 Matrix{Float64}
+       |      chol | nothing
+       |         w | nothing
+       |       ens | nothing
+       |       kld | nothing
+       |        ow | nothing
+       |        rr | nothing
+       |      f_mu | nothing
+       |   f_sigma | nothing
+       |       f_w | nothing
+    kt | 9×9 Matrix{Float64}
+    L2 | 6×9 SparseArrays.SparseMatrixCSC{Int64, Int64}
+    S2 | 6×9 SparseArrays.SparseMatrixCSC{Int64, Int64}
+    sk | 3×9 Matrix{Float64}
+     V | 3×3 Matrix{Float64}
+  skmp | nothing
+```
 
 # Related
 
