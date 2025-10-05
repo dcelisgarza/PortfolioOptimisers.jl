@@ -1,5 +1,17 @@
 # Base Prior
 
 ```@docs
+prior(pr::PortfolioOptimisers.AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+prior(pr::PortfolioOptimisers.AbstractPriorResult, args...; kwargs...)
+clusterise(cle::ClusteringEstimator, pr::PortfolioOptimisers.AbstractPriorResult; kwargs...)
+PortfolioOptimisers.AbstractPriorEstimator
+PortfolioOptimisers.AbstractLowOrderPriorEstimator
+PortfolioOptimisers.AbstractLowOrderPriorEstimator_A
+PortfolioOptimisers.AbstractLowOrderPriorEstimator_F
+PortfolioOptimisers.AbstractLowOrderPriorEstimator_AF
+PortfolioOptimisers.AbstractLowOrderPriorEstimator_A_AF
+PortfolioOptimisers.AbstractLowOrderPriorEstimator_F_AF
+PortfolioOptimisers.AbstractLowOrderPriorEstimator_A_F_AF
+PortfolioOptimisers.AbstractHighOrderPriorEstimator
 PortfolioOptimisers.AbstractPriorResult
 ```
