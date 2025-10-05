@@ -192,7 +192,12 @@
               DistributionallyRobustConditionalValueatRisk(),
               ValueatRisk(; alg = DistributionValueatRisk()),
               DistributionallyRobustConditionalValueatRiskRange(),
-              ValueatRiskRange(; alg = DistributionValueatRisk())]
+              ValueatRiskRange(; alg = DistributionValueatRisk()),
+              TurnoverRiskMeasure(; w = w0),
+              TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0)),
+              TrackingRiskMeasure(; tracking = WeightsTracking(; w = w0),
+                                  alg = NOCTracking())]
+
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
         for r in rs, obj in objs, ret in rets
@@ -208,7 +213,7 @@
                    (6, 16, 28, 36, 38, 40, 46, 52, 93, 108, 126, 139, 163, 165, 167, 177,
                     179, 204, 214, 216)
                 5e-6
-            elseif i in (18, 157, 158, 174)
+            elseif i in (18, 157, 158, 174, 228)
                 5e-4
             elseif i in (48, 58, 88, 90, 94, 98, 134, 140, 159, 176, 184)
                 1e-5
@@ -218,7 +223,7 @@
                 1e-3
             elseif i in (198, 210)
                 5e-2
-            elseif i == 208
+            elseif i in (208, 234)
                 1e-4
             else
                 1e-6
@@ -260,6 +265,78 @@
             end
             i += 1
         end
+
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskDT.csv.gz"), DataFrame)
+        tracking = WeightsTracking(; w = w0)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        i = 1
+        for r in rs
+            r1 = RiskTrackingRiskMeasure(; tracking = tracking, r = r,
+                                         alg = DependentVariableTracking())
+            mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
+            res = optimise!(mr, rd)
+            if isa(r, PortfolioOptimisers.QuadExpressionRiskMeasures)
+                @test isa(res.retcode, OptimisationFailure)
+                i += 1
+                continue
+            else
+                @test isa(res.retcode, OptimisationSuccess)
+            end
+            rtol = if i in (12, 14, 17, 30)
+                5e-4
+            elseif i in (13, 16)
+                0.05
+            elseif i in (15, 28)
+                0.1
+            elseif i == 29
+                5e-6
+            elseif i in (18, 24)
+                5e-3
+            elseif i in (22, 23)
+                1e-4
+            elseif i == 26
+                5e-5
+            else
+                1e-6
+            end
+            success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Counter: $i")
+                find_tol(res.w, df[!, "$i"])
+                display([res.w df[!, "$i"]])
+            end
+            @test success
+            i += 1
+        end
+
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskIT.csv.gz"), DataFrame)
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        i = 1
+        for r in rs
+            r1 = RiskTrackingRiskMeasure(; tracking = tracking, r = r,
+                                         alg = IndependentVariableTracking())
+            mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
+            res = optimise!(mr, rd)
+            @test isa(res.retcode, OptimisationSuccess)
+            rtol = if i in (16, 30)
+                1e-5
+            elseif i == 24
+                5e-6
+            elseif i == 27
+                5e-5
+            else
+                1e-6
+            end
+            success = isapprox(res.w, df[!, "$i"]; rtol = rtol)
+            if !success
+                println("Counter: $i")
+                find_tol(res.w, df[!, "$i"])
+                display([res.w df[!, "$i"]])
+            end
+            @test success
+            i += 1
+        end
+
         res = optimise!(MeanRisk(; wi = w0,
                                  opt = JuMPOptimiser(; pe = pr,
                                                      slv = Solver(;
@@ -270,7 +347,7 @@
         @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
 
         r = BrownianDistanceVariance()
-        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1BDV.csv.gz"), DataFrame)
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskBDV.csv.gz"), DataFrame)
         i = 1
         for obj in objs, ret in rets
             opt = JuMPOptimiser(; pe = pr2, slv = slv, ret = ret)
@@ -558,7 +635,7 @@
                       opt = opt)
         res3 = optimise!(mr)
         @test isapprox(res1.w,
-                       CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1BDV.csv.gz"),
+                       CSV.read(joinpath(@__DIR__, "./assets/MeanRiskBDV.csv.gz"),
                                 DataFrame)[!, 1], rtol = 5e-4)
         @test isapprox(res1.w, res2.w; rtol = 5e-4)
         @test isapprox(res1.w, res3.w; rtol = 1e-3)
@@ -1039,6 +1116,33 @@
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
         res = optimise!(mre)
         @test norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3
+
+        tr = RiskTrackingError(; err = 0.0, tracking = WeightsTracking(; w = w0),
+                               alg = DependentVariableTracking())
+        opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
+        mre = MeanRisk(; r = ConditionalValueatRisk(), opt = opt)
+        res = optimise!(mre)
+        @test isapprox(res.w,
+                       optimise!(MeanRisk(; r = ConditionalValueatRisk(),
+                                          opt = JuMPOptimiser(; pe = pr, slv = slv))).w,
+                       rtol = 1e-6)
+
+        tr = RiskTrackingError(; err = 0.5, tracking = WeightsTracking(; w = w0),
+                               alg = IndependentVariableTracking())
+        opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
+        mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
+        res = optimise!(mre)
+        @test isapprox(res.w,
+                       optimise!(MeanRisk(; obj = MaximumRatio(),
+                                          opt = JuMPOptimiser(; pe = pr, slv = slv))).w,
+                       rtol = 5e-4)
+
+        tr = RiskTrackingError(; err = 0, tracking = WeightsTracking(; w = w0),
+                               alg = IndependentVariableTracking())
+        opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
+        mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
+        res = optimise!(mre)
+        @test isapprox(res.w, w0, rtol = 1e-6)
     end
     @testset "Phylogeny" begin
         plc = IntegerPhylogenyEstimator(; pe = NetworkEstimator(), B = 1)

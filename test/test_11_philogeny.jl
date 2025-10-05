@@ -221,8 +221,7 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/PhylogenyMatrix2.csv.gz"), DataFrame)
         for i in 1:5
             A = phylogeny_matrix(NetworkEstimator(; n = i,
-                                                  alg = MaximumDistanceSimilarity()),
-                                 pr.X).X
+                                                  alg = MaximumDistanceSimilarity()), pr.X).X
             res = isapprox(vec(A), df[!, i])
             if !res
                 println("Iteration $i failed on MaximumDistanceSimilarity.")

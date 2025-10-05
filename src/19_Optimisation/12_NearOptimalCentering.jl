@@ -49,9 +49,13 @@ struct NearOptimalCentering{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T
                                   fallback::Union{Nothing, <:OptimisationEstimator})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r))
-            @argcheck(!any(x -> isa(x, QuadExpressionRiskMeasures), r))
+            if any(x -> isa(x, QuadExpressionRiskMeasures), r)
+                @warn("Risk measures that produce QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
+            end
         else
-            @argcheck(!isa(r, QuadExpressionRiskMeasures))
+            if isa(r, QuadExpressionRiskMeasures)
+                @warn("Risk measures that produce QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
+            end
         end
         if isa(w_min, AbstractVector)
             @argcheck(!isempty(w_min))
@@ -527,7 +531,7 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     @expression(model, k, 1)
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
-    set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing; rd = rd)
+    set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing, opt.fees; rd = rd)
     scalarise_risk_expression!(model, opt.sce)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
@@ -580,12 +584,12 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                           opt.slt, opt.sst, opt.sglt, nothing, opt.ss)
     set_turnover_constraints!(model, opt.tn)
     set_tracking_error_constraints!(model, opt.pe, opt.te, noc, opt.nplg, opt.cplg,
-                                    opt.fees)
+                                    opt.fees; rd = rd)
     set_number_effective_assets!(model, opt.nea)
     set_l1_regularisation!(model, opt.l1)
     set_l2_regularisation!(model, opt.l2)
     set_non_fixed_fees!(model, opt.fees)
-    set_risk_constraints!(model, r, noc, opt.pe, opt.nplg, opt.cplg; rd = rd)
+    set_risk_constraints!(model, r, noc, opt.pe, opt.nplg, opt.cplg, opt.fees; rd = rd)
     scalarise_risk_expression!(model, opt.sce)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
     set_sdp_phylogeny_constraints!(model, opt.nplg, :sdp_nplg)

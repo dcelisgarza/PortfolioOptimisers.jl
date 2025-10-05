@@ -10,7 +10,6 @@ const SquaredRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
                                   <:NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                      <:QuadRiskExpr}}
 const QuadExpressionRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
-                                         <:UncertaintySetVariance,
                                          <:LowOrderMoment{<:Any, <:Any, <:Any,
                                                           <:LowOrderDeviation{<:Any,
                                                                               <:SecondCentralMoment{<:Union{<:QuadRiskExpr,

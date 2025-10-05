@@ -12,7 +12,8 @@ struct RiskTrackingError{T1, T2, T3, T4} <: AbstractTracking
     end
 end
 function RiskTrackingError(; tracking::WeightsTracking,
-                           r::AbstractBaseRiskMeasure = Variance(), err::Real = 0.0,
+                           r::AbstractBaseRiskMeasure = StandardDeviation(),
+                           err::Real = 0.0,
                            alg::VariableTracking = IndependentVariableTracking())
     return RiskTrackingError(tracking, r, err, alg)
 end
@@ -72,6 +73,9 @@ struct RiskTrackingRiskMeasure{T1, T2, T3, T4} <: RiskMeasure
     function RiskTrackingRiskMeasure(settings::RiskMeasureSettings,
                                      tracking::WeightsTracking, r::AbstractBaseRiskMeasure,
                                      alg::VariableTracking)
+        if isa(alg, DependentVariableTracking) && isa(r, QuadExpressionRiskMeasures)
+            @warn("Risk measures that produce QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
+        end
         r = no_bounds_no_risk_expr_risk_measure(r)
         return new{typeof(settings), typeof(tracking), typeof(r), typeof(alg)}(settings,
                                                                                tracking, r,
@@ -118,4 +122,4 @@ function factory(r::RiskTrackingRiskMeasure, w::AbstractVector)
 end
 
 export SOCTracking, NOCTracking, IndependentVariableTracking, DependentVariableTracking,
-       TrackingRiskMeasure, RiskTrackingRiskMeasure
+       TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError
