@@ -592,7 +592,7 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds,
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     iplg_flag = isa(plg, IntegerPhylogeny) ||
-                isa(plg, AbstractVector) && any(isa(x -> isa(x, IntegerPhylogeny), plg))
+                isa(plg, AbstractVector) && any(x -> isa(x, IntegerPhylogeny), plg)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
     ffl_flag, ffs_flag, ffl, ffs = if !isnothing(fees)
@@ -1238,7 +1238,7 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model,
                                                     <:AbstractPhylogenyConstraintResult,
                                                     <:AbstractVector{<:AbstractPhylogenyConstraintResult}})
     if !(isa(plgs, SemiDefinitePhylogeny) ||
-         isa(plgs, AbstractVector) && any(isa(x -> isa(x, SemiDefinitePhylogeny), plgs)))
+         isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing
     end
     sc = model[:sc]
@@ -1264,7 +1264,7 @@ function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
                                                         <:AbstractPhylogenyConstraintResult,
                                                         <:AbstractVector{<:AbstractPhylogenyConstraintResult}})
     if !(isa(plgs, SemiDefinitePhylogeny) ||
-         isa(plgs, AbstractVector) && any(isa(x -> isa(x, SemiDefinitePhylogeny), plgs)))
+         isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing
     end
     sc = model[:sc]
