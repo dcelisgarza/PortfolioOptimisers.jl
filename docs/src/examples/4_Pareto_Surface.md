@@ -1,5 +1,4 @@
 The source files for all examples can be found in [/examples](https://github.com/dcelisgarza/PortfolioOptimiser.jl/tree/main/examples/).
-
 ```@meta
 EditURL = "../../../examples/4_Pareto_Surface.jl"
 ```
@@ -236,6 +235,7 @@ plot_measures(res3.w, pr; x = r1, y = r2,
               colorbar_title = "\n\nCDaR/Return", right_margin = 8Plots.mm)
 ````
 
-* * *
+---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

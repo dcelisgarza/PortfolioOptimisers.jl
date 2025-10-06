@@ -428,6 +428,11 @@ function phylogeny_constraints(plc::Union{<:SemiDefinitePhylogeny, <:IntegerPhyl
                                           Nothing}, args...; kwargs...)
     return plc
 end
+function phylogeny_constraints(plcs::AbstractVector{<:Union{<:AbstractPhylogenyConstraintEstimator,
+                                                            <:AbstractPhylogenyConstraintResult}},
+                               args...; kwargs...)
+    return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
+end
 """
 ```julia
 abstract type VectorToRealMeasure <: AbstractAlgorithm end

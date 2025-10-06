@@ -547,10 +547,8 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                           opt.sgmtx,
                                                                           opt.slt, opt.sst,
                                                                           opt.sglt,
-                                                                          opt.sgst,
-                                                                          opt.nplg,
-                                                                          opt.cplg, opt.tn,
-                                                                          opt.fees,
+                                                                          opt.sgst, opt.plg,
+                                                                          opt.tn, opt.fees,
                                                                           opt.ret),
                                          w_min_retcode, w_opt_retcode, w_max_retcode,
                                          noc_retcode, retcode, sol,
@@ -578,22 +576,20 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_linear_weight_constraints!(model, opt.lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, opt.cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, opt.lcm, :lcm_ineq, :lcm_eq)
-    set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.nplg, opt.cplg, opt.lt,
-                         opt.st, opt.fees, opt.ss)
+    set_mip_constraints!(model, opt.wb, opt.card, opt.gcard, opt.plg, opt.lt, opt.st,
+                         opt.fees, opt.ss)
     set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcard, opt.smtx, opt.sgmtx,
                           opt.slt, opt.sst, opt.sglt, nothing, opt.ss)
     set_turnover_constraints!(model, opt.tn)
-    set_tracking_error_constraints!(model, opt.pe, opt.te, noc, opt.nplg, opt.cplg,
-                                    opt.fees; rd = rd)
+    set_tracking_error_constraints!(model, opt.pe, opt.te, noc, opt.plg, opt.fees; rd = rd)
     set_number_effective_assets!(model, opt.nea)
     set_l1_regularisation!(model, opt.l1)
     set_l2_regularisation!(model, opt.l2)
     set_non_fixed_fees!(model, opt.fees)
-    set_risk_constraints!(model, r, noc, opt.pe, opt.nplg, opt.cplg, opt.fees; rd = rd)
+    set_risk_constraints!(model, r, noc, opt.pe, opt.plg, opt.fees; rd = rd)
     scalarise_risk_expression!(model, opt.sce)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
-    set_sdp_phylogeny_constraints!(model, opt.nplg, :sdp_nplg)
-    set_sdp_phylogeny_constraints!(model, opt.cplg, :sdp_cplg)
+    set_sdp_phylogeny_constraints!(model, opt.plg)
     add_custom_constraint!(model, opt.ccnt, opt, opt.pe)
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, rt_min, rt_max, w_min,
                                   w_max, Val(haskey(model, :ret_frontier)),
@@ -610,10 +606,8 @@ function optimise!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                                                           opt.sgmtx,
                                                                           opt.slt, opt.sst,
                                                                           opt.sglt,
-                                                                          opt.sgst,
-                                                                          opt.nplg,
-                                                                          opt.cplg, opt.tn,
-                                                                          opt.fees,
+                                                                          opt.sgst, opt.plg,
+                                                                          opt.tn, opt.fees,
                                                                           opt.ret),
                                          w_min_retcode, w_opt_retcode, w_max_retcode,
                                          noc_retcode, retcode, sol,
