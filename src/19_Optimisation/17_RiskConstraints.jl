@@ -239,7 +239,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                             strict = opt.opt.strict)
     key = Symbol(:variance_risk_, i)
     set_sdp_frc_constraints!(model)
-    W = model[:W]
+    W = model[:frc_W]
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     sigma_W = model[Symbol(:sigma_W_, i)] = @expression(model,
                                                         transpose(b1) * sigma * b1 * W)

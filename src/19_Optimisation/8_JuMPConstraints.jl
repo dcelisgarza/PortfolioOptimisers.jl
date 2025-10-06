@@ -1221,17 +1221,17 @@ function set_sdp_constraints!(model::JuMP.Model)
     return W
 end
 function set_sdp_frc_constraints!(model::JuMP.Model)
-    if haskey(model, :W)
-        return model[:W]
+    if haskey(model, :frc_W)
+        return model[:frc_W]
     end
     w1 = model[:w1]
     sc = model[:sc]
     k = model[:k]
     Nf = length(w1)
-    @variable(model, W[1:Nf, 1:Nf], Symmetric)
-    @expression(model, M, hcat(vcat(W, transpose(w1)), vcat(w1, k)))
-    @constraint(model, M_PSD, sc * M in PSDCone())
-    return W
+    @variable(model, frc_W[1:Nf, 1:Nf], Symmetric)
+    @expression(model, frc_M, hcat(vcat(frc_W, transpose(w1)), vcat(w1, k)))
+    @constraint(model, frc_M_PSD, sc * frc_M in PSDCone())
+    return frc_W
 end
 function set_sdp_phylogeny_constraints!(model::JuMP.Model,
                                         plgs::Union{Nothing,
@@ -1269,7 +1269,6 @@ function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
     end
     sc = model[:sc]
     W = set_sdp_frc_constraints!(model)
-
     for (i, plg) in enumerate(plgs)
         if !isa(plg, SemiDefinitePhylogeny)
             continue
