@@ -56,6 +56,132 @@ end
 function no_bounds_returns_estimator(r::KellyReturn, args...)
     return KellyReturn(; w = r.w)
 end
+#=
+mutable struct AKelly <: RetType
+    formulation::VarianceFormulation
+    a_rc::Union{<:AbstractMatrix, Nothing}
+    b_rc::Union{<:AbstractVector, Nothing}
+end
+function AKelly(; formulation::VarianceFormulation = SOC(),
+                a_rc::Union{<:AbstractMatrix, Nothing} = nothing,
+                b_rc::Union{<:AbstractVector, Nothing} = nothing)
+    if !isnothing(a_rc) && !isnothing(b_rc) && !isempty(a_rc) && !isempty(b_rc)
+        @smart_assert(size(a_rc, 1) == length(b_rc))
+    end
+    return AKelly(formulation, a_rc, b_rc)
+end
+function Base.setproperty!(obj::AKelly, sym::Symbol, val)
+    if sym == :a_rc
+        if !isnothing(val) && !isnothing(obj.b_rc) && !isempty(val) && !isempty(obj.b_rc)
+            @smart_assert(size(val, 1) == length(obj.b_rc))
+        end
+    elseif sym == :b_rc
+        if !isnothing(val) && !isnothing(obj.a_rc) && !isempty(val) && !isempty(obj.a_rc)
+            @smart_assert(size(obj.a_rc, 1) == length(val))
+        end
+    end
+    return setfield!(obj, sym, val)
+end
+function set_objective_function(port, ::Sharpe, ::Union{AKelly, EKelly}, custom_obj)
+    model = port.model
+    scale_obj = model[:scale_obj]
+    ret = model[:ret]
+    @expression(model, obj_func, ret)
+    add_objective_penalty(model, obj_func, -1)
+    custom_objective(port, obj_func, -1, custom_obj)
+    @objective(model, Max, scale_obj * obj_func)
+    return nothing
+end
+function return_constraints(port, type, ::Any, kelly::AKelly, mu, sigma, returns,
+                            kelly_approx_idx)
+    if isempty(mu)
+        return nothing
+    end
+
+    model = port.model
+    get_fees(model)
+    w = model[:w]
+    fees = model[:fees]
+    if isnothing(kelly_approx_idx) ||
+       isempty(kelly_approx_idx) ||
+       iszero(kelly_approx_idx[1])
+        if !haskey(model, :variance_risk)
+            a_rc = kelly.a_rc
+            b_rc = kelly.b_rc
+            sdp_rc_variance(model, type, a_rc, b_rc)
+            calc_variance_risk(get_ntwk_clust_type(port, a_rc, b_rc), kelly.formulation,
+                               model, mu, sigma, returns)
+        end
+        variance_risk = model[:variance_risk]
+        @expression(model, ret, dot(mu, w) - fees - 0.5 * variance_risk)
+    else
+        variance_risk = model[:variance_risk]
+        @expression(model, ret,
+                    dot(mu, w) - fees - 0.5 * variance_risk[kelly_approx_idx[1]])
+    end
+
+    return_bounds(port)
+
+    return nothing
+end
+function return_constraints(port, type, obj::Sharpe, kelly::AKelly, mu, sigma, returns,
+                            kelly_approx_idx)
+    a_rc = kelly.a_rc
+    b_rc = kelly.b_rc
+    sdp_rc_variance(port.model, type, a_rc, b_rc)
+    return_sharpe_akelly_constraints(port, type, obj, kelly,
+                                     get_ntwk_clust_type(port, a_rc, b_rc), mu, sigma,
+                                     returns, kelly_approx_idx)
+    return nothing
+end
+function return_sharpe_akelly_constraints(port, type, obj::Sharpe, kelly::AKelly,
+                                          adjacency_constraint::Union{NoAdj, IP}, mu, sigma,
+                                          returns, kelly_approx_idx)
+    if isempty(mu)
+        return nothing
+    end
+
+    model = port.model
+    get_fees(model)
+    scale_constr = model[:scale_constr]
+    w = model[:w]
+    k = model[:k]
+    fees = model[:fees]
+    ohf = model[:ohf]
+    risk = model[:risk]
+    rf = obj.rf
+    @variable(model, tapprox_kelly)
+    @constraint(model, constr_sr_akelly_risk, scale_constr * risk <= scale_constr * ohf)
+    @expression(model, ret, dot(mu, w) - fees - 0.5 * tapprox_kelly - k * rf)
+    if isnothing(kelly_approx_idx) ||
+       isempty(kelly_approx_idx) ||
+       iszero(kelly_approx_idx[1])
+        if !haskey(model, :variance_risk)
+            calc_variance_risk(adjacency_constraint, kelly.formulation, model, mu, sigma,
+                               returns)
+        end
+        dev = model[:dev]
+        @constraint(model, constr_sr_akelly_ret,
+                    [scale_constr * (k + tapprox_kelly)
+                     scale_constr * 2 * dev
+                     scale_constr * (k - tapprox_kelly)] ∈ SecondOrderCone())
+    else
+        dev = model[:dev]
+        @constraint(model, constr_sr_akelly_ret,
+                    [scale_constr * (k + tapprox_kelly)
+                     scale_constr * 2 * dev[kelly_approx_idx[1]]
+                     scale_constr * (k - tapprox_kelly)] ∈ SecondOrderCone())
+    end
+    return_bounds(port)
+
+    return nothing
+end
+function return_sharpe_akelly_constraints(port, type, obj::Sharpe, ::AKelly, ::SDP, ::Any,
+                                          ::Any, returns, ::Any)
+    return_constraints(port, type, obj, EKelly(), nothing, nothing, returns, nothing)
+    return nothing
+end
+=#
 for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
     eval(quote
              function bounds_returns_estimator(r::$(r), lb::Real)

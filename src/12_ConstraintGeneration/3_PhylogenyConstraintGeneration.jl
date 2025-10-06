@@ -140,7 +140,7 @@ SemiDefinitePhylogeny(;
 
 ## Validation
 
-  - `issymmetric(A)` and `all(x -> iszero(x), diag(A))`.
+  - `issymmetric(A)` and `all(iszero, diag(A))`.
   - `p >= 0`.
 
 # Examples
@@ -162,7 +162,7 @@ struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
     A::T1
     p::T2
     function SemiDefinitePhylogeny(A::AbstractMatrix{<:Real}, p::Real)
-        @argcheck(all(x -> iszero(x), diag(A)))
+        @argcheck(all(iszero, diag(A)))
         @argcheck(issymmetric(A))
         @argcheck(p >= zero(p))
         return new{typeof(A), typeof(p)}(A, p)
@@ -323,7 +323,7 @@ IntegerPhylogeny(;
 
 ## Validation
 
-  - `issymmetric(A)` and `all(x -> iszero(x), diag(A))`.
+  - `issymmetric(A)` and `all(iszero, diag(A))`.
   - If `B` is a vector: `!isempty(B)`, `all(x -> x >= 0, B)`, and `size(unique(A + I; dims = 1), 1) == length(B)`.
   - If `B` is an integer: `B >= 0`.
 
@@ -349,7 +349,7 @@ struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
     scale::T3
     function IntegerPhylogeny(A::AbstractMatrix{<:Real},
                               B::Union{<:Integer, <:AbstractVector{<:Integer}}, scale::Real)
-        @argcheck(all(x -> iszero(x), diag(A)))
+        @argcheck(all(iszero, diag(A)))
         @argcheck(issymmetric(A))
         A = unique(A + I; dims = 1)
         if isa(B, AbstractVector)
@@ -427,6 +427,11 @@ end
 function phylogeny_constraints(plc::Union{<:SemiDefinitePhylogeny, <:IntegerPhylogeny,
                                           Nothing}, args...; kwargs...)
     return plc
+end
+function phylogeny_constraints(plcs::AbstractVector{<:Union{<:AbstractPhylogenyConstraintEstimator,
+                                                            <:AbstractPhylogenyConstraintResult}},
+                               args...; kwargs...)
+    return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
 """
 ```julia

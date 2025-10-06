@@ -38,8 +38,8 @@ function get_black_litterman_views(lcs::Union{<:ParsingResult,
             end
             At += Ai * c
         end
-        @argcheck(any(x -> !iszero(x), At),
-                  DomainError("At least one entry in At must be non-zero:\nany(x -> !iszero(x), At) => $(any(x -> !iszero(x), At))"))
+        @argcheck(any(!iszero, At),
+                  DomainError("At least one entry in At must be non-zero:\nany(!iszero, At) => $(any(!iszero, At))"))
         append!(P, At)
         append!(Q, lc.rhs)
     end

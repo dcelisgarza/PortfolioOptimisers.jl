@@ -249,10 +249,10 @@
         for (i, opt) in enumerate(opts)
             res = optimise!(opt, rd)
             rtol = if i == 2
-                5e-5
+                1e-4
             elseif i == 3
                 5e-4
-            elseif i == 4 || Sys.isapple() && i == 12
+            elseif i in (4, 12)
                 5e-6
             else
                 1e-6

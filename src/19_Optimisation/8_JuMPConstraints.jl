@@ -566,18 +566,33 @@ function mip_constraints(model::JuMP.Model, wb::WeightBounds,
     end
     return ib
 end
+function set_iplg_constraints!(model::JuMP.Model,
+                               plgs::Union{<:AbstractPhylogenyConstraintResult,
+                                           <:AbstractVector{<:AbstractPhylogenyConstraintResult}})
+    ib = model[:ib]
+    sc = model[:sc]
+    for (i, plg) in enumerate(plgs)
+        if !isa(plg, IntegerPhylogeny)
+            continue
+        end
+        A = plg.A
+        B = plg.B
+        model[Symbol(:card_plg_, i)] = @constraint(model, sc * (A * ib ⊖ B) <= 0)
+    end
+    return nothing
+end
 function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds,
                               card::Union{Nothing, <:Integer},
                               gcard::Union{Nothing, <:LinearConstraint},
-                              nplg::Union{Nothing, <:AbstractPhylogenyConstraintResult},
-                              cplg::Union{Nothing, <:AbstractPhylogenyConstraintResult},
+                              plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                         <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                               lt::Union{Nothing, <:BuyInThreshold},
                               st::Union{Nothing, <:BuyInThreshold},
                               fees::Union{Nothing, <:Fees}, ss::Union{Nothing, <:Real})
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
-    n_flag = isa(nplg, IntegerPhylogeny)
-    c_flag = isa(cplg, IntegerPhylogeny)
+    iplg_flag = isa(plg, IntegerPhylogeny) ||
+                isa(plg, AbstractVector) && any(x -> isa(x, IntegerPhylogeny), plg)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
     ffl_flag, ffs_flag, ffl, ffs = if !isnothing(fees)
@@ -585,14 +600,7 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds,
     else
         false, false, nothing, nothing
     end
-    if !(card_flag ||
-         gcard_flag ||
-         n_flag ||
-         c_flag ||
-         lt_flag ||
-         st_flag ||
-         ffl_flag ||
-         ffs_flag)
+    if !(card_flag || gcard_flag || iplg_flag || lt_flag || st_flag || ffl_flag || ffs_flag)
         return nothing
     end
     ib = if (st_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
@@ -617,15 +625,8 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds,
             @constraint(model, gcard_eq, sc * (A * ib ⊖ B) == 0)
         end
     end
-    if n_flag
-        A = nplg.A
-        B = nplg.B
-        @constraint(model, card_nplg, sc * (A * ib ⊖ B) <= 0)
-    end
-    if c_flag
-        A = cplg.A
-        B = cplg.B
-        @constraint(model, card_cplg, sc * (A * ib ⊖ B) <= 0)
+    if iplg_flag
+        set_iplg_constraints!(model, plg)
     end
     return nothing
 end
@@ -1074,10 +1075,9 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:IndependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                     <:IntegerPhylogeny},
-                                         nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                     <:IntegerPhylogeny},
+                                         plg::Union{Nothing,
+                                                    <:AbstractPhylogenyConstraintResult,
+                                                    <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                          fees::Union{Nothing, <:Fees}, args...; kwargs...)
     r = te.r
     wb = te.tracking.w
@@ -1089,8 +1089,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     model[:oldw] = model[:w]
     unregister(model, :w)
     model[:w] = @expression(model, w - wb * k)
-    risk_expr = set_triv_risk_constraints!(model, te_dw, r, opt, pr, cplg, nplg, fees,
-                                           args...; kwargs...)
+    risk_expr = set_triv_risk_constraints!(model, te_dw, r, opt, pr, plg, fees, args...;
+                                           kwargs...)
     model[Symbol(:triv_, i, :_w)] = model[:w]
     model[:w] = model[:oldw]
     unregister(model, :oldw)
@@ -1102,10 +1102,9 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          te::RiskTrackingError{<:Any, <:Any, <:Any,
                                                                <:DependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
-                                         cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                     <:IntegerPhylogeny},
-                                         nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                     <:IntegerPhylogeny},
+                                         plg::Union{Nothing,
+                                                    <:AbstractPhylogenyConstraintResult,
+                                                    <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                          fees::Union{Nothing, <:Fees}, args...; kwargs...)
     ri = te.r
     wb = te.tracking.w
@@ -1115,8 +1114,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     sc = model[:sc]
     key = Symbol(:t_dr_, i)
     t_dr = model[key] = @variable(model)
-    risk_expr = set_trdv_risk_constraints!(model, key, ri, opt, pr, cplg, nplg, fees,
-                                           args...; kwargs...)
+    risk_expr = set_trdv_risk_constraints!(model, key, ri, opt, pr, plg, fees, args...;
+                                           kwargs...)
     dr = model[Symbol(:dr_, i)] = @expression(model, risk_expr - rb * k)
     model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = @constraints(model,
                                                                           begin
@@ -1222,50 +1221,67 @@ function set_sdp_constraints!(model::JuMP.Model)
     return W
 end
 function set_sdp_frc_constraints!(model::JuMP.Model)
-    if haskey(model, :W)
-        return model[:W]
+    if haskey(model, :frc_W)
+        return model[:frc_W]
     end
     w1 = model[:w1]
     sc = model[:sc]
     k = model[:k]
     Nf = length(w1)
-    @variable(model, W[1:Nf, 1:Nf], Symmetric)
-    @expression(model, M, hcat(vcat(W, transpose(w1)), vcat(w1, k)))
-    @constraint(model, M_PSD, sc * M in PSDCone())
-    return W
+    @variable(model, frc_W[1:Nf, 1:Nf], Symmetric)
+    @expression(model, frc_M, hcat(vcat(frc_W, transpose(w1)), vcat(w1, k)))
+    @constraint(model, frc_M_PSD, sc * frc_M in PSDCone())
+    return frc_W
 end
-function set_sdp_phylogeny_constraints!(args...)
-    return nothing
-end
-function set_sdp_phylogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhylogeny,
-                                        key::Symbol)
+function set_sdp_phylogeny_constraints!(model::JuMP.Model,
+                                        plgs::Union{Nothing,
+                                                    <:AbstractPhylogenyConstraintResult,
+                                                    <:AbstractVector{<:AbstractPhylogenyConstraintResult}})
+    if !(isa(plgs, SemiDefinitePhylogeny) ||
+         isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
+        return nothing
+    end
     sc = model[:sc]
     W = set_sdp_constraints!(model)
-    A = adj.A
-    model[key] = @constraint(model, sc * A ⊙ W == 0)
-    if !haskey(model, :variance_flag)
-        key = Symbol(key, :_p)
-        p = adj.p
-        plp = model[key] = @expression(model, p * tr(W))
-        add_to_objective_penalty!(model, plp)
+    for (i, plg) in enumerate(plgs)
+        if !isa(plg, SemiDefinitePhylogeny)
+            continue
+        end
+        key = Symbol(:sdp_plg_, i)
+        A = plg.A
+        model[key] = @constraint(model, sc * A ⊙ W == 0)
+        if !haskey(model, :variance_flag)
+            key = Symbol(key, :_p)
+            p = plg.p
+            plp = model[key] = @expression(model, p * tr(W))
+            add_to_objective_penalty!(model, plp)
+        end
     end
     return nothing
 end
-function set_sdp_frc_phylogeny_constraints!(args...)
-    return nothing
-end
-function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model, adj::SemiDefinitePhylogeny,
-                                            key::Symbol)
+function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
+                                            plgs::Union{Nothing,
+                                                        <:AbstractPhylogenyConstraintResult,
+                                                        <:AbstractVector{<:AbstractPhylogenyConstraintResult}})
+    if !(isa(plgs, SemiDefinitePhylogeny) ||
+         isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
+        return nothing
+    end
     sc = model[:sc]
-    set_sdp_frc_constraints!(model)
-    W = model[:W]
-    A = adj.A
-    model[key] = @constraint(model, sc * A ⊙ W == 0)
-    if !haskey(model, :variance_flag)
-        key = Symbol(key, :_p)
-        p = adj.p
-        plp = model[key] = @expression(model, p * tr(W))
-        add_to_objective_penalty!(model, plp)
+    W = set_sdp_frc_constraints!(model)
+    for (i, plg) in enumerate(plgs)
+        if !isa(plg, SemiDefinitePhylogeny)
+            continue
+        end
+        key = Symbol(:frc_sdp_plg_, i)
+        A = plg.A
+        model[key] = @constraint(model, sc * A ⊙ W == 0)
+        if !haskey(model, :variance_flag)
+            key = Symbol(key, :_p)
+            p = plg.p
+            plp = model[key] = @expression(model, p * tr(W))
+            add_to_objective_penalty!(model, plp)
+        end
     end
     return nothing
 end

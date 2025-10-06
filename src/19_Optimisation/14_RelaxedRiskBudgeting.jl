@@ -151,9 +151,9 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
 end
 function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(rrb.opt,
-                                                                                                                                                     rd;
-                                                                                                                                                     dims = dims)
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, plg, tn, fees, ret) = processed_jump_optimiser_attributes(rrb.opt,
+                                                                                                                                              rd;
+                                                                                                                                              dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)
@@ -162,8 +162,7 @@ function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, rrb.opt.lcm, :lcm_ineq, :lcm_eq)
-    set_mip_constraints!(model, wb, rrb.opt.card, gcard, nplg, cplg, lt, st, fees,
-                         rrb.opt.ss)
+    set_mip_constraints!(model, wb, rrb.opt.card, gcard, plg, lt, st, fees, rrb.opt.ss)
     set_smip_constraints!(model, wb, rrb.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, rrb.opt.ss)
     set_turnover_constraints!(model, tn)
@@ -174,8 +173,7 @@ function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_l2_regularisation!(model, rrb.opt.l2)
     set_non_fixed_fees!(model, fees)
     set_return_constraints!(model, ret, MinimumRisk(), pr; rd = rd)
-    set_sdp_phylogeny_constraints!(model, nplg, :sdp_nplg)
-    set_sdp_phylogeny_constraints!(model, cplg, :sdp_cplg)
+    set_sdp_phylogeny_constraints!(model, plg)
     add_custom_constraint!(model, rrb.opt.ccnt, rrb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rrb.opt.cobj, rrb, pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(pr.X))
@@ -184,10 +182,9 @@ function optimise!(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
                                       ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs,
                                                                        cent, gcard, sgcard,
                                                                        smtx, sgmtx, slt,
-                                                                       sst, sglt, sgst,
-                                                                       nplg, cplg, tn, fees,
-                                                                       ret), prb, retcode,
-                                      sol, ifelse(save, model, nothing))
+                                                                       sst, sglt, sgst, plg,
+                                                                       tn, fees, ret), prb,
+                                      retcode, sol, ifelse(save, model, nothing))
     else
         @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(rrb.fallback, rd; dims = dims, str_names = str_names, save = save,

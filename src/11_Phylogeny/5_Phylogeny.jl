@@ -28,7 +28,7 @@ Keyword arguments correspond to the fields above.
   - If `X` is a matrix:
 
       + Must be symmetric, `issymmetric(X) == true`.
-      + Must have zero diagonal, `all(x -> iszero(x), diag(X)) == true`.
+      + Must have zero diagonal, `all(iszero, diag(X)) == true`.
 
 # Examples
 
@@ -54,7 +54,7 @@ struct PhylogenyResult{T} <: AbstractPhylogenyResult
         @argcheck(!isempty(X))
         if isa(X, AbstractMatrix)
             @argcheck(issymmetric(X))
-            @argcheck(all(x -> iszero(x), diag(X)))
+            @argcheck(all(iszero, diag(X)))
         end
         return new{typeof(X)}(X)
     end

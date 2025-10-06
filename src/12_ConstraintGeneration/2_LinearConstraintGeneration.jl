@@ -1180,8 +1180,8 @@ function get_linear_constraints(lcs::Union{<:ParsingResult,
             end
             At += Ai * c
         end
-        @argcheck(any(x -> !iszero(x), At),
-                  DomainError("At least one entry in At must be non-zero:\nany(x -> !iszero(x), At) => $(any(x -> !iszero(x), At))"))
+        @argcheck(any(!iszero, At),
+                  DomainError("At least one entry in At must be non-zero:\nany(!iszero, At) => $(any(!iszero, At))"))
         d = ifelse(lc.op == ">=", -1, 1)
         flag = d == -1 || lc.op == "<="
         A = At .* d

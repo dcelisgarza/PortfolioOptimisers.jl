@@ -101,14 +101,12 @@ function sdp_rc_variance_flag!(::JuMP.Model,
     return true
 end
 function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool,
-                            cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                        <:IntegerPhylogeny},
-                            nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                        <:IntegerPhylogeny})
+                            plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                       <:AbstractVector{<:AbstractPhylogenyConstraintResult}})
     return if rc_flag ||
               haskey(model, :rc_variance) ||
-              isa(cplg, SemiDefinitePhylogeny) ||
-              isa(nplg, SemiDefinitePhylogeny)
+              isa(plg, SemiDefinitePhylogeny) ||
+              isa(plg, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plg)
         true
     else
         false
@@ -203,13 +201,13 @@ end
 function set_risk!(model::JuMP.Model, i::Any, r::Variance,
                    opt::Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting},
                    pr::AbstractPriorResult,
-                   cplg::Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny},
-                   nplg::Union{Nothing, <:SemiDefinitePhylogeny, <:IntegerPhylogeny},
+                   plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                              <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                    args...; kwargs...)
     rc = linear_constraints(r.rc, opt.opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
     rc_flag = sdp_rc_variance_flag!(model, opt, rc)
-    sdp_flag = sdp_variance_flag!(model, rc_flag, cplg, nplg)
+    sdp_flag = sdp_variance_flag!(model, rc_flag, plg)
     key = Symbol(:variance_risk_, i)
     variance_risk = set_variance_risk!(model, i, r, pr, sdp_flag, key)
     rc_variance_constraints!(model, i, rc, variance_risk)
@@ -218,15 +216,13 @@ end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
-                               cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny},
-                               nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny}, args...; kwargs...)
+                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
+                               args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
-    variance_risk, sdp_flag = set_risk!(model, i, r, opt, pr, cplg, nplg, args...;
-                                        kwargs...)
+    variance_risk, sdp_flag = set_risk!(model, i, r, opt, pr, plg, args...; kwargs...)
     var_bound_expr, var_bound_key = variance_risk_bounds_expr(model, i, sdp_flag)
     ub = variance_risk_bounds_val(sdp_flag, r.settings.ub)
     set_variance_risk_bounds_and_expression!(model, opt, var_bound_expr, ub, var_bound_key,
@@ -235,7 +231,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
 end
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::FactorRiskContribution, pr::AbstractPriorResult, ::Any,
-                               ::Any, ::Any, b1::AbstractMatrix, args...; kwargs...)
+                               ::Any, b1::AbstractMatrix, args...; kwargs...)
     if !haskey(model, :variance_flag)
         @expression(model, variance_flag, true)
     end
@@ -243,7 +239,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                             strict = opt.opt.strict)
     key = Symbol(:variance_risk_, i)
     set_sdp_frc_constraints!(model)
-    W = model[:W]
+    W = model[:frc_W]
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     sigma_W = model[Symbol(:sigma_W_, i)] = @expression(model,
                                                         transpose(b1) * sigma * b1 * W)
@@ -2100,24 +2096,20 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
 end
 function set_risk_tr_constraints!(key::Any, model::JuMP.Model, r::RiskMeasure,
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                                  cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                              <:IntegerPhylogeny},
-                                  nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                              <:IntegerPhylogeny},
+                                  plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                             <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                   fees::Union{Nothing, <:Fees}, args...; kwargs...)
-    return set_risk_constraints!(model, Symbol(key, 1), r, opt, pr, cplg, nplg, fees,
-                                 args...; kwargs...)
+    return set_risk_constraints!(model, Symbol(key, 1), r, opt, pr, plg, fees, args...;
+                                 kwargs...)
 end
 function set_risk_tr_constraints!(key::Any, model::JuMP.Model,
                                   rs::AbstractVector{<:RiskMeasure},
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
-                                  cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                              <:IntegerPhylogeny},
-                                  nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                              <:IntegerPhylogeny},
+                                  plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                             <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                   fees::Union{Nothing, <:Fees}, args...; kwargs...)
     for (i, r) in enumerate(rs)
-        set_risk_constraints!(model, Symbol(key, i), r, opt, pr, cplg, nplg, fees, args...;
+        set_risk_constraints!(model, Symbol(key, i), r, opt, pr, plg, fees, args...;
                               kwargs...)
     end
     return nothing
@@ -2125,10 +2117,8 @@ end
 function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                                <:RiskBudgeting}, pr::AbstractPriorResult,
-                                    cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                <:IntegerPhylogeny},
-                                    nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                <:IntegerPhylogeny},
+                                    plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                               <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                     fees::Union{Nothing, <:Fees}, args...; kwargs...)
     variance_flag = haskey(model, :variance_flag)
     rc_variance = haskey(model, :rc_variance)
@@ -2242,8 +2232,8 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
         unregister(model, :bdvariance_risk)
     end
 
-    risk_expr = set_risk_tr_constraints!(Symbol(:triv_, i, :_), model, r, opt, pr, cplg,
-                                         nplg, fees, args...; kwargs...)
+    risk_expr = set_risk_tr_constraints!(Symbol(:triv_, i, :_), model, r, opt, pr, plg,
+                                         fees, args...; kwargs...)
 
     if !variance_flag && haskey(model, :variance_flag) || haskey(model, :oldvariance_flag)
         model[Symbol(:trdv_, i, :_variance_flag)] = model[:variance_flag]
@@ -2460,10 +2450,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                           <:IndependentVariableTracking},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
-                               cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny},
-                               nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny},
+                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                fees::Union{Nothing, <:Fees}, args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
@@ -2473,8 +2461,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     model[:oldw] = model[:w]
     unregister(model, :w)
     model[:w] = @expression(model, w - wb * k)
-    tracking_risk = set_triv_risk_constraints!(model, i, ri, opt, pr, cplg, nplg, fees,
-                                               args...; kwargs...)
+    tracking_risk = set_triv_risk_constraints!(model, i, ri, opt, pr, plg, fees, args...;
+                                               kwargs...)
     model[Symbol(:triv_, i, :_w)] = model[:w]
     model[:w] = model[:oldw]
     unregister(model, :oldw)
@@ -2484,10 +2472,8 @@ end
 function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                                <:RiskBudgeting}, pr::AbstractPriorResult,
-                                    cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                <:IntegerPhylogeny},
-                                    nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                                <:IntegerPhylogeny},
+                                    plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                               <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                     fees::Union{Nothing, <:Fees}, args...; kwargs...)
     variance_flag = haskey(model, :variance_flag)
     rc_variance = haskey(model, :rc_variance)
@@ -2527,8 +2513,8 @@ function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
         unregister(model, :ceucs_variance)
     end
 
-    risk_expr = set_risk_tr_constraints!(Symbol(:trdv_, i, :_), model, r, opt, pr, cplg,
-                                         nplg, fees, args...; kwargs...)
+    risk_expr = set_risk_tr_constraints!(Symbol(:trdv_, i, :_), model, r, opt, pr, plg,
+                                         fees, args...; kwargs...)
 
     if !variance_flag && haskey(model, :variance_flag) || haskey(model, :oldvariance_flag)
         model[Symbol(:trdv_, i, :_variance_flag)] = model[:variance_flag]
@@ -2606,10 +2592,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                           <:DependentVariableTracking},
                                opt::Union{<:MeanRisk, <:NearOptimalCentering,
                                           <:RiskBudgeting}, pr::AbstractPriorResult,
-                               cplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny},
-                               nplg::Union{Nothing, <:SemiDefinitePhylogeny,
-                                           <:IntegerPhylogeny},
+                               plg::Union{Nothing, <:AbstractPhylogenyConstraintResult,
+                                          <:AbstractVector{<:AbstractPhylogenyConstraintResult}},
                                fees::Union{Nothing, <:Fees}, args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
@@ -2618,7 +2602,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     k = model[:k]
     sc = model[:sc]
     tracking_risk = model[key] = @variable(model)
-    risk_expr = set_trdv_risk_constraints!(model, i, ri, opt, pr, cplg, nplg, fees, args...;
+    risk_expr = set_trdv_risk_constraints!(model, i, ri, opt, pr, plg, fees, args...;
                                            kwargs...)
     dr = model[Symbol(:rdr_, i)] = @expression(model, risk_expr - rb * k)
     model[Symbol(:crtr_noc_, i)] = @constraint(model,

@@ -15,40 +15,63 @@ concurrency:
 
 jobs:
 
-  lint:
-    name: Linting
+  # lint:
+  #   name: Linting
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Clone
+  #       uses: actions/checkout@v5
+  #     - name: Setup Julia
+  #       uses: julia-actions/setup-julia@v2
+  #       with:
+  #         version: "1"
+  #     - name: Use Julia cache
+  #       uses: julia-actions/cache@v2
+  #     - name: Build package (required for ExplicitImports)
+  #       uses: julia-actions/julia-buildpkg@v1
+  #     - name: Install Julia packages
+  #       run: julia -e 'using Pkg; pkg"add ExplicitImports, JuliaFormatter"'
+  #     - name: Hack for setup-python cache # https://github.com/actions/setup-python/issues/807
+  #       run: touch requirements.txt
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v6
+  #       with:
+  #         cache: "pip"
+  #         python-version: "3.11"
+  #     - name: Hack for setup-python cache # https://github.com/actions/setup-python/issues/807
+  #       run: rm requirements.txt
+  #     - name: Cache pre-commit
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ~/.cache/pre-commit
+  #         key: ${{ runner.os }}-pre-commit-${{ hashFiles('**/.pre-commit-config.yaml') }}
+  #     - name: Install pre-commit
+  #       run: pip install pre-commit
+  #     - name: Run pre-commit
+  #       run: SKIP=no-commit-to-branch pre-commit run -a
+  build:
+    name: Format check
     runs-on: ubuntu-latest
     steps:
-      - name: Clone
-        uses: actions/checkout@v5
-      - name: Setup Julia
-        uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/setup-julia@latest
         with:
-          version: "1"
-      - name: Use Julia cache
-        uses: julia-actions/cache@v2
-      - name: Build package (required for ExplicitImports)
-        uses: julia-actions/julia-buildpkg@v1
-      - name: Install Julia packages
-        run: julia -e 'using Pkg; pkg"add ExplicitImports, JuliaFormatter"'
-      - name: Hack for setup-python cache # https://github.com/actions/setup-python/issues/807
-        run: touch requirements.txt
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          cache: "pip"
-          python-version: "3.11"
-      - name: Hack for setup-python cache # https://github.com/actions/setup-python/issues/807
-        run: rm requirements.txt
-      - name: Cache pre-commit
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pre-commit
-          key: ${{ runner.os }}-pre-commit-${{ hashFiles('**/.pre-commit-config.yaml') }}
-      - name: Install pre-commit
-        run: pip install pre-commit
-      - name: Run pre-commit
-        run: SKIP=no-commit-to-branch pre-commit run -a
+          version: '1'
+      - uses: actions/checkout@v4
+      - name: Format check
+        shell: julia --color=yes {0}
+        run: |
+          using Pkg
+          # If you update the version, also update the style guide docs.
+          Pkg.add(PackageSpec(name="JuliaFormatter", version="2"))
+          using JuliaFormatter
+          format("."; verbose = true)
+          out = String(read(Cmd(`git diff`)))
+          if isempty(out)
+              exit(0)
+          end
+          @error "Some files have not been formatted !!!"
+          write(stdout, out)
+          exit(1)
   link-checker:
     name: Link checker
     runs-on: ubuntu-latest

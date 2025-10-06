@@ -1,0 +1,33 @@
+name: Aqua
+
+on:
+  push:
+    branches:
+      - main
+    tags: ["*"]
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: '1'
+      - uses: actions/checkout@v5
+      - name: Aqua
+        shell: julia --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.add(PackageSpec(name="Aqua"))
+          Pkg.develop(PackageSpec(path=pwd()))
+          using PortfolioOptimisers, Aqua
+          Aqua.test_ambiguities(PortfolioOptimisers)
+          Aqua.test_unbound_args(PortfolioOptimisers)
+          Aqua.test_undefined_exports(PortfolioOptimisers)
+          Aqua.test_project_extras(PortfolioOptimisers)
+          Aqua.test_stale_deps(PortfolioOptimisers)
+          Aqua.test_piracies(PortfolioOptimisers)
+          Aqua.test_persistent_tasks(PortfolioOptimisers)
+          Aqua.test_deps_compat(PortfolioOptimisers)

@@ -1,83 +1,67 @@
-struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
-       AbstractPriorResult
-    X::T1
-    mu::T2
-    sigma::T3
-    chol::T4
-    w::T5
-    ens::T6
-    kld::T7
-    ow::T8
-    rr::T9
-    f_mu::T10
-    f_sigma::T11
-    f_w::T12
-    function LowOrderPrior(X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                           chol::Union{Nothing, <:AbstractMatrix},
-                           w::Union{Nothing, <:AbstractWeights},
-                           ens::Union{Nothing, <:Real},
-                           kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
-                           ow::Union{Nothing, <:AbstractVector},
-                           rr::Union{Nothing, <:Regression},
-                           f_mu::Union{Nothing, <:AbstractVector},
-                           f_sigma::Union{Nothing, <:AbstractMatrix},
-                           f_w::Union{Nothing, <:AbstractVector})
-        @argcheck(!isempty(X) && !isempty(mu) && !isempty(sigma))
-        @argcheck(size(X, 2) == length(mu))
-        assert_matrix_issquare(sigma)
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-            @argcheck(length(w) == size(X, 1))
-        end
-        if isa(kld, AbstractVector)
-            @argcheck(!isempty(kld))
-        end
-        if !isnothing(ow)
-            @argcheck(!isempty(ow))
-        end
-        loadings_flag = !isnothing(rr)
-        f_mu_flag = !isnothing(f_mu)
-        f_sigma_flag = !isnothing(f_sigma)
-        if loadings_flag || f_mu_flag || f_sigma_flag
-            @argcheck(loadings_flag && f_mu_flag && f_sigma_flag)
-            @argcheck(!isempty(f_mu) && !isempty(f_sigma))
-            assert_matrix_issquare(f_sigma)
-            @argcheck(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1))
-            @argcheck(size(rr.M, 1) == length(mu))
-            if !isnothing(chol)
-                @argcheck(!isempty(chol))
-                @argcheck(length(mu) == size(chol, 2))
-            end
-            if !isnothing(f_w)
-                @argcheck(!isempty(f_w))
-                @argcheck(length(f_w) == size(X, 1))
-            end
-        end
-        return new{typeof(X), typeof(mu), typeof(sigma), typeof(chol), typeof(w),
-                   typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(f_mu),
-                   typeof(f_sigma), typeof(f_w)}(X, mu, sigma, chol, w, ens, kld, ow, rr,
-                                                 f_mu, f_sigma, f_w)
-    end
+"""
+```julia
+struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_A
+    ce::T1
+    me::T2
+    horizon::T3
 end
-function LowOrderPrior(; X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix,
-                       chol::Union{Nothing, <:AbstractMatrix} = nothing,
-                       w::Union{Nothing, <:AbstractWeights} = nothing,
-                       ens::Union{Nothing, <:Real} = nothing,
-                       kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-                       ow::Union{Nothing, <:AbstractVector} = nothing,
-                       rr::Union{Nothing, <:Regression} = nothing,
-                       f_mu::Union{Nothing, <:AbstractVector} = nothing,
-                       f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
-                       f_w::Union{Nothing, <:AbstractVector} = nothing)
-    return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w)
-end
-function prior_view(pr::LowOrderPrior, i::AbstractVector)
-    chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
-    return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
-                         sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
-                         kld = pr.kld, ow = pr.ow, rr = regression_view(pr.rr, i),
-                         f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w)
-end
+```
+
+Empirical prior estimator for asset returns.
+
+`EmpiricalPrior` is a low order prior estimator that computes the mean and covariance of asset returns using empirical (sample-based) statistics. It supports custom expected returns and covariance estimators, as well as an optional investment horizon for log-normalisation and scaling.
+
+# Fields
+
+  - `ce`: Covariance estimator.
+  - `me`: Expected returns estimator.
+  - `horizon`: Optional investment horizon.
+
+# Constructor
+
+```julia
+EmpiricalPrior(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+               me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+               horizon::Union{Nothing, <:Real} = nothing)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `horizon` is not `nothing`, `horizon > 0`.
+
+# Examples
+
+```jldoctest
+julia> EmpiricalPrior()
+EmpiricalPrior
+       ce | PortfolioOptimisersCovariance
+          |   ce | Covariance
+          |      |    me | SimpleExpectedReturns
+          |      |       |   w | nothing
+          |      |    ce | GeneralWeightedCovariance
+          |      |       |   ce | StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+          |      |       |    w | nothing
+          |      |   alg | Full()
+          |   mp | DefaultMatrixProcessing
+          |      |       pdm | Posdef
+          |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+          |      |   denoise | nothing
+          |      |    detone | nothing
+          |      |       alg | nothing
+       me | SimpleExpectedReturns
+          |   w | nothing
+  horizon | nothing
+```
+
+# Related
+
+  - [`AbstractLowOrderPriorEstimator_A`](@ref)
+  - [`SimpleExpectedReturns`](@ref)
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`prior`](@ref)
+"""
 struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_A
     ce::T1
     me::T2
@@ -85,6 +69,9 @@ struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_A
     function EmpiricalPrior(ce::StatsBase.CovarianceEstimator,
                             me::AbstractExpectedReturnsEstimator,
                             horizon::Union{Nothing, <:Real})
+        if !isnothing(horizon)
+            @argcheck(horizon > 0)
+        end
         return new{typeof(ce), typeof(me), typeof(horizon)}(ce, me, horizon)
     end
 end
@@ -98,6 +85,38 @@ function factory(pe::EmpiricalPrior, w::Union{Nothing, <:AbstractWeights} = noth
     return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
                           horizon = pe.horizon)
 end
+"""
+```julia
+prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, args...; dims::Int = 1,
+      kwargs...)
+```
+
+Compute empirical prior moments for asset returns (no horizon adjustment).
+
+`prior` estimates the mean and covariance of asset returns using the specified empirical prior estimator, without log-normalisation or scaling for investment horizon. The mean and covariance are computed using the estimators stored in `pe`, and returned in a [`LowOrderPrior`](@ref) result.
+
+# Arguments
+
+  - `pe`: Empirical prior estimator.
+  - `X`: Asset returns matrix (observations × assets).
+  - `args...`: Additional positional arguments (ignored).
+  - `dims`: Dimension along which to compute moments.
+  - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
+
+# Validation
+
+  - `dims in (1, 2)`.
+
+# Related
+
+  - [`EmpiricalPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`prior`](@ref)
+"""
 function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, args...;
                dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
@@ -108,6 +127,38 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::AbstractMatrix, arg
     sigma = cov(pe.ce, X; kwargs...)
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
 end
+"""
+```julia
+prior(pe::EmpiricalPrior{<:Any, <:Any, <:Real}, X::AbstractMatrix, args...; dims::Int = 1,
+      kwargs...)
+```
+
+Compute empirical prior moments for asset returns with investment horizon adjustment.
+
+`prior` estimates the mean and covariance of asset returns using the specified empirical prior estimator, applying log-normalisation and scaling for the investment horizon. The asset returns are log-transformed, moments are computed using the estimators stored in `pe`, and then rescaled according to the investment horizon. The final mean and covariance are transformed back to arithmetic returns and returned in a [`LowOrderPrior`](@ref) result.
+
+# Arguments
+
+  - `pe`: Empirical prior estimator.
+  - `X`: Asset returns matrix (observations × assets).
+  - `args...`: Additional positional arguments (ignored).
+  - `dims`: Dimension along which to compute moments.
+  - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
+
+# Returns
+
+  - `pr::LowOrderPrior`: Result object containing asset returns, mean vector, and covariance matrix.
+
+# Validation
+
+  - `dims in (1, 2)`.
+
+# Related
+
+  - [`EmpiricalPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`prior`](@ref)
+"""
 function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Real}, X::AbstractMatrix, args...;
                dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
@@ -125,4 +176,4 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Real}, X::AbstractMatrix, args
     return LowOrderPrior(; X = X, mu = mu, sigma = sigma)
 end
 
-export EmpiricalPrior, LowOrderPrior
+export EmpiricalPrior

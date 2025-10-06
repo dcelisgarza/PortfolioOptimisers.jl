@@ -116,9 +116,9 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
 end
 function optimise!(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, nplg, cplg, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
-                                                                                                                                                     rd;
-                                                                                                                                                     dims = dims)
+    (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, plg, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
+                                                                                                                                              rd;
+                                                                                                                                              dims = dims)
     model = JuMP.Model()
     set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
@@ -126,20 +126,19 @@ function optimise!(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
     set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
     set_linear_weight_constraints!(model, rb.opt.lcm, :lcm_ineq, :lcm_eq)
-    set_mip_constraints!(model, wb, rb.opt.card, gcard, nplg, cplg, lt, st, fees, rb.opt.ss)
+    set_mip_constraints!(model, wb, rb.opt.card, gcard, plg, lt, st, fees, rb.opt.ss)
     set_smip_constraints!(model, wb, rb.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, rb.opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, rb.opt.te, rb, nplg, cplg, fees; rd = rd)
+    set_tracking_error_constraints!(model, pr, rb.opt.te, rb, plg, fees; rd = rd)
     set_number_effective_assets!(model, rb.opt.nea)
     set_l1_regularisation!(model, rb.opt.l1)
     set_l2_regularisation!(model, rb.opt.l2)
     set_non_fixed_fees!(model, fees)
-    set_risk_constraints!(model, rb.r, rb, pr, nplg, cplg, fees; rd = rd)
+    set_risk_constraints!(model, rb.r, rb, pr, plg, fees; rd = rd)
     scalarise_risk_expression!(model, rb.opt.sce)
     set_return_constraints!(model, ret, MinimumRisk(), pr; rd = rd)
-    set_sdp_phylogeny_constraints!(model, nplg, :sdp_nplg)
-    set_sdp_phylogeny_constraints!(model, cplg, :sdp_cplg)
+    set_sdp_phylogeny_constraints!(model, plg)
     add_custom_constraint!(model, rb.opt.ccnt, rb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
@@ -148,10 +147,9 @@ function optimise!(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
                                       ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs,
                                                                        cent, gcard, sgcard,
                                                                        smtx, sgmtx, slt,
-                                                                       sst, sglt, sgst,
-                                                                       nplg, cplg, tn, fees,
-                                                                       ret), prb, retcode,
-                                      sol, ifelse(save, model, nothing))
+                                                                       sst, sglt, sgst, plg,
+                                                                       tn, fees, ret), prb,
+                                      retcode, sol, ifelse(save, model, nothing))
     else
         @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
         optimise!(rb.fallback, rd; dims = dims, str_names = str_names, save = save,
