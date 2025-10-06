@@ -1,6 +1,6 @@
 """
 ```julia
-block_vec_pq(A, p, q)
+block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
 ```
 
 Block vectorisation operator.
@@ -39,7 +39,7 @@ julia> PortfolioOptimisers.block_vec_pq(A, 2, 2)
 
   - [`dup_elim_sum_matrices`](@ref)
 """
-function block_vec_pq(A, p, q)
+function block_vec_pq(A::AbstractMatrix, p::Integer, q::Integer)
     mp, nq = size(A)
 
     if !(mod(mp, p) == 0 && mod(nq, q) == 0)
@@ -115,7 +115,6 @@ function duplication_matrix(n::Int, diag::Bool = true)
                 push!(filtered_cols, cols[v[i]])
             end
         end
-
         sparse(filtered_rows, filtered_cols, 1, nsq, m)
     end
 end
