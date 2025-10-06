@@ -596,116 +596,62 @@ function prior_view(pr::LowOrderPrior, i::AbstractVector)
 end
 """
 ```julia
-struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14} <:
-       AbstractPriorResult
-    X::T1
-    mu::T2
-    sigma::T3
-    chol::T4
-    w::T5
-    ens::T6
-    kld::T7
-    ow::T8
-    rr::T9
-    f_mu::T10
-    f_sigma::T11
-    f_w::T12
-    coskew::T13
-    cokurt::T14
+struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
+    pr::T1
+    kt::T2
+    L2::T3
+    S2::T4
+    sk::T5
+    V::T6
+    skmp::T7
 end
 ```
 
 Container type for high order prior results in PortfolioOptimisers.jl.
 
-`HighOrderPrior` stores the output of high order prior estimation routines, including asset returns, mean vector, covariance matrix, Cholesky factor, weights, entropy, Kullback-Leibler divergence, outlier weights, regression results, optional factor moments, coskewness, and cokurtosis tensors. It is used throughout the package to represent validated prior information for portfolio optimisation and analytics involving higher moments.
+`HighOrderPrior` stores the output of high order prior estimation routines, including low order prior results, cokurtosis tensor, elimination and summation matrices, coskewness tensor, quadratic skewness matrix, and matrix processing estimator. It is used throughout the package to represent validated prior information for portfolio optimisation and analytics involving higher moments.
 
 # Fields
 
-  - `X`: Asset returns matrix.
-  - `mu`: Mean vector.
-  - `sigma`: Covariance matrix.
-  - `chol`: Cholesky factor of covariance matrix.
-  - `w`: Asset weights.
-  - `ens`: Entropy.
-  - `kld`: Kullback-Leibler divergence.
-  - `ow`: Opinion pooling weights.
-  - `rr`: Regression result.
-  - `f_mu`: Factor mean vector.
-  - `f_sigma`: Factor covariance matrix.
-  - `f_w`: Factor weights.
-  - `coskew`: Coskewness tensor.
-  - `cokurt`: Cokurtosis tensor.
+  - `pr`: Prior result for low order moments (`AbstractPriorResult`).
+  - `kt`: Cokurtosis tensor (`N^2 × N^2` matrix).
+  - `L2`: Elimination matrix (`div(N * (N + 1), 2) × N^2`).
+  - `S2`: Summation matrix (`div(N * (N + 1), 2) × N^2`).
+  - `sk`: Coskewness tensor (`N × N^2` matrix).
+  - `V`: Negative quadratic skewness matrix (`N × N`).
+  - `skmp`: Matrix processing estimator for post-processing quadratic skewness.
 
 # Constructor
 
 ```julia
-HighOrderPrior(X::AbstractMatrix, mu::AbstractVector, sigma::AbstractMatrix;
-               chol::Union{Nothing, <:AbstractMatrix} = nothing,
-               w::Union{Nothing, <:AbstractWeights} = nothing,
-               ens::Union{Nothing, <:Real} = nothing,
-               kld::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
-               ow::Union{Nothing, <:AbstractVector} = nothing,
-               rr::Union{Nothing, <:Regression} = nothing,
-               f_mu::Union{Nothing, <:AbstractVector} = nothing,
-               f_sigma::Union{Nothing, <:AbstractMatrix} = nothing,
-               f_w::Union{Nothing, <:AbstractVector} = nothing,
-               coskew::Union{Nothing, <:AbstractArray} = nothing,
-               cokurt::Union{Nothing, <:AbstractArray} = nothing)
+HighOrderPrior(pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix},
+               L2::Union{Nothing, <:AbstractMatrix}, S2::Union{Nothing, <:AbstractMatrix},
+               sk::Union{Nothing, <:AbstractMatrix}, V::Union{Nothing, <:AbstractMatrix},
+               skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator})
+HighOrderPrior(; pr::AbstractPriorResult, kt::Union{Nothing, <:AbstractMatrix} = nothing,
+               L2::Union{Nothing, <:AbstractMatrix} = nothing,
+               S2::Union{Nothing, <:AbstractMatrix} = nothing,
+               sk::Union{Nothing, <:AbstractMatrix} = nothing,
+               V::Union{Nothing, <:AbstractMatrix} = nothing,
+               skmp::Union{Nothing, <:AbstractMatrixProcessingEstimator} = nothing)
 ```
 
 Keyword arguments correspond to the fields above.
 
 ## Validation
 
-  - `X`, `mu`, and `sigma` must be non-empty.
-  - `size(X, 2) == length(mu)`.
-  - `sigma` must be square.
-  - If `w` is provided, it must be non-empty and `length(w) == size(X, 1)`.
-  - If `kld` is a vector, it must be non-empty.
-  - If `ow` is provided, it must be non-empty.
-  - If regression or factor moments are provided, all must be present and non-empty, and dimensions must match.
-  - If `chol`, `f_w`, `coskew`, or `cokurt` are provided, they must be non-empty and have correct dimensions.
+  - If any of `kt`, `L2`, or `S2` are provided, all must be provided, non-empty and have compatible dimensions.
+  - If `sk` or `V` are provided, both must be non-empty and have compatible dimensions.
+  - If only one of `sk` or `V` is provided, both must be provided.
 
-# Exmples
-
-```jldoctest
-julia> using StableRNGs
-
-julia> rng = StableRNG(1234);
-
-julia> X = rand(rng, 30, 3);
-
-julia> HighOrderPrior(LowOrderPrior(; X = X, mu = vec(mean(X; dims = 1)), sigma = cov(X)),
-                      cokurtosis(Cokurtosis(), X), PortfolioOptimisers.elimination_matrix(3),
-                      PortfolioOptimisers.summation_matrix(3), coskewness(Coskewness(), X)...,
-                      nothing)
-HighOrderPrior
-    pr | LowOrderPrior
-       |         X | 30×3 Matrix{Float64}
-       |        mu | Vector{Float64}: [0.4344395582263021, 0.4828107025557837, 0.49205915481935103]
-       |     sigma | 3×3 Matrix{Float64}
-       |      chol | nothing
-       |         w | nothing
-       |       ens | nothing
-       |       kld | nothing
-       |        ow | nothing
-       |        rr | nothing
-       |      f_mu | nothing
-       |   f_sigma | nothing
-       |       f_w | nothing
-    kt | 9×9 Matrix{Float64}
-    L2 | 6×9 SparseArrays.SparseMatrixCSC{Int64, Int64}
-    S2 | 6×9 SparseArrays.SparseMatrixCSC{Int64, Int64}
-    sk | 3×9 Matrix{Float64}
-     V | 3×3 Matrix{Float64}
-  skmp | nothing
-```
+# Examples
 
 # Related
 
   - [`AbstractPriorResult`](@ref)
-  - [`prior`](@ref)
   - [`LowOrderPrior`](@ref)
+  - [`HighOrderPriorEstimator`](@ref)
+  - [`prior`](@ref)
 """
 struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
     pr::T1

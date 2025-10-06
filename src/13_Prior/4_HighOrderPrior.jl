@@ -1,3 +1,44 @@
+"""
+```julia
+block_vec_pq(A, p, q)
+```
+
+Block vectorisation operator.
+
+`block_vec_pq` transforms a matrix `A` into a block vectorised form, partitioning `A` into blocks of size `(p, q)` and stacking the vectorised blocks row-wise. This is useful for higher-order moment computations and tensor manipulations in portfolio analytics.
+
+# Arguments
+
+  - `A`: Input matrix of size `(m * p, n * q)`, where `m` and `n` are integers.
+  - `p`: Number of rows in each block.
+  - `q`: Number of columns in each block.
+
+# Returns
+
+  - `A_vec::Matrix`: Block vectorised matrix of size `(m * n, p * q)`.
+
+# Validation
+
+  - `size(A, 1)` must be an integer multiple of `p`.
+  - `size(A, 2)` must be an integer multiple of `q`.
+
+# Examples
+
+```jldoctest
+julia> A = [1 2 3 4; 5 6 7 8; 9 10 11 12; 13 14 15 16];
+
+julia> PortfolioOptimisers.block_vec_pq(A, 2, 2)
+4×4 Matrix{Int64}:
+  1   5   2   6
+  9  13  10  14
+  3   7   4   8
+ 11  15  12  16
+```
+
+# Related
+
+  - [`dup_elim_sum_matrices`](@ref)
+"""
 function block_vec_pq(A, p, q)
     mp, nq = size(A)
 
@@ -150,6 +191,71 @@ function summation_matrix(n::Int, diag::Bool = true)
     end
 end
 # COV_EXCL_STOP
+"""
+```julia
+dup_elim_sum_matrices(n::Int)
+```
+
+Construct duplication, elimination, and summation matrices for symmetric matrix vectorisation.
+
+`dup_elim_sum_matrices` returns the duplication matrix `D`, elimination matrix `L`, and summation matrix `S` for symmetric matrices of size `n × n`. These matrices are used in higher-order moment computations, tensor manipulations, and efficient vectorisation of symmetric matrices in portfolio analytics.
+
+# Arguments
+
+  - `n`: Size of the symmetric matrix (integer).
+
+# Returns
+
+  - `(D, L, S)`: Tuple of three `SparseMatrixCSC{Int64, Int64}` sparse matrices:
+
+      + `D`: Duplication matrix (`n^2 × m`), where `m = n(n+1)/2`.
+      + `L`: Elimination matrix (`m × n^2`).
+      + `S`: Summation matrix (`m × n^2`).
+
+# Validation
+
+  - `n` must be a positive integer.
+
+# Examples
+
+```jldoctest
+julia> D, L, S = PortfolioOptimisers.dup_elim_sum_matrices(3);
+
+julia> D
+9×6 SparseArrays.SparseMatrixCSC{Int64, Int64} with 9 stored entries:
+ 1  ⋅  ⋅  ⋅  ⋅  ⋅
+ ⋅  1  ⋅  ⋅  ⋅  ⋅
+ ⋅  ⋅  1  ⋅  ⋅  ⋅
+ ⋅  1  ⋅  ⋅  ⋅  ⋅
+ ⋅  ⋅  ⋅  1  ⋅  ⋅
+ ⋅  ⋅  ⋅  ⋅  1  ⋅
+ ⋅  ⋅  1  ⋅  ⋅  ⋅
+ ⋅  ⋅  ⋅  ⋅  1  ⋅
+ ⋅  ⋅  ⋅  ⋅  ⋅  1
+
+julia> L
+6×9 SparseArrays.SparseMatrixCSC{Int64, Int64} with 6 stored entries:
+ 1  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅
+ ⋅  1  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅
+ ⋅  ⋅  1  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅
+ ⋅  ⋅  ⋅  ⋅  1  ⋅  ⋅  ⋅  ⋅
+ ⋅  ⋅  ⋅  ⋅  ⋅  1  ⋅  ⋅  ⋅
+ ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  1
+
+julia> S
+6×9 SparseArrays.SparseMatrixCSC{Int64, Int64} with 6 stored entries:
+ 1  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅
+ ⋅  2  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅
+ ⋅  ⋅  2  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅
+ ⋅  ⋅  ⋅  ⋅  1  ⋅  ⋅  ⋅  ⋅
+ ⋅  ⋅  ⋅  ⋅  ⋅  2  ⋅  ⋅  ⋅
+ ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  1
+```
+
+# Related
+
+  - [`block_vec_pq`](@ref)
+"""
 function dup_elim_sum_matrices(n::Int)
     m = div(n * (n + 1), 2)
     nsq = n^2
@@ -224,6 +330,94 @@ function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
+"""
+```julia
+struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
+    pe::T1
+    kte::T2
+    ske::T3
+end
+```
+
+High order prior estimator for asset returns.
+
+`HighOrderPriorEstimator` is a composite estimator that computes high order moments (coskewness and cokurtosis) for asset returns, in addition to low order moments (mean and covariance). It combines a low order prior estimator, a cokurtosis estimator, and a coskewness estimator to produce a [`HighOrderPrior`](@ref) result containing all relevant moments for advanced portfolio analytics.
+
+# Fields
+
+  - `pe`: Low order prior estimator (`AbstractLowOrderPriorEstimator_A_F_AF`).
+  - `kte`: Cokurtosis estimator (`CokurtosisEstimator` or `Nothing`).
+  - `ske`: Coskewness estimator (`CoskewnessEstimator` or `Nothing`).
+
+# Constructor
+
+```julia
+HighOrderPriorEstimator(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+                        kte::Union{Nothing, <:CokurtosisEstimator} = Cokurtosis(;
+                                                                                alg = Full()),
+                        ske::Union{Nothing, <:CoskewnessEstimator} = Coskewness(;
+                                                                                alg = Full()))
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - All estimators must be valid and subtype the appropriate abstract types.
+  - If provided, `kte` and `ske` must be compatible with the input data.
+
+# Examples
+
+```jldoctest
+julia> HighOrderPriorEstimator()
+HighOrderPriorEstimator
+   pe | EmpiricalPrior
+      |        ce | PortfolioOptimisersCovariance
+      |           |   ce | Covariance
+      |           |      |    me | SimpleExpectedReturns
+      |           |      |       |   w | nothing
+      |           |      |    ce | GeneralWeightedCovariance
+      |           |      |       |   ce | SimpleCovariance: SimpleCovariance(true)
+      |           |      |       |    w | nothing
+      |           |      |   alg | Full()
+      |           |   mp | DefaultMatrixProcessing
+      |           |      |       pdm | Posdef
+      |           |      |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+      |           |      |   denoise | nothing
+      |           |      |    detone | nothing
+      |           |      |       alg | nothing
+      |        me | SimpleExpectedReturns
+      |           |   w | nothing
+      |   horizon | nothing
+  kte | Cokurtosis
+      |    me | SimpleExpectedReturns
+      |       |   w | nothing
+      |    mp | DefaultMatrixProcessing
+      |       |       pdm | Posdef
+      |       |           |   alg | UnionAll: NearestCorrelationMatrix.Newton
+      |       |   denoise | nothing
+      |       |    detone | nothing
+      |       |       alg | nothing
+      |   alg | Full()
+  ske | Coskewness
+      |    me | SimpleExpectedReturns
+      |       |   w | nothing
+      |    mp | NonPositiveDefiniteMatrixProcessing
+      |       |   denoise | nothing
+      |       |    detone | nothing
+      |       |       alg | nothing
+      |   alg | Full()
+```
+
+# Related
+
+  - [`AbstractHighOrderPriorEstimator`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`EmpiricalPrior`](@ref)
+  - [`CokurtosisEstimator`](@ref)
+  - [`CoskewnessEstimator`](@ref)
+  - [`prior`](@ref)
+"""
 struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
     pe::T1
     kte::T2
@@ -256,6 +450,38 @@ function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
+"""
+    prior(pe::HighOrderPriorEstimator, X::AbstractMatrix, F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
+
+Compute high order prior moments for asset returns using a composite estimator.
+
+`prior` estimates the mean, covariance, coskewness, and cokurtosis of asset returns using the specified high order prior estimator. It first computes low order moments (mean and covariance) using the embedded prior estimator, then computes coskewness and cokurtosis tensors using the provided coskewness and cokurtosis estimators. Optionally, factor returns `F` can be provided for factor-based estimation. The result is returned as a [`HighOrderPrior`](@ref) object.
+
+# Arguments
+
+  - `pe`: High order prior estimator (`HighOrderPriorEstimator`).
+  - `X`: Asset returns matrix (observations × assets).
+  - `F`: Optional factor returns matrix (observations × factors).
+  - `dims`: Dimension along which to compute moments.
+  - `kwargs...`: Additional keyword arguments passed to underlying estimators.
+
+# Returns
+
+  - `pr::HighOrderPrior`: Result object containing asset returns, mean vector, covariance matrix, coskewness tensor, cokurtosis tensor, and related quantities.
+
+# Validation
+
+  - `dims in (1, 2)`.
+
+# Related
+
+  - [`HighOrderPriorEstimator`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`EmpiricalPrior`](@ref)
+  - [`CokurtosisEstimator`](@ref)
+  - [`CoskewnessEstimator`](@ref)
+  - [`prior`](@ref)
+"""
 function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
                F::Union{Nothing, <:AbstractMatrix} = nothing; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
