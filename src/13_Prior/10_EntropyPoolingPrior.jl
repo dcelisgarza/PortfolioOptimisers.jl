@@ -273,8 +273,8 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
     var_views = replace_group_by_assets(var_views, sets, false, true, false)
     var_views = replace_prior_views(var_views, pr, sets, :var, alpha; strict = strict)
     lcs = get_linear_constraints(var_views, sets; datatype = eltype(pr.X), strict = strict)
-    if !isnothing(lcs.ineq) && !any(iszero ∘ isone, lcs.A_ineq) ||
-       !isnothing(lcs.eq) && !any(iszero ∘ isone, lcs.A_eq)
+    if !isnothing(lcs.ineq) && !any(x -> (iszero(x) || isone(x)), lcs.A_ineq) ||
+       !isnothing(lcs.eq) && !any(x -> (iszero(x) || isone(x)), lcs.A_eq)
         throw(ArgumentError("`var_view` only supports coefficients of 1.\n$var_views"))
     end
     if !isnothing(lcs.ineq) && any(x -> x != 1, count(!iszero, lcs.A_ineq; dims = 2)) ||
