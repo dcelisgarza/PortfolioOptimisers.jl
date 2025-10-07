@@ -85,9 +85,9 @@ function finite_sub_allocation!(w::AbstractVector, p::AbstractVector, cash::Real
     idx = invperm(idx)
     return view(shares, idx), view(cost, idx), view(aw, idx), acash
 end
-function optimise!(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
-                   cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
-                   fees::Union{Nothing, <:Fees} = nothing; kwargs...)
+function optimise(ga::GreedyAllocation, w::AbstractVector, p::AbstractVector,
+                  cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
+                  fees::Union{Nothing, <:Fees} = nothing; kwargs...)
     @argcheck(!isempty(w) && !isempty(p) && length(w) == length(p))
     @argcheck(cash > zero(cash))
     if !isnothing(fees)

@@ -88,12 +88,12 @@ mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
 #=
 ### 2.3 Performing the optimisation
 
-The `optimise!` function is used to perform all optimisations in `PortfolioOptimisers`. Each method returns an `AbstractResult` object containing the optimisation results, which include a return code, a solution object, and relevant statistics (precomputed or otherwise) used in the optimisation.
+The `optimise` function is used to perform all optimisations in `PortfolioOptimisers`. Each method returns an `AbstractResult` object containing the optimisation results, which include a return code, a solution object, and relevant statistics (precomputed or otherwise) used in the optimisation.
 
 The field `retcode` informs us that our optimisation was successful because it contains an `OptimisationSuccess` return code.
 =#
 
-res = optimise!(mr, rd)
+res = optimise(mr, rd)
 
 #=
 Lets view the solution results as a pretty table. For convenience, we have ensured all `AbstractResult` have a property called `w`, which directly accesses `sol.w`. The optimisations don't shuffle the asset order, so we can simply view the asset names and weights side by side.
@@ -122,7 +122,7 @@ Luckily, we have the optimal weights, the latest prices are the last entry of ou
 The function can optionally take extra positional arguments to account for a variety of fees, but we will not use them here.
 =#
 
-mip_res = optimise!(da, res.w, vec(values(X[end])), 4206.9)
+mip_res = optimise(da, res.w, vec(values(X[end])), 4206.9)
 
 #=
 The result of this optimisation contains different pieces of information to the previous one. The reason various fields are prefixed by `l_`or `s_` is because the discrete allocation method splits the assets into long and short positions, which are recombined in the final result.

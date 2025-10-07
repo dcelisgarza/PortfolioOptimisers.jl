@@ -35,8 +35,8 @@ end
 function opt_view(opt::AbstractVector{<:AbstractOptimisationEstimator}, args...)
     return [opt_view(opti, args...) for opti in opt]
 end
-function optimise! end
-function optimise!(or::OptimisationResult, args...)
+function optimise end
+function optimise(or::OptimisationResult, args...)
     return or
 end
 function assert_internal_optimiser(::OptimisationResult)
@@ -54,4 +54,4 @@ function predict_outer_estimator_returns(opt::OptimisationEstimator, rd::Returns
     return pr.X * wi, rd.F, rd.ts, iv, ivpa
 end
 
-export optimise!, OptimisationSuccess, OptimisationFailure
+export optimise, OptimisationSuccess, OptimisationFailure

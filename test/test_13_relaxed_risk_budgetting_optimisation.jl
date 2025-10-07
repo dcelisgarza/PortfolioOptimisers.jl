@@ -74,7 +74,7 @@
         for (i, alg) in enumerate(algs)
             opt = JuMPOptimiser(; pe = pr, slv = slv)
             rb = RelaxedRiskBudgeting(; opt = opt, alg = alg)
-            res = optimise!(rb)
+            res = optimise(rb)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)
             v1, m1 = findmin(rkc)
@@ -115,7 +115,7 @@
                                                                rkb = RiskBudgetResult(;
                                                                                       val = 20:-1:1)),
                                       alg = alg)
-            res = optimise!(rb)
+            res = optimise(rb)
             @test isa(res.retcode, OptimisationSuccess)
             rkc = risk_contribution(r, res.w, pr.X)
             v1, m1 = findmin(rkc)
@@ -135,14 +135,14 @@
             @test success
         end
 
-        res = optimise!(RelaxedRiskBudgeting(; wi = w0,
-                                             opt = JuMPOptimiser(; pe = pr,
-                                                                 slv = Solver(;
-                                                                              solver = Clarabel.Optimizer,
-                                                                              settings = ["verbose" => false,
-                                                                                          "max_iter" => 1])),
-                                             fallback = InverseVolatility(; pe = pr)))
-        @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
+        res = optimise(RelaxedRiskBudgeting(; wi = w0,
+                                            opt = JuMPOptimiser(; pe = pr,
+                                                                slv = Solver(;
+                                                                             solver = Clarabel.Optimizer,
+                                                                             settings = ["verbose" => false,
+                                                                                         "max_iter" => 1])),
+                                            fallback = InverseVolatility(; pe = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
     end
     @testset "Factor Risk Budgeting" begin
         r = factory(StandardDeviation(), pr, slv)
@@ -154,7 +154,7 @@
         rr = regression(StepwiseRegression(), rd)
         for (i, alg) in enumerate(algs)
             rb = RelaxedRiskBudgeting(; opt = opt, rba = FactorRiskBudgeting(; re = rr))
-            res = optimise!(rb, rd)
+            res = optimise(rb, rd)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
                                            re = res.prb.rr)
             v1 = minimum(rkc[1:5])
@@ -182,7 +182,7 @@
                                       rba = FactorRiskBudgeting(; re = rr,
                                                                 rkb = RiskBudgetResult(;
                                                                                        val = 1:5)))
-            res = optimise!(rb, rd)
+            res = optimise(rb, rd)
             rkc = factor_risk_contribution(factory(r, pr, slv), res.w, pr.X;
                                            re = res.prb.rr)
             v1 = minimum(rkc[1:5])

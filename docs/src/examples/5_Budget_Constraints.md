@@ -106,7 +106,7 @@ You can see that `wb` is of type `WeightBounds`, `lb = 0.0` (asset weights lower
 We can check that the constraints were satisfied.
 
 ````@example 5_Budget_Constraints
-res1 = optimise!(mr1)
+res1 = optimise(mr1)
 println("budget: $(sum(res1.w))")
 println("long budget: $(sum(res1.w[res1.w .>= zero(eltype(res1.w))]))")
 println("short budget: $(sum(res1.w[res1.w .< zero(eltype(res1.w))]))")
@@ -117,7 +117,7 @@ Now lets allocate a finite amount of capital, `4206.9`, to this portfolio.
 
 ````@example 5_Budget_Constraints
 da = DiscreteAllocation(; slv = mip_slv)
-mip_res1 = optimise!(da, res1.w, vec(values(X[end])), 4206.9)
+mip_res1 = optimise(da, res1.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res1.shares, :cost => mip_res1.cost,
                        :opt_weights => res1.w, :mip_weights => mip_res1.w);
              formatters = mipresfmt)
@@ -144,7 +144,7 @@ opt2 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Weight bounds.
                      wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr2 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt2)
-res2 = optimise!(mr2)
+res2 = optimise(mr2)
 println("budget: $(sum(res2.w))")
 println("long budget: $(sum(res2.w[res2.w .>= zero(eltype(res2.w))]))")
 println("short budget: $(sum(res2.w[res2.w .< zero(eltype(res2.w))]))")
@@ -156,7 +156,7 @@ Lets allocate a finite amount of capital. Since we set the long and short budget
 The discrete allocation procedure automatically adjusts the cash amount depending on the optimal long and short weights, so there is no need to split the cash amount into long and short allocations.
 
 ````@example 5_Budget_Constraints
-mip_res2 = optimise!(da, res2.w, vec(values(X[end])), 4206.9)
+mip_res2 = optimise(da, res2.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res2.shares, :cost => mip_res2.cost,
                        :opt_weights => res2.w, :mip_weights => mip_res2.w);
              formatters = mipresfmt)
@@ -178,7 +178,7 @@ opt3 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Weight bounds.
                      wb = WeightBounds(; lb = -1.0, ub = 0.0))
 mr3 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt3)
-res3 = optimise!(mr3)
+res3 = optimise(mr3)
 println("budget: $(sum(res3.w))")
 println("long budget: $(sum(res3.w[res3.w .>= zero(eltype(res3.w))]))")
 println("short budget: $(sum(res3.w[res3.w .< zero(eltype(res3.w))]))")
@@ -188,7 +188,7 @@ println("weight bounds: $(all(x -> -one(x) <= x <= zero(x), res3.w))")
 We can confirm that the finite allocation behaves as expected.
 
 ````@example 5_Budget_Constraints
-mip_res3 = optimise!(da, res3.w, vec(values(X[end])), 4206.9)
+mip_res3 = optimise(da, res3.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res3.shares, :cost => mip_res3.cost,
                        :opt_weights => res3.w, :mip_weights => mip_res3.w);
              formatters = mipresfmt)
@@ -206,7 +206,7 @@ Lets try a leveraged long-only portfolio.
 ````@example 5_Budget_Constraints
 opt4 = JuMPOptimiser(; pe = pr, slv = slv, bgt = 1.3)
 mr4 = MeanRisk(; r = r, opt = opt4)
-res4 = optimise!(mr4)
+res4 = optimise(mr4)
 println("budget: $(sum(res4.w))")
 println("long budget: $(sum(res4.w[res4.w .>= zero(eltype(res4.w))]))")
 println("short budget: $(sum(res4.w[res4.w .< zero(eltype(res4.w))]))")
@@ -216,7 +216,7 @@ println("weight bounds: $(all(x -> zero(x) <= x <= one(x), res4.w))")
 Again, the finite allocation respects the budget constraints.
 
 ````@example 5_Budget_Constraints
-mip_res4 = optimise!(da, res4.w, vec(values(X[end])), 4206.9)
+mip_res4 = optimise(da, res4.w, vec(values(X[end])), 4206.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res4.shares, :cost => mip_res4.cost,
                        :opt_weights => res4.w, :mip_weights => mip_res4.w);
              formatters = mipresfmt)
@@ -240,7 +240,7 @@ opt5 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Weight bounds.
                      wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr5 = MeanRisk(; r = r, opt = opt5)
-res5 = optimise!(mr5)
+res5 = optimise(mr5)
 println("budget: $(sum(res5.w))")
 println("long budget: $(sum(res5.w[res5.w .>= zero(eltype(res5.w))]))")
 println("short budget: $(sum(res5.w[res5.w .< zero(eltype(res5.w))]))")
@@ -250,7 +250,7 @@ println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res5.w))")
 For this portfolio, the sum of the long and short cost will be approximately equal to half the allocated value of `4206.9`. Any discrepancies are due to the fact we are allocating a finite amount.
 
 ````@example 5_Budget_Constraints
-mip_res5 = optimise!(da, res5.w, vec(values(X[end])), 4506.9)
+mip_res5 = optimise(da, res5.w, vec(values(X[end])), 4506.9)
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res5.shares, :cost => mip_res5.cost,
                        :opt_weights => res5.w, :mip_weights => mip_res5.w);
              formatters = mipresfmt)
@@ -276,7 +276,7 @@ opt6 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Weight bounds.
                      wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr6 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt6)
-res6 = optimise!(mr6)
+res6 = optimise(mr6)
 println("budget: $(sum(res6.w))")
 println("long budget: $(sum(res6.w[res6.w .>= zero(eltype(res6.w))]))")
 println("short budget: $(sum(res6.w[res6.w .< zero(eltype(res6.w))]))")
@@ -296,7 +296,7 @@ opt7 = JuMPOptimiser(; pe = pr, slv = slv,
                      # Weight bounds.
                      wb = WeightBounds(; lb = -1.0, ub = 1.0))
 mr7 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt7)
-res7 = optimise!(mr7)
+res7 = optimise(mr7)
 println("budget: $(sum(res7.w))")
 println("long budget: $(sum(res7.w[res7.w .>= zero(eltype(res7.w))]))")
 println("short budget: $(sum(res7.w[res7.w .< zero(eltype(res7.w))]))")

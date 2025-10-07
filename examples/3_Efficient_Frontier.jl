@@ -69,7 +69,7 @@ We can now use `opt` to create the `MeanRisk` estimator. In order to get the ent
 =#
 
 mr = MeanRisk(; opt = opt, r = r)
-res1 = optimise!(mr)
+res1 = optimise(mr)
 
 #=
 Note that `retcode` and `sol` are now vectors. This is because there is one per point in the frontier. Since we didn't get any warnings that any optimisations failed we can proceed without checking the return codes. Regardless, lets check that all optimisations succeeded.

@@ -32,8 +32,9 @@ function assert_rc_variance(opt::Union{<:MeanRisk, <:FactorRiskContribution,
 end
 function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
     assert_rc_variance(opt)
-    @argcheck(!isa(opt.opt.lcs, LinearConstraint))
-    @argcheck(!isa(opt.opt.lcm, LinearConstraint))
+    @argcheck(!(isa(opt.opt.lcs, LinearConstraint) ||
+                isa(opt.opt.lcs, AbstractVector) &&
+                any(x -> isa(x, LinearConstraint), opt.opt.lcs)))
     @argcheck(!isa(opt.opt.cent, LinearConstraint))
     @argcheck(!isa(opt.opt.gcard, LinearConstraint))
     @argcheck(!isa(opt.opt.sgcard, LinearConstraint))
@@ -174,9 +175,9 @@ function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsEstimator,
     end
     return wb, retcode, w
 end
-function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
-                   dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
-                   save::Bool = true, kwargs...)
+function optimise(nco::NestedClustering, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  branchorder::Symbol = :optimal, str_names::Bool = false,
+                  save::Bool = true, kwargs...)
     pr = prior(nco.pe, rd; dims = dims)
     clr = clusterise(nco.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
@@ -192,8 +193,8 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
         else
             optic = opt_view(opti, cl, pr.X)
             rdc = returns_result_view(rd, cl)
-            res = optimise!(optic, rdc; dims = dims, branchorder = branchorder,
-                            str_names = str_names, save = save, kwargs...)
+            res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
+                           str_names = str_names, save = save, kwargs...)
             #! Support efficient frontier?
             @argcheck(!isa(res.retcode, AbstractVector))
             wi[cl, i] = res.w
@@ -203,8 +204,8 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
     X, F, ts, iv, ivpa = predict_outer_estimator_returns(nco, rd, pr, wi, resi; cls = cls)
     rdo = ReturnsResult(; nx = ["_$i" for i in 1:(clr.k)], X = X, nf = rd.nf, F = F,
                         ts = ts, iv = iv, ivpa = ivpa)
-    reso = optimise!(nco.opto, rdo; dims = dims, branchorder = branchorder,
-                     str_names = str_names, save = save, kwargs...)
+    reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
+                    str_names = str_names, save = save, kwargs...)
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.cwf, nco.strict,
                                                  resi, reso, wi * reso.w;
                                                  datatype = eltype(pr.X))
@@ -213,8 +214,8 @@ function optimise!(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
                                      w)
     else
         @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise!(nco.fallback, rd; dims = dims, branchorder = branchorder,
-                  str_names = str_names, save = save, kwargs...)
+        optimise(nco.fallback, rd; dims = dims, branchorder = branchorder,
+                 str_names = str_names, save = save, kwargs...)
     end
 end
 

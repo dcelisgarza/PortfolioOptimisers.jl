@@ -447,9 +447,9 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any,
     end
     return w, rkcl, fees
 end
-function optimise!(hec::HierarchicalEqualRiskContribution,
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                   branchorder::Symbol = :optimal, kwargs...)
+function optimise(hec::HierarchicalEqualRiskContribution,
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  branchorder::Symbol = :optimal, kwargs...)
     pr = prior(hec.opt.pe, rd; dims = dims)
     clr = clusterise(hec.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
@@ -495,7 +495,7 @@ function optimise!(hec::HierarchicalEqualRiskContribution,
         HierarchicalOptimisation(typeof(hec), pr, fees, wb, clr, retcode, w)
     else
         @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise!(hec.fallback, rd; dims = dims, kwargs...)
+        optimise(hec.fallback, rd; dims = dims, kwargs...)
     end
 end
 

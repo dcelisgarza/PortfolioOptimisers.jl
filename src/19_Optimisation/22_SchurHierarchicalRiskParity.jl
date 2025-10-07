@@ -245,8 +245,8 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::Weigh
     return schur_binary_search(objective, gammas[end - 1], gammas[end], risks[end - 1],
                                params.alg.tol, params.alg.iter, params.alg.strict)
 end
-function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+function optimise(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(sh.opt.pe, rd; dims = dims)
     clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.clustering.order]
@@ -258,11 +258,11 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
         SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gamma, retcode, w)
     else
         @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise!(sh.fallback, rd; dims = dims, kwargs...)
+        optimise(sh.fallback, rd; dims = dims, kwargs...)
     end
 end
-function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
-                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+function optimise(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(sh.opt.pe, rd; dims = dims)
     clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.clustering.order]
@@ -281,7 +281,7 @@ function optimise!(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
         SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gammas, retcode, w)
     else
         @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise!(sh.fallback, rd; dims = dims, kwargs...)
+        optimise(sh.fallback, rd; dims = dims, kwargs...)
     end
 end
 

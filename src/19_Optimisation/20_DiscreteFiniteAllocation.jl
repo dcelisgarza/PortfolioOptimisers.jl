@@ -81,10 +81,10 @@ function finite_sub_allocation(w::AbstractVector, p::AbstractVector, cash::Real,
         res
     end
 end
-function optimise!(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
-                   cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
-                   fees::Union{Nothing, <:Fees} = nothing; str_names::Bool = false,
-                   save::Bool = true, kwargs...)
+function optimise(da::DiscreteAllocation, w::AbstractVector, p::AbstractVector,
+                  cash::Real = 1e6, T::Union{Nothing, <:Real} = nothing,
+                  fees::Union{Nothing, <:Fees} = nothing; str_names::Bool = false,
+                  save::Bool = true, kwargs...)
     @argcheck(!isempty(w) && !isempty(p) && length(w) == length(p))
     @argcheck(cash > zero(cash))
     if !isnothing(fees)

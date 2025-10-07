@@ -31,14 +31,14 @@ function assert_external_optimiser(opt::InverseVolatility)
     assert_internal_optimiser(opt)
     return nothing
 end
-function optimise!(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
-                   dims::Int = 1, kwargs...)
+function optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  kwargs...)
     pr = prior(iv.pe, rd; dims = dims)
     w = inv.(sqrt.(diag(pr.sigma)))
     return NaiveOptimisation(typeof(iv), pr, w / sum(w), OptimisationSuccess(nothing))
 end
 struct EqualWeighted <: NaiveOptimisationEstimator end
-function optimise!(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
+function optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X))
     @argcheck(dims in (1, 2))
     dims = dims == 1 ? 2 : 1
@@ -56,7 +56,7 @@ end
 function RandomWeights(; rng::Union{Nothing, <:AbstractRNG} = nothing)
     return RandomWeights(rng)
 end
-function optimise!(rw::RandomWeights, rd::ReturnsResult; dims::Int = 1, kwargs...)
+function optimise(rw::RandomWeights, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X))
     @argcheck(dims in (1, 2))
     dims = dims == 1 ? 2 : 1

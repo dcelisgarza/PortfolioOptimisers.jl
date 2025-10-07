@@ -85,8 +85,8 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model,
     set_initial_w!(w1, wi)
     return b1, rr
 end
-function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
-                   dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+function optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
+                  dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, plg, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
                                                                                                                                               rd;
                                                                                                                                               dims = dims)
@@ -96,9 +96,8 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_maximum_ratio_factor_variables!(model, pr.mu, frc.obj)
     b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, frc.flag, frc.wi)
     set_weight_constraints!(model, wb, frc.opt.bgt, frc.opt.sbgt)
-    set_linear_weight_constraints!(model, lcs, :lcs_ineq, :lcs_eq)
-    set_linear_weight_constraints!(model, cent, :cent_ineq, :cent_eq)
-    set_linear_weight_constraints!(model, frc.opt.lcm, :lcm_ineq, :lcm_eq)
+    set_linear_weight_constraints!(model, lcs, :lcs_ineq_, :lcs_eq_)
+    set_linear_weight_constraints!(model, cent, :cent_ineq_, :cent_eq_)
     set_mip_constraints!(model, wb, frc.opt.card, gcard, plg, lt, st, fees, frc.opt.ss)
     set_smip_constraints!(model, wb, frc.opt.scard, sgcard, smtx, sgmtx, slt, sst, sglt,
                           sgst, frc.opt.ss)
@@ -131,8 +130,8 @@ function optimise!(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                                ifelse(save, model, nothing))
     else
         @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise!(frc.fallback, rd; dims = dims, str_names = str_names, save = save,
-                  kwargs...)
+        optimise(frc.fallback, rd; dims = dims, str_names = str_names, save = save,
+                 kwargs...)
     end
 end
 

@@ -203,7 +203,7 @@
         for r in rs, obj in objs, ret in rets
             opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
-            res = optimise!(mr, rd)
+            res = optimise(mr, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rtol = if i in
                       (4, 10, 22, 76, 86, 91, 92, 96, 97, 99, 101, 103, 105, 133, 135, 141,
@@ -240,12 +240,12 @@
                 opt1 = JuMPOptimiser(; pe = pr, slv = slv,
                                      ret = bounds_returns_estimator(ret, rt))
                 mr = MeanRisk(; r = r, opt = opt1)
-                res = optimise!(mr, rd)
+                res = optimise(mr, rd)
                 rt1 = expected_return(ret, res.w, pr)
                 @test rt1 >= rt || abs(rt1 - rt) < 1e-10
                 mr = MeanRisk(; r = bounds_risk_measure(r, rk), obj = MaximumReturn(),
                               opt = opt)
-                res = optimise!(mr, rd)
+                res = optimise(mr, rd)
                 rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
                 if !isa(r, SquareRootKurtosis) ||
                    isa(r, SquareRootKurtosis) && isnothing(r.N)
@@ -274,7 +274,7 @@
             r1 = RiskTrackingRiskMeasure(; tracking = tracking, r = r,
                                          alg = DependentVariableTracking())
             mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
-            res = optimise!(mr, rd)
+            res = optimise(mr, rd)
             if isa(r, PortfolioOptimisers.QuadExpressionRiskMeasures)
                 @test isa(res.retcode, OptimisationFailure)
                 i += 1
@@ -316,7 +316,7 @@
             r1 = RiskTrackingRiskMeasure(; tracking = tracking, r = r,
                                          alg = IndependentVariableTracking())
             mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
-            res = optimise!(mr, rd)
+            res = optimise(mr, rd)
             @test isa(res.retcode, OptimisationSuccess)
             rtol = if i in (16, 30)
                 1e-5
@@ -337,14 +337,14 @@
             i += 1
         end
 
-        res = optimise!(MeanRisk(; wi = w0,
-                                 opt = JuMPOptimiser(; pe = pr,
-                                                     slv = Solver(;
-                                                                  solver = Clarabel.Optimizer,
-                                                                  settings = ["verbose" => false,
-                                                                              "max_iter" => 1])),
-                                 fallback = InverseVolatility(; pe = pr)))
-        @test isapprox(res.w, optimise!(InverseVolatility(; pe = pr)).w)
+        res = optimise(MeanRisk(; wi = w0,
+                                opt = JuMPOptimiser(; pe = pr,
+                                                    slv = Solver(;
+                                                                 solver = Clarabel.Optimizer,
+                                                                 settings = ["verbose" => false,
+                                                                             "max_iter" => 1])),
+                                fallback = InverseVolatility(; pe = pr)))
+        @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
 
         r = BrownianDistanceVariance()
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskBDV.csv.gz"), DataFrame)
@@ -352,7 +352,7 @@
         for obj in objs, ret in rets
             opt = JuMPOptimiser(; pe = pr2, slv = slv, ret = ret)
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
-            res = optimise!(mr, rd2)
+            res = optimise(mr, rd2)
             @test isa(res.retcode, OptimisationSuccess)
             rtol = if i == 4
                 5e-6
@@ -373,24 +373,24 @@
     @testset "Formulations" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         r = factory(Variance(), pr)
-        res_min = optimise!(MeanRisk(; r = r, opt = opt))
-        res_max = optimise!(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
+        res_min = optimise(MeanRisk(; r = r, opt = opt))
+        res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
         rk_min = expected_risk(r, res_min.w, pr)
         rk_max = expected_risk(r, res_max.w, pr)
         rt_min = expected_return(ArithmeticReturn(), res_min.w, pr)
         rt_max = expected_return(ArithmeticReturn(), res_max.w, pr)
-        res1 = optimise!(MeanRisk(;
-                                  r = Variance(;
-                                               settings = RiskMeasureSettings(;
-                                                                              ub = Frontier(;
-                                                                                            N = 5))),
-                                  obj = MaximumReturn(), opt = opt))
-        res2 = optimise!(MeanRisk(;
-                                  r = Variance(; alg = QuadRiskExpr(),
-                                               settings = RiskMeasureSettings(;
-                                                                              ub = Frontier(;
-                                                                                            N = 5))),
-                                  obj = MaximumReturn(), opt = opt))
+        res1 = optimise(MeanRisk(;
+                                 r = Variance(;
+                                              settings = RiskMeasureSettings(;
+                                                                             ub = Frontier(;
+                                                                                           N = 5))),
+                                 obj = MaximumReturn(), opt = opt))
+        res2 = optimise(MeanRisk(;
+                                 r = Variance(; alg = QuadRiskExpr(),
+                                              settings = RiskMeasureSettings(;
+                                                                             ub = Frontier(;
+                                                                                           N = 5))),
+                                 obj = MaximumReturn(), opt = opt))
         res = isapprox(hcat(res1.w...), hcat(res2.w...); rtol = 5e-4)
         if !res
             println("Frontier formulation failed")
@@ -403,22 +403,22 @@
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
-        res3 = optimise!(MeanRisk(;
-                                  r = Variance(;
-                                               settings = RiskMeasureSettings(;
-                                                                              ub = range(;
-                                                                                         start = rk_min,
-                                                                                         stop = rk_max,
-                                                                                         length = 5))),
-                                  obj = MaximumReturn(), opt = opt))
-        res4 = optimise!(MeanRisk(;
-                                  r = Variance(; alg = QuadRiskExpr(),
-                                               settings = RiskMeasureSettings(;
-                                                                              ub = range(;
-                                                                                         start = rk_min,
-                                                                                         stop = rk_max,
-                                                                                         length = 5))),
-                                  obj = MaximumReturn(), opt = opt))
+        res3 = optimise(MeanRisk(;
+                                 r = Variance(;
+                                              settings = RiskMeasureSettings(;
+                                                                             ub = range(;
+                                                                                        start = rk_min,
+                                                                                        stop = rk_max,
+                                                                                        length = 5))),
+                                 obj = MaximumReturn(), opt = opt))
+        res4 = optimise(MeanRisk(;
+                                 r = Variance(; alg = QuadRiskExpr(),
+                                              settings = RiskMeasureSettings(;
+                                                                             ub = range(;
+                                                                                        start = rk_min,
+                                                                                        stop = rk_max,
+                                                                                        length = 5))),
+                                 obj = MaximumReturn(), opt = opt))
         res = isapprox(hcat(res3.w...), hcat(res4.w...); rtol = 1e-6)
         if !res
             println("Frontier formulation failed")
@@ -433,8 +433,8 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
-        res5 = optimise!(MeanRisk(; r = Variance(;), opt = opt))
-        res6 = optimise!(MeanRisk(; r = Variance(; alg = QuadRiskExpr()), opt = opt))
+        res5 = optimise(MeanRisk(; r = Variance(;), opt = opt))
+        res6 = optimise(MeanRisk(; r = Variance(; alg = QuadRiskExpr()), opt = opt))
         res = isapprox(hcat(res5.w...), hcat(res6.w...); rtol = 5e-4)
         if !res
             println("Frontier formulation failed")
@@ -451,8 +451,8 @@
                             ret = ArithmeticReturn(;
                                                    lb = range(; start = rt_min,
                                                               stop = rt_max, length = 5)))
-        res7 = optimise!(MeanRisk(; r = Variance(;), opt = opt))
-        res8 = optimise!(MeanRisk(; r = Variance(; alg = QuadRiskExpr()), opt = opt))
+        res7 = optimise(MeanRisk(; r = Variance(;), opt = opt))
+        res8 = optimise(MeanRisk(; r = Variance(; alg = QuadRiskExpr()), opt = opt))
         res = isapprox(hcat(res7.w...), hcat(res8.w...); rtol = 5e-4)
         if !res
             println("Frontier formulation failed")
@@ -471,30 +471,30 @@
                                                            alg = SecondCentralMoment(;
                                                                                      alg = QuadRiskExpr()))),
                     pr)
-        res_min = optimise!(MeanRisk(; r = r, opt = opt))
-        res_max = optimise!(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
+        res_min = optimise(MeanRisk(; r = r, opt = opt))
+        res_max = optimise(MeanRisk(; r = r, obj = MaximumReturn(), opt = opt))
         rk_min = expected_risk(r, res_min.w, pr)
         rk_max = expected_risk(r, res_max.w, pr)
         rt_min = expected_return(ArithmeticReturn(), res_min.w, pr)
         rt_max = expected_return(ArithmeticReturn(), res_max.w, pr)
-        res1 = optimise!(MeanRisk(;
-                                  r = LowOrderMoment(;
-                                                     settings = RiskMeasureSettings(;
-                                                                                    ub = Frontier(;
-                                                                                                  N = 5)),
-                                                     alg = LowOrderDeviation(;
-                                                                             alg = SecondCentralMoment(;
-                                                                                                       alg = QuadRiskExpr()))),
-                                  obj = MaximumReturn(), opt = opt))
-        res2 = optimise!(MeanRisk(;
-                                  r = LowOrderMoment(;
-                                                     settings = RiskMeasureSettings(;
-                                                                                    ub = Frontier(;
-                                                                                                  N = 5)),
-                                                     alg = LowOrderDeviation(;
-                                                                             alg = SecondCentralMoment(;
-                                                                                                       alg = RSOCRiskExpr()))),
-                                  obj = MaximumReturn(), opt = opt))
+        res1 = optimise(MeanRisk(;
+                                 r = LowOrderMoment(;
+                                                    settings = RiskMeasureSettings(;
+                                                                                   ub = Frontier(;
+                                                                                                 N = 5)),
+                                                    alg = LowOrderDeviation(;
+                                                                            alg = SecondCentralMoment(;
+                                                                                                      alg = QuadRiskExpr()))),
+                                 obj = MaximumReturn(), opt = opt))
+        res2 = optimise(MeanRisk(;
+                                 r = LowOrderMoment(;
+                                                    settings = RiskMeasureSettings(;
+                                                                                   ub = Frontier(;
+                                                                                                 N = 5)),
+                                                    alg = LowOrderDeviation(;
+                                                                            alg = SecondCentralMoment(;
+                                                                                                      alg = RSOCRiskExpr()))),
+                                 obj = MaximumReturn(), opt = opt))
         res = isapprox(hcat(res1.w...), hcat(res2.w...); rtol = 5e-3)
         if !res
             println("Frontier formulation failed")
@@ -507,28 +507,28 @@
         @test issorted(rts)
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
-        res3 = optimise!(MeanRisk(;
-                                  r = LowOrderMoment(;
-                                                     settings = RiskMeasureSettings(;
-                                                                                    ub = range(;
-                                                                                               start = rk_min,
-                                                                                               stop = rk_max,
-                                                                                               length = 5)),
-                                                     alg = LowOrderDeviation(;
-                                                                             alg = SecondCentralMoment(;
-                                                                                                       alg = QuadRiskExpr()))),
-                                  obj = MaximumReturn(), opt = opt))
-        res4 = optimise!(MeanRisk(;
-                                  r = LowOrderMoment(;
-                                                     settings = RiskMeasureSettings(;
-                                                                                    ub = range(;
-                                                                                               start = rk_min,
-                                                                                               stop = rk_max,
-                                                                                               length = 5)),
-                                                     alg = LowOrderDeviation(;
-                                                                             alg = SecondCentralMoment(;
-                                                                                                       alg = RSOCRiskExpr()))),
-                                  obj = MaximumReturn(), opt = opt))
+        res3 = optimise(MeanRisk(;
+                                 r = LowOrderMoment(;
+                                                    settings = RiskMeasureSettings(;
+                                                                                   ub = range(;
+                                                                                              start = rk_min,
+                                                                                              stop = rk_max,
+                                                                                              length = 5)),
+                                                    alg = LowOrderDeviation(;
+                                                                            alg = SecondCentralMoment(;
+                                                                                                      alg = QuadRiskExpr()))),
+                                 obj = MaximumReturn(), opt = opt))
+        res4 = optimise(MeanRisk(;
+                                 r = LowOrderMoment(;
+                                                    settings = RiskMeasureSettings(;
+                                                                                   ub = range(;
+                                                                                              start = rk_min,
+                                                                                              stop = rk_max,
+                                                                                              length = 5)),
+                                                    alg = LowOrderDeviation(;
+                                                                            alg = SecondCentralMoment(;
+                                                                                                      alg = RSOCRiskExpr()))),
+                                 obj = MaximumReturn(), opt = opt))
         res = isapprox(hcat(res3.w...), hcat(res4.w...); rtol = 5e-6)
         if !res
             println("Frontier formulation failed")
@@ -543,18 +543,18 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             ret = ArithmeticReturn(; lb = Frontier(; N = 5)))
-        res5 = optimise!(MeanRisk(;
-                                  r = LowOrderMoment(;
-                                                     alg = LowOrderDeviation(;
-                                                                             alg = SecondCentralMoment(;
-                                                                                                       alg = QuadRiskExpr()))),
-                                  opt = opt))
-        res6 = optimise!(MeanRisk(;
-                                  r = LowOrderMoment(;
-                                                     alg = LowOrderDeviation(;
-                                                                             alg = SecondCentralMoment(;
-                                                                                                       alg = RSOCRiskExpr()))),
-                                  opt = opt))
+        res5 = optimise(MeanRisk(;
+                                 r = LowOrderMoment(;
+                                                    alg = LowOrderDeviation(;
+                                                                            alg = SecondCentralMoment(;
+                                                                                                      alg = QuadRiskExpr()))),
+                                 opt = opt))
+        res6 = optimise(MeanRisk(;
+                                 r = LowOrderMoment(;
+                                                    alg = LowOrderDeviation(;
+                                                                            alg = SecondCentralMoment(;
+                                                                                                      alg = RSOCRiskExpr()))),
+                                 opt = opt))
         res = isapprox(hcat(res5.w...), hcat(res6.w...); rtol = 5e-3)
         if !res
             println("Frontier formulation failed")
@@ -571,18 +571,18 @@
                             ret = ArithmeticReturn(;
                                                    lb = range(; start = rt_min,
                                                               stop = rt_max, length = 5)))
-        res7 = optimise!(MeanRisk(;
-                                  r = LowOrderMoment(; settings = RiskMeasureSettings(;),
-                                                     alg = LowOrderDeviation(;
-                                                                             alg = SecondCentralMoment(;
-                                                                                                       alg = QuadRiskExpr()))),
-                                  opt = opt))
-        res8 = optimise!(MeanRisk(;
-                                  r = LowOrderMoment(; settings = RiskMeasureSettings(;),
-                                                     alg = LowOrderDeviation(;
-                                                                             alg = SecondCentralMoment(;
-                                                                                                       alg = RSOCRiskExpr()))),
-                                  opt = opt))
+        res7 = optimise(MeanRisk(;
+                                 r = LowOrderMoment(; settings = RiskMeasureSettings(;),
+                                                    alg = LowOrderDeviation(;
+                                                                            alg = SecondCentralMoment(;
+                                                                                                      alg = QuadRiskExpr()))),
+                                 opt = opt))
+        res8 = optimise(MeanRisk(;
+                                 r = LowOrderMoment(; settings = RiskMeasureSettings(;),
+                                                    alg = LowOrderDeviation(;
+                                                                            alg = SecondCentralMoment(;
+                                                                                                      alg = RSOCRiskExpr()))),
+                                 opt = opt))
         res = isapprox(hcat(res7.w...), hcat(res8.w...); rtol = 5e-3)
         if !res
             println("Frontier formulation failed")
@@ -596,44 +596,44 @@
         @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 
         opt = JuMPOptimiser(; pe = pr, slv = slv)
-        res9 = optimise!(MeanRisk(;
+        res9 = optimise(MeanRisk(;
+                                 r = ValueatRisk(;
+                                                 alg = DistributionValueatRisk(;
+                                                                               dist = Laplace())),
+                                 opt = opt))
+        res10 = optimise(MeanRisk(;
                                   r = ValueatRisk(;
                                                   alg = DistributionValueatRisk(;
-                                                                                dist = Laplace())),
+                                                                                dist = TDist(5)),),
                                   opt = opt))
-        res10 = optimise!(MeanRisk(;
-                                   r = ValueatRisk(;
-                                                   alg = DistributionValueatRisk(;
-                                                                                 dist = TDist(5)),),
-                                   opt = opt))
         @test isapprox(res9.w, res10.w; rtol = 5e-2)
 
-        res11 = optimise!(MeanRisk(;
-                                   r = ValueatRiskRange(;
-                                                        alg = DistributionValueatRisk(;
-                                                                                      dist = Laplace())),
-                                   opt = opt))
-        res12 = optimise!(MeanRisk(;
-                                   r = ValueatRiskRange(;
-                                                        alg = DistributionValueatRisk(;
-                                                                                      dist = TDist(5)),),
-                                   opt = opt))
+        res11 = optimise(MeanRisk(;
+                                  r = ValueatRiskRange(;
+                                                       alg = DistributionValueatRisk(;
+                                                                                     dist = Laplace())),
+                                  opt = opt))
+        res12 = optimise(MeanRisk(;
+                                  r = ValueatRiskRange(;
+                                                       alg = DistributionValueatRisk(;
+                                                                                     dist = TDist(5)),),
+                                  opt = opt))
         @test isapprox(res11.w, res12.w; rtol = 5e-4)
 
         opt = JuMPOptimiser(; pe = pr2, slv = slv)
         mr = MeanRisk(;
                       r = BrownianDistanceVariance(; algc = IneqBrownianDistanceVariance()),
                       opt = opt)
-        res1 = optimise!(mr)
+        res1 = optimise(mr)
 
         mr = MeanRisk(; r = BrownianDistanceVariance(; alg = RSOCRiskExpr()), opt = opt)
-        res2 = optimise!(mr)
+        res2 = optimise(mr)
 
         mr = MeanRisk(;
                       r = BrownianDistanceVariance(; alg = RSOCRiskExpr(),
                                                    algc = IneqBrownianDistanceVariance()),
                       opt = opt)
-        res3 = optimise!(mr)
+        res3 = optimise(mr)
         @test isapprox(res1.w,
                        CSV.read(joinpath(@__DIR__, "./assets/MeanRiskBDV.csv.gz"),
                                 DataFrame)[!, 1], rtol = 5e-4)
@@ -644,7 +644,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv)
         r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
         mr = MeanRisk(; r = r, opt = opt)
-        w1 = optimise!(mr, rd).w
+        w1 = optimise(mr, rd).w
         @test isapprox(w1,
                        [1.7074698994991376e-10, 8.433104973224101e-11,
                         1.9860067068611146e-9, 3.1027970850564853e-10, 0.09898828657505643,
@@ -658,18 +658,18 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sce = MaxScalariser())
         r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
         mr = MeanRisk(; r = r, opt = opt)
-        w2 = optimise!(mr, rd).w
+        w2 = optimise(mr, rd).w
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser(; gamma = 1e-3))
         r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
         mr = MeanRisk(; r = r, opt = opt)
-        w3 = optimise!(mr, rd).w
+        w3 = optimise(mr, rd).w
         @test isapprox(w3, w1, rtol = 5e-2)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, sce = LogSumExpScalariser(; gamma = 1e5))
         r = [StandardDeviation(), LowOrderMoment(; alg = MeanAbsoluteDeviation())]
         mr = MeanRisk(; r = r, opt = opt)
-        w4 = optimise!(mr, rd).w
+        w4 = optimise(mr, rd).w
         @test isapprox(w4, w2, rtol = 1e-4)
     end
     @testset "Arithmetic return uncertainty set" begin
@@ -687,7 +687,7 @@
                 ret = ArithmeticReturn(; ucs = ucs)
                 opt = JuMPOptimiser(; pe = pr, ret = ret, slv = slv)
                 mre = MeanRisk(; obj = obj, opt = opt)
-                res = optimise!(mre)
+                res = optimise(mre)
                 @test isa(res.retcode, OptimisationSuccess)
                 rtol = 1e-6
                 success = isapprox(res.w, df[!, i]; rtol = rtol)
@@ -708,7 +708,7 @@
                                                        ub = Dict("group1" => -0.1,
                                                                  "group2" => 1)))
         mr = MeanRisk(; opt = opt)
-        res1 = optimise!(mr)
+        res1 = optimise(mr)
         @test isapprox(sum(res1.w), 1)
         @test isapprox(sum(res1.w[res1.w .< zero(eltype(res1.w))]), -1)
         @test isapprox(sum(res1.w[res1.w .>= zero(eltype(res1.w))]), 2)
@@ -720,7 +720,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumReturn(), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(sum(res.w), 1)
         @test isapprox(sum(res.w[res.w .< zero(eltype(res.w))]), -1, rtol = 1e-6)
         @test isapprox(sum(res.w[res.w .>= zero(eltype(res.w))]), 2, rtol = 1e-6)
@@ -728,7 +728,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 0.15, bgt = 0.5,
                             wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(sum(res.w), 0.5)
         @test isapprox(sum(res.w[res.w .< zero(eltype(res.w))]), -0.15, rtol = 1e-4)
         @test isapprox(sum(res.w[res.w .>= zero(eltype(res.w))]), 0.65, rtol = 5e-5)
@@ -738,7 +738,7 @@
                             bgt = BudgetRange(; lb = 0.3, ub = 0.45),
                             wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test 0.1 <= sum(res.w) <= 0.45
         @test isapprox(sum(res.w[res.w .< zero(eltype(res.w))]), -0.15, rtol = 5e-5)
         @test 0.45 <= sum(res.w[res.w .>= zero(eltype(res.w))]) <= 0.60
@@ -746,7 +746,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = nothing, bgt = 1.7,
                             wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MinimumRisk(), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(sum(res.w), 1.7)
         @test all(res.w .>= 0)
         @test !haskey(res.model, :sbgt)
@@ -754,7 +754,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1.4, bgt = nothing,
                             wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(sum(res.w[res.w .< 0]), -1.4, rtol = 1e-3)
         @test !haskey(res.model, :bgt)
 
@@ -762,7 +762,7 @@
                             sbgt = BudgetRange(; lb = 0.41, ub = 0.63), bgt = 0.87,
                             wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(sum(res.w), 0.87)
         @test -0.63 <= sum(res.w[res.w .< zero(eltype(res.w))]) <= -0.41
         @test 0.87 + 0.41 <= sum(res.w[res.w .>= zero(eltype(res.w))]) <= 0.87 + 0.63
@@ -771,7 +771,7 @@
                             bgt = BudgetRange(; lb = 0.4, ub = 0.79),
                             wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumUtility(), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test 0.4 <= sum(res.w) <= 0.79
         @test isapprox(sum(res.w[res.w .< zero(eltype(res.w))]), -0.61, rtol = 5e-5)
         @test 0.61 + 0.4 <= sum(res.w[res.w .> zero(eltype(res.w))]) <= 0.61 + 0.79
@@ -780,7 +780,7 @@
                             sbgt = BudgetRange(; lb = 0.41, ub = 0.63), bgt = nothing,
                             wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test -0.63 <= sum(res.w[res.w .< zero(eltype(res.w))]) <= -0.41
         @test !haskey(res.model, :bgt)
 
@@ -788,7 +788,7 @@
                             bgt = BudgetRange(; lb = 0.4, ub = 0.79),
                             wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumUtility(), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test 0.4 <= sum(res.w) <= 0.79
         @test !haskey(res.model, :sbgt)
 
@@ -797,7 +797,7 @@
                             bgt = BudgetRange(; lb = 0.41, ub = nothing),
                             wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test sum(res.w) >= 0.41
         @test sum(res.w[res.w .< 0]) >= -0.23
         @test sum(res.w[res.w .>= 0]) >= 0.64
@@ -807,7 +807,7 @@
                             bgt = BudgetRange(; lb = nothing, ub = 0.65),
                             wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test sum(res.w) <= 0.41
         @test sum(res.w[res.w .< 0]) <= -0.35
         @test sum(res.w[res.w .>= 0]) <= 0.76
@@ -815,27 +815,27 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = nothing,
                             bgt = nothing, wb = WeightBounds(; lb = -1, ub = 1))
         mr = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test !haskey(res.model, :sbgt)
         @test !haskey(res.model, :lbgt)
     end
     @testset "Cardinality" begin
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, card = 3)
         mre = MeanRisk(; opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         w = res.w
         @test count(w .> 1e-10) <= 3
 
         opt = JuMPOptimiser(; l2 = 0.1, pe = pr, slv = mip_slv, card = 3)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         w = res.w
         @test count(w .> 1e-10) <= 3
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, wb = WeightBounds(; lb = -1, ub = 1),
                             sbgt = 1, bgt = 1, card = 7)
         mre = MeanRisk(; opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         w = res.w
         @test count(abs.(w) .> 1e-10) <= 7
 
@@ -845,7 +845,7 @@
                                                                      :(group2 == 5)]),
                             sets = sets)
         mre = MeanRisk(; opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         w = res.w
         @test rd.nx[.!iszero.(vec(res.gcard.A_ineq[1, :]))] == ["MRK", "WMT", "XOM"]
         @test rd.nx[.!iszero.(vec(res.gcard.A_eq[1, :]))] == rd.nx[2:2:end]
@@ -859,7 +859,7 @@
                                                                      :(group2 == 3)]),
                             sets = sets)
         mre = MeanRisk(; opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         w = res.w
         @test rd.nx[.!iszero.(vec(res.gcard.A_ineq[1, :]))] == ["MRK", "WMT", "XOM"]
         @test rd.nx[.!iszero.(vec(res.gcard.A_eq[1, :]))] == rd.nx[2:2:end]
@@ -870,7 +870,7 @@
                             smtx = AssetSetsMatrixEstimator(; val = "clusters1"),
                             sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
-        res = optimise!(mre, rd)
+        res = optimise(mre, rd)
         w = res.w
         @test sum(.!iszero.([sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)])) == 1
 
@@ -879,7 +879,7 @@
                             sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumRatio(; rf = rf),
                        opt = opt)
-        res = optimise!(mre, rd)
+        res = optimise(mre, rd)
         w = res.w
         @test sum(.!iszero.([sum(w[res.smtx[i, :]]) for i in axes(res.smtx, 1)])) == 2
 
@@ -888,7 +888,7 @@
                                     AssetSetsMatrixEstimator(; val = "clusters2")],
                             sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
-        res = optimise!(mre, rd)
+        res = optimise(mre, rd)
         w = res.w
 
         i = 1
@@ -906,7 +906,7 @@
                             smtx = AssetSetsMatrixEstimator(; val = "clusters3"),
                             sets = sets)
         mre = MeanRisk(; r = ConditionalValueatRisk(), obj = MinimumRisk(), opt = opt)
-        @test isapprox(res.w, optimise!(mre, rd).w)
+        @test isapprox(res.w, optimise(mre, rd).w)
     end
     @testset "Buy-in threshold" begin
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
@@ -915,27 +915,27 @@
                                                                 "group2" => 0.48]),
                             sets = sets)
         mre = MeanRisk(; opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         @test res.w[findfirst(x -> x == "WMT", rd.nx)] >= 0.23
         @test res.w[2:2:end][res.w[2:2:end] .> 1e-9][1] >= 0.48
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, lt = BuyInThreshold(; val = 0.15),
                             sets = sets)
         mre = MeanRisk(; opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         res.w[res.w .>= 1e-10] .>= 0.15
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
                             lt = BuyInThreshold(; val = fill(0.15, size(pr.X, 2))),
                             sets = sets)
         mre = MeanRisk(; opt = opt)
-        @test isapprox(res.w, optimise!(mre).w)
+        @test isapprox(res.w, optimise(mre).w)
 
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, wb = WeightBounds(; lb = -1, ub = 1),
                             sbgt = 1, bgt = 1, st = BuyInThreshold(; val = 0.25),
                             lt = BuyInThreshold(; val = 0.4), sets = sets)
         mre = MeanRisk(; opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)
         if Sys.isapple()
             @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<=
@@ -948,7 +948,7 @@
                             sbgt = 1, bgt = 1, st = BuyInThreshold(; val = 0.25),
                             lt = BuyInThreshold(; val = 0.4), sets = sets)
         mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         @test all(res.w[res.w .> 0][res.w[res.w .>= 0] .>= 1e-10] .>= 0.4)
         @test all(res.w[res.w .< 0][res.w[res.w .< 0] .<= -1e-10] .<= -0.25)
     end
@@ -961,7 +961,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), lcs = lcs)
         mr = MeanRisk(; obj = MinimumRisk(), opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test res.w[findfirst(x -> x == "AAPL", rd.nx)] >=
               0.2 * res.w[findfirst(x -> x == "MRK", rd.nx)]
         @test sum(res.w[[findfirst(x -> x == a, rd.nx) for a in sets.dict["group4"]]]) >=
@@ -971,13 +971,13 @@
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), lcs = res.lcs)
-        @test isapprox(res.w, optimise!(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
+        @test isapprox(res.w, optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
     end
     @testset "Regularisation" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), l1 = 5e-6)
         mr = MeanRisk(; opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(res.w,
                        [-0.08259934606632031, -0.01735523094219388, -6.306917873785564e-9,
                         -0.019964241234679967, 0.08433288155125772, 0.04082860469386889,
@@ -990,7 +990,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), l1 = 1)
         mr = MeanRisk(; opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(res.w,
                        [4.1633941065577117e-7, 2.6448742701527e-7, 4.477941406289695e-6,
                         4.854555411641452e-7, 0.07424358812530261, 0.00792596837274629,
@@ -1003,7 +1003,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), l2 = 5e-6)
         mr = MeanRisk(; opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(res.w,
                        [-0.11064349447254161, -0.017854196186798618, -0.04397298675384868,
                         -0.03145351033102496, 0.09495263689036014, 0.05053896454111151,
@@ -1016,7 +1016,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), l2 = 1e-4)
         mr = MeanRisk(; opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(res.w,
                        [-0.03076204518648503, -0.03965358415790933, 0.01741465312222848,
                         -0.014071169950968142, 0.08160008886554988, 0.038967358792986795,
@@ -1029,7 +1029,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), l1 = 5e-6, l2 = 5e-6)
         mr = MeanRisk(; opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(res.w,
                        [-0.07591829609679655, -0.019207462900668874, -4.164287783441495e-9,
                         -0.019697945739295775, 0.08623890830132815, 0.03970246984743602,
@@ -1042,7 +1042,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), l1 = 1, l2 = 1e-4)
         mr = MeanRisk(; opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(res.w,
                        [2.0232629822283223e-6, 9.760082045106613e-7, 0.0025796058703603294,
                         2.436499442593761e-6, 0.07216922707119579, 0.017185343248064092,
@@ -1056,7 +1056,7 @@
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), tn = Turnover(; w = w0))
         mr = MeanRisk(; opt = opt)
-        @test isapprox(w0, optimise!(mr).w)
+        @test isapprox(w0, optimise(mr).w)
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1),
@@ -1064,7 +1064,7 @@
                                                     val = ["AAPL" => 0, "MRK" => 0.05],
                                                     default = Inf)])
         mr = MeanRisk(; opt = opt)
-        res = optimise!(mr)
+        res = optimise(mr)
         @test isapprox(res.w,
                        [0.049999999999993605, -0.04520519208370696, -0.04869401288598486,
                         -0.04327195569636555, 0.11569334228575458, 0.0414229664404061,
@@ -1076,11 +1076,11 @@
     end
     @testset "Number of effective assets" begin
         opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 10)
-        res = optimise!(MeanRisk(; obj = MinimumRisk(), opt = opt))
+        res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
         @test round(inv(dot(res.w, res.w))) >= 10
 
         opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 15)
-        res = optimise!(MeanRisk(; obj = MaximumUtility(), opt = opt))
+        res = optimise(MeanRisk(; obj = MaximumUtility(), opt = opt))
         @test round(inv(dot(res.w, res.w))) >= 15
     end
     @testset "Tracking" begin
@@ -1092,7 +1092,7 @@
                                                tracking = ReturnsTracking(; w = vec(rdb.X)),
                                                err = 3e-3))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         @test norm(rd.X * res.w - vec(rdb.X)) / sqrt(size(rd.X, 1)) <= 3e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
@@ -1100,55 +1100,55 @@
                                                tracking = ReturnsTracking(; w = vec(rdb.X)),
                                                err = 2.5e-3, alg = NOCTracking()))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         @test norm(rd.X * res.w - vec(rdb.X), 1) / size(rd.X, 1) <= 2.5e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             te = TrackingError(; tracking = WeightsTracking(; w = w0),
                                                err = 2e-3))
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         @test norm(rd.X * (res.w - w0)) / sqrt(size(rd.X, 1)) <= 2e-3
 
         opt = JuMPOptimiser(; pe = pr, slv = slv,
                             te = [TrackingError(; tracking = WeightsTracking(; w = w0),
                                                 err = 2e-3, alg = NOCTracking())])
         mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         @test norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3
 
         tr = RiskTrackingError(; err = 0.0, tracking = WeightsTracking(; w = w0),
                                alg = DependentVariableTracking())
         opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
         mre = MeanRisk(; r = ConditionalValueatRisk(), opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         @test isapprox(res.w,
-                       optimise!(MeanRisk(; r = ConditionalValueatRisk(),
-                                          opt = JuMPOptimiser(; pe = pr, slv = slv))).w,
+                       optimise(MeanRisk(; r = ConditionalValueatRisk(),
+                                         opt = JuMPOptimiser(; pe = pr, slv = slv))).w,
                        rtol = 1e-6)
 
         tr = RiskTrackingError(; err = 0.5, tracking = WeightsTracking(; w = w0),
                                alg = IndependentVariableTracking())
         opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
         mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         @test isapprox(res.w,
-                       optimise!(MeanRisk(; obj = MaximumRatio(),
-                                          opt = JuMPOptimiser(; pe = pr, slv = slv))).w,
+                       optimise(MeanRisk(; obj = MaximumRatio(),
+                                         opt = JuMPOptimiser(; pe = pr, slv = slv))).w,
                        rtol = 5e-4)
 
         tr = RiskTrackingError(; err = 0, tracking = WeightsTracking(; w = w0),
                                alg = IndependentVariableTracking())
         opt = JuMPOptimiser(; pe = pr, slv = slv, te = tr)
         mre = MeanRisk(; obj = MaximumRatio(), opt = opt)
-        res = optimise!(mre)
+        res = optimise(mre)
         @test isapprox(res.w, w0, rtol = 1e-6)
     end
     @testset "Phylogeny" begin
         plc = IntegerPhylogenyEstimator(; pe = NetworkEstimator(), B = 1)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.001)
-        res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
+        res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
         @test all(value.(res.plg.A * res.model[:ib]) .<= res.plg.B)
         idx = [BitVector(res.plg.A[:, i]) for i in axes(res.plg.A, 2)]
         @test all([(count(abs.(getindex(res.w, i)) .> 1e-10) <= 1) for i in idx])
@@ -1166,7 +1166,7 @@
         plc = IntegerPhylogenyEstimator(; pe = NetworkEstimator(), B = 2)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.0001)
-        res = optimise!(MeanRisk(; obj = MinimumRisk(), opt = opt))
+        res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
         @test all(value.(res.plg.A * res.model[:ib]) .<= res.plg.B)
         idx = [BitVector(res.plg.A[:, i]) for i in axes(res.plg.A, 2)]
         @test all([(count(abs.(getindex(res.w, i)) .> 1e-10) <= 2) for i in idx])
@@ -1199,26 +1199,26 @@
         plc = SemiDefinitePhylogenyEstimator(; pe = clr)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
-        res = optimise!(MeanRisk(; obj = MinimumRisk(), opt = opt))
+        res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
         @test isapprox(value.(res.plg.A .* res.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
 
         plc = SemiDefinitePhylogenyEstimator(; pe = ClusteringEstimator(), p = 1000)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
-        @test isapprox(res.w, optimise!(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
+        @test isapprox(res.w, optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
 
         plc = phylogeny_constraints(SemiDefinitePhylogenyEstimator(; pe = clr, p = 10),
                                     rd.X)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
-        @test isapprox(res.w, optimise!(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
+        @test isapprox(res.w, optimise(MeanRisk(; obj = MinimumRisk(), opt = opt)).w)
 
         plc = SemiDefinitePhylogenyEstimator(; pe = clr)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
-        res1 = optimise!(MeanRisk(; r = ConditionalValueatRisk(),
-                                  obj = MaximumRatio(; rf = rf), opt = opt))
+        res1 = optimise(MeanRisk(; r = ConditionalValueatRisk(),
+                                 obj = MaximumRatio(; rf = rf), opt = opt))
         @test isapprox(value.(res1.plg.A .* res1.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
         @test isapprox(res1.w,
@@ -1233,8 +1233,8 @@
         plc = SemiDefinitePhylogenyEstimator(; pe = clr, p = 5)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
-        res2 = optimise!(MeanRisk(; r = ConditionalValueatRisk(),
-                                  obj = MaximumRatio(; rf = rf), opt = opt))
+        res2 = optimise(MeanRisk(; r = ConditionalValueatRisk(),
+                                 obj = MaximumRatio(; rf = rf), opt = opt))
         @test isapprox(value.(res2.plg.A .* res2.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
         @test !isapprox(res1.w, res2.w; rtol = 0.25)
@@ -1251,8 +1251,8 @@
         plc = SemiDefinitePhylogenyEstimator(; pe = clr)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
-        res1 = optimise!(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),
-                                  opt = opt))
+        res1 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),
+                                 opt = opt))
         @test isapprox(value.(res1.plg.A .* res1.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
         @test isapprox(res1.w,
@@ -1268,8 +1268,8 @@
         plc = SemiDefinitePhylogenyEstimator(; pe = clr, p = 5)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, plg = plc,
                             wb = WeightBounds(; lb = -1, ub = 1))
-        res2 = optimise!(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),
-                                  opt = opt))
+        res2 = optimise(MeanRisk(; r = ConditionalValueatRisk(), obj = MaximumUtility(),
+                                 opt = opt))
         @test isapprox(value.(res2.plg.A .* res2.model[:W]), zeros(size(pr.sigma)),
                        atol = 1e-10)
         @test isapprox(res2.w,
@@ -1298,54 +1298,54 @@
                                     A = CentralityEstimator(; cent = RadialityCentrality()),
                                     B = 0.63, comp = EQ())]
 
-        res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
-                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
-                                                     bgt = 1, cent = ces[1],
-                                                     wb = WeightBounds(; lb = -1, ub = 1))))
+        res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,
+                                                    cent = ces[1],
+                                                    wb = WeightBounds(; lb = -1, ub = 1))))
         @test average_centrality(ces[1].A, res.w, pr.X) >=
               minimum(centrality_vector(ces[1].A, pr.X).X)
 
-        res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
-                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
-                                                     bgt = 1, cent = ces[2],
-                                                     wb = WeightBounds(; lb = -1, ub = 1))))
+        res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,
+                                                    cent = ces[2],
+                                                    wb = WeightBounds(; lb = -1, ub = 1))))
         @test average_centrality(ces[2].A, res.w, pr.X) <=
               mean(centrality_vector(ces[2].A, pr.X).X)
 
-        res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
-                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
-                                                     bgt = 1, cent = ces[3],
-                                                     wb = WeightBounds(; lb = -1, ub = 1))))
+        res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,
+                                                    cent = ces[3],
+                                                    wb = WeightBounds(; lb = -1, ub = 1))))
         @test isapprox(average_centrality(ces[3].A, res.w, pr.X),
                        median(centrality_vector(ces[3].A, pr.X).X))
 
-        res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
-                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
-                                                     bgt = 1, cent = ces[4],
-                                                     wb = WeightBounds(; lb = -1, ub = 1))))
+        res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,
+                                                    cent = ces[4],
+                                                    wb = WeightBounds(; lb = -1, ub = 1))))
         @test isapprox(average_centrality(ces[4].A, res.w, pr.X),
                        maximum(centrality_vector(ces[4].A, pr.X).X))
 
-        res = optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
-                                 opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
-                                                     bgt = 1, cent = ces[5],
-                                                     wb = WeightBounds(; lb = -1, ub = 1))))
+        res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1, bgt = 1,
+                                                    cent = ces[5],
+                                                    wb = WeightBounds(; lb = -1, ub = 1))))
         @test isapprox(average_centrality(ces[5].A, res.w, pr.X), 0.63)
 
         @test isapprox(res.w,
-                       optimise!(MeanRisk(; obj = MaximumRatio(; rf = rf),
-                                          opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                              sbgt = 1, bgt = 1,
-                                                              cent = centrality_constraints(ces[5],
-                                                                                            pr.X),
-                                                              wb = WeightBounds(; lb = -1,
-                                                                                ub = 1)))).w)
+                       optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                         opt = JuMPOptimiser(; pe = pr, slv = slv, sbgt = 1,
+                                                             bgt = 1,
+                                                             cent = centrality_constraints(ces[5],
+                                                                                           pr.X),
+                                                             wb = WeightBounds(; lb = -1,
+                                                                               ub = 1)))).w)
     end
     @testset "Fees" begin
         r = ConditionalDrawdownatRisk()
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1))
-        w1 = optimise!(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)).w
+        w1 = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)).w
 
         fees = FeesEstimator(;
                              tn = TurnoverEstimator(; w = w0,
@@ -1354,7 +1354,7 @@
                              fl = ["HD" => 0.016 / 252], fs = "PFE" => 0.03 / 252)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), fees = fees, sets = sets)
-        res = optimise!(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+        res = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
         @test isapprox(res.w,
                        [-0.09154878925123214, -0.000997603027571535, -0.10856305089134274,
                         -0.08390917925486328, 0.039259568394976366, -0.02505835967729264,
@@ -1367,15 +1367,14 @@
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1),
                             fees = fees_constraints(fees, sets))
-        @test isapprox(res.w,
-                       optimise!(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)).w)
+        @test isapprox(res.w, optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)).w)
 
         fees = FeesEstimator(; tn = TurnoverEstimator(; w = w0, val = Dict("XOM" => 1)),
                              l = Dict("JNJ" => 1), s = "BBY" => 1, fl = ["HD" => 1],
                              fs = "PFE" => 1)
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1,
                             wb = WeightBounds(; lb = -1, ub = 1), fees = fees, sets = sets)
-        res = optimise!(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+        res = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
         @test isapprox(res.w[findfirst(x -> x == "XOM", rd.nx)],
                        w0[findfirst(x -> x == "XOM", rd.nx)])
         @test isapprox(res.w[findfirst(x -> x == "JNJ", rd.nx)], 0)
@@ -1392,7 +1391,7 @@
 
         fees = FeesEstimator(; fl = ["JNJ" => 1])
         opt = JuMPOptimiser(; pe = pr, slv = mip_slv, bgt = 1, fees = fees, sets = sets)
-        res = optimise!(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
+        res = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
         @test isapprox(res.w[findfirst(x -> x == "JNJ", rd.nx)], 0)
         @test isapprox(res.w,
                        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.0, 0.0, 0.0,
@@ -1408,7 +1407,7 @@
         r = Variance(; rc = lcs)
         obj = MaximumRatio()
         mr = MeanRisk(; obj = obj, opt = opt, r = r)
-        res = optimise!(mr)
+        res = optimise(mr)
         rkc = risk_contribution(factory(r, pr, slv), res.w, pr)
         rkc = rkc / sum(rkc)
         @test all(rkc .- 0.2 .- 20 * sqrt(eps()) .< 0)
@@ -1449,11 +1448,11 @@
                                 Union{<:ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
                                       <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                          <:MIPValueatRisk}})
-                optimise!(MeanRisk(; r = r1, opt = mip_opt)),
-                optimise!(MeanRisk(; r = r2, opt = mip_opt))
+                optimise(MeanRisk(; r = r1, opt = mip_opt)),
+                optimise(MeanRisk(; r = r2, opt = mip_opt))
             else
-                optimise!(MeanRisk(; r = r1, opt = opt)),
-                optimise!(MeanRisk(; r = r2, opt = opt))
+                optimise(MeanRisk(; r = r1, opt = opt)),
+                optimise(MeanRisk(; r = r2, opt = opt))
             end
             rtol = if i ∈ (2, 7)
                 5e-5

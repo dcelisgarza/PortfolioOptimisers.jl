@@ -129,8 +129,8 @@ Note the number of options in the estimator. In particular the `alg` property. W
 Lets optimise the portfolios.
 =#
 
-res1 = optimise!(opt1)
-res2 = optimise!(opt2)
+res1 = optimise(opt1)
+res2 = optimise(opt2)
 
 #=
 In order to allow for multiple risk measures in optimisations, certain measures can take different parameters. In this case, `NegativeSkewness` and `SquareRootKurtosis` take the moment matrices, which are used to compute the risk measures. We can use the `factory` function to create a new risk measure with the same parameters as the original, but with the moment matrices from the prior. Other risk measures require a solver, and this function is also used in those cases.
@@ -183,7 +183,7 @@ opt3 = NearOptimalCentering(; r = [r1, r2], obj = MaximumReturn(), opt = opt)
 See how `r` is a vector of risk measures with populated properties. We can now optimise the porftolios.
 =#
 
-res3 = optimise!(opt3)
+res3 = optimise(opt3)
 
 #=
 As expected, there are `5 × 5 = 25` solutions. Thankfully there are no warnings about failed optimisations, so there is no need to check the solutions.
