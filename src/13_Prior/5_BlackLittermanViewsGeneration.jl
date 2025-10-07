@@ -89,7 +89,7 @@ julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"]));
 
 julia> lcs = parse_equation(["A + B == 0.05", "C == 0.02"]);
 
-julia> get_black_litterman_views(lcs, sets)
+julia> PortfolioOptimisers.get_black_litterman_views(lcs, sets)
 BlackLittermanViews
   P | 2×3 Matrix{Float64}
   Q | Vector{Float64}: [0.05, 0.02]
