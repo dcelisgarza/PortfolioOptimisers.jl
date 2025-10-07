@@ -91,7 +91,7 @@ julia> lcs = parse_equation(["A + B == 0.05", "C == 0.02"]);
 
 julia> PortfolioOptimisers.get_black_litterman_views(lcs, sets)
 BlackLittermanViews
-  P | 2×3 Matrix{Float64}
+  P | 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
   Q | Vector{Float64}: [0.05, 0.02]
 ```
 
