@@ -107,15 +107,45 @@ function factory(pe::BlackLittermanPrior, w::Union{Nothing, <:AbstractWeights} =
                                sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
                                tau = pe.tau)
 end
+"""
+```julia
+calc_omega(views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}}, P::AbstractMatrix,
+           sigma::AbstractMatrix)
+```
+
+Compute the Black-Litterman view uncertainty matrix `Ω`.
+
+This method constructs the view uncertainty matrix `Ω` for the Black-Litterman model when no explicit view confidences are provided (`views_conf = nothing`). The uncertainty for each view is set to the variance of the projected prior covariance, i.e., `Ω = diag(P * Σ * P')`, where `P` is the view matrix and `Σ` is the prior covariance matrix.
+
+# Arguments
+
+  - `views_conf`:
+
+      + `::Nothing`: Indicates no view confidence is specified, `Diagonal(P * sigma * transpose(P))`.
+      + `::Real`: Scalar confidence level applied uniformly to all views, `(1/v - 1) * Diagonal(P * sigma * transpose(P))`, where `v` is the view confidence level.
+      + `::AbstractVector{<:Real}`: Vector of confidence levels for each view, `(1 ./ v - 1) * Diag(P * Σ * P')`.
+
+  - `P::AbstractMatrix`: The view matrix (views × assets).
+  - `sigma::AbstractMatrix`: The prior covariance matrix (assets × assets).
+
+# Returns
+
+  - `omega::Diagonal`: Diagonal matrix of view uncertainties.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+  - [`calc_omega`](@ref)
+"""
 function calc_omega(::Nothing, P::AbstractMatrix, sigma::AbstractMatrix)
     return Diagonal(P * sigma * transpose(P))
 end
-function calc_omega(views_conf::AbstractVector, P::AbstractMatrix, sigma::AbstractMatrix)
-    alphas = inv.(views_conf) .- one(eltype(views_conf))
-    return Diagonal(alphas .* P * sigma * transpose(P))
-end
 function calc_omega(views_conf::Real, P::AbstractMatrix, sigma::AbstractMatrix)
     alphas = inv(views_conf) - one(eltype(views_conf))
+    return Diagonal(alphas .* P * sigma * transpose(P))
+end
+function calc_omega(views_conf::AbstractVector, P::AbstractMatrix, sigma::AbstractMatrix)
+    alphas = inv.(views_conf) .- one(eltype(views_conf))
     return Diagonal(alphas .* P * sigma * transpose(P))
 end
 function vanilla_posteriors(tau::Real, rf::Real, prior_mu::AbstractVector,

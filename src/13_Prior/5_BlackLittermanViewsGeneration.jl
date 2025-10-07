@@ -231,15 +231,18 @@ Validate Black-Litterman view confidence specification.
 
 # Validation
 
-  - `views_conf::Nothing`, no-op.
+  - `views_conf`:
 
-  - `views_conf::Real`, `0 < views_conf < 1`.
-  - `views_conf::AbstractVector{<:Real}`, `all(x -> 0 < x < 1, views_conf)`, and must have the same length as the number of views.
+      + `::Nothing`, no-op.
+      + `::Real`, `0 < views_conf < 1`.
+      + `::AbstractVector{<:Real}`, `all(x -> 0 < x < 1, views_conf)`, and must have the same length as the number of views.
 
-      + `views::Union{<:AbstractString, Expr}`, `length(views_conf) == 1`.
-      + `views::AbstractVector{<:Union{<:AbstractString, Expr}}`, `length(views_conf) == length(views)`.
-      + `views::LinearConstraintEstimator`, calls `assert_bl_views_conf(views_conf, views.val)`.
-      + `views::BlackLittermanViews`, `length(views_conf) == length(views.Q)`.
+  - `views`:
+
+      + `::Union{<:AbstractString, Expr}`, `length(views_conf) == 1`.
+      + `::AbstractVector{<:Union{<:AbstractString, Expr}}`, `length(views_conf) == length(views)`.
+      + `::LinearConstraintEstimator`, calls `assert_bl_views_conf(views_conf, views.val)`.
+      + `::BlackLittermanViews`, `length(views_conf) == length(views.Q)`.
 
 # Related
 

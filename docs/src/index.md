@@ -73,6 +73,7 @@ fmt2 = (v, i, j) -> begin
         return isa(v, Number) ? "$(round(v*100, digits=3)) %" : v
     end
 end;
+nothing # hide
 ````
 
 We will now download the prices.
@@ -151,14 +152,20 @@ Finally, lets plot some results.
 ````@example 0_index
 # Plot the portfolio cumulative returns of the finite allocation portfolio.
 plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
+````
 
+````@example 0_index
 # Plot the risk contribution per asset.
 plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
                        percentage = true)
+````
 
+````@example 0_index
 # Plot histogram of returns.
 plot_histogram(mip_res.w, rd.X, slv)
+````
 
+````@example 0_index
 # Plot compounded drawdowns.
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
 ````

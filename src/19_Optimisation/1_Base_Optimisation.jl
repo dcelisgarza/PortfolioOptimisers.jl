@@ -46,7 +46,7 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
     res = nothing
     while true
         res = _optimise(current_opt, args...; kwargs...)
-        if isa(res.retcode, OptimisationSuccess) || isnothing(opt.fallback)
+        if isa(res.retcode, OptimisationSuccess) || isnothing(current_opt.fallback)
             break
         else
             push!(attempts, (current_opt, res))
