@@ -216,8 +216,8 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     end
     return retcodes, sols
 end
-function optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  str_names::Bool = false, save::Bool = true, kwargs...)
+function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, plg, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
                                                                                                                                               rd;
                                                                                                                                               dims = dims)
@@ -245,17 +245,17 @@ function optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int =
     add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
     retcode, sol = solve_mean_risk!(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), fees)
-    return if isa(retcode, OptimisationSuccess) || isnothing(mr.fallback)
-        JuMPOptimisation(typeof(mr),
-                         ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent, gcard,
-                                                          sgcard, smtx, sgmtx, slt, sst,
-                                                          sglt, sgst, plg, tn, fees, ret),
-                         retcode, sol, ifelse(save, model, nothing))
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise(mr.fallback, rd; dims = dims, str_names = str_names, save = save,
-                 kwargs...)
-    end
+    return JuMPOptimisation(typeof(mr),
+                            ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs, cent,
+                                                             gcard, sgcard, smtx, sgmtx,
+                                                             slt, sst, sglt, sgst, plg, tn,
+                                                             fees, ret), retcode, sol,
+                            ifelse(save, model, nothing), nothing)
+end
+function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  str_names::Bool = false, save::Bool = true, kwargs...)
+    return _optimise(mr, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
 export MeanRisk

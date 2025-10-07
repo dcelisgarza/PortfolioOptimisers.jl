@@ -114,8 +114,8 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
 end
-function optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  str_names::Bool = false, save::Bool = true, kwargs...)
+function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                   str_names::Bool = false, save::Bool = true, kwargs...)
     (; pr, wb, lt, st, lcs, cent, gcard, sgcard, smtx, slt, sst, sgmtx, sglt, sgst, plg, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
                                                                                                                                               rd;
                                                                                                                                               dims = dims)
@@ -141,19 +141,20 @@ function optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::
     add_custom_constraint!(model, rb.opt.ccnt, rb, pr)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
-    return if isa(retcode, OptimisationSuccess) || isnothing(rb.fallback)
-        JuMPOptimisationRiskBudgeting(typeof(rb),
-                                      ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcs,
-                                                                       cent, gcard, sgcard,
-                                                                       smtx, sgmtx, slt,
-                                                                       sst, sglt, sgst, plg,
-                                                                       tn, fees, ret), prb,
-                                      retcode, sol, ifelse(save, model, nothing))
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise(rb.fallback, rd; dims = dims, str_names = str_names, save = save,
-                 kwargs...)
-    end
+    return JuMPOptimisationRiskBudgeting(typeof(rb),
+                                         ProcessedJuMPOptimiserAttributes(pr, wb, lt, st,
+                                                                          lcs, cent, gcard,
+                                                                          sgcard, smtx,
+                                                                          sgmtx, slt, sst,
+                                                                          sglt, sgst, plg,
+                                                                          tn, fees, ret),
+                                         prb, retcode, sol, ifelse(save, model, nothing),
+                                         nothing)
+end
+function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  str_names::Bool = false, save::Bool = true, kwargs...)
+    return _optimise(rb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
 export AssetRiskBudgeting, FactorRiskBudgeting, RiskBudgeting

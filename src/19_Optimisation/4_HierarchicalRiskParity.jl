@@ -45,8 +45,8 @@ function split_factor_weight_constraints(alpha::Real, wb::WeightBounds, w::Abstr
     return one(alpha) -
            min(sum(view(ub, rc)) / wrc, max(sum(view(lb, rc)) / wrc, one(alpha) - alpha))
 end
-function optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     r = factory(hrp.r, pr, hrp.opt.slv)
@@ -81,12 +81,7 @@ function optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
         end
     end
     retcode, w = clustering_optimisation_result(hrp.opt.cwf, wb, w / sum(w))
-    return if isa(retcode, OptimisationSuccess) || isnothing(hrp.fallback)
-        HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise(hrp.fallback, rd; dims = dims, kwargs...)
-    end
+    return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w, nothing)
 end
 function hrp_scalarised_risk(::SumScalariser, wu::AbstractMatrix, wk::AbstractVector,
                              rku::AbstractVector, lc::AbstractVector, rc::AbstractVector,
@@ -151,9 +146,9 @@ function hrp_scalarised_risk(sce::LogSumExpScalariser, wu::AbstractMatrix,
     end
     return logsumexp(lrisk) / sce.gamma, logsumexp(rrisk) / sce.gamma
 end
-function optimise(hrp::HierarchicalRiskParity{<:Any,
-                                              <:AbstractVector{<:OptimisationRiskMeasure}},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+function _optimise(hrp::HierarchicalRiskParity{<:Any,
+                                               <:AbstractVector{<:OptimisationRiskMeasure}},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     clr = clusterise(hrp.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     r = factory(hrp.r, pr, hrp.opt.slv)
@@ -183,12 +178,11 @@ function optimise(hrp::HierarchicalRiskParity{<:Any,
         end
     end
     retcode, w = clustering_optimisation_result(hrp.opt.cwf, wb, w / sum(w))
-    return if isa(retcode, OptimisationSuccess) || isnothing(hrp.fallback)
-        HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w)
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise(hrp.fallback, rd; dims = dims, kwargs...)
-    end
+    return HierarchicalOptimisation(typeof(hrp), pr, fees, wb, clr, retcode, w, nothing)
+end
+function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    return _optimise(hrp, rd; dims = dims, kwargs...)
 end
 
 export HierarchicalRiskParity
