@@ -1,3 +1,60 @@
+"""
+```julia
+struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorEstimator_AF
+    pe::T1
+    mp::T2
+    views::T3
+    sets::T4
+    views_conf::T5
+    rf::T6
+    tau::T7
+end
+```
+
+Black-Litterman prior estimator for asset returns.
+
+`BlackLittermanPrior` is a low order prior estimator that computes the mean and covariance of asset returns using the Black-Litterman model. It combines a prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and a blending parameter `tau`. The estimator supports both direct and constraint-based views, and allows for flexible confidence specification and matrix processing.
+
+# Fields
+
+  - `pe`: Prior estimator.
+  - `mp`: Matrix post-processing estimator.
+  - `views`: Views estimator or views object.
+  - `sets`: Asset sets.
+  - `views_conf`: View confidence(s).
+  - `rf`: Risk-free rate.
+  - `tau`: Blending parameter.
+
+# Constructor
+
+```julia
+BlackLittermanPrior(;
+                    pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
+                                                                               me = EquilibriumExpectedReturns()),
+                    mp::AbstractMatrixProcessingEstimator = DefaultMatrixProcessing(),
+                    views::Union{<:LinearConstraintEstimator, <:BlackLittermanViews},
+                    sets::Union{Nothing, <:AssetSets} = nothing,
+                    views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}} = nothing,
+                    rf::Real = 0.0, tau::Union{Nothing, <:Real} = nothing)
+```
+
+Keyword arguments correspond to the fields above.
+
+## Validation
+
+  - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
+  - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
+  - If `tau` is not `nothing`, `tau > 0`.
+
+# Related
+
+  - [`AbstractLowOrderPriorEstimator_AF`](@ref)
+  - [`EmpiricalPrior`](@ref)
+  - [`BlackLittermanViews`](@ref)
+  - [`AssetSets`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`prior`](@ref)
+"""
 struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorEstimator_AF
     pe::T1
     mp::T2

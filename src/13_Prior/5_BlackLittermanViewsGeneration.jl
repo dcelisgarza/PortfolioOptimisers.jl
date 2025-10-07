@@ -207,6 +207,44 @@ function black_litterman_views(lcs::LinearConstraintEstimator, sets::AssetSets;
                                datatype::DataType = Float64, strict::Bool = false)
     return black_litterman_views(lcs.val, sets; datatype = datatype, strict = strict)
 end
+"""
+```julia
+assert_bl_views_conf(::Nothing, args...)
+assert_bl_views_conf(views_conf::Union{Nothing, <:Real, <:AbstractVector{<:Real}},
+                     views::Union{<:AbstractString, Expr,
+                                  <:AbstractVector{<:Union{<:AbstractString, Expr}},
+                                  <:LinearConstraintEstimator, <:BlackLittermanViews})
+```
+
+Validate Black-Litterman view confidence specification.
+
+`assert_bl_views_conf` checks that the view confidence parameter(s) provided for Black-Litterman prior construction are valid. It supports scalar and vector confidence values, and works with views specified as equations, constraint estimators, or canonical views objects. The function enforces that confidence values are strictly between 0 and 1, and that the number of confidence values matches the number of views when a vector is provided.
+
+# Arguments
+
+  - `views_conf`: Scalar or vector of confidence values.
+  - `views`: Black-Litterman views, which may be equations.
+
+# Returns
+
+  - `nothing`: Returns nothing if validation passes; throws an error otherwise.
+
+# Validation
+
+  - `views_conf::Nothing`, no-op.
+
+  - `views_conf::Real`, `0 < views_conf < 1`.
+  - `views_conf::AbstractVector{<:Real}`, `all(x -> 0 < x < 1, views_conf)`, and must have the same length as the number of views.
+
+      + `views::Union{<:AbstractString, Expr}`, `length(views_conf) == 1`.
+      + `views::AbstractVector{<:Union{<:AbstractString, Expr}}`, `length(views_conf) == length(views)`.
+      + `views::LinearConstraintEstimator`, calls `assert_bl_views_conf(views_conf, views.val)`.
+      + `views::BlackLittermanViews`, `length(views_conf) == length(views.Q)`.
+
+# Related
+
+  - [`BlackLittermanViews`](@ref)
+"""
 function assert_bl_views_conf(::Nothing, args...)
     return nothing
 end
@@ -221,6 +259,8 @@ function assert_bl_views_conf(views_conf::AbstractVector{<:Real},
                                          <:AbstractVector{<:Union{<:AbstractString, Expr}}})
     if isa(val, AbstractVector)
         @argcheck(length(val) == length(views_conf))
+    else
+        @argcheck(length(views_conf) == 1)
     end
     @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
