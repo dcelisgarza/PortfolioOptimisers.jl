@@ -1,4 +1,4 @@
-struct NestedClusteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
+struct NestedClusteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <:
        OptimisationResult
     oe::T1
     pr::T2
@@ -9,8 +9,12 @@ struct NestedClusteringOptimisation{T1, T2, T3, T4, T5, T6, T7, T8, T9} <:
     cv::T7
     retcode::T8
     w::T9
+    attempts::T10
 end
-
+function opt_attempt_factory(res::NestedClusteringOptimisation, attempts)
+    return NestedClusteringOptimisation(res.oe, res.pr, res.wb, res.clr, res.resi, res.reso,
+                                        res.cv, res.retcode, res.w, attempts)
+end
 function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
     @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
     return nothing
@@ -175,9 +179,9 @@ function nested_clustering_finaliser(wb::Union{Nothing, <:WeightBoundsEstimator,
     end
     return wb, retcode, w
 end
-function optimise(nco::NestedClustering, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
-                  branchorder::Symbol = :optimal, str_names::Bool = false,
-                  save::Bool = true, kwargs...)
+function _optimise(nco::NestedClustering, rd::ReturnsResult = ReturnsResult();
+                   dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+                   save::Bool = true, kwargs...)
     pr = prior(nco.pe, rd; dims = dims)
     clr = clusterise(nco.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder)
@@ -209,14 +213,16 @@ function optimise(nco::NestedClustering, rd::ReturnsResult = ReturnsResult(); di
     wb, retcode, w = nested_clustering_finaliser(nco.wb, nco.sets, nco.cwf, nco.strict,
                                                  resi, reso, wi * reso.w;
                                                  datatype = eltype(pr.X))
-    return if isa(retcode, OptimisationSuccess) || isnothing(nco.fallback)
-        NestedClusteringOptimisation(typeof(nco), pr, wb, clr, resi, reso, nco.cv, retcode,
-                                     w)
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise(nco.fallback, rd; dims = dims, branchorder = branchorder,
-                 str_names = str_names, save = save, kwargs...)
-    end
+    return NestedClusteringOptimisation(typeof(nco), pr, wb, clr, resi, reso, nco.cv,
+                                        retcode, w, nothing)
+end
+function optimise(nco::NestedClustering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                        <:Any, <:Any, <:Any, Nothing},
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  branchorder::Symbol = :optimal, str_names::Bool = false,
+                  save::Bool = true, kwargs...)
+    return _optimise(nco, rd; dims = dims, branchorder = branchorder, str_names = str_names,
+                     save = save, kwargs...)
 end
 
 export NestedClusteringOptimisation, NestedClustering

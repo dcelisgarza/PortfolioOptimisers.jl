@@ -1,4 +1,4 @@
-struct SchurHierarchicalRiskParityOptimisation{T1, T2, T3, T4, T5, T6, T7} <:
+struct SchurHierarchicalRiskParityOptimisation{T1, T2, T3, T4, T5, T6, T7, T8} <:
        OptimisationResult
     oe::T1
     pr::T2
@@ -7,6 +7,7 @@ struct SchurHierarchicalRiskParityOptimisation{T1, T2, T3, T4, T5, T6, T7} <:
     gamma::T5
     retcode::T6
     w::T7
+    fallback::T8
 end
 abstract type SchurAlgorithm <: AbstractAlgorithm end
 struct NonMonotonicSchur <: SchurAlgorithm end
@@ -245,8 +246,8 @@ function schur_weights(pr::AbstractPriorResult, items::AbstractVector, wb::Weigh
     return schur_binary_search(objective, gammas[end - 1], gammas[end], risks[end - 1],
                                params.alg.tol, params.alg.iter, params.alg.strict)
 end
-function optimise(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+function _optimise(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(sh.opt.pe, rd; dims = dims)
     clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.clustering.order]
@@ -254,15 +255,11 @@ function optimise(sh::SchurHierarchicalRiskParity{<:Any, <:Any},
                                    strict = sh.opt.strict, datatype = eltype(pr.X))
     w, gamma = schur_weights(pr, items, wb, sh.params)
     retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w)
-    return if isa(retcode, OptimisationSuccess) || isnothing(sh.fallback)
-        SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gamma, retcode, w)
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise(sh.fallback, rd; dims = dims, kwargs...)
-    end
+    return SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gamma, retcode,
+                                                   w, nothing)
 end
-function optimise(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+function _optimise(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
+                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     pr = prior(sh.opt.pe, rd; dims = dims)
     clr = clusterise(sh.opt.cle, pr.X; iv = rd.iv, ivpa = rd.ivpa, dims = dims)
     items = [clr.clustering.order]
@@ -277,12 +274,12 @@ function optimise(sh::SchurHierarchicalRiskParity{<:Any, <:AbstractVector},
         gammas[i] = gamma
     end
     retcode, w = clustering_optimisation_result(sh.opt.cwf, wb, w / sum(w))
-    return if isa(retcode, OptimisationSuccess) || isnothing(sh.fallback)
-        SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gammas, retcode, w)
-    else
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        optimise(sh.fallback, rd; dims = dims, kwargs...)
-    end
+    return SchurHierarchicalRiskParityOptimisation(typeof(sh), pr, wb, clr, gammas, retcode,
+                                                   w, nothing)
+end
+function optimise(sh::SchurHierarchicalRiskParity{<:Any, <:Any, Nothing},
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    return _optimise(sh, rd; dims = dims, kwargs...)
 end
 
 export SchurHierarchicalRiskParityOptimisation, SchurParams, SchurHierarchicalRiskParity,

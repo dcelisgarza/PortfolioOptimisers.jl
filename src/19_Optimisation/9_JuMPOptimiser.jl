@@ -27,14 +27,18 @@ end
 struct ProcessedAssetRiskBudgetingAttributes{T1} <: AbstractResult
     rkb::T1
 end
-struct JuMPOptimisation{T1, T2, T3, T4, T5} <: OptimisationResult
+struct JuMPOptimisation{T1, T2, T3, T4, T5, T6} <: OptimisationResult
     oe::T1
     pa::T2
     retcode::T3
     sol::T4
     model::T5
+    attempts::T6
 end
-struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
+function opt_attempt_factory(res::JuMPOptimisation, attempts)
+    return JuMPOptimisation(res.oe, res.pa, res.retcode, res.sol, res.model, attempts)
+end
+struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7, T8} <:
        OptimisationResult
     oe::T1
     pa::T2
@@ -43,14 +47,24 @@ struct JuMPOptimisationFactorRiskContribution{T1, T2, T3, T4, T5, T6, T7} <:
     retcode::T5
     sol::T6
     model::T7
+    attempts::T8
 end
-struct JuMPOptimisationRiskBudgeting{T1, T2, T3, T4, T5, T6} <: OptimisationResult
+function opt_attempt_factory(res::JuMPOptimisationFactorRiskContribution, attempts)
+    return JuMPOptimisationFactorRiskContribution(res.oe, res.pa, res.rr, res.frc_plg,
+                                                  res.retcode, res.sol, res.model, attempts)
+end
+struct JuMPOptimisationRiskBudgeting{T1, T2, T3, T4, T5, T6, T7} <: OptimisationResult
     oe::T1
     pa::T2
     prb::T3
     retcode::T4
     sol::T5
     model::T6
+    attempts::T7
+end
+function opt_attempt_factory(res::JuMPOptimisationRiskBudgeting, attempts)
+    return JuMPOptimisationRiskBudgeting(res.oe, res.pa, res.prb, res.retcode, res.sol,
+                                         res.model, attempts)
 end
 function Base.getproperty(r::JuMPOptimisation, sym::Symbol)
     return if sym == :w
