@@ -78,6 +78,10 @@ FactorPrior
 # Related
 
   - [`AbstractLowOrderPriorEstimator_F`](@ref)
+  - [`AbstractLowOrderPriorEstimator_A_AF`](@ref)
+  - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`AbstractRegressionEstimator`](@ref)
+  - [`AbstractVarianceEstimator`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`StepwiseRegression`](@ref)
   - [`SimpleVariance`](@ref)

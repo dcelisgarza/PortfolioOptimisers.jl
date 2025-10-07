@@ -360,11 +360,6 @@ HighOrderPriorEstimator(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalP
 
 Keyword arguments correspond to the fields above.
 
-## Validation
-
-  - All estimators must be valid and subtype the appropriate abstract types.
-  - If provided, `kte` and `ske` must be compatible with the input data.
-
 # Examples
 
 ```jldoctest
@@ -411,10 +406,13 @@ HighOrderPriorEstimator
 # Related
 
   - [`AbstractHighOrderPriorEstimator`](@ref)
+  - [`AbstractLowOrderPriorEstimator_A_F_AF`](@ref)
   - [`HighOrderPrior`](@ref)
   - [`EmpiricalPrior`](@ref)
   - [`CokurtosisEstimator`](@ref)
   - [`CoskewnessEstimator`](@ref)
+  - [`Cokurtosis`](@ref)
+  - [`Coskewness`](@ref)
   - [`prior`](@ref)
 """
 struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
@@ -458,7 +456,7 @@ Compute high order prior moments for asset returns using a composite estimator.
 
 # Arguments
 
-  - `pe`: High order prior estimator (`HighOrderPriorEstimator`).
+  - `pe`: High order prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Optional factor returns matrix (observations × factors).
   - `dims`: Dimension along which to compute moments.
@@ -476,9 +474,6 @@ Compute high order prior moments for asset returns using a composite estimator.
 
   - [`HighOrderPriorEstimator`](@ref)
   - [`HighOrderPrior`](@ref)
-  - [`EmpiricalPrior`](@ref)
-  - [`CokurtosisEstimator`](@ref)
-  - [`CoskewnessEstimator`](@ref)
   - [`prior`](@ref)
 """
 function prior(pe::HighOrderPriorEstimator, X::AbstractMatrix,
