@@ -13,8 +13,10 @@ EntropyPoolingPrior
 PortfolioOptimisers.AbstractEntropyPoolingOptimiser
 PortfolioOptimisers.AbstractEntropyPoolingAlgorithm
 PortfolioOptimisers.AbstractEntropyPoolingOptAlgorithm
-PortfolioOptimisers.replace_prior_views
 PortfolioOptimisers.get_epw
 PortfolioOptimisers.add_ep_constraint!
+PortfolioOptimisers.replace_prior_views
 PortfolioOptimisers.entropy_pooling
+PortfolioOptimisers.ep_cvar_views_solve!
+PortfolioOptimisers.get_pr_value
 ```

@@ -246,7 +246,7 @@ struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimise
 end
 ```
 
-Optim.jl-based entropy pooling optimiser.
+[`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)-based entropy pooling optimiser.
 
 `OptimEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptimiser`](@ref) that uses [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) to solve entropy pooling problems. This optimiser supports both logarithmic and exponential entropy pooling objectives, and allows for flexible configuration of solver arguments, scaling parameters, and algorithm selection.
 
@@ -327,7 +327,7 @@ struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
 end
 ```
 
-JuMP.jl-based entropy pooling optimiser.
+[`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)-based entropy pooling optimiser.
 
 `JuMPEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptimiser`](@ref) that uses [JuMP.jl](https://github.com/jump-dev/JuMP.jl) to solve entropy pooling problems. This optimiser supports both logarithmic and exponential entropy pooling objectives, and allows for flexible configuration of solver arguments, scaling parameters, and algorithm selection.
 
@@ -337,7 +337,7 @@ JuMP.jl-based entropy pooling optimiser.
   - `sc1`: Scaling parameter for the objective function.
   - `sc2`: Scaling parameter for constraint penalties.
   - `so`: Scaling parameter for the objective expression.
-  - `alg`: Entropy pooling optimisation algorithm (`LogEntropyPooling` or `ExpEntropyPooling`).
+  - `alg`: Entropy pooling optimisation algorithm.
 
 # Constructor
 
@@ -381,7 +381,7 @@ JuMPEntropyPooling
   - [`OptimEntropyPooling`](@ref)
   - [`CVaREntropyPooling`](@ref)
   - [`EntropyPoolingPrior`](@ref)
-  - [JuMP.jl](https://github.com/jump-dev/JuMP.jl)
+  - [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)
 """
 struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
     slv::T1
@@ -704,7 +704,7 @@ Replace prior references in view parsing results with their corresponding prior 
 # Arguments
 
   - `res`: Parsed view constraint containing variables and coefficients.
-  - `pr`: Prior result object containing prior values (mean, variance, etc.).
+  - `pr`: Prior result object containing prior values.
   - `sets`: Asset set mapping asset names to indices.
   - `key`: Moment type key (`:mu`, `:var`, `:cvar`, etc.).
   - `alpha`: Optional confidence level for VaR/CVaR views.
@@ -766,7 +766,29 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
     return ParsingResult(variables_new, coeffs_new, res.op, rhs, "$(eqn) $(res.op) $(rhs)")
 end
 """
-broadcasted version of replace_prior_views for vectors of parsing results (multiple views).
+```julia
+replace_prior_views(res::AbstractVector{<:ParsingResult}, args...; kwargs...)
+```
+
+Broadcast prior reference replacement across multiple view constraints.
+
+`replace_prior_views` applies [`replace_prior_views`](@ref) to each element of a vector of parsed view constraints, replacing prior references with their corresponding prior values. This enables efficient batch processing of multiple view constraints in entropy pooling routines.
+
+# Arguments
+
+  - `res:`: Vector of parsed view constraints.
+  - `args...`: Additional positional arguments forwarded to [`replace_prior_views`](@ref).
+  - `kwargs...`: Additional keyword arguments forwarded to [`replace_prior_views`](@ref).
+
+# Returns
+
+  - `res::Vector{<:ParsingResult}`: Vector of updated parsing results with prior references replaced by their values.
+
+# Related
+
+  - [`ParsingResult`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`AssetSets`](@ref)
 """
 function replace_prior_views(res::AbstractVector{<:ParsingResult}, args...; kwargs...)
     return replace_prior_views.(res, args...; kwargs...)
@@ -1080,9 +1102,6 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
         throw(ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     end
 end
-"""
-Solve the primal of the entropy pooling logarithmic formulation using JuMP.jl.
-"""
 function entropy_pooling(w::AbstractVector, epc::AbstractDict,
                          opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
                                                  <:LogEntropyPooling})
@@ -1135,16 +1154,25 @@ function entropy_pooling(w::AbstractVector, epc::AbstractDict,
         throw(ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     end
 end
+"""
+Solve entropy pooling views without cvar views, this is for api compatibility.
+"""
 function ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Real,
                               w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
                               ::Any, ::Any; kwargs...)
     return entropy_pooling(w, epc, opt)
 end
+"""
+get prior value for cvar views
+"""
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:cvar}, alpha::Real)
     #! Don't use a view, use a copy, value at risk uses partialsort!
     #! Including pr.w needs the counterpart in ep_var_views! to be implemented.
     return ConditionalValueatRisk(; alpha = alpha)(pr.X[:, i])
 end
+"""
+solve the entropy pooling problem with cvar views
+"""
 function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
                               pr::AbstractPriorResult, sets::AssetSets, alpha::Real,
                               w::AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
@@ -1255,8 +1283,42 @@ function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::AbstractVe
     end
     return nothing
 end
-
 """
+```julia
+replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets;
+                    strict::Bool = false)
+```
+
+Replace correlation prior references in view parsing results with their corresponding prior values.
+
+`replace_prior_views` scans a parsed correlation view constraint (`ParsingResult`) for references to prior values (e.g., `prior(A, B)`), and replaces them with the actual prior correlation value from the provided prior result object. This ensures that prior-based terms in correlation view constraints are treated as constants and not as variables in the optimisation. If an asset referenced in a prior is not found in the asset set, a warning is issued (or an error if `strict=true`). If all variables in the view are prior references, an error is thrown.
+
+# Arguments
+
+  - `res`: Parsed correlation view constraint containing variables and coefficients.
+  - `pr`: Prior result object containing prior correlation values.
+  - `sets`: Asset set mapping asset names to indices.
+  - `strict`: If `true`, throw errors for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `res::RhoParsingResult`: Updated parsing result with prior references replaced by their values and correlation indices.
+
+# Details
+
+  - Prior references are matched using the pattern `prior(<asset1>, <asset2>)`.
+  - The right-hand side of the constraint is adjusted by subtracting the prior correlation value times its coefficient.
+  - Variables corresponding to prior references are removed from the constraint.
+  - Throws an error if no non-prior variables remain.
+  - Returns a `RhoParsingResult` containing the updated variables, coefficients, operator, right-hand side, equation string, and correlation indices.
+
+# Related
+
+  - [`ParsingResult`](@ref)
+  - [`RhoParsingResult`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`AssetSets`](@ref)
+  - [`prior`](@ref)
 """
 function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets;
                              strict::Bool = false)
