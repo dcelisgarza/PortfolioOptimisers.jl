@@ -950,7 +950,7 @@ A new array with the same shape as `A`, but with a concrete element type inferre
 julia> A = Any[1, 2.0, 3];
 
 julia> PortfolioOptimisers.concrete_typed_array(A)
-3-element reshape(::Vector{Union{Float64, Int64}}, 3) with eltype Union{Float64, Int64}:
+3-element Vector{Union{Float64, Int64}}:
  1
  2.0
  3

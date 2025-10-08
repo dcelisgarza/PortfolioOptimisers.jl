@@ -101,13 +101,6 @@ Logarithmic entropy pooling optimisation algorithm.
 
 `LogEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptAlgorithm`](@ref) representing the logarithmic entropy pooling optimisation algorithm. This algorithm solves for posterior probabilities by minimising the Kullback-Leibler divergence between the prior and posterior weights, subject to moment and view constraints, using a logarithmic objective.
 
-# Examples
-
-```jldoctest
-julia> entropy_pooling(w0, epc, opt)
-w0 = pweights([0.25, 0.25, 0.25, 0.25])
-```
-
 # Related
 
   - [`AbstractEntropyPoolingOptAlgorithm`](@ref)
@@ -124,13 +117,6 @@ struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 Exponential entropy pooling optimisation algorithm.
 
 `ExpEntropyPooling` is a concrete subtype of [`AbstractEntropyPoolingOptAlgorithm`](@ref) representing the exponential entropy pooling optimisation algorithm. This algorithm solves for posterior probabilities by minimising the exponential divergence between the prior and posterior weights, subject to moment and view constraints, using an exponential objective.
-
-# Examples
-
-```jldoctest
-julia> entropy_pooling(w0, epc, opt)
-w0 = pweights([0.25, 0.25, 0.25, 0.25])
-```
 
 # Related
 

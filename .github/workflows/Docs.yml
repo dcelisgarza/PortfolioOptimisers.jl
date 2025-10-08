@@ -45,13 +45,6 @@ jobs:
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
-      - name: Run doctest
-        run: |
-          julia --project=docs -e '
-            using Documenter: DocMeta, doctest
-            using PortfolioOptimisers
-            DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers); recursive=true)
-            doctest(PortfolioOptimisers)'
       - name: Generate and deploy documentation
         run: julia --project=docs docs/make.jl
         env:
@@ -59,3 +52,26 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
           GKSwstype: "100" # https://discourse.julialang.org/t/generation-of-documentation-fails-qt-qpa-xcb-could-not-connect-to-display/60988
+  doctest:
+    name: Doctests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1"
+      - name: Use Julia cache
+        uses: julia-actions/cache@v2
+      - name: Instantiate environment with development version of the package
+        run: |
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+      - name: Run doctest
+        run: |
+          julia --project=docs -e '
+            using Documenter: DocMeta, doctest
+            using PortfolioOptimisers
+            DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers); recursive=true)
+            doctest(PortfolioOptimisers)'

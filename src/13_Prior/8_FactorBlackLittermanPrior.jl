@@ -66,12 +66,12 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-FactorBlackLittermanPrior(;
-                          sets = AssetSets(; key = "nx",
-                                           dict = Dict("nx" => ["A", "B", "C"])),
-                          views = LinearConstraintEstimator(;
-                                                            val = ["A == 0.03",
-                                                                   "B + C == 0.04"]))
+julia> FactorBlackLittermanPrior(;
+                                 sets = AssetSets(; key = "nx",
+                                                  dict = Dict("nx" => ["A", "B", "C"])),
+                                 views = LinearConstraintEstimator(;
+                                                                   val = ["A == 0.03",
+                                                                          "B + C == 0.04"]))
 FactorBlackLittermanPrior
           pe | EmpiricalPrior
              |        ce | PortfolioOptimisersCovariance
@@ -124,7 +124,7 @@ FactorBlackLittermanPrior
           rf | Float64: 0.0
            l | nothing
          tau | nothing
-         rsd | Bool: true                                                                   
+         rsd | Bool: true
 ```
 
 # Related
@@ -210,8 +210,8 @@ function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
 end
 """
 ```julia
-prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix;
-      dims::Int = 1, strict::Bool = false, kwargs...)
+prior(pe::FactorBlackLittermanPrior, X::AbstractMatrix, F::AbstractMatrix; dims::Int = 1,
+      strict::Bool = false, kwargs...)
 ```
 
 Compute factor Black-Litterman prior moments for asset returns.
